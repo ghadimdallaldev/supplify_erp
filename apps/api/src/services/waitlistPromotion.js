@@ -2,8 +2,12 @@ import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { isFeatureEnabled } from '../lib/subscription.js'
 import { config } from '../config/env.js'
-import { sendMail } from './mailer.service.js'
+import { sendTemplateEmail } from './email/email.service.js'
 import { buildWhatsAppUrl } from '../lib/whatsapp.js'
+import {
+  getRestaurantSlotAvailability,
+  assertSlotBookable,
+} from '../lib/reservation-availability.js'
 
 const OFFER_DURATION_HOURS = 2
 
@@ -19,6 +23,11 @@ export function buildWaitlistOfferUrls(offerToken) {
     acceptUrl: `${base}${path}/accept`,
     declineUrl: `${base}${path}/decline`,
   }
+}
+
+export function buildReservationManageUrl(publicToken) {
+  const base = buildOfferBaseUrl()
+  return `${base}/reserve/manage/${publicToken}`
 }
 
 async function fetchRestaurantName(restaurantId) {
@@ -45,8 +54,16 @@ export async function notifyGuestWaitlistOffer(waitlistEntry, restaurantName) {
 
   if (customerEmail) {
     try {
-      await sendMail({ to: customerEmail, subject: title, text: message })
-      results.email = true
+      const result = await sendTemplateEmail({
+        to: customerEmail,
+        template: 'reservation.waitlist_offer',
+        subject: title,
+        data: { message, title, tenantName: venue, ctaUrl: acceptUrl, ctaLabel: 'Accept table' },
+        eventType: 'reservation.waitlist_offer',
+        eventKey: `waitlist:offer:${waitlistEntry.id}:${waitlistEntry.offer_token}`,
+        entityId: waitlistEntry.id,
+      })
+      results.email = Boolean(result.sent || result.logOnly || result.preview)
     } catch (error) {
       logger.error('Waitlist offer email failed', { error: error.message })
     }
@@ -242,6 +259,18 @@ export async function acceptWaitlistOffer(token) {
 
     const scheduledAt = entry.preferred_time || new Date().toISOString()
 
+    const { rows: ohRows } = await client.query(
+      `SELECT operating_hours FROM restaurant WHERE id = $1`,
+      [entry.restaurant_id]
+    )
+    const availability = await getRestaurantSlotAvailability(client.query.bind(client), {
+      restaurantId: entry.restaurant_id,
+      dateInput: scheduledAt,
+      partySize: entry.party_size,
+      operatingHours: ohRows[0]?.operating_hours,
+    })
+    assertSlotBookable(availability, scheduledAt, entry.party_size)
+
     const { rows: reservationRows } = await client.query(
       `
         INSERT INTO reservation (
@@ -290,7 +319,13 @@ export async function acceptWaitlistOffer(token) {
       [entry.id]
     )
 
-    return { reservation, waitlist: waitlistRows[0] }
+    const manageToken = reservation.public_token
+    return {
+      reservation,
+      waitlist: waitlistRows[0],
+      manageToken,
+      manageUrl: buildReservationManageUrl(manageToken),
+    }
   })
 }
 

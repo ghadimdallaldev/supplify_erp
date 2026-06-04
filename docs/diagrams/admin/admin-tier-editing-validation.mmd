@@ -1,0 +1,19 @@
+%% Admin plan CRUD validation when editing tiers
+%% Status: current | Related: apps/api/src/lib/plan-admin-validation.js
+flowchart TD
+  Admin[Admin Plans tab] --> POST[POST/PATCH admin-dashboard/plans]
+  POST --> Validate[validatePlanLimitsAndFeatures]
+  Validate --> Keys{Canonical limit + feature keys only?}
+  Keys -->|unknown key| Reject[400 validation error]
+  Keys --> Removed{approvals_budgets enabled?}
+  Removed -->|yes| Reject
+  Keys --> Applicable{Restaurant-only keys on supplier?}
+  Applicable -->|invalid| Reject
+  Validate --> Scalar{limits: int >= 0 or -1 unlimited}
+  Scalar -->|invalid| Reject
+  Validate --> Ladder[Optional tier ladder warnings\nSilver < Gold < Platinum]
+  OK[Persist subscription_plan] --> SubChange[PATCH subscription/:id]
+  SubChange --> Preview[POST preview-change\nwillExceed + featureDiff]
+  Preview --> Force{force + reason?}
+  Force -->|no & exceeds| Block[400 LIMIT_EXCEEDED]
+  Force -->|yes| Apply[Update plan / pending_plan]

@@ -9,8 +9,23 @@ const RESTAURANT_ID = '33333333-3333-3333-3333-333333333333'
 const TIME_ENTRY_ID = '44444444-4444-4444-4444-444444444444'
 
 const queryMock = vi.fn()
+const handleReservationCancelledMock = vi.fn().mockResolvedValue(null)
+
 vi.mock('../lib/db.js', () => ({
   query: (...args) => queryMock(...args),
+}))
+vi.mock('../services/waitlistPromotion.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    handleReservationCancelled: (...args) => handleReservationCancelledMock(...args),
+  }
+})
+vi.mock('../services/notification.service.js', () => ({
+  notifyReservationCreated: vi.fn().mockResolvedValue(null),
+  notifyReservationWaitlist: vi.fn().mockResolvedValue(null),
+  notifyGuestReservationConfirmation: vi.fn().mockResolvedValue(null),
+  notifyReservationStaffEvent: vi.fn().mockResolvedValue(null),
 }))
 vi.mock('../lib/logger.js', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
@@ -263,5 +278,62 @@ describe('public.routes – staff portal time entries', () => {
       expect(res.body.data.clockOutAt).toBe(clockOutAt)
       expect(res.body.data.clockOutMethod).toBe('portal')
     })
+  })
+})
+
+const RESERVATION_PUBLIC_TOKEN = '99999999-9999-9999-9999-999999999999'
+
+describe('POST /api/public/reservations/manage/cancel', () => {
+  let app
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handleReservationCancelledMock.mockResolvedValue(null)
+    app = express()
+    app.use(express.json())
+    app.use((req, res, next) => {
+      req.requestId = 'test-request'
+      next()
+    })
+    app.use('/api/public', publicRoutes)
+  })
+
+  it('sets cancellation metadata and triggers waitlist promotion', async () => {
+    const cancelled = {
+      id: 'res-cancel-1',
+      status: 'CANCELLED',
+      restaurant_id: RESTAURANT_ID,
+      party_size: 4,
+      cancelled_at: new Date().toISOString(),
+      cancellation_reason: 'Guest cancelled',
+    }
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'res-cancel-1',
+            status: 'CONFIRMED',
+            public_token: RESERVATION_PUBLIC_TOKEN,
+            restaurant_id: RESTAURANT_ID,
+            party_size: 4,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [cancelled] })
+
+    const res = await request(app)
+      .post('/api/public/reservations/manage/cancel')
+      .send({ token: RESERVATION_PUBLIC_TOKEN })
+      .expect(200)
+
+    expect(res.body.ok).toBe(true)
+    expect(res.body.data.reservation.cancellation_reason).toBe('Guest cancelled')
+    expect(handleReservationCancelledMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'res-cancel-1' }),
+      { cancellationReason: 'Guest cancelled' }
+    )
+    const updateSql = String(queryMock.mock.calls[1][0])
+    expect(updateSql).toContain('cancelled_at')
+    expect(updateSql).toContain('cancellation_reason')
   })
 })

@@ -1,0 +1,15 @@
+%% Subscription admin + entitlements (tiers: free trial, silver $49, gold $149, platinum $349; bronze → silver)
+flowchart TB
+  Tenant[Tenant / org billing tenant] --> GetEntitlements[GET /subscriptions/entitlements]
+  GetEntitlements --> Plan[Plan + limits + overrides + add-ons + usage]
+  GetEntitlements --> Trial[free_sandbox_expires_at when plan free]
+  Admin[Admin] --> Preview[POST .../preview-change]
+  Preview --> WillExceed[willExceed, featureDiff]
+  Admin --> PATCH[PATCH .../subscriptions/:id]
+  PATCH --> Check{Usage vs target plan?}
+  Check -->|exceeds & !force| Block[400 LIMIT_EXCEEDED]
+  Check -->|ok or force+reason| Update[Update subscription]
+  PATCH --> ApplyAtEnd[applyAtPeriodEnd?\npending_plan_id, pending_effective_at]
+  Update --> ChangeLog[subscription_change_log]
+  GetEntitlements --> ApplyPending{pending_effective_at <= now?}
+  ApplyPending -->|yes| ApplyPlan[Apply pending plan]

@@ -15,6 +15,7 @@ import type {
   StaffPerformanceNote,
   StaffPayrollExport,
 } from '../types'
+import { normalizeListResponse } from '../lib/apiError'
 
 interface CreateStaffMemberInput {
   firstName: string
@@ -146,12 +147,20 @@ interface CreatePayrollExportInput {
   exportUrl?: string
 }
 
+/** Shared RTK cache defaults for staff list queries (reduces repeat middleware hits on tab switch). */
+const staffQueryCache = {
+  keepUnusedDataFor: 300,
+  refetchOnFocus: false,
+  refetchOnMountOrArgChange: false,
+} as const
+
 export const staffApi = api.injectEndpoints({
   endpoints: (build) => ({
     getStaffMembers: build.query<StaffMember[], void>({
       query: () => ({
         url: '/api/staff/members',
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffMember>(response),
       providesTags: (result) =>
         result
           ? [
@@ -159,6 +168,7 @@ export const staffApi = api.injectEndpoints({
               { type: 'StaffMember' as const, id: 'LIST' },
             ]
           : [{ type: 'StaffMember' as const, id: 'LIST' }],
+      ...staffQueryCache,
     }),
     createStaffMember: build.mutation<StaffMember, CreateStaffMemberInput>({
       query: (body) => ({
@@ -190,6 +200,7 @@ export const staffApi = api.injectEndpoints({
           endDate,
         },
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffShift>(response),
       providesTags: (result) =>
         result
           ? [
@@ -197,6 +208,7 @@ export const staffApi = api.injectEndpoints({
               { type: 'StaffShift' as const, id: 'LIST' },
             ]
           : [{ type: 'StaffShift' as const, id: 'LIST' }],
+      ...staffQueryCache,
     }),
     createStaffShift: build.mutation<StaffShift, CreateShiftInput>({
       query: (body) => ({
@@ -235,6 +247,7 @@ export const staffApi = api.injectEndpoints({
           endDate,
         },
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffTimeEntry>(response),
       providesTags: (result) =>
         result
           ? [
@@ -242,6 +255,7 @@ export const staffApi = api.injectEndpoints({
               { type: 'StaffTimeEntry' as const, id: 'LIST' },
             ]
           : [{ type: 'StaffTimeEntry' as const, id: 'LIST' }],
+      ...staffQueryCache,
     }),
     checkInStaffMember: build.mutation<StaffTimeEntry, CheckInInput>({
       query: (body) => ({
@@ -263,6 +277,7 @@ export const staffApi = api.injectEndpoints({
       query: () => ({
         url: '/api/staff/pto',
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffPtoRequest>(response),
       providesTags: (result) =>
         result
           ? [
@@ -270,6 +285,7 @@ export const staffApi = api.injectEndpoints({
               { type: 'StaffPto' as const, id: 'LIST' },
             ]
           : [{ type: 'StaffPto' as const, id: 'LIST' }],
+      ...staffQueryCache,
     }),
     createStaffPtoRequest: build.mutation<StaffPtoRequest, CreatePtoInput>({
       query: (body) => ({
@@ -297,7 +313,9 @@ export const staffApi = api.injectEndpoints({
       query: () => ({
         url: '/api/staff/availability',
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffAvailability>(response),
       providesTags: [{ type: 'StaffAvailability', id: 'LIST' }],
+      ...staffQueryCache,
     }),
     setStaffAvailability: build.mutation<StaffAvailability, SetAvailabilityInput>({
       query: (body) => ({
@@ -311,6 +329,7 @@ export const staffApi = api.injectEndpoints({
       query: () => ({
         url: '/api/staff/swaps',
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffShiftSwap>(response),
       providesTags: (result) =>
         result
           ? [
@@ -318,6 +337,7 @@ export const staffApi = api.injectEndpoints({
               { type: 'StaffSwap' as const, id: 'LIST' },
             ]
           : [{ type: 'StaffSwap' as const, id: 'LIST' }],
+      ...staffQueryCache,
     }),
     createStaffSwap: build.mutation<StaffShiftSwap, CreateSwapInput>({
       query: (body) => ({
@@ -346,6 +366,7 @@ export const staffApi = api.injectEndpoints({
         url: '/api/staff/announcements',
         params,
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffAnnouncement>(response),
       providesTags: (result) =>
         result
           ? [
@@ -356,6 +377,7 @@ export const staffApi = api.injectEndpoints({
               { type: 'StaffAnnouncement' as const, id: 'LIST' },
             ]
           : [{ type: 'StaffAnnouncement' as const, id: 'LIST' }],
+      ...staffQueryCache,
     }),
     createStaffAnnouncement: build.mutation<StaffAnnouncement, CreateAnnouncementInput>({
       query: (body) => ({
@@ -377,6 +399,7 @@ export const staffApi = api.injectEndpoints({
       query: () => ({
         url: '/api/staff/documents',
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffDocument>(response),
       providesTags: (result) =>
         result
           ? [
@@ -384,6 +407,7 @@ export const staffApi = api.injectEndpoints({
               { type: 'StaffDocument' as const, id: 'LIST' },
             ]
           : [{ type: 'StaffDocument' as const, id: 'LIST' }],
+      ...staffQueryCache,
     }),
     createStaffDocument: build.mutation<StaffDocument, CreateDocumentInput>({
       query: (body) => ({
@@ -397,6 +421,7 @@ export const staffApi = api.injectEndpoints({
       query: () => ({
         url: '/api/staff/incidents',
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffIncident>(response),
       providesTags: (result) =>
         result
           ? [
@@ -404,6 +429,7 @@ export const staffApi = api.injectEndpoints({
               { type: 'StaffIncident' as const, id: 'LIST' },
             ]
           : [{ type: 'StaffIncident' as const, id: 'LIST' }],
+      ...staffQueryCache,
     }),
     createStaffIncident: build.mutation<StaffIncident, CreateIncidentInput>({
       query: (body) => ({
@@ -417,6 +443,8 @@ export const staffApi = api.injectEndpoints({
       query: () => ({
         url: '/api/staff/performance-notes',
       }),
+      transformResponse: (response: unknown) =>
+        normalizeListResponse<StaffPerformanceNote>(response),
       providesTags: (result) =>
         result
           ? [
@@ -424,6 +452,7 @@ export const staffApi = api.injectEndpoints({
               { type: 'StaffPerformance' as const, id: 'LIST' },
             ]
           : [{ type: 'StaffPerformance' as const, id: 'LIST' }],
+      ...staffQueryCache,
     }),
     createStaffPerformanceNote: build.mutation<StaffPerformanceNote, CreatePerformanceNoteInput>({
       query: (body) => ({
@@ -437,6 +466,7 @@ export const staffApi = api.injectEndpoints({
       query: () => ({
         url: '/api/staff/payroll',
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffPayrollExport>(response),
       providesTags: (result) =>
         result
           ? [
@@ -444,6 +474,7 @@ export const staffApi = api.injectEndpoints({
               { type: 'StaffPayroll' as const, id: 'LIST' },
             ]
           : [{ type: 'StaffPayroll' as const, id: 'LIST' }],
+      ...staffQueryCache,
     }),
     createStaffPayrollExport: build.mutation<StaffPayrollExport, CreatePayrollExportInput>({
       query: (body) => ({
@@ -468,6 +499,7 @@ export const staffApi = api.injectEndpoints({
       string
     >({
       query: (staffId) => `/api/staff/members/${staffId}/portal`,
+      ...staffQueryCache,
     }),
     createStaffPortalAccount: build.mutation<
       { temporaryPassword?: string; status: string; loginUrl: string },
@@ -493,6 +525,7 @@ export const staffApi = api.injectEndpoints({
     }),
     getStaffPortalLoginLink: build.query<{ loginUrl: string; status: string }, string>({
       query: (staffId) => `/api/staff/members/${staffId}/portal/login-link`,
+      ...staffQueryCache,
     }),
     resetStaffPortalAccess: build.mutation<{ temporaryPassword?: string; status: string }, string>({
       query: (staffId) => ({

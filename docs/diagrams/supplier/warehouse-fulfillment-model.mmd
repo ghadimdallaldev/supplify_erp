@@ -1,0 +1,12 @@
+%% Supplier warehouse creation and fulfillment model
+%% Status: current | Related: apps/api/src/lib/plan-enforcement.js, 0081_warehouse_fulfillment.sql
+flowchart LR
+  Supplier[Supplier org tenant] --> WH[Warehouse records\nsupplier_id / tenant_id]
+  WH --> Stock[warehouse_inventory or inventory.warehouse_id]
+  Order[Customer order placed] --> Assign{multi_warehouse_enabled?}
+  Assign -->|yes| Route[assignWarehousesToOrder\norder_warehouse_assignment]
+  Assign -->|no| Default[default_warehouse_id]
+  Route --> Wave[Delivery wave → pick list]
+  Default --> Wave
+  Wave --> Pack[Pack → route → POD]
+  Pack --> Restaurant[Restaurant receiving]

@@ -3,18 +3,24 @@ import { requireAuth, resolveTenantContext } from '../lib/rbac.js'
 import { notificationsMutationGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
+import { config } from '../config/env.js'
 import { NotFoundError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 import {
   ensureNotificationPreferences,
+  invalidateNotificationPreferencesCache,
+  invalidateUserNotificationsListCache,
   getUserNotifications,
   getUserPreferences,
+  getUnreadNotificationCount,
   sendNotification,
 } from '../services/notification.service.js'
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext, notificationsMutationGuard)
+const tenantMutationGuard = [resolveTenantContext, notificationsMutationGuard]
+
+router.use(requireAuth)
 
 // Validation schemas
 const updatePreferencesSchema = z.object({
@@ -88,6 +94,39 @@ router.get('/', async (req, res) => {
   }
 })
 
+// Lightweight unread count for badge polling
+router.get('/unread-count', async (req, res) => {
+  try {
+    const userId = req.userData.id
+    const userType = req.userData.role
+
+    const result = await getUnreadNotificationCount(userId, userType)
+
+    res.json({
+      ok: true,
+      data: result,
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error({
+      message: 'Get unread notification count error',
+      error: error.message,
+      stack: error.stack,
+    })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get unread notification count',
+        details: error.message,
+      },
+      requestId: req.requestId,
+    })
+  }
+})
+
 // Get notification preferences
 router.get('/preferences', async (req, res) => {
   try {
@@ -122,7 +161,7 @@ router.get('/preferences', async (req, res) => {
 })
 
 // Update notification preferences
-router.patch('/preferences', async (req, res) => {
+router.patch('/preferences', ...tenantMutationGuard, async (req, res) => {
   try {
     const userId = req.userData.id
     const userType = req.userData.role
@@ -168,6 +207,7 @@ router.patch('/preferences', async (req, res) => {
       throw new NotFoundError('Notification preferences not found')
     }
 
+    await invalidateNotificationPreferencesCache(userId, userType)
     const prefs = await getUserPreferences(userId, userType)
 
     res.json({
@@ -223,6 +263,8 @@ router.post('/:id/read', async (req, res) => {
       [id, userId]
     )
 
+    await invalidateUserNotificationsListCache(userId, req.userData.role)
+
     res.json({
       ok: true,
       data: { id },
@@ -263,6 +305,8 @@ router.post('/read-all', async (req, res) => {
       [userId, userType]
     )
 
+    await invalidateUserNotificationsListCache(userId, req.userData.role)
+
     res.json({
       ok: true,
       data: { markedRead: rowCount },
@@ -288,10 +332,38 @@ router.post('/read-all', async (req, res) => {
   }
 })
 
-// Test notification endpoint (for admin/suppliers to test)
-router.post('/test', async (req, res) => {
+// Test notification endpoint (dev/debug only)
+router.post('/test', ...tenantMutationGuard, async (req, res) => {
+  if (!config.ENABLE_DEBUG_ROUTES) {
+    return res.status(404).json({ ok: false, error: { name: 'NOT_FOUND', message: 'Not found' } })
+  }
   try {
-    const { title, message, notificationType = 'TEST', notificationCategory = 'test' } = req.body
+    const {
+      title,
+      message,
+      notificationType = 'TEST',
+      notificationCategory = 'test',
+      emailTo,
+    } = req.body
+
+    if (emailTo) {
+      const { sendTemplateEmail } = await import('../services/email/email.service.js')
+      const emailResult = await sendTemplateEmail({
+        to: emailTo,
+        template: 'auth.test',
+        subject: title || 'Supplify email test',
+        data: { message: message || 'Test email from Supplify' },
+        eventType: 'test',
+        eventKey: `test:${emailTo}:${Date.now()}`,
+        skipDedup: true,
+      })
+      return res.json({
+        ok: true,
+        data: { emailResult },
+        error: null,
+        requestId: req.requestId,
+      })
+    }
 
     const notification = await sendNotification({
       userId: req.userData.id,

@@ -6,6 +6,7 @@ import {
   resolveTenantContext,
   resolveAdminContext,
   requirePermission,
+  requireAnyPermission,
   getSupplierIdForRequest,
   getRestaurantIdForRequest,
 } from '../lib/rbac.js'
@@ -17,7 +18,6 @@ import {
   discoverDealsForRestaurant,
   loadDealDetailForRestaurant,
   recordDealInteraction,
-  createDealPromotionCampaign,
   getDealAnalytics,
   enrichPromotionRow,
   enrichPromotionRows,
@@ -28,16 +28,19 @@ import {
 import {
   DEAL_STATUSES,
   PAYMENT_STATUSES,
-  getActivationPricing,
-  isActivationPaymentRequired,
-  resolveStatusAfterApproval,
   resolveScheduledOrActive,
   isPendingAdminReview,
   shouldResetApprovalOnEdit,
 } from '../services/deal-lifecycle.service.js'
+import {
+  applyBoostSelectionToDeal,
+  publishDealAfterApproval,
+  resolveStatusAfterBoostApproval,
+  buildBoostApprovalPreview,
+  isBoostPaymentWaived,
+} from '../services/deal-publish.service.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { requireFeature, requireWithinLimit } from '../lib/subscription.js'
-import { config } from '../config/env.js'
 
 const adminDealGuards = [
   requireAuth,
@@ -82,6 +85,11 @@ const promotionBodySchema = z.object({
   stockQuantity: z.number().int().positive().optional().nullable(),
   requiresAdminApproval: z.boolean().optional(),
   submitForReview: z.boolean().optional(),
+  pricingKey: z.string().min(1).optional(),
+})
+
+const submitDealBodySchema = z.object({
+  pricingKey: z.string().min(1),
 })
 
 const promoteBodySchema = z.object({
@@ -242,15 +250,33 @@ router.get(
   }
 )
 
+const BOOST_PRICING_WHERE = `package_type = 'boost' OR pricing_key LIKE 'boost_%'`
+
+/** GET: PROMOTIONS_VIEW; mutations: PROMOTIONS_MANAGE */
+function promotionsAccessGuard(req, res, next) {
+  const method = req.method.toUpperCase()
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+    return requireAnyPermission('PROMOTIONS_VIEW', 'PROMOTIONS_MANAGE')(req, res, next)
+  }
+  return requirePermission('PROMOTIONS_MANAGE')(req, res, next)
+}
+
 router.get(
   '/pricing',
   requireAuth,
   resolveTenantContext,
   requireRole(['SUPPLIER', 'ADMIN']),
+  requireAnyPermission('PROMOTIONS_VIEW', 'PROMOTIONS_MANAGE'),
   async (req, res, next) => {
     try {
       const { rows } = await query(
-        `SELECT * FROM promotion_pricing_config WHERE is_active = TRUE ORDER BY amount ASC`
+        `
+        SELECT *
+        FROM promotion_pricing_config
+        WHERE is_active = TRUE
+          AND (${BOOST_PRICING_WHERE})
+        ORDER BY sort_order ASC, amount ASC
+        `
       )
       res.json({ ok: true, data: { pricing: rows }, error: null, requestId: req.requestId })
     } catch (err) {
@@ -258,6 +284,17 @@ router.get(
     }
   }
 )
+
+router.get('/admin/pricing', ...adminDealGuards, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM promotion_pricing_config ORDER BY sort_order ASC, amount ASC`
+    )
+    res.json({ ok: true, data: { pricing: rows }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
 
 router.get('/admin/deals', ...adminDealGuards, async (req, res, next) => {
   try {
@@ -422,9 +459,12 @@ router.post('/admin/:id/approve', ...adminDealGuards, async (req, res, next) => 
       throw new NotFoundError('Deal not found or not pending approval')
     }
     const deal = existing[0]
-    const activationPricing = await getActivationPricing()
-    const activationAmount = Number(activationPricing.amount || 0)
-    const next = resolveStatusAfterApproval(deal, { activationAmount })
+    if (!deal.boost_pricing_key && !deal.boost_package_id) {
+      throw new ValidationError('Deal has no boost package selected for publishing')
+    }
+    const boostAmount = Number(deal.boost_price_snapshot || 0)
+    const waivePayment = isBoostPaymentWaived()
+    const next = resolveStatusAfterBoostApproval(deal, { boostAmount, waivePayment })
     const { rows } = await query(
       `
       UPDATE promotions SET
@@ -441,6 +481,15 @@ router.post('/admin/:id/approve', ...adminDealGuards, async (req, res, next) => 
       `,
       [req.params.id, next.status, next.payment_status, adminId]
     )
+    let approvedDeal = rows[0]
+    let publishResult = null
+    const canPublishNow =
+      next.status === DEAL_STATUSES.ACTIVE || next.status === DEAL_STATUSES.SCHEDULED
+    if (canPublishNow) {
+      publishResult = await publishDealAfterApproval(approvedDeal, { waivePayment })
+      approvedDeal = publishResult.deal
+    }
+
     await writeAuditLog(req, {
       action_type: 'deal.approved',
       tenant_type: 'ADMIN',
@@ -448,11 +497,12 @@ router.post('/admin/:id/approve', ...adminDealGuards, async (req, res, next) => 
       payload_json: {
         status: next.status,
         payment_status: next.payment_status,
-        activationAmount,
+        boostAmount,
+        boostPreview: buildBoostApprovalPreview(deal),
+        dealPromotionId: publishResult?.campaign?.id || null,
       },
     })
 
-    const approvedDeal = rows[0]
     if (next.status === DEAL_STATUSES.ACTIVE || next.status === DEAL_STATUSES.SCHEDULED) {
       const { rows: supplierRows } = await query(`SELECT name FROM supplier WHERE id = $1`, [
         approvedDeal.supplier_id,
@@ -461,7 +511,10 @@ router.post('/admin/:id/approve', ...adminDealGuards, async (req, res, next) => 
       notifyDealApproved(approvedDeal, {
         supplierName: supplierRows[0]?.name,
       }).catch((err) => {
-        logger.error('Deal approval notifications failed', { err: err.message, dealId: approvedDeal.id })
+        logger.error('Deal approval notifications failed', {
+          err: err.message,
+          dealId: approvedDeal.id,
+        })
       })
     }
 
@@ -496,6 +549,8 @@ router.post('/admin/:id/reject', ...adminDealGuards, async (req, res, next) => {
       target_id: req.params.id,
       payload_json: { rejectionReason: body.rejectionReason || null },
     })
+    const { notifyDealRejected } = await import('../services/notification.service.js')
+    notifyDealRejected(rows[0], { rejectionReason: body.rejectionReason || null }).catch(() => {})
     res.json({ ok: true, data: { deal: rows[0] }, error: null, requestId: req.requestId })
   } catch (err) {
     next(err)
@@ -525,6 +580,10 @@ router.patch('/admin/pricing/:key', ...adminDealGuards, async (req, res, next) =
         isActive: z.boolean().optional(),
         displayName: z.string().optional(),
         description: z.string().optional().nullable(),
+        estimatedReachLabel: z.string().optional().nullable(),
+        badgeLabel: z.string().optional().nullable(),
+        isRecommended: z.boolean().optional(),
+        sortOrder: z.number().int().optional(),
       })
       .parse(req.body)
 
@@ -537,6 +596,10 @@ router.patch('/admin/pricing/:key', ...adminDealGuards, async (req, res, next) =
       isActive: 'is_active',
       displayName: 'display_name',
       description: 'description',
+      estimatedReachLabel: 'estimated_reach_label',
+      badgeLabel: 'badge_label',
+      isRecommended: 'is_recommended',
+      sortOrder: 'sort_order',
     }
     for (const [key, col] of Object.entries(map)) {
       if (body[key] !== undefined) {
@@ -817,7 +880,7 @@ router.use(
   requireAuth,
   resolveTenantContext,
   requireRole(['SUPPLIER', 'ADMIN']),
-  requirePermission('PROMOTIONS_MANAGE'),
+  promotionsAccessGuard,
   promotionsWriteGate
 )
 
@@ -870,6 +933,9 @@ router.post('/', promotionsCreateLimitGate, async (req, res, next) => {
   try {
     const supplierId = await getSupplierId(req)
     const body = promotionBodySchema.parse(req.body)
+    if (body.submitForReview && !body.pricingKey) {
+      throw new ValidationError('Select a boost package before submitting for approval')
+    }
     const fields = mapPromotionInsertFields(body)
     const promotion = await withTransaction(async (client) => {
       const { rows } = await client.query(
@@ -933,6 +999,12 @@ router.post('/', promotionsCreateLimitGate, async (req, res, next) => {
       }
       return created
     })
+    let finalPromotion = promotion
+    if (body.submitForReview && body.pricingKey) {
+      await applyBoostSelectionToDeal(promotion.id, supplierId, body.pricingKey)
+      const { rows } = await query(`SELECT * FROM promotions WHERE id = $1`, [promotion.id])
+      finalPromotion = rows[0]
+    }
     await writeAuditLog(req, {
       action_type: 'promotion.created',
       tenant_type: 'SUPPLIER',
@@ -940,7 +1012,19 @@ router.post('/', promotionsCreateLimitGate, async (req, res, next) => {
       target_id: promotion.id,
       payload_json: { resource_type: 'deal', name: promotion.name },
     })
-    res.status(201).json({ ok: true, data: { promotion }, error: null, requestId: req.requestId })
+    if (body.submitForReview) {
+      const { rows: supplierRows } = await query(`SELECT name FROM supplier WHERE id = $1`, [
+        supplierId,
+      ])
+      const { notifyDealSubmitted } = await import('../services/notification.service.js')
+      notifyDealSubmitted(finalPromotion, { supplierName: supplierRows[0]?.name }).catch(() => {})
+    }
+    res.status(201).json({
+      ok: true,
+      data: { promotion: finalPromotion },
+      error: null,
+      requestId: req.requestId,
+    })
   } catch (err) {
     next(err)
   }
@@ -1045,24 +1129,32 @@ router.patch('/:id', async (req, res, next) => {
 router.post('/:id/submit', async (req, res, next) => {
   try {
     const supplierId = await getSupplierId(req)
+    const body = submitDealBodySchema.parse(req.body || {})
     await loadPromotionForSupplier(req.params.id, supplierId)
+    await applyBoostSelectionToDeal(req.params.id, supplierId, body.pricingKey)
     const { rows } = await query(
       `
       UPDATE promotions SET
         status = 'pending_approval',
         submitted_at = NOW(),
         updated_at = NOW()
-      WHERE id = $1 AND supplier_id = $2 AND status IN ('draft', 'rejected')
+      WHERE id = $1 AND supplier_id = $2 AND status IN ('draft', 'rejected', 'expired', 'paused')
       RETURNING *
       `,
       [req.params.id, supplierId]
     )
     if (!rows.length) {
-      throw new ValidationError('Only draft or rejected deals can be submitted for review')
+      throw new ValidationError(
+        'Only draft, rejected, expired, or paused deals can be submitted for review'
+      )
     }
     res.json({ ok: true, data: { promotion: rows[0] }, error: null, requestId: req.requestId })
   } catch (err) {
-    next(err)
+    if (err.message?.includes('Boost package') || err.message === 'Deal not found') {
+      next(new ValidationError(err.message))
+    } else {
+      next(err)
+    }
   }
 })
 
@@ -1071,22 +1163,26 @@ router.post('/:id/pay-activation', async (req, res, next) => {
     const supplierId = await getSupplierId(req)
     const deal = await loadPromotionForSupplier(req.params.id, supplierId)
     if (deal.status !== DEAL_STATUSES.APPROVED_PENDING_PAYMENT) {
-      throw new ValidationError('Deal is not awaiting activation payment')
+      throw new ValidationError('Deal is not awaiting boost payment')
     }
     if (deal.payment_status === PAYMENT_STATUSES.PAID) {
-      throw new ValidationError('Deal activation is already paid')
+      throw new ValidationError('Deal boost is already paid')
     }
-    const activationPricing = await getActivationPricing()
-    const amount = Number(activationPricing.amount || 0)
-    if (amount <= 0) {
+    const amount = Number(deal.boost_price_snapshot || 0)
+    if (amount <= 0 || isBoostPaymentWaived()) {
       const next = resolveScheduledOrActive(deal, { payment_status: PAYMENT_STATUSES.NOT_REQUIRED })
       const { rows } = await query(
         `UPDATE promotions SET status = $2, payment_status = $3, updated_at = NOW() WHERE id = $1 RETURNING *`,
         [req.params.id, next.status, next.payment_status]
       )
+      let promotion = rows[0]
+      if (next.status === DEAL_STATUSES.ACTIVE || next.status === DEAL_STATUSES.SCHEDULED) {
+        const published = await publishDealAfterApproval(promotion, { waivePayment: true })
+        promotion = published.deal
+      }
       return res.json({
         ok: true,
-        data: { promotion: rows[0] },
+        data: { promotion },
         error: null,
         requestId: req.requestId,
       })
@@ -1096,13 +1192,13 @@ router.post('/:id/pay-activation', async (req, res, next) => {
       data: {
         paymentRequired: true,
         amount,
-        pricingKey: activationPricing.pricing_key || 'deal_activation',
+        pricingKey: deal.boost_pricing_key,
         message:
-          'Payment provider is not connected yet. Deal activation payment must be confirmed on the server before the deal can go live.',
+          'Payment provider is not connected yet. Boost payment must be confirmed on the server before the deal can go live.',
       },
       error: {
         name: 'PAYMENT_REQUIRED',
-        message: 'Activation payment required before deal can become active',
+        message: 'Boost payment required before deal can become active',
       },
       requestId: req.requestId,
     })
@@ -1114,21 +1210,30 @@ router.post('/:id/pay-activation', async (req, res, next) => {
 router.post('/:id/activate', async (req, res, next) => {
   try {
     const supplierId = await getSupplierId(req)
-    const existing = await loadPromotionForSupplier(req.params.id, supplierId)
-    if (existing.status !== 'draft' && existing.status !== 'rejected') {
-      throw new ValidationError('Only draft or rejected deals can be submitted')
-    }
+    const body = submitDealBodySchema.parse(req.body || {})
+    await loadPromotionForSupplier(req.params.id, supplierId)
+    await applyBoostSelectionToDeal(req.params.id, supplierId, body.pricingKey)
     const { rows } = await query(
       `
-      UPDATE promotions SET status = 'pending_approval', submitted_at = NOW(), updated_at = NOW()
-      WHERE id = $1 AND supplier_id = $2
+      UPDATE promotions SET
+        status = 'pending_approval',
+        submitted_at = NOW(),
+        updated_at = NOW()
+      WHERE id = $1 AND supplier_id = $2 AND status IN ('draft', 'rejected', 'expired', 'paused')
       RETURNING *
       `,
       [req.params.id, supplierId]
     )
+    if (!rows.length) {
+      throw new ValidationError('Only draft, rejected, expired, or paused deals can be submitted')
+    }
     res.json({ ok: true, data: { promotion: rows[0] }, error: null, requestId: req.requestId })
   } catch (err) {
-    next(err)
+    if (err.message?.includes('Boost package') || err.message === 'Deal not found') {
+      next(new ValidationError(err.message))
+    } else {
+      next(err)
+    }
   }
 })
 
@@ -1173,35 +1278,36 @@ router.post('/:id/resume', async (req, res, next) => {
 router.post('/:id/promote', async (req, res, next) => {
   try {
     const supplierId = await getSupplierId(req)
-    await loadPromotionForSupplier(req.params.id, supplierId)
+    const existing = await loadPromotionForSupplier(req.params.id, supplierId)
+    if (!['draft', 'rejected', 'expired', 'paused'].includes(existing.status)) {
+      throw new ValidationError(
+        'Select a boost package and submit the deal for approval to publish. Post-approval promote is no longer supported.'
+      )
+    }
     const body = promoteBodySchema.parse(req.body)
-    const campaign = await createDealPromotionCampaign({
-      dealId: req.params.id,
-      supplierId,
-      pricingKey: body.pricingKey,
-      budget: body.budget,
-      startsAt: body.startsAt,
-      endsAt: body.endsAt,
-      targetAudience: body.targetAudience || { all: true },
-      waivePayment:
-        config.NODE_ENV !== 'production' ||
-        process.env.ALLOW_WAIVE_DEAL_PROMOTION_PAYMENT === 'true',
-    })
-    await writeAuditLog(req, {
-      action_type: 'deal.promoted',
-      tenant_type: 'SUPPLIER',
-      tenant_id: supplierId,
-      target_id: req.params.id,
-      payload_json: { dealPromotionId: campaign.id, budget: campaign.budget },
-    })
-    res.status(201).json({
+    if (!body.pricingKey) {
+      throw new ValidationError('pricingKey is required')
+    }
+    await applyBoostSelectionToDeal(req.params.id, supplierId, body.pricingKey)
+    const { rows } = await query(
+      `
+      UPDATE promotions SET status = 'pending_approval', submitted_at = NOW(), updated_at = NOW()
+      WHERE id = $1 AND supplier_id = $2 RETURNING *
+      `,
+      [req.params.id, supplierId]
+    )
+    return res.json({
       ok: true,
-      data: { promotion: campaign },
+      data: { promotion: rows[0] },
       error: null,
       requestId: req.requestId,
     })
   } catch (err) {
-    if (err.message === 'Deal not found' || err.message?.includes('Only active')) {
+    if (
+      err.message === 'Deal not found' ||
+      err.message?.includes('Only active') ||
+      err.message?.includes('not available')
+    ) {
       next(new ValidationError(err.message))
     } else {
       next(err)

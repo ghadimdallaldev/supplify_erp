@@ -4,11 +4,126 @@ import { filesUploadGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { config } from '../config/env.js'
+
+function setObjectCorsHeaders(req, res) {
+  const origin = req.headers.origin
+  if (origin && config.WEB_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Vary', 'Origin')
+  }
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+}
 import { meterStorageFromRequest } from '../lib/storage-upload.js'
-import { sanitizeUploadFileName, assertUploadKeyOwnedByUser } from '../lib/sanitize-upload.js'
-import { createPresignedUpload, buildObjectPublicUrl } from '../lib/object-storage.js'
+import {
+  sanitizeUploadFileName,
+  assertUploadKeyOwnedByUser,
+  assertFileExtensionMatchesMime,
+  MAX_UPLOAD_BYTES,
+} from '../lib/sanitize-upload.js'
+import {
+  createPresignedUpload,
+  buildObjectPublicUrl,
+  getStorageDriver,
+  getStorageProvider,
+  getObjectStream,
+} from '../services/storage/storage.service.js'
 
 const router = express.Router()
+
+/** Serve uploaded objects when buckets are private (Railway, R2 without public URL). */
+router.get('/object', async (req, res) => {
+  setObjectCorsHeaders(req, res)
+  try {
+    const rawKey = req.query.key
+    if (!rawKey || typeof rawKey !== 'string') {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'key query parameter is required' },
+        requestId: req.requestId,
+      })
+    }
+    const key = rawKey.replace(/^\/+/, '')
+    if (key.includes('..') || !key.startsWith('uploads/')) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'Invalid file key' },
+        requestId: req.requestId,
+      })
+    }
+
+    const { body, contentType, contentLength } = await getObjectStream(key)
+    if (contentType) res.setHeader('Content-Type', contentType)
+    if (contentLength != null) res.setHeader('Content-Length', String(contentLength))
+    res.setHeader('Cache-Control', 'public, max-age=86400')
+
+    if (body && typeof body.pipe === 'function') {
+      body.pipe(res)
+      return
+    }
+    if (Buffer.isBuffer(body)) {
+      return res.send(body)
+    }
+    if (body instanceof Uint8Array) {
+      return res.send(Buffer.from(body))
+    }
+    return res.status(404).end()
+  } catch (error) {
+    const notFound =
+      error?.name === 'NoSuchKey' ||
+      error?.Code === 'NoSuchKey' ||
+      error?.name === 'UPLOAD_KEY_INVALID'
+    logger.warn('File object serve error', { message: error?.message })
+    return res.status(notFound ? 404 : 500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: notFound ? 'NOT_FOUND' : 'INTERNAL_ERROR',
+        message: notFound ? 'File not found' : 'Failed to load file',
+      },
+      requestId: req.requestId,
+    })
+  }
+})
+
+// Complete PUT upload using signed token from /presign (local disk or private S3 via API)
+router.put('/upload/:token', express.raw({ type: '*/*', limit: '10mb' }), async (req, res) => {
+  setObjectCorsHeaders(req, res)
+  try {
+    const contentType = req.headers['content-type'] || 'application/octet-stream'
+    const body = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '')
+    const provider = getStorageProvider()
+    if (!provider.completeUpload) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'NOT_FOUND',
+          message: 'Direct upload not available for this storage driver',
+        },
+        requestId: req.requestId,
+      })
+    }
+    await provider.completeUpload(req.params.token, body, contentType)
+    res.status(204).end()
+  } catch (error) {
+    const invalid =
+      error?.name === 'UPLOAD_TOKEN_INVALID' ||
+      error?.name === 'UPLOAD_CONTENT_TYPE' ||
+      error?.name === 'UPLOAD_KEY_INVALID' ||
+      error?.name === 'UPLOAD_TOO_LARGE'
+    res.status(invalid ? 400 : 500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: invalid ? 'VALIDATION_ERROR' : 'INTERNAL_ERROR',
+        message: error?.message || 'Upload failed',
+      },
+      requestId: req.requestId,
+    })
+  }
+})
 
 // Generate presigned URL for file upload
 router.post(
@@ -63,19 +178,31 @@ router.post(
       let safeFileName
       try {
         safeFileName = sanitizeUploadFileName(fileName)
-      } catch {
+        assertFileExtensionMatchesMime(safeFileName, fileType)
+      } catch (err) {
         return res.status(400).json({
           ok: false,
           data: null,
           error: {
             name: 'VALIDATION_ERROR',
-            message: 'Invalid file name',
+            message: err?.message || 'Invalid file name',
           },
           requestId: req.requestId,
         })
       }
 
       const sizeBytes = fileSize ? Number(fileSize) : 0
+      if (sizeBytes > MAX_UPLOAD_BYTES) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'File size too large (max 10MB)',
+          },
+          requestId: req.requestId,
+        })
+      }
       const storageMeter = await meterStorageFromRequest(req, sizeBytes)
       if (!storageMeter.ok) {
         return res.status(storageMeter.status).json({
@@ -89,7 +216,9 @@ router.post(
       const fileKey = `uploads/${req.userData.id}/${Date.now()}-${safeFileName}`
       const { presignedUrl, publicUrl, bucket } = await createPresignedUpload({
         fileKey,
+        fileSize: sizeBytes > 0 ? sizeBytes : MAX_UPLOAD_BYTES,
         fileType,
+        userId: req.userData.id,
       })
 
       logger.info('Presigned URL generated', {
@@ -126,7 +255,7 @@ router.post(
         error: {
           name: isBucket ? 'STORAGE_UNAVAILABLE' : 'INTERNAL_ERROR',
           message: isBucket
-            ? `Storage bucket "${config.S3_BUCKET}" is missing. Run MinIO init or set S3_BUCKET.`
+            ? `Storage bucket "${config.STORAGE_BUCKET}" is missing. Check STORAGE_* settings or run storage init.`
             : 'Failed to generate presigned URL',
         },
         requestId: req.requestId,
@@ -209,7 +338,7 @@ router.post(
 
       const supplierId = products[0].supplier_id
       const sizeBytes = fileSize != null ? Math.max(0, parseInt(String(fileSize), 10) || 0) : 0
-      const fileUrl = buildObjectPublicUrl(config.S3_BUCKET, fileKey)
+      const fileUrl = buildObjectPublicUrl(fileKey)
 
       const { rows } = await query(
         `

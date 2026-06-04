@@ -1,6 +1,8 @@
 import crypto from 'node:crypto'
 import { query, withTransaction } from '../db.js'
 import { logger } from '../logger.js'
+import { getCache, setCache, deleteCache } from '../cache.js'
+import { singleflight } from '../singleflight.js'
 import { getBillingGateway } from './gateway-registry.js'
 import {
   GRACE_PERIOD_DAYS,
@@ -8,6 +10,7 @@ import {
   LOCK_REASON_FREE_SANDBOX_EXPIRED,
 } from './constants.js'
 import { clampFreeTrialDays, getFreeSandboxDays } from '../platform-settings.js'
+import { formatPlanDisplayName } from '../plan-codes.js'
 
 function addDays(date, days) {
   const d = new Date(date)
@@ -32,21 +35,43 @@ async function recordBillingEvent(
   )
 }
 
+const BILLING_SUB_CACHE_TTL_SECONDS = 180
+
+function billingSubCacheKey(tenantId, tenantType) {
+  return `billingSub:${tenantId}:${tenantType}`
+}
+
+/** Clear Redis cache used by getSubscriptionForBilling / GET /api/billing/status. */
+export async function invalidateBillingSubscriptionCache(tenantId, tenantType) {
+  await deleteCache(billingSubCacheKey(tenantId, tenantType)).catch(() => {})
+}
+
 /**
  * Latest subscription row for tenant (any non-cancelled status).
  */
 export async function getSubscriptionForBilling(tenantId, tenantType) {
-  const { rows } = await query(
-    `SELECT s.*, sp.code AS plan_code, sp.price_per_month, sp.price_per_year
+  const cacheKey = billingSubCacheKey(tenantId, tenantType)
+  const cached = await getCache(cacheKey)
+  if (cached !== null) return cached === 'null' ? null : cached
+
+  return singleflight(cacheKey, async () => {
+    const again = await getCache(cacheKey)
+    if (again !== null) return again === 'null' ? null : again
+
+    const { rows } = await query(
+      `SELECT s.*, sp.code AS plan_code, sp.price_per_month, sp.price_per_year
      FROM subscription s
      LEFT JOIN subscription_plan sp ON sp.id = s.plan_id
      WHERE s.tenant_id = $1 AND s.tenant_type = $2
        AND s.status NOT IN ('CANCELLED')
      ORDER BY s.created_at DESC
      LIMIT 1`,
-    [tenantId, tenantType]
-  )
-  return rows[0] || null
+      [tenantId, tenantType]
+    )
+    const row = rows[0] || null
+    await setCache(cacheKey, row ?? 'null', BILLING_SUB_CACHE_TTL_SECONDS).catch(() => {})
+    return row
+  })
 }
 
 export function computeBillingAccessState(subscription) {
@@ -114,15 +139,11 @@ export function computeBillingAccessState(subscription) {
 }
 
 export async function getBillingStatus(tenantId, tenantType) {
-  const subscription = await getSubscriptionForBilling(tenantId, tenantType)
-  const access = computeBillingAccessState(subscription)
-
-  let paymentMethods = []
-  let openInvoices = []
-  let defaultPaymentMethod = null
-
+  // Subscription (cached), payment methods, and open invoices are all independent — fetch in parallel.
+  let subscription, paymentMethods, openInvoices, defaultPaymentMethod
   try {
-    const [pmRes, invRes] = await Promise.all([
+    const [sub, pmRes, invRes] = await Promise.all([
+      getSubscriptionForBilling(tenantId, tenantType),
       query(
         `SELECT id, provider, type, brand, last4, exp_month, exp_year, bank_name, is_default, status, created_at
          FROM billing_payment_method
@@ -138,12 +159,19 @@ export async function getBillingStatus(tenantId, tenantType) {
         [tenantId, tenantType]
       ),
     ])
+    subscription = sub
     paymentMethods = pmRes.rows
     openInvoices = invRes.rows
     defaultPaymentMethod = paymentMethods.find((p) => p.is_default) || paymentMethods[0] || null
   } catch (e) {
     if (e.code !== '42P01') throw e
+    subscription = await getSubscriptionForBilling(tenantId, tenantType)
+    paymentMethods = []
+    openInvoices = []
+    defaultPaymentMethod = null
   }
+
+  const access = computeBillingAccessState(subscription)
 
   const amountDue = openInvoices.reduce((sum, inv) => sum + Number(inv.amount || 0), 0)
 
@@ -153,7 +181,7 @@ export async function getBillingStatus(tenantId, tenantType) {
           id: subscription.id,
           status: subscription.status,
           planId: subscription.plan_id,
-          planName: subscription.plan_name,
+          planName: formatPlanDisplayName(subscription.plan_code, subscription.plan_name),
           planCode: subscription.plan_code,
           billingCycle: subscription.billing_cycle,
           nextBillingDate: subscription.next_billing_date,
@@ -401,6 +429,7 @@ async function applyFreePlan(tenantId, tenantType, plan) {
       ]
     )
   }
+  await invalidateBillingSubscriptionCache(tenantId, tenantType)
   return {
     success: true,
     plan: plan.code,

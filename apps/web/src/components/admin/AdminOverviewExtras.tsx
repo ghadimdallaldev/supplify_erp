@@ -40,6 +40,7 @@ export function AdminOverviewExtras({
   lastUpdated?: Date | null
 }) {
   const alerts = (overview?.alerts || {}) as Record<string, number>
+  const operational = (overview?.operational || {}) as Record<string, number>
   const { data: dealInsights } = useGetAdminDealInsightsQuery()
   const { data: pendingDealsData } = useGetAdminPendingDealsQuery()
   const { data: healthData } = useGetAdminHealthQuery()
@@ -49,9 +50,9 @@ export function AdminOverviewExtras({
   })
 
   const insights = dealInsights?.insights as Record<string, number> | undefined
-  const pendingDeals = pendingDealsData?.deals || []
-  const recentErrors = healthData?.recentApiErrors || []
-  const recentEvents = activityData?.events || []
+  const pendingDeals = Array.isArray(pendingDealsData?.deals) ? pendingDealsData.deals : []
+  const recentErrors = Array.isArray(healthData?.recentApiErrors) ? healthData.recentApiErrors : []
+  const recentEvents = Array.isArray(activityData?.events) ? activityData.events : []
 
   const attentionItems: AttentionItem[] = []
 
@@ -119,6 +120,47 @@ export function AdminOverviewExtras({
     })
   }
 
+  const emailFailed = Number(operational.emailFailed24h || 0)
+  if (emailFailed >= 5) {
+    attentionItems.push({
+      id: 'email-failures',
+      label: `${emailFailed} failed emails in 24h`,
+      detail: 'Review delivery logs in Operations',
+      severity: 'warning',
+      tab: 'operations',
+    })
+  }
+
+  const openFulfillment = Number(operational.openFulfillmentIssues || 0)
+  if (openFulfillment >= 10) {
+    attentionItems.push({
+      id: 'fulfillment-issues',
+      label: `${openFulfillment} open fulfillment issues`,
+      severity: 'warning',
+      tab: 'operations',
+    })
+  }
+
+  const staleGps = Number(operational.staleGpsDeliveries || 0)
+  if (staleGps >= 10) {
+    attentionItems.push({
+      id: 'stale-gps',
+      label: `${staleGps} deliveries with stale GPS`,
+      severity: 'info',
+      tab: 'operations',
+    })
+  }
+
+  const expiredLots = Number(operational.expiredInventoryLots || 0)
+  if (expiredLots >= 20) {
+    attentionItems.push({
+      id: 'expired-lots',
+      label: `${expiredLots} expired inventory lots`,
+      severity: 'warning',
+      tab: 'operations',
+    })
+  }
+
   const severityStyles = {
     danger: 'border-red-200 bg-red-50 text-red-800',
     warning: 'border-amber-200 bg-amber-50 text-amber-800',
@@ -130,15 +172,19 @@ export function AdminOverviewExtras({
     { label: 'Manage tenants', tab: 'tenants', icon: Users },
     { label: 'Subscriptions', tab: 'subscriptions', icon: CreditCard },
     { label: 'Limit overrides', tab: 'limits', icon: Shield },
+    { label: 'Operations', tab: 'operations', icon: HeartPulse },
     { label: 'Health check', tab: 'health', icon: HeartPulse },
     { label: 'Audit logs', tab: 'audit', icon: AlertCircle },
   ]
 
   return (
-    <div className="space-y-5">
+    <div className="w-full space-y-5">
       <AdminRefreshBar lastUpdated={lastUpdated} onRefresh={onRefresh} refreshing={refreshing} />
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div
+        className="relative z-0 grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        data-testid="admin-overview-panels"
+      >
         {/* Needs attention */}
         <Card className="lg:col-span-1">
           <CardHeader className="pb-2">
@@ -230,22 +276,21 @@ export function AdminOverviewExtras({
         </Card>
 
         {/* Quick actions */}
-        <Card className="lg:col-span-1">
-          <CardHeader className="pb-2">
+        <Card className="lg:col-span-1 overflow-visible">
+          <CardHeader className="px-4 pb-2 pt-4 sm:px-6 sm:pt-6">
             <CardTitle className="text-sm font-semibold">Quick actions</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-2">
+          <CardContent className="px-4 pb-4 pt-0 sm:px-6 sm:pb-6">
+            <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
               {quickActions.map(({ label, tab, icon: Icon }) => (
                 <Button
                   key={tab}
                   variant="outline"
-                  size="sm"
-                  className="h-auto py-2.5 justify-start text-xs font-medium"
+                  className="box-border h-auto min-h-11 w-full justify-start gap-3 whitespace-normal rounded-lg px-5 py-3.5 text-xs font-medium leading-snug"
                   onClick={() => onNavigateTab(tab)}
                 >
-                  <Icon className="h-3.5 w-3.5 mr-2 shrink-0" />
-                  {label}
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                  <span className="min-w-0 text-left">{label}</span>
                 </Button>
               ))}
             </div>

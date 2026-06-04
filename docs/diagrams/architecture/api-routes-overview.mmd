@@ -1,0 +1,18 @@
+%% API routes overview (high level)
+%% Status: current | Related: docs/blueprint/api_architecture.mmd
+flowchart TB
+  Client[Web client] --> MW[requestContext → impersonationContext → requireAuth]
+  MW --> Tenant[resolveTenantContext]
+  MW --> Admin[resolveAdminContext]
+  Tenant --> Routes
+  subgraph Routes["Major /api groups"]
+    Orders[/orders + quick-lists]
+    Sub[/subscriptions + billing]
+    Org[/restaurant-org + org branches]
+    WH[/warehouses]
+    Res[/reservations + public/reserve]
+    Chat[/chat]
+    Disp[/disputes]
+    Promo[/promotions + admin]
+    AdminDash[/admin-dashboard]
+  end

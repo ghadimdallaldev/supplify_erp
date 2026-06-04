@@ -38,14 +38,21 @@ import {
   getSupplierIdForOrder,
   orderHasProofOfDelivery,
 } from '../lib/driver-delivery.js'
+import { resolveProductPricesBatch } from '../services/resolve-product-price.service.js'
 import {
   assertAndDeductSupplierStock,
   restoreSupplierStockForOrder,
 } from '../services/supplier-inventory.service.js'
+import { ordersRouterMutationGuard } from '../lib/route-permissions.js'
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext, requirePermission('ORDERS_VIEW'))
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  requirePermission('ORDERS_VIEW'),
+  ordersRouterMutationGuard
+)
 
 /** Build PDF buffer for a packing slip */
 function buildPackingSlipPdf(packingSlip) {
@@ -138,6 +145,7 @@ const deliveryStatusSchema = z.enum([
   'out_for_delivery',
   'delivered',
   'failed',
+  'rescheduled',
 ])
 
 const orderUpdateSchema = z.object({
@@ -166,13 +174,16 @@ const orderUpdateSchema = z.object({
 const orderListSchema = z.object({
   status: z.string().optional(),
   supplier: z.string().uuid().optional(),
+  q: z.string().max(200).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
   limit: z
     .string()
-    .transform((val) => parseInt(val, 10))
+    .transform((val) => Math.min(Math.max(parseInt(val, 10) || 20, 1), 100))
     .default('20'),
   offset: z
     .string()
-    .transform((val) => parseInt(val, 10))
+    .transform((val) => Math.max(parseInt(val, 10) || 0, 0))
     .default('0'),
 })
 
@@ -593,6 +604,43 @@ router.get('/', async (req, res) => {
       paramIndex++
     }
 
+    if (params.from) {
+      const fromDate = new Date(params.from)
+      if (!Number.isNaN(fromDate.getTime())) {
+        whereConditions.push(`COALESCE(o.placed_at, o.created_at) >= $${paramIndex}`)
+        queryParams.push(fromDate.toISOString())
+        paramIndex++
+      }
+    }
+
+    if (params.to) {
+      const toDate = new Date(params.to)
+      if (!Number.isNaN(toDate.getTime())) {
+        toDate.setHours(23, 59, 59, 999)
+        whereConditions.push(`COALESCE(o.placed_at, o.created_at) <= $${paramIndex}`)
+        queryParams.push(toDate.toISOString())
+        paramIndex++
+      }
+    }
+
+    if (params.q?.trim()) {
+      const term = `%${params.q.trim()}%`
+      whereConditions.push(`(
+        o.id::text ILIKE $${paramIndex}
+        OR r.name ILIKE $${paramIndex}
+        OR EXISTS (
+          SELECT 1
+          FROM order_item oi_q
+          JOIN product p_q ON p_q.id = oi_q.product_id
+          JOIN supplier s_q ON s_q.id = p_q.supplier_id
+          WHERE oi_q.order_id = o.id
+            AND s_q.name ILIKE $${paramIndex}
+        )
+      )`)
+      queryParams.push(term)
+      paramIndex++
+    }
+
     // Supplier filter (for admin when not impersonating)
     if (params.supplier && req.userData.role === 'ADMIN' && !tenant) {
       whereConditions.push(`p.supplier_id = $${paramIndex}`)
@@ -602,7 +650,13 @@ router.get('/', async (req, res) => {
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
 
-    const sql = `
+    const needsItemJoin =
+      tenant?.tenantType === 'SUPPLIER' ||
+      (params.supplier && req.userData.role === 'ADMIN' && !tenant) ||
+      Boolean(params.q?.trim())
+
+    const sql = needsItemJoin
+      ? `
       SELECT DISTINCT
         o.*,
         r.name as restaurant_name,
@@ -615,19 +669,50 @@ router.get('/', async (req, res) => {
       ORDER BY o.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `
+      : `
+      SELECT
+        o.*,
+        r.name as restaurant_name,
+        r.slug as restaurant_slug
+      FROM customer_order o
+      JOIN restaurant r ON r.id = o.restaurant_id
+      ${whereClause}
+      ORDER BY o.created_at DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `
 
     queryParams.push(params.limit, params.offset)
 
-    const { rows } = await query(sql, queryParams)
+    const countSql = needsItemJoin
+      ? `
+      SELECT COUNT(DISTINCT o.id) as total
+      FROM customer_order o
+      LEFT JOIN order_item oi ON oi.order_id = o.id
+      LEFT JOIN product p ON p.id = oi.product_id
+      ${whereClause}
+    `
+      : `
+      SELECT COUNT(*)::int as total
+      FROM customer_order o
+      JOIN restaurant r ON r.id = o.restaurant_id
+      ${whereClause}
+    `
+    const countParams = queryParams.slice(0, -2) // Remove limit and offset
 
-    // Get items for each order
+    // Main list and count are independent — run in parallel.
+    const [{ rows }, { rows: countRows }] = await Promise.all([
+      query(sql, queryParams),
+      query(countSql, countParams),
+    ])
+
+    // Fetch items for all orders in a single batch query.
     const orderIds = rows.map((order) => order.id)
     let items = []
     if (orderIds.length > 0) {
       try {
         const { rows: itemsRows } = await query(
           `
-          SELECT 
+          SELECT
             oi.*,
             p.name as product_name,
             p.sku as product_sku
@@ -663,18 +748,6 @@ router.get('/', async (req, res) => {
       ...order,
       items: itemsByOrder[order.id] || [],
     }))
-
-    // Get total count for pagination
-    const countSql = `
-      SELECT COUNT(DISTINCT o.id) as total
-      FROM customer_order o
-      LEFT JOIN order_item oi ON oi.order_id = o.id
-      LEFT JOIN product p ON p.id = oi.product_id
-      ${whereClause}
-    `
-
-    const countParams = queryParams.slice(0, -2) // Remove limit and offset
-    const { rows: countRows } = await query(countSql, countParams)
 
     res.json({
       ok: true,
@@ -958,50 +1031,71 @@ router.get('/:id', requireAuth, async (req, res, next) => {
       }
     }
 
-    // Get order items
-    const { rows: items } = await query(
-      `
-      SELECT 
-        oi.*,
-        p.name as product_name,
-        p.sku as product_sku,
-        s.name as supplier_name,
-        s.slug as supplier_slug,
-        pick.location_code
-      FROM order_item oi
-      JOIN product p ON p.id = oi.product_id
-      JOIN supplier s ON s.id = oi.supplier_id
-      LEFT JOIN LATERAL (
-        SELECT pli.location_code
-        FROM pick_list pl
-        JOIN pick_list_item pli ON pli.pick_list_id = pl.id
-        WHERE pl.order_id = oi.order_id
-          AND pli.product_id = oi.product_id
-        ORDER BY pl.created_at DESC
-        LIMIT 1
-      ) pick ON true
-      WHERE oi.order_id = $1
-      ORDER BY s.name, p.name
-    `,
-      [id]
-    )
-
-    const warehouseAssignments = await loadOrderWarehouseAssignments(id)
-
-    const { rows: promotionRows } = await query(
-      `
-      SELECT
-        pu.promotion_id,
-        pu.discount_applied,
-        p.name AS promotion_name,
-        p.type AS promotion_type
-      FROM promotion_usages pu
-      JOIN promotions p ON p.id = pu.promotion_id
-      WHERE pu.order_id = $1
-      LIMIT 1
+    // Fetch all order detail sub-queries in parallel — none depend on each other.
+    const [
+      { rows: items },
+      warehouseAssignments,
+      { rows: promotionRows },
+      { rows: replacementOrders },
+      { rows: disputeRows },
+    ] = await Promise.all([
+      query(
+        `
+        SELECT
+          oi.*,
+          p.name as product_name,
+          p.sku as product_sku,
+          s.name as supplier_name,
+          s.slug as supplier_slug,
+          pick.location_code
+        FROM order_item oi
+        JOIN product p ON p.id = oi.product_id
+        JOIN supplier s ON s.id = oi.supplier_id
+        LEFT JOIN LATERAL (
+          SELECT pli.location_code
+          FROM pick_list pl
+          JOIN pick_list_item pli ON pli.pick_list_id = pl.id
+          WHERE pl.order_id = oi.order_id
+            AND pli.product_id = oi.product_id
+          ORDER BY pl.created_at DESC
+          LIMIT 1
+        ) pick ON true
+        WHERE oi.order_id = $1
+        ORDER BY s.name, p.name
       `,
-      [id]
-    )
+        [id]
+      ),
+      loadOrderWarehouseAssignments(id),
+      query(
+        `
+        SELECT
+          pu.promotion_id,
+          pu.discount_applied,
+          p.name AS promotion_name,
+          p.type AS promotion_type
+        FROM promotion_usages pu
+        JOIN promotions p ON p.id = pu.promotion_id
+        WHERE pu.order_id = $1
+        LIMIT 1
+        `,
+        [id]
+      ),
+      query(
+        `
+        SELECT id, status, placement_source, source_order_id, source_dispute_id, created_at, total_amount
+        FROM customer_order
+        WHERE source_order_id = $1
+        ORDER BY created_at ASC
+        `,
+        [id]
+      ),
+      order.source_dispute_id
+        ? query(`SELECT id, status, resolution_type, order_id FROM disputes WHERE id = $1`, [
+            order.source_dispute_id,
+          ])
+        : Promise.resolve({ rows: [] }),
+    ])
+
     const promotionUsage = promotionRows[0]
     const appliedPromotion = promotionUsage
       ? {
@@ -1012,24 +1106,7 @@ router.get('/:id', requireAuth, async (req, res, next) => {
         }
       : null
 
-    const { rows: replacementOrders } = await query(
-      `
-      SELECT id, status, placement_source, source_order_id, source_dispute_id, created_at, total_amount
-      FROM customer_order
-      WHERE source_order_id = $1
-      ORDER BY created_at ASC
-      `,
-      [id]
-    )
-
-    let sourceDispute = null
-    if (order.source_dispute_id) {
-      const { rows: disputeRows } = await query(
-        `SELECT id, status, resolution_type, order_id FROM disputes WHERE id = $1`,
-        [order.source_dispute_id]
-      )
-      sourceDispute = disputeRows[0] || null
-    }
+    const sourceDispute = disputeRows[0] || null
 
     res.json({
       ok: true,
@@ -1112,6 +1189,20 @@ router.post(
 
       const productMap = new Map(products.map((p) => [p.id, p]))
 
+      const resolveItems = orderData.items.map((item) => {
+        const product = productMap.get(item.productId)
+        return {
+          productId: item.productId,
+          supplierId: product.supplier_id,
+          quantity: item.quantity,
+        }
+      })
+      const resolvedPrices = await resolveProductPricesBatch({
+        restaurantId,
+        items: resolveItems,
+      })
+      const resolvedMap = new Map(resolvedPrices.map((r) => [r.productId, r]))
+
       // Validate and group items by supplier
       const supplierGroups = new Map()
       for (const item of orderData.items) {
@@ -1119,7 +1210,8 @@ router.post(
         if (!product) {
           throw new ValidationError(`Product ${item.productId} not found`)
         }
-        if (!product.current_price) {
+        const resolved = resolvedMap.get(item.productId)
+        if (resolved?.unitPrice == null) {
           throw new ValidationError(`No valid price found for product ${product.sku}`)
         }
         if (!supplierGroups.has(product.supplier_id)) {
@@ -1128,7 +1220,10 @@ router.post(
         supplierGroups.get(product.supplier_id).push({
           ...item,
           product,
-          unitPrice: Number(product.current_price),
+          unitPrice: Number(resolved.unitPrice),
+          pricingSource: resolved.source,
+          contractPriceId: resolved.contractPriceId,
+          defaultCatalogPrice: resolved.defaultPrice,
         })
       }
 
@@ -1199,8 +1294,9 @@ router.post(
             } = await client.query(
               `
             INSERT INTO order_item (
-              order_id, product_id, supplier_id, quantity, unit_price, line_total, notes
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+              order_id, product_id, supplier_id, quantity, unit_price, line_total, notes,
+              pricing_source, contract_price_id, default_catalog_price
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
           `,
               [
@@ -1211,6 +1307,9 @@ router.post(
                 item.unitPrice,
                 lineTotal,
                 item.notes,
+                item.pricingSource || 'DEFAULT_PRICE',
+                item.contractPriceId || null,
+                item.defaultCatalogPrice ?? null,
               ]
             )
 
@@ -1468,9 +1567,19 @@ router.post(
         let totalAmount = 0
         const orderItems = []
 
+        const manualResolveItems = orderData.items.map((item) => ({
+          productId: item.productId,
+          supplierId,
+          quantity: item.quantity,
+        }))
+        const manualResolved = await resolveProductPricesBatch({
+          restaurantId: orderData.restaurant_id,
+          items: manualResolveItems,
+        })
+        const manualResolvedMap = new Map(manualResolved.map((r) => [r.productId, r]))
+
         // Process each item
         for (const item of orderData.items) {
-          // Get product and current price
           const { rows: products } = await client.query(
             `
           SELECT p.*, pr.amount as current_price, pr.currency
@@ -1489,8 +1598,9 @@ router.post(
           }
 
           const product = products[0]
+          const resolved = manualResolvedMap.get(item.productId)
 
-          if (!product.current_price) {
+          if (resolved?.unitPrice == null) {
             throw new ValidationError(`No valid price found for product ${product.sku}`)
           }
 
@@ -1499,22 +1609,32 @@ router.post(
             reserve: true,
           })
 
-          // Calculate line total
-          const unitPrice = Number(product.current_price)
+          const unitPrice = Number(resolved.unitPrice)
           const lineTotal = unitPrice * item.quantity
           totalAmount += lineTotal
 
-          // Create order item
           const {
             rows: [orderItem],
           } = await client.query(
             `
           INSERT INTO order_item (
-            order_id, product_id, supplier_id, quantity, unit_price, line_total, notes
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            order_id, product_id, supplier_id, quantity, unit_price, line_total, notes,
+            pricing_source, contract_price_id, default_catalog_price
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           RETURNING *
         `,
-            [order.id, item.productId, supplierId, item.quantity, unitPrice, lineTotal, item.notes]
+            [
+              order.id,
+              item.productId,
+              supplierId,
+              item.quantity,
+              unitPrice,
+              lineTotal,
+              item.notes,
+              resolved.source || 'DEFAULT_PRICE',
+              resolved.contractPriceId || null,
+              resolved.defaultPrice ?? null,
+            ]
           )
 
           orderItems.push(orderItem)

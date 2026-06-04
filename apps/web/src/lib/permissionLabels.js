@@ -40,7 +40,14 @@ export const PERMISSION_LABELS = {
   FULFILLMENT_MANAGE: 'Manage fulfillment',
   PROMOTIONS_VIEW: 'View promotions',
   PROMOTIONS_MANAGE: 'Manage promotions',
+  DRIVER_DELIVERIES_VIEW: 'View assigned deliveries',
+  DRIVER_DELIVERIES_MANAGE: 'Update delivery status & proof',
   ADMIN_ACCESS: 'Platform admin access',
+  ADMIN_TENANTS: 'Manage tenants',
+  ADMIN_SUPPORT: 'Manage platform users',
+  ADMIN_PLANS: 'Manage plans & subscriptions',
+  ADMIN_FINANCE: 'View financial overview',
+  ADMIN_GROWTH: 'Manage features & growth',
 }
 
 export const PERMISSION_DOMAINS = {
@@ -63,6 +70,7 @@ export const PERMISSION_DOMAINS = {
   Payments: ['PAYMENTS_VIEW', 'PAYMENTS_MANAGE'],
   Fulfillment: ['FULFILLMENT_VIEW', 'FULFILLMENT_MANAGE'],
   Promotions: ['PROMOTIONS_VIEW', 'PROMOTIONS_MANAGE'],
+  'Driver deliveries': ['DRIVER_DELIVERIES_VIEW', 'DRIVER_DELIVERIES_MANAGE'],
 }
 
 export const RESTAURANT_PERMISSION_DOMAINS = {
@@ -92,6 +100,7 @@ export const SUPPLIER_PERMISSION_DOMAINS = {
   Payments: PERMISSION_DOMAINS.Payments,
   Fulfillment: PERMISSION_DOMAINS.Fulfillment,
   Promotions: PERMISSION_DOMAINS.Promotions,
+  'Driver deliveries': PERMISSION_DOMAINS['Driver deliveries'],
 }
 
 export function labelForPermission(key) {

@@ -17,6 +17,11 @@ import {
 } from '../lib/invite-session'
 import { InviteEmailMismatchCard } from '../components/invite/InviteEmailMismatchCard'
 import { InviteSignupEmailField } from '../components/invite/InviteSignupEmailField'
+import {
+  LegalAcceptancePanel,
+  isLegalAcceptanceComplete,
+} from '../components/legal/LegalAcceptancePanel'
+import { buildLegalAcceptancePayload, type LegalDocumentSlug } from '../lib/legalDocuments'
 
 export function BranchInviteAcceptPage() {
   const [searchParams] = useSearchParams()
@@ -32,7 +37,12 @@ export function BranchInviteAcceptPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [acceptedLegal, setAcceptedLegal] = useState<Set<LegalDocumentSlug>>(new Set())
+  const [electronicSigned, setElectronicSigned] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const legalComplete = isLegalAcceptanceComplete('invite', null, acceptedLegal, electronicSigned)
+  const legalPayload = legalComplete ? buildLegalAcceptancePayload(acceptedLegal) : undefined
 
   const invite = data
   const loginHref = `/login?${searchParams.toString()}`
@@ -95,9 +105,15 @@ export function BranchInviteAcceptPage() {
 
   const handleAcceptLoggedIn = async () => {
     setError(null)
+    if (!legalPayload) {
+      setError('Please accept all required legal agreements before continuing.')
+      return
+    }
     try {
-      const result = await accept({ token }).unwrap()
+      const result = await accept({ token, legalAcceptance: legalPayload }).unwrap()
       dispatch(api.util.resetApiState())
+      const { refetchAppSession } = await import('../lib/refetchAppSession')
+      await refetchAppSession(dispatch)
       finishInviteAcceptNavigation(result, navigate, searchParams)
     } catch (err) {
       setError(
@@ -125,14 +141,21 @@ export function BranchInviteAcceptPage() {
       setError(inviteFormEmailMismatchMessage(requiredInviteEmail))
       return
     }
+    if (!legalPayload) {
+      setError('Please accept all required legal agreements before continuing.')
+      return
+    }
     try {
       const result = await accept({
         token,
         full_name: fullName.trim(),
         email: signupEmail,
         password,
+        legalAcceptance: legalPayload,
       }).unwrap()
       dispatch(api.util.resetApiState())
+      const { refetchAppSession } = await import('../lib/refetchAppSession')
+      await refetchAppSession(dispatch)
       finishInviteAcceptNavigation(result, navigate, searchParams)
     } catch (err) {
       setError(
@@ -150,7 +173,7 @@ export function BranchInviteAcceptPage() {
   if (sessionUser) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="max-w-md w-full space-y-4 border border-[var(--app-border)] rounded-lg p-6">
+        <div className="max-w-xl w-full space-y-4 border border-[var(--app-border)] rounded-lg p-6">
           <h1 className="text-xl font-semibold">Accept branch invitation</h1>
           {emailMismatch && invite.invited_email ? (
             <InviteEmailMismatchCard
@@ -165,11 +188,19 @@ export function BranchInviteAcceptPage() {
                 is for <strong>{invite.branch_name}</strong> ({invite.org_name}) as{' '}
                 {invite.role_name}.
               </p>
+              <LegalAcceptancePanel
+                variant="invite"
+                value={acceptedLegal}
+                onChange={setAcceptedLegal}
+                electronicSigned={electronicSigned}
+                onElectronicSignedChange={setElectronicSigned}
+                disabled={accepting}
+              />
               {error && <p className="text-sm text-red-600">{error}</p>}
               <Button
                 type="button"
                 className="w-full"
-                disabled={accepting}
+                disabled={accepting || !legalComplete}
                 onClick={() => handleAcceptLoggedIn()}
               >
                 Accept & Join Branch
@@ -189,7 +220,7 @@ export function BranchInviteAcceptPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
-      <div className="max-w-md w-full space-y-4 border border-[var(--app-border)] rounded-lg p-6">
+      <div className="max-w-xl w-full space-y-4 border border-[var(--app-border)] rounded-lg p-6">
         <h1 className="text-xl font-semibold">Welcome to Supplify</h1>
         <p className="text-sm text-[var(--text-muted)]">
           You&apos;ve been invited to join <strong>{invite.branch_name}</strong> ({invite.org_name})
@@ -232,8 +263,16 @@ export function BranchInviteAcceptPage() {
               minLength={8}
             />
           </label>
+          <LegalAcceptancePanel
+            variant="invite"
+            value={acceptedLegal}
+            onChange={setAcceptedLegal}
+            electronicSigned={electronicSigned}
+            onElectronicSignedChange={setElectronicSigned}
+            disabled={accepting}
+          />
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button type="submit" className="w-full" disabled={accepting}>
+          <Button type="submit" className="w-full" disabled={accepting || !legalComplete}>
             Create Account & Join Branch
           </Button>
         </form>

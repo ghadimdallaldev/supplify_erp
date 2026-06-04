@@ -51,6 +51,8 @@ import { usePermissions } from '../hooks/usePermissions'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
 import { StaffPortalAccessPanel } from '../components/StaffPortalAccessPanel'
+import { getApiErrorMessage } from '../lib/apiError'
+import { AlertCircle } from 'lucide-react'
 
 interface StaffFormState {
   firstName: string
@@ -187,48 +189,77 @@ export function StaffPage() {
     breakMinutes: '',
   })
 
-  const { data: staffMembers = [], isLoading: staffLoading } = useGetStaffMembersQuery()
+  const {
+    data: staffMembers = [],
+    isLoading: staffLoading,
+    isError: staffLoadError,
+    error: staffLoadErrorDetail,
+    refetch: refetchStaffMembers,
+  } = useGetStaffMembersQuery()
 
   const today = new Date()
   const scheduleStart = clampToISODate(today)
   const scheduleEnd = clampToISODate(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000))
 
-  const { data: shifts = [], isLoading: shiftsLoading } = useGetStaffShiftsQuery({
-    startDate: scheduleStart,
-    endDate: scheduleEnd,
-  })
+  const { data: shifts = [], isLoading: shiftsLoading } = useGetStaffShiftsQuery(
+    {
+      startDate: scheduleStart,
+      endDate: scheduleEnd,
+    },
+    { skip: activeTab !== 'schedule' }
+  )
 
-  const { data: timeEntries = [], isLoading: timeEntriesLoading } = useGetStaffTimeEntriesQuery({
-    startDate: clampToISODate(new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)),
-    endDate: clampToISODate(new Date(today.getTime() + 1 * 24 * 60 * 60 * 1000)),
-  })
+  const { data: timeEntries = [], isLoading: timeEntriesLoading } = useGetStaffTimeEntriesQuery(
+    {
+      startDate: clampToISODate(new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)),
+      endDate: clampToISODate(new Date(today.getTime() + 1 * 24 * 60 * 60 * 1000)),
+    },
+    { skip: activeTab !== 'schedule' }
+  )
 
   const [createStaffMember, { isLoading: creatingStaff }] = useCreateStaffMemberMutation()
   const [createShift, { isLoading: creatingShift }] = useCreateStaffShiftMutation()
   const [checkInStaff, { isLoading: checkingIn }] = useCheckInStaffMemberMutation()
   const [checkOutEntry, { isLoading: checkingOut }] = useCheckOutTimeEntryMutation()
-  const { data: ptoRequests = [], isLoading: ptoLoading } = useGetStaffPtoRequestsQuery()
+  const { data: ptoRequests = [], isLoading: ptoLoading } = useGetStaffPtoRequestsQuery(undefined, {
+    skip: activeTab !== 'pto',
+  })
   const [createPtoRequest, { isLoading: creatingPto }] = useCreateStaffPtoRequestMutation()
   const [updatePtoRequest, { isLoading: updatingPto }] = useUpdateStaffPtoRequestMutation()
-  const { data: availability = [] } = useGetStaffAvailabilityQuery()
+  const { data: availability = [] } = useGetStaffAvailabilityQuery(undefined, {
+    skip: activeTab !== 'pto',
+  })
   const [setAvailability, { isLoading: savingAvailability }] = useSetStaffAvailabilityMutation()
-  const { data: swaps = [], isLoading: swapsLoading } = useGetStaffSwapsQuery()
+  const { data: swaps = [], isLoading: swapsLoading } = useGetStaffSwapsQuery(undefined, {
+    skip: activeTab !== 'schedule',
+  })
   const [createSwap, { isLoading: creatingSwap }] = useCreateStaffSwapMutation()
   const [decideSwap, { isLoading: decidingSwap }] = useDecideStaffSwapMutation()
   const { data: announcements = [], isLoading: announcementsLoading } =
-    useGetStaffAnnouncementsQuery()
+    useGetStaffAnnouncementsQuery(undefined, { skip: activeTab !== 'announcements' })
   const [createAnnouncement, { isLoading: creatingAnnouncement }] =
     useCreateStaffAnnouncementMutation()
   const [ackAnnouncement] = useAcknowledgeStaffAnnouncementMutation()
-  const { data: documents = [], isLoading: documentsLoading } = useGetStaffDocumentsQuery()
+  const { data: documents = [], isLoading: documentsLoading } = useGetStaffDocumentsQuery(
+    undefined,
+    { skip: activeTab !== 'documents' }
+  )
   const [createDocument, { isLoading: creatingDocument }] = useCreateStaffDocumentMutation()
-  const { data: incidents = [], isLoading: incidentsLoading } = useGetStaffIncidentsQuery()
+  const { data: incidents = [], isLoading: incidentsLoading } = useGetStaffIncidentsQuery(
+    undefined,
+    { skip: activeTab !== 'documents' }
+  )
   const [createIncident, { isLoading: creatingIncident }] = useCreateStaffIncidentMutation()
-  const { data: performanceNotes = [], isLoading: notesLoading } =
-    useGetStaffPerformanceNotesQuery()
+  const { data: performanceNotes = [], isLoading: notesLoading } = useGetStaffPerformanceNotesQuery(
+    undefined,
+    { skip: activeTab !== 'reports' }
+  )
   const [createPerformanceNote, { isLoading: creatingPerformance }] =
     useCreateStaffPerformanceNoteMutation()
-  const { data: payrollExports = [], isLoading: payrollLoading } = useGetStaffPayrollExportsQuery()
+  const { data: payrollExports = [], isLoading: payrollLoading } = useGetStaffPayrollExportsQuery(
+    undefined,
+    { skip: activeTab !== 'reports' }
+  )
   const [createPayrollExport, { isLoading: creatingPayroll }] =
     useCreateStaffPayrollExportMutation()
 
@@ -302,13 +333,8 @@ export function StaffPage() {
       toast.success('Staff member added')
       setIsAddStaffOpen(false)
       resetStaffForm()
-    } catch (error: any) {
-      const apiMessage =
-        error?.data?.error?.message ||
-        error?.error ||
-        (typeof error?.message === 'string' ? error.message : null) ||
-        'Unable to create staff member'
-      toast.error(apiMessage)
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to create staff member'))
     }
   }
 
@@ -339,13 +365,8 @@ export function StaffPage() {
       toast.success('Shift scheduled')
       setIsAddShiftOpen(false)
       resetShiftForm()
-    } catch (error: any) {
-      const apiMessage =
-        error?.data?.error?.message ||
-        error?.error ||
-        (typeof error?.message === 'string' ? error.message : null) ||
-        'Unable to schedule shift'
-      toast.error(apiMessage)
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to schedule shift'))
     }
   }
 
@@ -356,8 +377,8 @@ export function StaffPage() {
         method: 'web',
       }).unwrap()
       toast.success(`${staff.displayName} checked in`)
-    } catch (error) {
-      toast.error('Unable to check in')
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to check in'))
     }
   }
 
@@ -368,8 +389,8 @@ export function StaffPage() {
         method: 'web',
       }).unwrap()
       toast.success(`${staff.displayName} checked out`)
-    } catch (error) {
-      toast.error('Unable to check out')
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to check out'))
     }
   }
 
@@ -446,8 +467,8 @@ export function StaffPage() {
       }).unwrap()
       toast.success('Availability recorded')
       setAvailabilityForm({ staffId: '', weekday: '0', start: '', end: '', notes: '' })
-    } catch {
-      toast.error('Unable to save availability')
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to save availability'))
     }
   }
 
@@ -880,7 +901,20 @@ export function StaffPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {staffLoading ? (
+                  {staffLoadError ? (
+                    <div className="flex flex-col items-center gap-3 py-8 text-center">
+                      <AlertCircle className="h-8 w-8 text-[var(--red)]" />
+                      <p className="text-sm text-[var(--text-muted)] max-w-md">
+                        {getApiErrorMessage(
+                          staffLoadErrorDetail,
+                          'Unable to load staff directory.'
+                        )}
+                      </p>
+                      <Button variant="outline" size="sm" onClick={() => refetchStaffMembers()}>
+                        Try again
+                      </Button>
+                    </div>
+                  ) : staffLoading ? (
                     <p className="text-sm text-[var(--text-muted)]">Loading staff…</p>
                   ) : staffMembers.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">

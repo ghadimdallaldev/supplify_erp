@@ -4,10 +4,70 @@ import { config } from '../config/env.js'
 import { persistMessageFromSocket } from '../services/chatSocket.service.js'
 import { userCanAccessConversation } from './chat-access.js'
 import { resolveSocketUserFromCookieHeader } from './socket-auth.js'
+import { attachSocketRedisAdapter } from './socket-redis-adapter.js'
 
 let io = null
 
-export function initializeSocket(server) {
+function userRoom(userId) {
+  return `user_${userId}`
+}
+
+/**
+ * @param {Record<string, unknown>} notification
+ * @returns {Record<string, unknown>}
+ */
+export function serializeNotificationPayload(notification) {
+  if (!notification || typeof notification !== 'object') return {}
+  let metadata = notification.metadata
+  if (typeof metadata === 'string') {
+    try {
+      metadata = JSON.parse(metadata)
+    } catch {
+      metadata = null
+    }
+  }
+  return {
+    id: notification.id,
+    title: notification.title ?? null,
+    message: notification.message ?? null,
+    reference_type: notification.reference_type ?? null,
+    reference_id: notification.reference_id ?? null,
+    metadata: metadata ?? null,
+    created_at: notification.created_at ?? new Date().toISOString(),
+    is_read: Boolean(notification.is_read),
+    notification_type: notification.notification_type ?? null,
+    notification_category: notification.notification_category ?? null,
+  }
+}
+
+/**
+ * @param {string} userId
+ * @param {string} event
+ * @param {unknown} payload
+ */
+export function emitToUser(userId, event, payload) {
+  if (!io || !userId) return
+  io.to(userRoom(userId)).emit(event, payload)
+}
+
+/**
+ * Push in-app notification to connected clients for a user.
+ * @param {Record<string, unknown>} notification
+ */
+export function emitNotificationNew(notification) {
+  const userId = notification?.user_id || notification?.userId
+  if (!io) {
+    logger.debug('emitNotificationNew skipped: socket not initialized')
+    return
+  }
+  if (!userId) {
+    return
+  }
+  const payload = serializeNotificationPayload(notification)
+  emitToUser(userId, 'notification_new', payload)
+}
+
+export async function initializeSocket(server) {
   io = new Server(server, {
     cors: {
       origin: config.WEB_ORIGINS,
@@ -15,6 +75,8 @@ export function initializeSocket(server) {
       credentials: true,
     },
   })
+
+  await attachSocketRedisAdapter(io)
 
   io.use(async (socket, next) => {
     try {
@@ -34,15 +96,19 @@ export function initializeSocket(server) {
   })
 
   io.on('connection', (socket) => {
+    const userId = socket.data.userId
+    if (userId) {
+      socket.join(userRoom(userId))
+    }
+
     logger.info({
       msg: 'WebSocket client connected',
       socketId: socket.id,
-      userId: socket.data.userId,
+      userId,
       role: socket.data.role,
       tenantId: socket.data.tenantId,
     })
 
-    // Handle joining a conversation
     socket.on('join_conversation', async (conversationId) => {
       try {
         if (!conversationId || typeof conversationId !== 'string') return
@@ -62,13 +128,11 @@ export function initializeSocket(server) {
       }
     })
 
-    // Handle leaving a conversation
     socket.on('leave_conversation', (conversationId) => {
       socket.leave(`conversation_${conversationId}`)
       logger.info('Client left conversation', { socketId: socket.id, conversationId })
     })
 
-    // Handle sending a message (fallback for clients that only emit socket; persist so message is not lost)
     socket.on('send_message', async (data) => {
       try {
         if (!data || typeof data !== 'object') return
@@ -92,7 +156,6 @@ export function initializeSocket(server) {
           }
         }
 
-        // Broadcast so all clients (including REST senders) can refetch or merge
         io.to(`conversation_${conversationId}`).emit('new_message', {
           conversationId,
           content,
@@ -105,19 +168,11 @@ export function initializeSocket(server) {
       }
     })
 
-    // Handle message read status update
     socket.on('message_read', (data) => {
       try {
         if (!data || typeof data !== 'object') return
         const { conversationId, messageId } = data
 
-        logger.info('Message read status update', {
-          socketId: socket.id,
-          conversationId,
-          messageId,
-        })
-
-        // Broadcast read status to all clients in the conversation
         io.to(`conversation_${conversationId}`).emit('message_read_update', {
           conversationId,
           messageId,
@@ -128,19 +183,11 @@ export function initializeSocket(server) {
       }
     })
 
-    // Handle typing indicator
     socket.on('typing', (data) => {
       try {
         if (!data || typeof data !== 'object') return
         const { conversationId, isTyping } = data
 
-        logger.debug('Typing indicator', {
-          socketId: socket.id,
-          conversationId,
-          isTyping,
-        })
-
-        // Broadcast typing status to all clients in the conversation except sender
         socket.to(`conversation_${conversationId}`).emit('user_typing', {
           conversationId,
           userId: socket.data.userId,
@@ -176,7 +223,6 @@ export function getIO() {
 
 /**
  * Notify all connected clients to refetch entitlements (global or tenant feature flag change).
- * Safe to call before Socket.IO is initialized (no-op).
  * @param {Record<string, unknown>} payload
  */
 export function emitEntitlementsRefreshNotice(payload) {

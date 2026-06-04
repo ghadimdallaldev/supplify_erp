@@ -1,8 +1,21 @@
 import { verifyToken, refreshAccessToken } from './auth.js'
+import { config } from '../config/env.js'
 import { query } from './db.js'
 import { logger } from './logger.js'
 import { syncRequestLogContext } from './request-log-context.js'
-import { getEffectiveTenant, impersonationCanAccessBranch } from './impersonation.js'
+import { getCache, setCache, deleteCache } from './cache.js'
+import { singleflight } from './singleflight.js'
+import { startStage, mark, noteCacheHit } from '../middlewares/request-timing.js'
+import {
+  resolveRequestBillingSubscription,
+  resolveRequestSubscription,
+} from './request-subscription.js'
+import {
+  getEffectiveTenant,
+  impersonationCanAccessBranch,
+  getImpersonationEffectivePermissions,
+  isImpersonating,
+} from './impersonation.js'
 import {
   getActiveTenantFromRequest,
   getPrimaryTenantForUser,
@@ -16,11 +29,34 @@ import {
   invalidateUserPermissionCache,
 } from './permissions.js'
 import {
+  canUseCrossRequestTenantCaches,
+  getTenantContextBundle,
+  setTenantContextBundle,
+} from './tenant-context-cache.js'
+import {
   ensureTenantSystemRoles,
   assignOwnerRoleForUser,
   userHasOwnerRole,
 } from './tenant-roles.js'
 import { assertStaffPortalRouteAccess, STAFF_PORTAL_APP_ROLE } from './staff-portal-auth.js'
+
+const TENANT_REQ_CACHE_TTL = 180 // seconds
+const USER_BY_SUB_CACHE_TTL = 300 // seconds
+
+function userBySubCacheKey(sub) {
+  return `user:sub:${sub}`
+}
+
+export async function invalidateUserBySubCache(sub) {
+  if (!sub) return
+  await deleteCache(userBySubCacheKey(sub)).catch(() => {})
+}
+
+/** Clear cached tenant resolution for a user (role change, workspace bind, invite accept). */
+export async function invalidateRequestTenantCache(userId, tenantType) {
+  if (!userId || !tenantType) return
+  await deleteCache(`tenant:req:${userId}:${tenantType}`).catch(() => {})
+}
 
 // Extract token from cookie
 export function extractTokenFromCookie(req) {
@@ -32,45 +68,66 @@ export function extractRefreshTokenFromCookie(req) {
   return req.cookies.refresh_token
 }
 
-// Set auth cookies
+function authCookieOptions(maxAge) {
+  const opts = {
+    httpOnly: true,
+    secure: config.COOKIE_SECURE,
+    sameSite: config.COOKIE_SAME_SITE,
+    path: '/',
+    maxAge,
+  }
+  if (config.COOKIE_DOMAIN) {
+    opts.domain = config.COOKIE_DOMAIN
+  }
+  return opts
+}
+
+// Set auth cookies (use COOKIE_SAME_SITE=none on Railway when web and API are different hosts)
 export function setAuthCookies(res, accessToken, refreshToken) {
-  const isProduction = process.env.NODE_ENV === 'production'
-
-  // In development, use 'lax' for sameSite (works with http://localhost)
-  const sameSite = 'lax'
-
-  // Access token cookie (short-lived)
-  res.cookie('access_token', accessToken, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite,
-    path: '/',
-    maxAge: 60 * 60 * 1000, // 1 hour (increased from 5 minutes)
-  })
-
-  // Refresh token cookie (longer-lived)
-  res.cookie('refresh_token', refreshToken, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite,
-    path: '/',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  })
+  res.cookie('access_token', accessToken, authCookieOptions(60 * 60 * 1000))
+  res.cookie('refresh_token', refreshToken, authCookieOptions(7 * 24 * 60 * 60 * 1000))
 }
 
 // Clear auth cookies (same path/sameSite as setAuthCookies so browser actually removes them)
 export function clearAuthCookies(res) {
-  const isProduction = process.env.NODE_ENV === 'production'
-  const opts = { path: '/', sameSite: 'lax', ...(isProduction && { secure: true }) }
+  const opts = {
+    path: '/',
+    sameSite: config.COOKIE_SAME_SITE,
+    secure: config.COOKIE_SECURE,
+    ...(config.COOKIE_DOMAIN ? { domain: config.COOKIE_DOMAIN } : {}),
+  }
   res.clearCookie('access_token', opts)
   res.clearCookie('refresh_token', opts)
 }
 
-// Get user from database by Keycloak sub
-export async function getUserBySub(sub) {
+// Get user from database by Keycloak sub (short TTL cache — hot path on every authenticated request)
+export async function getUserBySub(sub, req = null) {
   try {
-    const result = await query('SELECT * FROM app_user WHERE keycloak_sub = $1', [sub])
-    return result.rows[0] || null
+    const cacheKey = userBySubCacheKey(sub)
+    const cached = await getCache(cacheKey)
+    if (cached !== null) {
+      if (req?._perf) noteCacheHit(req, 'userBySub')
+      return cached === 'null' ? null : cached
+    }
+
+    return singleflight(cacheKey, async () => {
+      const again = await getCache(cacheKey)
+      if (again !== null) {
+        if (req?._perf) noteCacheHit(req, 'userBySub')
+        return again === 'null' ? null : again
+      }
+
+      const lookupStart = req?._perf ? process.hrtime.bigint() : null
+      const result = await query('SELECT * FROM app_user WHERE keycloak_sub = $1', [sub], req)
+      if (lookupStart != null && req?._perf) {
+        req._perf.stages.userLookup = Math.round(
+          Number(process.hrtime.bigint() - lookupStart) / 1_000_000
+        )
+      }
+      const user = result.rows[0] || null
+      await setCache(cacheKey, user ?? 'null', USER_BY_SUB_CACHE_TTL).catch(() => {})
+      return user
+    })
   } catch (error) {
     logger.error('Error getting user by sub', { error: error.message })
     throw error
@@ -139,7 +196,9 @@ export async function upsertUser(userInfo, roles = []) {
     )
 
     logger.debug('User upserted', { userId: result.rows[0]?.id, role: result.rows[0]?.role })
-    return result.rows[0]
+    const row = result.rows[0]
+    if (sub) await invalidateUserBySubCache(sub)
+    return row
   } catch (error) {
     logger.error('Error upserting user', { error: error.message })
     throw error
@@ -148,6 +207,7 @@ export async function upsertUser(userInfo, roles = []) {
 
 // Authentication middleware
 export async function requireAuth(req, res, next) {
+  startStage(req, 'auth')
   try {
     const accessToken = extractTokenFromCookie(req)
 
@@ -170,8 +230,9 @@ export async function requireAuth(req, res, next) {
       req.userSub = payload.sub
 
       // Get user from database
-      const user = await getUserBySub(payload.sub)
+      const user = await getUserBySub(payload.sub, req)
       if (!user) {
+        mark(req, 'auth')
         return res.status(401).json({
           ok: false,
           data: null,
@@ -187,8 +248,10 @@ export async function requireAuth(req, res, next) {
       syncRequestLogContext(req)
       const staffPortalBlock = assertStaffPortalRouteAccess(req, user)
       if (staffPortalBlock) {
+        mark(req, 'auth')
         return res.status(staffPortalBlock.status).json(staffPortalBlock.body)
       }
+      mark(req, 'auth')
       next()
     } catch (error) {
       logger.debug('Token verification failed, attempting refresh')
@@ -239,8 +302,9 @@ export async function requireAuth(req, res, next) {
       req.userSub = payload.sub
 
       // Get user from database
-      const user = await getUserBySub(payload.sub)
+      const user = await getUserBySub(payload.sub, req)
       if (!user) {
+        mark(req, 'auth')
         return res.status(401).json({
           ok: false,
           data: null,
@@ -256,11 +320,14 @@ export async function requireAuth(req, res, next) {
       syncRequestLogContext(req)
       const staffPortalBlock = assertStaffPortalRouteAccess(req, user)
       if (staffPortalBlock) {
+        mark(req, 'auth')
         return res.status(staffPortalBlock.status).json(staffPortalBlock.body)
       }
+      mark(req, 'auth')
       next()
     }
   } catch (error) {
+    mark(req, 'auth')
     logger.error('Authentication error', { error: error.message })
     clearAuthCookies(res)
     return res.status(500).json({
@@ -417,12 +484,30 @@ export async function assignDefaultRoleForTenant(userId, tenantId, tenantType) {
  * Get the tenant (restaurant or supplier) for this request.
  * When admin is impersonating, returns the impersonated tenant.
  * Otherwise for RESTAURANT/SUPPLIER resolves by contact_email.
+ *
+ * Process-level caching (60s TTL, via getCache/setCache) is applied only on the common path
+ * where there is no impersonation, no active-tenant cookie, and no x-branch-id header.
+ * Impersonation and branch-switch paths always bypass the cache.
+ *
  * @param {import('express').Request} req
  * @returns {Promise<{ tenantId: string, tenantType: string, tenantName: string } | null>}
  */
 export async function getRequestTenant(req) {
-  if (!req.userData) return null
-  if (req.userData.role === 'PENDING') return null
+  startStage(req, 'tenant')
+  if (req._requestTenantResolved) {
+    return req._requestTenantCache ?? null
+  }
+  req._requestTenantResolved = true
+
+  const finish = (tenant) => {
+    req._requestTenantCache = tenant ?? null
+    mark(req, 'tenant')
+    return req._requestTenantCache
+  }
+
+  if (!req.userData) return finish(null)
+  if (req.userData.role === 'PENDING') return finish(null)
+
   const effective = getEffectiveTenant(req)
   const activeFromCookie = await getActiveTenantFromRequest(req)
   if (effective && activeFromCookie) {
@@ -432,9 +517,9 @@ export async function getRequestTenant(req) {
       activeFromCookie.tenantId,
       activeFromCookie.tenantType
     )
-    if (branchOk) return activeFromCookie
+    if (branchOk) return finish(activeFromCookie)
   }
-  if (effective) return effective
+  if (effective) return finish(effective)
 
   const branchHeader = req.headers['x-branch-id']
   if (branchHeader && req.userData?.role === 'SUPPLIER') {
@@ -448,12 +533,79 @@ export async function getRequestTenant(req) {
     if (allowed) {
       const { rows } = await query(`SELECT id, name FROM supplier WHERE id = $1`, [branchHeader])
       if (rows.length) {
-        return { tenantId: rows[0].id, tenantType: 'SUPPLIER', tenantName: rows[0].name || '' }
+        return finish({
+          tenantId: rows[0].id,
+          tenantType: 'SUPPLIER',
+          tenantName: rows[0].name || '',
+        })
       }
     }
   }
 
-  if (activeFromCookie) return activeFromCookie
+  if (activeFromCookie) return finish(activeFromCookie)
+
+  // --- Process-level cache for the common path (no impersonation, no active-tenant cookie, no branch header) ---
+  const userId = req.userData.id
+  const tenantType = req.userData.role
+  if (
+    (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') &&
+    !branchHeader &&
+    !activeFromCookie &&
+    !effective
+  ) {
+    const processCacheKey = `tenant:req:${userId}:${tenantType}`
+    const cachedTenant = await getCache(processCacheKey)
+    if (cachedTenant !== null) {
+      noteCacheHit(req, 'requestTenant')
+      return finish(cachedTenant === 'null' ? null : cachedTenant)
+    }
+
+    const resolved = await singleflight(processCacheKey, async () => {
+      const again = await getCache(processCacheKey)
+      if (again !== null) return again === 'null' ? null : again
+
+      let tenantResolved = null
+
+      const assignment = await getTenantAssignmentForUser(userId, tenantType)
+      if (assignment?.tenantId) {
+        const allowed = await userCanAccessTenant(
+          userId,
+          req.userData.email,
+          assignment.tenantId,
+          assignment.tenantType
+        )
+        if (allowed) {
+          tenantResolved = {
+            tenantId: assignment.tenantId,
+            tenantType: assignment.tenantType,
+            tenantName: assignment.tenantName || '',
+          }
+        }
+      }
+
+      if (!tenantResolved) {
+        const email = (req.userData.email || '').trim().toLowerCase()
+        if (email) {
+          const primary = await getPrimaryTenantForUser(email, tenantType)
+          if (primary) {
+            tenantResolved = {
+              tenantId: primary.id,
+              tenantType,
+              tenantName: primary.name || '',
+            }
+          }
+        }
+      }
+
+      await setCache(processCacheKey, tenantResolved ?? 'null', TENANT_REQ_CACHE_TTL).catch(
+        () => {}
+      )
+      return tenantResolved
+    })
+
+    return finish(resolved)
+  }
+  // --- End process-level cache ---
 
   if (req.userData.role === 'RESTAURANT' || req.userData.role === 'SUPPLIER') {
     const assignment = await getTenantAssignmentForUser(req.userData.id, req.userData.role)
@@ -465,30 +617,38 @@ export async function getRequestTenant(req) {
         assignment.tenantType
       )
       if (allowed) {
-        return {
+        return finish({
           tenantId: assignment.tenantId,
           tenantType: assignment.tenantType,
           tenantName: assignment.tenantName || '',
-        }
+        })
       }
     }
   }
 
   const email = (req.userData.email || '').trim().toLowerCase()
-  if (!email) return null
+  if (!email) return finish(null)
   if (req.userData.role === 'SUPPLIER') {
     const primary = await getPrimaryTenantForUser(email, 'SUPPLIER')
     if (primary) {
-      return { tenantId: primary.id, tenantType: 'SUPPLIER', tenantName: primary.name || '' }
+      return finish({
+        tenantId: primary.id,
+        tenantType: 'SUPPLIER',
+        tenantName: primary.name || '',
+      })
     }
   }
   if (req.userData.role === 'RESTAURANT') {
     const primary = await getPrimaryTenantForUser(email, 'RESTAURANT')
     if (primary) {
-      return { tenantId: primary.id, tenantType: 'RESTAURANT', tenantName: primary.name || '' }
+      return finish({
+        tenantId: primary.id,
+        tenantType: 'RESTAURANT',
+        tenantName: primary.name || '',
+      })
     }
   }
-  return null
+  return finish(null)
 }
 
 /**
@@ -560,21 +720,18 @@ export async function ensurePrimaryContactOwnerRole(userId, email, tenantId, ten
  * Use after requireAuth on restaurant/supplier routes.
  */
 export function resolveTenantContext(req, res, next) {
+  startStage(req, 'tenantContext')
   getRequestTenant(req)
     .then(async (tenant) => {
       if (!tenant) {
         req.tenantContext = null
+        mark(req, 'tenantContext')
         return next()
       }
-      const { rows: subRows } = await query(
-        `SELECT status FROM subscription WHERE tenant_id = $1 AND tenant_type = $2 ORDER BY created_at DESC LIMIT 1`,
-        [tenant.tenantId, tenant.tenantType]
-      )
-      if (
-        subRows.length > 0 &&
-        subRows[0].status === 'SUSPENDED' &&
-        req.userData.role !== 'ADMIN'
-      ) {
+
+      const billingSub = await resolveRequestBillingSubscription(req, tenant)
+      if (billingSub?.status === 'SUSPENDED' && req.userData.role !== 'ADMIN') {
+        mark(req, 'tenantContext')
         return res.status(403).json({
           ok: false,
           data: null,
@@ -585,21 +742,63 @@ export function resolveTenantContext(req, res, next) {
           requestId: req.requestId,
         })
       }
-      await ensurePrimaryContactOwnerRole(
-        req.userData.id,
-        req.userData.email,
-        tenant.tenantId,
-        tenant.tenantType
-      )
 
-      await ensureTenantSystemRoles(tenant.tenantId, tenant.tenantType).catch(() => {})
+      const effectiveTenant = getEffectiveTenant(req)
+      const useBundleCache =
+        canUseCrossRequestTenantCaches(req) && !(req.userData.role === 'ADMIN' && effectiveTenant)
 
-      let roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
-      let permissions = await getPermissionsForUser(
-        req.userData.id,
-        tenant.tenantId,
-        tenant.tenantType
-      )
+      let roles
+      let permissions
+
+      if (useBundleCache) {
+        const bundle = await getTenantContextBundle(
+          req.userData.id,
+          tenant.tenantId,
+          tenant.tenantType,
+          req
+        )
+        roles = bundle.roles
+        permissions = bundle.permissions
+      } else {
+        roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType, req)
+        permissions = await getPermissionsForUser(
+          req.userData.id,
+          tenant.tenantId,
+          tenant.tenantType
+        )
+      }
+
+      if (roles.length === 0) {
+        // Cold path: user has no roles — run setup helpers then re-fetch.
+        await ensurePrimaryContactOwnerRole(
+          req.userData.id,
+          req.userData.email,
+          tenant.tenantId,
+          tenant.tenantType
+        )
+        await ensureTenantSystemRoles(tenant.tenantId, tenant.tenantType).catch(() => {})
+        roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType, req)
+        permissions = await getPermissionsForUser(
+          req.userData.id,
+          tenant.tenantId,
+          tenant.tenantType
+        )
+      }
+
+      if (req.userData.role === 'ADMIN' && effectiveTenant) {
+        permissions = await getImpersonationEffectivePermissions(
+          effectiveTenant.tenantId,
+          effectiveTenant.tenantType,
+          effectiveTenant.viewAsRoleId
+        )
+        roles = effectiveTenant.viewAsRoleId
+          ? (
+              await query(`SELECT name FROM tenant_roles WHERE id = $1`, [
+                effectiveTenant.viewAsRoleId,
+              ])
+            ).rows.map((r) => r.name)
+          : ['Owner (impersonation)']
+      }
       // Only the primary tenant contact gets an automatic Owner role when unassigned.
       if (
         roles.length === 0 &&
@@ -613,13 +812,23 @@ export function resolveTenantContext(req, res, next) {
         )
         if (isPrimary) {
           await assignDefaultRoleForTenant(req.userData.id, tenant.tenantId, tenant.tenantType)
-          roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
+          roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType, req)
           permissions = await getPermissionsForUser(
             req.userData.id,
             tenant.tenantId,
             tenant.tenantType
           )
         }
+      }
+
+      if (useBundleCache && roles.length > 0) {
+        await setTenantContextBundle(
+          req.userData.id,
+          tenant.tenantId,
+          tenant.tenantType,
+          roles,
+          permissions
+        )
       }
       req.tenantContext = {
         tenantId: tenant.tenantId,
@@ -628,10 +837,13 @@ export function resolveTenantContext(req, res, next) {
         roles,
         permissions,
       }
+      await resolveRequestSubscription(req, tenant)
       syncRequestLogContext(req)
+      mark(req, 'tenantContext')
       next()
     })
     .catch((err) => {
+      mark(req, 'tenantContext')
       logger.error('resolveTenantContext error', { error: err.message })
       res.status(500).json({
         ok: false,
@@ -647,13 +859,36 @@ export function resolveTenantContext(req, res, next) {
  * Sets req.adminContext = { roles[], permissions[] }.
  * Use after requireAuth and requireRole(['ADMIN']) on admin routes.
  */
+async function ensureDefaultAdminRole(userId) {
+  try {
+    await query(
+      `
+      INSERT INTO user_role (user_id, role_id, tenant_id, tenant_type)
+      SELECT $1, r.id, NULL, 'ADMIN'
+      FROM role r
+      WHERE r.code = 'SUPER_ADMIN' AND r.tenant_type = 'ADMIN'
+      ON CONFLICT (user_id, role_id, tenant_id, tenant_type) DO NOTHING
+    `,
+      [userId]
+    )
+  } catch (err) {
+    if (err.code !== '42P01') {
+      logger.warn('ensureDefaultAdminRole failed', { error: err.message, userId })
+    }
+  }
+}
+
 export async function resolveAdminContext(req, res, next) {
   if (req.userData?.role !== 'ADMIN') {
     req.adminContext = null
     return next()
   }
   try {
-    const roles = await getRolesForUser(req.userData.id, null, 'ADMIN')
+    let roles = await getRolesForUser(req.userData.id, null, 'ADMIN')
+    if (roles.length === 0) {
+      await ensureDefaultAdminRole(req.userData.id)
+      roles = await getRolesForUser(req.userData.id, null, 'ADMIN')
+    }
     const permissions = await getPermissionsForUser(req.userData.id, null, 'ADMIN')
     req.adminContext = { roles, permissions }
     next()
@@ -668,7 +903,7 @@ export async function resolveAdminContext(req, res, next) {
  * Require a permission in tenant or admin context. Use after resolveTenantContext or resolveAdminContext.
  * Allows access if:
  * - tenantContext.permissions or adminContext.permissions includes the key (or broader _MANAGE), or
- * - user is ADMIN and (impersonating a tenant, or on admin route with adminContext).
+ * - user is ADMIN on admin routes (adminContext), not when impersonating a tenant.
  * @param {string} permissionKey - e.g. 'ORDERS_VIEW', 'SETTINGS_MANAGE'
  */
 export function requirePermission(permissionKey) {
@@ -679,9 +914,8 @@ export function requirePermission(permissionKey) {
     if (hasPermission(perms, permissionKey)) {
       return next()
     }
-    if (req.userData?.role === 'ADMIN') {
-      if (getEffectiveTenant(req)) return next()
-      if (!tenant && admin) return next()
+    if (req.userData?.role === 'ADMIN' && !isImpersonating(req) && !tenant && admin) {
+      return next()
     }
     return res.status(403).json({
       ok: false,
@@ -704,9 +938,8 @@ export function requireAnyPermission(...permissionKeys) {
     if (permissionKeys.some((key) => hasPermission(perms, key))) {
       return next()
     }
-    if (req.userData?.role === 'ADMIN') {
-      if (getEffectiveTenant(req)) return next()
-      if (!tenant && admin) return next()
+    if (req.userData?.role === 'ADMIN' && !isImpersonating(req) && !tenant && admin) {
+      return next()
     }
     return res.status(403).json({
       ok: false,

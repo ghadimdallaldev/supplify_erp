@@ -1,0 +1,12 @@
+%% Replacement order from dispute (implemented)
+%% Status: current | Related: apps/api/src/lib/dispute-replacement-order.js
+flowchart TD
+  Dispute[Dispute with line items] --> Qty[computeReplacementQuantity per line]
+  Qty --> Lines[buildReplacementLineItems]
+  Lines --> Empty{any lines?}
+  Empty -->|no| Err[ValidationError — no disputed quantities]
+  Empty -->|yes| Create[INSERT customer_order\nplacement_source DISPUTE_REPLACEMENT]
+  Create --> Stock[assertAndDeductSupplierStock]
+  Stock --> Link[Link dispute → replacement order id]
+  Orig[Original order] --> Unchanged[Status unchanged received/partial]
+  Create --> Fulfill[Standard supplier fulfillment path]

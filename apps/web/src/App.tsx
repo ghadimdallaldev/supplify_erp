@@ -5,11 +5,17 @@ import { AuthGuard } from './components/AuthGuard'
 import { StaffPortalGuard } from './components/StaffPortalGuard'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
+import { RegisterCompletePage } from './pages/RegisterCompletePage'
+import { InviteAcceptPage } from './pages/InviteAcceptPage'
+import { BranchInviteAcceptPage } from './pages/BranchInviteAcceptPage'
 import { OAuthRedirect } from './components/OAuthRedirect'
 import { PageLoading } from './components/ui/page-loading'
 
 const DashboardPage = lazy(() =>
   import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage }))
+)
+const SupplierHome = lazy(() =>
+  import('./pages/SupplierHome').then((m) => ({ default: m.SupplierHome }))
 )
 const ProductsPage = lazy(() =>
   import('./pages/ProductsPage').then((m) => ({ default: m.ProductsPage }))
@@ -40,6 +46,16 @@ const CartPage = lazy(() => import('./pages/CartPage').then((m) => ({ default: m
 const ChatPage = lazy(() => import('./pages/ChatPage').then((m) => ({ default: m.ChatPage })))
 const FulfillmentPage = lazy(() =>
   import('./pages/FulfillmentPage').then((m) => ({ default: m.FulfillmentPage }))
+)
+const SupplierCommandCenterPage = lazy(() =>
+  import('./pages/SupplierCommandCenterPage').then((m) => ({
+    default: m.SupplierCommandCenterPage,
+  }))
+)
+const DriverDeliveriesPage = lazy(() =>
+  import('./pages/DriverDeliveriesPage').then((m) => ({
+    default: m.DriverDeliveriesPage,
+  }))
 )
 const InventoryPage = lazy(() =>
   import('./pages/InventoryPage').then((m) => ({ default: m.InventoryPage }))
@@ -80,6 +96,11 @@ const PublicReservationConfirmation = lazy(() =>
 const PublicReservationManage = lazy(() =>
   import('./pages/PublicReservationManage').then((m) => ({ default: m.PublicReservationManage }))
 )
+const PublicReservationWaitlistOffer = lazy(() =>
+  import('./pages/PublicReservationWaitlistOffer').then((m) => ({
+    default: m.PublicReservationWaitlistOffer,
+  }))
+)
 const StaffSelfServiceLogin = lazy(() =>
   import('./pages/StaffSelfServiceLogin').then((m) => ({ default: m.StaffSelfServiceLogin }))
 )
@@ -87,9 +108,6 @@ const StaffSelfServiceDashboard = lazy(() =>
   import('./pages/StaffSelfServiceDashboard').then((m) => ({
     default: m.StaffSelfServiceDashboard,
   }))
-)
-const RegisterCompletePage = lazy(() =>
-  import('./pages/RegisterCompletePage').then((m) => ({ default: m.RegisterCompletePage }))
 )
 const AccountActivationPage = lazy(() =>
   import('./pages/AccountActivationPage').then((m) => ({ default: m.AccountActivationPage }))
@@ -106,6 +124,12 @@ const DisputeDetailPage = lazy(() =>
 const PromotionsPage = lazy(() =>
   import('./pages/promotions/PromotionsPage').then((m) => ({ default: m.PromotionsPage }))
 )
+const ContractPricingPage = lazy(() =>
+  import('./pages/ContractPricingPage').then((m) => ({ default: m.ContractPricingPage }))
+)
+const MyContractPricesPage = lazy(() =>
+  import('./pages/MyContractPricesPage').then((m) => ({ default: m.MyContractPricesPage }))
+)
 const DealsPage = lazy(() =>
   import('./pages/deals/DealsPage').then((m) => ({ default: m.DealsPage }))
 )
@@ -115,11 +139,11 @@ const OrgOverviewPage = lazy(() =>
 const BranchDetailPage = lazy(() =>
   import('./pages/BranchDetailPage').then((m) => ({ default: m.BranchDetailPage }))
 )
-const BranchInviteAcceptPage = lazy(() =>
-  import('./pages/BranchInviteAcceptPage').then((m) => ({ default: m.BranchInviteAcceptPage }))
+const LegalHubPage = lazy(() =>
+  import('./pages/LegalDocumentPage').then((m) => ({ default: m.LegalHubPage }))
 )
-const InviteAcceptPage = lazy(() =>
-  import('./pages/InviteAcceptPage').then((m) => ({ default: m.InviteAcceptPage }))
+const LegalDocumentPage = lazy(() =>
+  import('./pages/LegalDocumentPage').then((m) => ({ default: m.LegalDocumentPage }))
 )
 
 function PageLoader() {
@@ -148,6 +172,22 @@ const router = createBrowserRouter([
     element: (
       <LazyPage>
         <PublicReservationConfirmation />
+      </LazyPage>
+    ),
+  },
+  {
+    path: '/reserve/waitlist/:token/accept',
+    element: (
+      <LazyPage>
+        <PublicReservationWaitlistOffer action="accept" />
+      </LazyPage>
+    ),
+  },
+  {
+    path: '/reserve/waitlist/:token/decline',
+    element: (
+      <LazyPage>
+        <PublicReservationWaitlistOffer action="decline" />
       </LazyPage>
     ),
   },
@@ -193,25 +233,29 @@ const router = createBrowserRouter([
   },
   {
     path: '/register/complete',
-    element: (
-      <LazyPage>
-        <RegisterCompletePage />
-      </LazyPage>
-    ),
+    element: <RegisterCompletePage />,
   },
   {
     path: '/invite/branch',
+    element: <BranchInviteAcceptPage />,
+  },
+  {
+    path: '/invite',
+    element: <InviteAcceptPage />,
+  },
+  {
+    path: '/legal',
     element: (
       <LazyPage>
-        <BranchInviteAcceptPage />
+        <LegalHubPage />
       </LazyPage>
     ),
   },
   {
-    path: '/invite',
+    path: '/legal/:slug',
     element: (
       <LazyPage>
-        <InviteAcceptPage />
+        <LegalDocumentPage />
       </LazyPage>
     ),
   },
@@ -237,7 +281,7 @@ const router = createBrowserRouter([
         index: true,
         element: (
           <LazyPage>
-            <DashboardPage />
+            <SupplierHome />
           </LazyPage>
         ),
       },
@@ -245,7 +289,7 @@ const router = createBrowserRouter([
         path: 'app',
         element: (
           <LazyPage>
-            <DashboardPage />
+            <SupplierHome />
           </LazyPage>
         ),
       },
@@ -254,6 +298,22 @@ const router = createBrowserRouter([
         element: (
           <LazyPage>
             <DashboardPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/command-center',
+        element: (
+          <LazyPage>
+            <SupplierCommandCenterPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/driver-deliveries',
+        element: (
+          <LazyPage>
+            <DriverDeliveriesPage />
           </LazyPage>
         ),
       },
@@ -326,6 +386,22 @@ const router = createBrowserRouter([
         element: (
           <LazyPage>
             <PromotionsPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/contract-pricing',
+        element: (
+          <LazyPage>
+            <ContractPricingPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/my-prices',
+        element: (
+          <LazyPage>
+            <MyContractPricesPage />
           </LazyPage>
         ),
       },

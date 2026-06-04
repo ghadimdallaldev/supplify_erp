@@ -4,6 +4,10 @@ import {
   orgStructureGuard,
   reviewsAccessGuard,
   restaurantSupplierMutationGuard,
+  ordersRouterMutationGuard,
+  chatSendGuard,
+  resolveAdminDashboardPermission,
+  adminDashboardPermissionGuard,
 } from './route-permissions.js'
 import { PERMISSION_KEYS as P } from './permission-keys.js'
 import { RESTAURANT_SYSTEM_ROLES, SUPPLIER_SYSTEM_ROLES } from './role-matrix.js'
@@ -115,6 +119,127 @@ describe('reviewsAccessGuard', () => {
     const r = mockResWithPerms([P.ORDERS_VIEW])
     reviewsAccessGuard(req, r, next)
     expect(r.status).toHaveBeenCalledWith(403)
+  })
+})
+
+describe('ordersRouterMutationGuard', () => {
+  beforeEach(() => next.mockReset())
+
+  it('allows GET with ORDERS_VIEW only', () => {
+    const req = { ...mockReq('GET', '/'), tenantContext: { permissions: [P.ORDERS_VIEW] } }
+    ordersRouterMutationGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('blocks POST / without ORDERS_CREATE or ORDERS_MANAGE', () => {
+    const req = { ...mockReq('POST', '/'), tenantContext: { permissions: [P.ORDERS_VIEW] } }
+    const r = mockResWithPerms([P.ORDERS_VIEW])
+    ordersRouterMutationGuard(req, r, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+
+  it('allows POST / with ORDERS_CREATE', () => {
+    const req = {
+      ...mockReq('POST', '/'),
+      tenantContext: { permissions: [P.ORDERS_VIEW, P.ORDERS_CREATE] },
+    }
+    ordersRouterMutationGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('allows POST /manual with ORDERS_MANAGE', () => {
+    const req = {
+      ...mockReq('POST', '/manual'),
+      tenantContext: { permissions: [P.ORDERS_VIEW, P.ORDERS_MANAGE] },
+    }
+    ordersRouterMutationGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('blocks PATCH without ORDERS_EDIT', () => {
+    const req = {
+      ...mockReq('PATCH', '/order-1'),
+      tenantContext: { permissions: [P.ORDERS_VIEW] },
+    }
+    const r = mockResWithPerms([P.ORDERS_VIEW])
+    ordersRouterMutationGuard(req, r, next)
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+})
+
+describe('chatSendGuard', () => {
+  beforeEach(() => next.mockReset())
+
+  it('allows GET conversations with CHAT_VIEW only', () => {
+    const req = {
+      ...mockReq('GET', '/conversations'),
+      tenantContext: { permissions: [P.CHAT_VIEW] },
+    }
+    chatSendGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('blocks POST message without CHAT_SEND', () => {
+    const req = {
+      ...mockReq('POST', '/conversations/c1/messages'),
+      tenantContext: { permissions: [P.CHAT_VIEW] },
+    }
+    const r = mockResWithPerms([P.CHAT_VIEW])
+    chatSendGuard(req, r, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+
+  it('allows POST message with CHAT_SEND', () => {
+    const req = {
+      ...mockReq('POST', '/conversations/c1/messages'),
+      tenantContext: { permissions: [P.CHAT_VIEW, P.CHAT_SEND] },
+    }
+    chatSendGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('allows PATCH read without CHAT_SEND', () => {
+    const req = {
+      ...mockReq('PATCH', '/conversations/c1/read'),
+      tenantContext: { permissions: [P.CHAT_VIEW] },
+    }
+    chatSendGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+})
+
+describe('adminDashboardPermissionGuard', () => {
+  beforeEach(() => next.mockReset())
+
+  it('maps finance routes to ADMIN_FINANCE', () => {
+    expect(resolveAdminDashboardPermission('/financial-overview')).toBe(P.ADMIN_FINANCE)
+  })
+
+  it('maps plans routes to ADMIN_PLANS', () => {
+    expect(resolveAdminDashboardPermission('/plans')).toBe(P.ADMIN_PLANS)
+    expect(resolveAdminDashboardPermission('/subscriptions')).toBe(P.ADMIN_PLANS)
+  })
+
+  it('blocks finance admin from plans API', () => {
+    const req = {
+      ...mockReq('GET', '/plans'),
+      tenantContext: { permissions: [P.ADMIN_ACCESS, P.ADMIN_FINANCE, P.ADMIN_TENANTS] },
+    }
+    const r = mockResWithPerms([P.ADMIN_ACCESS, P.ADMIN_FINANCE, P.ADMIN_TENANTS])
+    adminDashboardPermissionGuard(req, r, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+
+  it('allows finance admin on financial-overview', () => {
+    const req = {
+      ...mockReq('GET', '/financial-overview'),
+      tenantContext: { permissions: [P.ADMIN_ACCESS, P.ADMIN_FINANCE, P.ADMIN_TENANTS] },
+    }
+    adminDashboardPermissionGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
   })
 })
 

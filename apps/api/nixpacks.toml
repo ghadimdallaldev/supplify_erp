@@ -1,0 +1,15 @@
+# Nixpacks/Railpack fallback for API (optional — prefer apps/api/Dockerfile).
+# Use when builder is NIXPACKS or RAILPACK with Root Directory = repo root (empty).
+# Set nixpacksConfigPath to apps/api/nixpacks.toml in railway.json if needed.
+
+[phases.setup]
+nixPkgs = ["nodejs_22", "pnpm"]
+
+[phases.install]
+cmds = ["pnpm install --frozen-lockfile --filter @supplify/api..."]
+
+[phases.build]
+cmds = ["pnpm --filter @supplify/api build"]
+
+[start]
+cmd = "node apps/api/src/server.js"

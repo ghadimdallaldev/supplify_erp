@@ -3,7 +3,7 @@
 Platform admins can open the **restaurant** or **supplier** workspace as a tenant for support and debugging—without tenant passwords and with a full audit trail.
 
 **Canonical audit:** [IMPERSONATION_AUDIT.md](../IMPERSONATION_AUDIT.md)  
-**Admin guide:** [ADMIN.md](../admin/ADMIN.md) · **QA:** [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md) §4.9, §ADM-45–49
+**Admin guide:** [ADMIN.md](../admin/admin-guide.md) · **QA:** [regression-checklist.md](../qa/regression-checklist.md) §4.9, §ADM-45–49
 
 ---
 

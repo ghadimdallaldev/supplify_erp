@@ -29,7 +29,7 @@ After seed (`scripts\run-local.cmd seed` or `pnpm db:seed` + `pnpm seed:demo-use
 
 ## New tenant signup & activation
 
-Fresh Keycloak users complete organization setup at `/register/complete`, then unlock the workspace at `/app/activate` (Free tier without a card, or paid checkout). See [tenant-registration-activation.md](../features/tenant-registration-activation.md) and QA Part 1–2 in [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md).
+Fresh Keycloak users complete organization setup at `/register/complete`, then unlock the workspace at `/app/activate` (Free tier without a card, or paid checkout). See [tenant-registration.md](../features/tenant-registration.md) and QA Part 1–2 in [regression-checklist.md](../qa/regression-checklist.md).
 
 ## Roles & navigation
 
@@ -70,18 +70,18 @@ RBAC permissions (e.g. `RESERVATIONS_VIEW`, `STAFF_VIEW`, `INVOICES_VIEW`) furth
 | Quick lists          | `/app/quick-lists`               | `/api/quick-lists`     | Saved order templates; scheduled re-order               |
 | Scheduled orders     | —                                | cron in `server.js`    | Runs every 5 min in dev                                 |
 
-**Verify:** Restaurant → Cart → place order → Orders list shows new order. Supplier → Decline with reason → Restaurant sees **Declined by supplier**. Tests: `orders.routes.test.js`, `orderStatusDisplay.test.ts`, `orders.calendar.routes.test.js`, `scheduled-orders.service.test.js`.
+**Verify:** Restaurant → Cart → place order → Orders list shows new order. Supplier → Decline with reason → Restaurant sees **Declined by supplier**. Orders list supports **server-side search** and status inbox filters. Tests: `orders.routes.test.js` (search/status filters), `orderStatusDisplay.test.ts`, `orders.calendar.routes.test.js`, `scheduled-orders.service.test.js`.
 
 ## Chat & realtime
 
-| Feature   | Web route   | API prefix         | Notes                                                                                                                    |
-| --------- | ----------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| Chat UI   | `/app/chat` | `/api/chat`        | Conversations, messages, attachments                                                                                     |
-| Socket.IO | —           | same origin as API | `getChatSocket` / `getLayoutSocket` + `getSocketBaseUrl()` (shared connection per user; `VITE_API_URL` or window origin) |
+| Feature   | Web route   | API prefix         | Notes                                                                                                                      |
+| --------- | ----------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Chat UI   | `/app/chat` | `/api/chat`        | Conversations, messages, attachments; refactored thread/list/composer components                                           |
+| Socket.IO | —           | same origin as API | `getAppSocket()` + `useChatRealtime` / `useNotificationAlerts`; Redis adapter when `REDIS_URL` set (multi-replica Railway) |
 
 Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admin-feature-flags.md)).
 
-**Verify:** Restaurant opens chat from supplier detail; messages persist after refresh. Tests: `chat.routes.test.js`, web `useSocket.test.ts`.
+**Verify:** Restaurant opens chat from supplier detail; messages persist after refresh; recipient sees message within ~1s without reload. Tests: `chat.routes.test.js`, `socket.test.js`, `socket-auth.test.js`, web `useChatRealtime.test.ts`, `useNotificationAlerts.test.tsx`.
 
 ## Reports, disputes, promotions & reviews
 
@@ -101,13 +101,14 @@ Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admi
 
 ## Fulfillment & supplier inventory
 
-| Feature            | Web route                | API prefix                      | Notes                      |
-| ------------------ | ------------------------ | ------------------------------- | -------------------------- |
-| Fulfillment        | `/app/fulfillment`       | `/api/orders` (supplier status) | Pick/pack/ship workflow    |
-| Supplier inventory | `/app/inventory`         | `/api/inventory`                | Stock levels, reservations |
-| Supplier settings  | `/app/supplier-settings` | `/api/suppliers`                | Onboarding / profile       |
+| Feature                | Web route                      | API prefix                                                                   | Notes                                                                                                                        |
+| ---------------------- | ------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Fulfillment            | `/app/fulfillment`             | `/api/fulfillment/*`, `/api/orders/:id/tracking`, `/api/orders/:id/location` | Driver dispatch, routes, GPS tracking (supplier); see [drivers-and-gps-tracking.md](../features/drivers-and-gps-tracking.md) |
+| Order GPS (restaurant) | Order detail `/app/orders/:id` | `GET /api/orders/:id/tracking`                                               | `RestaurantOrderTrackingPanel`; sanitized payload; manual QA **GPS-R01–R10**                                                 |
+| Supplier inventory     | `/app/inventory`               | `/api/inventory`                                                             | Stock levels, reservations                                                                                                   |
+| Supplier settings      | `/app/supplier-settings`       | `/api/suppliers`                                                             | Onboarding / profile                                                                                                         |
 
-**Verify:** Supplier login → Fulfillment → advance order status. Tests: `inventory.routes.test.js`.
+**Verify:** Supplier login → Fulfillment → dispatch + **View tracking**; driver ping → Live badge. Restaurant → in-flight order detail → tracking panel. Tests: `delivery-tracking-payload.test.js`, `restaurant-tracking-payload.test.js`, `orders-driver-tracking.test.js`, `driver-location.service.test.js`; manual **GPS-S\***, **GPS-R\***, **DRV-GPS\***.
 
 ## Restaurant operations
 
@@ -189,7 +190,7 @@ Tests: `subscriptions.routes.test.js`, `feature-flags.test.js`, `subscription.te
 | WhatsApp             | Settings → Notifications         | —                    | Twilio / `wa.me` link in metadata                                           |
 | Web Push (PWA)       | Settings (restaurant onboarding) | `/api/push`          | VAPID keys on API; `usePushNotifications` + `/sw.js`; opt-in `push_enabled` |
 
-See [NOTIFICATIONS_SUMMARY.md](./NOTIFICATIONS_SUMMARY.md), [notifications-delivery.md](../features/notifications-delivery.md), and [push-notifications.md](../features/push-notifications.md).
+See [notifications-summary.md](./notifications-summary.md) and [notifications-and-alerts.md](../features/notifications-and-alerts.md).
 
 Tests: `notification.service.test.js`, `push.service.test.js`, `orderStatusDisplay.test.ts`.
 
@@ -255,20 +256,20 @@ node apps/api/scripts/migrate.js
 
 ## Manual smoke checklist
 
-| Check          | Command / action                       | Expected                                                   |
-| -------------- | -------------------------------------- | ---------------------------------------------------------- |
-| API up         | `GET /health`                          | `{ "ok": true, "status": "healthy" }`                      |
-| DB migrated    | `node apps/api/scripts/migrate.js`     | All migrations skipped or applied; no errors               |
-| Public API     | `GET /api/public/restaurants`          | `200` JSON envelope                                        |
-| Web dev server | Open Vite URL in browser               | Login page or app shell                                    |
-| Auth           | Log in as each demo role               | Correct sidebar for role                                   |
-| Chat           | Send message restaurant ↔ supplier    | Message appears; socket connected                          |
-| Order          | Place order from cart                  | Appears in Orders + supplier Fulfillment                   |
-| Order decline  | Supplier declines with reason          | Restaurant: label + reason + notification                  |
-| Notifications  | New order (second team user logged in) | Bell + toast for non-owner team member                     |
-| Reservations   | Restaurant board + `/reserve`          | Booking created; table assign; guest cancel notifies staff |
-| Staff          | `/app/staff` + `/staff/login`          | Roster + portal controls; staff login works                |
-| Admin flags    | `/app/admin` → Features                | List loads; toggle inherits/on/off                         |
+| Check          | Command / action                       | Expected                                                                                        |
+| -------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| API up         | `GET /health`                          | `{ "ok": true, "status": "healthy" }`                                                           |
+| DB migrated    | `node apps/api/scripts/migrate.js`     | All migrations skipped or applied; no errors                                                    |
+| Public API     | `GET /api/public/restaurants`          | `200` JSON envelope                                                                             |
+| Web dev server | Open Vite URL in browser               | Login page or app shell                                                                         |
+| Auth           | Log in as each demo role               | Correct sidebar for role                                                                        |
+| Chat           | Send message restaurant ↔ supplier    | Message appears in real-time on recipient (~1s); single Socket.IO connection in DevTools WS tab |
+| Order          | Place order from cart                  | Appears in Orders + supplier Fulfillment                                                        |
+| Order decline  | Supplier declines with reason          | Restaurant: label + reason + notification                                                       |
+| Notifications  | New order (second team user logged in) | Bell + toast for non-owner team member                                                          |
+| Reservations   | Restaurant board + `/reserve`          | Booking created; table assign; guest cancel notifies staff                                      |
+| Staff          | `/app/staff` + `/staff/login`          | Roster + portal controls; staff login works                                                     |
+| Admin flags    | `/app/admin` → Features                | List loads; toggle inherits/on/off                                                              |
 
 ## E2E (optional)
 

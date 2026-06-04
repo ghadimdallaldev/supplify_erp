@@ -43,40 +43,46 @@ vi.mock('../lib/auth.js', () => ({
     .mockResolvedValue('https://keycloak.example.com/logout?post_logout_redirect_uri=...'),
 }))
 
-vi.mock('../lib/rbac.js', () => ({
-  requireAuth: vi.fn(async (req, res, next) => {
-    req.userData = req.userData || {
-      ...mockUser,
+vi.mock('../lib/rbac.js', async (importOriginal) => {
+  const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
+  const base = await loadRbacRouteMock(importOriginal, {
+    getRequestTenant: vi.fn().mockResolvedValue({
+      tenantId: 'restaurant-1',
+      tenantType: 'RESTAURANT',
+      tenantName: 'Test Restaurant',
+    }),
+  })
+  return {
+    ...base,
+    requireAuth: vi.fn(async (req, res, next) => {
+      req.userData = req.userData || {
+        ...mockUser,
+        id: 'user-1',
+        email: 'test@example.com',
+        role: 'RESTAURANT',
+        display_name: 'Test User',
+        created_at: new Date(),
+      }
+      next()
+    }),
+    upsertUser: vi.fn().mockResolvedValue({
       id: 'user-1',
       email: 'test@example.com',
       role: 'RESTAURANT',
+      keycloak_sub: 'sub-123',
       display_name: 'Test User',
       created_at: new Date(),
-    }
-    next()
-  }),
-  getRequestTenant: vi.fn().mockResolvedValue({
-    tenantId: 'restaurant-1',
-    tenantType: 'RESTAURANT',
-    tenantName: 'Test Restaurant',
-  }),
-  upsertUser: vi.fn().mockResolvedValue({
-    id: 'user-1',
-    email: 'test@example.com',
-    role: 'RESTAURANT',
-    keycloak_sub: 'sub-123',
-    display_name: 'Test User',
-    created_at: new Date(),
-    updated_at: new Date(),
-  }),
-  setAuthCookies: vi.fn(),
-  clearAuthCookies: vi.fn(),
-  getUserBySub: vi
-    .fn()
-    .mockResolvedValue({ id: 'user-1', email: 'test@example.com', keycloak_sub: 'sub-123' }),
-  ensurePrimaryContactOwnerRole: vi.fn().mockResolvedValue(false),
-  assignDefaultRoleForTenant: vi.fn().mockResolvedValue(false),
-}))
+      updated_at: new Date(),
+    }),
+    setAuthCookies: vi.fn(),
+    clearAuthCookies: vi.fn(),
+    getUserBySub: vi
+      .fn()
+      .mockResolvedValue({ id: 'user-1', email: 'test@example.com', keycloak_sub: 'sub-123' }),
+    ensurePrimaryContactOwnerRole: vi.fn().mockResolvedValue(false),
+    assignDefaultRoleForTenant: vi.fn().mockResolvedValue(false),
+  }
+})
 
 vi.mock('../lib/workspace-tenant.js', () => ({
   isPrimaryTenantContact: vi.fn().mockResolvedValue(true),

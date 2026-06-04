@@ -1,0 +1,13 @@
+flowchart LR
+  A[Supplier issues invoice] --> B[Invoice ISSUED]
+  B --> C[Restaurant views / pays]
+  C --> D{Payment}
+  D -->|partial| E[PARTIALLY_PAID]
+  D -->|full| F[PAID]
+  B --> G[due_date passed]
+  G --> H[OVERDUE]
+  H --> C
+  B --> I[Admin / void]
+  E --> I
+  F --> I
+  I --> J[VOID]

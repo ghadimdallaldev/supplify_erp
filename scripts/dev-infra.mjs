@@ -15,6 +15,7 @@ spawnSync('node', ['scripts/ensure-native-env.mjs'], { cwd: root, stdio: 'inheri
 const services = [
   'postgres',
   'redis',
+  'mailpit',
   'minio',
   'minio-init',
   'keycloak',
@@ -29,5 +30,6 @@ const up = spawnSync('docker', dockerComposeArgs(['up', '-d', ...services]), {
 })
 if (up.status !== 0) process.exit(up.status ?? 1)
 
-console.log('\nInfrastructure is up. Postgres, Redis, MinIO, and Keycloak are on localhost ports from docker/.env')
+console.log('\nInfrastructure is up. Postgres, Redis, MinIO, Keycloak, and Mailpit are on localhost ports from docker/.env')
+console.log('Mailpit UI: http://localhost:8025  (SMTP localhost:1025 — captured emails appear here)')
 console.log('Next: pnpm dev   (API :4000 + web :5173 with hot reload)')

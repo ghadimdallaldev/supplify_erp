@@ -5,6 +5,8 @@ import {
   sendWhatsAppMessage,
   listTenantUserIds,
   notifyTenantUsers,
+  getUserNotifications,
+  getUnreadNotificationCount,
 } from './notification.service.js'
 
 const queryMock = vi.fn()
@@ -13,8 +15,14 @@ vi.mock('../lib/db.js', () => ({
   query: (...args) => queryMock(...args),
 }))
 
-vi.mock('./mailer.service.js', () => ({
-  sendMail: vi.fn().mockResolvedValue({ messageId: 'test-message-id' }),
+vi.mock('../lib/cache.js', () => ({
+  getCache: vi.fn().mockResolvedValue(null),
+  setCache: vi.fn().mockResolvedValue(undefined),
+  deleteCache: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('./email/email.service.js', () => ({
+  sendTemplateEmail: vi.fn().mockResolvedValue({ sent: true, provider: 'smtp' }),
 }))
 
 vi.mock('../lib/subscription.js', () => ({
@@ -23,6 +31,10 @@ vi.mock('../lib/subscription.js', () => ({
 
 vi.mock('./whatsapp.service.js', () => ({
   sendWhatsAppMessage: vi.fn().mockResolvedValue({ sent: false, reason: 'NOT_CONFIGURED' }),
+}))
+
+vi.mock('../lib/socket.js', () => ({
+  emitNotificationNew: vi.fn(),
 }))
 
 describe('Notification Service', () => {
@@ -40,7 +52,8 @@ describe('Notification Service', () => {
 
   describe('sendNotification', () => {
     it('creates a notification and sends email when enabled', async () => {
-      const { sendMail } = await import('./mailer.service.js')
+      const { sendTemplateEmail } = await import('./email/email.service.js')
+      const { emitNotificationNew } = await import('../lib/socket.js')
       const { getEntitlements } = await import('../lib/subscription.js')
       getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_and_email' } })
 
@@ -66,12 +79,13 @@ describe('Notification Service', () => {
       })
 
       expect(notification).toBeDefined()
-      expect(sendMail).toHaveBeenCalledWith(
+      expect(sendTemplateEmail).toHaveBeenCalledWith(
         expect.objectContaining({
           to: 'owner@test.com',
           subject: 'New Order Received',
         })
       )
+      expect(emitNotificationNew).toHaveBeenCalled()
     })
 
     it('skips notification when preference is disabled', async () => {
@@ -130,7 +144,7 @@ describe('Notification Service', () => {
     })
 
     it('does NOT send email when tenant is on Free plan', async () => {
-      const { sendMail } = await import('./mailer.service.js')
+      const { sendTemplateEmail } = await import('./email/email.service.js')
       const { getEntitlements } = await import('../lib/subscription.js')
 
       getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_only' } })
@@ -158,14 +172,14 @@ describe('Notification Service', () => {
         message: 'Order placed',
       })
 
-      expect(sendMail).not.toHaveBeenCalled()
+      expect(sendTemplateEmail).not.toHaveBeenCalled()
     })
 
     it('sends email when tenant is on Silver plan', async () => {
-      const { sendMail } = await import('./mailer.service.js')
+      const { sendTemplateEmail } = await import('./email/email.service.js')
       const { getEntitlements } = await import('../lib/subscription.js')
 
-      sendMail.mockResolvedValue({ messageId: 'msg-1' })
+      sendTemplateEmail.mockResolvedValue({ sent: true })
       getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_and_email' } })
 
       queryMock
@@ -189,11 +203,13 @@ describe('Notification Service', () => {
         message: 'Order placed',
       })
 
-      expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ to: 'owner@test.com' }))
+      expect(sendTemplateEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'owner@test.com' })
+      )
     })
 
     it('defaults to in_app_only when entitlements fetch fails', async () => {
-      const { sendMail } = await import('./mailer.service.js')
+      const { sendTemplateEmail } = await import('./email/email.service.js')
       const { getEntitlements } = await import('../lib/subscription.js')
 
       getEntitlements.mockRejectedValue(new Error('DB error'))
@@ -219,13 +235,13 @@ describe('Notification Service', () => {
         message: 'Order placed',
       })
 
-      expect(sendMail).not.toHaveBeenCalled()
+      expect(sendTemplateEmail).not.toHaveBeenCalled()
     })
   })
 
   describe('notifyGuestReservationConfirmation', () => {
     it('emails guest when email is provided', async () => {
-      const { sendMail } = await import('./mailer.service.js')
+      const { sendTemplateEmail } = await import('./email/email.service.js')
 
       const result = await notifyGuestReservationConfirmation(
         {
@@ -238,7 +254,7 @@ describe('Notification Service', () => {
         'Golden Fork'
       )
 
-      expect(sendMail).toHaveBeenCalled()
+      expect(sendTemplateEmail).toHaveBeenCalled()
       expect(result.email).toBe(true)
     })
 
@@ -301,6 +317,59 @@ describe('Notification Service', () => {
     it('returns a wa.me URL instead of sending server-side', async () => {
       const url = await sendWhatsAppMessage('+96176911906', 'Hello')
       expect(url).toBe('https://wa.me/96176911906?text=Hello')
+    })
+  })
+
+  describe('getUserNotifications', () => {
+    it('fetches list and unread count in parallel and caches the payload', async () => {
+      const { getCache, setCache } = await import('../lib/cache.js')
+      vi.mocked(getCache).mockResolvedValue(null)
+
+      queryMock.mockImplementation((sql) => {
+        if (String(sql).includes('COUNT(*)')) {
+          return Promise.resolve({ rows: [{ count: 1 }] })
+        }
+        return Promise.resolve({
+          rows: [{ id: 'n1', title: 'Hi', is_read: false, created_at: new Date().toISOString() }],
+        })
+      })
+
+      const first = await getUserNotifications('user-1', 'RESTAURANT', { limit: 25, offset: 0 })
+      expect(first.notifications).toHaveLength(1)
+      expect(first.unreadCount).toBe(1)
+      expect(queryMock).toHaveBeenCalledTimes(2)
+      expect(setCache).toHaveBeenCalled()
+
+      vi.mocked(getCache).mockResolvedValue(first)
+      queryMock.mockClear()
+      const second = await getUserNotifications('user-1', 'RESTAURANT', { limit: 25, offset: 0 })
+      expect(second).toEqual(first)
+      expect(queryMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('getUnreadNotificationCount', () => {
+    it('returns cached unread count without hitting the database', async () => {
+      const { getCache, setCache } = await import('../lib/cache.js')
+      vi.mocked(getCache).mockResolvedValue({ unreadCount: 4 })
+
+      const result = await getUnreadNotificationCount('user-1', 'RESTAURANT')
+      expect(result.unreadCount).toBe(4)
+      expect(queryMock).not.toHaveBeenCalled()
+      expect(setCache).not.toHaveBeenCalled()
+    })
+
+    it('queries count on cache miss and stores result', async () => {
+      const { getCache, setCache } = await import('../lib/cache.js')
+      const { resetSingleflightForTests } = await import('../lib/singleflight.js')
+      resetSingleflightForTests()
+      vi.mocked(getCache).mockResolvedValue(null)
+      queryMock.mockResolvedValueOnce({ rows: [{ count: 2 }] })
+
+      const result = await getUnreadNotificationCount('user-1', 'RESTAURANT')
+      expect(result.unreadCount).toBe(2)
+      expect(queryMock).toHaveBeenCalledTimes(1)
+      expect(setCache).toHaveBeenCalled()
     })
   })
 })

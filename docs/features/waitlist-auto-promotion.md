@@ -66,5 +66,12 @@ Migration: `0077_waitlist_auto_promotion.sql`
 
 Offer links use `PUBLIC_RESERVATION_BASE_URL` or `WEB_ORIGIN`:
 
-- Accept: `{base}/reserve/waitlist/{token}/accept`
-- Decline: `{base}/reserve/waitlist/{token}/decline`
+- Accept: `{base}/reserve/waitlist/{token}/accept` → `PublicReservationWaitlistOffer.tsx`
+- Decline: `{base}/reserve/waitlist/{token}/decline` → same page (decline action)
+
+## Tests
+
+- `apps/api/src/services/waitlistPromotion.test.js`
+- `apps/api/src/routes/reservations.routes.test.js`, `public.routes.test.js`
+- `apps/web/src/pages/PublicReservationWaitlistOffer.test.tsx`, `ReservationsPage.test.tsx`
+- Manual: **PUB-14 … PUB-16**, **RST-42a … RST-42c** in [regression-checklist.md](../qa/regression-checklist.md)

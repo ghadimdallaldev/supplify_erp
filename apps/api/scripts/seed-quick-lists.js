@@ -6,16 +6,11 @@
  * Optional: SEED=1337 (default) for determinism
  */
 import 'dotenv/config'
-import pg from 'pg'
+import { pool } from '../src/lib/db.js'
 import { createSeededRng, intBetween, pick, shuffle } from './seed/seedRng.js'
 
 const SEED = parseInt(process.env.SEED || '1337', 10)
 const rng = createSeededRng(SEED)
-
-const pool = new pg.Pool({
-  connectionString:
-    process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/supplify',
-})
 
 function uuid() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'

@@ -13,28 +13,29 @@ vi.mock('../lib/db.js', () => {
   }
 })
 
-vi.mock('../lib/rbac.js', () => ({
-  requireAuth: vi.fn(async (req, res, next) => {
-    req.userData = req.userData || { ...mockUser, role: 'ADMIN' }
-    next()
-  }),
-  requireRole: () => (req, res, next) => next(),
-  resolveTenantContext: (req, res, next) => {
-    req.tenantContext = req.tenantContext || {
-      tenantId: 'supplier-1',
-      tenantType: 'SUPPLIER',
-      permissions: ['CATALOG_MANAGE'],
-    }
-    next()
-  },
-  resolveAdminContext: (req, res, next) => {
-    req.adminContext = { permissions: ['ADMIN_ACCESS'] }
-    next()
-  },
-  requirePermission: () => (req, res, next) => next(),
-  getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
-  getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
-}))
+vi.mock('../lib/rbac.js', async (importOriginal) => {
+  const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
+  return loadRbacRouteMock(importOriginal, {
+    requireAuth: vi.fn(async (req, res, next) => {
+      req.userData = req.userData || { ...mockUser, role: 'ADMIN' }
+      next()
+    }),
+    resolveTenantContext: (req, res, next) => {
+      req.tenantContext = req.tenantContext || {
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: ['CATALOG_MANAGE'],
+      }
+      next()
+    },
+    resolveAdminContext: (req, res, next) => {
+      req.adminContext = { permissions: ['ADMIN_ACCESS'] }
+      next()
+    },
+    getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
+    getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
+  })
+})
 
 vi.mock('../lib/subscription.js', () => ({
   requireFeature: () => (req, res, next) => next(),
@@ -44,6 +45,12 @@ vi.mock('../lib/subscription.js', () => ({
 
 vi.mock('../lib/audit.js', () => ({
   writeAuditLog: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('../services/notification.service.js', () => ({
+  notifyDealApproved: vi.fn().mockResolvedValue(undefined),
+  notifyDealRejected: vi.fn().mockResolvedValue(undefined),
+  notifyDealSubmitted: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('../services/deal-promotions.service.js', () => ({
@@ -108,27 +115,21 @@ describe('promotions.routes admin', () => {
     expect(res.body.data.deals[0].name).toBe('Test Deal')
   })
 
-  it('POST /admin/:id/approve moves deal to active or pending payment', async () => {
-    db.query
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'deal-1',
-            status: 'pending_approval',
-            starts_at: new Date(Date.now() - 86400000).toISOString(),
-          },
-        ],
-      })
-      .mockResolvedValueOnce({ rows: [{ pricing_key: 'deal_activation', amount: 0 }] })
-      .mockResolvedValueOnce({
-        rows: [
-          { id: 'deal-1', status: 'active', payment_status: 'not_required', name: 'Test Deal' },
-        ],
-      })
+  it('POST /admin/:id/approve rejects deal without boost package', async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'deal-1',
+          status: 'pending_approval',
+          supplier_id: 'supplier-1',
+        },
+      ],
+    })
 
-    const res = await request(app).post('/api/promotions/admin/deal-1/approve').expect(200)
+    const res = await request(app).post('/api/promotions/admin/deal-1/approve')
 
-    expect(res.body.data.deal.status).toBe('active')
+    expect(res.status).toBeGreaterThanOrEqual(400)
+    expect(res.body.error.message).toMatch(/boost package/i)
   })
 
   it('POST /admin/:id/reject marks deal rejected', async () => {
@@ -161,17 +162,69 @@ describe('promotions.routes admin', () => {
       rows: [
         {
           pricing_key: 'boost_flat',
-          display_name: 'Single deal promotion',
-          amount: 39,
+          display_name: 'Starter Boost',
+          amount: 9,
+          duration_days: 1,
+          is_recommended: false,
         },
       ],
     })
 
     const res = await request(app)
       .patch('/api/promotions/admin/pricing/boost_flat')
-      .send({ amount: 39 })
+      .send({
+        amount: 9,
+        durationDays: 1,
+        displayName: 'Starter Boost',
+        estimatedReachLabel: 'Basic visibility',
+        badgeLabel: 'Test visibility',
+      })
       .expect(200)
 
-    expect(res.body.data.pricing.amount).toBe(39)
+    expect(res.body.data.pricing.amount).toBe(9)
+  })
+
+  it('GET /admin/pricing lists boost and activation packages', async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [
+        {
+          pricing_key: 'deal_activation',
+          package_type: 'activation',
+          amount: 0,
+          display_name: 'Deal activation',
+        },
+        {
+          pricing_key: 'boost_7_day',
+          package_type: 'boost',
+          display_name: 'Weekly Boost',
+          amount: 39,
+          is_active: true,
+        },
+      ],
+    })
+
+    const res = await request(app).get('/api/promotions/admin/pricing').expect(200)
+
+    expect(res.body.data.pricing).toHaveLength(2)
+  })
+
+  it('GET /pricing returns active boost packages only for suppliers', async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [
+        {
+          pricing_key: 'boost_flat',
+          package_type: 'boost',
+          display_name: 'Starter Boost',
+          amount: 9,
+          duration_days: 1,
+          is_active: true,
+        },
+      ],
+    })
+
+    const res = await request(app).get('/api/promotions/pricing').expect(200)
+
+    expect(res.body.data.pricing).toHaveLength(1)
+    expect(res.body.data.pricing[0].display_name).toBe('Starter Boost')
   })
 })

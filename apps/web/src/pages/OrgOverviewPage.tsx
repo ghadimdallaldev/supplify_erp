@@ -52,7 +52,7 @@ export function OrgOverviewPage() {
         <div className="p-6 max-w-3xl">
           <h1 className="text-xl font-semibold mb-2">Organization</h1>
           <p className="text-[var(--text-muted)]">
-            Multi-branch accounts are available on Silver and above. Upgrade your plan to add
+            Multi-branch accounts are available on Gold and above. Upgrade your plan to add
             locations.
           </p>
           <Link to="/app/settings?tab=subscription" className="text-sm underline mt-4 inline-block">

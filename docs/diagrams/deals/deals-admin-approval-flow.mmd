@@ -1,0 +1,15 @@
+%% Deals / promotions admin approval (do not change business rules)
+%% Status: current | Related: apps/api/src/services/deal-lifecycle.service.js
+stateDiagram-v2
+  [*] --> Draft: Supplier creates deal
+  Draft --> PendingAdmin: submit / pending_admin_approval
+  PendingAdmin --> ApprovedPendingPayment: admin approve
+  PendingAdmin --> Rejected: admin reject
+  ApprovedPendingPayment --> Active: payment / activation rules
+  Active --> Expired: end date / lifecycle job
+  Rejected --> [*]
+  Expired --> [*]
+  note right of PendingAdmin
+    Admin: POST /api/promotions/admin/:id/approve
+    Overview shows pending count
+  end note

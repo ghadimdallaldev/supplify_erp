@@ -15,6 +15,17 @@ export function getActiveTenantCookieName() {
   return COOKIE_NAME
 }
 
+/** Clear branch-switch cookie (e.g. when ending impersonation or starting a fresh login). */
+export function clearActiveTenantCookie(res) {
+  if (!res?.clearCookie) return
+  res.clearCookie(COOKIE_NAME, {
+    path: '/',
+    httpOnly: true,
+    secure: config.NODE_ENV === 'production',
+    sameSite: 'lax',
+  })
+}
+
 export async function createActiveTenantToken({ userId, tenantId, tenantType, tenantName }) {
   const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30
   return new jose.SignJWT({ userId, tenantId, tenantType, tenantName: tenantName || '' })

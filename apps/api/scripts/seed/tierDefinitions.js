@@ -8,33 +8,47 @@ export const TIERS = [
 export const SLUG_PREFIX = 'tier-'
 export const SEED_PASSWORD = process.env.SEED_ACCOUNTS_PASSWORD || 'Supplify1!'
 
-export function restaurantDef(tier, label) {
+/** Suffix for multi-tenant seeds: '' for single-tenant legacy, '-01'…'-10' when multi. */
+export function tenantIndexSuffix(index, multi) {
+  if (!multi && index === 1) return ''
+  return `-${String(index).padStart(2, '0')}`
+}
+
+export function restaurantDef(tier, label, index = 1, { multi = false } = {}) {
+  const ix = tenantIndexSuffix(index, multi)
   return {
-    slug: `${SLUG_PREFIX}restaurant-${tier}`,
-    name: `${label} Plate Restaurant`,
-    ownerEmail: `restaurant-${tier}@supplify.com`,
+    slug: `${SLUG_PREFIX}restaurant-${tier}${ix}`,
+    name: multi ? `${label} Plate #${index}` : `${label} Plate Restaurant`,
+    ownerEmail: multi
+      ? `restaurant-${tier}-${String(index).padStart(2, '0')}@supplify.com`
+      : `restaurant-${tier}@supplify.com`,
     tier,
+    index,
   }
 }
 
-export function supplierDef(tier, label) {
+export function supplierDef(tier, label, index = 1, { multi = false } = {}) {
+  const ix = tenantIndexSuffix(index, multi)
   return {
-    slug: `${SLUG_PREFIX}supplier-${tier}`,
-    name: `${label} Harvest Supplier`,
-    ownerEmail: `supplier-${tier}@supplify.com`,
+    slug: `${SLUG_PREFIX}supplier-${tier}${ix}`,
+    name: multi ? `${label} Harvest #${index}` : `${label} Harvest Supplier`,
+    ownerEmail: multi
+      ? `supplier-${tier}-${String(index).padStart(2, '0')}@supplify.com`
+      : `supplier-${tier}@supplify.com`,
     tier,
+    index,
   }
 }
 
 /** Extra logins per tenant for Team → assign role testing */
 export const RESTAURANT_TEAM_MEMBERS = [
-  { suffix: 'manager', roleName: 'Manager', lastName: 'Manager' },
+  { suffix: 'manager', roleName: 'Restaurant Manager', lastName: 'Manager' },
   { suffix: 'purchaser', roleName: 'Purchaser', lastName: 'Purchaser' },
 ]
 
 export const SUPPLIER_TEAM_MEMBERS = [
-  { suffix: 'manager', roleName: 'Manager', lastName: 'Manager' },
-  { suffix: 'sales', roleName: 'Sales Rep', lastName: 'Sales' },
+  { suffix: 'manager', roleName: 'Supplier Manager', lastName: 'Manager' },
+  { suffix: 'sales', roleName: 'Promotions Manager', lastName: 'Sales' },
 ]
 
 /**
@@ -49,62 +63,6 @@ export const SUPPLIER_TEAM_MEMBERS = [
  * Shape: { [planCode]: { [featureKey]: value } }
  * Applied per tenant_type via applyPlanFeaturePatches().
  */
-/** Gold catalog (migration 0119 is source of truth for limits + features). */
-export const GOLD_RESTAURANT_LIMITS = {
-  branches: 3,
-  users: 15,
-  orders_per_day: 100,
-  suppliers_per_restaurant: 30,
-  restaurant_inventory_skus: 3000,
-  chats_per_day: 500,
-  open_conversations: 30,
-  storage_mb: 10240,
-  quick_lists: 50,
-  quick_list_items: 500,
-  scheduled_quick_lists: 15,
-  deal_redemptions_per_day: 50,
-  scheduled_order_grace_per_day: 0,
-}
-
-export const GOLD_SUPPLIER_LIMITS = {
-  branches: 3,
-  warehouses: 3,
-  users: 15,
-  supplier_products_skus: 3000,
-  chats_per_day: 500,
-  open_conversations: 30,
-  storage_mb: 10240,
-  promotions: 25,
-}
-
-/** Platinum catalog (migration 0120 is source of truth for limits + features). */
-export const PLATINUM_RESTAURANT_LIMITS = {
-  branches: -1,
-  users: -1,
-  orders_per_day: -1,
-  suppliers_per_restaurant: -1,
-  restaurant_inventory_skus: -1,
-  chats_per_day: -1,
-  open_conversations: -1,
-  storage_mb: 30720,
-  quick_lists: -1,
-  quick_list_items: -1,
-  scheduled_quick_lists: -1,
-  deal_redemptions_per_day: -1,
-  scheduled_order_grace_per_day: 0,
-}
-
-export const PLATINUM_SUPPLIER_LIMITS = {
-  branches: -1,
-  warehouses: -1,
-  users: -1,
-  supplier_products_skus: -1,
-  chats_per_day: -1,
-  open_conversations: -1,
-  storage_mb: 30720,
-  promotions: -1,
-}
-
 /** Silver feature fillers for seed runs (migration 0117 is source of truth). */
 export const RESTAURANT_PLAN_FEATURE_PATCHES = {
   silver: {

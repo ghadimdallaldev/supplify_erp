@@ -41,6 +41,8 @@ import toast from 'react-hot-toast'
 import { formatNumber } from '../utils/format'
 import { featureEnabled } from '../lib/planLimits'
 import { RestaurantWastePanel } from '../components/inventory/RestaurantWastePanel'
+import { ExpiryInventoryTab } from '../components/inventory/ExpiryInventoryTab'
+import { RequirePermission } from '../components/RequirePermission'
 
 export function RestaurantInventoryPage() {
   const [search, setSearch] = useState('')
@@ -272,560 +274,346 @@ export function RestaurantInventoryPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[21px] font-black text-[var(--text)]">Inventory</h1>
-          <p className="text-[var(--text-muted)] mt-2">Track your stock levels and manage inventory</p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setShowBulkUploadDialog(true)} variant="outline">
-            <Upload className="h-4 w-4 mr-2" />
-            Bulk Upload
-          </Button>
-          <Button onClick={() => setShowAddProductDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Product
-          </Button>
-        </div>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="inventory">Current Inventory</TabsTrigger>
-          {wasteTrackingEnabled ? (
-            <TabsTrigger value="waste">Waste & spoilage</TabsTrigger>
-          ) : null}
-          <TabsTrigger value="history">Movement History</TabsTrigger>
-          <TabsTrigger value="totals">Totals & Sources</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="inventory" className="space-y-6">
-          {/* Inventory Trend Visualization */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Stock Trend Analysis</CardTitle>
-              <CardDescription>Visual overview of your inventory movements</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="text-sm text-[var(--text-muted)]">Total Movements</p>
-                    <p className="text-2xl font-bold">{history.length}</p>
-                  </div>
-                  <FileText className="h-8 w-8 text-[var(--brand-mid)]" />
-                </div>
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="text-sm text-[var(--text-muted)]">Recent Additions</p>
-                    <p className="text-2xl font-bold text-[var(--mint)]">
-                      {
-                        history.filter(
-                          (h: any) =>
-                            h.type === 'ADD' &&
-                            new Date(h.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-                        ).length
-                      }
-                    </p>
-                  </div>
-                  <TrendingUp className="h-8 w-8 text-[var(--mint)]" />
-                </div>
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="text-sm text-[var(--text-muted)]">Recent Subtractions</p>
-                    <p className="text-2xl font-bold text-[var(--red)]">
-                      {
-                        history.filter(
-                          (h: any) =>
-                            h.type === 'SUBTRACT' &&
-                            new Date(h.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-                        ).length
-                      }
-                    </p>
-                  </div>
-                  <TrendingDown className="h-8 w-8 text-[var(--red)]" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-[var(--text-muted)]">Total Products</p>
-                    <p className="text-2xl font-bold">{summary.total}</p>
-                  </div>
-                  <Package className="h-8 w-8 text-[var(--brand-mid)]" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-[var(--text-muted)]">In Stock</p>
-                    <p className="text-2xl font-bold">{summary.inStock}</p>
-                  </div>
-                  <TrendingUp className="h-8 w-8 text-[var(--mint)]" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-[var(--text-muted)]">Low Stock</p>
-                    <p className="text-2xl font-bold">{summary.lowStock}</p>
-                  </div>
-                  <AlertCircle className="h-8 w-8 text-[var(--amber-mid)]" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-[var(--text-muted)]">Out of Stock</p>
-                    <p className="text-2xl font-bold">{summary.outOfStock}</p>
-                  </div>
-                  <TrendingDown className="h-8 w-8 text-[var(--red)]" />
-                </div>
-              </CardContent>
-            </Card>
+    <RequirePermission permission="INVENTORY_VIEW" title="inventory">
+      <div className="space-y-6 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-[21px] font-black text-[var(--text)]">Inventory</h1>
+            <p className="text-[var(--text-muted)] mt-2">
+              Track your stock levels and manage inventory
+            </p>
           </div>
+          <div className="flex gap-2">
+            <Button onClick={() => setShowBulkUploadDialog(true)} variant="outline">
+              <Upload className="h-4 w-4 mr-2" />
+              Bulk Upload
+            </Button>
+            <Button onClick={() => setShowAddProductDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Product
+            </Button>
+          </div>
+        </div>
 
-          {/* Filters */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex gap-4 flex-wrap">
-                <div className="flex-1 min-w-64">
-                  <Input
-                    placeholder="Search products..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-                <select
-                  value={supplierFilter}
-                  onChange={(e) => setSupplierFilter(e.target.value)}
-                  className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
-                >
-                  <option value="ALL">All Suppliers</option>
-                  {Array.from(
-                    new Set<string>(
-                      inventory
-                        .map((item: { supplier_name?: string }) => item.supplier_name)
-                        .filter((s): s is string => Boolean(s))
-                    )
-                  ).map((supplier) => (
-                    <option key={supplier} value={supplier}>
-                      {supplier}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
-                >
-                  <option value="ALL">All Status</option>
-                  <option value="IN_STOCK">In Stock</option>
-                  <option value="LOW_STOCK">Low Stock</option>
-                  <option value="OUT_OF_STOCK">Out of Stock</option>
-                </select>
-              </div>
-            </CardContent>
-          </Card>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="inventory">Current Inventory</TabsTrigger>
+            {wasteTrackingEnabled ? (
+              <TabsTrigger value="waste">Waste & spoilage</TabsTrigger>
+            ) : null}
+            <TabsTrigger value="history">Movement History</TabsTrigger>
+            <TabsTrigger value="expiry">Expiry tracking</TabsTrigger>
+            <TabsTrigger value="totals">Totals & Sources</TabsTrigger>
+          </TabsList>
 
-          {/* Inventory Table */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Inventory Items</CardTitle>
-                  <CardDescription>View and manage your stock levels</CardDescription>
+          <TabsContent value="inventory" className="space-y-6">
+            {/* Inventory Trend Visualization */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Stock Trend Analysis</CardTitle>
+                <CardDescription>Visual overview of your inventory movements</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <p className="text-sm text-[var(--text-muted)]">Total Movements</p>
+                      <p className="text-2xl font-bold">{history.length}</p>
+                    </div>
+                    <FileText className="h-8 w-8 text-[var(--brand-mid)]" />
+                  </div>
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <p className="text-sm text-[var(--text-muted)]">Recent Additions</p>
+                      <p className="text-2xl font-bold text-[var(--mint)]">
+                        {
+                          history.filter(
+                            (h: any) =>
+                              h.type === 'ADD' &&
+                              new Date(h.created_at) >
+                                new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                          ).length
+                        }
+                      </p>
+                    </div>
+                    <TrendingUp className="h-8 w-8 text-[var(--mint)]" />
+                  </div>
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <p className="text-sm text-[var(--text-muted)]">Recent Subtractions</p>
+                      <p className="text-2xl font-bold text-[var(--red)]">
+                        {
+                          history.filter(
+                            (h: any) =>
+                              h.type === 'SUBTRACT' &&
+                              new Date(h.created_at) >
+                                new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                          ).length
+                        }
+                      </p>
+                    </div>
+                    <TrendingDown className="h-8 w-8 text-[var(--red)]" />
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={handleExportCSV}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Export CSV
-                  </Button>
-                  <label>
-                    <Button variant="outline" size="sm" asChild>
-                      <span>
-                        <Upload className="h-4 w-4 mr-2" />
-                        Import CSV
-                      </span>
-                    </Button>
-                    <input
-                      type="file"
-                      accept=".csv"
-                      onChange={handleImportCSV}
-                      className="hidden"
+              </CardContent>
+            </Card>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-[var(--text-muted)]">Total Products</p>
+                      <p className="text-2xl font-bold">{summary.total}</p>
+                    </div>
+                    <Package className="h-8 w-8 text-[var(--brand-mid)]" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-[var(--text-muted)]">In Stock</p>
+                      <p className="text-2xl font-bold">{summary.inStock}</p>
+                    </div>
+                    <TrendingUp className="h-8 w-8 text-[var(--mint)]" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-[var(--text-muted)]">Low Stock</p>
+                      <p className="text-2xl font-bold">{summary.lowStock}</p>
+                    </div>
+                    <AlertCircle className="h-8 w-8 text-[var(--amber-mid)]" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-[var(--text-muted)]">Out of Stock</p>
+                      <p className="text-2xl font-bold">{summary.outOfStock}</p>
+                    </div>
+                    <TrendingDown className="h-8 w-8 text-[var(--red)]" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Filters */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex gap-4 flex-wrap">
+                  <div className="flex-1 min-w-64">
+                    <Input
+                      placeholder="Search products..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
                     />
-                  </label>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-[var(--brand-ultra)]">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                        Product
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                        Supplier
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                        Quantity
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                        Suggested Reorder
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                        Status
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                        Last Updated
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--app-border)]">
-                    {filteredInventory.map((item: any) => {
-                      const status = getStockStatus(item.quantity, item.low_stock_threshold)
-                      const reorderQty = calculateReorderQuantity(item)
-                      return (
-                        <tr key={item.id} className="hover:bg-[var(--brand-ultra)]">
-                          <td className="px-4 py-4">
-                            <div>
-                              <p className="font-medium text-[var(--text)]">{item.product_name}</p>
-                              <p className="text-sm text-[var(--text-muted)]">{item.product_sku}</p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-4 text-sm text-[var(--text)]">{item.supplier_name}</td>
-                          <td className="px-4 py-4">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold">{item.quantity}</span>
-                              <span className="text-sm text-[var(--text-muted)]">{item.product_unit}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-4">
-                            {reorderQty > 0 ? (
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-[var(--amber)]">{reorderQty}</span>
-                                <Badge variant="outline" className="text-xs">
-                                  Suggested
-                                </Badge>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-xs"
-                                  onClick={() => {
-                                    toast.success('Adding to cart...', {
-                                      duration: 2000,
-                                    })
-                                    // TODO: Navigate to products page with search pre-filled
-                                  }}
-                                >
-                                  Order
-                                </Button>
-                              </div>
-                            ) : (
-                              <span className="text-[var(--text-muted)]">-</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4">
-                            <Badge variant={getStatusColor(status)}>
-                              {status.replace('_', ' ')}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                            {new Date(item.updated_at).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="flex gap-2">
-                              <Button
-                                variant={pinnedItems.has(item.product_id) ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => handlePinToggle(item.product_id)}
-                                title={
-                                  pinnedItems.has(item.product_id) ? 'Unpin item' : 'Pin to top'
-                                }
-                              >
-                                <Pin
-                                  className={`h-4 w-4 ${pinnedItems.has(item.product_id) ? 'fill-current' : ''}`}
-                                />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleOpenAdjustDialog(item, 'ADD')}
-                                title="Add inventory"
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
-                                title="Count correction (reduce stock)"
-                              >
-                                <Minus className="h-4 w-4" />
-                              </Button>
-                              {wasteTrackingEnabled ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-[var(--amber-mid)] border-[var(--amber-mid)]/40"
-                                  onClick={() => {
-                                    setWastePreselectProductId(item.product_id)
-                                    setActiveTab('waste')
-                                  }}
-                                  title="Log waste or spoilage"
-                                >
-                                  <Recycle className="h-4 w-4" />
-                                </Button>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {filteredInventory.length === 0 && (
-                <div className="text-center py-12 rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)]/90">
-                  <Package className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
-                  <p className="text-[var(--text-muted)] font-medium">No inventory yet</p>
-                  <p className="text-sm text-[var(--text-muted)] mt-1">
-                    Place an order and receive goods to see inventory here.
-                  </p>
-                  <Button asChild className="mt-4">
-                    <Link to="/app/cart">
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Create first order
-                    </Link>
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Adjust Inventory Dialog */}
-          <Dialog open={showAdjustDialog} onOpenChange={setShowAdjustDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>
-                  {adjustType === 'ADD' ? 'Add Inventory' : 'Reduce Inventory'}
-                </DialogTitle>
-                <DialogDescription>
-                  {adjustType === 'ADD'
-                    ? `Add ${adjustingItem?.product_name} to your inventory`
-                    : `Adjust inventory for ${adjustingItem?.product_name}`}
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="quantity">Quantity *</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="Enter quantity"
-                    value={adjustQuantity}
-                    onChange={(e) => setAdjustQuantity(e.target.value)}
-                  />
-                  <p className="text-sm text-[var(--text-muted)]">
-                    Current quantity: {adjustingItem?.quantity} {adjustingItem?.product_unit}
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="reason">Reason</Label>
-                  <Textarea
-                    id="reason"
-                    rows={3}
-                    placeholder="Optional: reason for this adjustment..."
-                    value={adjustReason}
-                    onChange={(e) => setAdjustReason(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowAdjustDialog(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleAdjustInventory}>
-                  {adjustType === 'ADD' ? 'Add Inventory' : 'Reduce Inventory'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </TabsContent>
-
-        {wasteTrackingEnabled ? (
-          <TabsContent value="waste" className="space-y-6">
-            <RestaurantWastePanel
-              inventory={inventory}
-              preselectedProductId={wastePreselectProductId}
-              onPreselectConsumed={() => setWastePreselectProductId(null)}
-            />
-          </TabsContent>
-        ) : null}
-
-        <TabsContent value="history" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Inventory Movement History</CardTitle>
-              <CardDescription>Recent inventory changes and adjustments</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-4 mb-4">
-                <div>
-                  <label className="text-sm text-[var(--text-muted)] mr-2">Source</label>
+                  </div>
                   <select
-                    onChange={(e) => {
-                      const val = e.target.value
-                      const table = document.getElementById(
-                        'history-table-body'
-                      ) as HTMLTableSectionElement | null
-                      if (!table) return
-                      const rows = Array.from(table.querySelectorAll('tr')) as HTMLTableRowElement[]
-                      rows.forEach((row) => {
-                        const cell = row.querySelector('[data-col="source"]') as HTMLElement | null
-                        if (!cell) return
-                        const src = cell.dataset?.value || cell.textContent || ''
-                        row.style.display = val === 'ALL' || src === val ? '' : 'none'
-                      })
-                    }}
+                    value={supplierFilter}
+                    onChange={(e) => setSupplierFilter(e.target.value)}
                     className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
                   >
-                    <option value="ALL">All</option>
-                    <option value="Order">Order</option>
-                    <option value="Manual">Manual</option>
+                    <option value="ALL">All Suppliers</option>
+                    {Array.from(
+                      new Set<string>(
+                        inventory
+                          .map((item: { supplier_name?: string }) => item.supplier_name)
+                          .filter((s): s is string => Boolean(s))
+                      )
+                    ).map((supplier) => (
+                      <option key={supplier} value={supplier}>
+                        {supplier}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
+                  >
+                    <option value="ALL">All Status</option>
+                    <option value="IN_STOCK">In Stock</option>
+                    <option value="LOW_STOCK">Low Stock</option>
+                    <option value="OUT_OF_STOCK">Out of Stock</option>
                   </select>
                 </div>
-              </div>
-              {isLoadingHistory ? (
-                <div className="text-center py-12">Loading history...</div>
-              ) : history.length === 0 ? (
-                <div className="text-center py-12">
-                  <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
-                  <p className="text-[var(--text-muted)]">No inventory movements yet</p>
+              </CardContent>
+            </Card>
+
+            {/* Inventory Table */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Inventory Items</CardTitle>
+                    <CardDescription>View and manage your stock levels</CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Export CSV
+                    </Button>
+                    <label>
+                      <Button variant="outline" size="sm" asChild>
+                        <span>
+                          <Upload className="h-4 w-4 mr-2" />
+                          Import CSV
+                        </span>
+                      </Button>
+                      <input
+                        type="file"
+                        accept=".csv"
+                        onChange={handleImportCSV}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
                 </div>
-              ) : (
+              </CardHeader>
+              <CardContent>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-[var(--brand-ultra)]">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Date
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                           Product
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Type
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Source
+                          Supplier
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                           Quantity
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Balance Before
+                          Suggested Reorder
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Balance After
+                          Status
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Reason
+                          Last Updated
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                          Actions
                         </th>
                       </tr>
                     </thead>
-                    <tbody id="history-table-body" className="divide-y divide-[var(--app-border)]">
-                      {history.map((movement: any) => {
-                        const source =
-                          movement.reference_type === 'RECEIVING_REPORT'
-                            ? 'Order'
-                            : movement.reference_type === 'MANUAL_ADD'
-                              ? 'Manual'
-                              : movement.reference_type || '—'
-                        const typeLabel = (() => {
-                          const t = (movement.type || '').toUpperCase()
-                          if (source === 'Order') return 'ADD'
-                          if (t === 'ORDER' || t === 'RECEIVED') return 'ADD'
-                          if (t === 'ADD') return 'ADD'
-                          if (t === 'SUBTRACT') return 'SUBTRACT'
-                          if (t === 'COUNT_CORRECTION') return 'ADJUST'
-                          if (t === 'WASTAGE') return 'WASTE'
-                          if (t === 'SPOILAGE') return 'SPOIL'
-                          return t || '—'
-                        })()
+                    <tbody className="divide-y divide-[var(--app-border)]">
+                      {filteredInventory.map((item: any) => {
+                        const status = getStockStatus(item.quantity, item.low_stock_threshold)
+                        const reorderQty = calculateReorderQuantity(item)
                         return (
-                          <tr key={movement.id} className="hover:bg-[var(--brand-ultra)]">
-                            <td className="px-4 py-4 text-sm text-[var(--text)]">
-                              {new Date(movement.created_at).toLocaleString()}
-                            </td>
+                          <tr key={item.id} className="hover:bg-[var(--brand-ultra)]">
                             <td className="px-4 py-4">
                               <div>
-                                <p className="font-medium text-[var(--text)]">{movement.product_name}</p>
-                                <p className="text-sm text-[var(--text-muted)]">{movement.product_sku}</p>
+                                <p className="font-medium text-[var(--text)]">
+                                  {item.product_name}
+                                </p>
+                                <p className="text-sm text-[var(--text-muted)]">
+                                  {item.product_sku}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 text-sm text-[var(--text)]">
+                              {item.supplier_name}
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">{item.quantity}</span>
+                                <span className="text-sm text-[var(--text-muted)]">
+                                  {item.product_unit}
+                                </span>
                               </div>
                             </td>
                             <td className="px-4 py-4">
-                              <Badge
-                                variant={
-                                  typeLabel === 'ADD'
-                                    ? 'default'
-                                    : typeLabel === 'ADJUST'
-                                      ? 'secondary'
-                                      : typeLabel === 'WASTE' || typeLabel === 'SPOIL'
-                                        ? 'destructive'
-                                        : 'destructive'
-                                }
-                              >
-                                {typeLabel === 'WASTE'
-                                  ? 'Wastage'
-                                  : typeLabel === 'SPOIL'
-                                    ? 'Spoilage'
-                                    : typeLabel}
+                              {reorderQty > 0 ? (
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold text-[var(--amber)]">
+                                    {reorderQty}
+                                  </span>
+                                  <Badge variant="outline" className="text-xs">
+                                    Suggested
+                                  </Badge>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-xs"
+                                    onClick={() => {
+                                      toast.success('Adding to cart...', {
+                                        duration: 2000,
+                                      })
+                                      // TODO: Navigate to products page with search pre-filled
+                                    }}
+                                  >
+                                    Order
+                                  </Button>
+                                </div>
+                              ) : (
+                                <span className="text-[var(--text-muted)]">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4">
+                              <Badge variant={getStatusColor(status)}>
+                                {status.replace('_', ' ')}
                               </Badge>
                             </td>
-                            <td
-                              className="px-4 py-4 text-sm text-[var(--text)]"
-                              data-col="source"
-                              data-value={source}
-                            >
-                              {source}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-[var(--text)]">
-                              {movement.quantity > 0 ? '+' : ''}
-                              {movement.quantity}
-                            </td>
                             <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                              {movement.balance_before}
+                              {new Date(item.updated_at).toLocaleDateString()}
                             </td>
-                            <td className="px-4 py-4 text-sm font-medium text-[var(--text)]">
-                              {movement.balance_after}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                              {movement.reason || '-'}
+                            <td className="px-4 py-4">
+                              <div className="flex gap-2">
+                                <Button
+                                  variant={pinnedItems.has(item.product_id) ? 'default' : 'outline'}
+                                  size="sm"
+                                  onClick={() => handlePinToggle(item.product_id)}
+                                  title={
+                                    pinnedItems.has(item.product_id) ? 'Unpin item' : 'Pin to top'
+                                  }
+                                >
+                                  <Pin
+                                    className={`h-4 w-4 ${pinnedItems.has(item.product_id) ? 'fill-current' : ''}`}
+                                  />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleOpenAdjustDialog(item, 'ADD')}
+                                  title="Add inventory"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
+                                  title="Count correction (reduce stock)"
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </Button>
+                                {wasteTrackingEnabled ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-[var(--amber-mid)] border-[var(--amber-mid)]/40"
+                                    onClick={() => {
+                                      setWastePreselectProductId(item.product_id)
+                                      setActiveTab('waste')
+                                    }}
+                                    title="Log waste or spoilage"
+                                  >
+                                    <Recycle className="h-4 w-4" />
+                                  </Button>
+                                ) : null}
+                              </div>
                             </td>
                           </tr>
                         )
@@ -833,210 +621,467 @@ export function RestaurantInventoryPage() {
                     </tbody>
                   </table>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        <TabsContent value="totals" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Totals After Receiving</CardTitle>
-              <CardDescription>Current stock per product and last update source</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-[var(--brand-ultra)]">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                        Product
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                        Current Total
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                        Unit
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                        Last Source
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                        Last Change
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--app-border)]">
-                    {inventory.map((item: any) => {
-                      const lastMovement = history.find(
-                        (m: any) => m.product_id === item.product_id
-                      )
-                      const source =
-                        lastMovement?.reference_type === 'RECEIVING_REPORT'
-                          ? 'Order'
-                          : lastMovement?.reference_type === 'MANUAL_ADD'
-                            ? 'Manual'
-                            : lastMovement?.reference_type || '—'
-                      return (
-                        <tr key={item.id} className="hover:bg-[var(--brand-ultra)]">
-                          <td className="px-4 py-4">
-                            <div>
-                              <p className="font-medium text-[var(--text)]">{item.product_name}</p>
-                              <p className="text-sm text-[var(--text-muted)]">{item.product_sku}</p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-4 font-semibold">{item.quantity}</td>
-                          <td className="px-4 py-4 text-sm text-[var(--text-muted)]">{item.product_unit}</td>
-                          <td className="px-4 py-4 text-sm text-[var(--text)]">{source}</td>
-                          <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                            {lastMovement
-                              ? new Date(lastMovement.created_at).toLocaleString()
-                              : '—'}
-                          </td>
+                {filteredInventory.length === 0 && (
+                  <div className="text-center py-12 rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)]/90">
+                    <Package className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
+                    <p className="text-[var(--text-muted)] font-medium">No inventory yet</p>
+                    <p className="text-sm text-[var(--text-muted)] mt-1">
+                      Place an order and receive goods to see inventory here.
+                    </p>
+                    <Button asChild className="mt-4">
+                      <Link to="/app/cart">
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Create first order
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Adjust Inventory Dialog */}
+            <Dialog open={showAdjustDialog} onOpenChange={setShowAdjustDialog}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>
+                    {adjustType === 'ADD' ? 'Add Inventory' : 'Reduce Inventory'}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {adjustType === 'ADD'
+                      ? `Add ${adjustingItem?.product_name} to your inventory`
+                      : `Adjust inventory for ${adjustingItem?.product_name}`}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="quantity">Quantity *</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Enter quantity"
+                      value={adjustQuantity}
+                      onChange={(e) => setAdjustQuantity(e.target.value)}
+                    />
+                    <p className="text-sm text-[var(--text-muted)]">
+                      Current quantity: {adjustingItem?.quantity} {adjustingItem?.product_unit}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="reason">Reason</Label>
+                    <Textarea
+                      id="reason"
+                      rows={3}
+                      placeholder="Optional: reason for this adjustment..."
+                      value={adjustReason}
+                      onChange={(e) => setAdjustReason(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowAdjustDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAdjustInventory}>
+                    {adjustType === 'ADD' ? 'Add Inventory' : 'Reduce Inventory'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </TabsContent>
+
+          {wasteTrackingEnabled ? (
+            <TabsContent value="waste" className="space-y-6">
+              <RestaurantWastePanel
+                inventory={inventory}
+                preselectedProductId={wastePreselectProductId}
+                onPreselectConsumed={() => setWastePreselectProductId(null)}
+              />
+            </TabsContent>
+          ) : null}
+
+          <TabsContent value="expiry" className="space-y-6">
+            <ExpiryInventoryTab />
+          </TabsContent>
+
+          <TabsContent value="history" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Inventory Movement History</CardTitle>
+                <CardDescription>Recent inventory changes and adjustments</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-4 mb-4">
+                  <div>
+                    <label className="text-sm text-[var(--text-muted)] mr-2">Source</label>
+                    <select
+                      onChange={(e) => {
+                        const val = e.target.value
+                        const table = document.getElementById(
+                          'history-table-body'
+                        ) as HTMLTableSectionElement | null
+                        if (!table) return
+                        const rows = Array.from(
+                          table.querySelectorAll('tr')
+                        ) as HTMLTableRowElement[]
+                        rows.forEach((row) => {
+                          const cell = row.querySelector(
+                            '[data-col="source"]'
+                          ) as HTMLElement | null
+                          if (!cell) return
+                          const src = cell.dataset?.value || cell.textContent || ''
+                          row.style.display = val === 'ALL' || src === val ? '' : 'none'
+                        })
+                      }}
+                      className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
+                    >
+                      <option value="ALL">All</option>
+                      <option value="Order">Order</option>
+                      <option value="Manual">Manual</option>
+                    </select>
+                  </div>
+                </div>
+                {isLoadingHistory ? (
+                  <div className="text-center py-12">Loading history...</div>
+                ) : history.length === 0 ? (
+                  <div className="text-center py-12">
+                    <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
+                    <p className="text-[var(--text-muted)]">No inventory movements yet</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-[var(--brand-ultra)]">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                            Date
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                            Product
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                            Type
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                            Source
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                            Quantity
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                            Balance Before
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                            Balance After
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                            Reason
+                          </th>
                         </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody
+                        id="history-table-body"
+                        className="divide-y divide-[var(--app-border)]"
+                      >
+                        {history.map((movement: any) => {
+                          const source =
+                            movement.reference_type === 'RECEIVING_REPORT'
+                              ? 'Order'
+                              : movement.reference_type === 'MANUAL_ADD'
+                                ? 'Manual'
+                                : movement.reference_type || '—'
+                          const typeLabel = (() => {
+                            const t = (movement.type || '').toUpperCase()
+                            if (source === 'Order') return 'ADD'
+                            if (t === 'ORDER' || t === 'RECEIVED') return 'ADD'
+                            if (t === 'ADD') return 'ADD'
+                            if (t === 'SUBTRACT') return 'SUBTRACT'
+                            if (t === 'COUNT_CORRECTION') return 'ADJUST'
+                            if (t === 'WASTAGE') return 'WASTE'
+                            if (t === 'SPOILAGE') return 'SPOIL'
+                            return t || '—'
+                          })()
+                          return (
+                            <tr key={movement.id} className="hover:bg-[var(--brand-ultra)]">
+                              <td className="px-4 py-4 text-sm text-[var(--text)]">
+                                {new Date(movement.created_at).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-4">
+                                <div>
+                                  <p className="font-medium text-[var(--text)]">
+                                    {movement.product_name}
+                                  </p>
+                                  <p className="text-sm text-[var(--text-muted)]">
+                                    {movement.product_sku}
+                                  </p>
+                                </div>
+                              </td>
+                              <td className="px-4 py-4">
+                                <Badge
+                                  variant={
+                                    typeLabel === 'ADD'
+                                      ? 'default'
+                                      : typeLabel === 'ADJUST'
+                                        ? 'secondary'
+                                        : typeLabel === 'WASTE' || typeLabel === 'SPOIL'
+                                          ? 'destructive'
+                                          : 'destructive'
+                                  }
+                                >
+                                  {typeLabel === 'WASTE'
+                                    ? 'Wastage'
+                                    : typeLabel === 'SPOIL'
+                                      ? 'Spoilage'
+                                      : typeLabel}
+                                </Badge>
+                              </td>
+                              <td
+                                className="px-4 py-4 text-sm text-[var(--text)]"
+                                data-col="source"
+                                data-value={source}
+                              >
+                                {source}
+                              </td>
+                              <td className="px-4 py-4 text-sm text-[var(--text)]">
+                                {movement.quantity > 0 ? '+' : ''}
+                                {movement.quantity}
+                              </td>
+                              <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
+                                {movement.balance_before}
+                              </td>
+                              <td className="px-4 py-4 text-sm font-medium text-[var(--text)]">
+                                {movement.balance_after}
+                              </td>
+                              <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
+                                {movement.reason || '-'}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="totals" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Totals After Receiving</CardTitle>
+                <CardDescription>Current stock per product and last update source</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-[var(--brand-ultra)]">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                          Product
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                          Current Total
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                          Unit
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                          Last Source
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                          Last Change
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--app-border)]">
+                      {inventory.map((item: any) => {
+                        const lastMovement = history.find(
+                          (m: any) => m.product_id === item.product_id
+                        )
+                        const source =
+                          lastMovement?.reference_type === 'RECEIVING_REPORT'
+                            ? 'Order'
+                            : lastMovement?.reference_type === 'MANUAL_ADD'
+                              ? 'Manual'
+                              : lastMovement?.reference_type || '—'
+                        return (
+                          <tr key={item.id} className="hover:bg-[var(--brand-ultra)]">
+                            <td className="px-4 py-4">
+                              <div>
+                                <p className="font-medium text-[var(--text)]">
+                                  {item.product_name}
+                                </p>
+                                <p className="text-sm text-[var(--text-muted)]">
+                                  {item.product_sku}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 font-semibold">{item.quantity}</td>
+                            <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
+                              {item.product_unit}
+                            </td>
+                            <td className="px-4 py-4 text-sm text-[var(--text)]">{source}</td>
+                            <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
+                              {lastMovement
+                                ? new Date(lastMovement.created_at).toLocaleString()
+                                : '—'}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Add Product Dialog */}
+        <Dialog open={showAddProductDialog} onOpenChange={setShowAddProductDialog}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Add Product to Inventory</DialogTitle>
+              <DialogDescription>Manually add a product to your inventory</DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="product">Select Product</Label>
+                <p className="text-sm text-[var(--text-muted)] mb-2">
+                  This feature requires API integration with product search
+                </p>
+                <Input
+                  id="product"
+                  placeholder="Start typing product name or SKU..."
+                  value={selectedProductId}
+                  onChange={(e) => setSelectedProductId(e.target.value)}
+                />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
 
-      {/* Add Product Dialog */}
-      <Dialog open={showAddProductDialog} onOpenChange={setShowAddProductDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Add Product to Inventory</DialogTitle>
-            <DialogDescription>Manually add a product to your inventory</DialogDescription>
-          </DialogHeader>
+              <div>
+                <Label htmlFor="quantity">Initial Quantity</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={addQuantity}
+                  onChange={(e) => setAddQuantity(e.target.value)}
+                  placeholder="Enter quantity"
+                />
+              </div>
 
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="product">Select Product</Label>
-              <p className="text-sm text-[var(--text-muted)] mb-2">
-                This feature requires API integration with product search
-              </p>
-              <Input
-                id="product"
-                placeholder="Start typing product name or SKU..."
-                value={selectedProductId}
-                onChange={(e) => setSelectedProductId(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="quantity">Initial Quantity</Label>
-              <Input
-                id="quantity"
-                type="number"
-                min="0"
-                step="0.01"
-                value={addQuantity}
-                onChange={(e) => setAddQuantity(e.target.value)}
-                placeholder="Enter quantity"
-              />
-            </div>
-
-            <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4">
-              <p className="text-sm text-[var(--brand-mid)]">
-                <strong>Tip:</strong> You can also add products by receiving orders or importing
-                from a CSV file.
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowAddProductDialog(false)
-                setSelectedProductId('')
-                setAddQuantity('')
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                toast('Manual product addition coming soon')
-                setShowAddProductDialog(false)
-              }}
-              disabled={!selectedProductId || !addQuantity}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Product
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Bulk Upload Dialog */}
-      <Dialog open={showBulkUploadDialog} onOpenChange={setShowBulkUploadDialog}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Bulk Upload Inventory</DialogTitle>
-            <DialogDescription>Import inventory items from a CSV or Excel file</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="file">Upload File</Label>
-              <Input
-                id="file"
-                type="file"
-                accept=".csv,.xlsx"
-                onChange={(e) => setBulkUploadFile(e.target.files?.[0] || null)}
-              />
-              <p className="text-sm text-[var(--text-muted)] mt-2">Accepted formats: CSV, Excel (.xlsx)</p>
-            </div>
-
-            <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4">
-              <p className="text-sm text-[var(--brand-mid)]">
-                <strong>CSV Format Example:</strong>
-                <br />
-                Product SKU,Quantity,Notes
-                <br />
-                TOM-001,50,Weekly supply
-                <br />
-                LET-001,30,Fresh produce
-              </p>
-            </div>
-
-            {bulkUploadFile && (
-              <div className="border rounded-md p-3 bg-[var(--brand-ultra)]">
-                <p className="text-sm font-medium text-[var(--text-mid)]">Selected: {bulkUploadFile.name}</p>
-                <p className="text-xs text-[var(--text-muted)]">
-                  Size: {formatNumber(bulkUploadFile.size / 1024, { maximumFractionDigits: 2 })} KB
+              <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4">
+                <p className="text-sm text-[var(--brand-mid)]">
+                  <strong>Tip:</strong> You can also add products by receiving orders or importing
+                  from a CSV file.
                 </p>
               </div>
-            )}
-          </div>
+            </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowBulkUploadDialog(false)
-                setBulkUploadFile(null)
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                toast.success('Bulk upload feature coming soon')
-                setShowBulkUploadDialog(false)
-              }}
-              disabled={!bulkUploadFile}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Upload
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAddProductDialog(false)
+                  setSelectedProductId('')
+                  setAddQuantity('')
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  toast('Manual product addition coming soon')
+                  setShowAddProductDialog(false)
+                }}
+                disabled={!selectedProductId || !addQuantity}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Product
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Bulk Upload Dialog */}
+        <Dialog open={showBulkUploadDialog} onOpenChange={setShowBulkUploadDialog}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Bulk Upload Inventory</DialogTitle>
+              <DialogDescription>Import inventory items from a CSV or Excel file</DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="file">Upload File</Label>
+                <Input
+                  id="file"
+                  type="file"
+                  accept=".csv,.xlsx"
+                  onChange={(e) => setBulkUploadFile(e.target.files?.[0] || null)}
+                />
+                <p className="text-sm text-[var(--text-muted)] mt-2">
+                  Accepted formats: CSV, Excel (.xlsx)
+                </p>
+              </div>
+
+              <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4">
+                <p className="text-sm text-[var(--brand-mid)]">
+                  <strong>CSV Format Example:</strong>
+                  <br />
+                  Product SKU,Quantity,Notes
+                  <br />
+                  TOM-001,50,Weekly supply
+                  <br />
+                  LET-001,30,Fresh produce
+                </p>
+              </div>
+
+              {bulkUploadFile && (
+                <div className="border rounded-md p-3 bg-[var(--brand-ultra)]">
+                  <p className="text-sm font-medium text-[var(--text-mid)]">
+                    Selected: {bulkUploadFile.name}
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Size: {formatNumber(bulkUploadFile.size / 1024, { maximumFractionDigits: 2 })}{' '}
+                    KB
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowBulkUploadDialog(false)
+                  setBulkUploadFile(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  toast.success('Bulk upload feature coming soon')
+                  setShowBulkUploadDialog(false)
+                }}
+                disabled={!bulkUploadFile}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </RequirePermission>
   )
 }

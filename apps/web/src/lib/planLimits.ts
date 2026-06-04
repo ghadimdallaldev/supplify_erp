@@ -34,15 +34,18 @@ export function featureEnabled(value: unknown): boolean {
   return evaluatePlanFeatureValue(value)
 }
 
-/** Resolved feature value: entitlements.features, then raw planFeatures from catalog JSON. */
+/** Resolved feature value: enabled tier from features or planFeatures; otherwise the off value. */
 export function resolveEntitlementFeature(
   entitlements: Entitlements | null | undefined,
   key: string
 ): unknown {
   if (!entitlements) return undefined
-  const resolved = entitlements.features?.[key]
-  if (resolved !== undefined && resolved !== null) return resolved
-  return entitlements.planFeatures?.[key]
+  const fromFeatures = entitlements.features?.[key]
+  const fromPlan = entitlements.planFeatures?.[key]
+  if (featureEnabled(fromFeatures)) return fromFeatures
+  if (featureEnabled(fromPlan)) return fromPlan
+  if (fromFeatures !== undefined && fromFeatures !== null) return fromFeatures
+  return fromPlan
 }
 
 export function isEntitlementFeatureEnabled(
@@ -491,15 +494,10 @@ export function getPlanLimitGate(
 export function isQuickListSchedulingEnabled(
   entitlements: Entitlements | null | undefined
 ): boolean {
-  const v = entitlements?.features?.quick_lists as unknown
-  if (v === true) return true
-  if (typeof v === 'string') {
-    const lower = v.toLowerCase()
-    return (
-      lower !== 'false' && lower !== 'disabled' && lower !== '' && lower !== 'basic_manual_only'
-    )
-  }
-  return false
+  const v = resolveEntitlementFeature(entitlements, 'quick_lists')
+  if (!featureEnabled(v)) return false
+  if (typeof v === 'string' && v.toLowerCase() === 'basic_manual_only') return false
+  return true
 }
 
 /** Whether the tenant may schedule this list (respects scheduled_quick_lists cap). */
@@ -541,7 +539,7 @@ export function getOrderUsageBadge(
 }
 
 export function canBrowseSupplierDeals(entitlements: Entitlements | null | undefined): boolean {
-  return featureEnabled(entitlements?.features?.supplier_deals)
+  return isEntitlementFeatureEnabled(entitlements, 'supplier_deals')
 }
 
 export function getDealRedeemGate(entitlements: Entitlements | null | undefined) {

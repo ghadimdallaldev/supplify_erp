@@ -329,18 +329,24 @@ export function normalizeActivityEvent(row) {
 }
 
 /**
- * @param {{ limit?: number; offset?: number; type?: string | null }} opts
+ * @param {{ limit?: number; offset?: number; type?: string | null; days?: number }} opts
  */
-export async function buildAdminActivityFeed({ limit = 50, offset = 0, type = null } = {}) {
+export async function buildAdminActivityFeed({
+  limit = 50,
+  offset = 0,
+  type = null,
+  days = 30,
+} = {}) {
   const lim = Math.min(Math.max(parseInt(String(limit), 10) || 50, 1), 100)
   const off = Math.max(parseInt(String(offset), 10) || 0, 0)
+  const windowDays = Math.min(Math.max(parseInt(String(days), 10) || 30, 1), 90)
   const typeFilter = type && type !== 'all' ? String(type) : null
 
   const branches = typeFilter
     ? ACTIVITY_BRANCHES.filter((b) => b.key === typeFilter)
     : ACTIVITY_BRANCHES
 
-  const fetchCap = lim + off
+  const perBranchCap = Math.min(Math.max(lim + off, lim) * 2, 200)
   const failedSources = []
   const allRows = []
 
@@ -348,8 +354,10 @@ export async function buildAdminActivityFeed({ limit = 50, offset = 0, type = nu
     branches.map(async (branch) => {
       try {
         const { rows } = await query(
-          `SELECT ${BRANCH_SELECT} FROM (${branch.sql}) src ORDER BY occurred_at DESC LIMIT $1`,
-          [fetchCap]
+          `SELECT ${BRANCH_SELECT} FROM (${branch.sql}) src
+           WHERE src.occurred_at >= NOW() - ($2::int * INTERVAL '1 day')
+           ORDER BY occurred_at DESC LIMIT $1`,
+          [perBranchCap, windowDays]
         )
         allRows.push(...rows)
       } catch (error) {
@@ -374,6 +382,7 @@ export async function buildAdminActivityFeed({ limit = 50, offset = 0, type = nu
     total: allRows.length,
     limit: lim,
     offset: off,
+    days: windowDays,
     sources: branches.map((b) => b.key),
     failedSources,
     partial: failedSources.length > 0,

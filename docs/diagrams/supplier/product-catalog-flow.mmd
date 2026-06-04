@@ -1,0 +1,10 @@
+%% Supplier product and catalog flow
+%% Status: current | Related: apps/api/src/routes/products.routes.js
+flowchart LR
+  Supplier[Supplier tenant] --> CRUD[POST/PATCH /api/products]
+  CRUD --> Limit[checkLimit supplier_products_skus]
+  Limit --> Product[product + supplier_product rows]
+  Product --> Price[prices / restaurant-pricing overrides]
+  Product --> Inv[supplier inventory stock]
+  Restaurant[Restaurant] --> Browse[GET catalog from linked suppliers]
+  Browse --> Cart[Add to cart at negotiated or list price]

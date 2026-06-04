@@ -3,11 +3,15 @@ import { logger } from './logger.js'
 import { resolveAllFeaturesForTenant } from './feature-flags.js'
 import { createPendingActivationSubscription } from './billing/subscription-activation.js'
 import { getCache, setCache, deleteCache } from './cache.js'
+import { singleflight } from './singleflight.js'
+import { startStage, mark, noteCacheHit, noteCacheMiss } from '../middlewares/request-timing.js'
 import {
   RESTAURANT_LIMIT_KEYS,
   SUPPLIER_LIMIT_KEYS,
   resolveEffectiveLimit,
+  resolveAllEffectiveLimits,
   discoverLimitKeys,
+  limitKeysForTenantType,
   fillMissingFreeTierLimits,
   stripHiddenEntitlementLimits,
   HIDDEN_ENTITLEMENT_LIMIT_KEYS,
@@ -29,12 +33,29 @@ export { normalizePlanCode, formatPlanDisplayName } from './plan-codes.js'
 
 export { RESTAURANT_LIMIT_KEYS, SUPPLIER_LIMIT_KEYS, discoverLimitKeys }
 
+/** Plan limits with Free-tier fallbacks applied before enforcement. */
+function getEnforcementPlanLimits(subscription, tenantType) {
+  const limits = { ...(subscription.limits || {}) }
+  fillMissingFreeTierLimits(limits, tenantType, subscription.plan_code)
+  return limits
+}
+
 /** Cache TTL for subscription data (seconds). Short enough to absorb burst traffic while staying fresh. */
-const SUBSCRIPTION_CACHE_TTL = 30
+const SUBSCRIPTION_CACHE_TTL = 180
+/** Full entitlements payload (plan, limits, features, usage) — hot path on every app shell load. */
+const ENTITLEMENTS_CACHE_TTL = 300
 
 /** Build a consistent cache key for a tenant subscription. */
 function subscriptionCacheKey(tenantId, tenantType) {
   return 'sub:' + tenantType + ':' + tenantId
+}
+
+function entitlementsCacheKey(tenantId, tenantType) {
+  return `ent:${tenantType}:${tenantId}`
+}
+
+export async function invalidateEntitlementsCache(tenantId, tenantType) {
+  await deleteCache(entitlementsCacheKey(tenantId, tenantType)).catch(() => {})
 }
 
 /**
@@ -90,43 +111,47 @@ export async function getTenantSubscription(tenantId, tenantType, options = {}) 
   const cached = await getCache(cacheKey)
   if (cached !== null) return cached
 
-  try {
+  return singleflight(cacheKey, async () => {
+    const again = await getCache(cacheKey)
+    if (again !== null) return again
+
     try {
-      const { rows: subRows } = await query(
-        `SELECT id, plan_id, pending_plan_id, pending_effective_at FROM subscription
+      try {
+        const { rows: subRows } = await query(
+          `SELECT id, plan_id, pending_plan_id, pending_effective_at FROM subscription
          WHERE tenant_id = $1 AND tenant_type = $2 AND status IN ('TRIALING', 'ACTIVE') ORDER BY created_at DESC LIMIT 1`,
-        [billingTenantId, tenantType]
-      )
-      if (subRows.length > 0) {
-        const sub = subRows[0]
-        if (
-          sub.pending_plan_id &&
-          sub.pending_effective_at &&
-          new Date(sub.pending_effective_at) <= new Date()
-        ) {
-          const { rows: planRows } = await query(
-            'SELECT id, name, code FROM subscription_plan WHERE id = $1',
-            [sub.pending_plan_id]
-          )
-          if (planRows.length > 0) {
-            const newPlan = planRows[0]
-            const { rows: oldPlan } = await query(
-              'SELECT code FROM subscription_plan WHERE id = $1',
-              [sub.plan_id]
+          [billingTenantId, tenantType]
+        )
+        if (subRows.length > 0) {
+          const sub = subRows[0]
+          if (
+            sub.pending_plan_id &&
+            sub.pending_effective_at &&
+            new Date(sub.pending_effective_at) <= new Date()
+          ) {
+            const { rows: planRows } = await query(
+              'SELECT id, name, code FROM subscription_plan WHERE id = $1',
+              [sub.pending_plan_id]
             )
-            await query(
-              `UPDATE subscription SET plan_id = $1, plan_name = $2, previous_plan_code = $3, pending_plan_id = NULL, pending_effective_at = NULL, updated_at = now() WHERE id = $4`,
-              [sub.pending_plan_id, newPlan.name, oldPlan[0]?.code || null, sub.id]
-            )
+            if (planRows.length > 0) {
+              const newPlan = planRows[0]
+              const { rows: oldPlan } = await query(
+                'SELECT code FROM subscription_plan WHERE id = $1',
+                [sub.plan_id]
+              )
+              await query(
+                `UPDATE subscription SET plan_id = $1, plan_name = $2, previous_plan_code = $3, pending_plan_id = NULL, pending_effective_at = NULL, updated_at = now() WHERE id = $4`,
+                [sub.pending_plan_id, newPlan.name, oldPlan[0]?.code || null, sub.id]
+              )
+            }
           }
         }
+      } catch (e) {
+        // Skip if columns missing (migration not run) or any error in pending-apply logic
       }
-    } catch (e) {
-      // Skip if columns missing (migration not run) or any error in pending-apply logic
-    }
 
-    let { rows } = await query(
-      `
+      let { rows } = await query(
+        `
       SELECT s.*, sp.limits, sp.features, sp.name as plan_display_name, sp.code as plan_code,
         sp.price_per_month as plan_price_per_month, sp.price_per_year as plan_price_per_year, sp.tenant_type as plan_tenant_type
       FROM subscription s
@@ -137,13 +162,13 @@ export async function getTenantSubscription(tenantId, tenantType, options = {}) 
       ORDER BY s.created_at DESC
       LIMIT 1
     `,
-      [billingTenantId, tenantType]
-    )
+        [billingTenantId, tenantType]
+      )
 
-    if (rows.length === 0) {
-      await ensureTenantSubscription(billingTenantId, tenantType)
-      const result = await query(
-        `
+      if (rows.length === 0) {
+        await ensureTenantSubscription(billingTenantId, tenantType)
+        const result = await query(
+          `
         SELECT s.*, sp.limits, sp.features, sp.name as plan_display_name, sp.code as plan_code,
           sp.price_per_month as plan_price_per_month, sp.price_per_year as plan_price_per_year, sp.tenant_type as plan_tenant_type
         FROM subscription s
@@ -154,22 +179,23 @@ export async function getTenantSubscription(tenantId, tenantType, options = {}) 
         ORDER BY s.created_at DESC
         LIMIT 1
       `,
-        [billingTenantId, tenantType]
-      )
-      rows = result.rows
-    }
+          [billingTenantId, tenantType]
+        )
+        rows = result.rows
+      }
 
-    const result = rows[0] || null
-    // Populate cache (TTL=30s). On cache miss (null result), do NOT cache — tenant may have
-    // just been created and ensureTenantSubscription will retry on next call.
-    if (result !== null) {
-      await setCache(cacheKey, result, SUBSCRIPTION_CACHE_TTL).catch(() => {})
+      const result = rows[0] || null
+      // Populate cache (TTL=30s). On cache miss (null result), do NOT cache — tenant may have
+      // just been created and ensureTenantSubscription will retry on next call.
+      if (result !== null) {
+        await setCache(cacheKey, result, SUBSCRIPTION_CACHE_TTL).catch(() => {})
+      }
+      return result
+    } catch (error) {
+      logger.error('Get tenant subscription error', { error: error.message })
+      return null
     }
-    return result
-  } catch (error) {
-    logger.error('Get tenant subscription error', { error: error.message })
-    return null
-  }
+  })
 }
 
 /**
@@ -178,6 +204,9 @@ export async function getTenantSubscription(tenantId, tenantType, options = {}) 
  */
 export async function invalidateTenantSubscriptionCache(tenantId, tenantType) {
   await deleteCache(subscriptionCacheKey(tenantId, tenantType)).catch(() => {})
+  await invalidateEntitlementsCache(tenantId, tenantType)
+  const { invalidateBillingSubscriptionCache } = await import('./billing/billing-service.js')
+  await invalidateBillingSubscriptionCache(tenantId, tenantType)
 }
 
 /**
@@ -227,12 +256,13 @@ export async function checkLimit(tenantId, tenantType, meterType) {
 
     // Resolve limit: tenant override > plan override > plan default (increase-only)
     const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+    const planLimits = getEnforcementPlanLimits(subscription, tenantType)
     const resolved = await resolveEffectiveLimit({
       tenantId: billingTenantId,
       tenantType,
       limitKey: meterType,
       planId: subscription.plan_id,
-      planLimits: subscription.limits || {},
+      planLimits,
     })
     const limit = resolved.effectiveLimit
     const isUnlimited = resolved.isUnlimited
@@ -392,13 +422,14 @@ export async function checkLimit(tenantId, tenantType, meterType) {
     }
   } catch (error) {
     logger.error('Check limit error:', error)
-    // On error, return safe defaults that don't block users
+    // Fail closed for countable meters — do not treat DB errors as unlimited
     return {
       current: 0,
-      limit: null,
-      isUnlimited: true,
-      isOverLimit: false,
-      effectiveLimit: null,
+      limit: 0,
+      isUnlimited: false,
+      isOverLimit: true,
+      effectiveLimit: 0,
+      resolutionError: true,
     }
   }
 }
@@ -483,13 +514,14 @@ export async function checkAndIncrementUsage(tenantId, tenantType, meterType, in
   if (!subscription) {
     return { allowed: false, current: 0, limit: 0 }
   }
-  let limit = subscription.limits?.[meterType]
+  const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+  const planLimits = getEnforcementPlanLimits(subscription, tenantType)
   const resolved = await resolveEffectiveLimit({
-    tenantId,
+    tenantId: billingTenantId,
     tenantType,
     limitKey: meterType,
     planId: subscription.plan_id,
-    planLimits: subscription.limits || {},
+    planLimits,
   })
   if (resolved.isUnlimited) {
     const res = await withTransaction(async (client) => {
@@ -510,8 +542,7 @@ export async function checkAndIncrementUsage(tenantId, tenantType, meterType, in
     })
     return res
   }
-  limit = resolved.effectiveLimit
-  const effectiveLimit = limit
+  const effectiveLimit = resolved.effectiveLimit
 
   return withTransaction(async (client) => {
     await client.query(
@@ -554,10 +585,19 @@ export async function checkAndIncrementUsage(tenantId, tenantType, meterType, in
  */
 export async function incrementUsage(tenantId, tenantType, meterType, increment = 1) {
   try {
-    // Get subscription to fetch limit value
     const subscription = await getTenantSubscription(tenantId, tenantType)
-    const limitValue = subscription?.limits?.[meterType]
-    const effectiveLimit = limitValue === -1 ? null : limitValue ? parseInt(limitValue) : null
+    if (!subscription) return
+
+    const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+    const planLimits = getEnforcementPlanLimits(subscription, tenantType)
+    const resolved = await resolveEffectiveLimit({
+      tenantId: billingTenantId,
+      tenantType,
+      limitKey: meterType,
+      planId: subscription.plan_id,
+      planLimits,
+    })
+    const effectiveLimit = resolved.isUnlimited ? null : resolved.effectiveLimit
 
     await query(
       `
@@ -616,6 +656,7 @@ async function getUsageSnapshot(tenantId, tenantType) {
       scheduledQuickLists,
       meterRows,
       branchCount,
+      openConvRows,
     ] = await Promise.all([
       query(
         `SELECT COUNT(DISTINCT product_id) as c FROM restaurant_inventory WHERE restaurant_id = $1`,
@@ -647,6 +688,16 @@ async function getUsageSnapshot(tenantId, tenantType) {
         [tenantId]
       ),
       countActiveBranchLocations(tenantId, 'RESTAURANT'),
+      query(
+        `
+      SELECT COUNT(DISTINCT c.id) AS c
+      FROM conversation c
+      LEFT JOIN conversation_participant cp
+        ON cp.conversation_id = c.id AND cp.participant_type = 'RESTAURANT'
+      WHERE c.restaurant_id = $1 AND (cp.id IS NULL OR cp.is_archived = false)
+      `,
+        [tenantId]
+      ),
     ])
     usage.restaurant_inventory_skus = parseInt(inv.rows[0]?.c || 0)
     usage.orders_per_day = parseInt(orders.rows[0]?.c || 0)
@@ -657,17 +708,7 @@ async function getUsageSnapshot(tenantId, tenantType) {
     usage.quick_lists = parseInt(quickLists.rows[0]?.c || 0)
     usage.quick_list_items = parseInt(quickListItems.rows[0]?.c || 0)
     usage.scheduled_quick_lists = parseInt(scheduledQuickLists.rows[0]?.c || 0)
-    const { rows: openConvRows } = await query(
-      `
-      SELECT COUNT(DISTINCT c.id) AS c
-      FROM conversation c
-      LEFT JOIN conversation_participant cp
-        ON cp.conversation_id = c.id AND cp.participant_type = 'RESTAURANT'
-      WHERE c.restaurant_id = $1 AND (cp.id IS NULL OR cp.is_archived = false)
-      `,
-      [tenantId]
-    )
-    usage.open_conversations = parseInt(openConvRows[0]?.c || 0, 10)
+    usage.open_conversations = parseInt(openConvRows.rows[0]?.c || 0, 10)
     meterRows.rows.forEach((r) => {
       if (keys.includes(r.meter_type)) usage[r.meter_type] = parseInt(r.current_value || 0)
     })
@@ -722,187 +763,210 @@ async function getUsageSnapshot(tenantId, tenantType) {
  * @param {string} tenantType - 'RESTAURANT' | 'SUPPLIER'
  * @returns {Promise<Object|null>} Entitlements object or null if no subscription
  */
-export async function getEntitlements(tenantId, tenantType) {
-  const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
-  const subscription = await getTenantSubscription(billingTenantId, tenantType, {
-    skipOrgBilling: true,
-  })
-  if (!subscription) return null
+export async function getEntitlements(tenantId, tenantType, req = null) {
+  const cacheKey = entitlementsCacheKey(tenantId, tenantType)
+  const cached = await getCache(cacheKey)
+  if (cached !== null) {
+    noteCacheHit(req, 'entitlements')
+    return cached
+  }
+  noteCacheMiss(req, 'entitlements')
 
-  const limitKeys =
-    tenantType === 'RESTAURANT' ? [...RESTAURANT_LIMIT_KEYS] : [...SUPPLIER_LIMIT_KEYS]
-  const baseLimits = {}
-  limitKeys.forEach((k) => {
-    const v = subscription.limits?.[k]
-    baseLimits[k] = v === -1 || v === null || v === undefined ? null : parseInt(v)
-  })
+  return singleflight(cacheKey, async () => {
+    const again = await getCache(cacheKey)
+    if (again !== null) {
+      noteCacheHit(req, 'entitlements')
+      return again
+    }
 
-  const limits = { ...baseLimits }
-  const limitsBeforeAddons = { ...baseLimits }
-  const overrides = []
-  for (const k of limitKeys) {
-    const resolved = await resolveEffectiveLimit({
-      tenantId: billingTenantId,
-      tenantType,
-      limitKey: k,
-      planId: subscription.plan_id,
-      planLimits: subscription.limits || {},
+    const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+    const subscription = await getTenantSubscription(billingTenantId, tenantType, {
+      skipOrgBilling: true,
     })
-    limits[k] = resolved.effectiveLimit
-    limitsBeforeAddons[k] = resolved.effectiveLimit
-    if (resolved.tenantOverride) {
-      overrides.push({
-        limitKey: k,
-        value: parseInt(resolved.tenantOverride.override_value, 10),
-        reason: resolved.tenantOverride.reason || null,
-        expiresAt: resolved.tenantOverride.expiration_date
-          ? new Date(resolved.tenantOverride.expiration_date).toISOString()
+    if (!subscription) return null
+
+    const limitKeys = limitKeysForTenantType(tenantType)
+    const baseLimits = {}
+    limitKeys.forEach((k) => {
+      const v = subscription.limits?.[k]
+      baseLimits[k] = v === -1 || v === null || v === undefined ? null : parseInt(v)
+    })
+
+    const limits = { ...baseLimits }
+    const limitsBeforeAddons = { ...baseLimits }
+    const overrides = []
+
+    const [resolvedByKey, { features, featureSources }, activeAddons, usage] = await Promise.all([
+      resolveAllEffectiveLimits({
+        tenantId: billingTenantId,
+        tenantType,
+        limitKeys,
+        planId: subscription.plan_id,
+        planLimits: subscription.limits || {},
+      }),
+      resolveAllFeaturesForTenant(billingTenantId, tenantType, subscription.features),
+      getActiveTenantAddons(billingTenantId, tenantType),
+      getUsageSnapshot(tenantId, tenantType),
+    ])
+
+    for (const k of limitKeys) {
+      const resolved = resolvedByKey[k]
+      if (!resolved) continue
+      limits[k] = resolved.effectiveLimit
+      limitsBeforeAddons[k] = resolved.effectiveLimit
+      if (resolved.tenantOverride) {
+        overrides.push({
+          limitKey: k,
+          value: parseInt(resolved.tenantOverride.override_value, 10),
+          reason: resolved.tenantOverride.reason || null,
+          expiresAt: resolved.tenantOverride.expiration_date
+            ? new Date(resolved.tenantOverride.expiration_date).toISOString()
+            : null,
+          scope: 'tenant',
+        })
+      } else if (resolved.planOverride) {
+        overrides.push({
+          limitKey: k,
+          value: parseInt(resolved.planOverride.override_value, 10),
+          reason: resolved.planOverride.reason || null,
+          expiresAt: resolved.planOverride.expiration_date
+            ? new Date(resolved.planOverride.expiration_date).toISOString()
+            : null,
+          scope: 'plan',
+        })
+      }
+    }
+
+    fillMissingFreeTierLimits(limits, tenantType, subscription.plan_code)
+    fillMissingFreeTierLimits(limitsBeforeAddons, tenantType, subscription.plan_code)
+    const addonBoosts = { branches: 0, warehouses: 0 }
+    for (const a of activeAddons) {
+      const qty = parseInt(a.quantity, 10) || 0
+      if (a.addon_key === addonKeyForLimitKey(tenantType, 'branches')) {
+        addonBoosts.branches = qty
+      }
+      if (a.addon_key === addonKeyForLimitKey(tenantType, 'warehouses')) {
+        addonBoosts.warehouses = qty
+      }
+    }
+    for (const k of ['branches', 'warehouses']) {
+      if (!isLimitKeyApplicable(tenantType, k)) continue
+      const qty = addonBoosts[k] || 0
+      if (limits[k] != null && qty > 0) {
+        limits[k] = computeEffectiveWithAddons(limits[k], qty)
+      }
+    }
+
+    if (tenantType === 'SUPPLIER') {
+      const warehouseLimit = limits.warehouses
+      if (warehouseLimit === 0) {
+        usage.warehouses = 0
+      }
+    }
+    stripHiddenEntitlementLimits(limits, usage)
+    stripHiddenEntitlementLimits(baseLimits, null)
+    stripHiddenEntitlementLimits(limitsBeforeAddons, null)
+    const visibleOverrides = stripHiddenEntitlementLimits(null, null, overrides)
+
+    const locationLimits = {}
+    if (isLimitKeyApplicable(tenantType, 'branches')) {
+      const included = limitsBeforeAddons.branches
+      const boost = addonBoosts.branches || 0
+      const effective = limits.branches
+      const current = usage.branches ?? 0
+      locationLimits.branches = {
+        included,
+        addonQuantity: boost,
+        effective,
+        current,
+        overIncludedLimit: included != null && current > included,
+        overEffectiveLimit: effective != null && current > effective,
+        enterpriseThreshold: ENTERPRISE_BRANCH_THRESHOLD,
+        atEnterpriseThreshold: current >= ENTERPRISE_BRANCH_THRESHOLD,
+      }
+    }
+    if (isLimitKeyApplicable(tenantType, 'warehouses')) {
+      const included = limitsBeforeAddons.warehouses
+      const boost = addonBoosts.warehouses || 0
+      const effective = limits.warehouses
+      const current = usage.warehouses ?? 0
+      locationLimits.warehouses = {
+        included,
+        addonQuantity: boost,
+        effective,
+        current,
+        overIncludedLimit: included != null && current > included,
+        overEffectiveLimit: effective != null && current > effective,
+      }
+    }
+
+    const usageWindowMeta = {}
+    limitKeys.forEach((k) => {
+      if (HIDDEN_ENTITLEMENT_LIMIT_KEYS.has(k)) return
+      if (k === 'orders_per_day' || k === 'chats_per_day')
+        usageWindowMeta[k] = { date: new Date().toISOString().slice(0, 10) }
+    })
+
+    const payload = {
+      tenantType,
+      tenantId,
+      billingTenantId,
+      usesOrgBilling: billingTenantId !== tenantId,
+      plan: {
+        id: subscription.plan_id,
+        name: formatPlanDisplayName(
+          subscription.plan_code,
+          subscription.plan_name || subscription.plan_display_name
+        ),
+        code: subscription.plan_code,
+        tenant_type: subscription.plan_tenant_type || subscription.tenant_type || tenantType,
+        price_monthly:
+          subscription.plan_price_per_month != null
+            ? Number(subscription.plan_price_per_month)
+            : null,
+        price_yearly:
+          subscription.plan_price_per_year != null
+            ? Number(subscription.plan_price_per_year)
+            : null,
+      },
+      features,
+      featureSources,
+      planFeatures: subscription.features || {},
+      limits,
+      baseLimits,
+      limitsBeforeAddons,
+      addons: activeAddons.map((a) => ({
+        id: a.id,
+        key: a.addon_key,
+        quantity: parseInt(a.quantity, 10) || 0,
+        unitPriceMonthly: a.unit_price_monthly != null ? Number(a.unit_price_monthly) : null,
+        status: a.status,
+        startsAt: a.starts_at ? new Date(a.starts_at).toISOString() : null,
+        endsAt: a.ends_at ? new Date(a.ends_at).toISOString() : null,
+      })),
+      locationLimits,
+      overrides: visibleOverrides.map((o) => ({
+        limitKey: o.limitKey,
+        value: o.value,
+        reason: o.reason || null,
+        expiresAt: o.expiresAt,
+        scope: o.scope,
+      })),
+      usage,
+      usageWindowMeta,
+      freeSandbox:
+        (subscription.plan_code || '').toLowerCase() === 'free'
+          ? {
+              expiresAt: subscription.free_sandbox_expires_at
+                ? new Date(subscription.free_sandbox_expires_at).toISOString()
+                : null,
+            }
           : null,
-        scope: 'tenant',
-      })
-    } else if (resolved.planOverride) {
-      overrides.push({
-        limitKey: k,
-        value: parseInt(resolved.planOverride.override_value, 10),
-        reason: resolved.planOverride.reason || null,
-        expiresAt: resolved.planOverride.expiration_date
-          ? new Date(resolved.planOverride.expiration_date).toISOString()
-          : null,
-        scope: 'plan',
-      })
     }
-  }
 
-  const { features, featureSources } = await resolveAllFeaturesForTenant(
-    billingTenantId,
-    tenantType,
-    subscription.features
-  )
-
-  fillMissingFreeTierLimits(limits, tenantType, subscription.plan_code)
-  fillMissingFreeTierLimits(limitsBeforeAddons, tenantType, subscription.plan_code)
-
-  const activeAddons = await getActiveTenantAddons(billingTenantId, tenantType)
-  const addonBoosts = { branches: 0, warehouses: 0 }
-  for (const a of activeAddons) {
-    const qty = parseInt(a.quantity, 10) || 0
-    if (a.addon_key === addonKeyForLimitKey(tenantType, 'branches')) {
-      addonBoosts.branches = qty
-    }
-    if (a.addon_key === addonKeyForLimitKey(tenantType, 'warehouses')) {
-      addonBoosts.warehouses = qty
-    }
-  }
-  for (const k of ['branches', 'warehouses']) {
-    if (!isLimitKeyApplicable(tenantType, k)) continue
-    const qty = addonBoosts[k] || 0
-    if (limits[k] != null && qty > 0) {
-      limits[k] = computeEffectiveWithAddons(limits[k], qty)
-    }
-  }
-
-  const usage = await getUsageSnapshot(tenantId, tenantType)
-  if (tenantType === 'SUPPLIER') {
-    const warehouseLimit = limits.warehouses
-    if (warehouseLimit === 0) {
-      usage.warehouses = 0
-    }
-  }
-  stripHiddenEntitlementLimits(limits, usage)
-  stripHiddenEntitlementLimits(baseLimits, null)
-  stripHiddenEntitlementLimits(limitsBeforeAddons, null)
-  const visibleOverrides = stripHiddenEntitlementLimits(null, null, overrides)
-
-  const locationLimits = {}
-  if (isLimitKeyApplicable(tenantType, 'branches')) {
-    const included = limitsBeforeAddons.branches
-    const boost = addonBoosts.branches || 0
-    const effective = limits.branches
-    const current = usage.branches ?? 0
-    locationLimits.branches = {
-      included,
-      addonQuantity: boost,
-      effective,
-      current,
-      overIncludedLimit: included != null && current > included,
-      overEffectiveLimit: effective != null && current > effective,
-      enterpriseThreshold: ENTERPRISE_BRANCH_THRESHOLD,
-      atEnterpriseThreshold: current >= ENTERPRISE_BRANCH_THRESHOLD,
-    }
-  }
-  if (isLimitKeyApplicable(tenantType, 'warehouses')) {
-    const included = limitsBeforeAddons.warehouses
-    const boost = addonBoosts.warehouses || 0
-    const effective = limits.warehouses
-    const current = usage.warehouses ?? 0
-    locationLimits.warehouses = {
-      included,
-      addonQuantity: boost,
-      effective,
-      current,
-      overIncludedLimit: included != null && current > included,
-      overEffectiveLimit: effective != null && current > effective,
-    }
-  }
-
-  const usageWindowMeta = {}
-  limitKeys.forEach((k) => {
-    if (HIDDEN_ENTITLEMENT_LIMIT_KEYS.has(k)) return
-    if (k === 'orders_per_day' || k === 'chats_per_day')
-      usageWindowMeta[k] = { date: new Date().toISOString().slice(0, 10) }
+    await setCache(cacheKey, payload, ENTITLEMENTS_CACHE_TTL).catch(() => {})
+    return payload
   })
-
-  return {
-    tenantType,
-    tenantId,
-    billingTenantId,
-    usesOrgBilling: billingTenantId !== tenantId,
-    plan: {
-      id: subscription.plan_id,
-      name: subscription.plan_name || subscription.plan_display_name,
-      code: subscription.plan_code,
-      tenant_type: subscription.plan_tenant_type || subscription.tenant_type || tenantType,
-      price_monthly:
-        subscription.plan_price_per_month != null
-          ? Number(subscription.plan_price_per_month)
-          : null,
-      price_yearly:
-        subscription.plan_price_per_year != null ? Number(subscription.plan_price_per_year) : null,
-    },
-    features,
-    featureSources,
-    planFeatures: subscription.features || {},
-    limits,
-    baseLimits,
-    limitsBeforeAddons,
-    addons: activeAddons.map((a) => ({
-      id: a.id,
-      key: a.addon_key,
-      quantity: parseInt(a.quantity, 10) || 0,
-      unitPriceMonthly: a.unit_price_monthly != null ? Number(a.unit_price_monthly) : null,
-      status: a.status,
-      startsAt: a.starts_at ? new Date(a.starts_at).toISOString() : null,
-      endsAt: a.ends_at ? new Date(a.ends_at).toISOString() : null,
-    })),
-    locationLimits,
-    overrides: visibleOverrides.map((o) => ({
-      limitKey: o.limitKey,
-      value: o.value,
-      reason: o.reason || null,
-      expiresAt: o.expiresAt,
-      scope: o.scope,
-    })),
-    usage,
-    usageWindowMeta,
-    freeSandbox:
-      (subscription.plan_code || '').toLowerCase() === 'free'
-        ? {
-            expiresAt: subscription.free_sandbox_expires_at
-              ? new Date(subscription.free_sandbox_expires_at).toISOString()
-              : null,
-          }
-        : null,
-  }
 }
 
 /**
@@ -1411,14 +1475,38 @@ export function requireWithinLimit(meterType, getTenantId, getTenantType) {
  */
 export function requireFeature(featureKey, getTenantId, getTenantType) {
   return async (req, res, next) => {
+    startStage(req, 'feature')
     try {
       const tenantId = getTenantId(req)
       const tenantType = getTenantType(req)
 
-      const [isEnabled, subscription] = await Promise.all([
-        isFeatureEnabled(tenantId, tenantType, featureKey),
-        getTenantSubscription(tenantId, tenantType),
-      ])
+      let subscription = req.subscription
+      if (!subscription && tenantId && tenantType) {
+        const { resolveRequestSubscription } = await import('./request-subscription.js')
+        subscription = await resolveRequestSubscription(req, {
+          tenantId,
+          tenantType,
+        })
+      }
+
+      const { resolveOrgBillingTenantId } = await import('./org-billing-tenant.js')
+      const { resolveFeatureEnabled, FEATURE_ALIASES } = await import('./feature-flags.js')
+      const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+      let featureResult = await resolveFeatureEnabled(
+        billingTenantId,
+        tenantType,
+        featureKey,
+        subscription?.features
+      )
+      if (!featureResult.enabled && FEATURE_ALIASES[featureKey]) {
+        featureResult = await resolveFeatureEnabled(
+          billingTenantId,
+          tenantType,
+          FEATURE_ALIASES[featureKey],
+          subscription?.features
+        )
+      }
+      const isEnabled = featureResult.enabled
 
       if (!isEnabled) {
         const { recordConversionEvent } = await import('./conversion-events.js')
@@ -1426,6 +1514,7 @@ export function requireFeature(featureKey, getTenantId, getTenantType) {
           () => {}
         )
         const recommendedPlans = await getRecommendedPlanNames(tenantType)
+        mark(req, 'feature')
         return res.status(403).json({
           ok: false,
           data: null,
@@ -1439,10 +1528,11 @@ export function requireFeature(featureKey, getTenantId, getTenantType) {
         })
       }
 
-      // Attach subscription so route handlers can reuse it without a second DB call
       req.subscription = subscription
+      mark(req, 'feature')
       next()
     } catch (error) {
+      mark(req, 'feature')
       logger.error('Check feature middleware error:', error)
       next(error)
     }

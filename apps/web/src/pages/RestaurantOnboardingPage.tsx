@@ -83,7 +83,8 @@ import { useAppDispatch } from '../hooks/redux'
 import { ActivityLogTab } from '../components/ActivityLogTab'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import { usePermissions } from '../hooks/usePermissions'
-import { featureEnabled } from '../lib/planLimits'
+import { isTenantOwner } from '../lib/tenantRoles'
+import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { normalizeAddress } from '../lib/address'
 import { useGetMyReviewsQuery } from '../services/api'
 import { Star } from 'lucide-react'
@@ -205,7 +206,7 @@ export function RestaurantOnboardingPage() {
 
   const [activeTab, setActiveTab] = useState('profile')
   const { can } = usePermissions()
-  const isOwner = user?.tenantRoles?.includes('RESTAURANT_OWNER') || can('SETTINGS_MANAGE')
+  const isOwner = isTenantOwner(user) || can('SETTINGS_MANAGE')
   const push = usePushNotifications()
   const { data: myReviewsData } = useGetMyReviewsQuery({ limit: 20 })
 
@@ -364,8 +365,8 @@ export function RestaurantOnboardingPage() {
   const refetchBranchesList = useRestaurantOrg ? refetchRestaurantOrgBranches : refetchBranches
   const branchGate = getBranchAddGate(entitlements, branches.length + 1)
   const brandingAllowed = canUseCustomBranding(entitlements)
-  const tenantAuditEnabled = featureEnabled(entitlements?.features?.tenant_audit_log)
-  const pushNotificationsEnabled = featureEnabled(entitlements?.features?.push_notifications)
+  const tenantAuditEnabled = isEntitlementFeatureEnabled(entitlements, 'tenant_audit_log')
+  const pushNotificationsEnabled = isEntitlementFeatureEnabled(entitlements, 'push_notifications')
   const canAddBranch = branchGate.canAdd
 
   // Notification preferences
@@ -531,38 +532,38 @@ export function RestaurantOnboardingPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList
-          className={`grid w-full ${isOwner && tenantAuditEnabled ? 'grid-cols-7' : 'grid-cols-6'}`}
-        >
+        <TabsList className="justify-start">
           <TabsTrigger value="profile">
-            <Building2 className="h-4 w-4 mr-2" />
+            <Building2 className="mr-0 h-4 w-4 sm:mr-2" />
             Profile
           </TabsTrigger>
           <TabsTrigger value="team">
-            <Users className="h-4 w-4 mr-2" />
+            <Users className="mr-0 h-4 w-4 sm:mr-2" />
             Team
           </TabsTrigger>
           <TabsTrigger value="branches">
-            <FileText className="h-4 w-4 mr-2" />
+            <FileText className="mr-0 h-4 w-4 sm:mr-2" />
             Branches
           </TabsTrigger>
           <TabsTrigger value="subscription">
-            <CreditCard className="h-4 w-4 mr-2" />
-            Subscription
+            <CreditCard className="mr-0 h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Subscription</span>
+            <span className="sm:hidden">Plan</span>
           </TabsTrigger>
           <TabsTrigger value="notifications">
-            <Settings className="h-4 w-4 mr-2" />
-            Notifications
+            <Settings className="mr-0 h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Notifications</span>
+            <span className="sm:hidden">Alerts</span>
           </TabsTrigger>
           {isOwner && tenantAuditEnabled && (
             <TabsTrigger value="activity">
-              <FileText className="h-4 w-4 mr-2" />
+              <FileText className="mr-0 h-4 w-4 sm:mr-2" />
               Activity
             </TabsTrigger>
           )}
           <TabsTrigger value="reviews">
-            <Star className="h-4 w-4 mr-2" />
-            My Reviews
+            <Star className="mr-0 h-4 w-4 sm:mr-2" />
+            Reviews
           </TabsTrigger>
         </TabsList>
 
@@ -630,7 +631,7 @@ export function RestaurantOnboardingPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="businessName">Business Name *</Label>
                   <Input
@@ -658,7 +659,7 @@ export function RestaurantOnboardingPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="registrationNumber">Registration Number</Label>
                   <Input
@@ -691,7 +692,7 @@ export function RestaurantOnboardingPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="contact-email">Contact Email *</Label>
                   <div className="relative">
@@ -750,7 +751,7 @@ export function RestaurantOnboardingPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="street">Street Address</Label>
                   <Input

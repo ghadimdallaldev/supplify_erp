@@ -29,9 +29,11 @@ import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { useCartActions } from '../hooks/useCartActions'
 import { formatPlanBlockNudgeMessage, getLimitLabel } from '../lib/planComparison'
 import { isAtEntitlementLimit, shouldShowEntitlementLimit } from '../lib/planLimits'
-import { getLayoutSocket, releaseLayoutSocket } from '../lib/layoutSocket'
+import { getAppSocket, releaseAppSocket } from '../lib/appSocket'
 import { useImpersonation } from '../hooks/useImpersonation'
+import { shouldLoadBillingStatus, shouldRedirectToActivate } from '../lib/billingActivationRedirect'
 import { LimitExceededBanner } from './LimitExceededBanner'
+import { OfflineBanner } from './OfflineBanner'
 import { useNotificationAlerts } from '../hooks/useNotificationAlerts'
 
 export function Layout() {
@@ -48,6 +50,22 @@ export function Layout() {
 
   useNotificationAlerts()
 
+  // Prefetch the most-visited route chunks after auth so first navigation is instant.
+  // Runs once on mount with a 2 s delay to avoid competing with the initial page load.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      import('../pages/DashboardPage')
+      import('../pages/OrdersPage')
+      import('../pages/StaffPage')
+      import('../pages/InventoryPage')
+      import('../pages/disputes/DisputesPage')
+      import('../pages/reports/ReportsPage')
+      import('../pages/ProductsPage')
+      import('../pages/ReservationsPage')
+    }, 500)
+    return () => clearTimeout(t)
+  }, [])
+
   useEffect(() => {
     dispatch(refreshBlockedCount())
   }, [dispatch])
@@ -60,20 +78,35 @@ export function Layout() {
   const { isImpersonating, isPlatformAdmin, shouldLoadTenantEntitlements } = useImpersonation()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: !shouldLoadTenantEntitlements,
+    refetchOnFocus: false,
+    refetchOnMountOrArgChange: false,
   })
   const { data: billingStatus } = useGetBillingStatusQuery(undefined, {
-    skip: isPlatformAdmin && !isImpersonating,
+    skip: !shouldLoadBillingStatus(isPlatformAdmin, isImpersonating),
+    refetchOnFocus: false,
+    refetchOnMountOrArgChange: false,
   })
+
+  // Keep shell caches warm on the server (entitlements TTL) without refetching on tab focus.
+  useEffect(() => {
+    if (!shouldLoadTenantEntitlements) return
+    dispatch(api.endpoints.getEntitlements.initiate(undefined, { subscribe: false }))
+  }, [dispatch, shouldLoadTenantEntitlements])
   const [recordConversionEvent] = useRecordConversionEventMutation()
 
   useEffect(() => {
-    if ((isPlatformAdmin && !isImpersonating) || !billingStatus?.access) return
-    const pending = billingStatus.access.pendingActivation && billingStatus.access.isLocked
-    if (!pending) return
-    if (!location.pathname.startsWith('/app/activate')) {
-      navigate('/app/activate', { replace: true })
+    if (
+      !shouldRedirectToActivate({
+        isPlatformAdmin,
+        isImpersonating,
+        pathname: location.pathname,
+        access: billingStatus?.access,
+      })
+    ) {
+      return
     }
-  }, [user?.role, billingStatus, location.pathname, navigate])
+    navigate('/app/activate', { replace: true })
+  }, [isPlatformAdmin, isImpersonating, billingStatus?.access, location.pathname, navigate])
   const blockedCountLast7d = useAppSelector((state) => state.monetization.blockedCountLast7d)
   const recentBlockedSummary = useAppSelector((state) => state.monetization.recentBlockedSummary)
 
@@ -89,11 +122,11 @@ export function Layout() {
 
   useEffect(() => {
     if (!user?.id) {
-      releaseLayoutSocket()
+      releaseAppSocket()
       return
     }
 
-    const socket = getLayoutSocket(user.id)
+    const socket = getAppSocket(user.id)
 
     const onEntitlementsRefresh = (payload: {
       reason?: string
@@ -190,14 +223,18 @@ export function Layout() {
       ? "You've hit your plan limits several times this week. Check usage in settings and upgrade for more room."
       : null)
 
+  const isAdminPortalRoute =
+    isPlatformAdmin && !isImpersonating && location.pathname.startsWith('/app/admin')
+
   return (
     <BranchProvider>
-      <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
+      <div className="min-h-screen min-h-[100dvh]" style={{ background: 'var(--bg)' }}>
         <ImpersonationBanner />
+        <OfflineBanner />
         <UpgradeModal />
         <PaymentModal />
         <div className="flex">
-          {mobileNavOpen && (
+          {mobileNavOpen && !isAdminPortalRoute && (
             <button
               type="button"
               className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
@@ -205,7 +242,9 @@ export function Layout() {
               onClick={() => setMobileNavOpen(false)}
             />
           )}
-          <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
+          {!isAdminPortalRoute && (
+            <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
+          )}
           <div className="flex min-w-0 flex-1 flex-col">
             <Header onOpenMobileNav={() => setMobileNavOpen(true)} />
             {(!isPlatformAdmin || isImpersonating) && <BillingOverdueBanner />}
@@ -344,10 +383,20 @@ export function Layout() {
                   </button>
                 </div>
               )}
-            <main className="flex-1 p-3 sm:p-4 md:p-6">
-              <div className="min-h-[calc(100vh-5rem)] rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm sm:rounded-2xl sm:p-4 md:p-6">
-                <Outlet />
-              </div>
+            <main
+              className={
+                isAdminPortalRoute ? 'flex min-h-0 flex-1 flex-col' : 'flex-1 p-3 sm:p-4 md:p-6'
+              }
+            >
+              {isAdminPortalRoute ? (
+                <div className="flex min-h-[calc(100dvh-3.5rem)] min-w-0 flex-1 flex-col bg-[var(--surface)]">
+                  <Outlet />
+                </div>
+              ) : (
+                <div className="min-h-[calc(100vh-5rem)] rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm sm:rounded-2xl sm:p-4 md:p-6">
+                  <Outlet />
+                </div>
+              )}
             </main>
           </div>
         </div>

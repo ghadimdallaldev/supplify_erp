@@ -1,0 +1,14 @@
+%% Warehouse monetization (supplier only — operational locations, not accounts)
+%% Status: current | Related: docs/product/tier-matrix.md
+flowchart TD
+  Supplier[Active supplier tenant] --> PlanLimit[warehouses limit\nFree: 0 | Silver: 1 | Gold: 3 | Platinum: 5]
+  PlanLimit --> Addon[supplier_extra_warehouse add-on\nGold $19/mo | Platinum $25/mo per unit]
+  Addon --> Eff[effectiveLimit = included + addon qty]
+  POST[POST /api/warehouses] --> Check[checkWarehouseLimit\ncountActiveWarehouses]
+  Check --> Eff
+  Eff --> OK{under limit?}
+  OK -->|yes| WH[Insert warehouse row\ninventory zones optional]
+  OK -->|no| Block[Block create — upgrade or addon]
+  WH --> Ops[Fulfillment routing\nwarehouse_inventory\nnot a separate login/tenant]
+  Note1[Warehouses are NOT branch accounts]
+  Note2[Silver+ required for first warehouse on paid tiers]

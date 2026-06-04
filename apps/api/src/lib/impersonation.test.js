@@ -57,6 +57,7 @@ describe('impersonation', () => {
       tenantType: 'SUPPLIER',
       tenantName: 'S',
       sessionId: 's1',
+      viewAsRoleId: null,
     })
 
     const otherAdmin = { ...req, userData: { id: 'admin-2', role: 'ADMIN' } }

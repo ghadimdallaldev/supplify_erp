@@ -16,6 +16,7 @@ import {
   getEntitlements,
   recommendPlan,
 } from '../lib/subscription.js'
+import { formatPlanDisplayName } from '../lib/plan-codes.js'
 import {
   recordConversionEvent,
   ALLOWED_TYPES as CONVERSION_ALLOWED_TYPES,
@@ -46,12 +47,11 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
       })
     }
 
-    let entitlements = await getEntitlements(tenant.tenantId, tenant.tenantType)
+    let entitlements = await getEntitlements(tenant.tenantId, tenant.tenantType, req)
     if (!entitlements) {
-      // Force ensure subscription and retry (handles migration not run or race)
-      const { getTenantSubscription } = await import('../lib/subscription.js')
+      // getTenantSubscription ensures Free row when missing; one retry avoids duplicate work
       await getTenantSubscription(tenant.tenantId, tenant.tenantType)
-      entitlements = await getEntitlements(tenant.tenantId, tenant.tenantType)
+      entitlements = await getEntitlements(tenant.tenantId, tenant.tenantType, req)
     }
     if (!entitlements) {
       // Last resort: return synthetic Free so UI always shows something; backend will still enforce limits
@@ -102,7 +102,7 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
         tenantType: tenant.tenantType,
         plan: {
           id: null,
-          name: 'Free',
+          name: formatPlanDisplayName('free', 'Free'),
           code: 'free',
           tenant_type: tenant.tenantType,
           price_monthly: 0,
@@ -110,6 +110,7 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
         },
         features,
         featureSources,
+        planFeatures: planFeat,
         limits: defaultLimits,
         baseLimits: defaultLimits,
         overrides: [],
@@ -179,7 +180,10 @@ router.get('/current', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (
     // Normalize for frontend: plan_display_name -> plan_name, ensure limits/features are objects
     const subscriptionPayload = {
       ...subscription,
-      plan_name: subscription.plan_display_name || subscription.plan_name,
+      plan_name: formatPlanDisplayName(
+        subscription.plan_code,
+        subscription.plan_display_name || subscription.plan_name
+      ),
       limits:
         subscription.limits && typeof subscription.limits === 'object' ? subscription.limits : {},
       features:

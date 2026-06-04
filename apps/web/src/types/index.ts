@@ -54,6 +54,14 @@ export interface Product {
   available_qty?: number
   current_price?: number
   currency?: string
+  /** Catalog list price before contract override */
+  catalog_price?: number
+  pricing_source?: 'DEFAULT_PRICE' | 'CONTRACT_PRICE'
+  contract_price_id?: string | null
+  contract_discount_percent?: number | null
+  contract_valid_from?: string | null
+  contract_valid_until?: string | null
+  contract_min_order_quantity?: number | null
 }
 
 export interface CreateProductRequest {
@@ -168,7 +176,13 @@ export interface UpdateOrderRequest {
   notes?: string
   cancel_reason?: string
   decline_reason?: string
-  delivery_status?: 'assigned' | 'picked_up' | 'out_for_delivery' | 'delivered' | 'failed'
+  delivery_status?:
+    | 'assigned'
+    | 'picked_up'
+    | 'out_for_delivery'
+    | 'delivered'
+    | 'failed'
+    | 'rescheduled'
   failure_reason?: string
 }
 
@@ -183,6 +197,81 @@ export interface DriverRecord {
   notes?: string | null
   is_active?: boolean
   warehouse_name?: string | null
+  user_id?: string | null
+  linked_user_email?: string | null
+  linked_user_name?: string | null
+}
+
+export interface RestaurantOrderTrackingResponse {
+  orderId: string
+  orderReference?: string
+  orderStatus?: string | null
+  trackingEnabled: boolean
+  reason?: string
+  etaAvailable: boolean
+  delivery?: {
+    status: string
+    label: string
+    assignedAt?: string | null
+    pickedUpAt?: string | null
+    deliveredAt?: string | null
+  } | null
+  driver?: { name?: string; phone?: string } | null
+  tracking?: DeliveryTrackingInfo | null
+}
+
+export interface SupplierOrderTrackingResponse {
+  orderId: string
+  orderRef?: string
+  orderStatus?: string | null
+  restaurantName?: string | null
+  trackingEnabled: boolean
+  etaAvailable?: boolean
+  routeId?: string | null
+  routeStopId?: string | null
+  routeNumber?: string | null
+  assignment?: {
+    id: string
+    status: string
+    driverId?: string
+    driverName?: string
+    driverPhone?: string
+    driverPhoneVisible?: boolean
+  } | null
+  tracking?: DeliveryTrackingInfo | null
+  latestLocation?: DeliveryTrackingInfo['latestLocation']
+  lastUpdatedLabel?: string | null
+}
+
+export type OrderTrackingResponse = RestaurantOrderTrackingResponse | SupplierOrderTrackingResponse
+
+export function isRestaurantOrderTracking(
+  data: OrderTrackingResponse | undefined
+): data is RestaurantOrderTrackingResponse {
+  return Boolean(data && 'orderReference' in data)
+}
+
+export function isSupplierOrderTracking(
+  data: OrderTrackingResponse | undefined
+): data is SupplierOrderTrackingResponse {
+  return Boolean(data && !isRestaurantOrderTracking(data))
+}
+
+export interface DeliveryTrackingInfo {
+  enabled: boolean
+  hasLocation: boolean
+  lastSeenAt: string | null
+  isStale: boolean
+  staleAfterSeconds?: number
+  latestLocation: {
+    latitude: number
+    longitude: number
+    accuracyMeters?: number | null
+    speedMps?: number | null
+    headingDegrees?: number | null
+    recordedAt: string
+  } | null
+  lastUpdatedLabel?: string | null
 }
 
 export interface DispatchOrderCard {
@@ -193,6 +282,11 @@ export interface DispatchOrderCard {
   restaurant_name: string
   item_count: number
   has_pod?: boolean
+  delivery_area?: string | null
+  scheduled_at?: string | null
+  delivery_status?: string | null
+  active_route_id?: string | null
+  active_route_number?: string | null
   assignment?: {
     id: string
     status: string
@@ -206,11 +300,62 @@ export interface DispatchOrderCard {
       vehicle_plate?: string | null
     }
   } | null
+  tracking?: DeliveryTrackingInfo | null
+  /** @deprecated Prefer `tracking` */
+  driver_last_seen?: {
+    recordedAt?: string
+    lastUpdatedLabel?: string
+    latitude?: number
+    longitude?: number
+    isStale?: boolean
+  } | null
+}
+
+export interface DeliveryRouteStop {
+  id: string
+  routeId: string
+  orderId: string
+  sequenceNumber: number
+  status: string
+  restaurantName: string
+  deliveryArea?: string | null
+  addressLine?: string | null
+  totalAmount: number
+  itemCount: number
+  notes?: string | null
+  assignmentStatus?: string | null
+  tracking?: DeliveryTrackingInfo | null
+}
+
+export interface DeliveryRouteSummary {
+  id: string
+  routeNumber: string
+  routeLabel: string
+  area?: string | null
+  driverId?: string | null
+  driverName: string
+  vehicle?: string | null
+  status: string
+  scheduledDate: string
+  stops: number
+  completedStops: number
+  failedStops: number
+  rescheduledStops: number
+}
+
+export interface DeliveryRouteDetail extends Omit<DeliveryRouteSummary, 'stops'> {
+  stops: DeliveryRouteStop[]
+  tracking?: DeliveryTrackingInfo | null
+  startedAt?: string | null
+  completedAt?: string | null
 }
 
 export interface OrderFilters {
   status?: string
   supplier?: string
+  q?: string
+  from?: string
+  to?: string
   limit?: number
   offset?: number
 }

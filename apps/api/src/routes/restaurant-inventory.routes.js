@@ -9,9 +9,24 @@ import {
 import { requireFeature } from '../lib/subscription.js'
 import { isFeatureEnabledForTenant } from '../lib/feature-flags.js'
 import { query, withTransaction } from '../lib/db.js'
+import { startStage, mark } from '../middlewares/request-timing.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
+import {
+  listExpiryLots,
+  getExpirySummary,
+  createExpiryLot,
+  updateExpiryLot,
+  archiveExpiryLot,
+  getExpirySettings,
+  updateExpirySettings,
+  runExpiryReminderCheck,
+} from '../services/inventory-expiry.service.js'
+import {
+  listRestaurantReminders,
+  recomputeCadencePatterns,
+} from '../services/reorder-cadence.service.js'
 
 const router = express.Router()
 
@@ -46,79 +61,62 @@ const updateInventorySchema = z.object({
 
 // Get restaurant inventory with products
 router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  startStage(req, 'handler')
   try {
     const restaurantId = await getRestaurantIdForRequest(req)
     if (!restaurantId) {
       throw new ValidationError('Restaurant not found')
     }
 
-    // Main inventory query with smart reorder calculation
     const { rows } = await query(
       `
-      SELECT 
+      WITH usage AS (
+        SELECT
+          restaurant_id,
+          product_id,
+          AVG(ABS(quantity)) FILTER (WHERE type = 'SUBTRACT') AS avg_daily_usage
+        FROM inventory_movement_log
+        WHERE restaurant_id = $1
+          AND created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY restaurant_id, product_id
+      )
+      SELECT
         ri.*,
-        p.name as product_name,
-        p.sku as product_sku,
-        p.unit as product_unit,
+        p.name AS product_name,
+        p.sku AS product_sku,
+        p.unit AS product_unit,
         p.supplier_id,
-        s.name as supplier_name,
-        COALESCE(ri.low_stock_threshold, 0) as low_stock_threshold,
-        b.name as branch_name,
-        -- Calculate average daily usage from movement logs (last 30 days)
-        COALESCE((
-          SELECT AVG(ABS(iml.quantity))
-          FROM inventory_movement_log iml
-          WHERE iml.restaurant_id = ri.restaurant_id 
-            AND iml.product_id = ri.product_id
-            AND iml.type = 'SUBTRACT'
-            AND iml.created_at >= NOW() - INTERVAL '30 days'
-        ), 0) as avg_daily_usage,
-        -- Calculate days of stock remaining
-        CASE 
-          WHEN COALESCE((
-            SELECT AVG(ABS(iml.quantity))
-            FROM inventory_movement_log iml
-            WHERE iml.restaurant_id = ri.restaurant_id 
-              AND iml.product_id = ri.product_id
-              AND iml.type = 'SUBTRACT'
-              AND iml.created_at >= NOW() - INTERVAL '30 days'
-          ), 0) > 0 
-          THEN ROUND(ri.quantity / NULLIF((
-            SELECT AVG(ABS(iml.quantity))
-            FROM inventory_movement_log iml
-            WHERE iml.restaurant_id = ri.restaurant_id 
-              AND iml.product_id = ri.product_id
-              AND iml.type = 'SUBTRACT'
-              AND iml.created_at >= NOW() - INTERVAL '30 days'
-          ), 0))
+        s.name AS supplier_name,
+        COALESCE(ri.low_stock_threshold, 0) AS low_stock_threshold,
+        b.name AS branch_name,
+        COALESCE(u.avg_daily_usage, 0) AS avg_daily_usage,
+        CASE
+          WHEN COALESCE(u.avg_daily_usage, 0) > 0
+          THEN ROUND(ri.quantity / NULLIF(u.avg_daily_usage, 0))
           ELSE NULL
-        END as days_of_stock,
-        -- Smart reorder quantity based on usage and lead time
-        CASE 
+        END AS days_of_stock,
+        CASE
           WHEN ri.quantity <= COALESCE(ri.low_stock_threshold, 0) THEN
             GREATEST(
-              COALESCE((
-                SELECT AVG(ABS(iml.quantity))
-                FROM inventory_movement_log iml
-                WHERE iml.restaurant_id = ri.restaurant_id 
-                  AND iml.product_id = ri.product_id
-                  AND iml.type = 'SUBTRACT'
-                  AND iml.created_at >= NOW() - INTERVAL '30 days'
-              ), ri.low_stock_threshold * 2) * 21, -- 3 weeks supply
-              ri.low_stock_threshold * 2 - ri.quantity -- Minimum to reach threshold x2
+              COALESCE(u.avg_daily_usage, ri.low_stock_threshold * 2) * 21,
+              ri.low_stock_threshold * 2 - ri.quantity
             )
           ELSE NULL
-        END as suggested_reorder_qty
+        END AS suggested_reorder_qty
       FROM restaurant_inventory ri
       JOIN product p ON p.id = ri.product_id
       JOIN supplier s ON s.id = p.supplier_id
       LEFT JOIN branch b ON b.id = ri.branch_id
+      LEFT JOIN usage u
+        ON u.restaurant_id = ri.restaurant_id AND u.product_id = ri.product_id
       WHERE ri.restaurant_id = $1
       ORDER BY ri.updated_at DESC, ri.created_at DESC
     `,
-      [restaurantId]
+      [restaurantId],
+      req
     )
 
+    mark(req, 'handler')
     res.json({
       ok: true,
       data: { inventory: rows },
@@ -126,6 +124,7 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
       requestId: req.requestId,
     })
   } catch (error) {
+    mark(req, 'handler')
     logger.error({
       message: 'Get restaurant inventory error',
       error: error.message,
@@ -952,6 +951,185 @@ router.get(
         },
         requestId: req.requestId,
       })
+    }
+  }
+)
+
+const expiryLotSchema = z.object({
+  itemName: z.string().min(1),
+  productId: z.string().uuid().optional().nullable(),
+  supplierId: z.string().uuid().optional().nullable(),
+  branchId: z.string().uuid().optional().nullable(),
+  orderId: z.string().uuid().optional().nullable(),
+  orderItemId: z.string().uuid().optional().nullable(),
+  productSku: z.string().optional().nullable(),
+  quantity: z.number().min(0).optional(),
+  unit: z.string().optional(),
+  batchLotNumber: z.string().optional().nullable(),
+  receivedDate: z.string().optional().nullable(),
+  expiryDate: z.string().min(1),
+  storageLocation: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+})
+
+router.get('/expiry', requireRole(['RESTAURANT', 'ADMIN']), async (req, res, next) => {
+  try {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) throw new ValidationError('Restaurant not found')
+    const data = await listExpiryLots(restaurantId, {
+      status: req.query.status,
+      supplierId: req.query.supplier_id || req.query.supplierId,
+      storageLocation: req.query.storage_location || req.query.storageLocation,
+      categoryId: req.query.category_id || req.query.categoryId,
+    })
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/expiry/summary', requireRole(['RESTAURANT', 'ADMIN']), async (req, res, next) => {
+  try {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) throw new ValidationError('Restaurant not found')
+    const summary = await getExpirySummary(restaurantId)
+    res.json({ ok: true, data: { summary }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/expiry/settings', requireRole(['RESTAURANT', 'ADMIN']), async (req, res, next) => {
+  try {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) throw new ValidationError('Restaurant not found')
+    const settings = await getExpirySettings(restaurantId)
+    res.json({ ok: true, data: { settings }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.patch(
+  '/expiry/settings',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const settings = await updateExpirySettings(restaurantId, {
+        expiringSoonDays: req.body.expiringSoonDays ?? req.body.expiring_soon_days,
+      })
+      res.json({ ok: true, data: { settings }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/expiry',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const body = expiryLotSchema.parse(req.body)
+      const lot = await createExpiryLot(restaurantId, body)
+      res.status(201).json({ ok: true, data: { lot }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.patch(
+  '/expiry/:lotId',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const lot = await updateExpiryLot(restaurantId, req.params.lotId, req.body)
+      res.json({ ok: true, data: { lot }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.delete(
+  '/expiry/:lotId',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const result = await archiveExpiryLot(restaurantId, req.params.lotId)
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/expiry/check-reminders',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const result = await runExpiryReminderCheck({ restaurantId })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/reorder-reminders',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requireFeature(
+    'smart_reorder',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const reminders = await listRestaurantReminders(restaurantId)
+      res.json({ ok: true, data: { reminders }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/reorder-cadence/recompute',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  requireFeature(
+    'smart_reorder',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const result = await recomputeCadencePatterns({ restaurantId })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
     }
   }
 )

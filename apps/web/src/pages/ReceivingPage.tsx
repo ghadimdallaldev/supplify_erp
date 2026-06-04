@@ -38,7 +38,8 @@ import {
   useGetReceivingHistoryQuery,
   useGetEntitlementsQuery,
 } from '../services/api'
-import { featureEnabled } from '../lib/planLimits'
+import { isEntitlementFeatureEnabled } from '../lib/planLimits'
+import { FeatureLockedCard } from '../components/FeatureLockedCard'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
 import { isOrderReadyForReceiving } from '../lib/orderReceiving'
@@ -72,7 +73,14 @@ export function ReceivingPage() {
   } | null>(null)
 
   const { data: entitlementsData } = useGetEntitlementsQuery()
-  const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)
+  const receivingEnabled = isEntitlementFeatureEnabled(
+    entitlementsData?.entitlements,
+    'receiving_quality'
+  )
+  const disputesEnabled = isEntitlementFeatureEnabled(
+    entitlementsData?.entitlements,
+    'disputes_returns'
+  )
   const canShowDispute = disputesEnabled && canOpenDispute
 
   const beginDisputeFromReceiving = (
@@ -153,6 +161,9 @@ export function ReceivingPage() {
             actual_unit_price: formData[`price_${item.id}`] || item.unit_price,
             quality_status: formData[`quality_${item.id}`] || 'ACCEPTED',
             notes: formData[`notes_${item.id}`] || '',
+            expiryDate: formData[`expiry_${item.id}`] || undefined,
+            batchLotNumber: formData[`batch_${item.id}`] || undefined,
+            storageLocation: formData[`storage_${item.id}`] || undefined,
           }
         }),
         deliveryNotes: formData.deliveryNotes,
@@ -301,300 +312,314 @@ export function ReceivingPage() {
 
   return (
     <RequirePermission permission="RECEIVING_VIEW" title="receiving">
-      <div className="space-y-6">
-        <Card className="shadow-sm">
-          <CardContent className="space-y-4 p-4 md:p-5">
-            <PageHeader
-              title="Receiving & Quality Control"
-              description="Confirm deliveries, record quality issues, and open disputes when needed."
-            />
+      {!receivingEnabled ? (
+        <FeatureLockedCard
+          featureKey="receiving_quality"
+          featureName="Receiving & quality control"
+          currentPlan={entitlementsData?.entitlements?.plan?.name ?? null}
+          upgradeUrl="/app/settings?tab=subscription"
+        />
+      ) : (
+        <div className="page-stack overflow-x-hidden" data-testid="receiving-page">
+          <Card className="shadow-sm">
+            <CardContent className="space-y-4 p-4 md:p-5">
+              <PageHeader
+                title="Receiving & Quality Control"
+                description="Confirm deliveries, record quality issues, and open disputes when needed."
+              />
 
-            <Tabs defaultValue="pending" className="space-y-4">
-              <TabsList className="h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
-                <TabsTrigger value="pending" className="flex items-center gap-2">
-                  <PackageCheck className="h-4 w-4" />
-                  Pending Orders
-                  {pendingOrders.length > 0 && (
-                    <Badge variant="destructive">{pendingOrders.length}</Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="history" className="flex items-center gap-2">
-                  <History className="h-4 w-4" />
-                  Receiving History
-                </TabsTrigger>
-              </TabsList>
+              <Tabs defaultValue="pending" className="space-y-4">
+                <TabsList className="tabs-scroll h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
+                  <TabsTrigger value="pending" className="flex items-center gap-2">
+                    <PackageCheck className="h-4 w-4" />
+                    Pending Orders
+                    {pendingOrders.length > 0 && (
+                      <Badge variant="destructive">{pendingOrders.length}</Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="history" className="flex items-center gap-2">
+                    <History className="h-4 w-4" />
+                    Receiving History
+                  </TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="pending" className="space-y-4">
-                {pendingLoading ? (
-                  <div className="space-y-2 py-4">
-                    <Skeleton className="h-16 w-full rounded-lg" />
-                    <Skeleton className="h-16 w-full rounded-lg" />
-                  </div>
-                ) : pendingOrders.length === 0 ? (
-                  <EmptyState
-                    title="No orders awaiting receiving"
-                    description="Delivered orders ready to receive will show up here."
-                    icon={<PackageCheck className="h-10 w-10" aria-hidden />}
-                  />
-                ) : (
-                  <div className="grid gap-4">
-                    {pendingOrders.map((order: any) => {
-                      const status = (order.status?.toUpperCase() || order.status || '') as string
-                      const readyToReceive = isOrderReadyForReceiving(status)
+                <TabsContent value="pending" className="space-y-4">
+                  {pendingLoading ? (
+                    <div className="space-y-2 py-4">
+                      <Skeleton className="h-16 w-full rounded-lg" />
+                      <Skeleton className="h-16 w-full rounded-lg" />
+                    </div>
+                  ) : pendingOrders.length === 0 ? (
+                    <EmptyState
+                      title="No orders awaiting receiving"
+                      description="Delivered orders ready to receive will show up here."
+                      icon={<PackageCheck className="h-10 w-10" aria-hidden />}
+                    />
+                  ) : (
+                    <div className="grid gap-4">
+                      {pendingOrders.map((order: any) => {
+                        const status = (order.status?.toUpperCase() || order.status || '') as string
+                        const readyToReceive = isOrderReadyForReceiving(status)
 
-                      return (
-                        <Card key={order.id}>
-                          <CardHeader>
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <CardTitle className="flex items-center gap-2">
-                                  Order #{order.id.slice(0, 8)}
-                                  <Badge variant="outline">{order.supplier_name}</Badge>
-                                  <Badge
-                                    variant={
-                                      readyToReceive
-                                        ? 'default'
-                                        : status === 'SHIPPED'
-                                          ? 'secondary'
-                                          : status === 'PROCESSING'
+                        return (
+                          <Card key={order.id}>
+                            <CardHeader>
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="min-w-0 flex-1">
+                                  <CardTitle className="flex items-center gap-2">
+                                    Order #{order.id.slice(0, 8)}
+                                    <Badge variant="outline">{order.supplier_name}</Badge>
+                                    <Badge
+                                      variant={
+                                        readyToReceive
+                                          ? 'default'
+                                          : status === 'SHIPPED'
                                             ? 'secondary'
-                                            : 'outline'
-                                    }
+                                            : status === 'PROCESSING'
+                                              ? 'secondary'
+                                              : 'outline'
+                                      }
+                                    >
+                                      {order.status || 'UNKNOWN'}
+                                    </Badge>
+                                  </CardTitle>
+                                  <p className="text-sm text-[var(--text-muted)] mt-1">
+                                    Placed: {new Date(order.created_at).toLocaleString()}
+                                  </p>
+                                  {readyToReceive ? (
+                                    <div className="mt-2 flex items-center gap-2 text-sm text-[var(--mint)] bg-[var(--mint-pale)] px-2 py-1 rounded">
+                                      <CheckCircle className="h-4 w-4 shrink-0" />
+                                      <span>
+                                        {status === 'DELIVERED'
+                                          ? 'Supplier marked this order as delivered. Confirm receipt and quantities below.'
+                                          : 'Ready to confirm receipt and quantities.'}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <div className="mt-2 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                                      {status === 'PLACED' && (
+                                        <>
+                                          <Clock className="h-4 w-4 shrink-0" />
+                                          <span>Waiting for supplier to acknowledge order</span>
+                                        </>
+                                      )}
+                                      {status === 'ACKNOWLEDGED' && (
+                                        <>
+                                          <CheckCircle className="h-4 w-4 shrink-0" />
+                                          <span>
+                                            Supplier acknowledged. Order is being prepared.
+                                          </span>
+                                        </>
+                                      )}
+                                      {status === 'PROCESSING' && (
+                                        <>
+                                          <PackageCheck className="h-4 w-4 shrink-0" />
+                                          <span>Supplier is processing your order</span>
+                                        </>
+                                      )}
+                                      {status === 'SHIPPED' && (
+                                        <>
+                                          <Truck className="h-4 w-4 shrink-0" />
+                                          <span>
+                                            Order is in transit. Waiting for supplier to mark as
+                                            delivered.
+                                          </span>
+                                        </>
+                                      )}
+                                      {![
+                                        'PLACED',
+                                        'ACKNOWLEDGED',
+                                        'PROCESSING',
+                                        'SHIPPED',
+                                      ].includes(status) && (
+                                        <>
+                                          <AlertCircle className="h-4 w-4 shrink-0" />
+                                          <span>
+                                            Order status: {status || 'unknown'}. Waiting for
+                                            supplier to mark as delivered.
+                                          </span>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                                {order.has_receiving_report || receivingOrderIds.has(order.id) ? (
+                                  <Button
+                                    disabled
+                                    variant="outline"
+                                    className="cursor-not-allowed opacity-75"
                                   >
-                                    {order.status || 'UNKNOWN'}
-                                  </Badge>
-                                </CardTitle>
-                                <p className="text-sm text-[var(--text-muted)] mt-1">
-                                  Placed: {new Date(order.created_at).toLocaleString()}
-                                </p>
-                                {readyToReceive ? (
-                                  <div className="mt-2 flex items-center gap-2 text-sm text-[var(--mint)] bg-[var(--mint-pale)] px-2 py-1 rounded">
-                                    <CheckCircle className="h-4 w-4 shrink-0" />
-                                    <span>
-                                      {status === 'DELIVERED'
-                                        ? 'Supplier marked this order as delivered. Confirm receipt and quantities below.'
-                                        : 'Ready to confirm receipt and quantities.'}
-                                    </span>
-                                  </div>
+                                    <PackageCheck className="h-4 w-4 mr-2" />
+                                    Received
+                                  </Button>
+                                ) : readyToReceive && canReceive ? (
+                                  <Button
+                                    className="min-h-[44px] w-full shrink-0 sm:w-auto"
+                                    onClick={() => handleReceive(order)}
+                                    disabled={isCreating || receivingOrderIds.has(order.id)}
+                                  >
+                                    {receivingOrderIds.has(order.id) ? (
+                                      <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Processing...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <PackageCheck className="h-4 w-4 mr-2" />
+                                        Receive Now
+                                      </>
+                                    )}
+                                  </Button>
                                 ) : (
-                                  <div className="mt-2 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 px-2 py-1 rounded">
-                                    {status === 'PLACED' && (
-                                      <>
-                                        <Clock className="h-4 w-4 shrink-0" />
-                                        <span>Waiting for supplier to acknowledge order</span>
-                                      </>
-                                    )}
-                                    {status === 'ACKNOWLEDGED' && (
-                                      <>
-                                        <CheckCircle className="h-4 w-4 shrink-0" />
-                                        <span>Supplier acknowledged. Order is being prepared.</span>
-                                      </>
-                                    )}
-                                    {status === 'PROCESSING' && (
-                                      <>
-                                        <PackageCheck className="h-4 w-4 shrink-0" />
-                                        <span>Supplier is processing your order</span>
-                                      </>
-                                    )}
-                                    {status === 'SHIPPED' && (
-                                      <>
-                                        <Truck className="h-4 w-4 shrink-0" />
-                                        <span>
-                                          Order is in transit. Waiting for supplier to mark as
-                                          delivered.
-                                        </span>
-                                      </>
-                                    )}
-                                    {!['PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED'].includes(
-                                      status
-                                    ) && (
-                                      <>
-                                        <AlertCircle className="h-4 w-4 shrink-0" />
-                                        <span>
-                                          Order status: {status || 'unknown'}. Waiting for supplier
-                                          to mark as delivered.
-                                        </span>
-                                      </>
-                                    )}
-                                  </div>
+                                  <Button
+                                    disabled
+                                    variant="outline"
+                                    className="cursor-not-allowed opacity-75"
+                                    title="Order must be marked delivered by the supplier before receiving"
+                                  >
+                                    <AlertCircle className="h-4 w-4 mr-2" />
+                                    Not delivered yet
+                                  </Button>
                                 )}
                               </div>
-                              {order.has_receiving_report || receivingOrderIds.has(order.id) ? (
-                                <Button
-                                  disabled
-                                  variant="outline"
-                                  className="cursor-not-allowed opacity-75"
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-2">
+                                {order.items?.map((item: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="flex flex-col gap-1 border-b py-2 last:border-0 sm:flex-row sm:items-center sm:justify-between"
+                                  >
+                                    <div>
+                                      <p className="font-medium">{item.product_name}</p>
+                                      <p className="text-sm text-[var(--text-muted)]">
+                                        {item.sku} • Qty: {item.ordered_quantity} {item.unit}
+                                      </p>
+                                    </div>
+                                    <p className="font-medium">{formatPrice(item.unit_price)}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )
+                      })}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="history" className="space-y-4">
+                  {historyLoading ? (
+                    <div className="space-y-2 py-4">
+                      <Skeleton className="h-20 w-full rounded-lg" />
+                      <Skeleton className="h-20 w-full rounded-lg" />
+                    </div>
+                  ) : historyReports.length === 0 ? (
+                    <EmptyState
+                      title="No receiving history"
+                      description="Completed receiving reports will appear here."
+                      icon={<History className="h-10 w-10" aria-hidden />}
+                    />
+                  ) : (
+                    <div className="grid gap-4">
+                      {historyReports.map((report: any) => (
+                        <Card key={report.id}>
+                          <CardHeader>
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0">
+                                <CardTitle className="flex flex-wrap items-center gap-2">
+                                  Order #{report.order_id?.slice(0, 8) || 'N/A'}
+                                  <Badge variant="outline">{report.supplier_name}</Badge>
+                                </CardTitle>
+                                <p className="text-sm text-[var(--text-muted)] mt-1">
+                                  Received: {new Date(report.received_at).toLocaleString()}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                {report.quality_score && (
+                                  <div className="flex items-center gap-1">
+                                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                    <span className="text-sm font-medium">
+                                      {report.quality_score}
+                                    </span>
+                                  </div>
+                                )}
+                                <Badge
+                                  variant={report.status === 'ACCEPTED' ? 'default' : 'secondary'}
                                 >
-                                  <PackageCheck className="h-4 w-4 mr-2" />
-                                  Received
-                                </Button>
-                              ) : readyToReceive && canReceive ? (
-                                <Button
-                                  onClick={() => handleReceive(order)}
-                                  disabled={isCreating || receivingOrderIds.has(order.id)}
-                                >
-                                  {receivingOrderIds.has(order.id) ? (
-                                    <>
-                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                      Processing...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <PackageCheck className="h-4 w-4 mr-2" />
-                                      Receive Now
-                                    </>
-                                  )}
-                                </Button>
-                              ) : (
-                                <Button
-                                  disabled
-                                  variant="outline"
-                                  className="cursor-not-allowed opacity-75"
-                                  title="Order must be marked delivered by the supplier before receiving"
-                                >
-                                  <AlertCircle className="h-4 w-4 mr-2" />
-                                  Not delivered yet
-                                </Button>
-                              )}
+                                  {report.status}
+                                </Badge>
+                              </div>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="space-y-2">
-                              {order.items?.map((item: any, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className="flex items-center justify-between py-2 border-b last:border-0"
-                                >
-                                  <div>
-                                    <p className="font-medium">{item.product_name}</p>
-                                    <p className="text-sm text-[var(--text-muted)]">
-                                      {item.sku} • Qty: {item.ordered_quantity} {item.unit}
-                                    </p>
-                                  </div>
-                                  <p className="font-medium">{formatPrice(item.unit_price)}</p>
-                                </div>
-                              ))}
+                            <div className="grid grid-cols-1 gap-3 text-sm xs:grid-cols-3 xs:gap-4">
+                              <div>
+                                <p className="text-[var(--text-muted)]">Items Ordered</p>
+                                <p className="font-semibold">{report.total_items_ordered}</p>
+                              </div>
+                              <div>
+                                <p className="text-[var(--text-muted)]">Items Received</p>
+                                <p className="font-semibold">{report.total_items_received}</p>
+                              </div>
+                              <div>
+                                <p className="text-[var(--text-muted)]">Total Cost</p>
+                                <p className="font-semibold">
+                                  {formatPrice(report.total_actual_cost)}
+                                </p>
+                              </div>
                             </div>
+                            {report.delivery_notes && (
+                              <div className="mt-4 pt-4 border-t">
+                                <p className="text-sm text-[var(--text-muted)] mb-2">
+                                  Delivery Notes:
+                                </p>
+                                <p className="text-sm">{report.delivery_notes}</p>
+                              </div>
+                            )}
                           </CardContent>
                         </Card>
-                      )
-                    })}
-                  </div>
-                )}
-              </TabsContent>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
 
-              <TabsContent value="history" className="space-y-4">
-                {historyLoading ? (
-                  <div className="text-center py-8 text-[var(--text-muted)]">Loading...</div>
-                ) : historyReports.length === 0 ? (
-                  <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-12">
-                      <History className="h-16 w-16 text-[var(--text-muted)] mb-4" />
-                      <p className="text-lg font-semibold mb-2">No Receiving History</p>
-                      <p className="text-sm text-[var(--text-muted)]">
-                        Receiving reports will appear here
-                      </p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="grid gap-4">
-                    {historyReports.map((report: any) => (
-                      <Card key={report.id}>
-                        <CardHeader>
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <CardTitle className="flex items-center gap-2">
-                                {report.order_id?.slice(0, 8) || 'N/A'}
-                                <Badge variant="outline">{report.supplier_name}</Badge>
-                              </CardTitle>
-                              <p className="text-sm text-[var(--text-muted)] mt-1">
-                                Received: {new Date(report.received_at).toLocaleString()}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {report.quality_score && (
-                                <div className="flex items-center gap-1">
-                                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                  <span className="text-sm font-medium">
-                                    {report.quality_score}
-                                  </span>
-                                </div>
-                              )}
-                              <Badge
-                                variant={report.status === 'ACCEPTED' ? 'default' : 'secondary'}
-                              >
-                                {report.status}
-                              </Badge>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="grid grid-cols-3 gap-4 text-sm">
-                            <div>
-                              <p className="text-[var(--text-muted)]">Items Ordered</p>
-                              <p className="font-semibold">{report.total_items_ordered}</p>
-                            </div>
-                            <div>
-                              <p className="text-[var(--text-muted)]">Items Received</p>
-                              <p className="font-semibold">{report.total_items_received}</p>
-                            </div>
-                            <div>
-                              <p className="text-[var(--text-muted)]">Total Cost</p>
-                              <p className="font-semibold">
-                                {formatPrice(report.total_actual_cost)}
-                              </p>
-                            </div>
-                          </div>
-                          {report.delivery_notes && (
-                            <div className="mt-4 pt-4 border-t">
-                              <p className="text-sm text-[var(--text-muted)] mb-2">
-                                Delivery Notes:
-                              </p>
-                              <p className="text-sm">{report.delivery_notes}</p>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+          {/* Receiving Dialog */}
+          {selectedOrder && (
+            <ReceivingDialog
+              order={selectedOrder}
+              open={showDialog}
+              onOpenChange={setShowDialog}
+              onSubmit={handleSubmitReceiving}
+              isLoading={isCreating}
+              canReceive={canReceive}
+              canOpenDispute={canShowDispute}
+              onOpenDispute={(formData) => beginDisputeFromReceiving(selectedOrder, formData)}
+            />
+          )}
 
-        {/* Receiving Dialog */}
-        {selectedOrder && (
-          <ReceivingDialog
-            order={selectedOrder}
-            open={showDialog}
-            onOpenChange={setShowDialog}
-            onSubmit={handleSubmitReceiving}
-            isLoading={isCreating}
-            canReceive={canReceive}
-            canOpenDispute={canShowDispute}
-            onOpenDispute={(formData) => beginDisputeFromReceiving(selectedOrder, formData)}
-          />
-        )}
-
-        {openDisputeContext && (
-          <OpenDisputeDialog
-            open={Boolean(openDisputeContext)}
-            onOpenChange={(open) => {
-              if (!open) setOpenDisputeContext(null)
-            }}
-            orderId={openDisputeContext.orderId}
-            defaultSupplierId={openDisputeContext.supplierId}
-            receivingReportId={openDisputeContext.receivingReportId}
-            initialLineItems={openDisputeContext.lineItems}
-            onCreated={() => {
-              setOpenDisputeContext(null)
-              void refetchPending()
-              void refetchHistory()
-            }}
-          />
-        )}
-      </div>
+          {openDisputeContext && (
+            <OpenDisputeDialog
+              open={Boolean(openDisputeContext)}
+              onOpenChange={(open) => {
+                if (!open) setOpenDisputeContext(null)
+              }}
+              orderId={openDisputeContext.orderId}
+              defaultSupplierId={openDisputeContext.supplierId}
+              receivingReportId={openDisputeContext.receivingReportId}
+              initialLineItems={openDisputeContext.lineItems}
+              onCreated={() => {
+                setOpenDisputeContext(null)
+                void refetchPending()
+                void refetchHistory()
+              }}
+            />
+          )}
+        </div>
+      )}
     </RequirePermission>
   )
 }
@@ -635,7 +660,7 @@ function ReceivingDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[min(90dvh,100vh)] max-w-3xl overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))]">
         <DialogHeader>
           <DialogTitle>Receive Order #{order.id.slice(0, 8)}</DialogTitle>
           <DialogDescription>
@@ -670,7 +695,7 @@ function ReceivingDialog({
                         </p>
                       </div>
                       <div className="border-t pt-3 mt-3">
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <div>
                             <Label htmlFor={`received_${item.id}`}>Received Qty</Label>
                             <Input
@@ -717,6 +742,34 @@ function ReceivingDialog({
                               id={`notes_${item.id}`}
                               onChange={(e) =>
                                 setFormData({ ...formData, [`notes_${item.id}`]: e.target.value })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`expiry_${item.id}`}>Expiry date (optional)</Label>
+                            <Input
+                              id={`expiry_${item.id}`}
+                              type="date"
+                              onChange={(e) =>
+                                setFormData({ ...formData, [`expiry_${item.id}`]: e.target.value })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`batch_${item.id}`}>Batch / lot #</Label>
+                            <Input
+                              id={`batch_${item.id}`}
+                              onChange={(e) =>
+                                setFormData({ ...formData, [`batch_${item.id}`]: e.target.value })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`storage_${item.id}`}>Storage location</Label>
+                            <Input
+                              id={`storage_${item.id}`}
+                              onChange={(e) =>
+                                setFormData({ ...formData, [`storage_${item.id}`]: e.target.value })
                               }
                             />
                           </div>
@@ -773,6 +826,7 @@ function ReceivingDialog({
               <Button
                 type="button"
                 variant="outline"
+                className="min-h-[44px] w-full sm:w-auto"
                 data-testid="receiving-open-dispute"
                 onClick={() => onOpenDispute(formData)}
               >
@@ -784,7 +838,11 @@ function ReceivingDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={() => onSubmit(formData)} disabled={isLoading || !canReceive}>
+            <Button
+              className="min-h-[44px] w-full sm:w-auto"
+              onClick={() => onSubmit(formData)}
+              disabled={isLoading || !canReceive}
+            >
               {isLoading ? 'Processing...' : 'Complete Receiving'}
             </Button>
           </div>

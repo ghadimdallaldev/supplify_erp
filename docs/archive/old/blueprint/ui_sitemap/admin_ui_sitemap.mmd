@@ -1,0 +1,52 @@
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#e3f2fd', 'primaryTextColor':'#0d47a1', 'primaryBorderColor':'#1976d2', 'lineColor':'#546e7a', 'secondaryColor':'#f5f5f5', 'tertiaryColor':'#fffde7' }}}%%
+flowchart TB
+  Admin["/app/admin\nAdmin"]
+
+  subgraph routes[" Routes "]
+    AdminRoot["/app/admin\nOverview tab"]
+    AdminSuppliers["/app/admin/suppliers\nTenants: Suppliers"]
+    AdminRestaurants["/app/admin/restaurants\nTenants: Restaurants"]
+  end
+
+  subgraph overview[" Overview "]
+    Overview["Overview"]
+  end
+
+  subgraph billing[" Plans & Billing "]
+    Plans["Plans"]
+    Subscriptions["Subscriptions"]
+  end
+
+  subgraph tenants[" Tenants "]
+    Tenants["Tenants\nSuppliers / Restaurants"]
+  end
+
+  subgraph ops[" Ops & Observability "]
+    Health["Health\nErrors, DB pool"]
+    Usage["Usage"]
+    Audit["Audit logs"]
+  end
+
+  subgraph finance[" Finance "]
+    Finance["Finance\nGMV, MRR, overdue"]
+  end
+
+  subgraph support[" Support "]
+    Impersonation["Impersonation\nStart/stop, banner"]
+  end
+
+  Admin --> AdminRoot
+  Admin --> AdminSuppliers
+  Admin --> AdminRestaurants
+  Admin --> Overview
+  Admin --> Plans
+  Admin --> Subscriptions
+  Admin --> Tenants
+  Admin --> Health
+  Admin --> Finance
+  Admin --> Usage
+  Admin --> Audit
+  Admin --> Impersonation
+
+  classDef app fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+  class Admin app

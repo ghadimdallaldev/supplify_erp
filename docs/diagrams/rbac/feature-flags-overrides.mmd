@@ -1,0 +1,12 @@
+%% Feature flags and overrides
+%% Status: current | Related: apps/api/src/lib/feature-flags.js
+flowchart LR
+  Req[Request] --> Resolve[isFeatureEnabled / getEntitlements]
+  Resolve --> T1{tenant feature_flag_override?}
+  T1 -->|hit| Out[enabled + source tenant_override]
+  T1 --> G1{global feature_flag_override?}
+  G1 -->|hit| Out2[enabled + source global]
+  G1 --> Plan[plan.features + evaluatePlanFeatureValue]
+  Plan --> Out3[enabled + source plan]
+  AdminUI[feature_flags_access tier\naddon_toggles → all_experimental] -.-> AdminOnly[Admin / settings toggles where exposed]
+  PlatinumCatalog[Platinum strings:\nfull_api_webhooks, white_label_domain,\nread receipts, custom reports] --> CatLabel[catalog-only / future\nsee PLATINUM_CATALOG_ONLY_FEATURES.md]

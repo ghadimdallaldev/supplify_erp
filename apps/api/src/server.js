@@ -1,12 +1,16 @@
 import express from 'express'
 import http from 'http'
 import cors from 'cors'
+import compression from 'compression'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import cookieParser from 'cookie-parser'
 import session from 'express-session'
-import { config } from './config/env.js'
+import { config, allowE2eRoutes } from './config/env.js'
+import { isRailwayRuntime } from './config/load-railway-env.js'
+import { isLikelyPublicRedisUrl } from './config/resolve-redis-url.js'
 import { validateProductionConfig } from './lib/validate-config.js'
+import { logEmailBootMode } from './services/email/email.service.js'
 import { logger } from './lib/logger.js'
 import { createSessionStore } from './lib/session-store.js'
 import { requestContext } from './middlewares/requestContext.js'
@@ -49,19 +53,18 @@ import { runSubscriptionBillingJob } from './jobs/subscription-billing.job.js'
 import { checkExpiredWaitlistOffers } from './services/waitlistPromotion.js'
 import { billingAccessMiddleware } from './middlewares/billingAccess.js'
 import { billingRoutes } from './routes/billing.routes.js'
-import {
-  ensureReservationsSchema,
-  ensureStaffAppSchema,
-  ensureOrderCancellationColumns,
-} from './lib/migrator.js'
+import { ensureOrderCancellationColumns } from './lib/migrator.js'
 import { staffRoutes } from './routes/staff.routes.js'
 import { publicRoutes } from './routes/public.routes.js'
 import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
 import { driversRoutes } from './routes/drivers.routes.js'
+import { supplierOpsRoutes } from './routes/supplier-ops.routes.js'
 import { runFulfillmentExceptionChecks } from './jobs/fulfillment-exceptions.job.js'
+import { runOperationalRemindersJob } from './jobs/operational-reminders.job.js'
 import { promotionsRoutes } from './routes/promotions.routes.js'
 import { tenantAuditRoutes } from './routes/tenant-audit.routes.js'
 import { runDeactivateExpiredPromotionsJob } from './jobs/promotions-expiry.job.js'
+import { runDriverLocationRetentionJob } from './jobs/driver-location-retention.job.js'
 import { runFreeSandboxExpiryJob } from './jobs/free-sandbox-expiry.job.js'
 import { disputesRoutes } from './routes/disputes.routes.js'
 import { creditNotesRoutes } from './routes/credit-notes.routes.js'
@@ -75,41 +78,55 @@ import restaurantOrgRoutes from './routes/restaurant-org.routes.js'
 import restaurantInvitationsRoutes from './routes/restaurant-invitations.routes.js'
 import { expireOldBranchInvitations } from './lib/branch-invitations.js'
 import { expireOldRestaurantInvitations } from './lib/restaurant-invitations.js'
-import { ensureObjectStorageBuckets, checkObjectStorageHealth } from './lib/object-storage.js'
-import { pool, closePool } from './lib/db.js'
+import { runCronJob, CRON_JOBS } from './lib/cron-runner.js'
+import path from 'node:path'
+import { ensureStorageReady, checkStorageHealth } from './services/storage/storage.service.js'
+import { pool, closePool, warmupPool, startPoolKeepalive, stopPoolKeepalive } from './lib/db.js'
+import { getKeycloakConfig } from './lib/auth.js'
+import { requestTimingMiddleware } from './middlewares/request-timing.js'
 import { disconnectCache, isRedisConnected } from './lib/cache.js'
+import { runFullStartupMigrations } from './lib/startup-migrations.js'
 import {
   getMemorySnapshot,
   shouldExposeMemoryOnHealth,
   startMemoryMonitor,
 } from './lib/memory-monitor.js'
 
-if (config.NODE_ENV === 'production') {
-  validateProductionConfig()
+validateProductionConfig()
+logEmailBootMode()
+
+if (config.REDIS_URL && isLikelyPublicRedisUrl(config.REDIS_URL)) {
+  logger.warn({
+    msg: 'REDIS_URL uses a public Railway Redis proxy (egress fees). Set REDIS_URL=${{your-redis-service.REDIS_URL}} on the API service — not REDIS_PUBLIC_URL.',
+    railway: isRailwayRuntime(),
+  })
 }
 
-if (config.NODE_ENV !== 'test') {
+/** Run after HTTP listen so Railway health checks get a response during slow DB work. */
+async function runStartupSchemaTasks() {
+  if (config.NODE_ENV === 'test') return
+
   try {
-    await ensureReservationsSchema()
-    await ensureStaffAppSchema()
+    await runFullStartupMigrations()
     await ensureOrderCancellationColumns()
   } catch (error) {
-    logger.error('Aborting server startup due to reservations migration failure', {
+    logger.error('Database migration failed after listen — shutting down', {
       error: error.message,
     })
     process.exit(1)
   }
 
   try {
-    const bucketResults = await ensureObjectStorageBuckets()
-    logger.info('Object storage buckets ready', {
-      buckets: bucketResults.map((r) => r.bucket),
+    const storageResults = await ensureStorageReady()
+    logger.info('Storage ready', {
+      driver: config.STORAGE_DRIVER,
+      results: storageResults,
     })
   } catch (error) {
-    logger.error('Object storage bucket setup failed — uploads may not work', {
+    logger.error('Storage setup failed — uploads may not work', {
       error: error.message,
-      endpoint: config.S3_ENDPOINT,
-      bucket: config.S3_BUCKET,
+      driver: config.STORAGE_DRIVER,
+      bucket: config.STORAGE_BUCKET,
     })
   }
 }
@@ -117,8 +134,19 @@ if (config.NODE_ENV !== 'test') {
 const app = express()
 const isProduction = config.NODE_ENV === 'production'
 
-// Trust proxy for rate limiting and IP detection
-app.set('trust proxy', 1)
+if (config.TRUST_PROXY) {
+  app.set('trust proxy', 1)
+}
+
+// Per-request timing — slow requests (>SLOW_REQUEST_MS) log structured stage breakdown.
+app.use(requestTimingMiddleware)
+
+// Gzip/deflate response compression. Big win on Railway where JSON list payloads
+// (orders, products, reports) cross the public network to the browser uncompressed.
+// Uses the `compressible` content-type filter (skips images/PDF/already-compressed),
+// default 1kb threshold (skips tiny bodies). API responses never embed the CSRF token
+// (header-based defense), so there is no BREACH exposure from compressing them.
+app.use(compression())
 
 // Security middleware
 app.use(
@@ -134,6 +162,8 @@ app.use(
     hsts: isProduction ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
     frameguard: { action: 'deny' },
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    // Allow web app on another Railway host to load /api/files/object images
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 )
 
@@ -153,69 +183,54 @@ app.use(
       'X-Requested-With',
       'X-Branch-Id',
     ],
+    maxAge: 600, // browsers cache preflight for 10 minutes — eliminates repeated OPTIONS round-trips
   })
 )
 
-// Rate limiting (stricter in production)
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: isProduction ? 300 : 1000,
-  message: 'Too many requests from this IP, please try again later.',
+const rateLimitMessage = 'Too many requests from this IP, please try again later.'
+const rateOpts = {
+  windowMs: config.RATE_LIMIT_WINDOW_MS,
   standardHeaders: true,
   legacyHeaders: false,
-})
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: isProduction ? 30 : 500,
-  message: 'Too many authentication attempts, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-const staffLinkLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: isProduction ? 10 : 100,
-  message: 'Too many staff portal link requests, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-// Stricter limits for sensitive endpoints (TODO: replace with Redis-backed limiter in production)
-const publicLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: isProduction ? 60 : 200,
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-const chatSendLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 300, // chat send per IP
-  message: 'Too many messages sent, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
+}
 const skipReadOnlyRequests = (req) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method)
 
-const ordersWriteLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: isProduction ? 120 : 500,
-  message: 'Too many order requests, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: skipReadOnlyRequests,
-})
+function createLimiter(max, message, extra = {}) {
+  return rateLimit({ ...rateOpts, max, message, ...extra })
+}
 
-const promotionsWriteLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: isProduction ? 80 : 400,
-  message: 'Too many promotion requests, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: skipReadOnlyRequests,
-})
+const noopLimiter = (_req, _res, next) => next()
+const limiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(config.RATE_LIMIT_MAX, rateLimitMessage)
+  : noopLimiter
+const authLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(
+      isProduction ? 30 : 500,
+      'Too many authentication attempts, please try again later.'
+    )
+  : noopLimiter
+const staffLinkLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(
+      isProduction ? 10 : 100,
+      'Too many staff portal link requests, please try again later.'
+    )
+  : noopLimiter
+const publicLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(isProduction ? 60 : 200, rateLimitMessage)
+  : noopLimiter
+const chatSendLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(300, 'Too many messages sent, please try again later.')
+  : noopLimiter
+const ordersWriteLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(isProduction ? 120 : 500, 'Too many order requests, please try again later.', {
+      skip: skipReadOnlyRequests,
+    })
+  : noopLimiter
+const promotionsWriteLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(isProduction ? 80 : 400, 'Too many promotion requests, please try again later.', {
+      skip: skipReadOnlyRequests,
+    })
+  : noopLimiter
 
 app.use('/auth', authLimiter)
 app.use('/api/public', publicLimiter)
@@ -227,26 +242,33 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 app.use(cookieParser())
 
 // Session configuration (PostgreSQL store for OAuth state across instances)
+// Scoped to /auth only — sessions are only needed for OAuth state (login/callback/logout).
+// Applying session globally would hit the PostgreSQL store on every API request (~15-25ms on Railway).
 const sessionStore = createSessionStore()
 
-app.use(
-  session({
-    store: sessionStore,
-    secret: config.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: isProduction,
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'lax', // Use 'lax' for development with localhost
-    },
-  })
-)
+const sessionCookie = {
+  secure: config.COOKIE_SECURE,
+  httpOnly: true,
+  maxAge: 24 * 60 * 60 * 1000,
+  sameSite: config.COOKIE_SAME_SITE,
+}
+if (config.COOKIE_DOMAIN) {
+  sessionCookie.domain = config.COOKIE_DOMAIN
+}
 
-// Request context + one log line per HTTP request
+const sessionMiddleware = session({
+  store: sessionStore,
+  secret: config.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: sessionCookie,
+})
+app.use('/auth', sessionMiddleware)
+
 app.use(requestContext)
-app.use(requestLogger)
+if (config.ENABLE_REQUEST_LOGGING) {
+  app.use(requestLogger)
+}
 
 // Impersonation: read signed cookie and set req.impersonationContext when admin is "viewing as" a tenant
 app.use(impersonationContext)
@@ -264,19 +286,25 @@ app.use((req, res, next) => {
   return csrfProtection(req, res, next)
 })
 
-// Health check endpoint
+if (config.STORAGE_DRIVER === 'local') {
+  const uploadsDir = path.resolve(config.STORAGE_LOCAL_PATH)
+  app.use('/uploads', express.static(uploadsDir))
+}
+
 app.get('/health', async (req, res) => {
-  const storage = await checkObjectStorageHealth()
+  const storage = await checkStorageHealth()
   const ok = storage.ok
   const payload = {
-    ok,
-    status: ok ? 'healthy' : 'degraded',
-    timestamp: new Date().toISOString(),
-    storage,
-    requestId: req.requestId,
+    status: ok ? 'ok' : 'degraded',
+    service: 'supplify-api',
+    env: config.APP_ENV,
   }
 
   if (shouldExposeMemoryOnHealth()) {
+    payload.ok = ok
+    payload.timestamp = new Date().toISOString()
+    payload.storage = storage
+    payload.requestId = req.requestId
     payload.memory = getMemorySnapshot()
     payload.dbPool = {
       total: pool.totalCount,
@@ -288,6 +316,15 @@ app.get('/health', async (req, res) => {
   }
 
   res.status(ok ? 200 : 503).json(payload)
+})
+
+app.get('/ready', async (req, res) => {
+  try {
+    await pool.query('SELECT 1')
+    res.json({ status: 'ok', service: 'supplify-api', env: config.APP_ENV })
+  } catch {
+    res.status(503).json({ status: 'degraded', service: 'supplify-api', env: config.APP_ENV })
+  }
 })
 
 // API routes
@@ -332,6 +369,12 @@ app.use('/api/billing', billingRoutes)
 app.use('/api/public/staff/request-link', staffLinkLimiter)
 app.use('/api/public', publicRoutes)
 app.use('/api/admin-dashboard', adminDashboardRoutes)
+<<<<<<< HEAD
+=======
+if (allowE2eRoutes()) {
+  app.use('/api/e2e', e2eRoutes)
+}
+>>>>>>> dev
 app.use('/api/branches', branchesRoutes)
 app.use('/api/org', orgRoutes)
 app.use('/api/org/invitations', branchInvitationsRoutes)
@@ -341,6 +384,7 @@ app.use('/api/public/invitations', branchInvitationsPublicRoutes)
 app.use('/api/warehouses', warehousesRoutes)
 app.use('/api/fulfillment', fulfillmentRoutes)
 app.use('/api/drivers', driversRoutes)
+app.use('/api/supplier', supplierOpsRoutes)
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -370,8 +414,10 @@ function trackInterval(fn, ms) {
   return timer
 }
 
-// Initialize Socket.IO
-initializeSocket(server)
+// Initialize Socket.IO (Redis adapter when REDIS_URL is set)
+void initializeSocket(server).catch((err) => {
+  logger.error({ msg: 'Socket.IO initialization failed', error: err?.message })
+})
 
 let shuttingDown = false
 async function gracefulShutdown(signal) {
@@ -383,6 +429,7 @@ async function gracefulShutdown(signal) {
     clearInterval(timer)
   }
   stopMemoryMonitor()
+  stopPoolKeepalive()
 
   await new Promise((resolve) => {
     server.close(() => resolve())
@@ -417,31 +464,45 @@ process.on('SIGINT', () => {
   })
 })
 
-server.listen(PORT, () => {
+const HOST = process.env.HOST || '0.0.0.0'
+server.listen(PORT, HOST, () => {
   stopMemoryMonitor = startMemoryMonitor()
   logger.info({
-    msg: `Server started on port ${PORT}`,
+    msg: `Server started on ${HOST}:${PORT}`,
+    host: HOST,
     port: PORT,
+    railwayPort: process.env.PORT ?? null,
     env: config.NODE_ENV,
+    appEnv: config.APP_ENV,
     webOrigin: config.WEB_ORIGIN,
+    paymentsMode: config.PAYMENTS_MODE,
   })
 
-  // Start scheduled orders cron job
-  // Run every 5 minutes to check for scheduled orders (for testing)
-  const CRON_INTERVAL = 5 * 60 * 1000 // 5 minutes in milliseconds
+  warmupPool()
+    .then(() => startPoolKeepalive())
+    .catch((error) => {
+      logger.warn('Database pool warmup failed', { error: error.message })
+    })
 
-  // Run immediately on startup
-  executeScheduledOrders().catch((err) => {
-    logger.error('Error in initial scheduled orders execution:', err)
+  // Pre-warm Keycloak OIDC config so the first user request doesn't pay the network round-trip.
+  getKeycloakConfig().catch((err) => {
+    logger.warn('Keycloak config pre-warm failed', { error: err?.message })
   })
 
-  trackInterval(() => {
-    executeScheduledOrders().catch((err) => {
+  runStartupSchemaTasks().catch((error) => {
+    logger.error('Startup schema tasks failed', { error: error.message })
+  })
+
+  const scheduledOrdersIntervalMs = config.CRON_SCHEDULED_ORDERS_INTERVAL_MS
+
+  const runScheduledOrdersCron = () =>
+    runCronJob(CRON_JOBS.SCHEDULED_ORDERS, () => executeScheduledOrders()).catch((err) => {
       logger.error('Error in scheduled orders execution:', err)
     })
-  }, CRON_INTERVAL)
 
-  logger.info('Scheduled orders cron job started (runs every 5 minutes for testing)')
+  runScheduledOrdersCron()
+  trackInterval(runScheduledOrdersCron, scheduledOrdersIntervalMs)
+  logger.info('Scheduled orders cron job started', { intervalMs: scheduledOrdersIntervalMs })
 
   if (config.NODE_ENV !== 'production') {
     import('./lib/keycloak-admin.js')
@@ -458,85 +519,88 @@ server.listen(PORT, () => {
       })
   }
 
-  checkOverdueInvoices().catch((err) => logger.error('Invoice overdue job failed on startup:', err))
-  trackInterval(
-    () => {
-      checkOverdueInvoices().catch((err) => logger.error('Invoice overdue job failed:', err))
-    },
-    24 * 60 * 60 * 1000
-  )
-  logger.info('Invoice overdue job started (runs every 24h)')
+  const invoiceOverdueIntervalMs = 24 * 60 * 60 * 1000
+  const runInvoiceOverdueCron = () =>
+    runCronJob(CRON_JOBS.INVOICE_OVERDUE, () => checkOverdueInvoices()).catch((err) =>
+      logger.error('Invoice overdue job failed:', err)
+    )
+  runInvoiceOverdueCron()
+  trackInterval(runInvoiceOverdueCron, invoiceOverdueIntervalMs)
+  logger.info('Invoice overdue job started', { intervalMs: invoiceOverdueIntervalMs })
 
-  runSubscriptionBillingJob().catch((err) =>
-    logger.error('Subscription billing job failed on startup:', err)
-  )
-  trackInterval(
-    () => {
-      runSubscriptionBillingJob().catch((err) =>
-        logger.error('Subscription billing job failed:', err)
-      )
-    },
-    60 * 60 * 1000
-  )
-  logger.info('Subscription billing job started (runs every 1h)')
+  const billingIntervalMs = 60 * 60 * 1000
+  const runBillingCron = () =>
+    runCronJob(CRON_JOBS.SUBSCRIPTION_BILLING, () => runSubscriptionBillingJob()).catch((err) =>
+      logger.error('Subscription billing job failed:', err)
+    )
+  runBillingCron()
+  trackInterval(runBillingCron, billingIntervalMs)
+  logger.info('Subscription billing job started', { intervalMs: billingIntervalMs })
 
-  const WAITLIST_OFFER_INTERVAL = 15 * 60 * 1000
-  checkExpiredWaitlistOffers().catch((err) =>
-    logger.error('Waitlist expired-offers job failed on startup:', err)
-  )
-  trackInterval(() => {
-    checkExpiredWaitlistOffers().catch((err) =>
+  const waitlistIntervalMs = 15 * 60 * 1000
+  const runWaitlistCron = () =>
+    runCronJob(CRON_JOBS.WAITLIST_OFFERS, () => checkExpiredWaitlistOffers()).catch((err) =>
       logger.error('Waitlist expired-offers job failed:', err)
     )
-  }, WAITLIST_OFFER_INTERVAL)
-  logger.info('Waitlist expired-offers job started (runs every 15 minutes)')
+  runWaitlistCron()
+  trackInterval(runWaitlistCron, waitlistIntervalMs)
+  logger.info('Waitlist expired-offers job started', { intervalMs: waitlistIntervalMs })
 
-  runDeactivateExpiredPromotionsJob().catch((err) =>
-    logger.error('Promotions expiry job failed on startup:', err)
-  )
-  trackInterval(
-    () => {
-      runDeactivateExpiredPromotionsJob().catch((err) =>
-        logger.error('Promotions expiry job failed:', err)
-      )
-    },
-    30 * 60 * 1000
-  )
-  logger.info('Promotions expiry job started (runs every 30 min)')
-
-  const runInvitationExpiry = () =>
-    Promise.all([expireOldBranchInvitations(), expireOldRestaurantInvitations()]).catch((err) =>
-      logger.error('Invitation expiry job failed:', err)
+  const promotionsIntervalMs = 30 * 60 * 1000
+  const runPromotionsCron = () =>
+    runCronJob(CRON_JOBS.PROMOTIONS_EXPIRY, () => runDeactivateExpiredPromotionsJob()).catch(
+      (err) => logger.error('Promotions expiry job failed:', err)
     )
-  runInvitationExpiry()
-  trackInterval(runInvitationExpiry, 60 * 60 * 1000)
-  logger.info('Invitation expiry job started (runs every 1h)')
+  runPromotionsCron()
+  trackInterval(runPromotionsCron, promotionsIntervalMs)
+  logger.info('Promotions expiry job started', { intervalMs: promotionsIntervalMs })
 
-  runFreeSandboxExpiryJob().catch((err) =>
-    logger.error('Free sandbox expiry job failed on startup:', err)
-  )
-  trackInterval(
-    () => {
-      runFreeSandboxExpiryJob().catch((err) =>
-        logger.error('Free sandbox expiry job failed:', err)
-      )
-    },
-    60 * 60 * 1000
-  )
-  logger.info('Free sandbox expiry job started (runs every 1h)')
+  const invitationIntervalMs = 60 * 60 * 1000
+  const runInvitationExpiryCron = () =>
+    runCronJob(CRON_JOBS.INVITATION_EXPIRY, () =>
+      Promise.all([expireOldBranchInvitations(), expireOldRestaurantInvitations()])
+    ).catch((err) => logger.error('Invitation expiry job failed:', err))
+  runInvitationExpiryCron()
+  trackInterval(runInvitationExpiryCron, invitationIntervalMs)
+  logger.info('Invitation expiry job started', { intervalMs: invitationIntervalMs })
 
-  runFulfillmentExceptionChecks().catch((err) =>
-    logger.error('Fulfillment exceptions job failed on startup:', err)
-  )
-  trackInterval(
-    () => {
-      runFulfillmentExceptionChecks().catch((err) =>
-        logger.error('Fulfillment exceptions job failed:', err)
-      )
-    },
-    30 * 60 * 1000
-  )
-  logger.info('Fulfillment exceptions job started (runs every 30 min)')
+  const sandboxIntervalMs = 60 * 60 * 1000
+  const runSandboxCron = () =>
+    runCronJob(CRON_JOBS.FREE_SANDBOX_EXPIRY, () => runFreeSandboxExpiryJob()).catch((err) =>
+      logger.error('Free sandbox expiry job failed:', err)
+    )
+  runSandboxCron()
+  trackInterval(runSandboxCron, sandboxIntervalMs)
+  logger.info('Free sandbox expiry job started', { intervalMs: sandboxIntervalMs })
+
+  const fulfillmentIntervalMs = 30 * 60 * 1000
+  const runFulfillmentCron = () =>
+    runCronJob(CRON_JOBS.FULFILLMENT_EXCEPTIONS, () => runFulfillmentExceptionChecks()).catch(
+      (err) => logger.error('Fulfillment exceptions job failed:', err)
+    )
+  runFulfillmentCron()
+  trackInterval(runFulfillmentCron, fulfillmentIntervalMs)
+  logger.info('Fulfillment exceptions job started', { intervalMs: fulfillmentIntervalMs })
+
+  const operationalRemindersIntervalMs = config.CRON_OPERATIONAL_REMINDERS_INTERVAL_MS
+  const runOperationalRemindersCron = () =>
+    runCronJob(CRON_JOBS.OPERATIONAL_REMINDERS, () => runOperationalRemindersJob()).catch((err) =>
+      logger.error('Operational reminders job failed:', err)
+    )
+  runOperationalRemindersCron()
+  trackInterval(runOperationalRemindersCron, operationalRemindersIntervalMs)
+  logger.info('Operational reminders job started', { intervalMs: operationalRemindersIntervalMs })
+
+  const driverLocationRetentionIntervalMs = 24 * 60 * 60 * 1000
+  const runDriverLocationRetentionCron = () =>
+    runCronJob(CRON_JOBS.DRIVER_LOCATION_RETENTION, () => runDriverLocationRetentionJob()).catch(
+      (err) => logger.error('Driver location retention job failed:', err)
+    )
+  runDriverLocationRetentionCron()
+  trackInterval(runDriverLocationRetentionCron, driverLocationRetentionIntervalMs)
+  logger.info('Driver location retention job started', {
+    intervalMs: driverLocationRetentionIntervalMs,
+  })
 })
 
 export default app

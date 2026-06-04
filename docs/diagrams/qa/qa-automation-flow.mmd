@@ -1,0 +1,13 @@
+%% QA automation pipeline
+%% Status: current | Related: package.json scripts, tests/README.md
+flowchart LR
+  Dev[Developer] --> QA[pnpm qa]
+  QA --> Lint[eslint api + web]
+  QA --> TC[typescript typecheck web]
+  QA --> Test[api test:run + web test:run]
+  QA --> Build[api build + web build]
+  Dev --> E2E[pnpm e2e:playwright]
+  E2E --> Probe[probe-urls.mjs]
+  Probe --> PW[Playwright suites\nsmoke, critical_e2e, nightly]
+  PW --> API_tests[API specs\nadmin-rbac, impersonation,\nsubscription-limits, deals-gates]
+  Cov[test:coverage-map] --> Map[tests/feature-inventory.yml]

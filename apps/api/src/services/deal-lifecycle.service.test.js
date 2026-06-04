@@ -41,10 +41,19 @@ describe('deal-lifecycle.service', () => {
     expect(next.status).toBe('scheduled')
   })
 
-  it('restaurants only see active paid deals in date range', () => {
-    expect(isRestaurantVisibleDeal({ ...baseDeal, status: 'active', payment_status: 'paid' })).toBe(
-      true
-    )
+  it('restaurants only see active paid deals in live boost window', () => {
+    const liveBoost = {
+      boost_start_at: new Date(Date.now() - 86400000).toISOString(),
+      boost_end_at: new Date(Date.now() + 86400000 * 7).toISOString(),
+    }
+    expect(
+      isRestaurantVisibleDeal({
+        ...baseDeal,
+        status: 'active',
+        payment_status: 'paid',
+        ...liveBoost,
+      })
+    ).toBe(true)
     expect(
       isRestaurantVisibleDeal({
         ...baseDeal,
@@ -87,5 +96,18 @@ describe('deal-lifecycle.service', () => {
 
   it('isPendingAdminReview accepts legacy pending_approval', () => {
     expect(isPendingAdminReview({ status: 'pending_approval' })).toBe(true)
+  })
+
+  it('active deal without boost window is not restaurant-visible', () => {
+    expect(
+      isRestaurantVisibleDeal({
+        status: 'active',
+        payment_status: 'not_required',
+        starts_at: new Date(Date.now() - 86400000).toISOString(),
+        ends_at: null,
+        boost_start_at: null,
+        boost_end_at: null,
+      })
+    ).toBe(false)
   })
 })

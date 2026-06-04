@@ -3,7 +3,10 @@ import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ALL_FEATURE_KEYS } from '../lib/feature-keys.js'
 
-vi.mock('../lib/db.js', () => ({ query: vi.fn() }))
+vi.mock('../lib/db.js', () => ({
+  query: vi.fn(),
+  pool: { totalCount: 2, idleCount: 1, waitingCount: 0 },
+}))
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
@@ -16,6 +19,7 @@ vi.mock('../lib/rbac.js', () => ({
     next()
   },
   requirePermission: () => (req, res, next) => next(),
+  requireAnyPermission: () => (req, res, next) => next(),
 }))
 vi.mock('../lib/impersonation.js', () => ({
   createImpersonationToken: vi.fn().mockResolvedValue('token'),
@@ -25,6 +29,11 @@ vi.mock('../lib/impersonation.js', () => ({
 }))
 
 const mockGetEntitlements = vi.fn()
+const mockResolveActiveBillingSubscription = vi.fn()
+vi.mock('../lib/org-billing-tenant.js', () => ({
+  resolveOrgBillingTenantId: vi.fn(async (tenantId) => tenantId),
+  resolveActiveBillingSubscription: (...args) => mockResolveActiveBillingSubscription(...args),
+}))
 vi.mock('../lib/audit.js', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('../lib/billing/billing-service.js', () => ({
   unlockSubscriptionAccount: vi.fn().mockResolvedValue(undefined),
@@ -40,6 +49,18 @@ const mockBuildAdminActivityFeed = vi.fn()
 vi.mock('../lib/admin-activity-feed.js', () => ({
   buildAdminActivityFeed: (...args) => mockBuildAdminActivityFeed(...args),
   normalizeActivityEvent: (row) => row,
+}))
+const mockBuildAdminOperationalSummary = vi.fn()
+const mockListAdminEmailDeliveryLogs = vi.fn()
+const mockBuildTenantOperationalSnapshot = vi.fn()
+const mockGetAdminEmailHealthFailures = vi.fn()
+vi.mock('../lib/admin-operational-metrics.js', () => ({
+  buildAdminOperationalSummary: (...args) => mockBuildAdminOperationalSummary(...args),
+  listAdminEmailDeliveryLogs: (...args) => mockListAdminEmailDeliveryLogs(...args),
+  listAdminFulfillmentIssues: vi.fn().mockResolvedValue({ total: 0, issues: [] }),
+  listAdminActiveDeliveries: vi.fn().mockResolvedValue({ deliveries: [] }),
+  buildTenantOperationalSnapshot: (...args) => mockBuildTenantOperationalSnapshot(...args),
+  getAdminEmailHealthFailures: (...args) => mockGetAdminEmailHealthFailures(...args),
 }))
 
 vi.mock('../lib/subscription.js', () => ({
@@ -71,6 +92,17 @@ describe('Admin Dashboard Routes', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
+    mockResolveActiveBillingSubscription.mockImplementation(async (tenantId, tenantType) => ({
+      billingTenantId: tenantId,
+      usesOrgBilling: false,
+      subscription: {
+        id: 'sub-1',
+        tenant_id: tenantId,
+        tenant_type: tenantType,
+        plan_id: 'p-gold',
+        status: 'ACTIVE',
+      },
+    }))
     const db = await import('../lib/db.js')
     query = db.query
     app = express()
@@ -578,6 +610,79 @@ describe('Admin Dashboard Routes', () => {
 
       expect(res.body.ok).toBe(true)
     })
+
+    it('applies plan change to org billing subscription when branch row was selected', async () => {
+      const planIdGold = 'a0000002-0001-4000-8000-000000000003'
+      query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'sub-branch',
+              tenant_id: 'branch-1',
+              tenant_type: 'RESTAURANT',
+              plan_id: 'p-free',
+              status: 'ACTIVE',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'sub-main',
+              tenant_id: 'main-1',
+              tenant_type: 'RESTAURANT',
+              plan_id: 'p-free',
+              status: 'ACTIVE',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [{ code: 'free' }] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: planIdGold,
+              name: 'Gold',
+              tenant_type: 'RESTAURANT',
+              limits: {},
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'sub-main',
+              plan_id: planIdGold,
+              plan_name: 'Gold',
+              tenant_id: 'main-1',
+              tenant_type: 'RESTAURANT',
+            },
+          ],
+        })
+        .mockResolvedValue({ rows: [] })
+
+      mockResolveActiveBillingSubscription.mockResolvedValueOnce({
+        billingTenantId: 'main-1',
+        usesOrgBilling: true,
+        subscription: {
+          id: 'sub-main',
+          tenant_id: 'main-1',
+          tenant_type: 'RESTAURANT',
+          plan_id: 'p-free',
+          status: 'ACTIVE',
+        },
+      })
+
+      mockGetEntitlements.mockResolvedValueOnce({ usage: { orders_per_day: 1 } })
+
+      const res = await request(app)
+        .patch('/api/admin-dashboard/subscriptions/sub-branch')
+        .send({ planId: planIdGold })
+        .expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.appliedViaOrgBilling).toBe(true)
+      expect(res.body.data.subscription.plan_id).toBe(planIdGold)
+    })
   })
 
   describe('GET /conversion-stats', () => {
@@ -648,6 +753,27 @@ describe('Admin Dashboard Routes', () => {
     })
   })
 
+  describe('GET /tenants/suppliers', () => {
+    it('returns paginated suppliers with total', async () => {
+      query
+        .mockResolvedValueOnce({ rows: [{ total: 120 }] })
+        .mockResolvedValueOnce({
+          rows: [{ id: 's1', name: 'Supplier One', product_count: 3, warehouse_count: 1 }],
+        })
+        .mockResolvedValue({ rows: [{ code: 'gold' }] })
+
+      const res = await request(app)
+        .get('/api/admin-dashboard/tenants/suppliers?limit=50&offset=0')
+        .expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.suppliers).toHaveLength(1)
+      expect(res.body.data.total).toBe(120)
+      expect(res.body.data.limit).toBe(50)
+      expect(res.body.data.offset).toBe(0)
+    })
+  })
+
   describe('GET /activity', () => {
     it('returns composed activity feed with expected shape', async () => {
       mockBuildAdminActivityFeed.mockResolvedValueOnce({
@@ -680,8 +806,87 @@ describe('Admin Dashboard Routes', () => {
       expect(res.body.data.events[0].event_type).toBe('order_placed')
       expect(res.body.data.total).toBe(1)
       expect(mockBuildAdminActivityFeed).toHaveBeenCalledWith(
-        expect.objectContaining({ limit: '30', offset: 0 })
+        expect.objectContaining({ limit: '30', offset: 0, days: undefined })
       )
+    })
+
+    it('passes days window to activity feed builder', async () => {
+      mockBuildAdminActivityFeed.mockResolvedValueOnce({
+        events: [],
+        total: 0,
+        limit: 30,
+        offset: 0,
+        days: 7,
+        sources: [],
+        failedSources: [],
+        partial: false,
+      })
+
+      await request(app).get('/api/admin-dashboard/activity?days=7').expect(200)
+
+      expect(mockBuildAdminActivityFeed).toHaveBeenCalledWith(
+        expect.objectContaining({ days: '7' })
+      )
+    })
+  })
+
+  describe('GET /operational-summary', () => {
+    it('returns operational summary for admin', async () => {
+      mockBuildAdminOperationalSummary.mockResolvedValueOnce({
+        email: { failed24h: 2, enabled: true },
+        warnings: [{ id: 'email-high-failures', severity: 'warning', message: '2 failed' }],
+      })
+      const res = await request(app).get('/api/admin-dashboard/operational-summary').expect(200)
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.summary.email.failed24h).toBe(2)
+    })
+  })
+
+  describe('GET /operational/email-logs', () => {
+    it('returns redacted email logs without secrets', async () => {
+      mockListAdminEmailDeliveryLogs.mockResolvedValueOnce({
+        total: 1,
+        limit: 50,
+        offset: 0,
+        logs: [
+          {
+            id: '1',
+            recipientRedacted: 'se***@example.com',
+            status: 'failed',
+            eventType: 'test',
+          },
+        ],
+      })
+      const res = await request(app).get('/api/admin-dashboard/operational/email-logs').expect(200)
+      expect(res.body.data.logs[0].recipientRedacted).toMatch(/\*\*\*/)
+      expect(JSON.stringify(res.body)).not.toContain('SMTP_PASS')
+    })
+  })
+
+  describe('GET /tenants/:tenantType/:id/operational-snapshot', () => {
+    it('returns supplier snapshot without GPS history', async () => {
+      mockBuildTenantOperationalSnapshot.mockResolvedValueOnce({
+        tenantId: 's1',
+        tenantType: 'SUPPLIER',
+        supplier: { driverCount: 1, gpsToday: { live: 0, stale: 0, noGps: 0, failed: 0 } },
+      })
+      const res = await request(app)
+        .get('/api/admin-dashboard/tenants/SUPPLIER/s1/operational-snapshot')
+        .expect(200)
+      expect(res.body.data.snapshot.supplier.driverCount).toBe(1)
+      expect(JSON.stringify(res.body)).not.toMatch(/driver_location_ping/)
+    })
+  })
+
+  describe('GET /health email failures', () => {
+    it('includes emailFailures from delivery log', async () => {
+      mockGetAdminEmailHealthFailures.mockResolvedValueOnce([
+        { id: '1', recipientRedacted: 'a***@b.com', eventType: 'x', status: 'failed' },
+      ])
+      query.mockResolvedValue({ rows: [] })
+      const res = await request(app).get('/api/admin-dashboard/health').expect(200)
+      expect(res.body.data.emailFailures).toHaveLength(1)
+      expect(res.body.data.emailFailures[0].recipientRedacted).toBeDefined()
     })
   })
 

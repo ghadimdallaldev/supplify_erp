@@ -5,10 +5,11 @@ import {
   useMarkAllNotificationsReadMutation,
   useGetEntitlementsQuery,
   useRecordConversionEventMutation,
+  api,
 } from '../services/api'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { Button } from './ui/button'
-import { Bell, X, TrendingUp, Settings, ChevronRight, Menu } from 'lucide-react'
+import { Bell, X, TrendingUp, Settings, ChevronRight, Menu, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { BranchSwitcher } from './BranchSwitcher'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -40,6 +41,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/app/disputes': 'Disputes',
   '/app/deals': 'Deals',
   '/app/promotions': 'Promotions',
+  '/app/driver-deliveries': 'My Deliveries',
   '/app/onboarding': 'Onboarding',
   '/app/org': 'Organization',
   '/app/inventory': 'Inventory',
@@ -82,6 +84,8 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
       workspace.roleName ? ` · ${workspace.roleName}` : ''
     }`
   const showUpgrade = (!isPlatformAdmin || isImpersonating) && user?.role !== 'PENDING'
+  const isAdminPortalRoute =
+    isPlatformAdmin && !isImpersonating && location.pathname.startsWith('/app/admin')
   const hasUrgency = usagePressure.length > 0 || (blockedCountLast7d ?? 0) >= 1
   const settingsPlanTab = isEffectiveSupplier
     ? '/app/settings?tab=plan'
@@ -109,6 +113,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
   const handleLogout = async () => {
     try {
       const data = await logout().unwrap()
+      dispatch(api.util.resetApiState())
       toast.success('Logged out successfully')
       if (data?.keycloakLogoutUrl) {
         window.location.href = data.keycloakLogoutUrl
@@ -136,20 +141,15 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
   return (
     <header
       data-testid="header"
+      className="flex shrink-0 items-center gap-2 border-b border-[var(--app-border)] bg-[var(--surface)] px-3 py-0 sm:gap-3 sm:px-5 lg:px-6"
       style={{
-        height: 56,
         minHeight: 56,
-        background: 'var(--surface)',
-        borderBottom: '1px solid var(--app-border)',
-        padding: '0 22px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
+        height: 56,
         fontFamily: "'Inter', system-ui, sans-serif",
-        flexShrink: 0,
+        paddingTop: 'env(safe-area-inset-top)',
       }}
     >
-      {onOpenMobileNav && (
+      {onOpenMobileNav && !isAdminPortalRoute && (
         <button
           type="button"
           className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--app-border)] lg:hidden"
@@ -161,15 +161,17 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
       )}
 
       {/* Breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
-        <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 400 }}>Supplify</span>
-        <ChevronRight size={13} style={{ color: 'var(--text-muted)' }} />
-        <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>{pageName}</span>
+      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+        <span className="hidden text-[13px] font-normal text-[var(--text-muted)] xs:inline">
+          Supplify
+        </span>
+        <ChevronRight size={13} className="hidden shrink-0 text-[var(--text-muted)] xs:block" />
+        <span className="truncate text-[13px] font-semibold text-[var(--text)]">{pageName}</span>
         {workspaceLabel && (
           <>
-            <ChevronRight size={13} style={{ color: 'var(--text-muted)' }} />
+            <ChevronRight size={13} className="hidden shrink-0 text-[var(--text-muted)] sm:block" />
             <span
-              style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}
+              className="hidden truncate text-xs font-medium text-[var(--text-muted)] sm:inline max-w-[8rem] md:max-w-[14rem]"
               data-testid="workspace-context"
             >
               {workspaceLabel}
@@ -179,44 +181,68 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
       </div>
 
       {/* Right side controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
         <BranchSwitcher />
 
         {showUpgrade && (
-          <Button
-            variant={hasUrgency ? 'default' : 'outline'}
-            size="sm"
-            onClick={handleNavUpgrade}
-            className="relative"
-            style={
-              hasUrgency
-                ? { background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }
-                : { borderColor: 'var(--app-border-mid)', color: 'var(--text-mid)' }
-            }
-          >
-            <TrendingUp style={{ width: 14, height: 14, marginRight: 4 }} />
-            {hasUrgency ? 'Upgrade' : 'Plans'}
-            {hasUrgency && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: -2,
-                  right: -2,
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: 'var(--amber-mid)',
-                  border: '2px solid var(--surface)',
-                }}
+          <>
+            <Button
+              variant={hasUrgency ? 'default' : 'outline'}
+              size="sm"
+              onClick={handleNavUpgrade}
+              className="relative hidden min-h-9 sm:inline-flex"
+              style={
+                hasUrgency
+                  ? { background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }
+                  : { borderColor: 'var(--app-border-mid)', color: 'var(--text-mid)' }
+              }
+            >
+              <TrendingUp style={{ width: 14, height: 14, marginRight: 4 }} />
+              {hasUrgency ? 'Upgrade' : 'Plans'}
+              {hasUrgency && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: -2,
+                    right: -2,
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: 'var(--amber-mid)',
+                    border: '2px solid var(--surface)',
+                  }}
+                />
+              )}
+            </Button>
+            <button
+              type="button"
+              className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--app-border)] sm:hidden"
+              aria-label={hasUrgency ? 'Upgrade plan' : 'View plans'}
+              onClick={handleNavUpgrade}
+            >
+              <TrendingUp
+                size={16}
+                style={{ color: hasUrgency ? 'var(--brand)' : 'var(--text-muted)' }}
               />
-            )}
-          </Button>
+              {hasUrgency && (
+                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--amber-mid)]" />
+              )}
+            </button>
+          </>
         )}
 
         {/* Quick jump to catalog */}
         <button
           type="button"
-          className="hidden h-[34px] min-w-[140px] items-center gap-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-2.5 text-left transition-colors hover:border-[var(--app-border-mid)] md:flex lg:min-w-[200px] cursor-pointer"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] md:hidden"
+          aria-label="Go to products catalog"
+          onClick={() => navigate('/app/products')}
+        >
+          <Search size={16} style={{ color: 'var(--text-muted)' }} />
+        </button>
+        <button
+          type="button"
+          className="hidden h-[34px] min-w-[140px] cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-2.5 text-left transition-colors hover:border-[var(--app-border-mid)] md:flex lg:min-w-[200px]"
           aria-label="Go to products catalog"
           onClick={() => navigate('/app/products')}
         >
@@ -273,19 +299,8 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
 
           {showNotifications && (
             <div
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 44,
-                width: 320,
-                background: 'var(--surface)',
-                borderRadius: 12,
-                border: '1px solid var(--app-border)',
-                boxShadow: '0 8px 32px rgba(91,33,182,0.12)',
-                zIndex: 50,
-                maxHeight: 400,
-                overflowY: 'auto',
-              }}
+              data-testid="notifications-dropdown"
+              className="fixed inset-x-3 top-[calc(3.5rem+env(safe-area-inset-top))] z-50 max-h-[min(70vh,24rem)] overflow-y-auto rounded-xl border border-[var(--app-border)] bg-[var(--surface)] shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-11 sm:w-[min(100vw-1.5rem,20rem)]"
             >
               <div
                 style={{

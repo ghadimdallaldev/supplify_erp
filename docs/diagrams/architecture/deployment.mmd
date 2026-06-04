@@ -1,0 +1,9 @@
+%% Deployment architecture
+%% Status: current | Related: docs/blueprint/deployment_architecture.mmd
+flowchart TB
+  Browser[Browser] --> CDN[CloudFront / CDN]
+  CDN --> WebApp[Static Web Vite build]
+  Browser --> APIServer[API Node/Express]
+  APIServer --> DB[(PostgreSQL)]
+  APIServer --> Keycloak[Keycloak]
+  APIServer --> S3[File storage buckets]

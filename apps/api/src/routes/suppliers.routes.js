@@ -13,6 +13,7 @@ import { requireFeature, isFeatureEnabled } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { createModuleLogger, logEvent, logQueryDebug, logger } from '../lib/logger.js'
 import { patchRequestLogTenant } from '../lib/request-log-context.js'
+import { invalidateTenantProfileCache } from '../lib/tenant-profile-cache.js'
 
 const log = createModuleLogger('suppliers.routes')
 import { ValidationError } from '../middlewares/errorHandler.js'
@@ -31,8 +32,11 @@ const router = express.Router()
 async function attachReviewFields(suppliers) {
   return Promise.all(
     suppliers.map(async (s) => {
-      const summary = await getSupplierRatingSummary(s.id)
-      const recent_reviews = await getRecentReviewsForSupplier(s.id, 3)
+      // rating summary and recent reviews are independent — fetch in parallel.
+      const [summary, recent_reviews] = await Promise.all([
+        getSupplierRatingSummary(s.id),
+        getRecentReviewsForSupplier(s.id, 3),
+      ])
       return {
         ...s,
         avg_overall: Number(summary.avg_overall) || 0,
@@ -863,6 +867,8 @@ router.patch(
         supplierId: rows[0].id,
         actor: req.userData.id,
       })
+
+      await invalidateTenantProfileCache(id, 'SUPPLIER')
 
       res.json({
         ok: true,

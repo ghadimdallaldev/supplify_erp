@@ -7,6 +7,7 @@ import {
   requirePermission,
   requireAnyPermission,
   getRequestTenant,
+  getRestaurantIdForRequest,
 } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -22,6 +23,10 @@ import {
 import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../lib/safe-update.js'
 import { writeAuditLog } from '../lib/audit.js'
+import { enrichProductsWithResolvedPricing } from '../services/resolve-product-price.service.js'
+import { getCache, setCache } from '../lib/cache.js'
+
+const CATALOG_META_CACHE_TTL_SECONDS = 300
 
 const router = express.Router()
 
@@ -90,7 +95,11 @@ const productListSchema = z.object({
     .optional(),
   limit: z
     .string()
-    .transform((val) => parseInt(val, 10))
+    .transform((val) => {
+      const n = parseInt(val, 10)
+      const parsed = Number.isFinite(n) ? n : 20
+      return Math.min(Math.max(parsed, 1), 100)
+    })
     .default('20'),
   offset: z
     .string()
@@ -104,25 +113,32 @@ router.get('/categories', async (req, res) => {
     const tenant = await getRequestTenant(req)
     const supplierId = tenant?.tenantType === 'SUPPLIER' ? tenant.tenantId : null
 
-    const { rows: categories } = await query(
-      `
-      SELECT
-        pc.id,
-        pc.name,
-        pc.slug,
-        pc.description,
-        pc.display_order,
-        COUNT(p.id)::int AS product_count
-      FROM product_category pc
-      LEFT JOIN product p ON p.category_id = pc.id
-        AND ($1::uuid IS NULL OR p.supplier_id = $1)
-      WHERE pc.is_active = true
-      GROUP BY pc.id
-      HAVING ($1::uuid IS NULL OR COUNT(p.id) > 0)
-      ORDER BY product_count DESC, pc.display_order, pc.name
-      `,
-      [supplierId]
-    )
+    const cacheKey = `productCats:${supplierId ?? 'all'}`
+    let categories = await getCache(cacheKey)
+    if (!Array.isArray(categories)) {
+      const { rows } = await query(
+        `
+        SELECT
+          pc.id,
+          pc.name,
+          pc.slug,
+          pc.description,
+          pc.display_order,
+          COUNT(p.id)::int AS product_count
+        FROM product_category pc
+        LEFT JOIN product p ON p.category_id = pc.id
+          AND ($1::uuid IS NULL OR p.supplier_id = $1)
+        WHERE pc.is_active = true
+        GROUP BY pc.id
+        HAVING ($1::uuid IS NULL OR COUNT(p.id) > 0)
+        ORDER BY product_count DESC, pc.display_order, pc.name
+        `,
+        [supplierId],
+        req
+      )
+      categories = rows
+      await setCache(cacheKey, categories, CATALOG_META_CACHE_TTL_SECONDS).catch(() => {})
+    }
 
     return res.json({ ok: true, data: { categories }, error: null, requestId: req.requestId })
   } catch (error) {
@@ -138,15 +154,28 @@ router.get('/tags', async (req, res) => {
     if (!hasTags) {
       return res.json({ ok: true, data: { tags: [] }, error: null, requestId: req.requestId })
     }
-    const { rows: tags } = await query(`
-      SELECT DISTINCT tag
-      FROM product, jsonb_array_elements_text(tags) AS tag
-      WHERE tags IS NOT NULL AND jsonb_array_length(tags) > 0
-      ORDER BY tag
-    `)
+    const tenant = await getRequestTenant(req)
+    const supplierId = tenant?.tenantType === 'SUPPLIER' ? tenant.tenantId : null
+    const cacheKey = `productTags:${supplierId ?? 'all'}`
+    let tagRows = await getCache(cacheKey)
+    if (!Array.isArray(tagRows)) {
+      const { rows } = await query(
+        `
+        SELECT DISTINCT tag
+        FROM product, jsonb_array_elements_text(tags) AS tag
+        WHERE tags IS NOT NULL AND jsonb_array_length(tags) > 0
+          AND ($1::uuid IS NULL OR supplier_id = $1)
+        ORDER BY tag
+        `,
+        [supplierId],
+        req
+      )
+      tagRows = rows
+      await setCache(cacheKey, tagRows, CATALOG_META_CACHE_TTL_SECONDS).catch(() => {})
+    }
     return res.json({
       ok: true,
-      data: { tags: tags.map((t) => t.tag) },
+      data: { tags: tagRows.map((t) => t.tag) },
       error: null,
       requestId: req.requestId,
     })
@@ -233,6 +262,17 @@ router.get('/', async (req, res) => {
     }
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
+    const needsInventory = Boolean(params.inStock)
+    const inventoryJoin = needsInventory
+      ? `LEFT JOIN (
+        SELECT product_id, SUM(available_qty) as total_available
+        FROM inventory
+        GROUP BY product_id
+      ) inv ON inv.product_id = p.id`
+      : ''
+    const availableQtyExpr = needsInventory
+      ? 'COALESCE(inv.total_available, 0) as available_qty'
+      : '0::int as available_qty'
 
     const sql = `
       SELECT 
@@ -240,16 +280,12 @@ router.get('/', async (req, res) => {
         s.name as supplier_name,
         s.slug as supplier_slug,
         s.contact_email as supplier_email,
-        COALESCE(inv.total_available, 0) as available_qty,
+        ${availableQtyExpr},
         pr.amount as current_price,
         pr.currency
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
-      LEFT JOIN (
-        SELECT product_id, SUM(available_qty) as total_available
-        FROM inventory
-        GROUP BY product_id
-      ) inv ON inv.product_id = p.id
+      ${inventoryJoin}
       LEFT JOIN LATERAL (
         SELECT amount, currency
         FROM price
@@ -265,13 +301,35 @@ router.get('/', async (req, res) => {
 
     queryParams.push(params.limit, params.offset)
 
-    const { rows } = await query(sql, queryParams)
+    let { rows } = await query(sql, queryParams)
 
-    // Get total count for pagination
-    const countSql = `
-      SELECT COUNT(*) as total
+    if (tenant?.tenantType === 'RESTAURANT') {
+      const restaurantId = tenant.tenantId
+      if (restaurantId) {
+        rows = await enrichProductsWithResolvedPricing(rows, restaurantId)
+      }
+    }
+
+    // Get total count for pagination (skip inventory join unless filtering by stock)
+    const countSql = needsInventory
+      ? `
+      SELECT COUNT(DISTINCT p.id) as total
       FROM product p
       LEFT JOIN inventory i ON i.product_id = p.id
+      ${whereClause}
+    `
+      : `
+      SELECT COUNT(*) as total
+      FROM product p
+      JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN LATERAL (
+        SELECT amount
+        FROM price
+        WHERE price.product_id = p.id
+          AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
+        ORDER BY valid_from DESC
+        LIMIT 1
+      ) pr ON true
       ${whereClause}
     `
 
@@ -360,9 +418,19 @@ router.get('/:id', async (req, res) => {
       })
     }
 
+    let product = rows[0]
+    const detailTenant = await getRequestTenant(req)
+    if (detailTenant?.tenantType === 'RESTAURANT') {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (restaurantId) {
+        const [enriched] = await enrichProductsWithResolvedPricing([product], restaurantId)
+        product = enriched
+      }
+    }
+
     res.json({
       ok: true,
-      data: { product: rows[0] },
+      data: { product },
       error: null,
       requestId: req.requestId,
     })

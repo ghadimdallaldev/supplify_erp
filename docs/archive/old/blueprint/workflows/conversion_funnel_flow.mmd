@@ -1,0 +1,31 @@
+flowchart TB
+  subgraph Events
+    VIEW[VIEW_PLANS\nuser opens plans/settings]
+    BLOCK_F[BLOCKED_FEATURE\n403 on gated feature]
+    BLOCK_L[BLOCKED_LIMIT\n403 on limit exceeded]
+    OPEN[OPEN_UPGRADE\nuser opens upgrade modal]
+    SUCCESS[UPGRADE_SUCCESS\nadmin changes plan]
+  end
+
+  subgraph Recording
+    API[POST /subscriptions/conversion-event\nVIEW_PLANS, OPEN_UPGRADE]
+    Middleware[requireFeature / requireWithinLimit\nBLOCKED_FEATURE, BLOCKED_LIMIT]
+    Admin[Admin PATCH subscription\nUPGRADE_SUCCESS]
+  end
+
+  subgraph Storage
+    Table[(conversion_event)]
+  end
+
+  subgraph AdminStats
+    Stats[GET /admin-dashboard/conversion-stats\nblocks, upgrades, conversion %]
+  end
+
+  VIEW --> API
+  OPEN --> API
+  API --> Table
+  BLOCK_F --> Middleware
+  BLOCK_L --> Middleware
+  Middleware --> Table
+  Admin --> Table
+  Table --> Stats

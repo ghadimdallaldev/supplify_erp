@@ -3,6 +3,15 @@ import {
   normalizeAdminPlanUpdateResult,
   type AdminPlanUpdateResult,
 } from '../lib/adminPlanSaveFeedback'
+import { normalizeListResponse } from '../lib/apiError'
+import {
+  normalizeContractPricingList,
+  normalizeContractPricingRecord,
+  normalizeMyContractPricing,
+  normalizeResolvedContractPrices,
+} from '../lib/contractPricingResponse'
+import { normalizeReportResponse } from '../lib/reportResponse'
+import type { LegalAcceptancePayload } from '../lib/legalDocuments'
 import type {
   User,
   Product,
@@ -53,9 +62,15 @@ import type {
   PublicReservationDetails,
   DriverRecord,
   DispatchOrderCard,
+  DeliveryRouteSummary,
+  DeliveryRouteDetail,
+  DeliveryTrackingInfo,
+  OrderTrackingResponse,
 } from '../types'
 
-const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:4000')
+import { getApiBase } from '../lib/env'
+
+const API_URL = getApiBase()
 
 type ApiErrorBody = { error?: { name?: string; message?: string } }
 
@@ -222,11 +237,13 @@ export const api = createApi({
     'OrdersCalendar',
     'QuickList',
     'Fulfillment',
+    'SupplierOps',
     'Driver',
     'Reviews',
     'Reports',
     'Disputes',
     'Promotions',
+    'ContractPricing',
     'Audit',
     'TenantRoles',
     'Amendments',
@@ -243,13 +260,16 @@ export const api = createApi({
     'StaffPerformance',
     'StaffPayroll',
   ],
+  keepUnusedDataFor: 120,
+  refetchOnFocus: false,
   endpoints: (builder) => ({
     // Auth endpoints
     getMe: builder.query<User, void>({
       query: () => '/auth/me',
       providesTags: ['User'],
-      // Cache for 5 minutes to reduce requests
-      keepUnusedDataFor: 300,
+      keepUnusedDataFor: 120,
+      refetchOnFocus: false,
+      refetchOnMountOrArgChange: false,
     }),
     getInviteSession: builder.query<
       { id: string; email: string; displayName: string } | null,
@@ -267,13 +287,19 @@ export const api = createApi({
     getRegisterStatus: builder.query<{ needsSetup: boolean }, void>({
       query: () => '/api/register/status',
       providesTags: ['RegisterStatus'],
+      keepUnusedDataFor: 120,
       transformResponse: (response: { data?: { needsSetup?: boolean } }) => ({
         needsSetup: Boolean(response?.data?.needsSetup),
       }),
     }),
     completeRegistration: builder.mutation<
       { tenantType: string; tenant: unknown },
-      { accountType: 'RESTAURANT' | 'SUPPLIER'; businessName: string; phone?: string }
+      {
+        accountType: 'RESTAURANT' | 'SUPPLIER'
+        businessName: string
+        phone?: string
+        legalAcceptance: LegalAcceptancePayload
+      }
     >({
       query: (body) => ({
         url: '/api/register/complete',
@@ -286,7 +312,8 @@ export const api = createApi({
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled
-          await dispatch(api.endpoints.getMe.initiate(undefined, { forceRefetch: true })).unwrap()
+          const { refetchAppSession } = await import('../lib/refetchAppSession')
+          await refetchAppSession(dispatch)
         } catch {
           // Leave cache as-is on failure
         }
@@ -316,10 +343,12 @@ export const api = createApi({
     >({
       query: () => '/api/products/categories',
       providesTags: ['Product'],
+      keepUnusedDataFor: 300,
     }),
     getProductTags: builder.query<{ tags: string[] }, void>({
       query: () => '/api/products/tags',
       providesTags: ['Product'],
+      keepUnusedDataFor: 300,
     }),
     getProduct: builder.query<Product, string>({
       query: (id) => `/api/products/${id}`,
@@ -468,6 +497,21 @@ export const api = createApi({
       },
       providesTags: ['Fulfillment'],
     }),
+    getUnlinkedDrivers: builder.query<
+      {
+        drivers: Array<{
+          id: string
+          full_name: string
+          phone?: string | null
+          vehicle_type?: string | null
+          is_active?: boolean
+        }>
+      },
+      void
+    >({
+      query: () => '/api/drivers/unlinked',
+      providesTags: ['Driver'],
+    }),
     getDrivers: builder.query<
       {
         drivers: Array<{
@@ -504,6 +548,7 @@ export const api = createApi({
         vehicle_plate?: string
         warehouse_id?: string
         notes?: string
+        user_id?: string | null
       }
     >({
       query: (body) => ({ url: '/api/drivers', method: 'POST', body }),
@@ -521,6 +566,7 @@ export const api = createApi({
           warehouse_id: string
           notes: string
           is_active: boolean
+          user_id?: string | null
         }>
       }
     >({
@@ -560,6 +606,8 @@ export const api = createApi({
         recipient_name?: string
         notes?: string
         file_key?: string
+        latitude?: number
+        longitude?: number
       }
     >({
       query: ({ orderId, ...body }) => ({
@@ -587,26 +635,87 @@ export const api = createApi({
       }),
       invalidatesTags: ['Fulfillment'],
     }),
-    getFulfillmentRoutes: builder.query<
-      {
-        routes: Array<{
-          id: string
-          routeNumber: string
-          driver: string
-          vehicle: string
-          status: string
-          stops: number
-          scheduledDate?: string
-        }>
-      },
-      { warehouseId?: string } | void
-    >({
-      query: (arg) => {
-        const id = arg && typeof arg === 'object' ? arg.warehouseId : undefined
-        const qs = id ? `?warehouse_id=${encodeURIComponent(id)}` : ''
-        return `/api/fulfillment/routes${qs}`
-      },
+    getFulfillmentRoutes: builder.query<{ routes: DeliveryRouteSummary[] }, void>({
+      query: () => '/api/fulfillment/routes',
       providesTags: ['Fulfillment'],
+    }),
+    getFulfillmentRoute: builder.query<{ route: DeliveryRouteDetail }, string>({
+      query: (id) => `/api/fulfillment/routes/${id}`,
+      providesTags: (_r, _e, id) => [{ type: 'Fulfillment', id }],
+    }),
+    getDriverActiveRoute: builder.query<{ route: DeliveryRouteDetail | null }, void>({
+      query: () => '/api/fulfillment/routes/active',
+      providesTags: ['Fulfillment'],
+    }),
+    createFulfillmentRoute: builder.mutation<
+      { route: DeliveryRouteDetail },
+      {
+        order_ids: string[]
+        driver_id: string
+        scheduled_date: string
+        route_label?: string
+        area?: string
+      }
+    >({
+      query: (body) => ({
+        url: '/api/fulfillment/routes',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
+    updateFulfillmentRoute: builder.mutation<
+      { route: DeliveryRouteDetail },
+      {
+        id: string
+        route_label?: string
+        area?: string
+        scheduled_date?: string
+        driver_id?: string
+        status?: 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/fulfillment/routes/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
+    cancelFulfillmentRoute: builder.mutation<{ route: DeliveryRouteDetail }, string>({
+      query: (id) => ({
+        url: `/api/fulfillment/routes/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
+    reorderFulfillmentRouteStops: builder.mutation<
+      { route: DeliveryRouteDetail },
+      { routeId: string; stop_ids: string[] }
+    >({
+      query: ({ routeId, stop_ids }) => ({
+        url: `/api/fulfillment/routes/${routeId}/stops/reorder`,
+        method: 'POST',
+        body: { stop_ids },
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
+    updateFulfillmentRouteStop: builder.mutation<
+      { route: DeliveryRouteDetail },
+      {
+        routeId: string
+        stopId: string
+        status?: 'PLANNED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED'
+        notes?: string
+        failure_reason?: string
+      }
+    >({
+      query: ({ routeId, stopId, ...body }) => ({
+        url: `/api/fulfillment/routes/${routeId}/stops/${stopId}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
     }),
     getFulfillmentExceptions: builder.query<
       {
@@ -647,7 +756,7 @@ export const api = createApi({
       { assignment: unknown },
       {
         orderId: string
-        status: 'picked_up' | 'out_for_delivery' | 'delivered' | 'failed'
+        status: 'picked_up' | 'out_for_delivery' | 'delivered' | 'failed' | 'rescheduled'
         notes?: string
         failure_reason?: string
       }
@@ -658,6 +767,43 @@ export const api = createApi({
         body: { status, notes, failure_reason },
       }),
       invalidatesTags: ['Fulfillment', 'Order'],
+    }),
+    sendDriverLocation: builder.mutation<
+      {
+        trackingEnabled: boolean
+        stored?: boolean
+        latestLocation?: {
+          latitude: number
+          longitude: number
+          recordedAt: string
+        } | null
+      },
+      {
+        orderId: string
+        latitude: number
+        longitude: number
+        accuracyMeters?: number
+        speedMps?: number
+        headingDegrees?: number
+        recordedAt?: string
+      }
+    >({
+      query: ({ orderId, ...body }) => ({
+        url: `/api/orders/${orderId}/location`,
+        method: 'POST',
+        body: {
+          latitude: body.latitude,
+          longitude: body.longitude,
+          accuracyMeters: body.accuracyMeters,
+          speedMps: body.speedMps,
+          headingDegrees: body.headingDegrees,
+          recordedAt: body.recordedAt,
+        },
+      }),
+    }),
+    getOrderTracking: builder.query<OrderTrackingResponse, string>({
+      query: (orderId) => `/api/orders/${orderId}/tracking`,
+      providesTags: (_r, _e, orderId) => [{ type: 'Order', id: orderId }],
     }),
 
     // Supplier endpoints
@@ -704,6 +850,7 @@ export const api = createApi({
     getSupplierMe: builder.query<{ supplier: Supplier }, void>({
       query: () => '/api/suppliers/me',
       providesTags: ['Supplier'],
+      keepUnusedDataFor: 300,
     }),
     updateSupplier: builder.mutation<Supplier, { id: string; data: Partial<Supplier> }>({
       query: ({ id, data }) => ({
@@ -753,6 +900,7 @@ export const api = createApi({
     getRestaurantMe: builder.query<{ restaurant: Restaurant }, void>({
       query: () => '/api/restaurants/me',
       providesTags: ['Restaurant'],
+      keepUnusedDataFor: 300,
     }),
     updateRestaurant: builder.mutation<Restaurant, { id: string; data: Partial<Restaurant> }>({
       query: ({ id, data }) => ({
@@ -901,6 +1049,7 @@ export const api = createApi({
     getDashboardStats: builder.query<any, void>({
       query: () => '/api/admin/dashboard',
       providesTags: ['User'],
+      keepUnusedDataFor: 120,
       transformResponse: (response: any) => response?.stats || {},
     }),
     getAuditLogs: builder.query<AuditLogsResponse, AuditLogFilters>({
@@ -977,6 +1126,7 @@ export const api = createApi({
           ...rest,
           created_at: new Date().toISOString(),
           isOptimistic: true,
+          sender_type: undefined,
         }
         const patchResult = dispatch(
           api.util.updateQueryData('getMessages', { conversationId }, (draft: any) => {
@@ -985,7 +1135,20 @@ export const api = createApi({
           })
         )
         try {
-          await queryFulfilled
+          const { data } = await queryFulfilled
+          const serverMessage = data?.message
+          if (serverMessage?.id) {
+            dispatch(
+              api.util.updateQueryData('getMessages', { conversationId }, (draft: any) => {
+                if (!draft?.messages) return
+                const withoutTemp = (draft.messages as { id?: string }[]).filter(
+                  (m) => m.id !== tempId
+                )
+                const exists = withoutTemp.some((m) => m.id === serverMessage.id)
+                draft.messages = exists ? withoutTemp : [...withoutTemp, serverMessage]
+              })
+            )
+          }
         } catch {
           patchResult.undo()
         }
@@ -1094,11 +1257,55 @@ export const api = createApi({
       query: () => '/api/restaurant-inventory/reorder-suggestions',
       providesTags: ['RestaurantInventory'],
     }),
+    getExpiryLots: builder.query<
+      any,
+      { status?: string; supplierId?: string; storageLocation?: string; categoryId?: string }
+    >({
+      query: (params) => ({
+        url: '/api/restaurant-inventory/expiry',
+        params,
+      }),
+      providesTags: ['RestaurantInventory'],
+    }),
+    getExpirySummary: builder.query<any, void>({
+      query: () => '/api/restaurant-inventory/expiry/summary',
+      providesTags: ['RestaurantInventory'],
+    }),
+    createExpiryLot: builder.mutation<any, Record<string, unknown>>({
+      query: (body) => ({
+        url: '/api/restaurant-inventory/expiry',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['RestaurantInventory'],
+    }),
+    updateExpiryLot: builder.mutation<any, { lotId: string; data: Record<string, unknown> }>({
+      query: ({ lotId, data }) => ({
+        url: `/api/restaurant-inventory/expiry/${lotId}`,
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: ['RestaurantInventory'],
+    }),
+    deleteExpiryLot: builder.mutation<any, string>({
+      query: (lotId) => ({
+        url: `/api/restaurant-inventory/expiry/${lotId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['RestaurantInventory'],
+    }),
+    getReorderReminders: builder.query<any, void>({
+      query: () => '/api/restaurant-inventory/reorder-reminders',
+      providesTags: ['RestaurantInventory'],
+    }),
     // Receiving endpoints
     getPendingOrdersForReceiving: builder.query<any, void>({
       query: () => '/api/receiving/pending-orders',
       providesTags: ['Receiving'],
-      ...({ pollingInterval: 15000 } as { pollingInterval?: number }),
+      ...({
+        pollingInterval: 30000,
+        skipPollingIfUnfocused: true,
+      } as { pollingInterval?: number; skipPollingIfUnfocused?: boolean }),
     }),
     getReceivingHistory: builder.query<any, void>({
       query: () => '/api/receiving/history',
@@ -1210,6 +1417,25 @@ export const api = createApi({
         'Order',
       ],
     }),
+    recordSupplierPayment: builder.mutation<
+      { payment: unknown },
+      {
+        invoice_id: string
+        payment_amount: number
+        payment_date: string
+        payment_method: string
+        payment_reference?: string
+        bank_name?: string
+        notes?: string
+      }
+    >({
+      query: (body) => ({
+        url: '/api/payments',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['RestaurantFinance', 'Order'],
+    }),
     getInvoiceCredits: builder.query<any, string>({
       query: (invoiceId) => `/api/restaurant-finance/invoices/${invoiceId}/credits`,
       providesTags: ['RestaurantFinance'],
@@ -1252,11 +1478,152 @@ export const api = createApi({
       query: (params) => ({ url: '/api/invoices', params }),
       providesTags: ['RestaurantFinance'],
     }),
+    getSupplierReceivables: builder.query<any, void>({
+      query: () => '/api/supplier/invoices/receivables',
+      providesTags: ['SupplierOps', 'RestaurantFinance'],
+    }),
+    getSupplierCommandCenter: builder.query<any, void>({
+      query: () => '/api/supplier/command-center',
+      providesTags: ['SupplierOps', 'Order', 'Fulfillment', 'RestaurantFinance'],
+    }),
+    getSupplierReorderIntelligence: builder.query<any, { graceDays?: number } | void>({
+      query: (arg) => {
+        const params = new URLSearchParams()
+        if (arg?.graceDays) params.set('grace_days', String(arg.graceDays))
+        const qs = params.toString()
+        return `/api/supplier/reorder-intelligence${qs ? `?${qs}` : ''}`
+      },
+      providesTags: ['SupplierOps'],
+    }),
+    createReorderReminderDraft: builder.mutation<
+      { draft: { id: string; subject: string; body: string; status: string; autoSent: boolean } },
+      string
+    >({
+      query: (restaurantId) => ({
+        url: `/api/supplier/reorder-intelligence/${restaurantId}/reminder-draft`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['SupplierOps'],
+    }),
+    getSupplierDeliveryBoard: builder.query<
+      any,
+      { date?: string; status?: string; driverId?: string; area?: string } | void
+    >({
+      query: (arg) => {
+        const params = new URLSearchParams()
+        if (arg?.date) params.set('date', arg.date)
+        if (arg?.status) params.set('status', arg.status)
+        if (arg?.driverId) params.set('driver_id', arg.driverId)
+        if (arg?.area) params.set('area', arg.area)
+        const qs = params.toString()
+        return `/api/supplier/deliveries/board${qs ? `?${qs}` : ''}`
+      },
+      providesTags: ['Fulfillment', 'SupplierOps'],
+    }),
+    previewProductImport: builder.mutation<
+      any,
+      { csv: string; columnMapping?: Record<string, string> }
+    >({
+      query: (body) => ({
+        url: '/api/supplier/products/import/preview',
+        method: 'POST',
+        body,
+      }),
+    }),
+    executeProductImport: builder.mutation<any, { csv: string; partial?: boolean }>({
+      query: (body) => ({
+        url: '/api/supplier/products/import',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Product', 'Inventory'],
+    }),
+    getProductSubstitutes: builder.query<any, string>({
+      query: (productId) => `/api/supplier/products/${productId}/substitutes`,
+      providesTags: (_r, _e, id) => [{ type: 'Product', id }],
+    }),
+    createProductSubstitute: builder.mutation<
+      any,
+      { productId: string; substituteProductId: string; priority?: number; notes?: string }
+    >({
+      query: ({ productId, ...body }) => ({
+        url: `/api/supplier/products/${productId}/substitutes`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { productId }) => [{ type: 'Product', id: productId }],
+    }),
+    deleteProductSubstitute: builder.mutation<any, { productId: string; substituteId: string }>({
+      query: ({ productId, substituteId }) => ({
+        url: `/api/supplier/products/${productId}/substitutes/${substituteId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_r, _e, { productId }) => [{ type: 'Product', id: productId }],
+    }),
+    getOrderSubstitutions: builder.query<any, string>({
+      query: (orderId) => `/api/supplier/orders/${orderId}/substitutions`,
+      providesTags: (_r, _e, id) => [{ type: 'Order', id }],
+    }),
+    proposeOrderSubstitution: builder.mutation<
+      any,
+      {
+        orderId: string
+        orderItemId: string
+        substituteProductId: string
+        description?: string
+      }
+    >({
+      query: ({ orderId, ...body }) => ({
+        url: `/api/supplier/orders/${orderId}/substitutions/propose`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { orderId }) => [{ type: 'Order', id: orderId }],
+    }),
+    getOrderFulfillmentIssues: builder.query<any, string>({
+      query: (orderId) => `/api/supplier/orders/${orderId}/fulfillment-issues`,
+      providesTags: (_r, _e, id) => [{ type: 'Order', id }],
+    }),
+    reportOrderShortage: builder.mutation<any, { orderId: string; body: Record<string, unknown> }>({
+      query: ({ orderId, body }) => ({
+        url: `/api/supplier/orders/${orderId}/fulfillment-issues/shortage`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { orderId }) => [{ type: 'Order', id: orderId }, 'Chat'],
+    }),
+    suggestOrderSubstitutionIssue: builder.mutation<
+      any,
+      { orderId: string; body: Record<string, unknown> }
+    >({
+      query: ({ orderId, body }) => ({
+        url: `/api/supplier/orders/${orderId}/fulfillment-issues/substitution`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { orderId }) => [{ type: 'Order', id: orderId }, 'Chat'],
+    }),
+    openOrderFulfillmentChat: builder.mutation<
+      any,
+      { orderId: string; body: Record<string, unknown> }
+    >({
+      query: ({ orderId, body }) => ({
+        url: `/api/supplier/orders/${orderId}/fulfillment-issues/open-chat`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { orderId }) => [{ type: 'Order', id: orderId }, 'Chat'],
+    }),
+    getSupplierAtRiskOrders: builder.query<any, void>({
+      query: () => '/api/supplier/reorder-cadence/at-risk',
+      providesTags: ['Order'],
+    }),
 
     // Notification endpoints
     getBranches: builder.query<{ branches: Array<Record<string, unknown>> }, void>({
       query: () => '/api/branches',
       providesTags: ['Branch'],
+      keepUnusedDataFor: 300,
     }),
     createBranch: builder.mutation<any, Record<string, unknown>>({
       query: (body) => ({
@@ -1303,6 +1670,7 @@ export const api = createApi({
     >({
       query: () => '/api/org',
       providesTags: ['Branch', 'Org'],
+      keepUnusedDataFor: 300,
     }),
     getOrgBranches: builder.query<
       {
@@ -1314,6 +1682,7 @@ export const api = createApi({
     >({
       query: () => '/api/org/branches',
       providesTags: ['Branch', 'Org'],
+      keepUnusedDataFor: 300,
     }),
     createOrgBranch: builder.mutation<any, Record<string, unknown>>({
       query: (body) => ({ url: '/api/org/branches', method: 'POST', body }),
@@ -1410,7 +1779,13 @@ export const api = createApi({
     }),
     acceptBranchInvite: builder.mutation<
       { user?: { email?: string; displayName?: string }; activeSupplierId: string },
-      { token: string; full_name?: string; email?: string; password?: string }
+      {
+        token: string
+        full_name?: string
+        email?: string
+        password?: string
+        legalAcceptance?: LegalAcceptancePayload
+      }
     >({
       query: (body) => ({
         url: '/api/public/invitations/branch/accept',
@@ -1449,6 +1824,7 @@ export const api = createApi({
         full_name?: string
         email?: string
         password?: string
+        legalAcceptance?: LegalAcceptancePayload
       }
     >({
       query: (body) => ({
@@ -1468,6 +1844,7 @@ export const api = createApi({
     >({
       query: () => '/api/restaurant-org',
       providesTags: ['RestaurantOrg', 'Branch'],
+      keepUnusedDataFor: 300,
     }),
     getRestaurantOrgBranches: builder.query<
       {
@@ -1479,6 +1856,7 @@ export const api = createApi({
     >({
       query: () => '/api/restaurant-org/branches',
       providesTags: ['RestaurantOrg', 'Branch'],
+      keepUnusedDataFor: 300,
     }),
     createRestaurantOrgBranch: builder.mutation<any, Record<string, unknown>>({
       query: (body) => ({ url: '/api/restaurant-org/branches', method: 'POST', body }),
@@ -1669,6 +2047,7 @@ export const api = createApi({
     >({
       query: () => '/api/roles',
       providesTags: ['TenantRoles'],
+      keepUnusedDataFor: 300,
     }),
     getTenantRoleUsers: builder.query<
       {
@@ -1715,13 +2094,18 @@ export const api = createApi({
       invalidatesTags: ['TenantRoles'],
     }),
     assignTenantUserRole: builder.mutation<
-      { userId: string; roleId: string; roleName: string },
-      { userId: string; role_id: string }
+      { userId: string; roleId: string; roleName: string; driverId?: string | null },
+      {
+        userId: string
+        role_id: string
+        driver_id?: string | null
+        create_driver_profile?: boolean
+      }
     >({
-      query: ({ userId, role_id }) => ({
+      query: ({ userId, role_id, driver_id, create_driver_profile }) => ({
         url: `/api/roles/users/${userId}/assign`,
         method: 'POST',
-        body: { role_id },
+        body: { role_id, driver_id, create_driver_profile },
       }),
       invalidatesTags: ['TenantRoles', 'User'],
     }),
@@ -1733,10 +2117,17 @@ export const api = createApi({
         params,
       }),
       providesTags: ['Notification'],
+      keepUnusedDataFor: 60,
+    }),
+    getUnreadNotificationCount: builder.query<{ unreadCount: number }, void>({
+      query: () => '/api/notifications/unread-count',
+      providesTags: ['Notification'],
+      keepUnusedDataFor: 60,
     }),
     getNotificationPreferences: builder.query<any, void>({
       query: () => '/api/notifications/preferences',
       providesTags: ['Notification'],
+      keepUnusedDataFor: 300,
     }),
     updateNotificationPreferences: builder.mutation<any, any>({
       query: (data) => ({
@@ -1762,12 +2153,6 @@ export const api = createApi({
     }),
 
     // Public reservation portal
-    getPublicRestaurants: builder.query<PublicRestaurant[], void>({
-      query: () => ({
-        url: '/api/public/restaurants',
-        credentials: 'omit',
-      }),
-    }),
     getPublicRestaurant: builder.query<PublicRestaurant, string>({
       query: (idOrSlug) => ({
         url: `/api/public/restaurants/${encodeURIComponent(idOrSlug)}`,
@@ -1911,6 +2296,7 @@ export const api = createApi({
         body,
         credentials: 'omit',
       }),
+      invalidatesTags: ['StaffPto'],
     }),
     submitStaffPortalSwap: builder.mutation<
       StaffShiftSwap,
@@ -1927,6 +2313,7 @@ export const api = createApi({
         body,
         credentials: 'omit',
       }),
+      invalidatesTags: ['StaffSwap'],
     }),
     getStaffPortalTimeEntries: builder.query<StaffTimeEntry[], { token: string }>({
       query: ({ token }) => ({
@@ -1934,6 +2321,7 @@ export const api = createApi({
         params: { token },
         credentials: 'omit',
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffTimeEntry>(response),
     }),
     staffPortalCheckIn: builder.mutation<StaffTimeEntry, { token: string; note?: string }>({
       query: (body) => ({
@@ -1942,6 +2330,7 @@ export const api = createApi({
         body,
         credentials: 'omit',
       }),
+      invalidatesTags: ['StaffTimeEntry'],
     }),
     staffPortalCheckOut: builder.mutation<StaffTimeEntry, { token: string; id: string }>({
       query: ({ token, id }) => ({
@@ -1950,6 +2339,7 @@ export const api = createApi({
         body: { token },
         credentials: 'omit',
       }),
+      invalidatesTags: ['StaffTimeEntry'],
     }),
     getStaffSelfDashboard: builder.query<StaffPortalDashboard, void>({
       query: () => ({
@@ -1966,6 +2356,7 @@ export const api = createApi({
     }),
     getStaffSelfTimeEntries: builder.query<StaffTimeEntry[], void>({
       query: () => '/api/staff/self/time-entries',
+      transformResponse: (response: unknown) => normalizeListResponse<StaffTimeEntry>(response),
       providesTags: ['StaffTimeEntry'],
     }),
     staffSelfCheckIn: builder.mutation<StaffTimeEntry, { note?: string }>({
@@ -1974,7 +2365,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['StaffTimeEntry'],
+      invalidatesTags: ['StaffTimeEntry', 'StaffMember', 'StaffShift'],
     }),
     staffSelfCheckOut: builder.mutation<StaffTimeEntry, { id: string }>({
       query: ({ id }) => ({
@@ -1999,6 +2390,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
+      invalidatesTags: ['StaffPto', 'StaffMember', 'StaffShift'],
     }),
     submitStaffSelfSwap: builder.mutation<
       StaffShiftSwap,
@@ -2013,6 +2405,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
+      invalidatesTags: ['StaffSwap', 'StaffMember', 'StaffShift'],
     }),
 
     // Reports
@@ -2024,6 +2417,7 @@ export const api = createApi({
         url: `/api/reports/restaurant/${path}`,
         params: { from, to, branch_id: branchId, granularity },
       }),
+      transformResponse: (response: unknown) => normalizeReportResponse(response),
       providesTags: ['Reports'],
     }),
     getSupplierReport: builder.query<
@@ -2034,6 +2428,7 @@ export const api = createApi({
         url: `/api/reports/supplier/${path}`,
         params: { from, to, granularity },
       }),
+      transformResponse: (response: unknown) => normalizeReportResponse(response),
       providesTags: ['Reports'],
     }),
 
@@ -2152,6 +2547,10 @@ export const api = createApi({
     getPromotionPricing: builder.query<{ pricing: Array<Record<string, unknown>> }, void>({
       query: () => '/api/promotions/pricing',
     }),
+    getAdminPromotionPricing: builder.query<{ pricing: Array<Record<string, unknown>> }, void>({
+      query: () => '/api/promotions/admin/pricing',
+      providesTags: ['Promotions'],
+    }),
     getDealDetail: builder.query<{ deal: Record<string, unknown> }, string>({
       query: (id) => `/api/promotions/${id}/detail`,
       providesTags: (_r, _e, id) => [{ type: 'Promotions', id }],
@@ -2178,6 +2577,111 @@ export const api = createApi({
     >({
       query: (id) => ({ url: `/api/promotions/${id}/use-coupon`, method: 'POST' }),
     }),
+
+    // Contract pricing
+    getContractPricing: builder.query<
+      { pricing: Array<Record<string, unknown>> },
+      { restaurantId?: string; productId?: string; q?: string; status?: string }
+    >({
+      query: (params) => ({
+        url: '/api/restaurant-pricing',
+        params,
+      }),
+      providesTags: ['ContractPricing'],
+      transformResponse: (response: unknown) => normalizeContractPricingList(response),
+    }),
+    getMyContractPricing: builder.query<
+      {
+        pricing: Array<Record<string, unknown>>
+        summary: Array<Record<string, unknown>>
+      },
+      { supplierId?: string; productId?: string; q?: string }
+    >({
+      query: (params) => ({
+        url: '/api/restaurant-pricing/my-pricing',
+        params,
+      }),
+      providesTags: ['ContractPricing'],
+      transformResponse: (response: unknown) => normalizeMyContractPricing(response),
+    }),
+    createContractPricing: builder.mutation<
+      { pricing: Record<string, unknown> },
+      {
+        restaurantId: string
+        productId: string
+        price: number
+        currency?: string
+        contractDiscountPercentage?: number
+        contractStartDate?: string
+        contractEndDate?: string
+        agreementType?: string
+        minOrderQuantity?: number
+        notes?: string
+      }
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-pricing',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['ContractPricing', 'Product'],
+      transformResponse: (response: unknown) => normalizeContractPricingRecord(response),
+    }),
+    updateContractPricing: builder.mutation<
+      { pricing: Record<string, unknown> },
+      {
+        id: string
+        price?: number
+        contractDiscountPercentage?: number
+        contractStartDate?: string | null
+        contractEndDate?: string | null
+        agreementType?: string
+        minOrderQuantity?: number | null
+        isActive?: boolean
+        notes?: string | null
+        restaurantId?: string
+        productId?: string
+      }
+    >({
+      query: ({ id, restaurantId: _r, productId: _p, ...body }) => ({
+        url: `/api/restaurant-pricing/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['ContractPricing', 'Product'],
+      transformResponse: (response: unknown) => normalizeContractPricingRecord(response),
+    }),
+    deactivateContractPricing: builder.mutation<{ pricing: Record<string, unknown> }, string>({
+      query: (id) => ({
+        url: `/api/restaurant-pricing/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['ContractPricing', 'Product'],
+      transformResponse: (response: unknown) => normalizeContractPricingRecord(response),
+    }),
+    resolveContractPrices: builder.mutation<
+      {
+        items: Array<{
+          productId: string
+          supplierId: string
+          quantity: number
+          unitPrice: number
+          source: string
+          defaultPrice: number | null
+          contractPriceId: string | null
+        }>
+      },
+      {
+        items: Array<{ productId: string; supplierId: string; quantity: number }>
+      }
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-pricing/resolve',
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (response: unknown) => normalizeResolvedContractPrices(response),
+    }),
     messageFromDeal: builder.mutation<
       {
         conversation: Record<string, unknown>
@@ -2187,7 +2691,7 @@ export const api = createApi({
       string
     >({
       query: (id) => ({ url: `/api/promotions/${id}/message`, method: 'POST' }),
-      invalidatesTags: ['Conversations'],
+      invalidatesTags: ['Chat'],
     }),
     promoteDeal: builder.mutation<
       { promotion: Record<string, unknown> },
@@ -2248,8 +2752,15 @@ export const api = createApi({
       query: (id) => ({ url: `/api/promotions/admin/${id}/pause`, method: 'POST' }),
       invalidatesTags: ['Promotions'],
     }),
-    submitPromotion: builder.mutation<{ promotion: Record<string, unknown> }, string>({
-      query: (id) => ({ url: `/api/promotions/${id}/submit`, method: 'POST' }),
+    submitPromotion: builder.mutation<
+      { promotion: Record<string, unknown> },
+      { id: string; pricingKey: string }
+    >({
+      query: ({ id, pricingKey }) => ({
+        url: `/api/promotions/${id}/submit`,
+        method: 'POST',
+        body: { pricingKey },
+      }),
       invalidatesTags: ['Promotions'],
     }),
     previewCartDeal: builder.mutation<
@@ -2273,6 +2784,10 @@ export const api = createApi({
         isActive?: boolean
         displayName?: string
         description?: string
+        estimatedReachLabel?: string | null
+        badgeLabel?: string | null
+        isRecommended?: boolean
+        sortOrder?: number
       }
     >({
       query: ({ key, ...body }) => ({
@@ -2325,6 +2840,40 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
+      invalidatesTags: ['Admin'],
+    }),
+    createAdminTenantLimitOverride: builder.mutation<
+      { override: Record<string, unknown> },
+      {
+        tenantType: 'RESTAURANT' | 'SUPPLIER'
+        tenantId: string
+        limit_type: string
+        override_value: number
+        expiration_date?: string | null
+        reason?: string | null
+      }
+    >({
+      query: ({ tenantType, tenantId, ...body }) => ({
+        url: `/api/admin-dashboard/tenants/${tenantType}/${tenantId}/override-limit`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Admin'],
+    }),
+    getAdminEffectiveLimit: builder.query<
+      {
+        resolved: {
+          baseLimit: number | null
+          effectiveLimit: number | null
+          tenantOverride?: unknown
+          planOverride?: unknown
+        }
+        usage: { current?: number; limit?: number }
+      },
+      { tenantType: 'RESTAURANT' | 'SUPPLIER'; tenantId: string; limitKey: string }
+    >({
+      query: ({ tenantType, tenantId, limitKey }) =>
+        `/api/admin-dashboard/tenants/${tenantType}/${tenantId}/effective-limit/${limitKey}`,
     }),
     updateAdminTenantLimitOverride: builder.mutation<
       { override: Record<string, unknown> },
@@ -2341,6 +2890,7 @@ export const api = createApi({
         method: 'PATCH',
         body,
       }),
+      invalidatesTags: ['Admin'],
     }),
     updateAdminPlanLimitOverride: builder.mutation<
       { override: Record<string, unknown> },
@@ -2357,18 +2907,27 @@ export const api = createApi({
         method: 'PATCH',
         body,
       }),
+      invalidatesTags: ['Admin'],
     }),
     getAdminSubscriptionAddons: builder.query<
       {
         billingTenantId: string
+        tenantName?: string | null
+        billingTenantName?: string | null
+        usesOrgBilling?: boolean
         addons: Array<Record<string, unknown>>
         locationLimits: Record<string, unknown>
         planCode: string | null
+        planName?: string | null
+        overrides?: Array<Record<string, unknown>>
       },
       { tenantType: 'RESTAURANT' | 'SUPPLIER'; tenantId: string }
     >({
       query: ({ tenantType, tenantId }) =>
         `/api/admin-dashboard/tenants/${tenantType}/${tenantId}/subscription-addons`,
+      providesTags: (_r, _e, { tenantId, tenantType }) => [
+        { type: 'Admin', id: `addons-${tenantType}-${tenantId}` },
+      ],
     }),
     upsertAdminSubscriptionAddon: builder.mutation<
       { addon: Record<string, unknown> | null; cancelled?: boolean },
@@ -2386,6 +2945,10 @@ export const api = createApi({
         method: 'PUT',
         body,
       }),
+      invalidatesTags: (_r, _e, { tenantId, tenantType }) => [
+        { type: 'Admin', id: `addons-${tenantType}-${tenantId}` },
+        'Admin',
+      ],
     }),
 
     // Reviews
@@ -2528,7 +3091,12 @@ export const api = createApi({
     }),
 
     acceptWaitlistOffer: builder.mutation<
-      { reservation: Record<string, unknown>; waitlist: Record<string, unknown> },
+      {
+        reservation: Record<string, unknown>
+        waitlist: Record<string, unknown>
+        manageToken?: string
+        manageUrl?: string
+      },
       string
     >({
       query: (token) => ({
@@ -2554,11 +3122,15 @@ export const api = createApi({
     getCurrentSubscription: builder.query<{ subscription: Subscription }, void>({
       query: () => '/api/subscriptions/current',
       providesTags: ['Subscription'],
+      keepUnusedDataFor: 300,
     }),
     getEntitlements: builder.query<{ entitlements: Entitlements }, void>({
       query: () => '/api/subscriptions/entitlements',
       providesTags: ['Subscription'],
-      keepUnusedDataFor: 5 * 60, // Cache 5 min per session to avoid repeated calls
+      keepUnusedDataFor: 120,
+      refetchOnMountOrArgChange: false,
+      refetchOnFocus: false,
+      refetchOnReconnect: true,
     }),
     getSubscriptionUsage: builder.query<UsageMeter & { meterType: string }, string>({
       query: (meterType) => `/api/subscriptions/usage/${meterType}`,
@@ -2604,6 +3176,9 @@ export const api = createApi({
     getBillingStatus: builder.query<BillingStatus, void>({
       query: () => '/api/billing/status',
       providesTags: ['Billing', 'Subscription'],
+      keepUnusedDataFor: 120,
+      refetchOnFocus: false,
+      refetchOnMountOrArgChange: false,
     }),
     getBillingPaymentMethods: builder.query<{ paymentMethods: BillingPaymentMethod[] }, void>({
       query: () => '/api/billing/payment-methods',
@@ -2653,6 +3228,15 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ['Billing', 'Subscription'],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled
+          const { refetchAppSession } = await import('../lib/refetchAppSession')
+          await refetchAppSession(dispatch)
+        } catch {
+          // Leave cache as-is on failure
+        }
+      },
     }),
     billingPayNow: builder.mutation<
       { allPaid: boolean },
@@ -2664,6 +3248,15 @@ export const api = createApi({
         body: body ?? {},
       }),
       invalidatesTags: ['Billing', 'Subscription'],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled
+          const { refetchAppSession } = await import('../lib/refetchAppSession')
+          await refetchAppSession(dispatch)
+        } catch {
+          // Leave cache as-is on failure
+        }
+      },
     }),
     setBillingAutoRenew: builder.mutation<{ autoRenew: boolean }, { autoRenew: boolean }>({
       query: (body) => ({
@@ -2683,6 +3276,15 @@ export const api = createApi({
         body: { reason, freeTrialDays },
       }),
       invalidatesTags: ['Admin', 'Billing', 'Subscription'],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled
+          const { refetchAppSession } = await import('../lib/refetchAppSession')
+          await refetchAppSession(dispatch)
+        } catch {
+          /* mutation failed — skip refetch */
+        }
+      },
     }),
 
     extendAdminFreeTrial: builder.mutation<
@@ -2799,12 +3401,31 @@ export const api = createApi({
       }),
       providesTags: ['Admin'],
     }),
-    updateAdminSubscription: builder.mutation<Subscription, { id: string; data: any }>({
+    updateAdminSubscription: builder.mutation<
+      {
+        subscription: Subscription
+        appliedViaOrgBilling?: boolean
+        billingTenantId?: string
+      },
+      { id: string; data: any }
+    >({
       query: ({ id, data }) => ({
         url: `/api/admin-dashboard/subscriptions/${id}`,
         method: 'PATCH',
         body: data,
       }),
+      transformResponse: (raw: {
+        subscription?: Subscription
+        appliedViaOrgBilling?: boolean
+        billingTenantId?: string
+      }) =>
+        raw?.subscription
+          ? {
+              subscription: raw.subscription,
+              appliedViaOrgBilling: raw.appliedViaOrgBilling,
+              billingTenantId: raw.billingTenantId,
+            }
+          : { subscription: raw as unknown as Subscription },
       invalidatesTags: ['Admin'],
     }),
     previewSubscriptionPlanChange: builder.mutation<
@@ -2858,13 +3479,72 @@ export const api = createApi({
       {
         jobFailures: any[] | null
         webhookFailures: any[] | null
-        emailFailures: any[] | null
+        emailFailures: Array<{
+          id: string
+          tenantId?: string
+          eventType: string
+          status: string
+          recipientRedacted: string
+          errorMessage?: string
+          createdAt: string
+        }> | null
         recentApiErrors: any[]
         dbPool: { total: number; idle: number; waiting: number } | null
       },
       void
     >({
       query: () => '/api/admin-dashboard/health',
+      providesTags: ['Admin'],
+    }),
+    getAdminOperationalSummary: builder.query<{ summary: Record<string, unknown> }, void>({
+      query: () => '/api/admin-dashboard/operational-summary',
+      providesTags: ['Admin'],
+    }),
+    getAdminEmailDeliveryLogs: builder.query<
+      { logs: any[]; total: number; limit: number; offset: number },
+      {
+        limit?: number
+        offset?: number
+        tenantId?: string
+        status?: string
+        eventType?: string
+        since?: string
+      }
+    >({
+      query: (params) => ({ url: '/api/admin-dashboard/operational/email-logs', params }),
+      providesTags: ['Admin'],
+    }),
+    getAdminFulfillmentIssues: builder.query<
+      { issues: any[]; total: number; limit: number; offset: number },
+      { limit?: number; offset?: number; supplierId?: string; restaurantId?: string }
+    >({
+      query: (params) => ({
+        url: '/api/admin-dashboard/operational/fulfillment-issues',
+        params,
+      }),
+      providesTags: ['Admin'],
+    }),
+    getAdminActiveDeliveries: builder.query<{ deliveries: any[] }, { limit?: number } | void>({
+      query: (params) => ({
+        url: '/api/admin-dashboard/operational/active-deliveries',
+        params: params ?? {},
+      }),
+      providesTags: ['Admin'],
+    }),
+    getAdminTenantOperationalSnapshot: builder.query<
+      { snapshot: Record<string, unknown> },
+      { tenantType: 'RESTAURANT' | 'SUPPLIER'; tenantId: string }
+    >({
+      query: ({ tenantType, tenantId }) =>
+        `/api/admin-dashboard/tenants/${tenantType}/${tenantId}/operational-snapshot`,
+      providesTags: ['Admin'],
+    }),
+    getAdminTenantEntitlements: builder.query<
+      { entitlements: Record<string, unknown>; effectiveFeatures: Record<string, unknown> },
+      { tenantType: 'RESTAURANT' | 'SUPPLIER'; tenantId: string }
+    >({
+      query: ({ tenantType, tenantId }) =>
+        `/api/admin-dashboard/tenants/${tenantType}/${tenantId}/entitlements`,
       providesTags: ['Admin'],
     }),
     getAdminFinancialOverview: builder.query<
@@ -2883,13 +3563,72 @@ export const api = createApi({
       query: () => '/api/admin-dashboard/financial-overview',
       providesTags: ['Admin'],
     }),
-    getAdminSuppliers: builder.query<{ suppliers: any[] }, void>({
-      query: () => '/api/admin-dashboard/tenants/suppliers',
+    getAdminSuppliers: builder.query<
+      { suppliers: any[]; total?: number; limit?: number; offset?: number },
+      { limit?: number; offset?: number } | void
+    >({
+      query: (args) => {
+        const limit = args?.limit ?? 100
+        const offset = args?.offset ?? 0
+        return `/api/admin-dashboard/tenants/suppliers?limit=${limit}&offset=${offset}`
+      },
       providesTags: ['Admin'],
     }),
-    getAdminRestaurants: builder.query<{ restaurants: any[] }, void>({
-      query: () => '/api/admin-dashboard/tenants/restaurants',
+    getAdminRestaurants: builder.query<
+      { restaurants: any[]; total?: number; limit?: number; offset?: number },
+      { limit?: number; offset?: number } | void
+    >({
+      query: (args) => {
+        const limit = args?.limit ?? 100
+        const offset = args?.offset ?? 0
+        return `/api/admin-dashboard/tenants/restaurants?limit=${limit}&offset=${offset}`
+      },
       providesTags: ['Admin'],
+    }),
+    getAdminUsers: builder.query<
+      {
+        users: Array<{
+          id: string
+          email: string
+          display_name: string | null
+          role: string
+          created_at: string
+          tenant_roles: Array<{ tenantId?: string; tenantType?: string; roleName?: string }>
+        }>
+      },
+      {
+        search?: string
+        q?: string
+        tenantId?: string
+        tenantType?: 'RESTAURANT' | 'SUPPLIER'
+        limit?: number
+      }
+    >({
+      query: (params) => ({ url: '/api/admin-dashboard/users', params }),
+      providesTags: ['Admin'],
+    }),
+    resetAdminUserPassword: builder.mutation<
+      {
+        userId: string
+        email: string
+        displayName: string | null
+        role: string
+        temporaryPassword?: string
+        temporary: boolean
+      },
+      {
+        userId?: string
+        email?: string
+        password?: string
+        temporary?: boolean
+        generate?: boolean
+      }
+    >({
+      query: (body) => ({
+        url: '/api/admin-dashboard/users/reset-password',
+        method: 'POST',
+        body,
+      }),
     }),
     getSupplierUsage: builder.query<{ usage: UsageMeter[] }, string>({
       query: (id) => `/api/admin-dashboard/tenants/suppliers/${id}/usage`,
@@ -3022,15 +3761,25 @@ export const {
   useSendOrderReminderMutation,
   useGetFulfillmentBoardQuery,
   useGetFulfillmentRoutesQuery,
+  useGetFulfillmentRouteQuery,
+  useGetDriverActiveRouteQuery,
+  useCreateFulfillmentRouteMutation,
+  useUpdateFulfillmentRouteMutation,
+  useCancelFulfillmentRouteMutation,
+  useReorderFulfillmentRouteStopsMutation,
+  useUpdateFulfillmentRouteStopMutation,
   useGetFulfillmentExceptionsQuery,
   useGetFulfillmentDispatchQuery,
   useGetDriversQuery,
+  useGetUnlinkedDriversQuery,
   useCreateDriverMutation,
   useUpdateDriverMutation,
   useDeactivateDriverMutation,
   useAssignDriverToOrderMutation,
   useReassignDriverOnOrderMutation,
   useUpdateOrderDeliveryStatusMutation,
+  useSendDriverLocationMutation,
+  useGetOrderTrackingQuery,
   useSubmitOrderProofOfDeliveryMutation,
   useResolveFulfillmentExceptionMutation,
   useIgnoreFulfillmentExceptionMutation,
@@ -3090,12 +3839,24 @@ export const {
   useAdjustRestaurantInventoryMutation,
   useGetRestaurantWasteAnalyticsQuery,
   useGetReorderSuggestionsQuery,
+  useGetExpiryLotsQuery,
+  useGetExpirySummaryQuery,
+  useCreateExpiryLotMutation,
+  useUpdateExpiryLotMutation,
+  useDeleteExpiryLotMutation,
+  useGetReorderRemindersQuery,
+  useGetOrderFulfillmentIssuesQuery,
+  useReportOrderShortageMutation,
+  useSuggestOrderSubstitutionIssueMutation,
+  useOpenOrderFulfillmentChatMutation,
+  useGetSupplierAtRiskOrdersQuery,
   useGetPendingOrdersForReceivingQuery,
   useGetReceivingHistoryQuery,
   useCreateReceivingReportMutation,
   useGetRestaurantInvoicesQuery,
   useGetRestaurantInvoiceQuery,
   useMarkInvoicePaidMutation,
+  useRecordSupplierPaymentMutation,
   useGetInvoiceCreditsQuery,
   useGetInvoiceAnalyticsQuery,
   useGetOrderInvoicesQuery,
@@ -3103,7 +3864,20 @@ export const {
   useGetRestaurantExpensesQuery,
   useGetOverdueInvoicesQuery,
   useGetSupplierInvoicesQuery,
+  useGetSupplierReceivablesQuery,
+  useGetSupplierCommandCenterQuery,
+  useGetSupplierReorderIntelligenceQuery,
+  useCreateReorderReminderDraftMutation,
+  useGetSupplierDeliveryBoardQuery,
+  usePreviewProductImportMutation,
+  useExecuteProductImportMutation,
+  useGetProductSubstitutesQuery,
+  useCreateProductSubstituteMutation,
+  useDeleteProductSubstituteMutation,
+  useGetOrderSubstitutionsQuery,
+  useProposeOrderSubstitutionMutation,
   useGetNotificationsQuery,
+  useGetUnreadNotificationCountQuery,
   useGetNotificationPreferencesQuery,
   useUpdateNotificationPreferencesMutation,
   useGetBranchesQuery,
@@ -3151,7 +3925,6 @@ export const {
   useAssignTenantUserRoleMutation,
   useMarkNotificationReadMutation,
   useMarkAllNotificationsReadMutation,
-  useGetPublicRestaurantsQuery,
   useGetPublicRestaurantQuery,
   useGetPublicReservationAvailabilityQuery,
   useLazyGetPublicReservationAvailabilityQuery,
@@ -3204,6 +3977,12 @@ export const {
   useApplyCreditNoteMutation,
   useGetPromotionsQuery,
   useGetActivePromotionsQuery,
+  useGetContractPricingQuery,
+  useGetMyContractPricingQuery,
+  useCreateContractPricingMutation,
+  useUpdateContractPricingMutation,
+  useDeactivateContractPricingMutation,
+  useResolveContractPricesMutation,
   useCreatePromotionMutation,
   useUpdatePromotionMutation,
   useActivatePromotionMutation,
@@ -3211,6 +3990,7 @@ export const {
   useDeletePromotionMutation,
   useGetPromotionAnalyticsQuery,
   useGetPromotionPricingQuery,
+  useGetAdminPromotionPricingQuery,
   useGetDealDetailQuery,
   useGetEligibleDealProductsQuery,
   useRecordDealInteractionMutation,
@@ -3230,6 +4010,8 @@ export const {
   useGetAdminLimitKeysQuery,
   useGetAdminLimitOverridesQuery,
   useCreateAdminPlanLimitOverrideMutation,
+  useCreateAdminTenantLimitOverrideMutation,
+  useGetAdminEffectiveLimitQuery,
   useUpdateAdminTenantLimitOverrideMutation,
   useUpdateAdminPlanLimitOverrideMutation,
   useUpdateAdminPromotionPricingMutation,
@@ -3259,14 +4041,24 @@ export const {
   useCreateAdminPlanMutation,
   useUpdateAdminPlanMutation,
   useGetAdminSubscriptionsQuery,
+  useGetAdminSubscriptionAddonsQuery,
+  useUpsertAdminSubscriptionAddonMutation,
   useUpdateAdminSubscriptionMutation,
   usePreviewSubscriptionPlanChangeMutation,
   useGetTenantUsageQuery,
   useGetAdminAuditLogsQuery,
   useGetAdminActivityQuery,
   useGetAdminHealthQuery,
+  useGetAdminOperationalSummaryQuery,
+  useGetAdminEmailDeliveryLogsQuery,
+  useGetAdminFulfillmentIssuesQuery,
+  useGetAdminActiveDeliveriesQuery,
+  useGetAdminTenantOperationalSnapshotQuery,
+  useGetAdminTenantEntitlementsQuery,
   useGetAdminSuppliersQuery,
   useGetAdminRestaurantsQuery,
+  useGetAdminUsersQuery,
+  useResetAdminUserPasswordMutation,
   useGetSupplierUsageQuery,
   useGetRestaurantUsageQuery,
   useGetImpersonationStatusQuery,

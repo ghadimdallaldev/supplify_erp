@@ -35,9 +35,11 @@ import {
   getPermissionsForTenantRole,
 } from './permissions.js'
 import { getCache, setCache, deleteCache } from './cache.js'
+import { resetSingleflightForTests } from './singleflight.js'
 
 describe('permissions resolution', () => {
   beforeEach(() => {
+    resetSingleflightForTests()
     queryMock.mockReset()
     getOrgRolePermissionsMock.mockReset()
     vi.mocked(getCache).mockResolvedValue(null)
@@ -112,6 +114,7 @@ describe('permissions resolution', () => {
   it('invalidates permission cache key', async () => {
     await invalidateUserPermissionCache('u1', 't1', 'RESTAURANT')
     expect(deleteCache).toHaveBeenCalledWith(permissionCacheKey('u1', 't1', 'RESTAURANT'))
+    expect(deleteCache).toHaveBeenCalledWith('tctx:u1:t1:RESTAURANT')
   })
 
   it('hasPermission treats MANAGE as superset', () => {
@@ -138,6 +141,7 @@ describe('permissions resolution', () => {
   it('denies supplier access when no org or branch roles', async () => {
     queryMock
       .mockResolvedValueOnce({ rows: [{ organization_id: 'org-1' }] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })

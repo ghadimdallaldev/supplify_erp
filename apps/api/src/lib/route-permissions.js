@@ -59,6 +59,58 @@ export function ordersCreateMutationGuard(req, res, next) {
   return requireAnyPermission(P.ORDERS_CREATE, P.ORDERS_MANAGE)(req, res, next)
 }
 
+/**
+ * After ORDERS_VIEW on /api/orders: enforce write permissions on mutations.
+ * POST create (/, /manual) requires ORDERS_CREATE or ORDERS_MANAGE.
+ * PATCH/PUT/DELETE require ORDERS_EDIT, ORDERS_MANAGE, or ORDERS_CREATE.
+ */
+export function ordersRouterMutationGuard(req, res, next) {
+  const method = req.method.toUpperCase()
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return next()
+  const path = req.path || ''
+  if (method === 'POST' && /\/remind$/.test(path)) {
+    return next()
+  }
+  if (method === 'POST' && /\/location$/.test(path)) {
+    return next()
+  }
+  if (method === 'POST') {
+    return requireAnyPermission(P.ORDERS_CREATE, P.ORDERS_MANAGE)(req, res, next)
+  }
+  return requireAnyPermission(P.ORDERS_EDIT, P.ORDERS_MANAGE, P.ORDERS_CREATE)(req, res, next)
+}
+
+/** Resolve granular admin-dashboard permission from request path (after resolveAdminContext). */
+export function resolveAdminDashboardPermission(path) {
+  const p = path || ''
+  if (p.startsWith('/financial-overview')) return P.ADMIN_FINANCE
+  if (
+    p.startsWith('/plans') ||
+    p.startsWith('/subscriptions') ||
+    p.startsWith('/usage') ||
+    p.startsWith('/limit-keys') ||
+    p.startsWith('/limit-overrides') ||
+    p.includes('/override-limit') ||
+    p.startsWith('/plan-overrides') ||
+    p.includes('/subscription-addons') ||
+    p.includes('/effective-limit')
+  ) {
+    return P.ADMIN_PLANS
+  }
+  if (p.startsWith('/operational')) return P.ADMIN_ACCESS
+  if (p.startsWith('/tenants')) return P.ADMIN_TENANTS
+  if (p.startsWith('/users')) return P.ADMIN_SUPPORT
+  if (p.startsWith('/impersonate')) return P.ADMIN_SUPPORT
+  if (p.startsWith('/feature-flags') || p.includes('/feature-overrides')) return P.ADMIN_GROWTH
+  return P.ADMIN_ACCESS
+}
+
+/** Per-tab admin API guard (SUPER_ADMIN has all keys; scoped admins only matching tabs). */
+export function adminDashboardPermissionGuard(req, res, next) {
+  const key = resolveAdminDashboardPermission(req.path)
+  return requirePermission(key)(req, res, next)
+}
+
 /** After CHAT_VIEW. */
 export function chatSendGuard(req, res, next) {
   const method = req.method.toUpperCase()

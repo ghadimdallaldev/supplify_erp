@@ -7,11 +7,13 @@ import { logger } from '../lib/logger.js'
 import { ZodError } from 'zod'
 import { config } from '../config/env.js'
 import { deliveredOrderStatusInSql } from '../lib/order-statuses.js'
+import { parseAdminListPagination } from '../lib/admin-list-pagination.js'
 import {
   createImpersonationToken,
   verifyImpersonationToken,
   getImpersonationCookieName,
   getEffectiveTenant,
+  clearImpersonationCookie,
 } from '../lib/impersonation.js'
 import {
   getEntitlements,
@@ -22,7 +24,11 @@ import {
   checkLimit,
 } from '../lib/subscription.js'
 import { resolveEffectiveLimit } from '../lib/limit-resolution.js'
-import { resolveOrgBillingTenantId } from '../lib/org-billing-tenant.js'
+import {
+  resolveOrgBillingTenantId,
+  resolveActiveBillingSubscription,
+} from '../lib/org-billing-tenant.js'
+import { clearActiveTenantCookie } from '../lib/tenant-switch.js'
 import {
   defaultAddonUnitPrice,
   getActiveTenantAddons,
@@ -54,6 +60,17 @@ import {
 import { isLimitKeyApplicable } from '../lib/limit-resolution.js'
 import { buildAdminOverviewMetrics } from '../lib/admin-overview-metrics.js'
 import { buildAdminActivityFeed } from '../lib/admin-activity-feed.js'
+import {
+  buildAdminOperationalSummary,
+  listAdminEmailDeliveryLogs,
+  listAdminFulfillmentIssues,
+  listAdminActiveDeliveries,
+  buildTenantOperationalSnapshot,
+  getAdminEmailHealthFailures,
+} from '../lib/admin-operational-metrics.js'
+import { adminResetUserPassword, listAdminUsers } from '../services/admin-user-password.service.js'
+import { adminDashboardPermissionGuard, requireAnyPermission } from '../lib/route-permissions.js'
+import { PERMISSION_KEYS as P } from '../lib/permission-keys.js'
 
 const router = Router()
 
@@ -61,7 +78,15 @@ router.use(
   requireAuth,
   requireRole(['ADMIN']),
   resolveAdminContext,
-  requirePermission('ADMIN_ACCESS')
+  requireAnyPermission(
+    P.ADMIN_ACCESS,
+    P.ADMIN_TENANTS,
+    P.ADMIN_PLANS,
+    P.ADMIN_FINANCE,
+    P.ADMIN_SUPPORT,
+    P.ADMIN_GROWTH
+  ),
+  adminDashboardPermissionGuard
 )
 
 // ========================================
@@ -827,7 +852,32 @@ router.post('/subscriptions/:id/preview-change', async (req, res) => {
         requestId: req.requestId,
       })
     }
-    const sub = subRows[0]
+    const requestedSub = subRows[0]
+    const billing = await resolveActiveBillingSubscription(
+      requestedSub.tenant_id,
+      requestedSub.tenant_type
+    )
+    if (!billing.subscription) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'No active subscription on the billing tenant for this organization.',
+        },
+        requestId: req.requestId,
+      })
+    }
+    const sub =
+      billing.subscription.id === requestedSub.id
+        ? requestedSub
+        : await query(
+            `SELECT s.*, sp.limits as current_limits, sp.features as current_features
+             FROM subscription s
+             JOIN subscription_plan sp ON sp.id = s.plan_id
+             WHERE s.id = $1`,
+            [billing.subscription.id]
+          ).then((r) => r.rows[0])
     const tenantId = sub.tenant_id
     const tenantType = sub.tenant_type
 
@@ -952,7 +1002,46 @@ router.patch('/subscriptions/:id', async (req, res) => {
       return
     }
 
-    const existing = existingSubs[0]
+    let existing = existingSubs[0]
+    let subscriptionId = id
+    let appliedViaOrgBilling = false
+
+    if (updateData.planId) {
+      const billing = await resolveActiveBillingSubscription(
+        existing.tenant_id,
+        existing.tenant_type
+      )
+      if (!billing.subscription) {
+        res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'No active subscription on the billing tenant for this organization.',
+          },
+          requestId: req.requestId,
+        })
+        return
+      }
+      if (billing.subscription.id !== existing.id) {
+        const { rows: billingFull } = await query('SELECT * FROM subscription WHERE id = $1', [
+          billing.subscription.id,
+        ])
+        if (billingFull.length === 0) {
+          res.status(404).json({
+            ok: false,
+            data: null,
+            error: { name: 'NOT_FOUND', message: 'Billing subscription not found' },
+            requestId: req.requestId,
+          })
+          return
+        }
+        existing = billingFull[0]
+        subscriptionId = billing.subscription.id
+        appliedViaOrgBilling = billing.usesOrgBilling
+      }
+    }
+
     let existingPlanCode = null
     if (existing.plan_id) {
       const { rows: oldPlan } = await query('SELECT code FROM subscription_plan WHERE id = $1', [
@@ -1071,7 +1160,20 @@ router.patch('/subscriptions/:id', async (req, res) => {
       values.push(updateData.cancelReason)
     }
 
-    values.push(id)
+    values.push(subscriptionId)
+
+    if (updates.length === 0) {
+      res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'No subscription fields to update (provide planId and/or status)',
+        },
+        requestId: req.requestId,
+      })
+      return
+    }
 
     const {
       rows: [updated],
@@ -1089,7 +1191,7 @@ router.patch('/subscriptions/:id', async (req, res) => {
       existing.lock_reason === 'pending_activation' &&
       (updateData.planId || updateData.status === 'ACTIVE')
     ) {
-      await unlockSubscriptionAccount(id, {
+      await unlockSubscriptionAccount(subscriptionId, {
         unlockedBy: 'admin',
         adminUserId: req.userData.id,
       })
@@ -1103,7 +1205,7 @@ router.patch('/subscriptions/:id', async (req, res) => {
           VALUES ($1, $2, $3, $4, $5)
         `,
           [
-            id,
+            subscriptionId,
             existing.plan_id,
             updateData.planId,
             req.userData.id,
@@ -1116,7 +1218,7 @@ router.patch('/subscriptions/:id', async (req, res) => {
       recordConversionEvent(existing.tenant_id, existing.tenant_type, 'UPGRADE_SUCCESS', {
         from_plan_id: existing.plan_id,
         to_plan_id: updateData.planId,
-        subscription_id: id,
+        subscription_id: subscriptionId,
       }).catch(() => {})
     }
 
@@ -1164,7 +1266,7 @@ router.patch('/subscriptions/:id', async (req, res) => {
       )
     }
 
-    invalidateTenantSubscriptionCache(existing.tenant_id, existing.tenant_type).catch(() => {})
+    await invalidateTenantSubscriptionCache(existing.tenant_id, existing.tenant_type)
     try {
       const { emitEntitlementsRefreshNotice } = await import('../lib/socket.js')
       emitEntitlementsRefreshNotice({
@@ -1177,7 +1279,11 @@ router.patch('/subscriptions/:id', async (req, res) => {
     }
     res.json({
       ok: true,
-      data: { subscription: updated },
+      data: {
+        subscription: updated,
+        appliedViaOrgBilling,
+        billingTenantId: existing.tenant_id,
+      },
       error: null,
       requestId: req.requestId,
     })
@@ -1259,7 +1365,7 @@ router.post('/subscriptions/:id/extend-free-trial', async (req, res) => {
       },
     })
 
-    invalidateTenantSubscriptionCache(existing.tenant_id, existing.tenant_type).catch(() => {})
+    await invalidateTenantSubscriptionCache(existing.tenant_id, existing.tenant_type)
     try {
       const { emitEntitlementsRefreshNotice } = await import('../lib/socket.js')
       emitEntitlementsRefreshNotice({
@@ -1383,7 +1489,7 @@ router.post('/subscriptions/:id/unlock', async (req, res) => {
       payload_json: { reason, adminUserId: req.userData.id },
     })
 
-    invalidateTenantSubscriptionCache(existing.tenant_id, existing.tenant_type).catch(() => {})
+    await invalidateTenantSubscriptionCache(existing.tenant_id, existing.tenant_type)
     try {
       const { emitEntitlementsRefreshNotice } = await import('../lib/socket.js')
       emitEntitlementsRefreshNotice({
@@ -1702,13 +1808,8 @@ router.post('/impersonate', async (req, res) => {
 router.post('/impersonate/stop', async (req, res) => {
   try {
     const ctx = req.impersonationContext
-    // Clear with same options as setCookie so the browser actually removes it
-    res.clearCookie(getImpersonationCookieName(), {
-      path: '/',
-      httpOnly: true,
-      secure: config.NODE_ENV === 'production',
-      sameSite: 'lax',
-    })
+    clearImpersonationCookie(res)
+    clearActiveTenantCookie(res)
 
     if (ctx) {
       await logAudit(
@@ -1783,34 +1884,190 @@ router.get('/impersonate', async (req, res) => {
 })
 
 // ========================================
+// USER PASSWORD MANAGEMENT
+// ========================================
+
+const adminResetPasswordSchema = z
+  .object({
+    userId: z.string().uuid().optional(),
+    email: z.string().email().optional(),
+    password: z.string().min(10).optional(),
+    temporary: z.boolean().optional(),
+    generate: z.boolean().optional(),
+  })
+  .refine((body) => Boolean(body.userId || body.email), {
+    message: 'userId or email is required',
+  })
+
+/**
+ * GET /api/admin-dashboard/users?search=&tenantId=&tenantType=
+ */
+router.get('/users', async (req, res) => {
+  try {
+    const tenantType = req.query.tenantType ? String(req.query.tenantType).toUpperCase() : undefined
+    if (tenantType && tenantType !== 'RESTAURANT' && tenantType !== 'SUPPLIER') {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'tenantType must be RESTAURANT or SUPPLIER' },
+        requestId: req.requestId,
+      })
+    }
+    const users = await listAdminUsers({
+      search: req.query.search || req.query.q || '',
+      tenantId: req.query.tenantId ? String(req.query.tenantId) : undefined,
+      tenantType,
+      limit: req.query.limit,
+    })
+    res.json({
+      ok: true,
+      data: { users },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('List admin users error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to list users' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
+ * POST /api/admin-dashboard/users/reset-password
+ * Reset a tenant or staff user's Keycloak password (admin support).
+ */
+router.post('/users/reset-password', async (req, res) => {
+  try {
+    const body = adminResetPasswordSchema.parse(req.body)
+    const result = await adminResetUserPassword({
+      actorUserId: req.userData.id,
+      targetUserId: body.userId,
+      email: body.email,
+      password: body.password,
+      temporary: body.temporary ?? true,
+      generate: body.generate ?? !body.password,
+    })
+
+    await logAudit(
+      req,
+      'ADMIN_RESET_USER_PASSWORD',
+      `Reset password for ${result.email}`,
+      'USER',
+      result.userId,
+      null,
+      { temporary: result.temporary },
+      { target_email: result.email, target_role: result.role }
+    )
+
+    res.json({
+      ok: true,
+      data: result,
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'Invalid body', details: error.errors },
+        requestId: req.requestId,
+      })
+    }
+    const status = error.status || 500
+    if (status < 500) {
+      return res.status(status).json({
+        ok: false,
+        data: null,
+        error: { name: error.name || 'ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Admin reset password error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to reset password' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+// ========================================
 // TENANT MANAGEMENT
 // ========================================
+
+/** Align admin tenant rows with the subscription row used for entitlements (org main branch). */
+async function attachBillingSubscriptionFields(rows, tenantType) {
+  await Promise.all(
+    rows.map(async (row) => {
+      const billing = await resolveActiveBillingSubscription(row.id, tenantType)
+      if (!billing.subscription) return
+      row.subscription_id = billing.subscription.id
+      row.uses_org_billing = billing.usesOrgBilling
+      row.billing_tenant_id = billing.billingTenantId
+      row.subscription_status = billing.subscription.status
+      row.plan_name = billing.subscription.plan_name
+      if (billing.subscription.plan_id) {
+        const { rows: planRows } = await query('SELECT code FROM subscription_plan WHERE id = $1', [
+          billing.subscription.plan_id,
+        ])
+        row.plan_code = planRows[0]?.code ?? row.plan_code
+      }
+    })
+  )
+}
 
 // Get suppliers with detailed info
 router.get('/tenants/suppliers', async (req, res) => {
   try {
-    const { rows: suppliers } = await query(`
+    const { limit, offset } = parseAdminListPagination(req.query)
+    const { rows: countRows } = await query(`SELECT COUNT(*)::int AS total FROM supplier`)
+    const total = countRows[0]?.total ?? 0
+
+    const { rows: suppliers } = await query(
+      `
       SELECT 
         s.*,
         sub.status as subscription_status,
         sub.plan_name,
-        (SELECT sp.code FROM subscription_plan sp WHERE sp.id = sub.plan_id LIMIT 1) as plan_code,
+        sp.code as plan_code,
         sub.id as subscription_id,
-        (SELECT COUNT(*) FROM product WHERE supplier_id = s.id) as product_count,
-        (SELECT COUNT(*) FROM warehouse WHERE supplier_id = s.id AND is_active = true) as warehouse_count,
-        (SELECT COALESCE(SUM(oi.line_total), 0)
-         FROM order_item oi
-         JOIN customer_order o ON o.id = oi.order_id
-         WHERE oi.supplier_id = s.id AND ${deliveredOrderStatusInSql('o.status')}
-        )::numeric(12,2) as total_revenue
+        COALESCE(pc.product_count, 0)::int as product_count,
+        COALESCE(wc.warehouse_count, 0)::int as warehouse_count,
+        COALESCE(rev.total_revenue, 0)::numeric(12,2) as total_revenue
       FROM supplier s
       LEFT JOIN subscription sub ON sub.tenant_id = s.id AND sub.tenant_type = 'SUPPLIER' AND sub.status IN ('ACTIVE', 'TRIALING')
+      LEFT JOIN subscription_plan sp ON sp.id = sub.plan_id
+      LEFT JOIN (
+        SELECT supplier_id, COUNT(*)::int AS product_count FROM product GROUP BY supplier_id
+      ) pc ON pc.supplier_id = s.id
+      LEFT JOIN (
+        SELECT supplier_id, COUNT(*)::int AS warehouse_count
+        FROM warehouse WHERE is_active = true GROUP BY supplier_id
+      ) wc ON wc.supplier_id = s.id
+      LEFT JOIN (
+        SELECT oi.supplier_id, COALESCE(SUM(oi.line_total), 0) AS total_revenue
+        FROM order_item oi
+        JOIN customer_order o ON o.id = oi.order_id
+        WHERE ${deliveredOrderStatusInSql('o.status')}
+        GROUP BY oi.supplier_id
+      ) rev ON rev.supplier_id = s.id
       ORDER BY s.name
-    `)
+      LIMIT $1 OFFSET $2
+    `,
+      [limit, offset]
+    )
+
+    await attachBillingSubscriptionFields(suppliers, 'SUPPLIER')
 
     res.json({
       ok: true,
-      data: { suppliers },
+      data: { suppliers, total, limit, offset },
       error: null,
       requestId: req.requestId,
     })
@@ -1828,24 +2085,44 @@ router.get('/tenants/suppliers', async (req, res) => {
 // Get restaurants with detailed info
 router.get('/tenants/restaurants', async (req, res) => {
   try {
-    const { rows: restaurants } = await query(`
+    const { limit, offset } = parseAdminListPagination(req.query)
+    const { rows: countRows } = await query(`SELECT COUNT(*)::int AS total FROM restaurant`)
+    const total = countRows[0]?.total ?? 0
+
+    const { rows: restaurants } = await query(
+      `
       SELECT 
         r.*,
         sub.status as subscription_status,
         sub.plan_name,
-        (SELECT sp.code FROM subscription_plan sp WHERE sp.id = sub.plan_id LIMIT 1) as plan_code,
+        sp.code as plan_code,
         sub.id as subscription_id,
-        (SELECT COUNT(*) FROM customer_order WHERE restaurant_id = r.id) as order_count,
-        (SELECT COALESCE(SUM(total_amount), 0) FROM customer_order WHERE restaurant_id = r.id AND ${deliveredOrderStatusInSql()}) as total_spent,
-        (SELECT COUNT(*) FROM customer_order WHERE restaurant_id = r.id AND placed_at >= NOW() - INTERVAL '30 days') as orders_last_30d
+        COALESCE(oc.order_count, 0)::int as order_count,
+        COALESCE(oc.total_spent, 0)::numeric(12,2) as total_spent,
+        COALESCE(oc.orders_last_30d, 0)::int as orders_last_30d
       FROM restaurant r
       LEFT JOIN subscription sub ON sub.tenant_id = r.id AND sub.tenant_type = 'RESTAURANT' AND sub.status IN ('ACTIVE', 'TRIALING')
+      LEFT JOIN subscription_plan sp ON sp.id = sub.plan_id
+      LEFT JOIN (
+        SELECT
+          restaurant_id,
+          COUNT(*)::int AS order_count,
+          COALESCE(SUM(total_amount) FILTER (WHERE ${deliveredOrderStatusInSql()}), 0) AS total_spent,
+          COUNT(*) FILTER (WHERE placed_at >= NOW() - INTERVAL '30 days')::int AS orders_last_30d
+        FROM customer_order
+        GROUP BY restaurant_id
+      ) oc ON oc.restaurant_id = r.id
       ORDER BY r.name
-    `)
+      LIMIT $1 OFFSET $2
+    `,
+      [limit, offset]
+    )
+
+    await attachBillingSubscriptionFields(restaurants, 'RESTAURANT')
 
     res.json({
       ok: true,
-      data: { restaurants },
+      data: { restaurants, total, limit, offset },
       error: null,
       requestId: req.requestId,
     })
@@ -1855,6 +2132,109 @@ router.get('/tenants/restaurants', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get restaurants' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
+ * GET /api/admin-dashboard/tenants/search?q=&type=RESTAURANT|SUPPLIER&orgMainOnly=true
+ * Lightweight tenant lookup for admin limits / billing tools.
+ */
+router.get('/tenants/search', async (req, res) => {
+  try {
+    const q = String(req.query.q || '')
+      .trim()
+      .toLowerCase()
+    const type = req.query.type ? String(req.query.type).toUpperCase() : null
+    const orgMainOnly = req.query.orgMainOnly === 'true'
+    const limit = Math.min(parseInt(String(req.query.limit || '50'), 10) || 50, 100)
+
+    const results = []
+
+    const matchesQuery = (row) => {
+      if (!q) return true
+      const haystack = [
+        row.name,
+        row.slug,
+        row.contact_email,
+        row.sales_contact_email,
+        row.plan_code,
+        row.plan_name,
+        row.subscription_status,
+        row.id,
+        row.tenant_type,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(q)
+    }
+
+    if (!type || type === 'SUPPLIER') {
+      const { rows } = await query(`
+        SELECT
+          s.id,
+          s.name,
+          s.slug,
+          s.organization_id,
+          s.is_main_branch,
+          COALESCE(s.contact_email, s.sales_contact_email, s.accounting_contact_email) AS contact_email,
+          sub.status AS subscription_status,
+          sub.plan_name,
+          (SELECT sp.code FROM subscription_plan sp WHERE sp.id = sub.plan_id LIMIT 1) AS plan_code,
+          'SUPPLIER' AS tenant_type
+        FROM supplier s
+        LEFT JOIN subscription sub ON sub.tenant_id = s.id AND sub.tenant_type = 'SUPPLIER'
+          AND sub.status IN ('ACTIVE', 'TRIALING')
+        ORDER BY s.name
+      `)
+      for (const row of rows) {
+        if (orgMainOnly && row.is_main_branch === false) continue
+        if (!matchesQuery(row)) continue
+        results.push(row)
+      }
+    }
+
+    if (!type || type === 'RESTAURANT') {
+      const { rows } = await query(`
+        SELECT
+          r.id,
+          r.name,
+          r.slug,
+          r.organization_id,
+          r.is_main_branch,
+          r.contact_email,
+          sub.status AS subscription_status,
+          sub.plan_name,
+          (SELECT sp.code FROM subscription_plan sp WHERE sp.id = sub.plan_id LIMIT 1) AS plan_code,
+          'RESTAURANT' AS tenant_type
+        FROM restaurant r
+        LEFT JOIN subscription sub ON sub.tenant_id = r.id AND sub.tenant_type = 'RESTAURANT'
+          AND sub.status IN ('ACTIVE', 'TRIALING')
+        ORDER BY r.name
+      `)
+      for (const row of rows) {
+        if (orgMainOnly && row.is_main_branch === false) continue
+        if (!matchesQuery(row)) continue
+        results.push(row)
+      }
+    }
+
+    results.sort((a, b) => String(a.name).localeCompare(String(b.name)))
+
+    res.json({
+      ok: true,
+      data: { tenants: results.slice(0, limit) },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Tenant search error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to search tenants' },
       requestId: req.requestId,
     })
   }
@@ -2028,6 +2408,36 @@ router.delete('/tenants/:tenantType/:id/override-limit/:overrideId', async (req,
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to remove override' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+// Get tenant operational snapshot (read-only diagnostics)
+router.get('/tenants/:tenantType/:id/operational-snapshot', async (req, res) => {
+  try {
+    const { tenantType, id } = req.params
+    if (!['RESTAURANT', 'SUPPLIER'].includes(tenantType)) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'tenantType must be RESTAURANT or SUPPLIER' },
+        requestId: req.requestId,
+      })
+    }
+    const snapshot = await buildTenantOperationalSnapshot(id, tenantType)
+    res.json({
+      ok: true,
+      data: { snapshot },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Get tenant operational snapshot error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get tenant operational snapshot' },
       requestId: req.requestId,
     })
   }
@@ -2484,13 +2894,26 @@ router.get('/tenants/:tenantType/:id/subscription-addons', async (req, res) => {
     const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
     const entitlements = await getEntitlements(tenantId, tenantType)
     const addons = await getActiveTenantAddons(billingTenantId, tenantType)
+    const table = tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'
+    const { rows: tenantRows } = await query(`SELECT id, name FROM ${table} WHERE id = $1`, [
+      tenantId,
+    ])
+    const { rows: billingRows } =
+      billingTenantId !== tenantId
+        ? await query(`SELECT id, name FROM ${table} WHERE id = $1`, [billingTenantId])
+        : tenantRows
     res.json({
       ok: true,
       data: {
         billingTenantId,
+        tenantName: tenantRows[0]?.name ?? null,
+        billingTenantName: billingRows[0]?.name ?? tenantRows[0]?.name ?? null,
+        usesOrgBilling: billingTenantId !== tenantId,
         addons,
         locationLimits: entitlements?.locationLimits ?? {},
         planCode: entitlements?.plan?.code ?? null,
+        planName: entitlements?.plan?.name ?? null,
+        overrides: entitlements?.overrides ?? [],
       },
       error: null,
       requestId: req.requestId,
@@ -2752,13 +3175,96 @@ router.get('/tenants/restaurants/:id/usage', async (req, res) => {
 })
 
 // ========================================
+// OPERATIONAL VISIBILITY (admin support / monitoring)
+// ========================================
+router.get('/operational-summary', async (req, res) => {
+  try {
+    const summary = await buildAdminOperationalSummary()
+    res.json({
+      ok: true,
+      data: { summary },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Operational summary error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get operational summary' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/operational/email-logs', async (req, res) => {
+  try {
+    const result = await listAdminEmailDeliveryLogs(req.query)
+    res.json({
+      ok: true,
+      data: result,
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Operational email logs error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to list email delivery logs' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/operational/fulfillment-issues', async (req, res) => {
+  try {
+    const result = await listAdminFulfillmentIssues(req.query)
+    res.json({
+      ok: true,
+      data: result,
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Operational fulfillment issues error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to list fulfillment issues' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/operational/active-deliveries', async (req, res) => {
+  try {
+    const limit = req.query.limit
+    const result = await listAdminActiveDeliveries({ limit })
+    res.json({
+      ok: true,
+      data: result,
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Operational active deliveries error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to list active deliveries' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+// ========================================
 // HEALTH (Phase C1)
 // ========================================
 router.get('/health', async (req, res) => {
   try {
     let jobFailures = []
     let webhookFailures = []
-    let emailFailures = []
     let recentErrors = []
     let dbPool = null
 
@@ -2775,6 +3281,8 @@ router.get('/health', async (req, res) => {
     } catch (e) {
       if (e.code !== '42P01') throw e
     }
+
+    const emailFailures = await getAdminEmailHealthFailures({ limit: 20 })
 
     if (pool && typeof pool.totalCount === 'number') {
       dbPool = { total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount }
@@ -3126,8 +3634,8 @@ router.delete('/tenants/:tenantType/:id/feature-overrides/:featureKey', async (r
  */
 router.get('/activity', async (req, res) => {
   try {
-    const { limit = 50, offset = 0, type } = req.query
-    const data = await buildAdminActivityFeed({ limit, offset, type })
+    const { limit = 50, offset = 0, type, days } = req.query
+    const data = await buildAdminActivityFeed({ limit, offset, type, days })
     res.json({
       ok: true,
       data,

@@ -2,12 +2,13 @@ import { query, withTransaction } from '../lib/db.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { createFulfillmentException } from '../lib/fulfillment-exceptions.js'
 import { syncWarehouseFulfillmentOnOrderStatus } from './warehouseInventory.js'
-import { notifyOrderStatusChange } from './notification.service.js'
+import { notifyOrderStatusChange, notifyDriverDeliveryMilestone } from './notification.service.js'
 
 export const DRIVER_STATUS_TRANSITIONS = {
-  assigned: ['picked_up', 'failed', 'reassigned'],
-  picked_up: ['out_for_delivery', 'failed'],
-  out_for_delivery: ['delivered', 'failed'],
+  assigned: ['picked_up', 'failed', 'reassigned', 'rescheduled'],
+  picked_up: ['out_for_delivery', 'failed', 'rescheduled'],
+  out_for_delivery: ['delivered', 'failed', 'rescheduled'],
+  rescheduled: ['assigned'],
 }
 
 const ACTIVE_ASSIGNMENT_STATUSES = ['assigned', 'picked_up', 'out_for_delivery']
@@ -62,7 +63,7 @@ export async function assignDriverToOrder({ supplierId, orderId, driverId, assig
     [orderId]
   )
 
-  return withTransaction(async (client) => {
+  const assignment = await withTransaction(async (client) => {
     const current = await getActiveDriverAssignment(orderId)
     if (current) throw new ValidationError('Order already has an active driver assignment')
 
@@ -84,6 +85,31 @@ export async function assignDriverToOrder({ supplierId, orderId, driverId, assig
 
     return assignments[0]
   })
+
+  try {
+    const { rows: orderRows } = await query(
+      `SELECT o.*, r.name AS restaurant_name
+       FROM customer_order o
+       JOIN restaurant r ON r.id = o.restaurant_id
+       WHERE o.id = $1`,
+      [orderId]
+    )
+    const { rows: driverRows } = await query(`SELECT full_name FROM drivers WHERE id = $1`, [
+      driverId,
+    ])
+    if (orderRows[0]) {
+      await notifyDriverDeliveryMilestone({
+        order: orderRows[0],
+        supplierId,
+        milestone: 'driver_assigned',
+        driverName: driverRows[0]?.full_name,
+      })
+    }
+  } catch {
+    /* non-blocking */
+  }
+
+  return assignment
 }
 
 export async function updateDeliveryStatus({
@@ -115,6 +141,8 @@ export async function updateDeliveryStatus({
     } else if (status === 'failed') {
       assignmentUpdate += `, failed_at = now(), failure_reason = $3`
       params.push(failureReason ?? null)
+    } else if (status === 'rescheduled') {
+      assignmentUpdate += `, notes = COALESCE($2, notes)`
     }
 
     const whereParam = params.length + 1
@@ -139,10 +167,10 @@ export async function updateDeliveryStatus({
       )
       const oldStatus = orders[0]?.status
       await client.query(
-        `UPDATE customer_order SET status = 'COMPLETED', updated_at = now() WHERE id = $1`,
+        `UPDATE customer_order SET status = 'DELIVERED', updated_at = now() WHERE id = $1`,
         [orderId]
       )
-      await syncWarehouseFulfillmentOnOrderStatus(client, orderId, 'COMPLETED', oldStatus)
+      await syncWarehouseFulfillmentOnOrderStatus(client, orderId, 'DELIVERED', oldStatus)
       await client.query(
         `UPDATE order_warehouse_assignment
          SET status = 'delivered'
@@ -178,24 +206,45 @@ export async function updateDeliveryStatus({
       [assignment.id]
     )
 
-    if (status === 'delivered') {
-      try {
-        const { rows: orderRows } = await query(
-          `SELECT o.*, s.name AS supplier_name
-           FROM customer_order o
-           JOIN order_item oi ON oi.order_id = o.id
-           JOIN supplier s ON s.id = oi.supplier_id
-           WHERE o.id = $1
-           LIMIT 1`,
-          [orderId]
-        )
-        if (orderRows[0]) {
-          orderRows[0].supplier_id = supplierId
-          await notifyOrderStatusChange(orderRows[0], 'COMPLETED')
+    try {
+      const { rows: orderRows } = await query(
+        `SELECT o.*, s.name AS supplier_name, r.name AS restaurant_name
+         FROM customer_order o
+         JOIN order_item oi ON oi.order_id = o.id
+         JOIN supplier s ON s.id = oi.supplier_id
+         JOIN restaurant r ON r.id = o.restaurant_id
+         WHERE o.id = $1
+         LIMIT 1`,
+        [orderId]
+      )
+      if (orderRows[0]) {
+        orderRows[0].supplier_id = supplierId
+        if (status === 'delivered') {
+          await notifyOrderStatusChange(orderRows[0], 'DELIVERED')
+          await notifyDriverDeliveryMilestone({
+            order: orderRows[0],
+            supplierId,
+            milestone: 'delivered',
+            driverName: updatedAssignment[0]?.driver_name,
+          })
+        } else if (status === 'out_for_delivery') {
+          await notifyDriverDeliveryMilestone({
+            order: orderRows[0],
+            supplierId,
+            milestone: 'out_for_delivery',
+            driverName: updatedAssignment[0]?.driver_name,
+          })
+        } else if (status === 'failed') {
+          await notifyDriverDeliveryMilestone({
+            order: orderRows[0],
+            supplierId,
+            milestone: 'failed_delivery',
+            driverName: updatedAssignment[0]?.driver_name,
+          })
         }
-      } catch {
-        /* non-blocking */
       }
+    } catch {
+      /* non-blocking */
     }
 
     return updatedAssignment[0]
@@ -249,6 +298,8 @@ export async function submitProofOfDelivery({
   recipientName,
   driverAssignmentId,
   userId,
+  latitude = null,
+  longitude = null,
 }) {
   await assertSupplierOwnsOrder(supplierId, orderId)
   const assignment =
@@ -268,11 +319,15 @@ export async function submitProofOfDelivery({
           )
         ).rows[0]
 
+  const gpsLat = latitude != null && Number.isFinite(Number(latitude)) ? Number(latitude) : null
+  const gpsLng = longitude != null && Number.isFinite(Number(longitude)) ? Number(longitude) : null
+
   const { rows } = await query(
     `INSERT INTO proof_of_delivery (
        order_id, driver_assignment_id, delivery_date, delivered_by,
-       recipient_name, file_key, notes, delivery_timestamp
-     ) VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, $6, now())
+       recipient_name, file_key, notes, delivery_timestamp,
+       delivery_gps_lat, delivery_gps_lng
+     ) VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, $6, now(), $7, $8)
      RETURNING *`,
     [
       orderId,
@@ -281,6 +336,8 @@ export async function submitProofOfDelivery({
       recipientName ?? null,
       fileKey ?? null,
       notes ?? null,
+      gpsLat,
+      gpsLng,
     ]
   )
   return rows[0]
@@ -299,7 +356,10 @@ export async function confirmProofOfDelivery(orderId, restaurantId, userId) {
   return rows[0]
 }
 
-export async function getProofOfDelivery(orderId) {
+export async function getProofOfDelivery(orderId, supplierId = null) {
+  if (supplierId) {
+    await assertSupplierOwnsOrder(supplierId, orderId)
+  }
   const { rows } = await query(
     `SELECT * FROM proof_of_delivery WHERE order_id = $1 ORDER BY delivery_timestamp DESC LIMIT 1`,
     [orderId]

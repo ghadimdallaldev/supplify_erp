@@ -108,6 +108,15 @@ describe('quick list scheduling', () => {
     expect(isQuickListSchedulingEnabled(ent)).toBe(false)
   })
 
+  it('enables scheduling when planFeatures has full_schedule but features is false', () => {
+    const ent = {
+      ...baseEntitlements({}, {}),
+      features: { quick_lists: false },
+      planFeatures: { quick_lists: 'full_schedule' },
+    } as Entitlements
+    expect(isQuickListSchedulingEnabled(ent)).toBe(true)
+  })
+
   it('allows one scheduled list on Free', () => {
     const ent = {
       ...baseEntitlements({ scheduled_quick_lists: 1 }, { scheduled_quick_lists: 0 }),

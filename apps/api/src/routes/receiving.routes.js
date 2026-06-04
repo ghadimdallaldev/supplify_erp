@@ -8,10 +8,13 @@ import {
   getRestaurantIdForRequest,
 } from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
+import { startStage, mark } from '../middlewares/request-timing.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError } from '../middlewares/errorHandler.js'
 import { requireFeature } from '../lib/subscription.js'
 import { notifyLeaveReviewIfEligible } from '../services/reviews.service.js'
+import { notifyInvoiceIssued } from '../services/notification.service.js'
+import { createLotFromReceivingLine } from '../services/inventory-expiry.service.js'
 
 const router = express.Router()
 
@@ -27,8 +30,12 @@ router.use(requireAuth, resolveTenantContext, receivingQualityGate)
 const RECEIVABLE_ORDER_STATUSES = ['DELIVERED', 'COMPLETED']
 
 async function resolveRestaurantId(req) {
+  if (req.tenantContext?.tenantType === 'RESTAURANT') {
+    return req.tenantContext.tenantId
+  }
   const tenantId = await getRestaurantIdForRequest(req)
   if (tenantId) return tenantId
+  if (req.userData?.role !== 'ADMIN') return null
   const { rows } = await query(
     `SELECT id FROM restaurant WHERE LOWER(TRIM(contact_email)) = LOWER(TRIM($1)) LIMIT 1`,
     [req.userData.email]
@@ -42,10 +49,12 @@ router.get(
   requireRole(['RESTAURANT', 'ADMIN']),
   requirePermission('RECEIVING_VIEW'),
   async (req, res) => {
+    startStage(req, 'handler')
     try {
       const restaurantId = await resolveRestaurantId(req)
 
       if (!restaurantId) {
+        mark(req, 'handler')
         return res.status(403).json({
           ok: false,
           data: null,
@@ -57,41 +66,36 @@ router.get(
         })
       }
 
-      // Orders supplier marked delivered (or legacy COMPLETED) without a receiving report yet
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100)
+
       const { rows: orders } = await query(
         `
       SELECT DISTINCT ON (o.id)
         o.*,
-        s.name as supplier_name,
-        s.contact_email as supplier_email,
-        COALESCE(
-          (SELECT COUNT(*) > 0 
-           FROM receiving_report 
-           WHERE order_id = o.id 
-             AND status IN ('ACCEPTED', 'REJECTED', 'PARTIAL')
-          ), 
-          false
-        ) as has_receiving_report
+        s.name AS supplier_name,
+        s.contact_email AS supplier_email,
+        (rr.id IS NOT NULL) AS has_receiving_report
       FROM customer_order o
       JOIN order_item oi ON oi.order_id = o.id
       JOIN supplier s ON s.id = oi.supplier_id
-      WHERE o.restaurant_id = $1 
+      LEFT JOIN receiving_report rr
+        ON rr.order_id = o.id
+        AND rr.status IN ('ACCEPTED', 'REJECTED', 'PARTIAL')
+      WHERE o.restaurant_id = $1
         AND o.status::text = ANY($2::text[])
-        AND NOT EXISTS (
-          SELECT 1 FROM receiving_report 
-          WHERE order_id = o.id 
-            AND status IN ('ACCEPTED', 'REJECTED', 'PARTIAL')
-        )
+        AND rr.id IS NULL
       ORDER BY o.id, o.created_at DESC
+      LIMIT $3
     `,
-        [restaurantId, RECEIVABLE_ORDER_STATUSES]
+        [restaurantId, RECEIVABLE_ORDER_STATUSES, limit],
+        req
       )
 
-      // For each order, fetch its items
-      const ordersWithItems = await Promise.all(
-        orders.map(async (order) => {
-          const { rows: items } = await query(
-            `
+      const orderIds = orders.map((o) => o.id)
+      let itemsByOrderId = new Map()
+      if (orderIds.length > 0) {
+        const { rows: allItems } = await query(
+          `
           SELECT 
             oi.*,
             p.name as product_name,
@@ -99,23 +103,29 @@ router.get(
             p.unit
           FROM order_item oi
           JOIN product p ON p.id = oi.product_id
-          WHERE oi.order_id = $1
+          WHERE oi.order_id = ANY($1::uuid[])
         `,
-            [order.id]
-          )
+          [orderIds]
+        )
+        itemsByOrderId = allItems.reduce((map, item) => {
+          const list = map.get(item.order_id) ?? []
+          list.push({
+            ...item,
+            ordered_quantity: parseFloat(item.quantity),
+            received_quantity: 0,
+            quality_status: 'PENDING',
+          })
+          map.set(item.order_id, list)
+          return map
+        }, new Map())
+      }
 
-          return {
-            ...order,
-            items: items.map((item) => ({
-              ...item,
-              ordered_quantity: parseFloat(item.quantity),
-              received_quantity: 0,
-              quality_status: 'PENDING',
-            })),
-          }
-        })
-      )
+      const ordersWithItems = orders.map((order) => ({
+        ...order,
+        items: itemsByOrderId.get(order.id) ?? [],
+      }))
 
+      mark(req, 'handler')
       res.json({
         ok: true,
         data: { orders: ordersWithItems },
@@ -123,6 +133,7 @@ router.get(
         requestId: req.requestId,
       })
     } catch (error) {
+      mark(req, 'handler')
       logger.error({
         message: 'Get pending orders for receiving error',
         error: error.message,
@@ -180,10 +191,10 @@ router.get(
       FROM customer_order o
       JOIN order_item oi ON oi.order_id = o.id
       JOIN restaurant r ON r.id = o.restaurant_id
-      WHERE o.status = 'DELIVERED' AND oi.supplier_id = $1
+      WHERE o.status::text = ANY($2::text[]) AND oi.supplier_id = $1
       ORDER BY o.id, o.created_at DESC
     `,
-        [supplierId]
+        [supplierId, RECEIVABLE_ORDER_STATUSES]
       )
 
       res.json({
@@ -395,7 +406,7 @@ router.post(
 
         // Create receiving line items
         for (const item of lineItems) {
-          await client.query(
+          const { rows: insertedLines } = await client.query(
             `
           INSERT INTO receiving_line_item (
             receiving_report_id, product_id, order_item_id,
@@ -404,6 +415,7 @@ router.post(
             quality_status, notes
           )
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          RETURNING id
         `,
             [
               report.id,
@@ -420,6 +432,34 @@ router.post(
               item.notes || '',
             ]
           )
+
+          const lineItemId = insertedLines[0]?.id
+          const expiryDate = item.expiryDate || item.expiry_date
+          if (
+            item.quality_status === 'ACCEPTED' &&
+            expiryDate &&
+            parseFloat(item.received_quantity || 0) > 0
+          ) {
+            await createLotFromReceivingLine(client, {
+              restaurantId,
+              reportId: report.id,
+              lineItemId,
+              productId: item.productId,
+              supplierId,
+              orderId,
+              orderItemId: item.orderItemId,
+              itemName: item.product_name,
+              productSku: item.sku,
+              quantity: item.received_quantity,
+              unit: item.unit || 'unit',
+              batchLotNumber: item.batchLotNumber || item.batch_lot_number,
+              receivedDate:
+                item.receivedDate || item.received_date || new Date().toISOString().slice(0, 10),
+              expiryDate,
+              storageLocation: item.storageLocation || item.storage_location,
+              notes: item.notes,
+            })
+          }
 
           // Update restaurant inventory if item is accepted and has quantity
           if (item.quality_status === 'ACCEPTED' && parseFloat(item.received_quantity || 0) > 0) {
@@ -496,6 +536,7 @@ router.post(
         )
 
         // Build invoice from received items (actual quantities/prices)
+        let createdInvoice = null
         const { rows: rItems } = await client.query(
           `
         SELECT 
@@ -574,6 +615,7 @@ router.post(
           )
 
           const invoice = invRows[0]
+          createdInvoice = invoice
           for (const it of rItems) {
             const lineTotal = parseFloat(it.unit_price || 0) * parseFloat(it.quantity || 0)
             await client.query(
@@ -607,8 +649,14 @@ router.post(
           )
         }
 
-        return report
+        return { report, createdInvoice }
       })
+
+      if (result.createdInvoice) {
+        notifyInvoiceIssued(result.createdInvoice).catch((err) => {
+          logger.warn('Auto-invoice notification failed', { error: err.message, orderId })
+        })
+      }
 
       notifyLeaveReviewIfEligible({
         orderId,
@@ -620,7 +668,7 @@ router.post(
 
       res.status(201).json({
         ok: true,
-        data: { report: result },
+        data: { report: result.report },
         error: null,
         requestId: req.requestId,
       })

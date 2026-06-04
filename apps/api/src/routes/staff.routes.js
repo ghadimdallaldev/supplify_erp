@@ -1,12 +1,26 @@
 import express from 'express'
 import { z, ZodError } from 'zod'
-import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  requirePermission,
+  getRestaurantIdForRequest,
+} from '../lib/rbac.js'
 import { requireStaffPortalAuth, requirePlatformAppAccess } from '../lib/staff-portal-auth.js'
 import { staffMutationGuard } from '../lib/route-permissions.js'
+import { cachedStaffList, staffListCacheInvalidationMiddleware } from '../lib/staff-list-cache.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { getRestaurantIdByEmail } from '../lib/tenant.js'
-import { notifyStaffPtoRequest, notifyStaffSwapRequest } from '../services/notification.service.js'
+import { assertPresignedFileUrl } from '../lib/sanitize-upload.js'
+import {
+  notifyStaffPtoRequest,
+  notifyStaffSwapRequest,
+  notifyStaffAnnouncement,
+  notifyStaffDocumentUploaded,
+  notifyStaffShiftEvent,
+} from '../services/notification.service.js'
 import {
   fetchStaffPortalDashboard,
   fetchStaffPortalTimeEntries,
@@ -189,6 +203,9 @@ const createPayrollExportSchema = z.object({
 })
 
 async function resolveRestaurantId(req) {
+  const fromTenant = await getRestaurantIdForRequest(req)
+  if (fromTenant) return fromTenant
+
   const role = req.userData?.role
 
   if (role === 'ADMIN') {
@@ -308,6 +325,7 @@ function mapTimeEntryRow(row) {
     staffId: row.staff_id,
     clockInAt: row.clock_in_at,
     clockOutAt: row.clock_out_at,
+    clockInMethod: row.clock_in_method,
     clockOutMethod: row.clock_out_method,
     breakMinutes: row.break_minutes != null ? Number(row.break_minutes) : null,
     note: row.note,
@@ -786,25 +804,29 @@ router.use(
   requirePlatformAppAccess,
   resolveTenantContext,
   requirePermission('STAFF_VIEW'),
-  staffMutationGuard
+  staffMutationGuard,
+  staffListCacheInvalidationMiddleware
 )
 
 router.get('/members', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const restaurantId = await resolveRestaurantId(req)
-    const { rows } = await query(
-      `
+    const data = await cachedStaffList('members', restaurantId, req, async () => {
+      const { rows } = await query(
+        `
           SELECT *
           FROM staff_member
           WHERE restaurant_id = $1
           ORDER BY display_name NULLS LAST, first_name, last_name
         `,
-      [restaurantId]
-    )
+        [restaurantId]
+      )
+      return rows.map(mapStaffRow)
+    })
 
     res.json({
       ok: true,
-      data: rows.map(mapStaffRow),
+      data,
       error: null,
       requestId: req.requestId,
     })
@@ -1127,6 +1149,14 @@ router.post('/shifts', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async 
       error: null,
       requestId: req.requestId,
     })
+
+    if (shiftRow.staff_id && (shiftRow.status === 'PUBLISHED' || !payload.status)) {
+      notifyStaffShiftEvent(shiftRow.staff_id, restaurantId, {
+        title: 'Shift assigned',
+        message: `You have a new shift on ${shiftRow.shift_date} (${shiftRow.starts_at} – ${shiftRow.ends_at}).`,
+        shiftId: shiftRow.id,
+      }).catch(() => {})
+    }
   } catch (error) {
     logger.error('Failed to create staff shift', { error: error.message })
     if (error instanceof ZodError) {
@@ -1520,20 +1550,23 @@ router.post(
 router.get('/pto', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const restaurantId = await resolveRestaurantId(req)
-    const { rows } = await query(
-      `
+    const data = await cachedStaffList('pto', restaurantId, req, async () => {
+      const { rows } = await query(
+        `
           SELECT p.*, m.display_name AS staff_name, m.role AS staff_role
           FROM staff_pto_request p
           JOIN staff_member m ON m.id = p.staff_id
           WHERE p.restaurant_id = $1
           ORDER BY p.created_at DESC
         `,
-      [restaurantId]
-    )
+        [restaurantId]
+      )
+      return rows.map(mapPtoRow)
+    })
 
     res.json({
       ok: true,
-      data: rows.map(mapPtoRow),
+      data,
       error: null,
       requestId: req.requestId,
     })
@@ -1766,14 +1799,24 @@ router.post(
           restaurantId,
           payload.staffId,
           payload.weekday,
-          payload.availability,
+          JSON.stringify(payload.availability),
           payload.notes ?? null,
         ]
       )
 
+      const row = rows[0]
       res.status(201).json({
         ok: true,
-        data: rows[0],
+        data: {
+          id: row.id,
+          restaurantId: row.restaurant_id,
+          staffId: row.staff_id,
+          weekday: row.weekday,
+          availability: row.availability,
+          notes: row.notes,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        },
         error: null,
         requestId: req.requestId,
       })
@@ -1792,8 +1835,9 @@ router.post(
 router.get('/swaps', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const restaurantId = await resolveRestaurantId(req)
-    const { rows } = await query(
-      `
+    const data = await cachedStaffList('swaps', restaurantId, req, async () => {
+      const { rows } = await query(
+        `
           SELECT s.*,
                  sh.role AS shift_role,
                  sh.starts_at AS shift_starts_at,
@@ -1809,12 +1853,14 @@ router.get('/swaps', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
           WHERE s.restaurant_id = $1
           ORDER BY s.created_at DESC
         `,
-      [restaurantId]
-    )
+        [restaurantId]
+      )
+      return rows.map(mapSwapRow)
+    })
 
     res.json({
       ok: true,
-      data: rows.map(mapSwapRow),
+      data,
       error: null,
       requestId: req.requestId,
     })
@@ -2096,6 +2142,12 @@ router.post(
         error: null,
         requestId: req.requestId,
       })
+
+      notifyStaffAnnouncement(restaurantId, {
+        title: payload.title,
+        message: payload.body,
+        announcementId: rows[0].id,
+      }).catch(() => {})
     } catch (error) {
       logger.error('Failed to create announcement', { error: error.message })
       res.status(400).json({
@@ -2162,6 +2214,7 @@ router.get('/documents', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asyn
           JOIN staff_member m ON m.id = d.staff_id
           WHERE d.restaurant_id = $1
           ORDER BY d.uploaded_at DESC
+          LIMIT 100
         `,
       [restaurantId]
     )
@@ -2202,6 +2255,20 @@ router.post('/documents', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asy
         error: {
           name: 'DOCUMENT_CREATE_ERROR',
           message: 'Staff member does not belong to this restaurant',
+        },
+        requestId: req.requestId,
+      })
+    }
+
+    try {
+      assertPresignedFileUrl(payload.fileUrl, req.userData.id)
+    } catch (err) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: err?.message || 'Invalid file URL',
         },
         requestId: req.requestId,
       })
@@ -2266,6 +2333,12 @@ router.post('/documents', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asy
       error: null,
       requestId: req.requestId,
     })
+
+    notifyStaffDocumentUploaded(restaurantId, {
+      title: payload.title || 'New document',
+      message: `A new document "${payload.title || payload.docType}" was uploaded for ${docRow.staff_name || 'a team member'}.`,
+      documentId: docRow.id,
+    }).catch(() => {})
   } catch (error) {
     logger.error('Failed to create staff document', { error: error.message })
     res.status(400).json({
@@ -2493,19 +2566,22 @@ router.post(
 router.get('/payroll', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const restaurantId = await resolveRestaurantId(req)
-    const { rows } = await query(
-      `
+    const data = await cachedStaffList('payroll', restaurantId, req, async () => {
+      const { rows } = await query(
+        `
           SELECT *
           FROM staff_payroll_export
           WHERE restaurant_id = $1
           ORDER BY period_end DESC
         `,
-      [restaurantId]
-    )
+        [restaurantId]
+      )
+      return rows.map(mapPayrollExportRow)
+    })
 
     res.json({
       ok: true,
-      data: rows.map(mapPayrollExportRow),
+      data,
       error: null,
       requestId: req.requestId,
     })

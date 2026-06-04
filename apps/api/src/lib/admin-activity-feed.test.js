@@ -81,8 +81,11 @@ describe('admin-activity-feed', () => {
       return { rows: [] }
     })
 
-    const result = await buildAdminActivityFeed({ limit: 10, offset: 0 })
+    const result = await buildAdminActivityFeed({ limit: 10, offset: 0, days: 14 })
     expect(result.events.length).toBeGreaterThanOrEqual(2)
+    expect(result.days).toBe(14)
+    const sqlCalls = query.mock.calls.map((c) => c[0])
+    expect(sqlCalls.some((sql) => sql.includes("INTERVAL '1 day'"))).toBe(true)
     expect(result.events[0].event_type).toBe('new_tenant')
     expect(result.sources.length).toBeGreaterThan(0)
   })

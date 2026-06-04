@@ -1,0 +1,11 @@
+flowchart TB
+  Admin[Admin] --> Overview[Overview]
+  Admin --> Plans[Plans CRUD]
+  Admin --> Subscriptions[Subscriptions list\nPATCH plan/status]
+  Admin --> Tenants[Tenants: suppliers, restaurants]
+  Admin --> Overrides[Override limits\nPOST/DELETE override-limit]
+  Admin --> Health[Health: recent errors, DB pool]
+  Admin --> Finance[Finance: GMV, MRR, overdue, top tenants]
+  Admin --> Audit[Audit logs]
+  Subscriptions --> Preview[preview-change]
+  Subscriptions --> Force[force + reason for downgrade]

@@ -1,0 +1,14 @@
+%% RBAC and permissions resolution
+%% Status: current | Related: apps/api/src/lib/rbac.js, docs/blueprint/rbac_multitenancy.mmd
+flowchart TD
+  User[Authenticated user] --> Role{Platform role}
+  Role -->|ADMIN| AdminCtx[Admin context\nadmin permissions]
+  Role -->|RESTAURANT/SUPPLIER| TenantCtx[Tenant context\ntenantId + tenantType]
+  TenantCtx --> OrgRole{Org model?}
+  OrgRole -->|yes| OrgPerm[restaurant_org_* / org_* roles\nbranch access table]
+  OrgRole -->|no| TenantRole[tenant_user_roles + tenant_role_permissions]
+  TenantCtx --> Sub[Subscription entitlements]
+  Sub --> FeatGate[requireFeature middleware]
+  Sub --> LimGate[requireWithinLimit / checkLimit]
+  AdminCtx --> Impersonate[Optional impersonation\nsee admin/impersonation-flow.mmd]
+  Removed[approvals_budgets — removed product-wide] -.x FeatGate

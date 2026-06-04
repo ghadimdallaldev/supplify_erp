@@ -7,11 +7,14 @@ import { Package, ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useCartActions } from '../hooks/useCartActions'
 import toast from 'react-hot-toast'
-import { formatPrice } from '../utils/format'
+import { ContractPriceDisplay } from '../components/ContractPriceDisplay'
+import { useImpersonation } from '../hooks/useImpersonation'
+import { ProductSubstitutesSection } from '../components/supplier/ProductSubstitutesSection'
 
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { addItem } = useCartActions()
+  const { isEffectiveSupplier } = useImpersonation()
 
   const { data, isLoading, error } = useGetProductQuery(id!)
 
@@ -85,7 +88,7 @@ export function ProductDetailPage() {
               <CardTitle>Product Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                 <div>
                   <p className="font-medium text-[var(--text-muted)]">SKU</p>
                   <p>{product.sku}</p>
@@ -113,12 +116,13 @@ export function ProductDetailPage() {
               <CardTitle>Pricing</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-[var(--brand-mid)]">
-                {formatPrice(product.current_price) || 'N/A'}
-              </div>
-              <p className="text-sm text-[var(--text-muted)] mt-1">
-                {product.currency || 'USD'} per {product.unit || 'unit'}
-              </p>
+              <ContractPriceDisplay
+                currentPrice={product.current_price}
+                catalogPrice={product.catalog_price}
+                pricingSource={product.pricing_source}
+                currency={product.currency}
+                unit={product.unit}
+              />
             </CardContent>
           </Card>
 
@@ -134,6 +138,8 @@ export function ProductDetailPage() {
               <Link to="/app/cart">View Cart</Link>
             </Button>
           </div>
+
+          {isEffectiveSupplier && id && <ProductSubstitutesSection productId={id} />}
         </div>
       </div>
     </div>

@@ -79,7 +79,7 @@ async function requireRestaurantOrgContext(req, res, next) {
 
   if (organizationId && !organizationName) {
     const { rows: orgRows } = await query(
-      `SELECT name FROM restaurant_organization WHERE id = $1`,
+      `SELECT name FROM restaurant_organizations WHERE id = $1`,
       [organizationId]
     )
     organizationName = orgRows[0]?.name || ''

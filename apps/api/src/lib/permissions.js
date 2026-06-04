@@ -5,26 +5,36 @@
 import { query } from './db.js'
 import { logger } from './logger.js'
 import { getCache, setCache, deleteCache } from './cache.js'
+import { singleflight } from './singleflight.js'
+import { invalidateTenantContextCache } from './tenant-context-cache.js'
 import { PERMISSION_KEYS } from './permission-keys.js'
 import { getOrgRolePermissions } from './supplier-org.js'
 import { getRestaurantOrgRolePermissions } from './restaurant-org.js'
 
 export { PERMISSION_KEYS }
 
-const PERMISSION_CACHE_TTL_SECONDS = 300
+const PERMISSION_CACHE_TTL_SECONDS = 120
+const ROLES_CACHE_TTL_SECONDS = 180
 
 export function permissionCacheKey(userId, tenantId, tenantType) {
   return `perms:${userId}:${tenantId}:${tenantType}`
+}
+
+export function rolesCacheKey(userId, tenantId, tenantType) {
+  return `roles:${userId}:${tenantId ?? 'null'}:${tenantType}`
 }
 
 export async function invalidateUserPermissionCache(userId, tenantId, tenantType) {
   if (!userId || tenantType === 'ADMIN') {
     if (tenantType === 'ADMIN') {
       await deleteCache(permissionCacheKey(userId, null, 'ADMIN'))
+      await deleteCache(rolesCacheKey(userId, null, 'ADMIN'))
     }
     return
   }
   await deleteCache(permissionCacheKey(userId, tenantId, tenantType))
+  await deleteCache(rolesCacheKey(userId, tenantId, tenantType))
+  await invalidateTenantContextCache(userId, tenantId, tenantType)
 }
 
 async function getLegacyRolesForUser(userId, tenantId, tenantType) {
@@ -89,14 +99,46 @@ function mergeUniquePermissions(...lists) {
 
 /**
  * Get role codes for a user in a tenant context.
+ * @param {import('express').Request} [req] Optional request for per-request memoization.
  */
-export async function getRolesForUser(userId, tenantId, tenantType) {
+export async function getRolesForUser(userId, tenantId, tenantType, req = null) {
+  const memoKey = `${userId}:${tenantId}:${tenantType}`
+  if (req?._rolesMemoKey === memoKey && Array.isArray(req._rolesMemo)) {
+    return req._rolesMemo
+  }
   try {
-    if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
-      const named = await getTenantNamedRoleCodes(userId, tenantId, tenantType)
-      if (named.length > 0) return named
+    const cacheKey = rolesCacheKey(userId, tenantId, tenantType)
+    const cached = await getCache(cacheKey)
+    if (Array.isArray(cached)) {
+      if (req) {
+        req._rolesMemoKey = memoKey
+        req._rolesMemo = cached
+      }
+      return cached
     }
-    return await getLegacyRolesForUser(userId, tenantId, tenantType)
+
+    const roles = await singleflight(cacheKey, async () => {
+      const again = await getCache(cacheKey)
+      if (Array.isArray(again)) return again
+
+      let resolved
+      if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
+        const named = await getTenantNamedRoleCodes(userId, tenantId, tenantType)
+        resolved =
+          named.length > 0 ? named : await getLegacyRolesForUser(userId, tenantId, tenantType)
+      } else {
+        resolved = await getLegacyRolesForUser(userId, tenantId, tenantType)
+      }
+
+      await setCache(cacheKey, resolved, ROLES_CACHE_TTL_SECONDS).catch(() => {})
+      return resolved
+    })
+
+    if (req) {
+      req._rolesMemoKey = memoKey
+      req._rolesMemo = roles
+    }
+    return roles
   } catch (err) {
     if (err.code === '42P01') return []
     logger.error('getRolesForUser error', { error: err.message })
@@ -114,99 +156,104 @@ export async function getPermissionsForUser(userId, tenantId, tenantType) {
     const cached = await getCache(cacheKey)
     if (Array.isArray(cached)) return cached
 
-    let named = []
-    let legacy = []
+    return singleflight(cacheKey, async () => {
+      const again = await getCache(cacheKey)
+      if (Array.isArray(again)) return again
 
-    let orgPerms = []
-    let hasOrgRole = false
+      let named = []
+      let legacy = []
 
-    if (tenantType === 'SUPPLIER') {
-      try {
-        const { rows: orgRows } = await query(
-          `SELECT organization_id FROM supplier WHERE id = $1`,
-          [tenantId]
-        )
-        const organizationId = orgRows[0]?.organization_id
-        if (organizationId) {
-          const { rows: orgMembership } = await query(
-            `SELECT 1 FROM org_user_roles WHERE user_id = $1 AND organization_id = $2`,
-            [userId, organizationId]
+      let orgPerms = []
+      let hasOrgRole = false
+
+      if (tenantType === 'SUPPLIER') {
+        try {
+          const { rows: orgRows } = await query(
+            `SELECT organization_id FROM supplier WHERE id = $1`,
+            [tenantId]
           )
-          hasOrgRole = orgMembership.length > 0
-          if (hasOrgRole) {
-            orgPerms = await getOrgRolePermissions(userId, organizationId, tenantId)
+          const organizationId = orgRows[0]?.organization_id
+          if (organizationId) {
+            const { rows: orgMembership } = await query(
+              `SELECT 1 FROM org_user_roles WHERE user_id = $1 AND organization_id = $2`,
+              [userId, organizationId]
+            )
+            hasOrgRole = orgMembership.length > 0
+            if (hasOrgRole) {
+              orgPerms = await getOrgRolePermissions(userId, organizationId, tenantId)
+            }
           }
+        } catch (err) {
+          if (err.code !== '42P01') throw err
         }
-      } catch (err) {
-        if (err.code !== '42P01') throw err
       }
-    }
 
-    if (tenantType === 'RESTAURANT') {
-      try {
-        const { rows: orgRows } = await query(
-          `SELECT organization_id FROM restaurant WHERE id = $1`,
-          [tenantId]
-        )
-        const organizationId = orgRows[0]?.organization_id
-        if (organizationId) {
-          const { rows: orgMembership } = await query(
-            `SELECT 1 FROM restaurant_org_user_roles WHERE user_id = $1 AND organization_id = $2`,
-            [userId, organizationId]
+      if (tenantType === 'RESTAURANT') {
+        try {
+          const { rows: orgRows } = await query(
+            `SELECT organization_id FROM restaurant WHERE id = $1`,
+            [tenantId]
           )
-          hasOrgRole = orgMembership.length > 0
-          if (hasOrgRole) {
-            orgPerms = await getRestaurantOrgRolePermissions(userId, organizationId, tenantId)
+          const organizationId = orgRows[0]?.organization_id
+          if (organizationId) {
+            const { rows: orgMembership } = await query(
+              `SELECT 1 FROM restaurant_org_user_roles WHERE user_id = $1 AND organization_id = $2`,
+              [userId, organizationId]
+            )
+            hasOrgRole = orgMembership.length > 0
+            if (hasOrgRole) {
+              orgPerms = await getRestaurantOrgRolePermissions(userId, organizationId, tenantId)
+            }
           }
+        } catch (err) {
+          if (err.code !== '42P01') throw err
         }
-      } catch (err) {
-        if (err.code !== '42P01') throw err
       }
-    }
 
-    if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
+      if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
+        try {
+          named = await getTenantNamedPermissionsForUser(userId, tenantId, tenantType)
+        } catch (err) {
+          if (err.code !== '42P01') throw err
+        }
+      }
+
       try {
-        named = await getTenantNamedPermissionsForUser(userId, tenantId, tenantType)
+        legacy = await getLegacyPermissionsForUser(userId, tenantId, tenantType)
       } catch (err) {
         if (err.code !== '42P01') throw err
       }
-    }
 
-    try {
-      legacy = await getLegacyPermissionsForUser(userId, tenantId, tenantType)
-    } catch (err) {
-      if (err.code !== '42P01') throw err
-    }
+      // When user has a named tenant role assignment, use ONLY that role's permissions (strict RBAC).
+      // Legacy user_role grants must not expand Viewer/Accountant into full owner access.
+      let hasNamedAssignment = false
+      if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
+        const { rows: tur } = await query(
+          `SELECT 1 FROM tenant_user_roles WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = $3 LIMIT 1`,
+          [userId, tenantId, tenantType]
+        )
+        hasNamedAssignment = tur.length > 0
+      }
 
-    // When user has a named tenant role assignment, use ONLY that role's permissions (strict RBAC).
-    // Legacy user_role grants must not expand Viewer/Accountant into full owner access.
-    let hasNamedAssignment = false
-    if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
-      const { rows: tur } = await query(
-        `SELECT 1 FROM tenant_user_roles WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = $3 LIMIT 1`,
-        [userId, tenantId, tenantType]
-      )
-      hasNamedAssignment = tur.length > 0
-    }
+      const branchPerms = hasNamedAssignment ? named : mergeUniquePermissions(named, legacy)
 
-    const branchPerms = hasNamedAssignment ? named : mergeUniquePermissions(named, legacy)
+      if ((tenantType === 'SUPPLIER' || tenantType === 'RESTAURANT') && hasOrgRole) {
+        const permissions = hasNamedAssignment
+          ? mergeUniquePermissions(orgPerms, named)
+          : mergeUniquePermissions(orgPerms, branchPerms)
+        await setCache(cacheKey, permissions, PERMISSION_CACHE_TTL_SECONDS)
+        return permissions
+      }
 
-    if ((tenantType === 'SUPPLIER' || tenantType === 'RESTAURANT') && hasOrgRole) {
-      const permissions = hasNamedAssignment
-        ? mergeUniquePermissions(orgPerms, named)
-        : mergeUniquePermissions(orgPerms, branchPerms)
+      if (tenantType === 'SUPPLIER' && !hasOrgRole && branchPerms.length === 0) {
+        await setCache(cacheKey, [], PERMISSION_CACHE_TTL_SECONDS)
+        return []
+      }
+
+      const permissions = branchPerms
       await setCache(cacheKey, permissions, PERMISSION_CACHE_TTL_SECONDS)
       return permissions
-    }
-
-    if (tenantType === 'SUPPLIER' && !hasOrgRole && branchPerms.length === 0) {
-      await setCache(cacheKey, [], PERMISSION_CACHE_TTL_SECONDS)
-      return []
-    }
-
-    const permissions = branchPerms
-    await setCache(cacheKey, permissions, PERMISSION_CACHE_TTL_SECONDS)
-    return permissions
+    })
   } catch (err) {
     if (err.code === '42P01') return []
     logger.error('getPermissionsForUser error', { error: err.message })

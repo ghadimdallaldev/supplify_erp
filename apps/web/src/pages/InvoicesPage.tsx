@@ -46,6 +46,7 @@ import {
   useGetRestaurantInvoicesQuery,
   useGetRestaurantInvoiceQuery,
   useMarkInvoicePaidMutation,
+  useRecordSupplierPaymentMutation,
   useGetInvoiceCreditsQuery,
   useGetInvoiceAnalyticsQuery,
   useGetOverdueInvoicesQuery,
@@ -54,11 +55,11 @@ import {
   useApplyCreditNoteMutation,
   useGetEntitlementsQuery,
 } from '../services/api'
-import { featureEnabled } from '../lib/planLimits'
+import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { canUseFinanceInvoices } from '../lib/planFeatureGates'
 import { Link } from 'react-router-dom'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+import { SupplierReceivablesPanel } from '../components/supplier/SupplierReceivablesPanel'
+import { apiUrl } from '../lib/apiBase'
 
 export function InvoicesPage() {
   const [search, setSearch] = useState('')
@@ -115,7 +116,13 @@ export function InvoicesPage() {
   )
   const { data: overdueData } = useGetOverdueInvoicesQuery(undefined, { skip: !isRestaurant })
   const [markPaid, { isLoading: isProcessingPayment }] = useMarkInvoicePaidMutation()
-  const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)
+  const [recordSupplierPayment, { isLoading: isRecordingSupplierPayment }] =
+    useRecordSupplierPaymentMutation()
+  const isProcessingAnyPayment = isProcessingPayment || isRecordingSupplierPayment
+  const disputesEnabled = isEntitlementFeatureEnabled(
+    entitlementsData?.entitlements,
+    'disputes_returns'
+  )
   const { data: tenantCreditNotesData, refetch: refetchCreditNotes } = useGetCreditNotesQuery(
     undefined,
     {
@@ -240,21 +247,37 @@ export function InvoicesPage() {
     }
 
     try {
-      await markPaid({
-        invoiceId: selectedInvoice.id,
-        data: {
-          paymentAmount: finalPaymentAmount > 0 ? finalPaymentAmount : undefined, // undefined = full payment
-          paymentDate: new Date().toISOString().split('T')[0],
-          paymentMethod: paymentMethod as any,
-          paymentReference: paymentReference || undefined,
-          bankName: bankName || undefined,
+      if (!isRestaurant) {
+        if (paymentMode === 'credit') {
+          toast.error('Credit notes can only be applied by the restaurant')
+          return
+        }
+        await recordSupplierPayment({
+          invoice_id: selectedInvoice.id,
+          payment_amount: finalPaymentAmount,
+          payment_date: new Date().toISOString().split('T')[0],
+          payment_method: paymentMethod,
+          payment_reference: paymentReference || undefined,
+          bank_name: bankName || undefined,
           notes: paymentNotes || undefined,
-          creditAmount: creditAmount > 0 ? creditAmount : undefined,
-          creditNoteId: selectedCreditNoteId || undefined,
-          paidByHQ: paidByHQ,
-          hqNotes: hqNotes || undefined,
-        },
-      }).unwrap()
+        }).unwrap()
+      } else {
+        await markPaid({
+          invoiceId: selectedInvoice.id,
+          data: {
+            paymentAmount: finalPaymentAmount > 0 ? finalPaymentAmount : undefined,
+            paymentDate: new Date().toISOString().split('T')[0],
+            paymentMethod: paymentMethod as any,
+            paymentReference: paymentReference || undefined,
+            bankName: bankName || undefined,
+            notes: paymentNotes || undefined,
+            creditAmount: creditAmount > 0 ? creditAmount : undefined,
+            creditNoteId: selectedCreditNoteId || undefined,
+            paidByHQ: paidByHQ,
+            hqNotes: hqNotes || undefined,
+          },
+        }).unwrap()
+      }
 
       toast.success('Payment recorded successfully!')
       setShowPaymentDialog(false)
@@ -288,6 +311,8 @@ export function InvoicesPage() {
             </Button>
           }
         />
+
+        {!isRestaurant && financeInvoicesEnabled && <SupplierReceivablesPanel />}
 
         {disputesEnabled && tenantCreditNotes.length > 0 && (
           <Card>
@@ -580,7 +605,7 @@ export function InvoicesPage() {
                             Paid: {formatPrice(invoice.total_paid)}
                           </p>
                         )}
-                        {isRestaurant && canRecordPayments && remaining > 0 && (
+                        {canRecordPayments && remaining > 0 && (
                           <Button
                             size="sm"
                             variant="default"
@@ -626,12 +651,9 @@ export function InvoicesPage() {
                       if (!selectedInvoice?.id) return
                       setDownloadingPdfId(selectedInvoice.id)
                       try {
-                        const res = await fetch(
-                          `${API_URL}/api/invoices/${selectedInvoice.id}/pdf`,
-                          {
-                            credentials: 'include',
-                          }
-                        )
+                        const res = await fetch(apiUrl(`/api/invoices/${selectedInvoice.id}/pdf`), {
+                          credentials: 'include',
+                        })
                         if (!res.ok) throw new Error('Failed to download PDF')
                         const blob = await res.blob()
                         const url = URL.createObjectURL(blob)
@@ -695,7 +717,7 @@ export function InvoicesPage() {
                   ) : invoiceDetail?.invoice ? (
                     <>
                       {/* Invoice Header */}
-                      <div className="grid grid-cols-2 gap-6 border-b pb-6">
+                      <div className="grid grid-cols-1 gap-6 border-b pb-6 sm:grid-cols-2">
                         <div>
                           <h3 className="font-semibold mb-2">Bill From:</h3>
                           <p className="font-medium">{invoiceDetail.invoice.supplier_name}</p>
@@ -899,7 +921,7 @@ export function InvoicesPage() {
                           </CardContent>
                         </Card>
                       ))}
-                      {isRestaurant && remainingBalance > 0 && (
+                      {canRecordPayments && remainingBalance > 0 && (
                         <div className="border-2 border-[var(--amber-mid)]/40 rounded-lg p-4 bg-[var(--amber-pale)]">
                           <div className="flex justify-between items-center">
                             <div>
@@ -921,7 +943,7 @@ export function InvoicesPage() {
                     <div className="border rounded-lg p-8 text-center bg-[var(--brand-ultra)]">
                       <CreditCard className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
                       <p className="text-[var(--text-muted)]">No payments recorded yet</p>
-                      {isRestaurant && remainingBalance > 0 && (
+                      {canRecordPayments && remainingBalance > 0 && (
                         <Button
                           className="mt-4"
                           onClick={() => {
@@ -993,13 +1015,14 @@ export function InvoicesPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Enhanced Payment Dialog (Restaurant only) */}
-        <Dialog open={isRestaurant && showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Record Payment</DialogTitle>
               <DialogDescription>
-                Record full payment, partial payment, or apply credit notes
+                {isRestaurant
+                  ? 'Record full payment, partial payment, or apply credit notes'
+                  : 'Record payment received from the restaurant against this invoice'}
               </DialogDescription>
             </DialogHeader>
 
@@ -1031,10 +1054,12 @@ export function InvoicesPage() {
                 <div>
                   <Label className="mb-2 block">Payment Type</Label>
                   <Tabs value={paymentMode} onValueChange={(v) => setPaymentMode(v as any)}>
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList
+                      className={`grid w-full ${isRestaurant ? 'grid-cols-3' : 'grid-cols-2'}`}
+                    >
                       <TabsTrigger value="full">Full Payment</TabsTrigger>
                       <TabsTrigger value="partial">Partial Payment</TabsTrigger>
-                      <TabsTrigger value="credit">Apply Credit</TabsTrigger>
+                      {isRestaurant && <TabsTrigger value="credit">Apply Credit</TabsTrigger>}
                     </TabsList>
                   </Tabs>
                 </div>
@@ -1050,7 +1075,7 @@ export function InvoicesPage() {
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label>Payment Method *</Label>
                         <Select value={paymentMethod} onValueChange={setPaymentMethod}>
@@ -1133,7 +1158,7 @@ export function InvoicesPage() {
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label>Payment Method *</Label>
                         <Select value={paymentMethod} onValueChange={setPaymentMethod}>
@@ -1415,12 +1440,12 @@ export function InvoicesPage() {
               <Button
                 onClick={handleRecordPayment}
                 disabled={
-                  isProcessingPayment ||
+                  isProcessingAnyPayment ||
                   (paymentMode === 'credit' && creditAmount <= 0) ||
                   (paymentMode === 'partial' && paymentAmount <= 0)
                 }
               >
-                {isProcessingPayment ? (
+                {isProcessingAnyPayment ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Processing...

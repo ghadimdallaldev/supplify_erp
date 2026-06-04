@@ -8,8 +8,8 @@ import {
   useBillingCheckoutMutation,
   useBillingPayNowMutation,
   useSetBillingAutoRenewMutation,
-  api,
 } from '../../services/api'
+import { refetchAppSession } from '../../lib/refetchAppSession'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -154,7 +154,7 @@ export function PaymentModal() {
         )
       }
 
-      dispatch(api.util.invalidateTags(['Subscription', 'Billing']))
+      await refetchAppSession(dispatch)
       handleClose()
     } catch (e: unknown) {
       const msg =
@@ -201,7 +201,7 @@ export function PaymentModal() {
 
         {!isPayOverdue && plan && !isFreeCheckout && (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <button
                 type="button"
                 onClick={() => setBillingCycle('MONTHLY')}
@@ -314,7 +314,7 @@ export function PaymentModal() {
                   autoComplete="cc-number"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <Label htmlFor="expMonth">Expiry month</Label>
                   <Input

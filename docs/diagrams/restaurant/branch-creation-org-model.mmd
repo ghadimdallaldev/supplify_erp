@@ -1,0 +1,29 @@
+%% Branch creation and organization model
+%% Status: current (dual legacy models noted) | Related: docs/BRANCHES_WAREHOUSES_AUDIT.md
+flowchart TB
+  subgraph OrgModel["Canonical: org sub-tenants (current)"]
+    Org[restaurant_organizations / supplier_organizations]
+    Main[Main branch tenant\nis_main_branch = true]
+    Branch[Branch tenant rows\nis_branch_active]
+    Org --> Main
+    Org --> Branch
+    Branch --> PendingSub[subscription row often pending Free\nactivation only]
+    Branch --> Entitlements[Entitlements from parent\nresolveOrgBillingTenantId]
+    Switch[POST .../context/switch cookie] --> Active[Active branch tenant context]
+  end
+
+  subgraph LegacyLink["Legacy: tenant_account_link"]
+    Parent[Parent restaurant/supplier]
+    Linked[Linked branch tenant]
+    Parent --> LinkTable[tenant_account_link]
+    LinkTable --> Linked
+    SwitchLegacy[POST /api/branches/switch] --> Active
+  end
+
+  subgraph LegacyBranchTable["Legacy: branch table (partial)"]
+    RestTenant[restaurant.id]
+    BranchRow[branch rows]
+    RestTenant --> BranchRow
+    BranchRow --> ResUse[reservations\nrestaurant_inventory\noptional customer_order.branch_id]
+    Note[Org branches do NOT auto-create branch table rows]
+  end

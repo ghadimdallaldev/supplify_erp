@@ -9,8 +9,10 @@ vi.mock('../config/env.js', () => ({
 }))
 
 const isEmailConfigured = vi.fn()
-vi.mock('./mailer.service.js', () => ({
-  sendMail: vi.fn().mockResolvedValue({ messageId: 'test-id' }),
+const sendTemplateEmail = vi.fn().mockResolvedValue({ sent: true })
+
+vi.mock('./email/email.service.js', () => ({
+  sendTemplateEmail: (...args) => sendTemplateEmail(...args),
   isEmailConfigured: () => isEmailConfigured(),
 }))
 
@@ -40,7 +42,6 @@ describe('staff-portal-mail.service', () => {
   it('sendStaffPortalMagicLink sends email when email provider is configured', async () => {
     isEmailConfigured.mockReturnValue(true)
     const { sendStaffPortalMagicLink } = await import('./staff-portal-mail.service.js')
-    const { sendMail } = await import('./mailer.service.js')
 
     const result = await sendStaffPortalMagicLink({
       to: 'staff@example.com',
@@ -50,17 +51,16 @@ describe('staff-portal-mail.service', () => {
     })
 
     expect(result.delivered).toBe(true)
-    expect(sendMail).toHaveBeenCalledWith(
+    expect(sendTemplateEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'staff@example.com',
-        subject: expect.stringContaining('staff portal'),
+        template: 'staff.magic_link',
       })
     )
   })
 
   it('sendStaffPortalMagicLink skips send when email is not configured', async () => {
     const { sendStaffPortalMagicLink } = await import('./staff-portal-mail.service.js')
-    const { sendMail } = await import('./mailer.service.js')
 
     const result = await sendStaffPortalMagicLink({
       to: 'staff@example.com',
@@ -71,6 +71,6 @@ describe('staff-portal-mail.service', () => {
 
     expect(result.delivered).toBe(false)
     expect(result.preview).toBe(true)
-    expect(sendMail).not.toHaveBeenCalled()
+    expect(sendTemplateEmail).not.toHaveBeenCalled()
   })
 })

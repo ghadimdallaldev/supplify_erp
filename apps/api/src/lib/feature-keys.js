@@ -52,6 +52,9 @@ export const SUPPLIER_FEATURE_KEYS = [
 
 export const ALL_FEATURE_KEYS = [...new Set([...RESTAURANT_FEATURE_KEYS, ...SUPPLIER_FEATURE_KEYS])]
 
+/** Legacy / migration-only keys in DB JSON — verifier warns, does not fail. */
+export const KNOWN_EXTRA_FEATURE_KEYS = ['supplier_deals_redeem']
+
 export function getAllowedFeatureKeys(tenantType) {
   return tenantType === 'RESTAURANT' ? RESTAURANT_FEATURE_KEYS : SUPPLIER_FEATURE_KEYS
 }

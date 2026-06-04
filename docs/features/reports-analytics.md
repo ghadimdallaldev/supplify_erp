@@ -60,3 +60,9 @@ All report endpoints accept:
 ## Database
 
 Migration: `0071_reports_analytics_indexes.sql` — supporting indexes only (no new tables).
+
+## Tests
+
+- API: `apps/api/src/services/reports.service.test.js`, `apps/api/src/routes/reports.routes.test.js`
+- Web: `apps/web/src/lib/reportResponse.test.ts` (RTK unwrap / envelope parsing), `contractPricingResponse.test.ts` (contract pricing pages)
+- Manual: Reports page loads on Silver+; Free → 403 (GATE-R09)

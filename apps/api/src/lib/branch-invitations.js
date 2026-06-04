@@ -19,6 +19,8 @@ import {
   keycloakRealmRoleForWorkspace,
   normalizeInvitationEmail,
 } from './invitation-accept.js'
+import { syncDriverLinkForRoleAssignment } from './driver-user-link.js'
+import { sendTeamInvitationEmail } from '../services/invitation-mail.service.js'
 
 export function generateBranchInviteToken() {
   return generateInviteToken()
@@ -144,9 +146,24 @@ export async function createBranchInvitation({
     ]
   )
   const invitation = rows[0]
+  const invite_url = buildBranchInviteUrl(token)
+  if (invitedEmail) {
+    const { rows: supplierRows } = await query(`SELECT name FROM supplier WHERE id = $1`, [
+      supplierId,
+    ])
+    sendTeamInvitationEmail({
+      to: invitedEmail,
+      inviteUrl: invite_url,
+      invitedName: invitedName,
+      tenantName: supplierRows[0]?.name,
+      tenantType: 'SUPPLIER',
+      invitationId: invitation.id,
+      tenantId: supplierId,
+    }).catch(() => {})
+  }
   return {
     invitation,
-    invite_url: buildBranchInviteUrl(token),
+    invite_url,
     expires_at: expiresAt,
   }
 }
@@ -183,9 +200,25 @@ export async function regenerateBranchInvitation(invitationId, organizationId) {
     [token, expiresAt, invitationId, organizationId]
   )
   if (!rows.length) return null
+  const invitation = rows[0]
+  const invite_url = buildBranchInviteUrl(token)
+  if (invitation.invited_email) {
+    const { rows: supplierRows } = await query(`SELECT name FROM supplier WHERE id = $1`, [
+      invitation.supplier_id,
+    ])
+    sendTeamInvitationEmail({
+      to: invitation.invited_email,
+      inviteUrl: invite_url,
+      invitedName: invitation.invited_name,
+      tenantName: supplierRows[0]?.name,
+      tenantType: 'SUPPLIER',
+      invitationId: invitation.id,
+      tenantId: invitation.supplier_id,
+    }).catch(() => {})
+  }
   return {
-    invitation: rows[0],
-    invite_url: buildBranchInviteUrl(token),
+    invitation,
+    invite_url,
     expires_at: expiresAt,
   }
 }
@@ -328,13 +361,28 @@ export async function acceptBranchInvitation({
     const { rows: roleRows } = await client.query(`SELECT name FROM tenant_roles WHERE id = $1`, [
       row.role_id,
     ])
+    const roleName = roleRows[0]?.name || null
+
+    let driverLink = null
+    if (roleName === 'Driver') {
+      driverLink = await syncDriverLinkForRoleAssignment(
+        {
+          userId,
+          supplierId: row.supplier_id,
+          roleName,
+          createDriverProfile: true,
+        },
+        client
+      )
+    }
 
     return {
       userId,
       supplierId: row.supplier_id,
       email: resolvedEmail,
       roleId: row.role_id,
-      roleName: roleRows[0]?.name || null,
+      roleName,
+      driverId: driverLink?.id ?? null,
       needsLogin: !existingUserId,
       password: existingUserId ? null : password,
     }

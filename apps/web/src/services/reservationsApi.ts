@@ -21,9 +21,6 @@ export const reservationsApi = api.injectEndpoints({
         },
       }),
       providesTags: (_result) => [{ type: 'Reservation' as const, id: 'BOARD' }],
-      refetchOnFocus: true,
-      refetchOnReconnect: true,
-      pollingInterval: 30_000,
     }),
     saveReservationTables: build.mutation<
       { tables: ReservationTable[] },
@@ -71,7 +68,7 @@ export const reservationsApi = api.injectEndpoints({
     }),
     assignReservationTables: build.mutation<
       { reservation: Reservation },
-      { id: string; tableIds: string[]; boardDate?: string }
+      { id: string; tableIds: string[]; boardDate?: string; branchId?: string }
     >({
       query: ({ id, tableIds }) => ({
         url: `/api/reservations/${id}/tables`,
@@ -79,35 +76,28 @@ export const reservationsApi = api.injectEndpoints({
         body: { tableIds },
       }),
       invalidatesTags: [{ type: 'Reservation' as const, id: 'BOARD' }],
-      async onQueryStarted({ id, tableIds, boardDate }, { dispatch, queryFulfilled }) {
+      async onQueryStarted({ id, tableIds, boardDate, branchId }, { dispatch, queryFulfilled }) {
         if (!boardDate) return
+        const boardArgs = { date: boardDate, ...(branchId ? { branchId } : {}) }
         const patch = dispatch(
-          reservationsApi.util.updateQueryData(
-            'getReservationBoard',
-            { date: boardDate },
-            (draft) => {
-              const reservation = draft.reservations.find((r) => r.id === id)
-              if (reservation) {
-                reservation.tables = tableIds
-                reservation.updated_at = new Date().toISOString()
-              }
+          reservationsApi.util.updateQueryData('getReservationBoard', boardArgs, (draft) => {
+            const reservation = draft.reservations.find((r) => r.id === id)
+            if (reservation) {
+              reservation.tables = tableIds
+              reservation.updated_at = new Date().toISOString()
             }
-          )
+          })
         )
         try {
           const { data } = await queryFulfilled
           if (data?.reservation?.tables?.length) {
             dispatch(
-              reservationsApi.util.updateQueryData(
-                'getReservationBoard',
-                { date: boardDate },
-                (draft) => {
-                  const reservation = draft.reservations.find((r) => r.id === id)
-                  if (reservation) {
-                    reservation.tables = data.reservation.tables
-                  }
+              reservationsApi.util.updateQueryData('getReservationBoard', boardArgs, (draft) => {
+                const reservation = draft.reservations.find((r) => r.id === id)
+                if (reservation) {
+                  reservation.tables = data.reservation.tables
                 }
-              )
+              })
             )
           }
         } catch {
@@ -127,8 +117,14 @@ export const reservationsApi = api.injectEndpoints({
         },
       }),
     }),
-    getReservationWaitlist: build.query<{ waitlist: Array<Record<string, unknown>> }, void>({
-      query: () => '/api/reservations/waitlist',
+    getReservationWaitlist: build.query<
+      { waitlist: Array<Record<string, unknown>> },
+      { branchId?: string } | void
+    >({
+      query: (args) => ({
+        url: '/api/reservations/waitlist',
+        params: args?.branchId ? { branchId: args.branchId } : undefined,
+      }),
       providesTags: [{ type: 'Reservation' as const, id: 'WAITLIST' }],
     }),
     manuallyPromoteWaitlist: build.mutation<{ waitlist: Record<string, unknown> }, string>({

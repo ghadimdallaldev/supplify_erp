@@ -9,12 +9,14 @@ import {
   useGetTenantAuditLogFiltersQuery,
   useGetTenantAuditLogsQuery,
 } from '../services/api'
-import { featureEnabled } from '../lib/planLimits'
+import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { downloadCsv } from '../utils/csvExport'
 import { Loader2, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:4000')
+import { getApiBase } from '../lib/env'
+
+const API_URL = getApiBase()
 
 type ActivityLogTabProps = {
   canExport?: boolean
@@ -22,8 +24,9 @@ type ActivityLogTabProps = {
 
 export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
   const { data: entitlementsData } = useGetEntitlementsQuery()
-  const tenantAuditEnabled = featureEnabled(
-    entitlementsData?.entitlements?.features?.tenant_audit_log
+  const tenantAuditEnabled = isEntitlementFeatureEnabled(
+    entitlementsData?.entitlements,
+    'tenant_audit_log'
   )
 
   const [action, setAction] = useState('')

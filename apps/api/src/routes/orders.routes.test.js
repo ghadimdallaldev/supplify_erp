@@ -16,35 +16,10 @@ vi.mock('../lib/db.js', () => {
   }
 })
 
-vi.mock('../lib/rbac.js', () => ({
-  requireAuth: vi.fn(async (req, res, next) => {
-    req.userData = req.userData || { ...mockUser }
-    next()
-  }),
-  requireRole: () => (req, res, next) => next(),
-  requireOwnership: () => (req, res, next) => next(),
-  resolveTenantContext: (req, res, next) => {
-    req.tenantContext = req.tenantContext || {
-      permissions: ['ORDERS_VIEW'],
-      tenantId: 'restaurant-1',
-      tenantType: 'RESTAURANT',
-    }
-    next()
-  },
-  requirePermission: () => (req, res, next) => next(),
-  getRequestTenant: vi.fn().mockResolvedValue({
-    tenantId: 'restaurant-1',
-    tenantType: 'RESTAURANT',
-    tenantName: 'Test Restaurant',
-  }),
-  getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
-  getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
-  checkPermission: vi.fn().mockResolvedValue(true),
-  upsertUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com' }),
-  setAuthCookies: vi.fn(),
-  clearAuthCookies: vi.fn(),
-  getUserBySub: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com' }),
-}))
+vi.mock('../lib/rbac.js', async (importOriginal) => {
+  const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
+  return loadRbacRouteMock(importOriginal)
+})
 
 vi.mock('../lib/subscription.js', () => ({
   checkLimit: vi
@@ -91,6 +66,15 @@ vi.mock('../services/warehouseInventory.js', () => ({
   releaseInventoryForOrder: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('../services/resolve-product-price.service.js', () => ({
+  resolveProductPricesBatch: vi.fn(),
+}))
+
+vi.mock('../services/supplier-inventory.service.js', () => ({
+  assertAndDeductSupplierStock: vi.fn().mockResolvedValue(undefined),
+  restoreSupplierStockForOrder: vi.fn().mockResolvedValue(undefined),
+}))
+
 // Import routes after mocks
 import { ordersRoutes } from './orders.routes.js'
 
@@ -120,8 +104,7 @@ describe('Orders Routes', () => {
 
   describe('GET /api/orders', () => {
     it('should return list of orders for restaurant', async () => {
-      // Mock: restaurant lookup, orders query, order items query
-      // The orders query uses DISTINCT and LEFT JOINs, so we need to mock it properly
+      // Mock order: restaurant lookup, then list+count run in parallel, then items batch.
       db.query
         .mockResolvedValueOnce({
           rows: [{ id: 'restaurant-1' }], // Restaurant lookup
@@ -140,6 +123,9 @@ describe('Orders Routes', () => {
           ],
         })
         .mockResolvedValueOnce({
+          rows: [{ total: '1' }], // Count query (parallel with list)
+        })
+        .mockResolvedValueOnce({
           rows: [
             {
               id: 'item-1',
@@ -151,14 +137,40 @@ describe('Orders Routes', () => {
             },
           ],
         })
-        .mockResolvedValueOnce({
-          rows: [{ total: '1' }], // Count query for pagination
-        })
 
       const response = await request(app).get('/api/orders').expect(200)
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.orders).toHaveLength(1)
+    })
+
+    it('should filter orders by search query', async () => {
+      // Mock order: list+count run in parallel, then items batch.
+      db.query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'order-abc-12345678',
+              restaurant_id: 'restaurant-1',
+              status: 'PLACED',
+              total_amount: 50,
+              created_at: new Date(),
+              placed_at: new Date(),
+              restaurant_name: 'Cafe Roma',
+              restaurant_slug: 'cafe-roma',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [{ total: '1' }] }) // count (parallel with list)
+        .mockResolvedValueOnce({ rows: [] }) // items batch
+
+      const response = await request(app).get('/api/orders?q=Cafe').expect(200)
+
+      expect(response.body.ok).toBe(true)
+      expect(response.body.data.orders).toHaveLength(1)
+      const listSql = db.query.mock.calls[0][0]
+      expect(listSql).toContain('ILIKE')
+      expect(listSql).toContain('r.name')
     })
 
     it('should filter orders by status', async () => {
@@ -208,6 +220,7 @@ describe('Orders Routes', () => {
         })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
 
       const response = await request(app).get('/api/orders/order-1').expect(200)
 
@@ -254,6 +267,7 @@ describe('Orders Routes', () => {
             },
           ],
         })
+        .mockResolvedValueOnce({ rows: [] })
 
       const response = await request(app).get('/api/orders/order-1').expect(200)
 
@@ -302,13 +316,26 @@ describe('Orders Routes', () => {
         ], // Product query for first item
       })
 
-      const { checkLimit } = await import('../lib/subscription.js')
-      vi.mocked(checkLimit).mockResolvedValueOnce({
+      const { resolveProductPricesBatch } = await import(
+        '../services/resolve-product-price.service.js'
+      )
+      vi.mocked(resolveProductPricesBatch).mockResolvedValueOnce([
+        {
+          productId,
+          supplierId,
+          quantity: 10,
+          unitPrice: 10.05,
+          source: 'DEFAULT_PRICE',
+          defaultPrice: 10.05,
+          contractPriceId: null,
+        },
+      ])
+
+      const { checkAndIncrementUsage } = await import('../lib/subscription.js')
+      vi.mocked(checkAndIncrementUsage).mockResolvedValueOnce({
         allowed: true,
         current: 0,
         limit: 100,
-        isOverLimit: false,
-        isUnlimited: false,
       })
 
       // Mock transaction - withTransaction is used, and it returns createdOrders array
@@ -319,11 +346,14 @@ describe('Orders Routes', () => {
             .fn()
             .mockResolvedValueOnce({
               rows: [
-                { id: 'order-1', status: 'PLACED', total_amount: 0, restaurant_id: restaurantId },
+                {
+                  id: 'order-1',
+                  status: 'PLACED',
+                  total_amount: 0,
+                  restaurant_id: restaurantId,
+                },
               ],
             }) // INSERT order
-            .mockResolvedValueOnce({ rows: [{ available_qty: 100 }] }) // Check inventory
-            .mockResolvedValueOnce({}) // Deduct inventory
             .mockResolvedValueOnce({
               rows: [
                 {
@@ -337,34 +367,14 @@ describe('Orders Routes', () => {
                 },
               ],
             }) // INSERT order item
-            .mockResolvedValueOnce({ rows: [{ id: 'order-1', total_amount: 100.5 }] }) // UPDATE order total
+            .mockResolvedValueOnce({ rows: [] }) // UPDATE order total + placed_at
             .mockResolvedValueOnce({
               rows: [
                 { id: supplierId, multi_warehouse_enabled: false, fulfillment_mode: 'single' },
               ],
             }), // supplier for warehouse assignment
         }
-        const result = await handler(mockClient)
-        // Return array of created orders (the handler returns createdOrders)
-        return [
-          {
-            id: 'order-1',
-            status: 'PLACED',
-            total_amount: 100.5,
-            restaurant_id: restaurantId,
-            items: [
-              {
-                id: 'item-1',
-                order_id: 'order-1',
-                product_id: productId,
-                supplier_id: supplierId,
-                quantity: 10,
-                unit_price: 10.05,
-                line_total: 100.5,
-              },
-            ],
-          },
-        ]
+        return handler(mockClient)
       })
 
       const response = await request(app)

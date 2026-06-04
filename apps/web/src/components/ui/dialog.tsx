@@ -27,28 +27,48 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+function treeHasDialogDescription(node: React.ReactNode): boolean {
+  for (const child of React.Children.toArray(node)) {
+    if (!React.isValidElement(child)) continue
+    if (child.type === DialogDescription || child.type === DialogPrimitive.Description) {
+      return true
+    }
+    if (treeHasDialogDescription(child.props.children)) return true
+  }
+  return false
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        'fixed left-[50%] top-[50%] z-50 grid w-[calc(100vw-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-[var(--app-border)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-xl sm:p-6',
-        className
-      )}
-      {...props}
-    >
-      {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]/40 focus:ring-offset-2 focus:ring-offset-[var(--surface)] disabled:pointer-events-none data-[state=open]:bg-[var(--brand-ultra)] data-[state=open]:text-[var(--text-muted)]">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </DialogPortal>
-))
+>(({ className, children, 'aria-describedby': ariaDescribedBy, ...props }, ref) => {
+  const hasDescription = treeHasDialogDescription(children)
+  const describedByProps =
+    hasDescription && ariaDescribedBy === undefined
+      ? {}
+      : { 'aria-describedby': ariaDescribedBy ?? undefined }
+
+  return (
+    <DialogPortal>
+      <DialogOverlay />
+      <DialogPrimitive.Content
+        ref={ref}
+        className={cn(
+          'fixed left-[50%] top-[50%] z-50 grid max-h-[min(90dvh,calc(100vh-2rem))] w-[calc(100vw-1.5rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto border border-[var(--app-border)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:w-full sm:rounded-xl sm:p-6',
+          className
+        )}
+        {...props}
+        {...describedByProps}
+      >
+        {children}
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]/40 focus:ring-offset-2 focus:ring-offset-[var(--surface)] disabled:pointer-events-none data-[state=open]:bg-[var(--brand-ultra)] data-[state=open]:text-[var(--text-muted)]">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  )
+})
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
@@ -58,7 +78,10 @@ DialogHeader.displayName = 'DialogHeader'
 
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2', className)}
+    className={cn(
+      'flex flex-col-reverse gap-2 border-t border-[var(--app-border)] pt-4 sm:flex-row sm:justify-end sm:gap-2 sm:border-0 sm:pt-0',
+      className
+    )}
     {...props}
   />
 )

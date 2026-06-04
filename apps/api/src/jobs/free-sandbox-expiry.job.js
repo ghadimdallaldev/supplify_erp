@@ -2,6 +2,7 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { LOCK_REASON_FREE_SANDBOX_EXPIRED } from '../lib/billing/constants.js'
 import { invalidateTenantSubscriptionCache } from '../lib/subscription.js'
+import { notifyBillingAccountLocked } from '../services/notification.service.js'
 
 /**
  * Lock free-plan workspaces whose sandbox period has ended.
@@ -27,7 +28,20 @@ export async function runFreeSandboxExpiryJob() {
   )
 
   for (const row of rows) {
-    await invalidateTenantSubscriptionCache(row.tenant_id, row.tenant_type).catch(() => {})
+    try {
+      await invalidateTenantSubscriptionCache(row.tenant_id, row.tenant_type)
+    } catch (err) {
+      logger.error('Failed to invalidate subscription cache after free sandbox expiry', {
+        tenantId: row.tenant_id,
+        tenantType: row.tenant_type,
+        error: err.message,
+      })
+    }
+    notifyBillingAccountLocked({
+      tenantId: row.tenant_id,
+      tenantType: row.tenant_type,
+      reason: 'free sandbox trial expired',
+    }).catch(() => {})
   }
 
   if (rows.length > 0) {

@@ -23,6 +23,7 @@ import {
 } from '../lib/subscription.js'
 import { z } from 'zod'
 import { notifyMessageReceived } from '../services/notification.service.js'
+import { assertChatAttachmentUrl } from '../lib/sanitize-upload.js'
 
 const router = express.Router()
 
@@ -201,6 +202,7 @@ router.get('/conversations', async (req, res) => {
         WHERE c.supplier_id = $1
           AND (cp.id IS NULL OR cp.is_archived = false)
         ORDER BY COALESCE(cp.is_pinned, false) DESC, c.last_message_at DESC NULLS LAST
+        LIMIT 200
       `
       queryParams = [tenant.tenantId]
     } else if (tenant?.tenantType === 'RESTAURANT') {
@@ -223,6 +225,7 @@ router.get('/conversations', async (req, res) => {
         WHERE c.restaurant_id = $1
           AND (cp.id IS NULL OR cp.is_archived = false)
         ORDER BY COALESCE(cp.is_pinned, false) DESC, c.last_message_at DESC NULLS LAST
+        LIMIT 200
       `
       queryParams = [tenant.tenantId]
     } else {
@@ -478,7 +481,10 @@ router.post(
 router.get('/conversations/:conversationId/messages', requireAuth, async (req, res, next) => {
   try {
     const { conversationId } = req.params
-    const { limit = '50', offset = '0' } = req.query
+    const limit = String(
+      Math.min(Math.max(parseInt(String(req.query.limit ?? '50'), 10) || 50, 1), 100)
+    )
+    const offset = String(Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0))
 
     // Verify conversation exists and current user is a participant (tenant scoping)
     const { rows: conversations } = await query(
@@ -621,6 +627,12 @@ router.post(
 
       const { conversationId } = req.params
       const messageData = sendMessageSchema.parse(req.body)
+
+      if (messageData.attachments?.length) {
+        for (const attachment of messageData.attachments) {
+          assertChatAttachmentUrl(attachment.fileUrl, req.userData.id)
+        }
+      }
 
       // Verify conversation and access
       const { rows: conversations } = await query(

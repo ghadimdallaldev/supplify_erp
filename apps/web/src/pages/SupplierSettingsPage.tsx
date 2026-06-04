@@ -57,6 +57,7 @@ import {
   multiWarehousePlanEnabled,
   isMultiWarehouseActive,
   featureEnabled,
+  isEntitlementFeatureEnabled,
 } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { formatAddressLine, normalizeAddress } from '../lib/address'
@@ -83,6 +84,7 @@ import {
   useUpdateSupplierFulfillmentMutation,
   useSimulateWarehouseRoutingMutation,
 } from '../services/api'
+import { RequirePermission } from '../components/RequirePermission'
 
 const SUPPLIER_NOTIFICATION_DEFAULTS = {
   emailEnabled: true,
@@ -131,7 +133,8 @@ const SUPPLIER_NOTIFICATION_FIELDS: Array<{
 export function SupplierSettingsPage() {
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
-  const { can } = usePermissions()
+  const { can, canAny } = usePermissions()
+  const canWriteWarehouses = canAny('WAREHOUSES_EDIT', 'WAREHOUSES_MANAGE')
   const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState('profile')
   const {
@@ -170,7 +173,7 @@ export function SupplierSettingsPage() {
     useUpdateNotificationPreferencesMutation()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
   const entitlements = entitlementsData?.entitlements
-  const tenantAuditEnabled = featureEnabled(entitlements?.features?.tenant_audit_log)
+  const tenantAuditEnabled = isEntitlementFeatureEnabled(entitlements, 'tenant_audit_log')
   const supplier = supplierData?.supplier
   const warehousesEnabled = warehousesFeatureEnabled(entitlements)
   const multiWarehousePlan = multiWarehousePlanEnabled(entitlements)
@@ -506,1095 +509,1123 @@ export function SupplierSettingsPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-[21px] font-black text-[var(--text)]">Supplier Settings</h1>
-        <p className="text-[var(--text-muted)] mt-2">Manage your business profile and settings</p>
-      </div>
+    <RequirePermission permission="SETTINGS_VIEW" title="supplier settings">
+      <div className="space-y-4 sm:space-y-6">
+        <div>
+          <h1 className="text-[21px] font-black text-[var(--text)]">Supplier Settings</h1>
+          <p className="text-[var(--text-muted)] mt-2">Manage your business profile and settings</p>
+        </div>
 
-      {/* Statistics Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-[var(--brand-ultra)] to-[var(--brand-pale)] border-[var(--app-border)]">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[var(--brand-mid)]">Total Products</p>
-                <p className="text-2xl font-bold text-[var(--text)]">{statistics.totalProducts}</p>
-                <p className="text-xs text-[var(--brand-mid)] mt-1">
-                  {statistics.activeProducts} active
-                </p>
-              </div>
-              <Package className="h-10 w-10 text-[var(--brand-mid)]" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-[var(--mint-pale)] to-[var(--mint-pale)] border-[var(--mint)]/35">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[var(--mint)]">Total Orders</p>
-                <p className="text-2xl font-bold text-[var(--mint)]">{statistics.totalOrders}</p>
-                <p className="text-xs text-[var(--mint)] mt-1">
-                  {statistics.completedOrders} completed
-                </p>
-              </div>
-              <ShoppingCart className="h-10 w-10 text-[var(--mint)]" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-[var(--amber-pale)] to-[var(--amber-pale)] border-[var(--amber-mid)]/35">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[var(--amber)]">Pending Orders</p>
-                <p className="text-2xl font-bold text-[var(--amber)]">{statistics.pendingOrders}</p>
-                <p className="text-xs text-[var(--amber)] mt-1">Awaiting fulfillment</p>
-              </div>
-              <Clock className="h-10 w-10 text-[var(--amber-mid)]" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-[var(--brand-pale)] to-[var(--brand-ultra)] border-[var(--app-border)]">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[var(--brand-mid)]">Total Revenue</p>
-                <p className="text-2xl font-bold text-[var(--text)]">
-                  {formatCurrency(statistics.totalRevenue)}
-                </p>
-                <p className="text-xs text-[var(--brand-mid)] mt-1">All-time</p>
-              </div>
-              <DollarSign className="h-10 w-10 text-[var(--brand-mid)]" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="flex h-auto w-full flex-wrap gap-1 p-1">
-          <TabsTrigger value="profile" className="flex-1 min-w-[5.5rem] sm:flex-none">
-            Profile
-          </TabsTrigger>
-          <TabsTrigger value="contacts" className="flex-1 min-w-[5.5rem] sm:flex-none">
-            Contacts
-          </TabsTrigger>
-          {(can('STAFF_VIEW') || can('SETTINGS_VIEW')) && (
-            <TabsTrigger value="team" className="flex-1 min-w-[5.5rem] sm:flex-none">
-              Team & roles
-            </TabsTrigger>
-          )}
-          <TabsTrigger value="business" className="flex-1 min-w-[5.5rem] sm:flex-none">
-            Business
-          </TabsTrigger>
-          <TabsTrigger value="warehouses" className="flex-1 min-w-[5.5rem] sm:flex-none">
-            Warehouses
-          </TabsTrigger>
-          <TabsTrigger value="delivery" className="flex-1 min-w-[5.5rem] sm:flex-none">
-            Delivery Zones
-          </TabsTrigger>
-          <TabsTrigger value="drivers" className="flex-1 min-w-[5.5rem] sm:flex-none">
-            Drivers
-          </TabsTrigger>
-          <TabsTrigger value="branches" className="flex-1 min-w-[5.5rem] sm:flex-none">
-            Branches
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex-1 min-w-[5.5rem] sm:flex-none">
-            Notifications
-          </TabsTrigger>
-          <TabsTrigger value="plan" className="flex-1 min-w-[5.5rem] sm:flex-none">
-            Plan & usage
-          </TabsTrigger>
-          {can('SETTINGS_VIEW') && tenantAuditEnabled && (
-            <TabsTrigger value="activity" className="flex-1 min-w-[5.5rem] sm:flex-none">
-              Activity
-            </TabsTrigger>
-          )}
-        </TabsList>
-
-        <TabsContent value="profile" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Company Logo
-              </CardTitle>
-              <CardDescription>
-                Upload your company logo. This will be displayed in your profile and to restaurants.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!brandingAllowed && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <span>{customBrandingUpgradeMessage(entitlements?.plan?.name)}</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      openBrowseUpgrade(dispatch, {
-                        currentPlan: entitlements?.plan?.name ?? null,
-                        upgradeUrl: '/app/settings?tab=plan',
-                      })
-                    }
-                  >
-                    Compare plans
-                  </Button>
-                </div>
-              )}
-              {supplier ? (
-                brandingAllowed ? (
-                  <LogoUpload
-                    currentLogo={supplier.logo_url}
-                    onUpload={handleLogoUpload}
-                    entityId={supplier.id}
-                    entityName={supplier.name || 'Supplier'}
-                    getPresignedUrl={handleGetPresignedUrl}
-                  />
-                ) : supplier.logo_url ? (
-                  <img
-                    src={supplier.logo_url}
-                    alt={`${supplier.name || 'Supplier'} logo`}
-                    className="h-24 w-24 rounded-lg border object-contain bg-white"
-                  />
-                ) : (
-                  <p className="text-sm text-[var(--text-muted)]">
-                    Upgrade to Gold or Platinum to upload your logo.
-                  </p>
-                )
-              ) : (
-                <p className="text-sm text-[var(--text-muted)]">Loading supplier information...</p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Company Information
-              </CardTitle>
-              <CardDescription>Update your company details and contact information</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Company Name *</Label>
-                  <Input
-                    id="name"
-                    value={profileForm.name}
-                    onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                    placeholder="Fresh Produce Co"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="legal_name">Legal Name</Label>
-                  <Input
-                    id="legal_name"
-                    value={profileForm.legal_name}
-                    onChange={(e) => setProfileForm({ ...profileForm, legal_name: e.target.value })}
-                    placeholder="Fresh Produce Co LLC"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="vat_no">VAT Number</Label>
-                  <Input
-                    id="vat_no"
-                    value={profileForm.vat_no}
-                    onChange={(e) => setProfileForm({ ...profileForm, vat_no: e.target.value })}
-                    placeholder="VAT-123456"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="trade_license_no">Trade License</Label>
-                  <Input
-                    id="trade_license_no"
-                    value={profileForm.trade_license_no}
-                    onChange={(e) =>
-                      setProfileForm({ ...profileForm, trade_license_no: e.target.value })
-                    }
-                    placeholder="TL-456789"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="contact_email">Contact Email *</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-                    <Input
-                      id="contact_email"
-                      type="email"
-                      value={profileForm.contact_email}
-                      onChange={(e) =>
-                        setProfileForm({ ...profileForm, contact_email: e.target.value })
-                      }
-                      placeholder="contact@example.com"
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-                    <Input
-                      id="phone"
-                      type="tel"
-                      value={profileForm.phone}
-                      onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                      placeholder="+1 (555) 123-4567"
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="website">Website</Label>
-                <div className="relative">
-                  <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-                  <Input
-                    id="website"
-                    type="url"
-                    value={profileForm.website}
-                    onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
-                    placeholder="https://www.example.com"
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Company Description</Label>
-                <Textarea
-                  id="description"
-                  value={profileForm.description}
-                  onChange={(e) => setProfileForm({ ...profileForm, description: e.target.value })}
-                  placeholder="Tell restaurants about your company..."
-                  rows={4}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="street">Street Address</Label>
-                  <Input
-                    id="street"
-                    value={profileForm.address.street}
-                    onChange={(e) =>
-                      setProfileForm({
-                        ...profileForm,
-                        address: { ...profileForm.address, street: e.target.value },
-                      })
-                    }
-                    placeholder="123 Main Street"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="city">City</Label>
-                  <Input
-                    id="city"
-                    value={profileForm.address.city}
-                    onChange={(e) =>
-                      setProfileForm({
-                        ...profileForm,
-                        address: { ...profileForm.address, city: e.target.value },
-                      })
-                    }
-                    placeholder="City Name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="region">Region/State</Label>
-                  <Input
-                    id="region"
-                    value={profileForm.address.region}
-                    onChange={(e) =>
-                      setProfileForm({
-                        ...profileForm,
-                        address: { ...profileForm.address, region: e.target.value },
-                      })
-                    }
-                    placeholder="State or Region"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="country">Country</Label>
-                  <Input
-                    id="country"
-                    value={profileForm.address.country}
-                    onChange={(e) =>
-                      setProfileForm({
-                        ...profileForm,
-                        address: { ...profileForm.address, country: e.target.value },
-                      })
-                    }
-                    placeholder="Country"
-                  />
-                </div>
-              </div>
-
-              <Button onClick={handleSaveProfile} disabled={isUpdating}>
-                {isUpdating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="contacts" className="space-y-4">
-          <Card>
-            <CardHeader>
+        {/* Statistics Dashboard */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="bg-gradient-to-br from-[var(--brand-ultra)] to-[var(--brand-pale)] border-[var(--app-border)]">
+            <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Building2 className="h-5 w-5" />
-                    Business Contacts
-                  </CardTitle>
-                  <CardDescription>Manage business contact information</CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload CSV/Excel
-                  </Button>
-                  <Button onClick={() => setShowAddContact(true)}>
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Add Contact
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h4 className="font-semibold">John Doe</h4>
-                        <Badge variant="secondary">Sales Manager</Badge>
-                        <Badge className="bg-[var(--brand)] text-white">Primary</Badge>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-[var(--text-muted)]">
-                        <span className="flex items-center gap-1">
-                          <Mail className="h-3 w-3" />
-                          john.doe@freshproduce.com
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          +1 (555) 123-4567
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-[var(--red)] hover:text-[var(--red)]"
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h4 className="font-semibold">Jane Smith</h4>
-                        <Badge variant="secondary">Operations Lead</Badge>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-[var(--text-muted)]">
-                        <span className="flex items-center gap-1">
-                          <Mail className="h-3 w-3" />
-                          jane.smith@freshproduce.com
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          +1 (555) 987-6543
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-[var(--red)] hover:text-[var(--red)]"
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-center py-8 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
-                  <UserPlus className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
-                  <p className="text-[var(--text-muted)]">No additional contacts</p>
-                  <p className="text-sm text-[var(--text-muted)] mt-1">
-                    Add contacts to manage your team
+                  <p className="text-sm font-medium text-[var(--brand-mid)]">Total Products</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">
+                    {statistics.totalProducts}
+                  </p>
+                  <p className="text-xs text-[var(--brand-mid)] mt-1">
+                    {statistics.activeProducts} active
                   </p>
                 </div>
+                <Package className="h-10 w-10 text-[var(--brand-mid)]" />
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        <TabsContent value="business" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Business Hours & Policies
-              </CardTitle>
-              <CardDescription>Set your operating hours and business policies</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-lg">Operating Hours</h3>
-                  <Badge variant="outline">Configure your weekly schedule</Badge>
+          <Card className="bg-gradient-to-br from-[var(--mint-pale)] to-[var(--mint-pale)] border-[var(--mint)]/35">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-[var(--mint)]">Total Orders</p>
+                  <p className="text-2xl font-bold text-[var(--mint)]">{statistics.totalOrders}</p>
+                  <p className="text-xs text-[var(--mint)] mt-1">
+                    {statistics.completedOrders} completed
+                  </p>
                 </div>
-                <div className="space-y-3">
-                  {[
-                    'Monday',
-                    'Tuesday',
-                    'Wednesday',
-                    'Thursday',
-                    'Friday',
-                    'Saturday',
-                    'Sunday',
-                  ].map((day) => (
-                    <div
-                      key={day}
-                      className="flex items-center gap-4 p-3 border rounded-lg hover:bg-[var(--brand-ultra)]"
-                    >
-                      <div className="w-28 font-medium">{day}</div>
-                      <Input type="time" className="w-32" placeholder="09:00" />
-                      <span className="text-[var(--text-muted)]">to</span>
-                      <Input type="time" className="w-32" placeholder="17:00" />
-                      <Button variant="outline" size="sm" className="ml-auto">
-                        Closed
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                <ShoppingCart className="h-10 w-10 text-[var(--mint)]" />
               </div>
-
-              <div className="border-t pt-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-lg">Business Policies</h3>
-                  <Badge variant="outline">Terms & Conditions</Badge>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Minimum Order Value ($)</Label>
-                    <Input type="number" placeholder="100.00" />
-                    <p className="text-xs text-[var(--text-muted)]">
-                      Restaurants must order at least this amount
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Payment Terms</Label>
-                    <Input placeholder="Net 30" />
-                    <p className="text-xs text-[var(--text-muted)]">
-                      e.g., Net 30, Cash on Delivery
-                    </p>
-                  </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label>Return Policy</Label>
-                    <Textarea placeholder="7 days return window for damaged goods..." rows={3} />
-                  </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label>Terms & Conditions</Label>
-                    <Textarea placeholder="Your terms and conditions for orders..." rows={4} />
-                  </div>
-                </div>
-              </div>
-
-              <Button>
-                <Save className="h-4 w-4 mr-2" />
-                Save Business Settings
-              </Button>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        <TabsContent value="warehouses" className="space-y-4">
-          {!warehousesEnabled ? (
+          <Card className="bg-gradient-to-br from-[var(--amber-pale)] to-[var(--amber-pale)] border-[var(--amber-mid)]/35">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-[var(--amber)]">Pending Orders</p>
+                  <p className="text-2xl font-bold text-[var(--amber)]">
+                    {statistics.pendingOrders}
+                  </p>
+                  <p className="text-xs text-[var(--amber)] mt-1">Awaiting fulfillment</p>
+                </div>
+                <Clock className="h-10 w-10 text-[var(--amber-mid)]" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-[var(--brand-pale)] to-[var(--brand-ultra)] border-[var(--app-border)]">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-[var(--brand-mid)]">Total Revenue</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">
+                    {formatCurrency(statistics.totalRevenue)}
+                  </p>
+                  <p className="text-xs text-[var(--brand-mid)] mt-1">All-time</p>
+                </div>
+                <DollarSign className="h-10 w-10 text-[var(--brand-mid)]" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="justify-start">
+            <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="contacts">Contacts</TabsTrigger>
+            {(can('STAFF_VIEW') || can('SETTINGS_VIEW')) && (
+              <TabsTrigger value="team">Team & roles</TabsTrigger>
+            )}
+            <TabsTrigger value="business">Business</TabsTrigger>
+            {can('WAREHOUSES_VIEW') && <TabsTrigger value="warehouses">Warehouses</TabsTrigger>}
+            <TabsTrigger value="delivery">Delivery Zones</TabsTrigger>
+            <TabsTrigger value="drivers">Drivers</TabsTrigger>
+            <TabsTrigger value="branches">Branches</TabsTrigger>
+            <TabsTrigger value="notifications">Notifications</TabsTrigger>
+            <TabsTrigger value="plan">Plan & usage</TabsTrigger>
+            {can('SETTINGS_VIEW') && tenantAuditEnabled && (
+              <TabsTrigger value="activity">Activity</TabsTrigger>
+            )}
+          </TabsList>
+
+          <TabsContent value="profile" className="space-y-4">
             <Card>
-              <CardContent className="py-8 text-center">
-                <p className="text-[var(--text-muted)] mb-3">
-                  Warehouse management requires Silver or higher. Free accounts do not include
-                  warehouse locations; any legacy default warehouse from older data is not usable
-                  until you upgrade.
-                </p>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Company Logo
+                </CardTitle>
+                <CardDescription>
+                  Upload your company logo. This will be displayed in your profile and to
+                  restaurants.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {!brandingAllowed && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <span>{customBrandingUpgradeMessage(entitlements?.plan?.name)}</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        openBrowseUpgrade(dispatch, {
+                          currentPlan: entitlements?.plan?.name ?? null,
+                          upgradeUrl: '/app/settings?tab=plan',
+                        })
+                      }
+                    >
+                      Compare plans
+                    </Button>
+                  </div>
+                )}
+                {supplier ? (
+                  brandingAllowed ? (
+                    <LogoUpload
+                      currentLogo={supplier.logo_url}
+                      onUpload={handleLogoUpload}
+                      entityId={supplier.id}
+                      entityName={supplier.name || 'Supplier'}
+                      getPresignedUrl={handleGetPresignedUrl}
+                    />
+                  ) : supplier.logo_url ? (
+                    <img
+                      src={supplier.logo_url}
+                      alt={`${supplier.name || 'Supplier'} logo`}
+                      className="h-24 w-24 rounded-lg border object-contain bg-white"
+                    />
+                  ) : (
+                    <p className="text-sm text-[var(--text-muted)]">
+                      Upgrade to Gold or Platinum to upload your logo.
+                    </p>
+                  )
+                ) : (
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Loading supplier information...
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Company Information
+                </CardTitle>
+                <CardDescription>
+                  Update your company details and contact information
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Company Name *</Label>
+                    <Input
+                      id="name"
+                      value={profileForm.name}
+                      onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                      placeholder="Fresh Produce Co"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="legal_name">Legal Name</Label>
+                    <Input
+                      id="legal_name"
+                      value={profileForm.legal_name}
+                      onChange={(e) =>
+                        setProfileForm({ ...profileForm, legal_name: e.target.value })
+                      }
+                      placeholder="Fresh Produce Co LLC"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="vat_no">VAT Number</Label>
+                    <Input
+                      id="vat_no"
+                      value={profileForm.vat_no}
+                      onChange={(e) => setProfileForm({ ...profileForm, vat_no: e.target.value })}
+                      placeholder="VAT-123456"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="trade_license_no">Trade License</Label>
+                    <Input
+                      id="trade_license_no"
+                      value={profileForm.trade_license_no}
+                      onChange={(e) =>
+                        setProfileForm({ ...profileForm, trade_license_no: e.target.value })
+                      }
+                      placeholder="TL-456789"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="contact_email">Contact Email *</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+                      <Input
+                        id="contact_email"
+                        type="email"
+                        value={profileForm.contact_email}
+                        onChange={(e) =>
+                          setProfileForm({ ...profileForm, contact_email: e.target.value })
+                        }
+                        placeholder="contact@example.com"
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone</Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+                      <Input
+                        id="phone"
+                        type="tel"
+                        value={profileForm.phone}
+                        onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                        placeholder="+1 (555) 123-4567"
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="website">Website</Label>
+                  <div className="relative">
+                    <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+                    <Input
+                      id="website"
+                      type="url"
+                      value={profileForm.website}
+                      onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
+                      placeholder="https://www.example.com"
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Company Description</Label>
+                  <Textarea
+                    id="description"
+                    value={profileForm.description}
+                    onChange={(e) =>
+                      setProfileForm({ ...profileForm, description: e.target.value })
+                    }
+                    placeholder="Tell restaurants about your company..."
+                    rows={4}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="street">Street Address</Label>
+                    <Input
+                      id="street"
+                      value={profileForm.address.street}
+                      onChange={(e) =>
+                        setProfileForm({
+                          ...profileForm,
+                          address: { ...profileForm.address, street: e.target.value },
+                        })
+                      }
+                      placeholder="123 Main Street"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      value={profileForm.address.city}
+                      onChange={(e) =>
+                        setProfileForm({
+                          ...profileForm,
+                          address: { ...profileForm.address, city: e.target.value },
+                        })
+                      }
+                      placeholder="City Name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="region">Region/State</Label>
+                    <Input
+                      id="region"
+                      value={profileForm.address.region}
+                      onChange={(e) =>
+                        setProfileForm({
+                          ...profileForm,
+                          address: { ...profileForm.address, region: e.target.value },
+                        })
+                      }
+                      placeholder="State or Region"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="country">Country</Label>
+                    <Input
+                      id="country"
+                      value={profileForm.address.country}
+                      onChange={(e) =>
+                        setProfileForm({
+                          ...profileForm,
+                          address: { ...profileForm.address, country: e.target.value },
+                        })
+                      }
+                      placeholder="Country"
+                    />
+                  </div>
+                </div>
+
                 <Button
-                  variant="outline"
-                  onClick={() =>
-                    openBrowseUpgrade(dispatch, {
-                      currentPlan: entitlements?.plan?.name ?? null,
-                      upgradeUrl: '/app/settings?tab=plan',
-                    })
-                  }
+                  onClick={handleSaveProfile}
+                  disabled={isUpdating}
+                  className="w-full sm:w-auto"
                 >
-                  View plans
+                  {isUpdating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </>
+                  )}
                 </Button>
               </CardContent>
             </Card>
-          ) : (
-            <>
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <Warehouse className="h-5 w-5" />
-                        Warehouses
-                      </CardTitle>
-                      <CardDescription>Manage your warehouse locations</CardDescription>
-                    </div>
-                    <Button
-                      disabled={!canAddWarehouse}
-                      onClick={() => {
-                        if (!canAddWarehouse) {
-                          openBrowseUpgrade(dispatch, {
-                            currentPlan: entitlements?.plan?.name ?? null,
-                            upgradeUrl: '/app/settings?tab=plan',
-                          })
-                          return
-                        }
-                        setShowAddWarehouse(true)
-                      }}
-                    >
-                      <Warehouse className="h-4 w-4 mr-2" />
-                      Add Warehouse
+          </TabsContent>
+
+          <TabsContent value="contacts" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Building2 className="h-5 w-5" />
+                      Business Contacts
+                    </CardTitle>
+                    <CardDescription>Manage business contact information</CardDescription>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload CSV/Excel
+                    </Button>
+                    <Button onClick={() => setShowAddContact(true)}>
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Add Contact
                     </Button>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  {!canAddWarehouse && (
-                    <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                      {formatWarehouseGateMessage(warehouseGate)}
-                    </div>
-                  )}
-                  <div className="space-y-3">
-                    {(warehousesData?.warehouses ?? []).length === 0 ? (
-                      <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
-                        <Warehouse className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
-                        <p className="text-[var(--text-muted)]">No warehouses yet</p>
-                        <p className="text-sm text-[var(--text-muted)] mt-1">
-                          Add a warehouse to manage multiple locations
-                        </p>
-                      </div>
-                    ) : (
-                      (warehousesData?.warehouses ?? []).map((wh: any) => (
-                        <div
-                          key={wh.id}
-                          className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h4 className="font-semibold">{wh.name}</h4>
-                                {wh.code && <Badge variant="outline">{wh.code}</Badge>}
-                                {(wh.is_default || wh.is_main) && (
-                                  <Badge variant="secondary">Default</Badge>
-                                )}
-                              </div>
-                              {formatAddressLine(wh.address) && (
-                                <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-                                  <MapPin className="h-4 w-4" />
-                                  <span>{formatAddressLine(wh.address)}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          )}
-        </TabsContent>
-
-        <TabsContent value="plan" className="space-y-4">
-          <SubscriptionInfo />
-        </TabsContent>
-        <TabsContent value="branches" className="space-y-4">
-          <BranchAccountsPanel entityLabel="supplier location" />
-        </TabsContent>
-
-        {(can('STAFF_VIEW') || can('SETTINGS_VIEW')) && (
-          <TabsContent value="team" className="space-y-4">
-            <TeamRolesPanel
-              tenantType="SUPPLIER"
-              renderInviteForm={
-                can('STAFF_INVITE') && supplier?.id
-                  ? () => (
-                      <p className="text-sm text-[var(--text-muted)] mt-2">
-                        Use branch invitations below to invite staff with a role. Each person can
-                        only belong to one supplier account.
-                      </p>
-                    )
-                  : undefined
-              }
-            />
-            {can('STAFF_INVITE') && supplier?.id && (
-              <BranchInvitationsPanel supplierId={supplier.id} branchName={supplier.name} />
-            )}
-          </TabsContent>
-        )}
-
-        <TabsContent value="notifications" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                Notification Preferences
-              </CardTitle>
-              <CardDescription>Choose how you want to be notified</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {isLoadingNotificationPrefs ? (
-                <div className="flex items-center gap-3 text-sm text-[var(--text-muted)]">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading notification preferences…
                 </div>
-              ) : (
-                <>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {SUPPLIER_NOTIFICATION_FIELDS.map(({ key, label, description }) => (
-                      <label
-                        key={key}
-                        className="flex flex-col gap-2 rounded-xl border p-4 hover:bg-[var(--brand-ultra)] cursor-pointer"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium text-[var(--text)]">{label}</span>
-                          {notificationPrefs[key] && (
-                            <CheckCircle2 className="h-5 w-5 text-[var(--mint)] shrink-0" />
-                          )}
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <h4 className="font-semibold">John Doe</h4>
+                          <Badge variant="secondary">Sales Manager</Badge>
+                          <Badge className="bg-[var(--brand)] text-white">Primary</Badge>
                         </div>
-                        <p className="text-xs text-[var(--text-muted)]">{description}</p>
-                        <input
-                          type="checkbox"
-                          className="hidden"
-                          checked={notificationPrefs[key]}
-                          onChange={() => handleToggleNotification(key)}
-                        />
-                      </label>
+                        <div className="flex flex-col gap-2 text-sm text-[var(--text-muted)] sm:flex-row sm:items-center sm:gap-4">
+                          <span className="flex items-center gap-1 min-w-0">
+                            <Mail className="h-3 w-3 shrink-0" />
+                            <span className="truncate">john.doe@freshproduce.com</span>
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Phone className="h-3 w-3 shrink-0" />
+                            +1 (555) 123-4567
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <Button variant="outline" size="sm">
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-[var(--red)] hover:text-[var(--red)]"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <h4 className="font-semibold">Jane Smith</h4>
+                          <Badge variant="secondary">Operations Lead</Badge>
+                        </div>
+                        <div className="flex flex-col gap-2 text-sm text-[var(--text-muted)] sm:flex-row sm:items-center sm:gap-4">
+                          <span className="flex items-center gap-1 min-w-0">
+                            <Mail className="h-3 w-3 shrink-0" />
+                            <span className="truncate">jane.smith@freshproduce.com</span>
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Phone className="h-3 w-3 shrink-0" />
+                            +1 (555) 987-6543
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <Button variant="outline" size="sm">
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-[var(--red)] hover:text-[var(--red)]"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-center py-8 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
+                    <UserPlus className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
+                    <p className="text-[var(--text-muted)]">No additional contacts</p>
+                    <p className="text-sm text-[var(--text-muted)] mt-1">
+                      Add contacts to manage your team
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="business" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Business Hours & Policies
+                </CardTitle>
+                <CardDescription>Set your operating hours and business policies</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-lg">Operating Hours</h3>
+                    <Badge variant="outline">Configure your weekly schedule</Badge>
+                  </div>
+                  <div className="space-y-3">
+                    {[
+                      'Monday',
+                      'Tuesday',
+                      'Wednesday',
+                      'Thursday',
+                      'Friday',
+                      'Saturday',
+                      'Sunday',
+                    ].map((day) => (
+                      <div
+                        key={day}
+                        className="flex flex-col gap-3 p-3 border rounded-lg hover:bg-[var(--brand-ultra)] sm:flex-row sm:items-center sm:gap-4"
+                      >
+                        <div className="w-full font-medium sm:w-28">{day}</div>
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                          <Input
+                            type="time"
+                            className="w-full min-w-[7rem] flex-1 sm:w-32 sm:flex-none"
+                            placeholder="09:00"
+                          />
+                          <span className="text-[var(--text-muted)]">to</span>
+                          <Input
+                            type="time"
+                            className="w-full min-w-[7rem] flex-1 sm:w-32 sm:flex-none"
+                            placeholder="17:00"
+                          />
+                        </div>
+                        <Button variant="outline" size="sm" className="w-full sm:ml-auto sm:w-auto">
+                          Closed
+                        </Button>
+                      </div>
                     ))}
                   </div>
-                  <Button
-                    onClick={handleSaveNotifications}
-                    className="w-full"
-                    disabled={isSavingNotificationPrefs}
-                  >
-                    {isSavingNotificationPrefs ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    {isSavingNotificationPrefs ? 'Saving…' : 'Save preferences'}
-                  </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="delivery" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5" />
-                    Delivery Zones
-                  </CardTitle>
-                  <CardDescription>Manage delivery coverage areas and pricing</CardDescription>
                 </div>
-                <Button onClick={() => setShowAddZone(true)}>
-                  <MapPin className="h-4 w-4 mr-2" />
-                  Add Zone
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
+
+                <div className="border-t pt-6 space-y-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-semibold mb-2">Downtown Zone</h4>
-                      <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <span className="text-[var(--text-muted)]">Fee:</span>
-                          <span className="ml-2 font-medium">$10.00</span>
-                        </div>
-                        <div>
-                          <span className="text-[var(--text-muted)]">Min Order:</span>
-                          <span className="ml-2 font-medium">$50.00</span>
-                        </div>
-                        <div>
-                          <span className="text-[var(--text-muted)]">Delivery:</span>
-                          <span className="ml-2 font-medium">2 days</span>
-                        </div>
-                      </div>
+                    <h3 className="font-semibold text-lg">Business Policies</h3>
+                    <Badge variant="outline">Terms & Conditions</Badge>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Minimum Order Value ($)</Label>
+                      <Input type="number" placeholder="100.00" />
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Restaurants must order at least this amount
+                      </p>
                     </div>
-                    <Button variant="outline" size="sm">
-                      Edit
-                    </Button>
+                    <div className="space-y-2">
+                      <Label>Payment Terms</Label>
+                      <Input placeholder="Net 30" />
+                      <p className="text-xs text-[var(--text-muted)]">
+                        e.g., Net 30, Cash on Delivery
+                      </p>
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Return Policy</Label>
+                      <Textarea placeholder="7 days return window for damaged goods..." rows={3} />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Terms & Conditions</Label>
+                      <Textarea placeholder="Your terms and conditions for orders..." rows={4} />
+                    </div>
                   </div>
                 </div>
 
-                <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
+                <Button>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Business Settings
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {can('WAREHOUSES_VIEW') && (
+            <TabsContent value="warehouses" className="space-y-4">
+              {!warehousesEnabled ? (
+                <Card>
+                  <CardContent className="py-8 text-center">
+                    <p className="text-[var(--text-muted)] mb-3">
+                      Warehouse management requires Silver or higher. Free accounts do not include
+                      warehouse locations; any legacy default warehouse from older data is not
+                      usable until you upgrade.
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        openBrowseUpgrade(dispatch, {
+                          currentPlan: entitlements?.plan?.name ?? null,
+                          upgradeUrl: '/app/settings?tab=plan',
+                        })
+                      }
+                    >
+                      View plans
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="flex items-center gap-2">
+                            <Warehouse className="h-5 w-5" />
+                            Warehouses
+                          </CardTitle>
+                          <CardDescription>Manage your warehouse locations</CardDescription>
+                        </div>
+                        <Button
+                          disabled={!canAddWarehouse || !canWriteWarehouses}
+                          onClick={() => {
+                            if (!canWriteWarehouses) {
+                              toast.error('You do not have permission to manage warehouses')
+                              return
+                            }
+                            if (!canAddWarehouse) {
+                              openBrowseUpgrade(dispatch, {
+                                currentPlan: entitlements?.plan?.name ?? null,
+                                upgradeUrl: '/app/settings?tab=plan',
+                              })
+                              return
+                            }
+                            setShowAddWarehouse(true)
+                          }}
+                        >
+                          <Warehouse className="h-4 w-4 mr-2" />
+                          Add Warehouse
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {!canAddWarehouse && (
+                        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                          {formatWarehouseGateMessage(warehouseGate)}
+                        </div>
+                      )}
+                      <div className="space-y-3">
+                        {(warehousesData?.warehouses ?? []).length === 0 ? (
+                          <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
+                            <Warehouse className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
+                            <p className="text-[var(--text-muted)]">No warehouses yet</p>
+                            <p className="text-sm text-[var(--text-muted)] mt-1">
+                              Add a warehouse to manage multiple locations
+                            </p>
+                          </div>
+                        ) : (
+                          (warehousesData?.warehouses ?? []).map((wh: any) => (
+                            <div
+                              key={wh.id}
+                              className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h4 className="font-semibold">{wh.name}</h4>
+                                    {wh.code && <Badge variant="outline">{wh.code}</Badge>}
+                                    {(wh.is_default || wh.is_main) && (
+                                      <Badge variant="secondary">Default</Badge>
+                                    )}
+                                  </div>
+                                  {formatAddressLine(wh.address) && (
+                                    <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                                      <MapPin className="h-4 w-4" />
+                                      <span>{formatAddressLine(wh.address)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </TabsContent>
+          )}
+
+          <TabsContent value="plan" className="space-y-4">
+            <SubscriptionInfo />
+          </TabsContent>
+          <TabsContent value="branches" className="space-y-4">
+            <BranchAccountsPanel entityLabel="supplier location" />
+          </TabsContent>
+
+          {(can('STAFF_VIEW') || can('SETTINGS_VIEW')) && (
+            <TabsContent value="team" className="space-y-4">
+              <TeamRolesPanel
+                tenantType="SUPPLIER"
+                renderInviteForm={
+                  can('STAFF_INVITE') && supplier?.id
+                    ? () => (
+                        <p className="text-sm text-[var(--text-muted)] mt-2">
+                          Use branch invitations below to invite staff with a role. Each person can
+                          only belong to one supplier account.
+                        </p>
+                      )
+                    : undefined
+                }
+              />
+              {can('STAFF_INVITE') && supplier?.id && (
+                <BranchInvitationsPanel supplierId={supplier.id} branchName={supplier.name} />
+              )}
+            </TabsContent>
+          )}
+
+          <TabsContent value="notifications" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="h-5 w-5" />
+                  Notification Preferences
+                </CardTitle>
+                <CardDescription>Choose how you want to be notified</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {isLoadingNotificationPrefs ? (
+                  <div className="flex items-center gap-3 text-sm text-[var(--text-muted)]">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading notification preferences…
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {SUPPLIER_NOTIFICATION_FIELDS.map(({ key, label, description }) => (
+                        <label
+                          key={key}
+                          className="flex flex-col gap-2 rounded-xl border p-4 hover:bg-[var(--brand-ultra)] cursor-pointer"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-[var(--text)]">{label}</span>
+                            {notificationPrefs[key] && (
+                              <CheckCircle2 className="h-5 w-5 text-[var(--mint)] shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-xs text-[var(--text-muted)]">{description}</p>
+                          <input
+                            type="checkbox"
+                            className="hidden"
+                            checked={notificationPrefs[key]}
+                            onChange={() => handleToggleNotification(key)}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <Button
+                      onClick={handleSaveNotifications}
+                      className="w-full"
+                      disabled={isSavingNotificationPrefs}
+                    >
+                      {isSavingNotificationPrefs ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-2" />
+                      )}
+                      {isSavingNotificationPrefs ? 'Saving…' : 'Save preferences'}
+                    </Button>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="delivery" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <MapPin className="h-5 w-5" />
+                      Delivery Zones
+                    </CardTitle>
+                    <CardDescription>Manage delivery coverage areas and pricing</CardDescription>
+                  </div>
+                  <Button
+                    onClick={() => setShowAddZone(true)}
+                    className="w-full sm:w-auto shrink-0"
+                  >
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Add Zone
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-semibold mb-2">Downtown Zone</h4>
+                        <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3 sm:gap-4">
+                          <div>
+                            <span className="text-[var(--text-muted)]">Fee:</span>
+                            <span className="ml-2 font-medium">$10.00</span>
+                          </div>
+                          <div>
+                            <span className="text-[var(--text-muted)]">Min Order:</span>
+                            <span className="ml-2 font-medium">$50.00</span>
+                          </div>
+                          <div>
+                            <span className="text-[var(--text-muted)]">Delivery:</span>
+                            <span className="ml-2 font-medium">2 days</span>
+                          </div>
+                        </div>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        Edit
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
+                    <MapPin className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
+                    <p className="text-[var(--text-muted)]">No additional delivery zones</p>
+                    <p className="text-sm text-[var(--text-muted)] mt-1">
+                      Add zones to define delivery areas and pricing
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="drivers" className="space-y-4">
+            <DriversSettingsPanel />
+          </TabsContent>
+
+          {can('SETTINGS_VIEW') && tenantAuditEnabled && (
+            <TabsContent value="activity" className="space-y-4">
+              <ActivityLogTab canExport={can('SETTINGS_MANAGE')} />
+            </TabsContent>
+          )}
+        </Tabs>
+
+        {/* Add Warehouse Dialog */}
+        <Dialog open={showAddWarehouse} onOpenChange={setShowAddWarehouse}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add New Warehouse</DialogTitle>
+              <DialogDescription>
+                Create a new warehouse location for your business
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="warehouse-name">Warehouse Name *</Label>
+                  <Input
+                    id="warehouse-name"
+                    placeholder="Main Warehouse"
+                    value={warehouseForm.name}
+                    onChange={(e) => setWarehouseForm({ ...warehouseForm, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="warehouse-code">Warehouse Code *</Label>
+                  <Input
+                    id="warehouse-code"
+                    placeholder="WH-001"
+                    value={warehouseForm.code}
+                    onChange={(e) => setWarehouseForm({ ...warehouseForm, code: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="warehouse-address">Street Address</Label>
+                  <Input
+                    id="warehouse-address"
+                    placeholder="123 Farm Road"
+                    value={warehouseForm.address}
+                    onChange={(e) =>
+                      setWarehouseForm({ ...warehouseForm, address: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="warehouse-city">City</Label>
+                  <Input
+                    id="warehouse-city"
+                    placeholder="Agricultural City"
+                    value={warehouseForm.city}
+                    onChange={(e) => setWarehouseForm({ ...warehouseForm, city: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="warehouse-country">Country</Label>
+                  <Input
+                    id="warehouse-country"
+                    placeholder="USA"
+                    value={warehouseForm.country}
+                    onChange={(e) =>
+                      setWarehouseForm({ ...warehouseForm, country: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="flex items-center space-x-2 md:col-span-2">
+                  <input
+                    type="checkbox"
+                    id="isMain"
+                    checked={warehouseForm.isMain}
+                    onChange={(e) =>
+                      setWarehouseForm({ ...warehouseForm, isMain: e.target.checked })
+                    }
+                    className="rounded"
+                  />
+                  <Label htmlFor="isMain" className="text-sm font-medium">
+                    Set as main warehouse
+                  </Label>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAddWarehouse(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddWarehouse} disabled={isCreatingWarehouse}>
+                {isCreatingWarehouse ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Add Warehouse
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Delivery Zone Dialog */}
+        <Dialog open={showAddZone} onOpenChange={setShowAddZone}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Delivery Zone</DialogTitle>
+              <DialogDescription>Create a new delivery coverage zone</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="zone-name">Zone Name *</Label>
+                <Input
+                  id="zone-name"
+                  placeholder="Downtown Zone"
+                  value={zoneForm.name}
+                  onChange={(e) => setZoneForm({ ...zoneForm, name: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="delivery-fee">Delivery Fee ($)</Label>
+                  <Input
+                    id="delivery-fee"
+                    type="number"
+                    placeholder="10.00"
+                    value={zoneForm.deliveryFee}
+                    onChange={(e) => setZoneForm({ ...zoneForm, deliveryFee: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="min-order">Min Order Amount ($)</Label>
+                  <Input
+                    id="min-order"
+                    type="number"
+                    placeholder="50.00"
+                    value={zoneForm.minOrderAmount}
+                    onChange={(e) => setZoneForm({ ...zoneForm, minOrderAmount: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="delivery-time">Delivery Time (days)</Label>
+                  <Input
+                    id="delivery-time"
+                    type="number"
+                    placeholder="2"
+                    value={zoneForm.deliveryTimeDays}
+                    onChange={(e) => setZoneForm({ ...zoneForm, deliveryTimeDays: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Coverage Area (Map Integration)</Label>
+                <div className="border-2 border-dashed border-[var(--app-border-mid)] rounded-lg p-8 text-center">
                   <MapPin className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
-                  <p className="text-[var(--text-muted)]">No additional delivery zones</p>
-                  <p className="text-sm text-[var(--text-muted)] mt-1">
-                    Add zones to define delivery areas and pricing
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Map picker will be integrated here
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">
+                    Draw polygon or select area
                   </p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAddZone(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddZone}>Add Zone</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-        <TabsContent value="drivers" className="space-y-4">
-          <DriversSettingsPanel />
-        </TabsContent>
-
-        {can('SETTINGS_VIEW') && tenantAuditEnabled && (
-          <TabsContent value="activity" className="space-y-4">
-            <ActivityLogTab canExport={can('SETTINGS_MANAGE')} />
-          </TabsContent>
-        )}
-      </Tabs>
-
-      {/* Add Warehouse Dialog */}
-      <Dialog open={showAddWarehouse} onOpenChange={setShowAddWarehouse}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Add New Warehouse</DialogTitle>
-            <DialogDescription>Create a new warehouse location for your business</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+        {/* Add Contact Dialog */}
+        <Dialog open={showAddContact} onOpenChange={setShowAddContact}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Contact</DialogTitle>
+              <DialogDescription>Add a business contact person</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="warehouse-name">Warehouse Name *</Label>
+                <Label htmlFor="contact-name">Name *</Label>
                 <Input
-                  id="warehouse-name"
-                  placeholder="Main Warehouse"
-                  value={warehouseForm.name}
-                  onChange={(e) => setWarehouseForm({ ...warehouseForm, name: e.target.value })}
+                  id="contact-name"
+                  placeholder="John Doe"
+                  value={contactForm.name}
+                  onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="warehouse-code">Warehouse Code *</Label>
-                <Input
-                  id="warehouse-code"
-                  placeholder="WH-001"
-                  value={warehouseForm.code}
-                  onChange={(e) => setWarehouseForm({ ...warehouseForm, code: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2 col-span-2">
-                <Label htmlFor="warehouse-address">Street Address</Label>
-                <Input
-                  id="warehouse-address"
-                  placeholder="123 Farm Road"
-                  value={warehouseForm.address}
-                  onChange={(e) => setWarehouseForm({ ...warehouseForm, address: e.target.value })}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="contact-email">Email *</Label>
+                  <Input
+                    id="contact-email"
+                    type="email"
+                    placeholder="john.doe@example.com"
+                    value={contactForm.email}
+                    onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="contact-phone">Phone *</Label>
+                  <Input
+                    id="contact-phone"
+                    type="tel"
+                    placeholder="+1 (555) 123-4567"
+                    value={contactForm.phone}
+                    onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="warehouse-city">City</Label>
+                <Label htmlFor="contact-role">Role/Title</Label>
                 <Input
-                  id="warehouse-city"
-                  placeholder="Agricultural City"
-                  value={warehouseForm.city}
-                  onChange={(e) => setWarehouseForm({ ...warehouseForm, city: e.target.value })}
+                  id="contact-role"
+                  placeholder="Sales Manager"
+                  value={contactForm.role}
+                  onChange={(e) => setContactForm({ ...contactForm, role: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="warehouse-country">Country</Label>
-                <Input
-                  id="warehouse-country"
-                  placeholder="USA"
-                  value={warehouseForm.country}
-                  onChange={(e) => setWarehouseForm({ ...warehouseForm, country: e.target.value })}
-                />
-              </div>
-              <div className="flex items-center space-x-2 col-span-2">
+              <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
-                  id="isMain"
-                  checked={warehouseForm.isMain}
-                  onChange={(e) => setWarehouseForm({ ...warehouseForm, isMain: e.target.checked })}
+                  id="isPrimary"
+                  checked={contactForm.isPrimary}
+                  onChange={(e) => setContactForm({ ...contactForm, isPrimary: e.target.checked })}
                   className="rounded"
                 />
-                <Label htmlFor="isMain" className="text-sm font-medium">
-                  Set as main warehouse
+                <Label htmlFor="isPrimary" className="text-sm font-medium">
+                  Set as primary contact
                 </Label>
               </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddWarehouse(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddWarehouse} disabled={isCreatingWarehouse}>
-              {isCreatingWarehouse ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Add Warehouse
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAddContact(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddContact}>Add Contact</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Add Delivery Zone Dialog */}
-      <Dialog open={showAddZone} onOpenChange={setShowAddZone}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Delivery Zone</DialogTitle>
-            <DialogDescription>Create a new delivery coverage zone</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="zone-name">Zone Name *</Label>
-              <Input
-                id="zone-name"
-                placeholder="Downtown Zone"
-                value={zoneForm.name}
-                onChange={(e) => setZoneForm({ ...zoneForm, name: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="delivery-fee">Delivery Fee ($)</Label>
-                <Input
-                  id="delivery-fee"
-                  type="number"
-                  placeholder="10.00"
-                  value={zoneForm.deliveryFee}
-                  onChange={(e) => setZoneForm({ ...zoneForm, deliveryFee: e.target.value })}
+        {/* CSV Upload Feature */}
+        <Dialog open={showBulkUpload} onOpenChange={setShowBulkUpload}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Upload Contacts from CSV/Excel</DialogTitle>
+              <DialogDescription>Upload a spreadsheet file to bulk add contacts</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="border-2 border-dashed border-[var(--app-border-mid)] rounded-lg p-8 text-center hover:border-[var(--brand-mid)] cursor-pointer transition-colors">
+                <input
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="csv-upload"
                 />
+                <label htmlFor="csv-upload" className="cursor-pointer">
+                  <Upload className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
+                  <p className="text-sm text-[var(--text-muted)]">Drop your CSV/Excel file here</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">or click to browse</p>
+                </label>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="min-order">Min Order Amount ($)</Label>
-                <Input
-                  id="min-order"
-                  type="number"
-                  placeholder="50.00"
-                  value={zoneForm.minOrderAmount}
-                  onChange={(e) => setZoneForm({ ...zoneForm, minOrderAmount: e.target.value })}
-                />
+              <div className="text-sm text-[var(--text-muted)] bg-[var(--brand-ultra)] p-4 rounded-lg">
+                <p className="font-medium mb-2">Expected columns:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Name (required)</li>
+                  <li>Email (required)</li>
+                  <li>Phone</li>
+                  <li>Role or Title</li>
+                  <li>Is Primary (true/false, optional)</li>
+                </ul>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="delivery-time">Delivery Time (days)</Label>
-                <Input
-                  id="delivery-time"
-                  type="number"
-                  placeholder="2"
-                  value={zoneForm.deliveryTimeDays}
-                  onChange={(e) => setZoneForm({ ...zoneForm, deliveryTimeDays: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Coverage Area (Map Integration)</Label>
-              <div className="border-2 border-dashed border-[var(--app-border-mid)] rounded-lg p-8 text-center">
-                <MapPin className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
-                <p className="text-sm text-[var(--text-muted)]">
-                  Map picker will be integrated here
-                </p>
-                <p className="text-xs text-[var(--text-muted)] mt-1">Draw polygon or select area</p>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddZone(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddZone}>Add Zone</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      {/* Add Contact Dialog */}
-      <Dialog open={showAddContact} onOpenChange={setShowAddContact}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Contact</DialogTitle>
-            <DialogDescription>Add a business contact person</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="contact-name">Name *</Label>
-              <Input
-                id="contact-name"
-                placeholder="John Doe"
-                value={contactForm.name}
-                onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="contact-email">Email *</Label>
-                <Input
-                  id="contact-email"
-                  type="email"
-                  placeholder="john.doe@example.com"
-                  value={contactForm.email}
-                  onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="contact-phone">Phone *</Label>
-                <Input
-                  id="contact-phone"
-                  type="tel"
-                  placeholder="+1 (555) 123-4567"
-                  value={contactForm.phone}
-                  onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="contact-role">Role/Title</Label>
-              <Input
-                id="contact-role"
-                placeholder="Sales Manager"
-                value={contactForm.role}
-                onChange={(e) => setContactForm({ ...contactForm, role: e.target.value })}
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="isPrimary"
-                checked={contactForm.isPrimary}
-                onChange={(e) => setContactForm({ ...contactForm, isPrimary: e.target.checked })}
-                className="rounded"
-              />
-              <Label htmlFor="isPrimary" className="text-sm font-medium">
-                Set as primary contact
-              </Label>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddContact(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddContact}>Add Contact</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* CSV Upload Feature */}
-      <Dialog open={showBulkUpload} onOpenChange={setShowBulkUpload}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Upload Contacts from CSV/Excel</DialogTitle>
-            <DialogDescription>Upload a spreadsheet file to bulk add contacts</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="border-2 border-dashed border-[var(--app-border-mid)] rounded-lg p-8 text-center hover:border-[var(--brand-mid)] cursor-pointer transition-colors">
-              <input
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                onChange={handleFileUpload}
-                className="hidden"
-                id="csv-upload"
-              />
-              <label htmlFor="csv-upload" className="cursor-pointer">
-                <Upload className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
-                <p className="text-sm text-[var(--text-muted)]">Drop your CSV/Excel file here</p>
-                <p className="text-xs text-[var(--text-muted)] mt-1">or click to browse</p>
-              </label>
-            </div>
-            <div className="text-sm text-[var(--text-muted)] bg-[var(--brand-ultra)] p-4 rounded-lg">
-              <p className="font-medium mb-2">Expected columns:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Name (required)</li>
-                <li>Email (required)</li>
-                <li>Phone</li>
-                <li>Role or Title</li>
-                <li>Is Primary (true/false, optional)</li>
-              </ul>
-            </div>
-
-            {uploadedContacts.length > 0 && (
-              <div className="space-y-2">
-                <p className="font-medium text-sm">Preview ({uploadedContacts.length} contacts):</p>
-                <div className="max-h-48 overflow-y-auto border rounded-lg">
-                  <table className="w-full text-sm">
-                    <thead className="bg-[var(--brand-ultra)]">
-                      <tr>
-                        <th className="px-3 py-2 text-left">Name</th>
-                        <th className="px-3 py-2 text-left">Email</th>
-                        <th className="px-3 py-2 text-left">Phone</th>
-                        <th className="px-3 py-2 text-left">Role</th>
-                        <th className="px-3 py-2 text-center">Primary</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {uploadedContacts.map((contact) => (
-                        <tr key={contact.id} className="border-t">
-                          <td className="px-3 py-2">{contact.name}</td>
-                          <td className="px-3 py-2">{contact.email}</td>
-                          <td className="px-3 py-2">{contact.phone}</td>
-                          <td className="px-3 py-2">{contact.role}</td>
-                          <td className="px-3 py-2 text-center">
-                            {contact.isPrimary ? (
-                              <CheckCircle2 className="h-4 w-4 text-[var(--mint)] mx-auto" />
-                            ) : (
-                              <XCircle className="h-4 w-4 text-[var(--text-muted)] mx-auto" />
-                            )}
-                          </td>
+              {uploadedContacts.length > 0 && (
+                <div className="space-y-2">
+                  <p className="font-medium text-sm">
+                    Preview ({uploadedContacts.length} contacts):
+                  </p>
+                  <div className="max-h-48 overflow-y-auto border rounded-lg">
+                    <table className="w-full text-sm">
+                      <thead className="bg-[var(--brand-ultra)]">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Name</th>
+                          <th className="px-3 py-2 text-left">Email</th>
+                          <th className="px-3 py-2 text-left">Phone</th>
+                          <th className="px-3 py-2 text-left">Role</th>
+                          <th className="px-3 py-2 text-center">Primary</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {uploadedContacts.map((contact) => (
+                          <tr key={contact.id} className="border-t">
+                            <td className="px-3 py-2">{contact.name}</td>
+                            <td className="px-3 py-2">{contact.email}</td>
+                            <td className="px-3 py-2">{contact.phone}</td>
+                            <td className="px-3 py-2">{contact.role}</td>
+                            <td className="px-3 py-2 text-center">
+                              {contact.isPrimary ? (
+                                <CheckCircle2 className="h-4 w-4 text-[var(--mint)] mx-auto" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-[var(--text-muted)] mx-auto" />
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowBulkUpload(false)
-                setUploadedContacts([])
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleSaveBulkContacts} disabled={uploadedContacts.length === 0}>
-              Upload {uploadedContacts.length > 0 ? `(${uploadedContacts.length})` : ''}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowBulkUpload(false)
+                  setUploadedContacts([])
+                }}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSaveBulkContacts} disabled={uploadedContacts.length === 0}>
+                Upload {uploadedContacts.length > 0 ? `(${uploadedContacts.length})` : ''}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </RequirePermission>
   )
 }

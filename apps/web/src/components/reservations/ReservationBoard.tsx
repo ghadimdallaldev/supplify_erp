@@ -35,6 +35,7 @@ interface ReservationBoardProps {
   tables: ReservationTable[]
   waitlist: ReservationWaitlist[]
   boardDate: string
+  branchId?: string
   onOpenReservation?: (reservation: Reservation) => void
 }
 
@@ -58,6 +59,7 @@ function SortableReservationCard({
   onStatusChange,
   onAssignTables,
   boardDate,
+  branchId,
   updating,
 }: {
   reservation: Reservation
@@ -65,6 +67,7 @@ function SortableReservationCard({
   onStatusChange: (id: string, status: ReservationStatus) => Promise<void>
   onAssignTables: (id: string, tableIds: string[]) => Promise<void>
   boardDate: string
+  branchId?: string
   updating: boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -230,6 +233,7 @@ export function ReservationBoard({
   tables,
   waitlist,
   boardDate,
+  branchId,
 }: ReservationBoardProps) {
   const [updateStatus, { isLoading: updatingStatus }] = useUpdateReservationStatusMutation()
   const [assignTables, { isLoading: assigningTables }] = useAssignReservationTablesMutation()
@@ -288,7 +292,7 @@ export function ReservationBoard({
 
   const handleAssignTables = async (id: string, tableIds: string[]) => {
     try {
-      await assignTables({ id, tableIds, boardDate }).unwrap()
+      await assignTables({ id, tableIds, boardDate, ...(branchId ? { branchId } : {}) }).unwrap()
       toast.success('Table assigned')
     } catch (error: unknown) {
       const err = error as { data?: { error?: { message?: string } } }
@@ -360,6 +364,7 @@ export function ReservationBoard({
                           onStatusChange={handleQuickStatus}
                           onAssignTables={handleAssignTables}
                           boardDate={boardDate}
+                          branchId={branchId}
                           updating={updating}
                         />
                       ))

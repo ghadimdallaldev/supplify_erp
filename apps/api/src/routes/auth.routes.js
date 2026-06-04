@@ -12,6 +12,7 @@ import { userNeedsTenantSetup } from '../lib/register-account.js'
 import { upsertUser } from '../lib/rbac.js'
 import { setAuthCookies, clearAuthCookies } from '../lib/rbac.js'
 import { clearImpersonationCookie } from '../lib/impersonation.js'
+import { clearActiveTenantCookie } from '../lib/tenant-switch.js'
 import {
   requireAuth,
   optionalAuth,
@@ -19,6 +20,7 @@ import {
   assignDefaultRoleForTenant,
 } from '../lib/rbac.js'
 import { getRolesForUser, getPermissionsForUser } from '../lib/permissions.js'
+import { getTenantProfileRow } from '../lib/tenant-profile-cache.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
@@ -29,6 +31,7 @@ const router = express.Router()
 function clearLocalAuthSession(req, res) {
   clearAuthCookies(res)
   clearImpersonationCookie(res)
+  clearActiveTenantCookie(res)
   return new Promise((resolve) => {
     if (!req.session) {
       resolve()
@@ -45,6 +48,9 @@ function apiOrigin(req) {
 // Generate login URL and redirect to Keycloak
 router.get('/login', async (req, res) => {
   try {
+    clearImpersonationCookie(res)
+    clearActiveTenantCookie(res)
+
     // Generate CSRF token for this session
     const state = randomBytes(32).toString('hex')
 
@@ -65,16 +71,9 @@ router.get('/login', async (req, res) => {
     logger.debug('Redirecting to Keycloak for authentication')
     res.redirect(authUrl)
   } catch (error) {
-    logger.error('Login error', { error: error.message })
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Login failed',
-      },
-      requestId: req.requestId,
-    })
+    logger.error('Login error', { error: error.message, stack: error.stack })
+    const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173'
+    res.redirect(`${webOrigin}/login?error=callback_failed`)
   }
 })
 
@@ -181,6 +180,8 @@ router.get('/callback', async (req, res) => {
 
     // Set auth cookies
     setAuthCookies(res, tokens.access_token, tokens.refresh_token)
+    clearImpersonationCookie(res)
+    clearActiveTenantCookie(res)
 
     logger.info('User authenticated', { userId: user.id, role: user.role })
 
@@ -233,6 +234,10 @@ router.get('/me', requireAuth, async (req, res) => {
     let adminPermissions = []
     let workspace = null
     const tenant = await getRequestTenant(req)
+    const { getEffectiveTenant, getImpersonationEffectivePermissions } = await import(
+      '../lib/impersonation.js'
+    )
+    const effectiveTenant = getEffectiveTenant(req)
     if (tenant) {
       const { ensurePrimaryContactOwnerRole, assignDefaultRoleForTenant: assignDefault } =
         await import('../lib/rbac.js')
@@ -241,49 +246,68 @@ router.get('/me', requireAuth, async (req, res) => {
       )
       await ensurePrimaryContactOwnerRole(user.id, user.email, tenant.tenantId, tenant.tenantType)
 
-      tenantRoles = await getRolesForUser(user.id, tenant.tenantId, tenant.tenantType)
-      tenantPermissions = await getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType)
-      if (tenantRoles.length === 0 && (user.role === 'RESTAURANT' || user.role === 'SUPPLIER')) {
-        const isPrimary = await isPrimaryTenantContact(
-          user.id,
-          user.email,
-          tenant.tenantId,
-          tenant.tenantType
+      if (user.role === 'ADMIN' && effectiveTenant) {
+        tenantPermissions = await getImpersonationEffectivePermissions(
+          effectiveTenant.tenantId,
+          effectiveTenant.tenantType,
+          effectiveTenant.viewAsRoleId
         )
-        if (isPrimary) {
-          await assignDefault(user.id, tenant.tenantId, tenant.tenantType)
-          tenantRoles = await getRolesForUser(user.id, tenant.tenantId, tenant.tenantType)
-          tenantPermissions = await getPermissionsForUser(
+        if (effectiveTenant.viewAsRoleId) {
+          const { rows: roleRows } = await query(`SELECT name FROM tenant_roles WHERE id = $1`, [
+            effectiveTenant.viewAsRoleId,
+          ])
+          tenantRoles = roleRows.map((r) => r.name)
+        } else {
+          tenantRoles = ['Owner (impersonation)']
+        }
+      } else {
+        // roles, permissions, workspace assignment, and tenant data are all independent reads.
+        const [rolesResult, permsResult, assignment, tenantProfileRow] = await Promise.all([
+          getRolesForUser(user.id, tenant.tenantId, tenant.tenantType),
+          getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType),
+          getTenantAssignmentForUser(user.id, user.role),
+          getTenantProfileRow(tenant.tenantType, tenant.tenantId),
+        ])
+        tenantRoles = rolesResult
+        tenantPermissions = permsResult
+        const tenantDataRows = tenantProfileRow ? [tenantProfileRow] : []
+
+        if (tenantRoles.length === 0 && (user.role === 'RESTAURANT' || user.role === 'SUPPLIER')) {
+          const isPrimary = await isPrimaryTenantContact(
             user.id,
+            user.email,
             tenant.tenantId,
             tenant.tenantType
           )
+          if (isPrimary) {
+            await assignDefault(user.id, tenant.tenantId, tenant.tenantType)
+            ;[tenantRoles, tenantPermissions] = await Promise.all([
+              getRolesForUser(user.id, tenant.tenantId, tenant.tenantType),
+              getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType),
+            ])
+          }
         }
-      }
 
-      const assignment = await getTenantAssignmentForUser(user.id, user.role)
-      workspace = {
-        tenantId: tenant.tenantId,
-        tenantType: tenant.tenantType,
-        tenantName: tenant.tenantName || assignment?.tenantName || '',
-        roleName: assignment?.roleName || tenantRoles[0] || null,
-      }
+        workspace = {
+          tenantId: tenant.tenantId,
+          tenantType: tenant.tenantType,
+          tenantName: tenant.tenantName || assignment?.tenantName || '',
+          roleName: assignment?.roleName || tenantRoles[0] || null,
+        }
 
-      if (tenant.tenantType === 'SUPPLIER') {
-        const { rows: suppliers } = await query('SELECT * FROM supplier WHERE id = $1', [
-          tenant.tenantId,
-        ])
-        if (suppliers.length > 0) additionalData.supplier = suppliers[0]
-      } else if (tenant.tenantType === 'RESTAURANT') {
-        const { rows: restaurants } = await query('SELECT * FROM restaurant WHERE id = $1', [
-          tenant.tenantId,
-        ])
-        if (restaurants.length > 0) additionalData.restaurant = restaurants[0]
+        if (tenant.tenantType === 'SUPPLIER' && tenantDataRows.length > 0) {
+          additionalData.supplier = tenantDataRows[0]
+        } else if (tenant.tenantType === 'RESTAURANT' && tenantDataRows.length > 0) {
+          additionalData.restaurant = tenantDataRows[0]
+        }
       }
     }
     if (user.role === 'ADMIN') {
-      adminRoles = await getRolesForUser(user.id, null, 'ADMIN')
-      adminPermissions = await getPermissionsForUser(user.id, null, 'ADMIN')
+      // Admin roles and permissions are independent reads.
+      ;[adminRoles, adminPermissions] = await Promise.all([
+        getRolesForUser(user.id, null, 'ADMIN'),
+        getPermissionsForUser(user.id, null, 'ADMIN'),
+      ])
     }
 
     const accessType = user.role === 'STAFF_PORTAL' ? 'staff_portal' : 'platform'
@@ -412,6 +436,7 @@ router.post('/logout', requireAuth, async (req, res) => {
     // Clear cookies (same path/sameSite as set so browser actually removes them)
     clearAuthCookies(res)
     clearImpersonationCookie(res)
+    clearActiveTenantCookie(res)
 
     // Destroy Express session so session cookie is cleared
     await new Promise((resolve, reject) => {
@@ -446,6 +471,7 @@ router.post('/logout', requireAuth, async (req, res) => {
     // Clear cookies and session even if revocation or destroy fails
     clearAuthCookies(res)
     clearImpersonationCookie(res)
+    clearActiveTenantCookie(res)
     req.session.destroy(() => {})
 
     let keycloakLogoutUrl = null

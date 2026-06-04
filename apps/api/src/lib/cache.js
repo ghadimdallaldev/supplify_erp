@@ -1,29 +1,44 @@
 import Redis from 'ioredis'
 import { config } from '../config/env.js'
+import { redisIoredisOptions } from '../config/resolve-redis-url.js'
 import { logger } from './logger.js'
 
 let redisClient = null
 
 if (config.REDIS_URL) {
   try {
-    redisClient = new Redis(config.REDIS_URL, {
-      maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
-    })
+    redisClient = new Redis(config.REDIS_URL, redisIoredisOptions({ maxRetriesPerRequest: 1 }))
 
     redisClient.on('error', (error) => {
-      logger.warn('Redis connection error for calendar cache', { error: error.message })
+      const log = logger.warn ?? logger.info ?? logger.error
+      if (typeof log === 'function') {
+        log.call(logger, 'Redis cache connection error', { error: error.message })
+      }
     })
 
     redisClient.on('connect', () => {
-      logger.info('Redis connection established for calendar cache')
+      if (typeof logger.info === 'function') {
+        logger.info('Redis cache connection established (shared cross-request cache enabled)')
+      }
     })
   } catch (error) {
-    logger.warn('Failed to initialize Redis client, falling back to in-memory cache', {
-      error: error.message,
-    })
+    const log = logger.warn ?? logger.info ?? logger.error
+    if (typeof log === 'function') {
+      log.call(logger, 'Failed to initialize Redis client, falling back to in-memory cache', {
+        error: error.message,
+      })
+    }
     redisClient = null
   }
+} else if (typeof logger.warn === 'function') {
+  logger.warn(
+    'REDIS_URL is not set — API caches use in-process memory only (no cross-replica sharing)'
+  )
+}
+
+/** @returns {boolean} */
+export function isRedisCacheEnabled() {
+  return redisClient != null
 }
 
 const memoryCache = new Map()

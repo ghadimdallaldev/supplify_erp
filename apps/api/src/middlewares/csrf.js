@@ -44,6 +44,11 @@ export function csrfProtection(req, res, next) {
     return next()
   }
 
+  // Local storage direct PUT uses HMAC upload token (no session cookie)
+  if (req.path.startsWith('/api/files/upload/')) {
+    return next()
+  }
+
   // Cookie-based JSON API: require non-simple custom header + trusted origin
   if (req.path.startsWith('/api/')) {
     if (config.NODE_ENV === 'test') {
@@ -78,7 +83,9 @@ export function csrfProtection(req, res, next) {
     return next()
   }
 
-  // Session-backed non-API routes: issue CSRF token in session
+  // Session-backed non-API routes: issue CSRF token in session.
+  // Guard: session is scoped to /auth in server.js; non-API routes outside /auth won't have it.
+  if (!req.session) return next()
   if (!req.session.csrfToken) {
     req.session.csrfToken = randomBytes(32).toString('hex')
   }

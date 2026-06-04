@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 
 type Props = {
   permission?: string
-  anyOf?: string[]
+  anyOf?: readonly string[]
   title?: string
   children: ReactNode
 }

@@ -2,6 +2,8 @@ import { query } from '../lib/db.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 
 const GRANULARITIES = ['day', 'week', 'month']
+/** Maximum inclusive report window (days). */
+export const MAX_REPORT_RANGE_DAYS = 366
 
 function startOfDay(d) {
   const x = new Date(d)
@@ -23,6 +25,11 @@ export function parseReportQuery(query = {}) {
   }
   if (from > to) {
     throw new ValidationError('from must be before to')
+  }
+  const spanMs = to.getTime() - from.getTime()
+  const maxSpanMs = MAX_REPORT_RANGE_DAYS * 24 * 60 * 60 * 1000
+  if (spanMs > maxSpanMs) {
+    throw new ValidationError(`Date range cannot exceed ${MAX_REPORT_RANGE_DAYS} days`)
   }
   const granularity = (query.granularity || 'day').toLowerCase()
   if (!GRANULARITIES.includes(granularity)) {

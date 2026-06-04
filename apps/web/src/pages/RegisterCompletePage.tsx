@@ -11,9 +11,15 @@ import {
   useGetMeQuery,
   useGetRegisterStatusQuery,
 } from '../services/api'
+import { refetchAppSession, hasStaleRegistrationState } from '../lib/refetchAppSession'
 import { useAppDispatch } from '../hooks/redux'
 import { Building2, Loader2, Store, Truck } from 'lucide-react'
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query'
+import {
+  LegalAcceptancePanel,
+  isLegalAcceptanceComplete,
+} from '../components/legal/LegalAcceptancePanel'
+import { buildLegalAcceptancePayload, type LegalDocumentSlug } from '../lib/legalDocuments'
 
 type AccountType = 'RESTAURANT' | 'SUPPLIER'
 
@@ -52,16 +58,29 @@ export function RegisterCompletePage() {
   const [accountType, setAccountType] = useState<AccountType | null>(null)
   const [businessName, setBusinessName] = useState('')
   const [phone, setPhone] = useState('')
+  const [acceptedLegal, setAcceptedLegal] = useState<Set<LegalDocumentSlug>>(new Set())
+  const [electronicSigned, setElectronicSigned] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const legalComplete = isLegalAcceptanceComplete(
+    'registration',
+    accountType,
+    acceptedLegal,
+    electronicSigned
+  )
 
   useEffect(() => {
     if (!user || user.role === 'ADMIN') return
+    if (hasStaleRegistrationState({ role: user.role, needsSetup: status?.needsSetup })) {
+      void refetchAppSession(dispatch)
+      return
+    }
     if (user.role === 'RESTAURANT' || user.role === 'SUPPLIER') {
       if (status?.needsSetup === false) {
         navigate('/app/activate', { replace: true })
       }
     }
-  }, [user, status, navigate])
+  }, [user, status, navigate, dispatch])
 
   useEffect(() => {
     if (isUnauthorized(userError) || isUnauthorized(statusError)) {
@@ -76,14 +95,18 @@ export function RegisterCompletePage() {
       setError('Please choose whether you are a restaurant or a supplier.')
       return
     }
+    if (!legalComplete) {
+      setError('Please accept all required legal agreements before continuing.')
+      return
+    }
     try {
       await completeRegistration({
         accountType,
         businessName: businessName.trim(),
         phone: phone.trim() || undefined,
+        legalAcceptance: buildLegalAcceptancePayload(acceptedLegal),
       }).unwrap()
-      await dispatch(api.endpoints.getMe.initiate(undefined, { forceRefetch: true })).unwrap()
-      await dispatch(api.endpoints.getRegisterStatus.initiate(undefined, { forceRefetch: true }))
+      await refetchAppSession(dispatch)
       navigate('/app/activate', { replace: true })
     } catch (err: unknown) {
       const fetchErr = err as FetchBaseQueryError
@@ -94,6 +117,7 @@ export function RegisterCompletePage() {
 
       if (isNetworkError) {
         try {
+          await refetchAppSession(dispatch)
           const me = await dispatch(
             api.endpoints.getMe.initiate(undefined, { forceRefetch: true })
           ).unwrap()
@@ -141,7 +165,7 @@ export function RegisterCompletePage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-ultra)] via-[var(--surface)] to-[var(--brand-ultra)] p-6">
-      <Card className="w-full max-w-lg border-2 shadow-xl">
+      <Card className="w-full max-w-xl border-2 shadow-xl">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Set up your organization</CardTitle>
           <CardDescription>
@@ -208,11 +232,25 @@ export function RegisterCompletePage() {
                 id="phone"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+971 50 000 0000"
+                placeholder="+961 3 000 000"
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={submitting || !accountType}>
+            <LegalAcceptancePanel
+              variant="registration"
+              accountType={accountType}
+              value={acceptedLegal}
+              onChange={setAcceptedLegal}
+              electronicSigned={electronicSigned}
+              onElectronicSignedChange={setElectronicSigned}
+              disabled={submitting}
+            />
+
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={submitting || !accountType || !legalComplete}
+            >
               {submitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

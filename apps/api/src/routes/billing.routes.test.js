@@ -45,17 +45,23 @@ vi.mock('../lib/billing/gateway-registry.js', () => ({
 }))
 
 vi.mock('../lib/audit.js', () => ({
-  writeAuditLog: vi.fn(),
+  writeAuditLog: vi.fn().mockResolvedValue(undefined),
+}))
+
+const getEffectiveTenant = vi.fn()
+vi.mock('../lib/impersonation.js', () => ({
+  getEffectiveTenant,
 }))
 
 vi.mock('../lib/logger.js', () => ({
-  logger: { error: vi.fn(), info: vi.fn() },
+  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
 
 describe('billing.routes', () => {
   let app
 
   beforeEach(async () => {
+    getEffectiveTenant.mockReturnValue(null)
     getBillingStatus.mockReset()
     listPaymentMethods.mockReset()
     setAutoRenew.mockReset()
@@ -137,5 +143,25 @@ describe('billing.routes', () => {
         paymentMethodId: undefined,
       })
     )
+  })
+
+  it('POST /checkout returns 403 while impersonating', async () => {
+    getEffectiveTenant.mockReturnValue({
+      tenantId: 'rest-1',
+      tenantType: 'RESTAURANT',
+      tenantName: 'Test Restaurant',
+    })
+
+    const res = await request(app)
+      .post('/api/billing/checkout')
+      .send({
+        planId: '00000000-0000-4000-8000-000000000099',
+        billingCycle: 'MONTHLY',
+        idempotencyKey: 'impersonation-blocked-key',
+      })
+      .expect(403)
+
+    expect(res.body.error.name).toBe('IMPERSONATION_RESTRICTED')
+    expect(checkoutSubscription).not.toHaveBeenCalled()
   })
 })

@@ -79,6 +79,7 @@ export const FREE_TIER_LIMIT_PATCHES = {
     quick_list_items: 1,
     scheduled_quick_lists: 1,
     scheduled_order_grace_per_day: 1,
+    deal_redemptions_per_day: 1,
   },
   SUPPLIER: {
     branches: 1,
@@ -185,6 +186,88 @@ export async function resolveEffectiveLimit({
     tenantOverride,
     isUnlimited: effective == null,
   }
+}
+
+function resolveOneLimitFromMaps(limitKey, planLimits, planOverrideMap, tenantOverrideMap) {
+  const baseLimit = planLimits?.[limitKey]
+  let effective = parseLimitValue(baseLimit)
+  const planOverride = planOverrideMap.get(limitKey) || null
+  const tenantOverride = tenantOverrideMap.get(limitKey) || null
+
+  if (planOverride) {
+    effective = applyIncreaseOnly(baseLimit, planOverride.override_value)
+  }
+  if (tenantOverride) {
+    effective = applyIncreaseOnly(baseLimit, tenantOverride.override_value)
+  }
+
+  return {
+    limitKey,
+    baseLimit: parseLimitValue(baseLimit),
+    effectiveLimit: effective,
+    planOverride,
+    tenantOverride,
+    isUnlimited: effective == null,
+  }
+}
+
+/**
+ * Resolve all limit keys in two DB round-trips (plan + tenant overrides).
+ * @returns {Promise<Record<string, Awaited<ReturnType<typeof resolveEffectiveLimit>>>>}
+ */
+export async function resolveAllEffectiveLimits({
+  tenantId,
+  tenantType,
+  limitKeys,
+  planId,
+  planLimits = {},
+}) {
+  const keys = limitKeys.filter((k) => isLimitKeyApplicable(tenantType, k))
+  const planOverrideMap = new Map()
+  const tenantOverrideMap = new Map()
+
+  if (planId && keys.length > 0) {
+    try {
+      const { rows } = await query(
+        `SELECT limit_type, override_value, expiration_date, is_active, reason, id
+         FROM plan_limit_override
+         WHERE plan_id = $1 AND limit_type = ANY($2::text[])`,
+        [planId, keys]
+      )
+      for (const row of rows) {
+        if (isOverrideRowActive(row)) planOverrideMap.set(row.limit_type, row)
+      }
+    } catch (error) {
+      if (error.code !== '42P01') throw error
+    }
+  }
+
+  if (keys.length > 0) {
+    try {
+      const { rows } = await query(
+        `SELECT limit_type, override_value, expiration_date, is_active, reason, id
+         FROM tenant_limit_override
+         WHERE tenant_id = $1 AND tenant_type = $2 AND limit_type = ANY($3::text[])`,
+        [tenantId, tenantType, keys]
+      )
+      for (const row of rows) {
+        if (isOverrideRowActive(row)) tenantOverrideMap.set(row.limit_type, row)
+      }
+    } catch (error) {
+      if (error.code !== '42P01') throw error
+    }
+  }
+
+  const out = {}
+  for (const limitKey of keys) {
+    out[limitKey] = resolveOneLimitFromMaps(
+      limitKey,
+      planLimits,
+      planOverrideMap,
+      tenantOverrideMap
+    )
+  }
+  return out
 }
 
 /**

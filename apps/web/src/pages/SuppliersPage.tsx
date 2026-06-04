@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type ReactNode } from 'react'
 import {
   useGetSuppliersQuery,
   useFollowSupplierMutation,
@@ -33,6 +33,7 @@ import {
   Users,
   Store,
   Clock,
+  X,
 } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { Link, useNavigate } from 'react-router-dom'
@@ -46,8 +47,59 @@ import {
   cardActionBtnClass,
   cardShellClass,
   formatAddressLine,
-  pageHeaderRowClass,
 } from '../components/ui/card-layout'
+import { EmptyState } from '../components/ui/empty-state'
+import { PageHeader } from '../components/ui/page-header'
+import { cn } from '../lib/utils'
+
+function SupplierStatCard({
+  label,
+  value,
+  hint,
+  icon,
+  iconWrapClassName,
+  active,
+  onClick,
+}: {
+  label: string
+  value: number | string
+  hint?: string
+  icon: ReactNode
+  iconWrapClassName: string
+  active?: boolean
+  onClick?: () => void
+}) {
+  const Comp = onClick ? 'button' : 'div'
+  return (
+    <Comp
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={cn(
+        'flex w-full items-start justify-between gap-3 rounded-xl border bg-[var(--surface)] p-4 text-left shadow-sm transition',
+        'border-[var(--app-border-mid)]',
+        onClick &&
+          'hover:border-[var(--brand-mid)] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]',
+        active && 'border-[var(--brand-mid)] ring-2 ring-[var(--brand-pale)]'
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
+          {label}
+        </p>
+        <p className="mt-1 text-2xl font-bold tabular-nums text-[var(--text)]">{value}</p>
+        {hint && <p className="mt-1 text-xs text-[var(--text-muted)] line-clamp-2">{hint}</p>}
+      </div>
+      <div
+        className={cn(
+          'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+          iconWrapClassName
+        )}
+      >
+        {icon}
+      </div>
+    </Comp>
+  )
+}
 
 function isSupplierNew(createdAt: string) {
   const daysSince = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)
@@ -86,8 +138,12 @@ export function SuppliersPage() {
         (sum: number, s: any) => sum + Number(s.product_count || 0),
         0
       ),
+      newSuppliers: suppliers.filter((s: any) => isSupplierNew(s.created_at)).length,
     }
   }, [data?.suppliers])
+
+  const suppliers = data?.suppliers || []
+  const hasActiveFilters = Boolean(search || cityFilter || filterBy !== 'all')
 
   // Filter and sort suppliers
   const filteredSuppliers = useMemo(() => {
@@ -168,166 +224,176 @@ export function SuppliersPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 min-w-0">
-      <div className={pageHeaderRowClass}>
-        <div>
-          <h1 className="text-[21px] font-black text-[var(--text)]">Suppliers</h1>
-          <p className="text-[var(--text-muted)] mt-2">
-            {isRestaurant
-              ? 'Discover and connect with trusted suppliers'
-              : 'Manage suppliers in the marketplace'}
-          </p>
-        </div>
-        {isRestaurant && (
-          <div className="flex gap-2">
-            <Button
-              variant={viewMode === 'grid' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setViewMode('grid')}
-            >
-              <Grid3x3 className="h-4 w-4 mr-1" />
-              Grid
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setViewMode('list')}
-            >
-              <List className="h-4 w-4 mr-1" />
-              List
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* Statistics Cards */}
-      {isRestaurant && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Total Suppliers</p>
-                  <p className="text-2xl font-bold text-[var(--text)]">{stats.total}</p>
-                </div>
-                <Building2 className="h-8 w-8 text-[var(--brand-mid)]" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Following</p>
-                  <p className="text-2xl font-bold text-[var(--text)]">{stats.followed}</p>
-                </div>
-                <Heart className="h-8 w-8 text-[var(--red)] fill-current" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">With Products</p>
-                  <p className="text-2xl font-bold text-[var(--text)]">{stats.withProducts}</p>
-                </div>
-                <Package className="h-8 w-8 text-[var(--mint)]" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Total Products</p>
-                  <p className="text-2xl font-bold text-[var(--text)]">{stats.totalProducts}</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-[var(--amber-mid)]" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Search and Filters */}
-      {isRestaurant && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col gap-4 md:flex-row md:flex-wrap">
-              <div className="flex-1 min-w-0 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-                <Input
-                  placeholder="Search suppliers by name, email, or city..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Input
-                placeholder="Filter by city..."
-                value={cityFilter}
-                onChange={(e) => setCityFilter(e.target.value)}
-                className="w-full md:w-48"
-              />
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant={filterBy === 'all' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilterBy('all')}
-                >
-                  <Filter className="h-4 w-4 mr-1" />
-                  All
-                </Button>
-                <Button
-                  variant={filterBy === 'followed' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilterBy('followed')}
-                >
-                  <Heart className="h-4 w-4 mr-1" />
-                  Following
-                </Button>
-                <Button
-                  variant={filterBy === 'new' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilterBy('new')}
-                >
-                  <Sparkles className="h-4 w-4 mr-1" />
-                  New
-                </Button>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setSortBy(
-                      sortBy === 'name' ? 'products' : sortBy === 'products' ? 'recent' : 'name'
-                    )
-                  }
-                >
-                  <ArrowUpDown className="h-4 w-4 mr-1" />
-                  {sortBy === 'name' ? 'Name' : sortBy === 'products' ? 'Products' : 'Recent'}
-                </Button>
-              </div>
+    <div className="space-y-5 min-w-0" data-testid="suppliers-page">
+      <PageHeader
+        title="Suppliers"
+        description={
+          isRestaurant
+            ? 'Discover suppliers, follow favorites, and browse their catalogs.'
+            : 'Manage suppliers in the marketplace'
+        }
+        actions={
+          isRestaurant ? (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/app/products">Browse products</Link>
+              </Button>
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                aria-pressed={viewMode === 'grid'}
+              >
+                <Grid3x3 className="h-4 w-4 mr-1" />
+                Grid
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                aria-pressed={viewMode === 'list'}
+              >
+                <List className="h-4 w-4 mr-1" />
+                List
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+          ) : undefined
+        }
+      />
+
+      {isRestaurant && (
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+            <SupplierStatCard
+              label="Total suppliers"
+              value={stats.total}
+              hint="Available in your marketplace"
+              icon={<Building2 className="h-5 w-5 text-[var(--brand-mid)]" />}
+              iconWrapClassName="bg-[var(--brand-pale)]"
+              active={filterBy === 'all' && stats.total > 0}
+              onClick={stats.total > 0 ? () => setFilterBy('all') : undefined}
+            />
+            <SupplierStatCard
+              label="Following"
+              value={stats.followed}
+              hint="Suppliers you follow for quick access"
+              icon={<Heart className="h-5 w-5 text-[var(--red)]" />}
+              iconWrapClassName="bg-[var(--red-pale)]"
+              active={filterBy === 'followed'}
+              onClick={stats.total > 0 ? () => setFilterBy('followed') : undefined}
+            />
+            <SupplierStatCard
+              label="With products"
+              value={stats.withProducts}
+              hint="Ready to browse and order"
+              icon={<Package className="h-5 w-5 text-[var(--mint)]" />}
+              iconWrapClassName="bg-[var(--mint)]/15"
+            />
+            <SupplierStatCard
+              label="Total products"
+              value={stats.totalProducts}
+              hint={
+                stats.newSuppliers > 0
+                  ? `${stats.newSuppliers} new supplier${stats.newSuppliers === 1 ? '' : 's'} this month`
+                  : 'Across all suppliers'
+              }
+              icon={<TrendingUp className="h-5 w-5 text-[var(--amber-mid)]" />}
+              iconWrapClassName="bg-[var(--amber-pale)]"
+              active={filterBy === 'new'}
+              onClick={stats.newSuppliers > 0 ? () => setFilterBy('new') : undefined}
+            />
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-xl border border-[var(--app-border-mid)] bg-[var(--surface)] p-3 shadow-sm lg:flex-row lg:items-center lg:p-4">
+            <div className="relative min-w-0 flex-1">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
+                aria-hidden
+              />
+              <Input
+                placeholder="Search by name, email, or city…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-10 rounded-lg border-[var(--app-border-mid)] pl-10"
+                aria-label="Search suppliers"
+              />
+            </div>
+            <Input
+              placeholder="City"
+              value={cityFilter}
+              onChange={(e) => setCityFilter(e.target.value)}
+              className="h-10 w-full rounded-lg border-[var(--app-border-mid)] lg:w-40"
+              aria-label="Filter by city"
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={filterBy === 'all' ? 'default' : 'outline'}
+                size="sm"
+                className="h-10 rounded-lg"
+                onClick={() => setFilterBy('all')}
+              >
+                <Filter className="h-4 w-4 mr-1.5" />
+                All
+                <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
+                  {stats.total}
+                </Badge>
+              </Button>
+              <Button
+                variant={filterBy === 'followed' ? 'default' : 'outline'}
+                size="sm"
+                className="h-10 rounded-lg"
+                onClick={() => setFilterBy('followed')}
+              >
+                <Heart className="h-4 w-4 mr-1.5" />
+                Following
+                <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
+                  {stats.followed}
+                </Badge>
+              </Button>
+              <Button
+                variant={filterBy === 'new' ? 'default' : 'outline'}
+                size="sm"
+                className="h-10 rounded-lg"
+                onClick={() => setFilterBy('new')}
+              >
+                <Sparkles className="h-4 w-4 mr-1.5" />
+                New
+                <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
+                  {stats.newSuppliers}
+                </Badge>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-10 rounded-lg"
+                onClick={() =>
+                  setSortBy(
+                    sortBy === 'name' ? 'products' : sortBy === 'products' ? 'recent' : 'name'
+                  )
+                }
+              >
+                <ArrowUpDown className="h-4 w-4 mr-1.5" />
+                {sortBy === 'name' ? 'Name' : sortBy === 'products' ? 'Products' : 'Recent'}
+              </Button>
+            </div>
+          </div>
+        </>
       )}
 
-      {/* Supplier Grid/List */}
       {filteredSuppliers.length === 0 ? (
-        <Card>
-          <CardContent className="pt-12 pb-12">
-            <div className="text-center">
-              <Building2 className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-[var(--text)] mb-2">No suppliers found</h3>
-              <p className="text-[var(--text-muted)] mb-6">
-                {search || cityFilter || filterBy !== 'all'
-                  ? 'Try adjusting your search or filter criteria'
-                  : 'No suppliers available in the marketplace'}
-              </p>
-              {(search || cityFilter || filterBy !== 'all') && (
+        <div className="space-y-4">
+          <EmptyState
+            title={hasActiveFilters ? 'No suppliers match your filters' : 'No suppliers yet'}
+            description={
+              hasActiveFilters
+                ? 'Try clearing filters or broadening your search.'
+                : isRestaurant
+                  ? 'When suppliers join the marketplace, they will appear here. Browse products or check back soon.'
+                  : 'No suppliers are registered in the marketplace yet.'
+            }
+            icon={<Building2 className="h-6 w-6" aria-hidden />}
+            action={
+              hasActiveFilters ? (
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -336,12 +402,68 @@ export function SuppliersPage() {
                     setFilterBy('all')
                   }}
                 >
-                  Clear Filters
+                  <X className="h-4 w-4 mr-2" />
+                  Clear filters
                 </Button>
-              )}
+              ) : isRestaurant ? (
+                <Button asChild>
+                  <Link to="/app/products">
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Browse products
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={() => refetch()}>
+                  Refresh
+                </Button>
+              )
+            }
+          />
+          {isRestaurant && !hasActiveFilters && suppliers.length === 0 && (
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                {
+                  step: '1',
+                  title: 'Explore the catalog',
+                  body: 'Browse products from every connected supplier.',
+                  icon: Package,
+                  to: '/app/products',
+                },
+                {
+                  step: '2',
+                  title: 'Follow suppliers',
+                  body: 'Save favorites to find them quickly later.',
+                  icon: Heart,
+                },
+                {
+                  step: '3',
+                  title: 'Message & order',
+                  body: 'Chat with suppliers and place orders from their catalog.',
+                  icon: MessageCircle,
+                },
+              ].map(({ step, title, body, icon: Icon, to }) => (
+                <div
+                  key={step}
+                  className="rounded-xl border border-[var(--app-border-mid)] bg-[var(--surface)] p-4 shadow-sm"
+                >
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--brand-pale)] text-xs font-bold text-[var(--brand-mid)]">
+                      {step}
+                    </span>
+                    <Icon className="h-4 w-4 text-[var(--brand-mid)]" aria-hidden />
+                    <span className="text-sm font-semibold text-[var(--text)]">{title}</span>
+                  </div>
+                  <p className="text-sm leading-relaxed text-[var(--text-muted)]">{body}</p>
+                  {to && (
+                    <Button variant="link" size="sm" className="mt-2 h-auto p-0" asChild>
+                      <Link to={to}>Go to products</Link>
+                    </Button>
+                  )}
+                </div>
+              ))}
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {filteredSuppliers.map((supplier: any) => {

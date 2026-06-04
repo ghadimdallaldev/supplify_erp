@@ -27,29 +27,26 @@ import {
   useGetEntitlementsQuery,
 } from '../../services/api'
 import { useImpersonation } from '../../hooks/useImpersonation'
-import { featureEnabled } from '../../lib/planLimits'
+import { RequirePermission } from '../../components/RequirePermission'
+import { isEntitlementFeatureEnabled } from '../../lib/planLimits'
 import {
   disputeEligibilityMessage,
   isOrderEligibleForDispute,
 } from '../../lib/orderDisputeEligibility'
 import { OpenDisputeDialog } from '../../components/disputes/OpenDisputeDialog'
+import {
+  DisputeListCards,
+  formatOrderRef,
+  statusBadge,
+} from '../../components/disputes/DisputeListCards'
+import { TableScroll } from '../../components/ui/table-scroll'
+import { EmptyState } from '../../components/ui/empty-state'
 import { formatPrice } from '../../utils/format'
 import toast from 'react-hot-toast'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Scale } from 'lucide-react'
 
-function statusBadge(status: string) {
-  const s = status?.toLowerCase()
-  if (s === 'resolved') return 'default'
-  if (s === 'rejected' || s === 'cancelled') return 'destructive'
-  if (s === 'under_review') return 'secondary'
-  return 'outline'
-}
-
-function formatOrderRef(orderId: unknown): string {
-  const id = String(orderId || '')
-  if (!id) return '—'
-  return `#${id.slice(0, 8).toUpperCase()}`
-}
+const FORM_SELECT_CLASS =
+  'mt-1.5 h-10 w-full rounded-lg border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30'
 
 type DisputeRow = {
   id: string
@@ -86,7 +83,10 @@ export function DisputesPage() {
   })
 
   const { data: entitlementsData } = useGetEntitlementsQuery()
-  const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)
+  const disputesEnabled = isEntitlementFeatureEnabled(
+    entitlementsData?.entitlements,
+    'disputes_returns'
+  )
 
   const {
     data: restaurantData,
@@ -258,344 +258,388 @@ export function DisputesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Disputes"
-        description={
-          isSupplier ? 'Incoming disputes from restaurants' : 'Open and track order disputes'
-        }
-        actions={
-          !isSupplier ? (
-            <Button
-              onClick={() => {
-                setCreateForm({
-                  orderId: '',
-                  supplierId: '',
-                  type: 'short_delivery',
-                  description: '',
-                  disputedAmount: '',
-                })
-                setShowCreate(true)
-              }}
-            >
-              Open dispute
-            </Button>
-          ) : undefined
-        }
-      />
-
-      <Card>
-        <CardContent className="pt-6 flex flex-wrap gap-3 items-end">
-          <div>
-            <Label>Status</Label>
-            <select
-              className="h-10 rounded-md border border-[var(--app-border)] px-3 text-sm"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="">All</option>
-              <option value="open">Open</option>
-              <option value="under_review">Under review</option>
-              <option value="resolved">Resolved</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{isSupplier ? 'Incoming' : 'My disputes'}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <Loader2 className="h-6 w-6 animate-spin" />
-          ) : disputes.length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)]">No disputes found.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-[var(--text-muted)]">
-                    <th className="py-2">Order</th>
-                    {isSupplier && <th>Restaurant</th>}
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th>Amount</th>
-                    <th className="text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {disputes.map((row) => {
-                    const dispute = row as DisputeRow
-                    const orderId = dispute.orderId || dispute.order_id
-                    const disputedAmount = dispute.disputedAmount ?? dispute.disputed_amount
-                    return (
-                      <tr key={String(dispute.id)} className="border-b border-[var(--app-border)]">
-                        <td className="py-3">
-                          {orderId ? (
-                            <Link
-                              to={`/app/orders/${orderId}`}
-                              className="text-[var(--brand-mid)] hover:underline font-mono text-xs"
-                            >
-                              {formatOrderRef(orderId)}
-                            </Link>
-                          ) : (
-                            <span className="text-[var(--text-muted)]">—</span>
-                          )}
-                        </td>
-                        {isSupplier && (
-                          <td className="text-sm">
-                            {String(dispute.restaurantName ?? dispute.restaurant_name ?? '—')}
-                          </td>
-                        )}
-                        <td className="capitalize">
-                          <Link
-                            to={`/app/disputes/${dispute.id}`}
-                            className="text-[var(--brand-mid)] hover:underline"
-                          >
-                            {String(dispute.type || '').replace(/_/g, ' ')}
-                          </Link>
-                        </td>
-                        <td>
-                          <Badge variant={statusBadge(String(dispute.status))}>
-                            {String(dispute.status)}
-                          </Badge>
-                        </td>
-                        <td>
-                          {disputedAmount != null ? `$${formatPrice(Number(disputedAmount))}` : '—'}
-                        </td>
-                        <td className="text-right space-x-2">
-                          {isSupplier && dispute.status === 'open' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleReview(String(dispute.id))}
-                            >
-                              Review
-                            </Button>
-                          )}
-                          {isSupplier &&
-                            (dispute.status === 'open' || dispute.status === 'under_review') && (
-                              <>
-                                <Button size="sm" onClick={() => setResolveId(String(dispute.id))}>
-                                  Resolve
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setRejectId(String(dispute.id))}
-                                >
-                                  Reject
-                                </Button>
-                              </>
-                            )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Dialog
-        open={showCreate}
-        onOpenChange={(open) => {
-          setShowCreate(open)
-          if (!open) {
-            setCreateForm({
-              orderId: '',
-              supplierId: '',
-              type: 'short_delivery',
-              description: '',
-              disputedAmount: '',
-            })
+    <RequirePermission permission="ORDERS_VIEW" title="disputes">
+      <div className="page-stack">
+        <PageHeader
+          title="Disputes"
+          description={
+            isSupplier ? 'Incoming disputes from restaurants' : 'Open and track order disputes'
           }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Open dispute</DialogTitle>
-            <DialogDescription>
-              Report delivery, quality, or billing issues for an order that has been delivered or
-              received.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            {(orderFromUrlIneligible || selectedOrderIneligible) && (
-              <p className="text-sm text-amber-700 dark:text-amber-400 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2">
-                {disputeEligibilityMessage(
-                  orderFromUrlIneligible ? orderForDispute?.order?.status : selectedOrderStatus
-                )}
-              </p>
-            )}
-            <div>
-              <Label>Order</Label>
-              <select
-                className="w-full h-10 rounded-md border border-[var(--app-border)] px-3 text-sm"
-                value={createForm.orderId}
-                onChange={(e) =>
-                  setCreateForm((f) => ({
-                    ...f,
-                    orderId: e.target.value,
+          actions={
+            !isSupplier ? (
+              <Button
+                className="w-full sm:w-auto"
+                onClick={() => {
+                  setCreateForm({
+                    orderId: '',
                     supplierId: '',
-                  }))
-                }
-                disabled={loadingOrders}
+                    type: 'short_delivery',
+                    description: '',
+                    disputedAmount: '',
+                  })
+                  setShowCreate(true)
+                }}
               >
-                <option value="">
-                  {loadingOrders
-                    ? 'Loading orders…'
-                    : orderOptions.length === 0
-                      ? 'No eligible delivered orders'
-                      : 'Select an order'}
-                </option>
-                {orderOptions.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label>Supplier</Label>
-              <select
-                className="w-full h-10 rounded-md border border-[var(--app-border)] px-3 text-sm"
-                value={createForm.supplierId}
-                onChange={(e) => setCreateForm((f) => ({ ...f, supplierId: e.target.value }))}
-                disabled={!createForm.orderId || loadingSuppliers}
-              >
-                <option value="">
-                  {!createForm.orderId
-                    ? 'Select an order first'
-                    : supplierOptions.length === 0
-                      ? 'No suppliers on this order'
-                      : 'Select supplier'}
-                </option>
-                {supplierOptions.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <p className="text-sm text-[var(--text-muted)]">
-              Next you can select specific line items and quantities (e.g. received 1 of 3
-              products).
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (!createForm.orderId) {
-                  toast.error('Order is required')
-                  return
-                }
-                if (!createForm.supplierId) {
-                  toast.error('Supplier is required')
-                  return
-                }
-                if (selectedOrderIneligible) {
-                  toast.error(disputeEligibilityMessage(selectedOrderStatus))
-                  return
-                }
-                setDisputeDialogOrderId(createForm.orderId)
-                setShowCreate(false)
-              }}
-              disabled={selectedOrderIneligible || !createForm.orderId || !createForm.supplierId}
-            >
-              Continue
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                Open dispute
+              </Button>
+            ) : undefined
+          }
+        />
 
-      <Dialog open={Boolean(resolveId)} onOpenChange={() => setResolveId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Resolve dispute</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label>Resolution</Label>
+        <Card className="overflow-visible">
+          <CardContent className="px-4 py-4 sm:px-6 sm:py-6">
+            <div className="flex w-full max-w-md flex-col gap-2">
+              <Label>Status filter</Label>
               <select
-                className="w-full h-10 rounded-md border px-3 text-sm"
-                value={resolutionType}
-                onChange={(e) => setResolutionType(e.target.value)}
+                className={FORM_SELECT_CLASS}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
               >
-                <option value="credit_note">Credit note</option>
-                <option value="replacement">Replacement</option>
-                <option value="refund">Refund</option>
-                <option value="no_action">No action</option>
+                <option value="">All</option>
+                <option value="open">Open</option>
+                <option value="under_review">Under review</option>
+                <option value="resolved">Resolved</option>
+                <option value="rejected">Rejected</option>
               </select>
             </div>
-            {resolutionType === 'credit_note' && (
-              <div>
-                <Label>Credit amount</Label>
-                <Input
-                  type="number"
-                  value={creditAmount}
-                  onChange={(e) => setCreditAmount(e.target.value)}
-                />
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-visible">
+          <CardHeader className="px-4 pb-2 pt-4 sm:px-6 sm:pt-6">
+            <CardTitle>{isSupplier ? 'Incoming' : 'My disputes'}</CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4 pt-0 sm:px-6 sm:pb-6">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-10 text-[var(--text-muted)]">
+                <Loader2 className="h-6 w-6 animate-spin text-[var(--brand-mid)]" />
               </div>
-            )}
-            <div>
-              <Label>Notes</Label>
-              <Textarea
-                value={resolutionNotes}
-                onChange={(e) => setResolutionNotes(e.target.value)}
+            ) : disputes.length === 0 ? (
+              <EmptyState
+                title="No disputes found"
+                description={
+                  statusFilter
+                    ? 'Try clearing the status filter to see more results.'
+                    : 'Disputes opened from receiving or order issues will appear here.'
+                }
+                icon={<Scale className="h-6 w-6" aria-hidden />}
               />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={handleResolve} disabled={resolving}>
-              Confirm
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            ) : (
+              <>
+                <DisputeListCards
+                  disputes={disputes as DisputeRow[]}
+                  isSupplier={isSupplier}
+                  formatAmount={(n) => `$${formatPrice(n)}`}
+                  onReview={isSupplier ? handleReview : undefined}
+                  onResolve={isSupplier ? (id) => setResolveId(id) : undefined}
+                  onReject={isSupplier ? (id) => setRejectId(id) : undefined}
+                />
+                <TableScroll aria-label="Disputes table" className="hidden md:block">
+                  <table className="w-full min-w-[720px] text-sm">
+                    <thead>
+                      <tr className="border-b bg-[var(--brand-ultra)]/40 text-left text-[var(--text-muted)]">
+                        <th className="px-4 py-3 pl-5 font-medium">Order</th>
+                        {isSupplier && <th className="px-4 py-3 font-medium">Restaurant</th>}
+                        <th className="px-4 py-3 font-medium">Type</th>
+                        <th className="px-4 py-3 font-medium">Status</th>
+                        <th className="px-4 py-3 font-medium">Amount</th>
+                        <th className="px-4 py-3 pr-5 text-right font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {disputes.map((row) => {
+                        const dispute = row as DisputeRow
+                        const orderId = dispute.orderId || dispute.order_id
+                        const disputedAmount = dispute.disputedAmount ?? dispute.disputed_amount
+                        return (
+                          <tr
+                            key={String(dispute.id)}
+                            className="border-b border-[var(--app-border)]"
+                          >
+                            <td className="px-4 py-3 pl-5">
+                              {orderId ? (
+                                <Link
+                                  to={`/app/orders/${orderId}`}
+                                  className="text-[var(--brand-mid)] hover:underline font-mono text-xs"
+                                >
+                                  {formatOrderRef(orderId)}
+                                </Link>
+                              ) : (
+                                <span className="text-[var(--text-muted)]">—</span>
+                              )}
+                            </td>
+                            {isSupplier && (
+                              <td className="px-4 py-3 text-sm">
+                                {String(dispute.restaurantName ?? dispute.restaurant_name ?? '—')}
+                              </td>
+                            )}
+                            <td className="px-4 py-3 capitalize">
+                              <Link
+                                to={`/app/disputes/${dispute.id}`}
+                                className="text-[var(--brand-mid)] hover:underline"
+                              >
+                                {String(dispute.type || '').replace(/_/g, ' ')}
+                              </Link>
+                            </td>
+                            <td className="px-4 py-3">
+                              <Badge variant={statusBadge(String(dispute.status))}>
+                                {String(dispute.status)}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3 tabular-nums">
+                              {disputedAmount != null
+                                ? `$${formatPrice(Number(disputedAmount))}`
+                                : '—'}
+                            </td>
+                            <td className="px-4 py-3 pr-5 text-right">
+                              <div className="flex flex-wrap justify-end gap-2">
+                                {isSupplier && dispute.status === 'open' && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleReview(String(dispute.id))}
+                                  >
+                                    Review
+                                  </Button>
+                                )}
+                                {isSupplier &&
+                                  (dispute.status === 'open' ||
+                                    dispute.status === 'under_review') && (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => setResolveId(String(dispute.id))}
+                                      >
+                                        Resolve
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setRejectId(String(dispute.id))}
+                                      >
+                                        Reject
+                                      </Button>
+                                    </>
+                                  )}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </TableScroll>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
-      <Dialog open={Boolean(rejectId)} onOpenChange={() => setRejectId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reject dispute</DialogTitle>
-          </DialogHeader>
-          <Textarea
-            placeholder="Reason for rejection (required)"
-            value={resolutionNotes}
-            onChange={(e) => setResolutionNotes(e.target.value)}
-          />
-          <DialogFooter>
-            <Button variant="destructive" onClick={handleReject} disabled={rejecting}>
-              Reject
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {!isSupplier && disputeDialogOrderId && (
-        <OpenDisputeDialog
-          open={Boolean(disputeDialogOrderId)}
+        <Dialog
+          open={showCreate}
           onOpenChange={(open) => {
+            setShowCreate(open)
             if (!open) {
-              setDisputeDialogOrderId(null)
-              setSearchParams({})
+              setCreateForm({
+                orderId: '',
+                supplierId: '',
+                type: 'short_delivery',
+                description: '',
+                disputedAmount: '',
+              })
             }
           }}
-          orderId={disputeDialogOrderId}
-          defaultSupplierId={createForm.supplierId || supplierIdFromUrl}
-          onCreated={() => {
-            setDisputeDialogOrderId(null)
-            refetch()
-          }}
-        />
-      )}
-    </div>
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Open dispute</DialogTitle>
+              <DialogDescription>
+                Report delivery, quality, or billing issues for an order that has been delivered or
+                received.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              {(orderFromUrlIneligible || selectedOrderIneligible) && (
+                <p className="text-sm text-amber-700 dark:text-amber-400 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2">
+                  {disputeEligibilityMessage(
+                    orderFromUrlIneligible ? orderForDispute?.order?.status : selectedOrderStatus
+                  )}
+                </p>
+              )}
+              <div>
+                <Label>Order</Label>
+                <select
+                  className={FORM_SELECT_CLASS}
+                  value={createForm.orderId}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({
+                      ...f,
+                      orderId: e.target.value,
+                      supplierId: '',
+                    }))
+                  }
+                  disabled={loadingOrders}
+                >
+                  <option value="">
+                    {loadingOrders
+                      ? 'Loading orders…'
+                      : orderOptions.length === 0
+                        ? 'No eligible delivered orders'
+                        : 'Select an order'}
+                  </option>
+                  {orderOptions.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Supplier</Label>
+                <select
+                  className={FORM_SELECT_CLASS}
+                  value={createForm.supplierId}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, supplierId: e.target.value }))}
+                  disabled={!createForm.orderId || loadingSuppliers}
+                >
+                  <option value="">
+                    {!createForm.orderId
+                      ? 'Select an order first'
+                      : supplierOptions.length === 0
+                        ? 'No suppliers on this order'
+                        : 'Select supplier'}
+                  </option>
+                  {supplierOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-sm text-[var(--text-muted)]">
+                Next you can select specific line items and quantities (e.g. received 1 of 3
+                products).
+              </p>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => setShowCreate(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="w-full sm:w-auto"
+                onClick={() => {
+                  if (!createForm.orderId) {
+                    toast.error('Order is required')
+                    return
+                  }
+                  if (!createForm.supplierId) {
+                    toast.error('Supplier is required')
+                    return
+                  }
+                  if (selectedOrderIneligible) {
+                    toast.error(disputeEligibilityMessage(selectedOrderStatus))
+                    return
+                  }
+                  setDisputeDialogOrderId(createForm.orderId)
+                  setShowCreate(false)
+                }}
+                disabled={selectedOrderIneligible || !createForm.orderId || !createForm.supplierId}
+              >
+                Continue
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={Boolean(resolveId)} onOpenChange={() => setResolveId(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Resolve dispute</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>Resolution</Label>
+                <select
+                  className={FORM_SELECT_CLASS}
+                  value={resolutionType}
+                  onChange={(e) => setResolutionType(e.target.value)}
+                >
+                  <option value="credit_note">Credit note</option>
+                  <option value="replacement">Replacement</option>
+                  <option value="refund">Refund</option>
+                  <option value="no_action">No action</option>
+                </select>
+              </div>
+              {resolutionType === 'credit_note' && (
+                <div>
+                  <Label>Credit amount</Label>
+                  <Input
+                    type="number"
+                    value={creditAmount}
+                    onChange={(e) => setCreditAmount(e.target.value)}
+                  />
+                </div>
+              )}
+              <div>
+                <Label>Notes</Label>
+                <Textarea
+                  value={resolutionNotes}
+                  onChange={(e) => setResolutionNotes(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button className="w-full sm:w-auto" onClick={handleResolve} disabled={resolving}>
+                Confirm
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={Boolean(rejectId)} onOpenChange={() => setRejectId(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reject dispute</DialogTitle>
+            </DialogHeader>
+            <Textarea
+              placeholder="Reason for rejection (required)"
+              value={resolutionNotes}
+              onChange={(e) => setResolutionNotes(e.target.value)}
+            />
+            <DialogFooter>
+              <Button
+                variant="destructive"
+                className="w-full sm:w-auto"
+                onClick={handleReject}
+                disabled={rejecting}
+              >
+                Reject
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {!isSupplier && disputeDialogOrderId && (
+          <OpenDisputeDialog
+            open={Boolean(disputeDialogOrderId)}
+            onOpenChange={(open) => {
+              if (!open) {
+                setDisputeDialogOrderId(null)
+                setSearchParams({})
+              }
+            }}
+            orderId={disputeDialogOrderId}
+            defaultSupplierId={createForm.supplierId || supplierIdFromUrl}
+            onCreated={() => {
+              setDisputeDialogOrderId(null)
+              refetch()
+            }}
+          />
+        )}
+      </div>
+    </RequirePermission>
   )
 }

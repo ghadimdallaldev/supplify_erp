@@ -12,9 +12,11 @@ import {
   useGetEntitlementsQuery,
 } from '../../services/api'
 import { useAppSelector } from '../../hooks/redux'
+import { RequirePermission } from '../../components/RequirePermission'
 import { canUseGlobalReports } from '../../lib/planFeatureGates'
 import { downloadCsv, reportRowsToCsv } from '../../utils/csvExport'
-import { Loader2, Download } from 'lucide-react'
+import { reportErrorMessage } from '../../lib/reportResponse'
+import { Loader2, Download, AlertCircle } from 'lucide-react'
 import {
   ResponsiveContainer,
   LineChart,
@@ -153,8 +155,12 @@ function ReportPanel({
     { path: def.path, from, to, granularity },
     { skip: isRestaurant, refetchOnMountOrArgChange: true }
   )
-  const { data, isLoading, isFetching } = isRestaurant ? restaurantQuery : supplierQuery
-  const rows = (data?.data as Array<Record<string, unknown>>) || []
+  const { data, isLoading, isFetching, isError, error, refetch } = isRestaurant
+    ? restaurantQuery
+    : supplierQuery
+  const rows = data?.data ?? []
+  const showInitialLoad = isLoading && !data
+  const showRefreshing = isFetching && !isLoading && rows.length > 0
 
   const chartData = useMemo(
     () =>
@@ -176,22 +182,44 @@ function ReportPanel({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>{def.label}</CardTitle>
-        <Button variant="outline" size="sm" onClick={exportCsv} disabled={!rows.length}>
+      <CardHeader className="flex flex-row items-center justify-between gap-2">
+        <CardTitle className="flex items-center gap-2">
+          {def.label}
+          {showRefreshing ? (
+            <Loader2 className="h-4 w-4 animate-spin text-[var(--text-muted)]" />
+          ) : null}
+        </CardTitle>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={exportCsv}
+          disabled={!rows.length || showInitialLoad}
+        >
           <Download className="h-4 w-4 mr-1" />
           CSV
         </Button>
       </CardHeader>
       <CardContent>
-        {isLoading || isFetching ? (
-          <Loader2 className="h-6 w-6 animate-spin" />
+        {showInitialLoad ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
+          </div>
+        ) : isError ? (
+          <div className="flex flex-col items-center gap-3 py-10 text-center">
+            <AlertCircle className="h-8 w-8 text-[var(--red)]" />
+            <p className="text-sm text-[var(--text-muted)] max-w-md">{reportErrorMessage(error)}</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              Try again
+            </Button>
+          </div>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-[var(--text-muted)]">No data for this period.</p>
+          <p className="text-sm text-[var(--text-muted)] py-8 text-center">
+            No data for this period. Try widening the date range or placing orders in this window.
+          </p>
         ) : (
           <div className="space-y-4">
-            <div style={{ width: '100%', height: 280 }}>
-              <ResponsiveContainer>
+            <div className="w-full min-h-[280px]" style={{ height: 280 }}>
+              <ResponsiveContainer width="100%" height="100%">
                 {def.chart === 'line' ? (
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -269,90 +297,94 @@ export function ReportsPage() {
 
   if (!reportsEnabled) {
     return (
-      <div className="space-y-4">
-        <PageHeader title="Reports" />
-        <Card>
-          <CardContent className="py-8 text-sm text-[var(--text-muted)]">
-            Reports are not available on your current plan. Contact support if this looks wrong.
-          </CardContent>
-        </Card>
-      </div>
+      <RequirePermission permission="ORDERS_VIEW" title="reports">
+        <div className="space-y-4">
+          <PageHeader title="Reports" />
+          <Card>
+            <CardContent className="py-8 text-sm text-[var(--text-muted)]">
+              Reports are not available on your current plan. Contact support if this looks wrong.
+            </CardContent>
+          </Card>
+        </div>
+      </RequirePermission>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Reports & Analytics"
-        description={
-          isRestaurant
-            ? 'Restaurant purchasing and operations insights'
-            : 'Supplier revenue and fulfillment insights'
-        }
-      />
+    <RequirePermission permission="ORDERS_VIEW" title="reports">
+      <div className="space-y-6">
+        <PageHeader
+          title="Reports & Analytics"
+          description={
+            isRestaurant
+              ? 'Restaurant purchasing and operations insights'
+              : 'Supplier revenue and fulfillment insights'
+          }
+        />
 
-      <Card>
-        <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <Label>From</Label>
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          </div>
-          <div>
-            <Label>To</Label>
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-          </div>
-          <div>
-            <Label>Granularity</Label>
-            <select
-              className="w-full h-10 rounded-md border border-[var(--app-border)] px-3 text-sm"
-              value={granularity}
-              onChange={(e) => setGranularity(e.target.value)}
-            >
-              <option value="day">Day</option>
-              <option value="week">Week</option>
-              <option value="month">Month</option>
-            </select>
-          </div>
-          {isRestaurant && branches.length > 0 ? (
+        <Card>
+          <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <Label>Branch</Label>
+              <Label>From</Label>
+              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            </div>
+            <div>
+              <Label>To</Label>
+              <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            </div>
+            <div>
+              <Label>Granularity</Label>
               <select
                 className="w-full h-10 rounded-md border border-[var(--app-border)] px-3 text-sm"
-                value={branchId}
-                onChange={(e) => setBranchId(e.target.value)}
+                value={granularity}
+                onChange={(e) => setGranularity(e.target.value)}
               >
-                <option value="">All branches</option>
-                {branches.map((b: { id: string; name: string }) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
+                <option value="day">Day</option>
+                <option value="week">Week</option>
+                <option value="month">Month</option>
               </select>
             </div>
-          ) : null}
-        </CardContent>
-      </Card>
+            {isRestaurant && branches.length > 0 ? (
+              <div>
+                <Label>Branch</Label>
+                <select
+                  className="w-full h-10 rounded-md border border-[var(--app-border)] px-3 text-sm"
+                  value={branchId}
+                  onChange={(e) => setBranchId(e.target.value)}
+                >
+                  <option value="">All branches</option>
+                  {branches.map((b: { id: string; name: string }) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
 
-      <Tabs value={activeReport} onValueChange={setActiveReport}>
-        <TabsList className="flex flex-wrap h-auto">
-          {defs.map((def) => (
-            <TabsTrigger key={def.key} value={def.key}>
-              {def.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-        <TabsContent value={current.key} className="mt-4">
-          <ReportPanel
-            key={`${current.key}-${from}-${to}-${branchId}-${granularity}`}
-            def={current}
-            isRestaurant={isRestaurant}
-            from={from}
-            to={to}
-            branchId={branchId}
-            granularity={granularity}
-          />
-        </TabsContent>
-      </Tabs>
-    </div>
+        <Tabs value={activeReport} onValueChange={setActiveReport}>
+          <TabsList className="flex flex-wrap h-auto">
+            {defs.map((def) => (
+              <TabsTrigger key={def.key} value={def.key}>
+                {def.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <TabsContent value={current.key} className="mt-4">
+            <ReportPanel
+              key={`${current.key}-${from}-${to}-${branchId}-${granularity}`}
+              def={current}
+              isRestaurant={isRestaurant}
+              from={from}
+              to={to}
+              branchId={branchId}
+              granularity={granularity}
+            />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </RequirePermission>
   )
 }

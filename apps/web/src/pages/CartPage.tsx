@@ -3,7 +3,9 @@ import {
   useCreateOrderMutation,
   useGetActivePromotionsQuery,
   useGetEntitlementsQuery,
+  useResolveContractPricesMutation,
 } from '../services/api'
+import { updateItemResolvedPrice } from '../features/cart/cartSlice'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -34,6 +36,7 @@ import { useSearchParams } from 'react-router-dom'
 import { formatPrice } from '../utils/format'
 import { usePermissions } from '../hooks/usePermissions'
 import { useImpersonation } from '../hooks/useImpersonation'
+import { RequirePermission } from '../components/RequirePermission'
 
 export function CartPage() {
   const [searchParams] = useSearchParams()
@@ -76,6 +79,8 @@ export function CartPage() {
   } = useCartActions()
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [createOrder] = useCreateOrderMutation()
+  const [resolveContractPrices] = useResolveContractPricesMutation()
+  const ownerEmail = user?.email ?? null
 
   // Draft management
   const [showSaveDraft, setShowSaveDraft] = useState(false)
@@ -100,8 +105,36 @@ export function CartPage() {
     rehydrateCart()
   }, [rehydrateCart])
 
-  const handleUpdateQuantity = (productId: string, quantity: number) => {
+  const handleUpdateQuantity = async (productId: string, quantity: number) => {
     updateQuantity(productId, quantity)
+    if (quantity <= 0) return
+    const item = groups.flatMap((g) => g.items).find((i) => i.productId === productId)
+    if (!item?.product.supplier_id) return
+    try {
+      const result = await resolveContractPrices({
+        items: [
+          {
+            productId,
+            supplierId: item.product.supplier_id,
+            quantity,
+          },
+        ],
+      }).unwrap()
+      const resolved = result.items[0]
+      if (resolved?.unitPrice != null) {
+        dispatch(
+          updateItemResolvedPrice({
+            productId,
+            currentPrice: resolved.unitPrice,
+            pricingSource: resolved.source,
+            catalogPrice: resolved.defaultPrice ?? undefined,
+            ownerEmail,
+          })
+        )
+      }
+    } catch {
+      // Order creation re-resolves server-side; cart preview is best-effort
+    }
   }
 
   const handleRemoveItem = (productId: string) => {
@@ -242,333 +275,345 @@ export function CartPage() {
   }
 
   return (
-    <div className="space-y-6" data-testid="cart-page">
-      <div className={pageHeaderRowClass}>
-        <div className="min-w-0">
-          <h1 className="text-[21px] font-black text-[var(--text)]">Shopping Cart</h1>
-          <p className="text-[var(--text-muted)] mt-2">Review your order before placing it</p>
-        </div>
-        <div className="flex flex-wrap gap-2 shrink-0">
-          {drafts.length > 0 && (
-            <Button variant="outline" onClick={() => setShowLoadDraft(true)}>
-              Load Draft
+    <RequirePermission permission="ORDERS_CREATE" title="cart">
+      <div className="space-y-6" data-testid="cart-page">
+        <div className={pageHeaderRowClass}>
+          <div className="min-w-0">
+            <h1 className="text-[21px] font-black text-[var(--text)]">Shopping Cart</h1>
+            <p className="text-[var(--text-muted)] mt-2">Review your order before placing it</p>
+          </div>
+          <div className="flex flex-wrap gap-2 shrink-0">
+            {drafts.length > 0 && (
+              <Button variant="outline" onClick={() => setShowLoadDraft(true)}>
+                Load Draft
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => setShowSaveDraft(true)}
+              disabled={groups.length === 0}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save Draft
             </Button>
-          )}
-          <Button
-            variant="outline"
-            onClick={() => setShowSaveDraft(true)}
-            disabled={groups.length === 0}
+            <Button variant="outline" onClick={() => clearCart()}>
+              Clear Cart
+            </Button>
+          </div>
+        </div>
+
+        {!orderGate.canPlace && orderGate.reason === 'at_limit' && orderGate.limit != null && (
+          <LimitExceededBanner
+            limitKey="orders_per_day"
+            currentUsage={orderGate.current}
+            limitValue={orderGate.limit}
+            currentPlan={orderGate.planName}
+            upgradeUrl="/app/settings?tab=subscription"
+            className="border-red-200 bg-red-50 text-red-900 [&_p]:text-red-800"
+          />
+        )}
+        {!orderGate.canPlace && orderGate.reason === 'would_exceed' && (
+          <div
+            className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            role="alert"
           >
-            <Save className="h-4 w-4 mr-2" />
-            Save Draft
-          </Button>
-          <Button variant="outline" onClick={() => clearCart()}>
-            Clear Cart
-          </Button>
-        </div>
-      </div>
+            {formatOrderPlaceGateMessage(orderGate)}
+          </div>
+        )}
 
-      {!orderGate.canPlace && orderGate.reason === 'at_limit' && orderGate.limit != null && (
-        <LimitExceededBanner
-          limitKey="orders_per_day"
-          currentUsage={orderGate.current}
-          limitValue={orderGate.limit}
-          currentPlan={orderGate.planName}
-          upgradeUrl="/app/settings?tab=subscription"
-          className="border-red-200 bg-red-50 text-red-900 [&_p]:text-red-800"
-        />
-      )}
-      {!orderGate.canPlace && orderGate.reason === 'would_exceed' && (
-        <div
-          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-          role="alert"
-        >
-          {formatOrderPlaceGateMessage(orderGate)}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          {groups.map((group) => (
-            <Card key={group.supplierId}>
-              <CardHeader>
-                <CardTitle className={splitRowClass}>
-                  <span className="min-w-0 truncate">{group.supplierName}</span>
-                  <Badge variant="secondary" className="shrink-0">
-                    ${formatPrice(group.subtotal)}
-                  </Badge>
-                </CardTitle>
-                <CardDescription>
-                  {group.items.length} item{group.items.length !== 1 ? 's' : ''}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {group.items.map((item) => (
-                  <div
-                    key={item.productId}
-                    className="flex flex-col gap-3 p-4 border rounded-lg sm:flex-row sm:items-center sm:gap-4"
-                    data-testid={`cart-item-row-${item.productId}`}
-                  >
-                    <div className="w-16 h-16 shrink-0 bg-[var(--brand-ultra)] rounded-lg flex items-center justify-center">
-                      {item.product.image_url ? (
-                        <img
-                          src={item.product.image_url}
-                          alt={item.product.name}
-                          className="w-full h-full object-cover rounded-lg"
-                        />
-                      ) : (
-                        <ShoppingCart className="h-6 w-6 text-[var(--text-muted)]" />
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium truncate">{item.product.name}</h4>
-                      <p className="text-sm text-[var(--text-muted)]">SKU: {item.product.sku}</p>
-                      <p className="text-sm text-[var(--text-muted)]">
-                        $
-                        {typeof item.product.current_price === 'number'
-                          ? formatPrice(item.product.current_price)
-                          : item.product.current_price || 'N/A'}{' '}
-                        per {item.product.unit || 'unit'}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleUpdateQuantity(item.productId, item.quantity - 1)}
-                          disabled={item.quantity <= 1}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                        <span className="w-8 text-center tabular-nums">{item.quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleUpdateQuantity(item.productId, item.quantity + 1)}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            {groups.map((group) => (
+              <Card key={group.supplierId}>
+                <CardHeader>
+                  <CardTitle className={splitRowClass}>
+                    <span className="min-w-0 truncate">{group.supplierName}</span>
+                    <Badge variant="secondary" className="shrink-0">
+                      ${formatPrice(group.subtotal)}
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    {group.items.length} item{group.items.length !== 1 ? 's' : ''}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {group.items.map((item) => (
+                    <div
+                      key={item.productId}
+                      className="flex flex-col gap-3 p-4 border rounded-lg sm:flex-row sm:items-center sm:gap-4"
+                      data-testid={`cart-item-row-${item.productId}`}
+                    >
+                      <div className="w-16 h-16 shrink-0 bg-[var(--brand-ultra)] rounded-lg flex items-center justify-center">
+                        {item.product.image_url ? (
+                          <img
+                            src={item.product.image_url}
+                            alt={item.product.name}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                        ) : (
+                          <ShoppingCart className="h-6 w-6 text-[var(--text-muted)]" />
+                        )}
                       </div>
 
-                      <p className="font-medium tabular-nums sm:text-right">
-                        $
-                        {(typeof item.product.current_price === 'number'
-                          ? item.product.current_price
-                          : parseFloat(String(item.product.current_price ?? '')) || 0) *
-                          item.quantity}
-                      </p>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium truncate">{item.product.name}</h4>
+                        <p className="text-sm text-[var(--text-muted)]">SKU: {item.product.sku}</p>
+                        <p className="text-sm text-[var(--text-muted)]">
+                          {formatPrice(item.product.current_price)} per{' '}
+                          {item.product.unit || 'unit'}
+                          {item.product.pricing_source === 'CONTRACT_PRICE' && (
+                            <Badge variant="secondary" className="ml-2 text-xs">
+                              Your price
+                            </Badge>
+                          )}
+                        </p>
+                      </div>
 
+                      <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUpdateQuantity(item.productId, item.quantity - 1)}
+                            disabled={item.quantity <= 1}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <span className="w-8 text-center tabular-nums">{item.quantity}</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUpdateQuantity(item.productId, item.quantity + 1)}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        <p className="font-medium tabular-nums sm:text-right">
+                          {formatPrice(
+                            (typeof item.product.current_price === 'number'
+                              ? item.product.current_price
+                              : parseFloat(String(item.product.current_price ?? '')) || 0) *
+                              item.quantity
+                          )}
+                        </p>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (item.productId) handleRemoveItem(item.productId)
+                          }}
+                          aria-label="Remove item"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Order Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--text-muted)]">Subtotal</span>
+                  <span>${formatPrice(total)}</span>
+                </div>
+                {estimatedPromoDiscount > 0 ? (
+                  <div className="flex items-center justify-between text-sm text-[var(--mint)]">
+                    <span>Est. promotion savings</span>
+                    <span>-${formatPrice(estimatedPromoDiscount)}</span>
+                  </div>
+                ) : dealRedeemGate.limit != null ? (
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Deal redemptions today: {dealRedeemGate.current}/{dealRedeemGate.limit}
+                    {!canRedeemDeals && dealRedeemGate.message
+                      ? ` — ${dealRedeemGate.message}`
+                      : ''}
+                  </p>
+                ) : null}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--text-muted)]">Tax</span>
+                  <span>$0.00</span>
+                </div>
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between font-semibold text-lg">
+                    <span>Total</span>
+                    <span>${formatPrice(Math.max(0, total - estimatedPromoDiscount))}</span>
+                  </div>
+                </div>
+                {estimatedPromoDiscount > 0 ? (
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Final discount applied at checkout based on eligible supplier promotions.
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+
+            {!canPlaceOrders ? (
+              <p className="text-sm text-[var(--text-muted)] text-center">
+                Your role does not have permission to place orders. Contact your workspace admin.
+              </p>
+            ) : null}
+            <Button
+              onClick={handlePlaceOrder}
+              disabled={isPlacingOrder || !orderGate.canPlace || !canPlaceOrders}
+              className="w-full"
+              size="lg"
+              data-testid="cart-place-order"
+            >
+              {isPlacingOrder
+                ? 'Placing Order...'
+                : !canPlaceOrders
+                  ? 'Cannot place orders'
+                  : !orderGate.canPlace
+                    ? 'Daily order limit reached'
+                    : 'Place Order'}
+            </Button>
+            {!orderGate.canPlace && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() =>
+                  openBrowseUpgrade(dispatch, {
+                    currentPlan: orderGate.planName,
+                    upgradeUrl: '/app/settings?tab=subscription',
+                  })
+                }
+              >
+                Upgrade to place more orders
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Save Draft Dialog */}
+        <Dialog open={showSaveDraft} onOpenChange={setShowSaveDraft}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Save Cart as Draft</DialogTitle>
+              <DialogDescription>Save your current cart to load it later</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="draft-name">Draft Name</Label>
+                <Input
+                  id="draft-name"
+                  placeholder="e.g., Weekly Order"
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowSaveDraft(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveDraft}>Save Draft</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Load Draft Dialog */}
+        <Dialog open={showLoadDraft} onOpenChange={setShowLoadDraft}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Load Draft</DialogTitle>
+              <DialogDescription>Select a saved draft to load into your cart</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {drafts.length === 0 ? (
+                <p className="text-sm text-[var(--text-muted)]">No saved drafts</p>
+              ) : (
+                drafts.map((draft) => (
+                  <div
+                    key={draft.id}
+                    className="flex items-center justify-between border rounded-lg p-4"
+                  >
+                    <div>
+                      <p className="font-medium">{draft.name}</p>
+                      <p className="text-sm text-[var(--text-muted)]">
+                        {draft.items.length} items •{' '}
+                        {new Date(draft.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button size="sm" onClick={() => handleLoadDraft(draft.id)}>
+                        Load
+                      </Button>
                       <Button
-                        variant="outline"
                         size="sm"
-                        onClick={() => {
-                          if (item.productId) handleRemoveItem(item.productId)
-                        }}
-                        aria-label="Remove item"
+                        variant="outline"
+                        onClick={() => handleDeleteDraft(draft.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                ))
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowLoadDraft(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Order Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-[var(--text-muted)]">Subtotal</span>
-                <span>${formatPrice(total)}</span>
+        {/* Order Details Dialog */}
+        <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Order Details</DialogTitle>
+              <DialogDescription>Add delivery information and notes</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="delivery-date">
+                  <Calendar className="h-4 w-4 inline mr-2" />
+                  Preferred Delivery Date
+                </Label>
+                <Input
+                  id="delivery-date"
+                  type="date"
+                  value={deliveryDate}
+                  onChange={(e) => setDeliveryDate(e.target.value)}
+                />
               </div>
-              {estimatedPromoDiscount > 0 ? (
-                <div className="flex items-center justify-between text-sm text-[var(--mint)]">
-                  <span>Est. promotion savings</span>
-                  <span>-${formatPrice(estimatedPromoDiscount)}</span>
-                </div>
-              ) : dealRedeemGate.limit != null ? (
-                <p className="text-xs text-[var(--text-muted)]">
-                  Deal redemptions today: {dealRedeemGate.current}/{dealRedeemGate.limit}
-                  {!canRedeemDeals && dealRedeemGate.message ? ` — ${dealRedeemGate.message}` : ''}
-                </p>
-              ) : null}
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-[var(--text-muted)]">Tax</span>
-                <span>$0.00</span>
+              <div className="space-y-2">
+                <Label htmlFor="delivery-notes">
+                  <FileText className="h-4 w-4 inline mr-2" />
+                  Order Notes
+                </Label>
+                <Textarea
+                  id="delivery-notes"
+                  placeholder="Special instructions, delivery window, etc."
+                  rows={4}
+                  value={deliveryNotes}
+                  onChange={(e) => setDeliveryNotes(e.target.value)}
+                />
               </div>
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between font-semibold text-lg">
-                  <span>Total</span>
-                  <span>${formatPrice(Math.max(0, total - estimatedPromoDiscount))}</span>
-                </div>
-              </div>
-              {estimatedPromoDiscount > 0 ? (
-                <p className="text-xs text-[var(--text-muted)]">
-                  Final discount applied at checkout based on eligible supplier promotions.
-                </p>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          {!canPlaceOrders ? (
-            <p className="text-sm text-[var(--text-muted)] text-center">
-              Your role does not have permission to place orders. Contact your workspace admin.
-            </p>
-          ) : null}
-          <Button
-            onClick={handlePlaceOrder}
-            disabled={isPlacingOrder || !orderGate.canPlace || !canPlaceOrders}
-            className="w-full"
-            size="lg"
-            data-testid="cart-place-order"
-          >
-            {isPlacingOrder
-              ? 'Placing Order...'
-              : !canPlaceOrders
-                ? 'Cannot place orders'
-                : !orderGate.canPlace
-                  ? 'Daily order limit reached'
-                  : 'Place Order'}
-          </Button>
-          {!orderGate.canPlace && (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() =>
-                openBrowseUpgrade(dispatch, {
-                  currentPlan: orderGate.planName,
-                  upgradeUrl: '/app/settings?tab=subscription',
-                })
-              }
-            >
-              Upgrade to place more orders
-            </Button>
-          )}
-        </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowOrderDetails(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleConfirmOrder} disabled={isPlacingOrder}>
+                {isPlacingOrder ? 'Placing Order...' : 'Confirm Order'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
-
-      {/* Save Draft Dialog */}
-      <Dialog open={showSaveDraft} onOpenChange={setShowSaveDraft}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Save Cart as Draft</DialogTitle>
-            <DialogDescription>Save your current cart to load it later</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="draft-name">Draft Name</Label>
-              <Input
-                id="draft-name"
-                placeholder="e.g., Weekly Order"
-                value={draftName}
-                onChange={(e) => setDraftName(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSaveDraft(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveDraft}>Save Draft</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Load Draft Dialog */}
-      <Dialog open={showLoadDraft} onOpenChange={setShowLoadDraft}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Load Draft</DialogTitle>
-            <DialogDescription>Select a saved draft to load into your cart</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {drafts.length === 0 ? (
-              <p className="text-sm text-[var(--text-muted)]">No saved drafts</p>
-            ) : (
-              drafts.map((draft) => (
-                <div
-                  key={draft.id}
-                  className="flex items-center justify-between border rounded-lg p-4"
-                >
-                  <div>
-                    <p className="font-medium">{draft.name}</p>
-                    <p className="text-sm text-[var(--text-muted)]">
-                      {draft.items.length} items • {new Date(draft.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button size="sm" onClick={() => handleLoadDraft(draft.id)}>
-                      Load
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleDeleteDraft(draft.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLoadDraft(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Order Details Dialog */}
-      <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Order Details</DialogTitle>
-            <DialogDescription>Add delivery information and notes</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="delivery-date">
-                <Calendar className="h-4 w-4 inline mr-2" />
-                Preferred Delivery Date
-              </Label>
-              <Input
-                id="delivery-date"
-                type="date"
-                value={deliveryDate}
-                onChange={(e) => setDeliveryDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="delivery-notes">
-                <FileText className="h-4 w-4 inline mr-2" />
-                Order Notes
-              </Label>
-              <Textarea
-                id="delivery-notes"
-                placeholder="Special instructions, delivery window, etc."
-                rows={4}
-                value={deliveryNotes}
-                onChange={(e) => setDeliveryNotes(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowOrderDetails(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleConfirmOrder} disabled={isPlacingOrder}>
-              {isPlacingOrder ? 'Placing Order...' : 'Confirm Order'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+    </RequirePermission>
   )
 }

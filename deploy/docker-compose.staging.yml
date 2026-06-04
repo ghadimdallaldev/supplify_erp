@@ -13,7 +13,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - supplify_staging_pgdata:/var/lib/postgresql/data
-      - ../infra/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-supplify} -d ${POSTGRES_DB:-supplify} -h 127.0.0.1"]
       interval: 5s
@@ -100,7 +100,7 @@ services:
       - --import-realm
     volumes:
       - supplify_staging_keycloak:/opt/keycloak/data
-      - ../infra/keycloak/realm-export.json:/opt/keycloak/data/import/Supplify-realm.json:ro
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/Supplify-realm.json:ro
     ports:
       - "${KEYCLOAK_PORT:-8180}:8080"
     depends_on:
@@ -123,7 +123,7 @@ services:
       - /bin/bash
       - /scripts/keycloak-init.sh
     volumes:
-      - ../infra/keycloak/realm-export.json:/import/realm-export.json:ro
+      - ./keycloak/realm-export.json:/import/realm-export.json:ro
       - ./scripts/keycloak-init.sh:/scripts/keycloak-init.sh:ro
     depends_on:
       keycloak:
@@ -187,6 +187,13 @@ services:
       S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       REDIS_URL: redis://redis:6379
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-20}
+      DATABASE_POOL_IDLE_TIMEOUT_MS: ${DATABASE_POOL_IDLE_TIMEOUT_MS:-600000}
+      SLOW_REQUEST_MS: ${SLOW_REQUEST_MS:-800}
+      IDLE_PERF_LOG_MS: ${IDLE_PERF_LOG_MS:-500}
+      DB_KEEPALIVE_ENABLED: ${DB_KEEPALIVE_ENABLED:-true}
+      DB_KEEPALIVE_INTERVAL_SECONDS: ${DB_KEEPALIVE_INTERVAL_SECONDS:-60}
+      CRONS_ENABLED: ${CRONS_ENABLED:-true}
     depends_on:
       postgres:
         condition: service_healthy
@@ -276,17 +283,12 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       BACKUP_DIR: ${BACKUP_DIR:-/opt/supplify/backups-staging}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
-      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
-      BACKUP_S3_PREFIX: ${BACKUP_S3_PREFIX:-supplify-staging}
-      AWS_REGION: ${AWS_REGION:-}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      BACKUP_REMOTE_URL: ${BACKUP_REMOTE_URL:-}
     volumes:
       - ${BACKUP_DIR:-/opt/supplify/backups-staging}:/backups
     entrypoint: ["/bin/sh", "-lc"]
     command: >
-      "apk add --no-cache bash tzdata aws-cli >/dev/null 2>&1 || true;
+      "apk add --no-cache bash tzdata >/dev/null 2>&1 || true;
        echo 'Backup container ready. Use ./deploy/scripts/backup-now.sh to trigger.';
        tail -f /dev/null"
     restart: unless-stopped

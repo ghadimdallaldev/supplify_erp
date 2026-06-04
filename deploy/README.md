@@ -1,6 +1,14 @@
 # Supplify deployment
 
-**Release branches (`preprod`, `prod`) contain runtime code only** — no docs, tests, or IDE/agent config. Promote from `dev` with `pnpm promote:preprod` or `pnpm promote:prod` (see `docs/BRANCHING.md`).
+**Primary hosting:** [railway-environments.md](../docs/operations/railway-environments.md) (dev / preprod / prod on Railway).
+
+**Release branches (`preprod`, `prod`)** contain runtime code only — promote from `dev` with `pnpm promote:preprod` or `pnpm promote:prod` (see `docs/operations/branching.md`).
+
+---
+
+## Legacy: EC2 Docker (optional VM)
+
+Historical design notes: [docs/archive/legacy-ec2/](../docs/archive/legacy-ec2/README.md).
 
 One-command **EC2 Docker** deploy per environment (run from repo root on the server):
 
@@ -13,6 +21,8 @@ One-command **EC2 Docker** deploy per environment (run from repo root on the ser
 Legacy: `deploy-staging.sh` remains for servers already on staging compose files (same as preprod).
 
 Each script bootstraps Docker, creates `deploy/env/.env.<env>`, builds images, starts infra (Postgres, Redis, MinIO, Keycloak), runs migrations + tenant role backfill + **system role sync** (`sync-system-roles.mjs`) + Keycloak realm init, then starts the app behind nginx.
+
+The **migrate** service applies all pending SQL files under `apps/api/db/migrations/` (including restaurant-operations migrations **0133–0135**). Set `CRONS_ENABLED=true` in `deploy/env/.env.*` so in-process jobs (expiry + reorder reminders) run in the backend container.
 
 ## Local full stack (developer machine)
 
@@ -96,7 +106,7 @@ Secrets live in `deploy/env/.env.*` on the server. Re-deploy after `git pull`:
 cd /opt/supplify && git pull origin prod && sudo ./deploy/scripts/deploy-prod.sh
 ```
 
-For **AWS CDK** (ECS, RDS, CloudFront), see `infra/README.md`.
+For **Railway** hosting, see [railway.md](../docs/operations/railway.md). AWS CDK was removed from this repo.
 
 ## Files
 

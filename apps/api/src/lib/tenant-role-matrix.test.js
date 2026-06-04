@@ -114,8 +114,9 @@ describe('Supplier default roles', () => {
   it('Promotions Manager manages deals', () => {
     const perms = role('Promotions Manager', 'SUPPLIER')
     expect(can(perms, P.PROMOTIONS_MANAGE)).toBe(true)
-    expect(can(perms, P.ORDERS_MANAGE)).toBe(false)
+    expect(can(perms, P.ORDERS_MANAGE)).toBe(true)
     expect(can(perms, P.CATALOG_MANAGE)).toBe(false)
+    expect(can(perms, P.CATALOG_VIEW)).toBe(true)
   })
 
   it('Accountant cannot accept/decline orders', () => {

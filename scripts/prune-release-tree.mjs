@@ -53,7 +53,7 @@ function removeTestFiles() {
     if (file.endsWith('.test.js')) rmFile(path.relative(ROOT, file))
   })
   walk(path.join(ROOT, 'apps/web/src'), (file) => {
-    if (/\.test\.(ts|tsx)$/.test(file)) rmFile(path.relative(ROOT, file))
+    if (/\.test\.(ts|tsx|jsx)$/.test(file)) rmFile(path.relative(ROOT, file))
   })
 }
 

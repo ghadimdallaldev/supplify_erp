@@ -1,0 +1,24 @@
+%% Public reservations booking flow
+%% Status: current | Related: apps/api/src/routes/public.routes.js
+sequenceDiagram
+  participant Guest
+  participant Web as Public /reserve UI
+  participant API as /api/public
+  participant Avail as reservation-availability
+
+  Guest->>Web: Open booking page
+  Web->>API: GET slots / availability
+  API->>Avail: calculateSlotsFromData
+  Avail-->>Web: slots with seatsLeft
+  Guest->>Web: Select slot + party size
+  Web->>API: POST book
+  alt seats available
+    API-->>Web: CONFIRMED or PENDING reservation
+    Web-->>Guest: Confirmation + manage token
+  else full
+    API-->>Web: WAITLIST or waitlist flag
+    Web-->>Guest: Waitlist confirmation
+  end
+  Guest->>Web: /reserve/manage/:token
+  Web->>API: Cancel / reschedule
+  API-->>Guest: Notify restaurant team stub/log

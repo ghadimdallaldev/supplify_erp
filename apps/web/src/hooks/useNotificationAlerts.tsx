@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Bell } from 'lucide-react'
-import { useGetNotificationsQuery } from '../services/api'
-import { useAppSelector } from './redux'
+import { useGetNotificationsQuery, api } from '../services/api'
+import { useAppDispatch, useAppSelector } from './redux'
 import {
   NOTIFICATION_TOAST_DURATION_MS,
   playNotificationSound,
@@ -12,8 +12,10 @@ import {
   unlockNotificationAudio,
   type NotificationLike,
 } from '../lib/notificationAlerts'
+import { registerServiceWorker } from '../lib/registerServiceWorker'
+import { getAppSocket } from '../lib/appSocket'
 
-const POLL_MS = 12_000
+const POLL_DISCONNECTED_MS = 30_000
 const PERMISSION_PROMPT_KEY = 'supplify_notif_permission_asked'
 
 function showNotificationToast(notification: NotificationLike, onNavigate: (path: string) => void) {
@@ -56,16 +58,38 @@ function showNotificationToast(notification: NotificationLike, onNavigate: (path
   )
 }
 
+function shouldSuppressChatToast(
+  notification: NotificationLike,
+  pathname: string,
+  activeConversationId: string | null
+): boolean {
+  const type = String(notification.reference_type || '').toUpperCase()
+  if (type !== 'CONVERSATION' && type !== 'CHAT' && type !== 'MESSAGE') return false
+  if (!pathname.startsWith('/app/chat')) return false
+  const refId = notification.reference_id
+  if (!refId || !activeConversationId) return false
+  return refId === activeConversationId
+}
+
 /**
- * Polls for new notifications and surfaces toast + sound + browser banner.
- * Mount once in Layout (not in Header) to avoid duplicate alerts.
+ * Real-time notification toasts via Socket.IO; polling as fallback when disconnected.
+ * Mount once in Layout.
  */
 export function useNotificationAlerts() {
   const { user } = useAppSelector((state) => state.auth)
+  const dispatch = useAppDispatch()
   const navigate = useNavigate()
+  const location = useLocation()
   const bootstrappedRef = useRef(false)
   const seenIdsRef = useRef<Set<string>>(new Set())
   const lastUserIdRef = useRef<string | null>(null)
+  const [socketConnected, setSocketConnected] = useState(false)
+  const activeConversationIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    activeConversationIdRef.current = params.get('conversation')
+  }, [location.pathname, location.search])
 
   useEffect(() => {
     const uid = user?.id ?? null
@@ -79,16 +103,59 @@ export function useNotificationAlerts() {
     { limit: 25, offset: 0 },
     {
       skip: !user,
-      pollingInterval: POLL_MS,
-      refetchOnFocus: true,
+      pollingInterval: socketConnected ? undefined : POLL_DISCONNECTED_MS,
+      skipPollingIfUnfocused: true,
+      refetchOnFocus: false,
       refetchOnReconnect: true,
     }
   )
 
+  const alertForNotification = (item: NotificationLike) => {
+    if (!item.id || seenIdsRef.current.has(item.id)) return
+    seenIdsRef.current.add(item.id)
+    if (item.is_read) return
+    if (shouldSuppressChatToast(item, location.pathname, activeConversationIdRef.current)) {
+      dispatch(api.util.invalidateTags(['Notification']))
+      return
+    }
+    playNotificationSound()
+    showNotificationToast(item, (path) => navigate(path))
+    showBrowserNotificationAlways(
+      item.title || 'Supplify',
+      item.message || 'You have a new notification',
+      resolveNotificationUrl(item)
+    )
+    dispatch(api.util.invalidateTags(['Notification']))
+  }
+
   useEffect(() => {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
-    navigator.serviceWorker.register('/sw.js').catch(() => undefined)
+    registerServiceWorker()
   }, [])
+
+  useEffect(() => {
+    if (!user?.id) return
+
+    const socket = getAppSocket(user.id)
+
+    const onConnect = () => setSocketConnected(true)
+    const onDisconnect = () => setSocketConnected(false)
+    setSocketConnected(socket.connected)
+
+    const onNotificationNew = (payload: NotificationLike) => {
+      if (!payload?.id) return
+      alertForNotification(payload)
+    }
+
+    socket.on('connect', onConnect)
+    socket.on('disconnect', onDisconnect)
+    socket.on('notification_new', onNotificationNew)
+
+    return () => {
+      socket.off('connect', onConnect)
+      socket.off('disconnect', onDisconnect)
+      socket.off('notification_new', onNotificationNew)
+    }
+  }, [user?.id, dispatch, navigate, location.pathname])
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -128,19 +195,8 @@ export function useNotificationAlerts() {
     }
 
     const newcomers = list.filter((item) => item.id && !seenIdsRef.current.has(item.id))
-    if (!newcomers.length) return
-
     for (const item of newcomers) {
-      seenIdsRef.current.add(item.id)
-      if (item.is_read) continue
-
-      playNotificationSound()
-      showNotificationToast(item, (path) => navigate(path))
-      showBrowserNotificationAlways(
-        item.title || 'Supplify',
-        item.message || 'You have a new notification',
-        resolveNotificationUrl(item)
-      )
+      alertForNotification(item)
     }
-  }, [data?.notifications, user, navigate])
+  }, [data?.notifications, user])
 }

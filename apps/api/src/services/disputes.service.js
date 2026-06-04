@@ -293,7 +293,10 @@ export async function createDispute({
   return loadDisputeDetail(result.id, { restaurantId })
 }
 
-export async function listDisputesForRestaurant(restaurantId, { status } = {}) {
+export async function listDisputesForRestaurant(
+  restaurantId,
+  { status, limit = 50, offset = 0 } = {}
+) {
   const params = [restaurantId]
   let sql = `
     SELECT d.*, r.name AS restaurant_name, s.name AS supplier_name, o.status AS order_status
@@ -307,12 +310,18 @@ export async function listDisputesForRestaurant(restaurantId, { status } = {}) {
     params.push(status)
     sql += ` AND d.status = $${params.length}`
   }
-  sql += ' ORDER BY d.created_at DESC'
+  const clampedLimit = Math.min(Math.max(parseInt(limit) || 50, 1), 100)
+  const clampedOffset = Math.max(parseInt(offset) || 0, 0)
+  params.push(clampedLimit, clampedOffset)
+  sql += ` ORDER BY d.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`
   const { rows } = await query(sql, params)
   return rows.map(mapDisputeRow)
 }
 
-export async function listIncomingDisputesForSupplier(supplierId, { status } = {}) {
+export async function listIncomingDisputesForSupplier(
+  supplierId,
+  { status, limit = 50, offset = 0 } = {}
+) {
   const params = [supplierId]
   let sql = `
     SELECT d.*, r.name AS restaurant_name, s.name AS supplier_name, o.status AS order_status
@@ -326,7 +335,10 @@ export async function listIncomingDisputesForSupplier(supplierId, { status } = {
     params.push(status)
     sql += ` AND d.status = $${params.length}`
   }
-  sql += ' ORDER BY d.created_at DESC'
+  const clampedLimit = Math.min(Math.max(parseInt(limit) || 50, 1), 100)
+  const clampedOffset = Math.max(parseInt(offset) || 0, 0)
+  params.push(clampedLimit, clampedOffset)
+  sql += ` ORDER BY d.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`
   const { rows } = await query(sql, params)
   return rows.map(mapDisputeRow)
 }
@@ -336,6 +348,9 @@ export async function getDispute(disputeId, scope) {
 }
 
 export async function addDisputeAttachment(disputeId, restaurantId, userId, { fileKey, fileName }) {
+  const { assertUploadKeyOwnedByUser } = await import('../lib/sanitize-upload.js')
+  assertUploadKeyOwnedByUser(fileKey, userId)
+
   const { rows } = await query(
     `SELECT id, status FROM disputes WHERE id = $1 AND restaurant_id = $2`,
     [disputeId, restaurantId]

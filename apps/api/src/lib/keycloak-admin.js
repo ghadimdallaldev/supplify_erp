@@ -172,6 +172,48 @@ export async function setKeycloakUserEnabled(adminToken, userId, enabled) {
   }
 }
 
+/** Split app display name (or email local-part) into Keycloak profile fields. */
+export function splitNameForKeycloak(displayName, email) {
+  const parts = String(displayName || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  if (parts.length >= 2) {
+    return { firstName: parts[0], lastName: parts.slice(1).join(' ') }
+  }
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: 'User' }
+  }
+  const local = String(email || '')
+    .split('@')[0]
+    ?.replace(/[._-]+/g, ' ')
+    .trim()
+  const localParts = local.split(/\s+/).filter(Boolean)
+  if (localParts.length >= 2) {
+    return { firstName: localParts[0], lastName: localParts.slice(1).join(' ') }
+  }
+  return { firstName: localParts[0] || 'User', lastName: 'User' }
+}
+
+export async function updateKeycloakUserProfile(adminToken, userId, { firstName, lastName }) {
+  const url = `${base()}/admin/realms/${config.KEYCLOAK_REALM}/users/${userId}`
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${adminToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      firstName: firstName || 'User',
+      lastName: lastName || 'User',
+    }),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Update Keycloak profile failed: ${res.status} ${text}`)
+  }
+}
+
 export async function resetKeycloakUserPassword(adminToken, userId, password, temporary = true) {
   const url = `${base()}/admin/realms/${config.KEYCLOAK_REALM}/users/${userId}/reset-password`
   const res = await fetch(url, {
