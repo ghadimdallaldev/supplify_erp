@@ -9,6 +9,7 @@ import { z } from 'zod'
 import {
   ensureNotificationPreferences,
   invalidateNotificationPreferencesCache,
+  invalidateUserNotificationsListCache,
   getUserNotifications,
   getUserPreferences,
   sendNotification,
@@ -16,7 +17,9 @@ import {
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext, notificationsMutationGuard)
+const tenantMutationGuard = [resolveTenantContext, notificationsMutationGuard]
+
+router.use(requireAuth)
 
 // Validation schemas
 const updatePreferencesSchema = z.object({
@@ -124,7 +127,7 @@ router.get('/preferences', async (req, res) => {
 })
 
 // Update notification preferences
-router.patch('/preferences', async (req, res) => {
+router.patch('/preferences', ...tenantMutationGuard, async (req, res) => {
   try {
     const userId = req.userData.id
     const userType = req.userData.role
@@ -226,6 +229,8 @@ router.post('/:id/read', async (req, res) => {
       [id, userId]
     )
 
+    await invalidateUserNotificationsListCache(userId, req.userData.role)
+
     res.json({
       ok: true,
       data: { id },
@@ -266,6 +271,8 @@ router.post('/read-all', async (req, res) => {
       [userId, userType]
     )
 
+    await invalidateUserNotificationsListCache(userId, req.userData.role)
+
     res.json({
       ok: true,
       data: { markedRead: rowCount },
@@ -292,7 +299,7 @@ router.post('/read-all', async (req, res) => {
 })
 
 // Test notification endpoint (dev/debug only)
-router.post('/test', async (req, res) => {
+router.post('/test', ...tenantMutationGuard, async (req, res) => {
   if (!config.ENABLE_DEBUG_ROUTES) {
     return res.status(404).json({ ok: false, error: { name: 'NOT_FOUND', message: 'Not found' } })
   }

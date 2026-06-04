@@ -201,42 +201,65 @@ export function StaffPage() {
   const scheduleStart = clampToISODate(today)
   const scheduleEnd = clampToISODate(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000))
 
-  const { data: shifts = [], isLoading: shiftsLoading } = useGetStaffShiftsQuery({
-    startDate: scheduleStart,
-    endDate: scheduleEnd,
-  })
+  const { data: shifts = [], isLoading: shiftsLoading } = useGetStaffShiftsQuery(
+    {
+      startDate: scheduleStart,
+      endDate: scheduleEnd,
+    },
+    { skip: activeTab !== 'schedule' }
+  )
 
-  const { data: timeEntries = [], isLoading: timeEntriesLoading } = useGetStaffTimeEntriesQuery({
-    startDate: clampToISODate(new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)),
-    endDate: clampToISODate(new Date(today.getTime() + 1 * 24 * 60 * 60 * 1000)),
-  })
+  const { data: timeEntries = [], isLoading: timeEntriesLoading } = useGetStaffTimeEntriesQuery(
+    {
+      startDate: clampToISODate(new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)),
+      endDate: clampToISODate(new Date(today.getTime() + 1 * 24 * 60 * 60 * 1000)),
+    },
+    { skip: activeTab !== 'schedule' }
+  )
 
   const [createStaffMember, { isLoading: creatingStaff }] = useCreateStaffMemberMutation()
   const [createShift, { isLoading: creatingShift }] = useCreateStaffShiftMutation()
   const [checkInStaff, { isLoading: checkingIn }] = useCheckInStaffMemberMutation()
   const [checkOutEntry, { isLoading: checkingOut }] = useCheckOutTimeEntryMutation()
-  const { data: ptoRequests = [], isLoading: ptoLoading } = useGetStaffPtoRequestsQuery()
+  const { data: ptoRequests = [], isLoading: ptoLoading } = useGetStaffPtoRequestsQuery(undefined, {
+    skip: activeTab !== 'pto',
+  })
   const [createPtoRequest, { isLoading: creatingPto }] = useCreateStaffPtoRequestMutation()
   const [updatePtoRequest, { isLoading: updatingPto }] = useUpdateStaffPtoRequestMutation()
-  const { data: availability = [] } = useGetStaffAvailabilityQuery()
+  const { data: availability = [] } = useGetStaffAvailabilityQuery(undefined, {
+    skip: activeTab !== 'pto',
+  })
   const [setAvailability, { isLoading: savingAvailability }] = useSetStaffAvailabilityMutation()
-  const { data: swaps = [], isLoading: swapsLoading } = useGetStaffSwapsQuery()
+  const { data: swaps = [], isLoading: swapsLoading } = useGetStaffSwapsQuery(undefined, {
+    skip: activeTab !== 'schedule',
+  })
   const [createSwap, { isLoading: creatingSwap }] = useCreateStaffSwapMutation()
   const [decideSwap, { isLoading: decidingSwap }] = useDecideStaffSwapMutation()
   const { data: announcements = [], isLoading: announcementsLoading } =
-    useGetStaffAnnouncementsQuery()
+    useGetStaffAnnouncementsQuery(undefined, { skip: activeTab !== 'announcements' })
   const [createAnnouncement, { isLoading: creatingAnnouncement }] =
     useCreateStaffAnnouncementMutation()
   const [ackAnnouncement] = useAcknowledgeStaffAnnouncementMutation()
-  const { data: documents = [], isLoading: documentsLoading } = useGetStaffDocumentsQuery()
+  const { data: documents = [], isLoading: documentsLoading } = useGetStaffDocumentsQuery(
+    undefined,
+    { skip: activeTab !== 'documents' }
+  )
   const [createDocument, { isLoading: creatingDocument }] = useCreateStaffDocumentMutation()
-  const { data: incidents = [], isLoading: incidentsLoading } = useGetStaffIncidentsQuery()
+  const { data: incidents = [], isLoading: incidentsLoading } = useGetStaffIncidentsQuery(
+    undefined,
+    { skip: activeTab !== 'documents' }
+  )
   const [createIncident, { isLoading: creatingIncident }] = useCreateStaffIncidentMutation()
-  const { data: performanceNotes = [], isLoading: notesLoading } =
-    useGetStaffPerformanceNotesQuery()
+  const { data: performanceNotes = [], isLoading: notesLoading } = useGetStaffPerformanceNotesQuery(
+    undefined,
+    { skip: activeTab !== 'reports' }
+  )
   const [createPerformanceNote, { isLoading: creatingPerformance }] =
     useCreateStaffPerformanceNoteMutation()
-  const { data: payrollExports = [], isLoading: payrollLoading } = useGetStaffPayrollExportsQuery()
+  const { data: payrollExports = [], isLoading: payrollLoading } = useGetStaffPayrollExportsQuery(
+    undefined,
+    { skip: activeTab !== 'reports' }
+  )
   const [createPayrollExport, { isLoading: creatingPayroll }] =
     useCreateStaffPayrollExportMutation()
 
