@@ -1,8 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { runCronJob, CRON_JOBS, _clearRunningJobsForTests } from './cron-runner.js'
 
-vi.mock('./db.js', () => ({
+const mockClient = {
   query: vi.fn(),
+  release: vi.fn(),
+}
+
+vi.mock('./db.js', () => ({
+  pool: {
+    connect: vi.fn(async () => mockClient),
+  },
 }))
 
 vi.mock('./logger.js', () => ({
@@ -25,10 +32,9 @@ describe('cron-runner', () => {
   })
 
   it('runs job when advisory lock is acquired', async () => {
-    const { query } = await import('./db.js')
-    query
+    mockClient.query
       .mockResolvedValueOnce({ rows: [{ acquired: true }] })
-      .mockResolvedValueOnce({ rows: [{ acquired: true }] })
+      .mockResolvedValueOnce({ rows: [{ pg_advisory_unlock: true }] })
 
     const fn = vi.fn().mockResolvedValue({ ok: true })
     const result = await runCronJob(CRON_JOBS.INVOICE_OVERDUE, fn)
@@ -36,12 +42,12 @@ describe('cron-runner', () => {
     expect(result.ran).toBe(true)
     expect(result.result).toEqual({ ok: true })
     expect(fn).toHaveBeenCalledOnce()
-    expect(query).toHaveBeenCalledTimes(2)
+    expect(mockClient.query).toHaveBeenCalledTimes(2)
+    expect(mockClient.release).toHaveBeenCalledOnce()
   })
 
   it('skips when advisory lock is held by another session', async () => {
-    const { query } = await import('./db.js')
-    query.mockResolvedValueOnce({ rows: [{ acquired: false }] })
+    mockClient.query.mockResolvedValueOnce({ rows: [{ acquired: false }] })
 
     const fn = vi.fn()
     const result = await runCronJob(CRON_JOBS.SCHEDULED_ORDERS, fn)
@@ -49,11 +55,12 @@ describe('cron-runner', () => {
     expect(result.ran).toBe(false)
     expect(result.skipped).toBe('advisory_lock_held')
     expect(fn).not.toHaveBeenCalled()
+    expect(mockClient.query).toHaveBeenCalledTimes(1)
+    expect(mockClient.release).toHaveBeenCalledOnce()
   })
 
   it('skips when the same job is already running in-process', async () => {
-    const { query } = await import('./db.js')
-    query.mockResolvedValue({ rows: [{ acquired: true }] })
+    mockClient.query.mockResolvedValue({ rows: [{ acquired: true }] })
 
     let release
     const blocker = new Promise((resolve) => {

@@ -1,4 +1,4 @@
-import { query } from './db.js'
+import { pool } from './db.js'
 import { logger } from './logger.js'
 import { config } from '../config/env.js'
 
@@ -41,45 +41,54 @@ export async function runCronJob(jobName, fn) {
 
   runningJobs.add(jobName)
 
-  const { rows } = await query(`SELECT pg_try_advisory_lock(hashtext($1::text)) AS acquired`, [
-    advisoryLockKey(jobName),
-  ])
-  const acquired = rows[0]?.acquired === true
-  if (!acquired) {
-    runningJobs.delete(jobName)
-    logger.debug({ event: 'cron.skipped', job: jobName, reason: 'advisory_lock_held' })
-    return { ran: false, skipped: 'advisory_lock_held' }
-  }
-  const startedAt = Date.now()
-  logger.info({ event: 'cron.started', job: jobName })
+  const client = await pool.connect()
+  let acquired = false
 
   try {
-    const result = await fn()
-    logger.info({
-      event: 'cron.completed',
-      job: jobName,
-      durationMs: Date.now() - startedAt,
-    })
-    return { ran: true, result }
-  } catch (error) {
-    logger.error({
-      event: 'cron.failed',
-      job: jobName,
-      durationMs: Date.now() - startedAt,
-      error: error.message,
-    })
-    throw error
+    const { rows } = await client.query(
+      `SELECT pg_try_advisory_lock(hashtext($1::text)) AS acquired`,
+      [advisoryLockKey(jobName)]
+    )
+    acquired = rows[0]?.acquired === true
+    if (!acquired) {
+      logger.debug({ event: 'cron.skipped', job: jobName, reason: 'advisory_lock_held' })
+      return { ran: false, skipped: 'advisory_lock_held' }
+    }
+
+    const startedAt = Date.now()
+    logger.info({ event: 'cron.started', job: jobName })
+
+    try {
+      const result = await fn()
+      logger.info({
+        event: 'cron.completed',
+        job: jobName,
+        durationMs: Date.now() - startedAt,
+      })
+      return { ran: true, result }
+    } catch (error) {
+      logger.error({
+        event: 'cron.failed',
+        job: jobName,
+        durationMs: Date.now() - startedAt,
+        error: error.message,
+      })
+      throw error
+    }
   } finally {
     runningJobs.delete(jobName)
-    await query(`SELECT pg_advisory_unlock(hashtext($1::text))`, [advisoryLockKey(jobName)]).catch(
-      (unlockErr) => {
-        logger.warn({
-          event: 'cron.unlock_failed',
-          job: jobName,
-          error: unlockErr.message,
+    if (acquired) {
+      await client
+        .query(`SELECT pg_advisory_unlock(hashtext($1::text))`, [advisoryLockKey(jobName)])
+        .catch((unlockErr) => {
+          logger.warn({
+            event: 'cron.unlock_failed',
+            job: jobName,
+            error: unlockErr.message,
+          })
         })
-      }
-    )
+    }
+    client.release()
   }
 }
 

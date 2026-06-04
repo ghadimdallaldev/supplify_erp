@@ -51,10 +51,10 @@ COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 
 # Railway routes traffic to $PORT — template is rendered at container start
 COPY apps/web/nginx.conf.template /etc/nginx/conf.d/default.conf.template
-COPY apps/web/nginx-proxy-api.conf.template /etc/nginx/conf.d/proxy-api.conf.template
+COPY apps/web/nginx-proxy-api.conf.template /etc/supplify/proxy-api.conf.template
 COPY deploy/railway/${RAILWAY_DEPLOY_ENV}/web.env /etc/supplify/web-build.env
 COPY apps/web/docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 
 ENV PORT=80
 
