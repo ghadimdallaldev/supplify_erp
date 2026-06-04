@@ -1,8 +1,10 @@
 import { AlertTriangle } from 'lucide-react'
 import { Button } from './ui/button'
-import { useNavigate } from 'react-router-dom'
 import { getLimitUpgradeCopy } from '../lib/upgradeCopy'
 import { splitRowClass } from './ui/card-layout'
+import { useAppDispatch, useAppSelector } from '../hooks/redux'
+import { showMonetizationBlock } from '../features/monetization/monetizationSlice'
+import { resolveUpgradeUrl } from '../lib/externallyControlledFeatures'
 
 type LimitExceededBannerProps = {
   limitKey: string
@@ -35,14 +37,16 @@ export function LimitExceededBanner({
   limitValue,
   currentPlan,
   recommendedPlans = [],
-  upgradeUrl = '/app/settings',
+  upgradeUrl,
   className = '',
 }: LimitExceededBannerProps) {
-  const navigate = useNavigate()
+  const dispatch = useAppDispatch()
+  const user = useAppSelector((state) => state.auth.user)
   const label = LIMIT_LABELS[limitKey] || limitKey.replace(/_/g, ' ')
   const upgradeCopy = getLimitUpgradeCopy(limitKey)
   const planToUnlock = upgradeCopy?.plan ?? recommendedPlans[0] ?? 'Gold'
   const valueProp = upgradeCopy?.value
+  const resolvedUpgradeUrl = resolveUpgradeUrl(upgradeUrl, null, user?.role)
 
   return (
     <div
@@ -70,7 +74,21 @@ export function LimitExceededBanner({
         size="sm"
         variant="outline"
         className="shrink-0 whitespace-normal border-amber-300 bg-[var(--surface)] hover:bg-amber-100"
-        onClick={() => navigate(upgradeUrl)}
+        onClick={() =>
+          dispatch(
+            showMonetizationBlock({
+              type: 'limit',
+              payload: {
+                limitKey,
+                limitValue,
+                currentUsage,
+                currentPlan: currentPlan ?? null,
+                recommendedPlans,
+                upgradeUrl: resolvedUpgradeUrl,
+              },
+            })
+          )
+        }
         title={valueProp ?? `Upgrade to ${planToUnlock} for higher ${label} limit`}
       >
         Upgrade

@@ -1,5 +1,6 @@
 import type { AppDispatch } from '../store'
 import { showMonetizationBlock } from '../features/monetization/monetizationSlice'
+import { resolveUpgradeUrl } from './externallyControlledFeatures'
 
 /** Open the compare-plans upgrade modal (voluntary upgrade, not a blocked feature). */
 export function openBrowseUpgrade(
@@ -13,7 +14,7 @@ export function openBrowseUpgrade(
       currentPlan: options?.currentPlan ?? null,
       requiredPlan: null,
       recommendedPlans: [],
-      upgradeUrl: options?.upgradeUrl ?? '/app/settings?tab=subscription',
+      upgradeUrl: resolveUpgradeUrl(options?.upgradeUrl, null, undefined),
     },
   })
   // Defer so the button click that opens the modal is not treated as an outside dismiss.

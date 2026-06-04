@@ -1,5 +1,5 @@
 import express from 'express'
-import { requireAuth, requireRole } from '../lib/rbac.js'
+import { requireAuth, requireRole, getSupplierIdForRequest } from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -49,7 +49,7 @@ const restaurantListSchema = z.object({
     .default('0'),
 })
 
-// List restaurants (admin sees all, suppliers see only their customer restaurants)
+// List restaurants (admin sees all; suppliers see customers who ordered or follow them)
 router.get('/', requireAuth, async (req, res) => {
   try {
     const params = restaurantListSchema.parse(req.query)
@@ -60,13 +60,9 @@ router.get('/', requireAuth, async (req, res) => {
 
     // Role-based filtering
     if (req.userData.role === 'SUPPLIER') {
-      // Suppliers see only restaurants that have ordered from them
-      const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
-        req.userData.email,
-      ])
+      const supplierId = await getSupplierIdForRequest(req)
 
-      if (suppliers.length === 0) {
-        // Return empty list if supplier record not found
+      if (!supplierId) {
         return res.json({
           ok: true,
           data: {
@@ -84,13 +80,22 @@ router.get('/', requireAuth, async (req, res) => {
 
       whereConditions.push(`
         id IN (
-          SELECT DISTINCT o.restaurant_id 
+          SELECT DISTINCT o.restaurant_id
           FROM customer_order o
           JOIN order_item oi ON oi.order_id = o.id
           WHERE oi.supplier_id = $${paramIndex}
+          UNION
+          SELECT sf.restaurant_id
+          FROM supplier_follow sf
+          WHERE sf.supplier_id = $${paramIndex}
+        )
+        AND id NOT IN (
+          SELECT sb.restaurant_id
+          FROM supplier_blocklist sb
+          WHERE sb.supplier_id = $${paramIndex}
         )
       `)
-      queryParams.push(suppliers[0].id)
+      queryParams.push(supplierId)
       paramIndex++
     } else if (req.userData.role !== 'ADMIN') {
       // Other roles (RESTAURANT) have no access

@@ -1246,7 +1246,9 @@ router.post(
             limitCheck,
             'orders_per_day',
             subscription?.plan_name || subscription?.plan_display_name,
-            recommendedPlans
+            recommendedPlans,
+            undefined,
+            'RESTAURANT'
           )
           err.details.requested = ordersToCreate
           return res.status(403).json({
@@ -1533,18 +1535,40 @@ router.post(
         })
       }
 
-      // Verify restaurant exists
-      const { rows: restaurants } = await query('SELECT id FROM restaurant WHERE id = $1', [
-        orderData.restaurant_id,
-      ])
+      // Verify restaurant is an eligible customer (follows supplier or has ordered before)
+      const { rows: eligibleRestaurants } = await query(
+        `
+        SELECT r.id
+        FROM restaurant r
+        WHERE r.id = $1
+          AND r.id NOT IN (
+            SELECT sb.restaurant_id FROM supplier_blocklist sb WHERE sb.supplier_id = $2
+          )
+          AND (
+            EXISTS (
+              SELECT 1
+              FROM supplier_follow sf
+              WHERE sf.supplier_id = $2 AND sf.restaurant_id = r.id
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM customer_order o
+              JOIN order_item oi ON oi.order_id = o.id
+              WHERE o.restaurant_id = r.id AND oi.supplier_id = $2
+            )
+          )
+      `,
+        [orderData.restaurant_id, supplierId]
+      )
 
-      if (restaurants.length === 0) {
+      if (eligibleRestaurants.length === 0) {
         return res.status(400).json({
           ok: false,
           data: null,
           error: {
             name: 'VALIDATION_ERROR',
-            message: 'Restaurant not found',
+            message:
+              'This restaurant cannot receive manual orders. They must follow your supplier profile or have placed an order with you before.',
           },
           requestId: req.requestId,
         })
