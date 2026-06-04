@@ -4,16 +4,18 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '../../lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-[transform,box-shadow,background-color,border-color,color,opacity] duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none disabled:active:scale-100 motion-reduce:transition-none motion-reduce:active:scale-100',
   {
     variants: {
       variant: {
-        default: 'bg-[var(--brand)] text-white border border-[var(--brand)] hover:opacity-90',
-        destructive: 'bg-[var(--red)] text-white border border-[var(--red)] hover:opacity-90',
+        default:
+          'bg-[var(--brand)] text-white border border-[var(--brand)] shadow-sm shadow-[var(--brand)]/20 hover:bg-[var(--brand-mid)] hover:border-[var(--brand-mid)] hover:shadow-md hover:shadow-[var(--brand)]/25',
+        destructive:
+          'bg-[var(--red)] text-white border border-[var(--red)] shadow-sm shadow-[var(--red)]/20 hover:opacity-90 hover:shadow-md hover:shadow-[var(--red)]/25',
         outline:
-          'border border-[var(--app-border-mid)] bg-transparent text-[var(--text-mid)] hover:bg-[var(--brand-ultra)]',
+          'border border-[var(--app-border-mid)] bg-transparent text-[var(--text-mid)] hover:bg-[var(--brand-ultra)] hover:border-[var(--brand-light)] hover:text-[var(--text)]',
         secondary:
-          'bg-[var(--brand-ultra)] text-[var(--text-mid)] border border-[var(--app-border)] hover:bg-[var(--brand-pale)]',
+          'bg-[var(--brand-ultra)] text-[var(--text-mid)] border border-[var(--app-border)] hover:bg-[var(--brand-pale)] hover:border-[var(--brand-light)]',
         ghost: 'text-[var(--text)] hover:bg-[var(--brand-ultra)]',
         link: 'text-[var(--brand-mid)] underline-offset-4 hover:underline',
       },
