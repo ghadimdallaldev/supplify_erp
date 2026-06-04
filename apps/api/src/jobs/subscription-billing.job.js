@@ -109,9 +109,15 @@ async function attemptAutoRenewal(subscription) {
     const { rowCount } = updateResult
 
     if (rowCount > 0) {
-      invalidateTenantSubscriptionCache(subscription.tenant_id, subscription.tenant_type).catch(
-        () => {}
-      )
+      try {
+        await invalidateTenantSubscriptionCache(subscription.tenant_id, subscription.tenant_type)
+      } catch (err) {
+        logger.error('Failed to invalidate subscription cache after auto-renewal', {
+          tenantId: subscription.tenant_id,
+          tenantType: subscription.tenant_type,
+          error: err.message,
+        })
+      }
       notifyBillingRenewed({
         tenantId: subscription.tenant_id,
         tenantType: subscription.tenant_type,

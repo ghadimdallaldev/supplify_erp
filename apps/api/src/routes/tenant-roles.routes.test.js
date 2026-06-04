@@ -80,6 +80,10 @@ vi.mock('../lib/rbac-guards.js', () => ({
   assertCanGrantPermissions: (...args) => assertCanGrantPermissions(...args),
 }))
 
+vi.mock('../lib/access-cache.js', () => ({
+  invalidateUserAuthCaches: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('../lib/permissions.js', async (importOriginal) => {
   const actual = await importOriginal()
   return {
@@ -277,7 +281,7 @@ describe('Tenant roles routes', () => {
     expect(res.body.error.message).toMatch(/Owner/)
   })
 
-  it('assign role calls service and invalidates cache', async () => {
+  it('assign role calls service and invalidates auth caches', async () => {
     const mgrRoleId = 'a0000001-0001-4000-8000-000000000098'
     assertCanAssignRole.mockResolvedValueOnce({
       id: mgrRoleId,
@@ -285,12 +289,19 @@ describe('Tenant roles routes', () => {
       tenant_id: 'tenant-1',
       tenant_type: 'RESTAURANT',
     })
+    const targetUserId = 'a0000001-0001-4000-8000-000000000088'
     const res = await request(app)
-      .post('/api/roles/users/a0000001-0001-4000-8000-000000000088/assign')
+      .post(`/api/roles/users/${targetUserId}/assign`)
       .send({ role_id: mgrRoleId })
       .expect(200)
     expect(assignTenantUserRole).toHaveBeenCalled()
     expect(res.body.data.roleName).toBe('Manager')
+    const { invalidateUserAuthCaches } = await import('../lib/access-cache.js')
+    expect(invalidateUserAuthCaches).toHaveBeenCalledWith({
+      userId: targetUserId,
+      tenantId: 'tenant-1',
+      tenantType: 'RESTAURANT',
+    })
   })
 
   it('POST assign allows STAFF_INVITE without SETTINGS_MANAGE', async () => {

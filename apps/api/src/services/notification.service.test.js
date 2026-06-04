@@ -6,6 +6,7 @@ import {
   listTenantUserIds,
   notifyTenantUsers,
   getUserNotifications,
+  getUnreadNotificationCount,
 } from './notification.service.js'
 
 const queryMock = vi.fn()
@@ -344,6 +345,31 @@ describe('Notification Service', () => {
       const second = await getUserNotifications('user-1', 'RESTAURANT', { limit: 25, offset: 0 })
       expect(second).toEqual(first)
       expect(queryMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('getUnreadNotificationCount', () => {
+    it('returns cached unread count without hitting the database', async () => {
+      const { getCache, setCache } = await import('../lib/cache.js')
+      vi.mocked(getCache).mockResolvedValue({ unreadCount: 4 })
+
+      const result = await getUnreadNotificationCount('user-1', 'RESTAURANT')
+      expect(result.unreadCount).toBe(4)
+      expect(queryMock).not.toHaveBeenCalled()
+      expect(setCache).not.toHaveBeenCalled()
+    })
+
+    it('queries count on cache miss and stores result', async () => {
+      const { getCache, setCache } = await import('../lib/cache.js')
+      const { resetSingleflightForTests } = await import('../lib/singleflight.js')
+      resetSingleflightForTests()
+      vi.mocked(getCache).mockResolvedValue(null)
+      queryMock.mockResolvedValueOnce({ rows: [{ count: 2 }] })
+
+      const result = await getUnreadNotificationCount('user-1', 'RESTAURANT')
+      expect(result.unreadCount).toBe(2)
+      expect(queryMock).toHaveBeenCalledTimes(1)
+      expect(setCache).toHaveBeenCalled()
     })
   })
 })

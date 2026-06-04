@@ -6,6 +6,7 @@ import { query } from './db.js'
 import { logger } from './logger.js'
 import { getCache, setCache, deleteCache } from './cache.js'
 import { singleflight } from './singleflight.js'
+import { invalidateTenantContextCache } from './tenant-context-cache.js'
 import { PERMISSION_KEYS } from './permission-keys.js'
 import { getOrgRolePermissions } from './supplier-org.js'
 import { getRestaurantOrgRolePermissions } from './restaurant-org.js'
@@ -33,6 +34,7 @@ export async function invalidateUserPermissionCache(userId, tenantId, tenantType
   }
   await deleteCache(permissionCacheKey(userId, tenantId, tenantType))
   await deleteCache(rolesCacheKey(userId, tenantId, tenantType))
+  await invalidateTenantContextCache(userId, tenantId, tenantType)
 }
 
 async function getLegacyRolesForUser(userId, tenantId, tenantType) {
@@ -115,15 +117,23 @@ export async function getRolesForUser(userId, tenantId, tenantType, req = null) 
       return cached
     }
 
-    let roles
-    if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
-      const named = await getTenantNamedRoleCodes(userId, tenantId, tenantType)
-      roles = named.length > 0 ? named : await getLegacyRolesForUser(userId, tenantId, tenantType)
-    } else {
-      roles = await getLegacyRolesForUser(userId, tenantId, tenantType)
-    }
+    const roles = await singleflight(cacheKey, async () => {
+      const again = await getCache(cacheKey)
+      if (Array.isArray(again)) return again
 
-    await setCache(cacheKey, roles, ROLES_CACHE_TTL_SECONDS).catch(() => {})
+      let resolved
+      if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
+        const named = await getTenantNamedRoleCodes(userId, tenantId, tenantType)
+        resolved =
+          named.length > 0 ? named : await getLegacyRolesForUser(userId, tenantId, tenantType)
+      } else {
+        resolved = await getLegacyRolesForUser(userId, tenantId, tenantType)
+      }
+
+      await setCache(cacheKey, resolved, ROLES_CACHE_TTL_SECONDS).catch(() => {})
+      return resolved
+    })
+
     if (req) {
       req._rolesMemoKey = memoKey
       req._rolesMemo = roles

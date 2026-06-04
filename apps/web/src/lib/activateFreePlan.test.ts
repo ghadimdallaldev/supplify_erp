@@ -4,6 +4,7 @@ import { activateFreePlanFromPlans, openFreePlanCheckout } from './activateFreeP
 const checkoutInitiateMock = vi.fn()
 const invalidateTagsMock = vi.fn()
 const openPaymentModalMock = vi.fn()
+const refetchAppSessionMock = vi.fn()
 
 vi.mock('../services/api', () => ({
   api: {
@@ -18,6 +19,10 @@ vi.mock('../services/api', () => ({
   },
 }))
 
+vi.mock('./refetchAppSession', () => ({
+  refetchAppSession: (...args: unknown[]) => refetchAppSessionMock(...args),
+}))
+
 vi.mock('./openPaymentModal', () => ({
   openCheckoutPayment: (...args: unknown[]) => openPaymentModalMock(...args),
 }))
@@ -30,6 +35,8 @@ describe('activateFreePlan', () => {
     checkoutInitiateMock.mockReset()
     invalidateTagsMock.mockReset()
     openPaymentModalMock.mockReset()
+    refetchAppSessionMock.mockReset()
+    refetchAppSessionMock.mockResolvedValue(undefined)
     unwrap.mockReset()
     unwrap.mockResolvedValue({ success: true })
   })
@@ -58,6 +65,7 @@ describe('activateFreePlan', () => {
         })
       )
       expect(invalidateTagsMock).toHaveBeenCalledWith(['Subscription', 'Billing', 'User'])
+      expect(refetchAppSessionMock).toHaveBeenCalledWith(dispatch)
     })
 
     it('returns API error message on checkout failure', async () => {

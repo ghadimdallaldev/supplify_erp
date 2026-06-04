@@ -260,12 +260,14 @@ export const api = createApi({
     'StaffPerformance',
     'StaffPayroll',
   ],
+  keepUnusedDataFor: 120,
+  refetchOnFocus: false,
   endpoints: (builder) => ({
     // Auth endpoints
     getMe: builder.query<User, void>({
       query: () => '/auth/me',
       providesTags: ['User'],
-      keepUnusedDataFor: 600,
+      keepUnusedDataFor: 120,
       refetchOnFocus: false,
       refetchOnMountOrArgChange: false,
     }),
@@ -285,6 +287,7 @@ export const api = createApi({
     getRegisterStatus: builder.query<{ needsSetup: boolean }, void>({
       query: () => '/api/register/status',
       providesTags: ['RegisterStatus'],
+      keepUnusedDataFor: 120,
       transformResponse: (response: { data?: { needsSetup?: boolean } }) => ({
         needsSetup: Boolean(response?.data?.needsSetup),
       }),
@@ -309,7 +312,8 @@ export const api = createApi({
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled
-          await dispatch(api.endpoints.getMe.initiate(undefined, { forceRefetch: true })).unwrap()
+          const { refetchAppSession } = await import('../lib/refetchAppSession')
+          await refetchAppSession(dispatch)
         } catch {
           // Leave cache as-is on failure
         }
@@ -339,12 +343,12 @@ export const api = createApi({
     >({
       query: () => '/api/products/categories',
       providesTags: ['Product'],
-      keepUnusedDataFor: 120,
+      keepUnusedDataFor: 300,
     }),
     getProductTags: builder.query<{ tags: string[] }, void>({
       query: () => '/api/products/tags',
       providesTags: ['Product'],
-      keepUnusedDataFor: 120,
+      keepUnusedDataFor: 300,
     }),
     getProduct: builder.query<Product, string>({
       query: (id) => `/api/products/${id}`,
@@ -1045,6 +1049,7 @@ export const api = createApi({
     getDashboardStats: builder.query<any, void>({
       query: () => '/api/admin/dashboard',
       providesTags: ['User'],
+      keepUnusedDataFor: 120,
       transformResponse: (response: any) => response?.stats || {},
     }),
     getAuditLogs: builder.query<AuditLogsResponse, AuditLogFilters>({
@@ -1618,6 +1623,7 @@ export const api = createApi({
     getBranches: builder.query<{ branches: Array<Record<string, unknown>> }, void>({
       query: () => '/api/branches',
       providesTags: ['Branch'],
+      keepUnusedDataFor: 300,
     }),
     createBranch: builder.mutation<any, Record<string, unknown>>({
       query: (body) => ({
@@ -1664,6 +1670,7 @@ export const api = createApi({
     >({
       query: () => '/api/org',
       providesTags: ['Branch', 'Org'],
+      keepUnusedDataFor: 300,
     }),
     getOrgBranches: builder.query<
       {
@@ -1675,6 +1682,7 @@ export const api = createApi({
     >({
       query: () => '/api/org/branches',
       providesTags: ['Branch', 'Org'],
+      keepUnusedDataFor: 300,
     }),
     createOrgBranch: builder.mutation<any, Record<string, unknown>>({
       query: (body) => ({ url: '/api/org/branches', method: 'POST', body }),
@@ -1836,6 +1844,7 @@ export const api = createApi({
     >({
       query: () => '/api/restaurant-org',
       providesTags: ['RestaurantOrg', 'Branch'],
+      keepUnusedDataFor: 300,
     }),
     getRestaurantOrgBranches: builder.query<
       {
@@ -1847,6 +1856,7 @@ export const api = createApi({
     >({
       query: () => '/api/restaurant-org/branches',
       providesTags: ['RestaurantOrg', 'Branch'],
+      keepUnusedDataFor: 300,
     }),
     createRestaurantOrgBranch: builder.mutation<any, Record<string, unknown>>({
       query: (body) => ({ url: '/api/restaurant-org/branches', method: 'POST', body }),
@@ -2037,6 +2047,7 @@ export const api = createApi({
     >({
       query: () => '/api/roles',
       providesTags: ['TenantRoles'],
+      keepUnusedDataFor: 300,
     }),
     getTenantRoleUsers: builder.query<
       {
@@ -2108,9 +2119,15 @@ export const api = createApi({
       providesTags: ['Notification'],
       keepUnusedDataFor: 60,
     }),
+    getUnreadNotificationCount: builder.query<{ unreadCount: number }, void>({
+      query: () => '/api/notifications/unread-count',
+      providesTags: ['Notification'],
+      keepUnusedDataFor: 60,
+    }),
     getNotificationPreferences: builder.query<any, void>({
       query: () => '/api/notifications/preferences',
       providesTags: ['Notification'],
+      keepUnusedDataFor: 300,
     }),
     updateNotificationPreferences: builder.mutation<any, any>({
       query: (data) => ({
@@ -3110,7 +3127,7 @@ export const api = createApi({
     getEntitlements: builder.query<{ entitlements: Entitlements }, void>({
       query: () => '/api/subscriptions/entitlements',
       providesTags: ['Subscription'],
-      keepUnusedDataFor: 10 * 60,
+      keepUnusedDataFor: 120,
       refetchOnMountOrArgChange: false,
       refetchOnFocus: false,
       refetchOnReconnect: true,
@@ -3159,7 +3176,7 @@ export const api = createApi({
     getBillingStatus: builder.query<BillingStatus, void>({
       query: () => '/api/billing/status',
       providesTags: ['Billing', 'Subscription'],
-      keepUnusedDataFor: 600,
+      keepUnusedDataFor: 120,
       refetchOnFocus: false,
       refetchOnMountOrArgChange: false,
     }),
@@ -3211,6 +3228,15 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ['Billing', 'Subscription'],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled
+          const { refetchAppSession } = await import('../lib/refetchAppSession')
+          await refetchAppSession(dispatch)
+        } catch {
+          // Leave cache as-is on failure
+        }
+      },
     }),
     billingPayNow: builder.mutation<
       { allPaid: boolean },
@@ -3222,6 +3248,15 @@ export const api = createApi({
         body: body ?? {},
       }),
       invalidatesTags: ['Billing', 'Subscription'],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled
+          const { refetchAppSession } = await import('../lib/refetchAppSession')
+          await refetchAppSession(dispatch)
+        } catch {
+          // Leave cache as-is on failure
+        }
+      },
     }),
     setBillingAutoRenew: builder.mutation<{ autoRenew: boolean }, { autoRenew: boolean }>({
       query: (body) => ({
@@ -3241,6 +3276,15 @@ export const api = createApi({
         body: { reason, freeTrialDays },
       }),
       invalidatesTags: ['Admin', 'Billing', 'Subscription'],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled
+          const { refetchAppSession } = await import('../lib/refetchAppSession')
+          await refetchAppSession(dispatch)
+        } catch {
+          /* mutation failed — skip refetch */
+        }
+      },
     }),
 
     extendAdminFreeTrial: builder.mutation<
@@ -3833,6 +3877,7 @@ export const {
   useGetOrderSubstitutionsQuery,
   useProposeOrderSubstitutionMutation,
   useGetNotificationsQuery,
+  useGetUnreadNotificationCountQuery,
   useGetNotificationPreferencesQuery,
   useUpdateNotificationPreferencesMutation,
   useGetBranchesQuery,

@@ -53,6 +53,23 @@ describe('runFreeSandboxExpiryJob', () => {
     expect(mockInvalidate).toHaveBeenCalledWith('sup-1', 'SUPPLIER')
   })
 
+  it('logs and continues when cache invalidation fails', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ tenant_id: 'rest-1', tenant_type: 'RESTAURANT' }],
+    })
+    mockInvalidate.mockRejectedValueOnce(new Error('redis down'))
+    const { logger } = await import('../lib/logger.js')
+    const { runFreeSandboxExpiryJob } = await import('./free-sandbox-expiry.job.js')
+
+    const result = await runFreeSandboxExpiryJob()
+
+    expect(result).toEqual({ locked: 1 })
+    expect(logger.error).toHaveBeenCalledWith(
+      'Failed to invalidate subscription cache after free sandbox expiry',
+      expect.objectContaining({ tenantId: 'rest-1', tenantType: 'RESTAURANT' })
+    )
+  })
+
   it('SQL targets only free plan and active/trialing statuses (not paid tiers)', async () => {
     mockQuery.mockResolvedValueOnce({ rows: [] })
     const { runFreeSandboxExpiryJob } = await import('./free-sandbox-expiry.job.js')

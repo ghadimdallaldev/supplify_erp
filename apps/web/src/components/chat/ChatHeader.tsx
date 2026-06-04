@@ -57,7 +57,7 @@ export function ChatHeader({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <span
-              className={`hidden items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide sm:inline-flex ${
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
                 connected
                   ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
                   : 'bg-amber-500/15 text-amber-800 dark:text-amber-300'
@@ -65,9 +65,9 @@ export function ChatHeader({
               title={connected ? 'Connected' : 'Reconnecting'}
             >
               {connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-              {connected ? 'Live' : 'Reconnecting'}
+              <span className="hidden sm:inline">{connected ? 'Live' : 'Reconnecting'}</span>
             </span>
-            <div className="relative hidden sm:block">
+            <div className="relative hidden md:block">
               <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
               <Input
                 placeholder="Search messages..."
@@ -145,7 +145,7 @@ export function ChatHeader({
         {otherPartyTyping ? (
           <p className="text-xs text-[var(--text-muted)] animate-pulse">Typing…</p>
         ) : null}
-        <div className="relative sm:hidden">
+        <div className="relative md:hidden">
           <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
           <Input
             placeholder="Search in thread..."

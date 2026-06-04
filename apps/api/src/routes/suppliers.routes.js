@@ -13,6 +13,7 @@ import { requireFeature, isFeatureEnabled } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { createModuleLogger, logEvent, logQueryDebug, logger } from '../lib/logger.js'
 import { patchRequestLogTenant } from '../lib/request-log-context.js'
+import { invalidateTenantProfileCache } from '../lib/tenant-profile-cache.js'
 
 const log = createModuleLogger('suppliers.routes')
 import { ValidationError } from '../middlewares/errorHandler.js'
@@ -866,6 +867,8 @@ router.patch(
         supplierId: rows[0].id,
         actor: req.userData.id,
       })
+
+      await invalidateTenantProfileCache(id, 'SUPPLIER')
 
       res.json({
         ok: true,

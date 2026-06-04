@@ -11,6 +11,7 @@ import {
   useGetMeQuery,
   useGetRegisterStatusQuery,
 } from '../services/api'
+import { refetchAppSession, hasStaleRegistrationState } from '../lib/refetchAppSession'
 import { useAppDispatch } from '../hooks/redux'
 import { Building2, Loader2, Store, Truck } from 'lucide-react'
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query'
@@ -70,12 +71,16 @@ export function RegisterCompletePage() {
 
   useEffect(() => {
     if (!user || user.role === 'ADMIN') return
+    if (hasStaleRegistrationState({ role: user.role, needsSetup: status?.needsSetup })) {
+      void refetchAppSession(dispatch)
+      return
+    }
     if (user.role === 'RESTAURANT' || user.role === 'SUPPLIER') {
       if (status?.needsSetup === false) {
         navigate('/app/activate', { replace: true })
       }
     }
-  }, [user, status, navigate])
+  }, [user, status, navigate, dispatch])
 
   useEffect(() => {
     if (isUnauthorized(userError) || isUnauthorized(statusError)) {
@@ -101,8 +106,7 @@ export function RegisterCompletePage() {
         phone: phone.trim() || undefined,
         legalAcceptance: buildLegalAcceptancePayload(acceptedLegal),
       }).unwrap()
-      await dispatch(api.endpoints.getMe.initiate(undefined, { forceRefetch: true })).unwrap()
-      await dispatch(api.endpoints.getRegisterStatus.initiate(undefined, { forceRefetch: true }))
+      await refetchAppSession(dispatch)
       navigate('/app/activate', { replace: true })
     } catch (err: unknown) {
       const fetchErr = err as FetchBaseQueryError
@@ -113,6 +117,7 @@ export function RegisterCompletePage() {
 
       if (isNetworkError) {
         try {
+          await refetchAppSession(dispatch)
           const me = await dispatch(
             api.endpoints.getMe.initiate(undefined, { forceRefetch: true })
           ).unwrap()

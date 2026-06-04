@@ -29,6 +29,10 @@ vi.mock('./plan-enforcement.js', () => ({
   countActiveBranchLocations: vi.fn().mockResolvedValue(0),
   countActiveWarehouses: vi.fn().mockResolvedValue(0),
 }))
+const mockInvalidateBillingSubscriptionCache = vi.fn().mockResolvedValue(undefined)
+vi.mock('./billing/billing-service.js', () => ({
+  invalidateBillingSubscriptionCache: (...args) => mockInvalidateBillingSubscriptionCache(...args),
+}))
 
 describe('Subscription lib', () => {
   beforeEach(() => {
@@ -460,6 +464,25 @@ describe('Subscription lib', () => {
 
       expect(result.allowed).toBe(false)
       expect(result.usesGrace).toBe(false)
+    })
+  })
+
+  describe('invalidateTenantSubscriptionCache', () => {
+    beforeEach(async () => {
+      const { deleteCache } = await import('./cache.js')
+      deleteCache.mockClear()
+      mockInvalidateBillingSubscriptionCache.mockClear()
+    })
+
+    it('clears sub, ent, and billingSub caches', async () => {
+      const { deleteCache } = await import('./cache.js')
+      const { invalidateTenantSubscriptionCache } = await import('./subscription.js')
+
+      await invalidateTenantSubscriptionCache('t1', 'RESTAURANT')
+
+      expect(deleteCache).toHaveBeenCalledWith('sub:RESTAURANT:t1')
+      expect(deleteCache).toHaveBeenCalledWith('ent:RESTAURANT:t1')
+      expect(mockInvalidateBillingSubscriptionCache).toHaveBeenCalledWith('t1', 'RESTAURANT')
     })
   })
 })

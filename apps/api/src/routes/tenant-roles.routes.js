@@ -17,7 +17,7 @@ import {
   getAllPermissionsForTenantType,
   assignTenantUserRole,
 } from '../lib/tenant-roles.js'
-import { invalidateUserPermissionCache } from '../lib/permissions.js'
+import { invalidateUserAuthCaches } from '../lib/access-cache.js'
 import { resolveWorkspaceScope } from '../lib/workspace-membership.js'
 import { assertCanAssignRole, assertCanGrantPermissions } from '../lib/rbac-guards.js'
 import { MAIN_ADMIN_ROLE_NAME } from '../lib/workspace-membership.js'
@@ -247,7 +247,11 @@ router.patch('/:id', requirePermission('SETTINGS_MANAGE'), async (req, res) => {
           [role.id]
         )
         for (const row of assigned) {
-          await invalidateUserPermissionCache(row.user_id, tenantId, tenantType)
+          await invalidateUserAuthCaches({
+            userId: row.user_id,
+            tenantId,
+            tenantType,
+          })
         }
       }
     }
@@ -429,7 +433,11 @@ router.post(
         tenantType,
         assignedBy: req.userData.id,
       })
-      await invalidateUserPermissionCache(targetUserId, tenantId, tenantType)
+      await invalidateUserAuthCaches({
+        userId: targetUserId,
+        tenantId,
+        tenantType,
+      })
 
       let driverLink = null
       if (tenantType === 'SUPPLIER') {

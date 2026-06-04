@@ -109,7 +109,7 @@ export function LogoUpload({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
         <div className="relative">
           <div className="w-32 h-32 rounded-lg border-2 border-[var(--app-border-mid)] flex items-center justify-center bg-[var(--brand-ultra)] overflow-hidden">
             {preview ? (

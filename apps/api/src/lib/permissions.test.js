@@ -114,6 +114,7 @@ describe('permissions resolution', () => {
   it('invalidates permission cache key', async () => {
     await invalidateUserPermissionCache('u1', 't1', 'RESTAURANT')
     expect(deleteCache).toHaveBeenCalledWith(permissionCacheKey('u1', 't1', 'RESTAURANT'))
+    expect(deleteCache).toHaveBeenCalledWith('tctx:u1:t1:RESTAURANT')
   })
 
   it('hasPermission treats MANAGE as superset', () => {

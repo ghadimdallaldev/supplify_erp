@@ -1,5 +1,6 @@
 import { query } from './db.js'
 import { getCache, setCache } from './cache.js'
+import { singleflight } from './singleflight.js'
 
 const ORG_BILLING_CACHE_TTL_SECONDS = 300
 
@@ -17,33 +18,38 @@ export async function resolveOrgBillingTenantId(tenantId, tenantType) {
   const cached = await getCache(cacheKey)
   if (cached !== null && typeof cached === 'string') return cached
 
-  const table = tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'
-  const { rows } = await query(`SELECT organization_id FROM ${table} WHERE id = $1`, [tenantId])
-  const organizationId = rows[0]?.organization_id
-  if (!organizationId) {
-    await setCache(cacheKey, tenantId, ORG_BILLING_CACHE_TTL_SECONDS).catch(() => {})
-    return tenantId
-  }
+  return singleflight(cacheKey, async () => {
+    const again = await getCache(cacheKey)
+    if (again !== null && typeof again === 'string') return again
 
-  const { rows: mainRows } = await query(
-    `SELECT id FROM ${table}
+    const table = tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'
+    const { rows } = await query(`SELECT organization_id FROM ${table} WHERE id = $1`, [tenantId])
+    const organizationId = rows[0]?.organization_id
+    if (!organizationId) {
+      await setCache(cacheKey, tenantId, ORG_BILLING_CACHE_TTL_SECONDS).catch(() => {})
+      return tenantId
+    }
+
+    const { rows: mainRows } = await query(
+      `SELECT id FROM ${table}
      WHERE organization_id = $1 AND is_main_branch = true
      ORDER BY created_at ASC
      LIMIT 1`,
-    [organizationId]
-  )
-  if (mainRows[0]?.id) {
-    await setCache(cacheKey, mainRows[0].id, ORG_BILLING_CACHE_TTL_SECONDS).catch(() => {})
-    return mainRows[0].id
-  }
+      [organizationId]
+    )
+    if (mainRows[0]?.id) {
+      await setCache(cacheKey, mainRows[0].id, ORG_BILLING_CACHE_TTL_SECONDS).catch(() => {})
+      return mainRows[0].id
+    }
 
-  const { rows: fallback } = await query(
-    `SELECT id FROM ${table} WHERE organization_id = $1 ORDER BY created_at ASC LIMIT 1`,
-    [organizationId]
-  )
-  const billingId = fallback[0]?.id || tenantId
-  await setCache(cacheKey, billingId, ORG_BILLING_CACHE_TTL_SECONDS).catch(() => {})
-  return billingId
+    const { rows: fallback } = await query(
+      `SELECT id FROM ${table} WHERE organization_id = $1 ORDER BY created_at ASC LIMIT 1`,
+      [organizationId]
+    )
+    const billingId = fallback[0]?.id || tenantId
+    await setCache(cacheKey, billingId, ORG_BILLING_CACHE_TTL_SECONDS).catch(() => {})
+    return billingId
+  })
 }
 
 /**

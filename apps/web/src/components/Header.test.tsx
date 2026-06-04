@@ -7,6 +7,18 @@ vi.mock('./BranchSwitcher', () => ({
   BranchSwitcher: () => null,
 }))
 
+vi.mock('../hooks/useImpersonation', () => ({
+  useImpersonation: () => ({
+    isImpersonating: false,
+    impersonationTarget: null,
+    stopImpersonation: vi.fn(),
+  }),
+}))
+
+vi.mock('../hooks/useNotificationBadge', () => ({
+  useNotificationBadge: () => ({ notifications: [], unreadCount: 0 }),
+}))
+
 vi.mock('../services/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/api')>()
   return {

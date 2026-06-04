@@ -9,8 +9,12 @@ vi.mock('./db.js', () => ({
   withTransaction: async (fn) => fn({ query: (...args) => mockClientQuery(...args) }),
 }))
 
-vi.mock('./rbac.js', () => ({
-  assignDefaultRoleForTenant: vi.fn().mockResolvedValue(undefined),
+vi.mock('./permissions.js', () => ({
+  invalidateUserPermissionCache: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('./access-cache.js', () => ({
+  invalidateUserAuthCaches: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('./keycloak-admin.js', () => ({
@@ -157,6 +161,22 @@ describe('register-account', () => {
         'RESTAURANT',
         'free'
       )
+
+      const { invalidateUserAuthCaches } = await import('./access-cache.js')
+      expect(invalidateUserAuthCaches).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'u1',
+          keycloakSub: 'kc-1',
+          tenantId: 'rest-1',
+          tenantType: 'RESTAURANT',
+        })
+      )
+
+      const { invalidateRestaurantOrgPermissionCaches } = await import('./restaurant-org.js')
+      expect(invalidateRestaurantOrgPermissionCaches).toHaveBeenCalledWith('u1', 'org-1')
+
+      const { invalidateUserPermissionCache } = await import('./permissions.js')
+      expect(invalidateUserPermissionCache).not.toHaveBeenCalled()
     })
 
     it('creates supplier with pending activation subscription', async () => {

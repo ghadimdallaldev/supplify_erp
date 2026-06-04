@@ -13,11 +13,12 @@ import {
   useDeleteConversationMutation,
 } from '../services/api'
 import { Card, CardContent } from '../components/ui/card'
+import { Button } from '../components/ui/button'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
-import { MessageSquare } from 'lucide-react'
+import { MessageSquare, Plus } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, isToday, isYesterday } from 'date-fns'
 import { useChatRealtime } from '../hooks/useChatRealtime'
@@ -25,6 +26,7 @@ import { ChatConversationList } from '../components/chat/ChatConversationList'
 import { ChatHeader } from '../components/chat/ChatHeader'
 import { ChatThread } from '../components/chat/ChatThread'
 import { ChatComposer } from '../components/chat/ChatComposer'
+import { NewConversationDialog } from '../components/chat/NewConversationDialog'
 
 export function ChatPage() {
   const { user } = useAppSelector((state) => state.auth)
@@ -51,6 +53,7 @@ export function ChatPage() {
   const [showConversationMenu, setShowConversationMenu] = useState(false)
   const [otherPartyTyping, setOtherPartyTyping] = useState(false)
   const [mobileShowThread, setMobileShowThread] = useState(false)
+  const [showNewConversation, setShowNewConversation] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null!)
   const messagesContainerRef = useRef<HTMLDivElement>(null!)
@@ -116,7 +119,28 @@ export function ChatPage() {
   const selectConversation = (id: string) => {
     setSelectedConversation(id)
     setMobileShowThread(true)
+    setShowNewConversation(false)
     navigate(`/app/chat?conversation=${id}`, { replace: true })
+  }
+
+  const handleStartConversation = async (supplierId: string) => {
+    const existingConv = conversations.find(
+      (conv: { supplier_id?: string }) => conv.supplier_id === supplierId
+    )
+    if (existingConv) {
+      selectConversation(existingConv.id)
+      return
+    }
+
+    try {
+      const result = await createConversation({ supplierId }).unwrap()
+      selectConversation(result.conversation.id)
+      toast.success('Conversation started')
+    } catch (error: unknown) {
+      const err = error as { data?: { error?: { message?: string }; message?: string } }
+      const msg = err?.data?.message || err?.data?.error?.message || 'Failed to start conversation'
+      toast.error(typeof msg === 'string' ? msg : 'Failed to start conversation')
+    }
   }
 
   const handleTyping = () => {
@@ -394,6 +418,7 @@ export function ChatPage() {
 
   const showListOnMobile = !mobileShowThread || !selectedConversation
   const showThreadOnMobile = mobileShowThread && selectedConversation
+  const canStartConversation = user?.role === 'RESTAURANT' && canSendMessages
 
   return (
     <RequirePermission permission="CHAT_VIEW" title="chat">
@@ -401,6 +426,14 @@ export function ChatPage() {
         <PageHeader
           title="Messages"
           description="Chat with suppliers and restaurants in real time."
+          actions={
+            canStartConversation ? (
+              <Button size="sm" onClick={() => setShowNewConversation(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                New message
+              </Button>
+            ) : undefined
+          }
         />
 
         <div className="flex min-h-0 gap-4 lg:gap-6 h-[calc(100vh-11rem)] max-h-[900px]">
@@ -418,6 +451,10 @@ export function ChatPage() {
               userRole={user?.role}
               formatConversationDate={formatConversationDate}
               className="h-full"
+              canStartConversation={canStartConversation}
+              onStartConversation={
+                canStartConversation ? () => setShowNewConversation(true) : undefined
+              }
             />
           </div>
 
@@ -498,13 +535,33 @@ export function ChatPage() {
                 </CardContent>
               </>
             ) : (
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-[var(--text-muted)]">
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-[var(--text-muted)]">
                 <MessageSquare className="h-14 w-14 opacity-40" />
                 <p className="text-sm font-medium">Select a conversation to start chatting</p>
+                {canStartConversation ? (
+                  <>
+                    <p className="text-xs">Or start a new chat with a supplier.</p>
+                    <Button size="sm" onClick={() => setShowNewConversation(true)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      New message
+                    </Button>
+                  </>
+                ) : user?.role === 'SUPPLIER' ? (
+                  <p className="text-xs max-w-sm">
+                    Restaurants message you first. Conversations appear in the list on the left.
+                  </p>
+                ) : null}
               </div>
             )}
           </Card>
         </div>
+
+        <NewConversationDialog
+          open={showNewConversation}
+          onOpenChange={setShowNewConversation}
+          onSelectSupplier={handleStartConversation}
+          isCreating={isCreatingConversation}
+        />
       </div>
     </RequirePermission>
   )

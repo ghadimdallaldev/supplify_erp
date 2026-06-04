@@ -88,7 +88,7 @@ export function ProductDetailPage() {
               <CardTitle>Product Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                 <div>
                   <p className="font-medium text-[var(--text-muted)]">SKU</p>
                   <p>{product.sku}</p>

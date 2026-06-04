@@ -407,3 +407,45 @@ Local functional test: a 500-item JSON list (~90KB uncompressed) compressed to *
 ### Tests
 
 Full `apps/api` vitest suite re-run after the change — 846 passing; the only failures are the documented pre-existing ones (`delivery-routes.service.test.js` requires a live DB, `auth.test.js` Keycloak mock, feature-flags), none of which import `server.js`.
+
+---
+
+## Phase 9: Comprehensive safe caching (2026-06-04)
+
+**Symptom:** After Phase 8, staff routes and middleware still paid repeated RBAC/subscription costs on cache miss; notification polling transferred full list JSON when socket was connected; RTK Query refetched many endpoints on tab focus; without `REDIS_URL`, caches were per-process only.
+
+### Fixes applied
+
+| Area           | Change                                                                                                                                                                                                     |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Redis ops      | Startup log distinguishes shared Redis vs in-memory fallback; staging `secrets.env.example` added                                                                                                          |
+| Singleflight   | Extended to `getRolesForUser`, `getUserBySub`, `getEntitlements`, `getTenantSubscription`, `getSubscriptionForBilling`, `resolveOrgBillingTenantId`, `resolveAllFeaturesForTenant`, `getUserNotifications` |
+| Tenant context | Bundle cache `tctx:{userId}:{tenantId}:{tenantType}` (120s); bypassed on impersonation/branch/cookie paths; invalidated with permission cache                                                              |
+| Workspace      | `getTenantAssignmentForUser` cached 180s; invalidated on role assign / invitation accept                                                                                                                   |
+| Profile        | `/auth/me` tenant row via `tenant:profile:{type}:{id}` (300s); invalidated on supplier/restaurant PATCH                                                                                                    |
+| Staff lists    | Response cache 45s for `members`, `pto`, `swaps`, `payroll`; auto-invalidate on staff mutations                                                                                                            |
+| Notifications  | `GET /api/notifications/unread-count` (30s cache); badge polls count when socket connected; full list poll only when disconnected                                                                          |
+| Frontend RTK   | Global `keepUnusedDataFor: 120`, `refetchOnFocus: false`; longer TTL on roles/branches/org/catalog                                                                                                         |
+
+### Security
+
+- All keys are user- and/or tenant-scoped; impersonation and branch-switch paths bypass cross-request caches (unchanged from Phase 8).
+- `requirePermission` still runs before cached staff list handlers.
+- No HTTP `Cache-Control: public` on authenticated JSON.
+
+### Expected after deploy
+
+| Scenario                       | Before                     | After                    |
+| ------------------------------ | -------------------------- | ------------------------ |
+| Staff tab revisit (warm)       | middleware + SQL each time | bundle + list cache hits |
+| Parallel staff requests (miss) | N× DB bursts               | 1× singleflight compute  |
+| Notification poll (socket up)  | full list every 60s        | COUNT only every 60s     |
+| Tab refocus                    | many refetches             | RTK serves cached data   |
+
+### Railway env reminder
+
+Set `REDIS_URL` in Railway dashboard for every API service (see `deploy/railway/*/secrets.env.example`). Without it, caches do not share across replicas.
+
+### Tests
+
+`tenant-context-cache.test.js`, `staff-list-cache.test.js`, extended `notification.service.test.js`, `permissions.test.js` (tctx invalidation).

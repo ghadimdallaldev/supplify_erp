@@ -650,7 +650,118 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
         </Card>
 
         <Card className="overflow-hidden p-0 shadow-sm">
-          <div className="overflow-x-auto">
+          <div className="divide-y md:hidden">
+            {filteredProducts?.map((product) => (
+              <div
+                key={product.id}
+                className="space-y-3 p-4"
+                data-testid={`product-card-${product.id}`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded border border-[var(--app-border)] bg-[var(--bg)]">
+                    {product.image_url ? (
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <Package className="h-6 w-6 text-[var(--text-muted)]" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-[var(--text)]">{product.name}</p>
+                    <p className="text-sm text-[var(--text-muted)]">{product.sku}</p>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      <Badge variant="secondary">
+                        {product.category_name || product.category || 'N/A'}
+                      </Badge>
+                      {!isSupplier && product.supplier_name ? (
+                        <Badge variant="outline">{product.supplier_name}</Badge>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  {product.current_price ? (
+                    <ContractPriceDisplay
+                      compact
+                      currentPrice={product.current_price}
+                      catalogPrice={product.catalog_price}
+                      pricingSource={product.pricing_source}
+                      currency={product.currency}
+                      unit={product.unit}
+                    />
+                  ) : (
+                    <span className="text-[var(--text-muted)]">N/A</span>
+                  )}
+                  <span
+                    className={`font-medium ${
+                      parseFloat(product.available_qty || 0) > 0
+                        ? 'text-[var(--mint)]'
+                        : 'text-[var(--red)]'
+                    }`}
+                  >
+                    {formatNumber(product.available_qty, { maximumFractionDigits: 2 })}{' '}
+                    {product.unit || 'units'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {!isSupplier && (
+                    <>
+                      <Button
+                        size="sm"
+                        className="flex-1 sm:flex-none"
+                        onClick={() => handleAddToCart(product)}
+                        disabled={!product.available_qty || product.available_qty <= 0}
+                        data-testid={`product-add-to-cart-${product.id}`}
+                      >
+                        <Plus className="mr-1 h-4 w-4" />
+                        Add to Cart
+                      </Button>
+                      {product.supplier_id && (
+                        <AddToOrderingListButton
+                          productId={product.id}
+                          supplierId={product.supplier_id}
+                          productName={product.name}
+                          defaultUnit={product.unit}
+                        />
+                      )}
+                    </>
+                  )}
+                  {isSupplier && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 sm:flex-none"
+                        onClick={() => {
+                          setSelectedProductForAdjustment(product)
+                          setShowInventoryAdjustment(true)
+                        }}
+                      >
+                        <TrendingUp className="mr-1 h-4 w-4" />
+                        Adjust Stock
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          toast('Edit product functionality coming soon')
+                        }}
+                      >
+                        Edit
+                      </Button>
+                    </>
+                  )}
+                  <Button variant="outline" size="sm" className="flex-1 sm:flex-none" asChild>
+                    <Link to={`/app/products/${product.id}`}>View</Link>
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[640px]">
               <thead className="border-b border-[var(--app-border)] bg-[var(--bg)]">
                 <tr>
@@ -832,7 +943,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Product Name *</Label>
                   <Input
@@ -861,7 +972,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                   onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
                 />
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="category_id">Category *</Label>
                   <select

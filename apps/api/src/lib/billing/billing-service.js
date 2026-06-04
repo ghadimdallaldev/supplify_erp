@@ -1,7 +1,8 @@
 import crypto from 'node:crypto'
 import { query, withTransaction } from '../db.js'
 import { logger } from '../logger.js'
-import { getCache, setCache } from '../cache.js'
+import { getCache, setCache, deleteCache } from '../cache.js'
+import { singleflight } from '../singleflight.js'
 import { getBillingGateway } from './gateway-registry.js'
 import {
   GRACE_PERIOD_DAYS,
@@ -40,6 +41,11 @@ function billingSubCacheKey(tenantId, tenantType) {
   return `billingSub:${tenantId}:${tenantType}`
 }
 
+/** Clear Redis cache used by getSubscriptionForBilling / GET /api/billing/status. */
+export async function invalidateBillingSubscriptionCache(tenantId, tenantType) {
+  await deleteCache(billingSubCacheKey(tenantId, tenantType)).catch(() => {})
+}
+
 /**
  * Latest subscription row for tenant (any non-cancelled status).
  */
@@ -48,19 +54,24 @@ export async function getSubscriptionForBilling(tenantId, tenantType) {
   const cached = await getCache(cacheKey)
   if (cached !== null) return cached === 'null' ? null : cached
 
-  const { rows } = await query(
-    `SELECT s.*, sp.code AS plan_code, sp.price_per_month, sp.price_per_year
+  return singleflight(cacheKey, async () => {
+    const again = await getCache(cacheKey)
+    if (again !== null) return again === 'null' ? null : again
+
+    const { rows } = await query(
+      `SELECT s.*, sp.code AS plan_code, sp.price_per_month, sp.price_per_year
      FROM subscription s
      LEFT JOIN subscription_plan sp ON sp.id = s.plan_id
      WHERE s.tenant_id = $1 AND s.tenant_type = $2
        AND s.status NOT IN ('CANCELLED')
      ORDER BY s.created_at DESC
      LIMIT 1`,
-    [tenantId, tenantType]
-  )
-  const row = rows[0] || null
-  await setCache(cacheKey, row ?? 'null', BILLING_SUB_CACHE_TTL_SECONDS).catch(() => {})
-  return row
+      [tenantId, tenantType]
+    )
+    const row = rows[0] || null
+    await setCache(cacheKey, row ?? 'null', BILLING_SUB_CACHE_TTL_SECONDS).catch(() => {})
+    return row
+  })
 }
 
 export function computeBillingAccessState(subscription) {
@@ -418,6 +429,7 @@ async function applyFreePlan(tenantId, tenantType, plan) {
       ]
     )
   }
+  await invalidateBillingSubscriptionCache(tenantId, tenantType)
   return {
     success: true,
     plan: plan.code,
