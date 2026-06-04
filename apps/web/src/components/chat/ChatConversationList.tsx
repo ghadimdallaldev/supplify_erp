@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Building2, Clock, MessageSquare, Pin, Plus, ShoppingCart } from 'lucide-react'
+import { Building2, Clock, MessageSquare, Pin, ShoppingCart } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -23,8 +23,6 @@ type Props = {
   userRole?: string
   formatConversationDate: (date: string) => string
   className?: string
-  canStartConversation?: boolean
-  onStartConversation?: () => void
 }
 
 export function ChatConversationList({
@@ -36,9 +34,8 @@ export function ChatConversationList({
   userRole,
   formatConversationDate,
   className = '',
-  canStartConversation = false,
-  onStartConversation,
 }: Props) {
+  const hasConversations = conversations.length > 0
   const filtered = listFilter.trim()
     ? conversations.filter((c) =>
         (c.participant_name || '').toLowerCase().includes(listFilter.toLowerCase())
@@ -54,37 +51,31 @@ export function ChatConversationList({
   return (
     <Card className={`flex flex-col min-h-0 ${className}`}>
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <MessageSquare className="h-5 w-5" />
-            Conversations
-          </CardTitle>
-          {canStartConversation && onStartConversation ? (
-            <Button type="button" size="sm" className="shrink-0" onClick={onStartConversation}>
-              <Plus className="mr-1.5 h-4 w-4" />
-              New
-            </Button>
-          ) : null}
-        </div>
-        <div className="relative mt-2">
-          <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
-          <Input
-            placeholder="Search people..."
-            value={listFilter}
-            onChange={(e) => onListFilterChange(e.target.value)}
-            className="h-9 pl-8"
-          />
-          {listFilter ? (
-            <button
-              type="button"
-              onClick={() => onListFilterChange('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2"
-              aria-label="Clear search"
-            >
-              <X className="h-4 w-4 text-[var(--text-muted)]" />
-            </button>
-          ) : null}
-        </div>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <MessageSquare className="h-5 w-5" />
+          Conversations
+        </CardTitle>
+        {hasConversations ? (
+          <div className="relative mt-2">
+            <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+            <Input
+              placeholder="Search people..."
+              value={listFilter}
+              onChange={(e) => onListFilterChange(e.target.value)}
+              className="h-9 pl-8"
+            />
+            {listFilter ? (
+              <button
+                type="button"
+                onClick={() => onListFilterChange('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2"
+                aria-label="Clear search"
+              >
+                <X className="h-4 w-4 text-[var(--text-muted)]" />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </CardHeader>
       <CardContent className="flex-1 overflow-y-auto p-0 min-h-0">
         <div className="divide-y">
@@ -97,22 +88,14 @@ export function ChatConversationList({
               {!listFilter && userRole === 'RESTAURANT' && (
                 <>
                   <p className="text-xs px-2">
-                    Start a chat by messaging a supplier. Tap New above or pick one below.
+                    Message a supplier to get started, or browse the directory.
                   </p>
-                  <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-center">
-                    {onStartConversation ? (
-                      <Button size="sm" onClick={onStartConversation}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        New message
-                      </Button>
-                    ) : null}
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to="/app/suppliers">
-                        <Building2 className="mr-2 h-4 w-4" />
-                        Browse suppliers
-                      </Link>
-                    </Button>
-                  </div>
+                  <Button variant="outline" size="sm" className="mt-1" asChild>
+                    <Link to="/app/suppliers">
+                      <Building2 className="mr-2 h-4 w-4" />
+                      Browse suppliers
+                    </Link>
+                  </Button>
                 </>
               )}
               {!listFilter && userRole === 'SUPPLIER' && (

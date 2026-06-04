@@ -12,9 +12,21 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // Group vendor libs into shared chunks to reduce per-route request count
+        // Group vendor libs into shared chunks to reduce per-route request count.
+        // Heavy, route-specific libs get their OWN chunks so they load lazily with
+        // their routes (Dashboard/Reports/Reservations) instead of bloating the
+        // eagerly-loaded `vendor` chunk shared by every page.
         manualChunks: (id) => {
           if (!id.includes('node_modules')) return
+          if (id.includes('recharts') || id.includes('/d3-') || id.includes('victory-vendor'))
+            return 'charts'
+          if (id.includes('@fullcalendar') || id.includes('/preact')) return 'calendar'
+          if (
+            id.includes('framer-motion') ||
+            id.includes('motion-dom') ||
+            id.includes('motion-utils')
+          )
+            return 'motion'
           if (id.includes('@radix-ui') || id.includes('lucide-react')) return 'ui-vendor'
           if (id.includes('react-router') || id.includes('@remix-run')) return 'router-vendor'
           if (id.includes('@reduxjs') || id.includes('react-redux')) return 'redux-vendor'

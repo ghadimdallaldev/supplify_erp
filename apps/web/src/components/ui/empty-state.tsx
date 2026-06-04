@@ -17,13 +17,13 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--app-border)] bg-[var(--app-bg-subtle)] px-5 py-10 text-center sm:px-8 sm:py-12',
+        'animate-fade-in flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--app-border)] bg-[var(--app-bg-subtle)] px-5 py-10 text-center sm:px-8 sm:py-12',
         className
       )}
       role="status"
     >
       {icon && (
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--brand-pale)] text-[var(--brand-mid)]">
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--brand-pale)] text-[var(--brand-mid)] ring-8 ring-[var(--brand-pale)]/40">
           {icon}
         </div>
       )}

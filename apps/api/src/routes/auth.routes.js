@@ -41,7 +41,21 @@ function clearLocalAuthSession(req, res) {
   })
 }
 
-function apiOrigin(req) {
+/**
+ * Origin the OAuth callback must live on. The callback has to land first-party
+ * on the web host so auth cookies aren't third-party (mobile Chrome blocks those).
+ * Behind the nginx same-origin proxy the API receives Host = API host, so we can't
+ * use req host. Prefer an explicit env (deterministic, survives Railway's edge),
+ * then X-Forwarded-Host, then the request host (localhost dev / direct API).
+ */
+function callbackOrigin(req) {
+  const configured = process.env.OAUTH_CALLBACK_BASE_URL
+  if (configured) return configured.replace(/\/$/, '')
+  const forwardedHost = req.get('x-forwarded-host')
+  if (forwardedHost) {
+    const proto = req.get('x-forwarded-proto') || req.protocol
+    return `${proto}://${forwardedHost}`
+  }
   return `${req.protocol}://${req.get('host')}`
 }
 
@@ -64,7 +78,7 @@ router.get('/login', async (req, res) => {
 
     logger.info('Login initiated')
 
-    const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`
+    const redirectUri = `${callbackOrigin(req)}/auth/callback`
 
     const authUrl = await getAuthorizationUrl(redirectUri, state)
 
@@ -84,7 +98,7 @@ router.get('/register', async (req, res) => {
     // Keycloak blocks registration when another SSO session is active — end it first.
     if (req.query.continue !== '1') {
       await clearLocalAuthSession(req, res)
-      const continueUrl = `${apiOrigin(req)}/auth/register?continue=1`
+      const continueUrl = `${callbackOrigin(req)}/auth/register?continue=1`
       const logoutUrl = await getKeycloakLogoutUrl(continueUrl)
       logger.info('Registration: clearing Keycloak SSO session before signup')
       return res.redirect(logoutUrl)
@@ -96,7 +110,7 @@ router.get('/register', async (req, res) => {
       if (err) logger.error('Error saving session', { error: err.message })
     })
 
-    const redirectUri = `${apiOrigin(req)}/auth/callback`
+    const redirectUri = `${callbackOrigin(req)}/auth/callback`
     const registrationUrl = await getRegistrationUrl(redirectUri, state)
 
     logger.info('Registration initiated')
@@ -158,7 +172,7 @@ router.get('/callback', async (req, res) => {
     // Clear the state from session after successful verification
     delete req.session.oauthState
 
-    const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`
+    const redirectUri = `${callbackOrigin(req)}/auth/callback`
 
     // Exchange code for tokens
     const tokens = await exchangeCodeForTokens(code, redirectUri)

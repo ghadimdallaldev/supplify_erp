@@ -143,17 +143,6 @@ function KpiCard({
         border: '1px solid var(--app-border)',
         borderRadius: 12,
         padding: 15,
-        transition: 'transform 0.15s, box-shadow 0.15s',
-      }}
-      onMouseEnter={(e) => {
-        const el = e.currentTarget as HTMLElement
-        el.style.transform = 'translateY(-1px)'
-        el.style.boxShadow = '0 6px 20px rgba(91,33,182,0.12)'
-      }}
-      onMouseLeave={(e) => {
-        const el = e.currentTarget as HTMLElement
-        el.style.transform = ''
-        el.style.boxShadow = ''
       }}
     >
       <div
