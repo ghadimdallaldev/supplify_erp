@@ -369,12 +369,9 @@ app.use('/api/billing', billingRoutes)
 app.use('/api/public/staff/request-link', staffLinkLimiter)
 app.use('/api/public', publicRoutes)
 app.use('/api/admin-dashboard', adminDashboardRoutes)
-<<<<<<< HEAD
-=======
 if (allowE2eRoutes()) {
   app.use('/api/e2e', e2eRoutes)
 }
->>>>>>> dev
 app.use('/api/branches', branchesRoutes)
 app.use('/api/org', orgRoutes)
 app.use('/api/org/invitations', branchInvitationsRoutes)
