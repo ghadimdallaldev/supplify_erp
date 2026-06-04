@@ -28,6 +28,7 @@ import {
   FileText,
   ShoppingCart,
   Recycle,
+  Search,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import {
@@ -273,6 +274,9 @@ export function RestaurantInventoryPage() {
     )
   }
 
+  const filterSelectClass =
+    'h-10 w-full rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]'
+
   return (
     <RequirePermission permission="INVENTORY_VIEW" title="inventory">
       <div className="space-y-6 p-6">
@@ -407,44 +411,64 @@ export function RestaurantInventoryPage() {
             </div>
 
             {/* Filters */}
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex gap-4 flex-wrap">
-                  <div className="flex-1 min-w-64">
-                    <Input
-                      placeholder="Search products..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
+            <Card className="shadow-sm">
+              <CardContent className="space-y-4 p-4 pt-6">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12 lg:items-end">
+                  <div className="min-w-0 sm:col-span-2 lg:col-span-6">
+                    <Label htmlFor="inventory-search" className="sr-only">
+                      Search products
+                    </Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+                      <Input
+                        id="inventory-search"
+                        placeholder="Search products..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="h-10 pl-10"
+                      />
+                    </div>
                   </div>
-                  <select
-                    value={supplierFilter}
-                    onChange={(e) => setSupplierFilter(e.target.value)}
-                    className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
-                  >
-                    <option value="ALL">All Suppliers</option>
-                    {Array.from(
-                      new Set<string>(
-                        inventory
-                          .map((item: { supplier_name?: string }) => item.supplier_name)
-                          .filter((s): s is string => Boolean(s))
-                      )
-                    ).map((supplier) => (
-                      <option key={supplier} value={supplier}>
-                        {supplier}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
-                  >
-                    <option value="ALL">All Status</option>
-                    <option value="IN_STOCK">In Stock</option>
-                    <option value="LOW_STOCK">Low Stock</option>
-                    <option value="OUT_OF_STOCK">Out of Stock</option>
-                  </select>
+                  <div className="min-w-0 lg:col-span-3">
+                    <Label htmlFor="inventory-supplier-filter" className="sr-only">
+                      Supplier
+                    </Label>
+                    <select
+                      id="inventory-supplier-filter"
+                      value={supplierFilter}
+                      onChange={(e) => setSupplierFilter(e.target.value)}
+                      className={filterSelectClass}
+                    >
+                      <option value="ALL">All Suppliers</option>
+                      {Array.from(
+                        new Set<string>(
+                          inventory
+                            .map((item: { supplier_name?: string }) => item.supplier_name)
+                            .filter((s): s is string => Boolean(s))
+                        )
+                      ).map((supplier) => (
+                        <option key={supplier} value={supplier}>
+                          {supplier}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="min-w-0 lg:col-span-3">
+                    <Label htmlFor="inventory-status-filter" className="sr-only">
+                      Status
+                    </Label>
+                    <select
+                      id="inventory-status-filter"
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className={filterSelectClass}
+                    >
+                      <option value="ALL">All Status</option>
+                      <option value="IN_STOCK">In Stock</option>
+                      <option value="LOW_STOCK">Low Stock</option>
+                      <option value="OUT_OF_STOCK">Out of Stock</option>
+                    </select>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -452,12 +476,12 @@ export function RestaurantInventoryPage() {
             {/* Inventory Table */}
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <CardTitle>Inventory Items</CardTitle>
                     <CardDescription>View and manage your stock levels</CardDescription>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex shrink-0 flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={handleExportCSV}>
                       <Download className="h-4 w-4 mr-2" />
                       Export CSV
@@ -480,161 +504,182 @@ export function RestaurantInventoryPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-[var(--brand-ultra)]">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Product
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Supplier
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Quantity
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Suggested Reorder
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Status
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Last Updated
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--app-border)]">
-                      {filteredInventory.map((item: any) => {
-                        const status = getStockStatus(item.quantity, item.low_stock_threshold)
-                        const reorderQty = calculateReorderQuantity(item)
-                        return (
-                          <tr key={item.id} className="hover:bg-[var(--brand-ultra)]">
-                            <td className="px-4 py-4">
-                              <div>
-                                <p className="font-medium text-[var(--text)]">
-                                  {item.product_name}
-                                </p>
-                                <p className="text-sm text-[var(--text-muted)]">
-                                  {item.product_sku}
-                                </p>
-                              </div>
-                            </td>
-                            <td className="px-4 py-4 text-sm text-[var(--text)]">
-                              {item.supplier_name}
-                            </td>
-                            <td className="px-4 py-4">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold">{item.quantity}</span>
-                                <span className="text-sm text-[var(--text-muted)]">
-                                  {item.product_unit}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-4">
-                              {reorderQty > 0 ? (
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-[var(--amber)]">
-                                    {reorderQty}
-                                  </span>
-                                  <Badge variant="outline" className="text-xs">
-                                    Suggested
-                                  </Badge>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-xs"
-                                    onClick={() => {
-                                      toast.success('Adding to cart...', {
-                                        duration: 2000,
-                                      })
-                                      // TODO: Navigate to products page with search pre-filled
-                                    }}
-                                  >
-                                    Order
-                                  </Button>
+                {filteredInventory.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)]/90 px-4 py-12 text-center">
+                    <Package className="mx-auto mb-4 h-16 w-16 text-[var(--text-muted)]" />
+                    <p className="font-medium text-[var(--text-muted)]">
+                      {inventory.length === 0 ? 'No inventory yet' : 'No matching items'}
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--text-muted)]">
+                      {inventory.length === 0
+                        ? 'Place an order and receive goods to see inventory here.'
+                        : 'Try adjusting your search or filters.'}
+                    </p>
+                    {inventory.length === 0 ? (
+                      <Button asChild className="mt-4">
+                        <Link to="/app/cart">
+                          <ShoppingCart className="mr-2 h-4 w-4" />
+                          Create first order
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        className="mt-4"
+                        onClick={() => {
+                          setSearch('')
+                          setStatusFilter('ALL')
+                          setSupplierFilter('ALL')
+                          setCategoryFilter('ALL')
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-[var(--app-border)]">
+                    <table className="w-full">
+                      <thead className="bg-[var(--brand-ultra)]">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                            Product
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                            Supplier
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                            Quantity
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                            Suggested Reorder
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                            Status
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                            Last Updated
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--app-border)]">
+                        {filteredInventory.map((item: any) => {
+                          const status = getStockStatus(item.quantity, item.low_stock_threshold)
+                          const reorderQty = calculateReorderQuantity(item)
+                          return (
+                            <tr key={item.id} className="hover:bg-[var(--brand-ultra)]">
+                              <td className="px-4 py-4">
+                                <div>
+                                  <p className="font-medium text-[var(--text)]">
+                                    {item.product_name}
+                                  </p>
+                                  <p className="text-sm text-[var(--text-muted)]">
+                                    {item.product_sku}
+                                  </p>
                                 </div>
-                              ) : (
-                                <span className="text-[var(--text-muted)]">-</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-4">
-                              <Badge variant={getStatusColor(status)}>
-                                {status.replace('_', ' ')}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                              {new Date(item.updated_at).toLocaleDateString()}
-                            </td>
-                            <td className="px-4 py-4">
-                              <div className="flex gap-2">
-                                <Button
-                                  variant={pinnedItems.has(item.product_id) ? 'default' : 'outline'}
-                                  size="sm"
-                                  onClick={() => handlePinToggle(item.product_id)}
-                                  title={
-                                    pinnedItems.has(item.product_id) ? 'Unpin item' : 'Pin to top'
-                                  }
-                                >
-                                  <Pin
-                                    className={`h-4 w-4 ${pinnedItems.has(item.product_id) ? 'fill-current' : ''}`}
-                                  />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleOpenAdjustDialog(item, 'ADD')}
-                                  title="Add inventory"
-                                >
-                                  <Plus className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
-                                  title="Count correction (reduce stock)"
-                                >
-                                  <Minus className="h-4 w-4" />
-                                </Button>
-                                {wasteTrackingEnabled ? (
+                              </td>
+                              <td className="px-4 py-4 text-sm text-[var(--text)]">
+                                {item.supplier_name}
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold">{item.quantity}</span>
+                                  <span className="text-sm text-[var(--text-muted)]">
+                                    {item.product_unit}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-4">
+                                {reorderQty > 0 ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-[var(--amber)]">
+                                      {reorderQty}
+                                    </span>
+                                    <Badge variant="outline" className="text-xs">
+                                      Suggested
+                                    </Badge>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-xs"
+                                      onClick={() => {
+                                        toast.success('Adding to cart...', {
+                                          duration: 2000,
+                                        })
+                                        // TODO: Navigate to products page with search pre-filled
+                                      }}
+                                    >
+                                      Order
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <span className="text-[var(--text-muted)]">-</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-4">
+                                <Badge variant={getStatusColor(status)}>
+                                  {status.replace('_', ' ')}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
+                                {new Date(item.updated_at).toLocaleDateString()}
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant={
+                                      pinnedItems.has(item.product_id) ? 'default' : 'outline'
+                                    }
+                                    size="sm"
+                                    onClick={() => handlePinToggle(item.product_id)}
+                                    title={
+                                      pinnedItems.has(item.product_id) ? 'Unpin item' : 'Pin to top'
+                                    }
+                                  >
+                                    <Pin
+                                      className={`h-4 w-4 ${pinnedItems.has(item.product_id) ? 'fill-current' : ''}`}
+                                    />
+                                  </Button>
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    className="text-[var(--amber-mid)] border-[var(--amber-mid)]/40"
-                                    onClick={() => {
-                                      setWastePreselectProductId(item.product_id)
-                                      setActiveTab('waste')
-                                    }}
-                                    title="Log waste or spoilage"
+                                    onClick={() => handleOpenAdjustDialog(item, 'ADD')}
+                                    title="Add inventory"
                                   >
-                                    <Recycle className="h-4 w-4" />
+                                    <Plus className="h-4 w-4" />
                                   </Button>
-                                ) : null}
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {filteredInventory.length === 0 && (
-                  <div className="text-center py-12 rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)]/90">
-                    <Package className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
-                    <p className="text-[var(--text-muted)] font-medium">No inventory yet</p>
-                    <p className="text-sm text-[var(--text-muted)] mt-1">
-                      Place an order and receive goods to see inventory here.
-                    </p>
-                    <Button asChild className="mt-4">
-                      <Link to="/app/cart">
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        Create first order
-                      </Link>
-                    </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
+                                    title="Count correction (reduce stock)"
+                                  >
+                                    <Minus className="h-4 w-4" />
+                                  </Button>
+                                  {wasteTrackingEnabled ? (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-[var(--amber-mid)] border-[var(--amber-mid)]/40"
+                                      onClick={() => {
+                                        setWastePreselectProductId(item.product_id)
+                                        setActiveTab('waste')
+                                      }}
+                                      title="Log waste or spoilage"
+                                    >
+                                      <Recycle className="h-4 w-4" />
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </CardContent>

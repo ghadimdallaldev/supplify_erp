@@ -18,7 +18,7 @@ import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
-import { MessageSquare, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, isToday, isYesterday } from 'date-fns'
 import { useChatRealtime } from '../hooks/useChatRealtime'
@@ -419,6 +419,14 @@ export function ChatPage() {
   const showListOnMobile = !mobileShowThread || !selectedConversation
   const showThreadOnMobile = mobileShowThread && selectedConversation
   const canStartConversation = user?.role === 'RESTAURANT' && canSendMessages
+  const hasConversations = conversations.length > 0
+
+  const newMessageAction = canStartConversation ? (
+    <Button size="sm" onClick={() => setShowNewConversation(true)}>
+      <Plus className="mr-2 h-4 w-4" />
+      New message
+    </Button>
+  ) : undefined
 
   return (
     <RequirePermission permission="CHAT_VIEW" title="chat">
@@ -426,22 +434,11 @@ export function ChatPage() {
         <PageHeader
           title="Messages"
           description="Chat with suppliers and restaurants in real time."
-          actions={
-            canStartConversation ? (
-              <Button size="sm" onClick={() => setShowNewConversation(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                New message
-              </Button>
-            ) : undefined
-          }
+          actions={newMessageAction}
         />
 
-        <div className="flex min-h-0 gap-4 lg:gap-6 h-[calc(100vh-11rem)] max-h-[900px]">
-          <div
-            className={`min-h-0 w-full shrink-0 lg:block lg:w-80 ${
-              showListOnMobile ? 'block' : 'hidden'
-            } ${showThreadOnMobile ? 'lg:block' : ''}`}
-          >
+        {!hasConversations ? (
+          <div className="mx-auto w-full max-w-md">
             <ChatConversationList
               conversations={conversations}
               selectedConversationId={selectedConversation}
@@ -450,111 +447,116 @@ export function ChatPage() {
               onListFilterChange={setListFilter}
               userRole={user?.role}
               formatConversationDate={formatConversationDate}
-              className="h-full"
-              canStartConversation={canStartConversation}
-              onStartConversation={
-                canStartConversation ? () => setShowNewConversation(true) : undefined
-              }
             />
           </div>
+        ) : (
+          <div className="flex min-h-0 gap-4 lg:gap-6 h-[calc(100vh-11rem)] max-h-[900px]">
+            <div
+              className={`min-h-0 w-full shrink-0 lg:block lg:w-80 ${
+                showListOnMobile ? 'block' : 'hidden'
+              } ${showThreadOnMobile ? 'lg:block' : ''}`}
+            >
+              <ChatConversationList
+                conversations={conversations}
+                selectedConversationId={selectedConversation}
+                onSelect={selectConversation}
+                listFilter={listFilter}
+                onListFilterChange={setListFilter}
+                userRole={user?.role}
+                formatConversationDate={formatConversationDate}
+                className="h-full"
+              />
+            </div>
 
-          <Card
-            className={`min-h-0 flex flex-1 flex-col ${
-              showThreadOnMobile || selectedConversation ? 'flex' : 'hidden lg:flex'
-            } ${!selectedConversation ? 'lg:flex' : ''}`}
-          >
-            {selectedConversation && activeConv ? (
-              <>
-                <ChatHeader
-                  participantName={activeConv.participant_name || 'Chat'}
-                  isPinned={activeConv.is_pinned}
-                  searchQuery={searchQuery}
-                  onSearchChange={setSearchQuery}
-                  showMenu={showConversationMenu}
-                  onToggleMenu={() => setShowConversationMenu((v) => !v)}
-                  onPin={handlePinConversation}
-                  onArchive={handleArchiveConversation}
-                  onDelete={handleDeleteConversation}
-                  onBack={() => {
-                    setMobileShowThread(false)
-                    navigate('/app/chat', { replace: true })
-                  }}
-                  connected={connected}
-                  otherPartyTyping={otherPartyTyping}
-                />
-                <CardContent className="flex min-h-0 flex-1 flex-col p-0">
-                  <ChatThread
-                    messagesLoading={messagesLoading}
-                    groupedMessages={groupedMessages}
+            <Card
+              className={`min-h-0 flex flex-1 flex-col ${
+                showThreadOnMobile || selectedConversation ? 'flex' : 'hidden lg:flex'
+              }`}
+            >
+              {selectedConversation && activeConv ? (
+                <>
+                  <ChatHeader
+                    participantName={activeConv.participant_name || 'Chat'}
+                    isPinned={activeConv.is_pinned}
                     searchQuery={searchQuery}
-                    userRole={user?.role}
-                    onReply={setReplyingTo}
+                    onSearchChange={setSearchQuery}
+                    showMenu={showConversationMenu}
+                    onToggleMenu={() => setShowConversationMenu((v) => !v)}
+                    onPin={handlePinConversation}
+                    onArchive={handleArchiveConversation}
+                    onDelete={handleDeleteConversation}
+                    onBack={() => {
+                      setMobileShowThread(false)
+                      navigate('/app/chat', { replace: true })
+                    }}
+                    connected={connected}
                     otherPartyTyping={otherPartyTyping}
-                    formatMessageDate={formatMessageDate}
-                    messagesContainerRef={messagesContainerRef}
-                    messagesEndRef={messagesEndRef}
-                    showScrollButton={showScrollButton}
-                    onScrollToBottom={scrollToBottom}
                   />
-                  <ChatComposer
-                    canSend={canSendMessages}
-                    message={message}
-                    onMessageChange={setMessage}
-                    onSend={handleSendMessage}
-                    onTyping={handleTyping}
-                    isSending={isSendingMessage}
-                    isUploading={isUploadingFile}
-                    replyingTo={replyingTo}
-                    onClearReply={() => setReplyingTo(null)}
-                    showEmojiPicker={showEmojiPicker}
-                    onToggleEmojiPicker={() => setShowEmojiPicker((v) => !v)}
-                    onInsertEmoji={(emoji) => {
-                      setMessage((prev) => prev + emoji)
-                      setShowEmojiPicker(false)
-                    }}
-                    showOrderPicker={showOrderPicker}
-                    onToggleOrderPicker={() => setShowOrderPicker((v) => !v)}
-                    orders={ordersData?.orders || []}
-                    selectedOrder={selectedOrder}
-                    onSelectOrder={(order) => {
-                      setSelectedOrder(order)
-                      setShowOrderPicker(false)
-                    }}
-                    onClearOrder={() => setSelectedOrder(null)}
-                    selectedFiles={selectedFiles}
-                    filePreviews={filePreviews}
-                    onFileSelect={handleFileSelect}
-                    onRemoveFile={(index) => {
-                      setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
-                      setFilePreviews((prev) => prev.filter((_, i) => i !== index))
-                    }}
-                    fileInputRef={fileInputRef}
-                    inputRef={inputRef}
-                    userRole={user?.role}
-                  />
-                </CardContent>
-              </>
-            ) : (
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-[var(--text-muted)]">
-                <MessageSquare className="h-14 w-14 opacity-40" />
-                <p className="text-sm font-medium">Select a conversation to start chatting</p>
-                {canStartConversation ? (
-                  <>
-                    <p className="text-xs">Or start a new chat with a supplier.</p>
-                    <Button size="sm" onClick={() => setShowNewConversation(true)}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      New message
-                    </Button>
-                  </>
-                ) : user?.role === 'SUPPLIER' ? (
-                  <p className="text-xs max-w-sm">
-                    Restaurants message you first. Conversations appear in the list on the left.
+                  <CardContent className="flex min-h-0 flex-1 flex-col p-0">
+                    <ChatThread
+                      messagesLoading={messagesLoading}
+                      groupedMessages={groupedMessages}
+                      searchQuery={searchQuery}
+                      userRole={user?.role}
+                      onReply={setReplyingTo}
+                      otherPartyTyping={otherPartyTyping}
+                      formatMessageDate={formatMessageDate}
+                      messagesContainerRef={messagesContainerRef}
+                      messagesEndRef={messagesEndRef}
+                      showScrollButton={showScrollButton}
+                      onScrollToBottom={scrollToBottom}
+                    />
+                    <ChatComposer
+                      canSend={canSendMessages}
+                      message={message}
+                      onMessageChange={setMessage}
+                      onSend={handleSendMessage}
+                      onTyping={handleTyping}
+                      isSending={isSendingMessage}
+                      isUploading={isUploadingFile}
+                      replyingTo={replyingTo}
+                      onClearReply={() => setReplyingTo(null)}
+                      showEmojiPicker={showEmojiPicker}
+                      onToggleEmojiPicker={() => setShowEmojiPicker((v) => !v)}
+                      onInsertEmoji={(emoji) => {
+                        setMessage((prev) => prev + emoji)
+                        setShowEmojiPicker(false)
+                      }}
+                      showOrderPicker={showOrderPicker}
+                      onToggleOrderPicker={() => setShowOrderPicker((v) => !v)}
+                      orders={ordersData?.orders || []}
+                      selectedOrder={selectedOrder}
+                      onSelectOrder={(order) => {
+                        setSelectedOrder(order)
+                        setShowOrderPicker(false)
+                      }}
+                      onClearOrder={() => setSelectedOrder(null)}
+                      selectedFiles={selectedFiles}
+                      filePreviews={filePreviews}
+                      onFileSelect={handleFileSelect}
+                      onRemoveFile={(index) => {
+                        setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+                        setFilePreviews((prev) => prev.filter((_, i) => i !== index))
+                      }}
+                      fileInputRef={fileInputRef}
+                      inputRef={inputRef}
+                      userRole={user?.role}
+                    />
+                  </CardContent>
+                </>
+              ) : (
+                <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-[var(--text-muted)]">
+                  <p className="text-sm font-medium">Select a conversation</p>
+                  <p className="text-xs max-w-xs">
+                    {user?.role === 'SUPPLIER'
+                      ? 'Restaurants message you first. Pick one from the list.'
+                      : 'Choose someone from the list to view messages.'}
                   </p>
-                ) : null}
-              </div>
-            )}
-          </Card>
-        </div>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
 
         <NewConversationDialog
           open={showNewConversation}
