@@ -4,15 +4,22 @@
   .sidebar-nav-item {
     transition:
       background-color 0.15s ease,
-      color 0.15s ease;
+      color 0.15s ease,
+      transform 0.15s ease;
   }
   .sidebar-nav-item:hover {
     background: var(--brand-ultra);
     color: var(--text-mid);
+    transform: translateX(2px);
   }
   .sidebar-nav-item:focus-visible {
     outline: 2px solid var(--brand-light);
     outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar-nav-item:hover {
+      transform: none;
+    }
   }
 }
 
@@ -98,16 +105,70 @@
   * {
     @apply border-border;
   }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background text-foreground overflow-x-hidden;
     font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
+  }
+
+  /* Branded text selection */
+  ::selection {
+    background: var(--brand-pale);
+    color: var(--brand);
+  }
+
+  /* Refined, branded scrollbars (desktop pointer devices only) */
+  @media (pointer: fine) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--app-border-mid) transparent;
+    }
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--app-border-mid);
+      border-radius: 9999px;
+      border: 2px solid transparent;
+      background-clip: content-box;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--brand-light);
+      background-clip: content-box;
+    }
   }
 
   @media (display-mode: standalone) {
     body {
       -webkit-tap-highlight-color: transparent;
+    }
+  }
+
+  /* Respect users who prefer reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
     }
   }
 }
@@ -345,5 +406,122 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-muted);
+  }
+
+  /* —— Reusable entrance animations —— */
+  @keyframes supplify-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes supplify-rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes supplify-scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes supplify-shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  .animate-fade-in {
+    animation: supplify-fade-in 0.3s ease-out both;
+  }
+
+  .animate-rise-in {
+    animation: supplify-rise-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-scale-in {
+    animation: supplify-scale-in 0.2s ease-out both;
+  }
+
+  /* Polished skeleton shimmer — overlays a moving highlight on muted blocks */
+  .skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .skeleton-shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+    animation: supplify-shimmer 1.6s ease-in-out infinite;
+  }
+
+  /* Gradient brand text — for hero headings / emphasis */
+  .text-brand-gradient {
+    background: linear-gradient(135deg, var(--brand), var(--mint-mid));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Subtle interactive lift for clickable rows/tiles */
+  .hover-lift {
+    transition:
+      transform 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px -4px rgba(15, 23, 42, 0.12);
+  }
+
+  /* Dashboard KPI tile — CSS-only hover (no per-hover JS recalc) */
+  .kpi-card {
+    transition:
+      transform 0.18s ease,
+      box-shadow 0.18s ease,
+      border-color 0.18s ease;
+  }
+
+  .kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px -6px rgba(91, 33, 182, 0.16);
+    border-color: var(--brand-light);
+  }
+
+  /* Smooth every data-table row hover (paint-only, no layout cost).
+     Scoped away from FullCalendar's internal tables. */
+  table:not(.fc-scrollgrid) tbody tr {
+    transition: background-color 0.12s ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-in,
+    .animate-rise-in,
+    .animate-scale-in,
+    .skeleton-shimmer::after {
+      animation: none;
+    }
+    .hover-lift:hover {
+      transform: none;
+    }
   }
 }

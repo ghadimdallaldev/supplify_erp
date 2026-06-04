@@ -56,6 +56,15 @@ const TONE_CLASSES: Record<StatusTone, string> = {
   muted: 'bg-[var(--app-border)]/40 text-[var(--text-muted)] border-[var(--app-border)]',
 }
 
+const TONE_DOT_CLASSES: Record<StatusTone, string> = {
+  success: 'bg-emerald-500',
+  warning: 'bg-amber-500',
+  danger: 'bg-red-500',
+  info: 'bg-sky-500',
+  neutral: 'bg-slate-400',
+  muted: 'bg-[var(--app-border-mid)]',
+}
+
 export function formatStatusLabel(status: string): string {
   return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
@@ -86,17 +95,25 @@ export function StatusBadge({
   status,
   className = '',
   label,
+  showDot = true,
 }: {
   status: string
   className?: string
   label?: string
+  showDot?: boolean
 }) {
   const tone = getStatusTone(status)
   return (
     <span
-      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${TONE_CLASSES[tone]} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-semibold ${TONE_CLASSES[tone]} ${className}`}
       title={label ?? formatStatusLabel(status)}
     >
+      {showDot && (
+        <span
+          aria-hidden
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${TONE_DOT_CLASSES[tone]}`}
+        />
+      )}
       {label ?? formatStatusLabel(status || 'unknown')}
     </span>
   )
