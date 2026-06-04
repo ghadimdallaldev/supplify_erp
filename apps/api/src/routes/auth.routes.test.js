@@ -1,6 +1,6 @@
 import express from 'express'
 import request from 'supertest'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setupMocks, mockUser, clearAllMocks } from '../test/helpers.js'
 
 // Setup mocks at top level
@@ -176,6 +176,39 @@ describe('Auth Routes', () => {
       await request(appWithSession).get('/auth/login')
 
       expect(session.oauthState).toBeDefined()
+    })
+  })
+
+  describe('OAuth redirect_uri origin', () => {
+    afterEach(() => {
+      delete process.env.OAUTH_CALLBACK_BASE_URL
+    })
+
+    it('uses OAUTH_CALLBACK_BASE_URL when set (same-origin proxy flow)', async () => {
+      process.env.OAUTH_CALLBACK_BASE_URL = 'https://web.example.com'
+      const { getAuthorizationUrl } = await import('../lib/auth.js')
+
+      await request(app).get('/auth/login').expect(302)
+
+      expect(getAuthorizationUrl).toHaveBeenCalledWith(
+        'https://web.example.com/auth/callback',
+        expect.any(String)
+      )
+    })
+
+    it('falls back to X-Forwarded-Host when env is unset', async () => {
+      const { getAuthorizationUrl } = await import('../lib/auth.js')
+
+      await request(app)
+        .get('/auth/login')
+        .set('X-Forwarded-Host', 'web.example.com')
+        .set('X-Forwarded-Proto', 'https')
+        .expect(302)
+
+      expect(getAuthorizationUrl).toHaveBeenCalledWith(
+        'https://web.example.com/auth/callback',
+        expect.any(String)
+      )
     })
   })
 
