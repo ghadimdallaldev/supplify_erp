@@ -44,6 +44,7 @@ import { featureEnabled } from '../lib/planLimits'
 import { RestaurantWastePanel } from '../components/inventory/RestaurantWastePanel'
 import { ExpiryInventoryTab } from '../components/inventory/ExpiryInventoryTab'
 import { RequirePermission } from '../components/RequirePermission'
+import { PageHeader } from '../components/ui/page-header'
 
 export function RestaurantInventoryPage() {
   const [search, setSearch] = useState('')
@@ -63,6 +64,7 @@ export function RestaurantInventoryPage() {
   const [addQuantity, setAddQuantity] = useState('')
   const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null)
   const [wastePreselectProductId, setWastePreselectProductId] = useState<string | null>(null)
+  const [historySource, setHistorySource] = useState('ALL')
 
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const wasteTrackingEnabled = featureEnabled(
@@ -187,6 +189,31 @@ export function RestaurantInventoryPage() {
     reader.readAsText(file)
   }
 
+  const getMovementSource = (movement: any) =>
+    movement.reference_type === 'RECEIVING_REPORT'
+      ? 'Order'
+      : movement.reference_type === 'MANUAL_ADD'
+        ? 'Manual'
+        : movement.reference_type || '—'
+
+  const getMovementTypeLabel = (movement: any, source: string) => {
+    const t = (movement.type || '').toUpperCase()
+    if (source === 'Order') return 'ADD'
+    if (t === 'ORDER' || t === 'RECEIVED') return 'ADD'
+    if (t === 'ADD') return 'ADD'
+    if (t === 'SUBTRACT') return 'SUBTRACT'
+    if (t === 'COUNT_CORRECTION') return 'ADJUST'
+    if (t === 'WASTAGE') return 'WASTE'
+    if (t === 'SPOILAGE') return 'SPOIL'
+    return t || '—'
+  }
+
+  const getMovementBadgeVariant = (typeLabel: string) =>
+    typeLabel === 'ADD' ? 'default' : typeLabel === 'ADJUST' ? 'secondary' : 'destructive'
+
+  const getMovementTypeText = (typeLabel: string) =>
+    typeLabel === 'WASTE' ? 'Wastage' : typeLabel === 'SPOIL' ? 'Spoilage' : typeLabel
+
   const getStockStatus = (quantity: number, threshold: number) => {
     if (quantity === 0) return 'OUT_OF_STOCK'
     if (threshold && quantity <= threshold) return 'LOW_STOCK'
@@ -246,9 +273,14 @@ export function RestaurantInventoryPage() {
     ).length,
   }
 
+  const filteredHistory =
+    historySource === 'ALL'
+      ? history
+      : history.filter((m: any) => getMovementSource(m) === historySource)
+
   if (isLoading) {
     return (
-      <div className="space-y-6 p-6">
+      <div className="page-stack p-4 sm:p-6">
         <div className="flex justify-between items-start">
           <div>
             <Skeleton className="h-9 w-40 mb-2" />
@@ -279,25 +311,27 @@ export function RestaurantInventoryPage() {
 
   return (
     <RequirePermission permission="INVENTORY_VIEW" title="inventory">
-      <div className="space-y-6 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-[21px] font-black text-[var(--text)]">Inventory</h1>
-            <p className="text-[var(--text-muted)] mt-2">
-              Track your stock levels and manage inventory
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={() => setShowBulkUploadDialog(true)} variant="outline">
-              <Upload className="h-4 w-4 mr-2" />
-              Bulk Upload
-            </Button>
-            <Button onClick={() => setShowAddProductDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Product
-            </Button>
-          </div>
-        </div>
+      <div className="page-stack p-4 sm:p-6">
+        <PageHeader
+          title="Inventory"
+          description="Track your stock levels and manage inventory"
+          actions={
+            <>
+              <Button
+                onClick={() => setShowBulkUploadDialog(true)}
+                variant="outline"
+                className="flex-1 sm:flex-none"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Bulk Upload
+              </Button>
+              <Button onClick={() => setShowAddProductDialog(true)} className="flex-1 sm:flex-none">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Product
+              </Button>
+            </>
+          }
+        />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
@@ -363,48 +397,70 @@ export function RestaurantInventoryPage() {
             </Card>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
               <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-[var(--text-muted)]">Total Products</p>
-                      <p className="text-2xl font-bold">{summary.total}</p>
+                <CardContent className="p-4 sm:pt-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs text-[var(--text-muted)] sm:text-sm">
+                        Total Products
+                      </p>
+                      <p className="text-xl font-bold sm:text-2xl">{summary.total}</p>
                     </div>
-                    <Package className="h-8 w-8 text-[var(--brand-mid)]" />
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-pale)] sm:h-11 sm:w-11">
+                      <Package className="h-5 w-5 text-[var(--brand-mid)] sm:h-6 sm:w-6" />
+                    </span>
                   </div>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-[var(--text-muted)]">In Stock</p>
-                      <p className="text-2xl font-bold">{summary.inStock}</p>
+                <CardContent className="p-4 sm:pt-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs text-[var(--text-muted)] sm:text-sm">
+                        In Stock
+                      </p>
+                      <p className="text-xl font-bold text-[var(--mint)] sm:text-2xl">
+                        {summary.inStock}
+                      </p>
                     </div>
-                    <TrendingUp className="h-8 w-8 text-[var(--mint)]" />
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--mint-pale)] sm:h-11 sm:w-11">
+                      <TrendingUp className="h-5 w-5 text-[var(--mint)] sm:h-6 sm:w-6" />
+                    </span>
                   </div>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-[var(--text-muted)]">Low Stock</p>
-                      <p className="text-2xl font-bold">{summary.lowStock}</p>
+                <CardContent className="p-4 sm:pt-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs text-[var(--text-muted)] sm:text-sm">
+                        Low Stock
+                      </p>
+                      <p className="text-xl font-bold text-[var(--amber)] sm:text-2xl">
+                        {summary.lowStock}
+                      </p>
                     </div>
-                    <AlertCircle className="h-8 w-8 text-[var(--amber-mid)]" />
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--amber-pale)] sm:h-11 sm:w-11">
+                      <AlertCircle className="h-5 w-5 text-[var(--amber-mid)] sm:h-6 sm:w-6" />
+                    </span>
                   </div>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-[var(--text-muted)]">Out of Stock</p>
-                      <p className="text-2xl font-bold">{summary.outOfStock}</p>
+                <CardContent className="p-4 sm:pt-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs text-[var(--text-muted)] sm:text-sm">
+                        Out of Stock
+                      </p>
+                      <p className="text-xl font-bold text-[var(--red)] sm:text-2xl">
+                        {summary.outOfStock}
+                      </p>
                     </div>
-                    <TrendingDown className="h-8 w-8 text-[var(--red)]" />
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--red-pale)] sm:h-11 sm:w-11">
+                      <TrendingDown className="h-5 w-5 text-[var(--red)] sm:h-6 sm:w-6" />
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -538,149 +594,254 @@ export function RestaurantInventoryPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto rounded-lg border border-[var(--app-border)]">
-                    <table className="w-full">
-                      <thead className="bg-[var(--brand-ultra)]">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                            Product
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                            Supplier
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                            Quantity
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                            Suggested Reorder
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                            Status
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                            Last Updated
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--app-border)]">
-                        {filteredInventory.map((item: any) => {
-                          const status = getStockStatus(item.quantity, item.low_stock_threshold)
-                          const reorderQty = calculateReorderQuantity(item)
-                          return (
-                            <tr key={item.id} className="hover:bg-[var(--brand-ultra)]">
-                              <td className="px-4 py-4">
-                                <div>
-                                  <p className="font-medium text-[var(--text)]">
-                                    {item.product_name}
-                                  </p>
-                                  <p className="text-sm text-[var(--text-muted)]">
-                                    {item.product_sku}
-                                  </p>
-                                </div>
-                              </td>
-                              <td className="px-4 py-4 text-sm text-[var(--text)]">
-                                {item.supplier_name}
-                              </td>
-                              <td className="px-4 py-4">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold">{item.quantity}</span>
-                                  <span className="text-sm text-[var(--text-muted)]">
+                  <>
+                    {/* Mobile: card list */}
+                    <div className="space-y-3 md:hidden">
+                      {filteredInventory.map((item: any) => {
+                        const status = getStockStatus(item.quantity, item.low_stock_threshold)
+                        const reorderQty = calculateReorderQuantity(item)
+                        const isPinned = pinnedItems.has(item.product_id)
+                        return (
+                          <div
+                            key={item.id}
+                            className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate font-semibold text-[var(--text)]">
+                                  {item.product_name}
+                                </p>
+                                <p className="truncate text-xs text-[var(--text-muted)]">
+                                  {item.product_sku}
+                                  {item.supplier_name ? ` · ${item.supplier_name}` : ''}
+                                </p>
+                              </div>
+                              <Badge variant={getStatusColor(status)} className="shrink-0">
+                                {status.replace('_', ' ')}
+                              </Badge>
+                            </div>
+
+                            <div className="mt-3 flex items-end justify-between gap-3">
+                              <div>
+                                <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+                                  On hand
+                                </p>
+                                <p className="text-lg font-bold text-[var(--text)]">
+                                  {item.quantity}{' '}
+                                  <span className="text-sm font-medium text-[var(--text-muted)]">
                                     {item.product_unit}
                                   </span>
-                                </div>
-                              </td>
-                              <td className="px-4 py-4">
-                                {reorderQty > 0 ? (
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-semibold text-[var(--amber)]">
-                                      {reorderQty}
+                                </p>
+                              </div>
+                              {reorderQty > 0 ? (
+                                <div className="text-right">
+                                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+                                    Suggested reorder
+                                  </p>
+                                  <p className="text-lg font-bold text-[var(--amber)]">
+                                    {reorderQty}{' '}
+                                    <span className="text-sm font-medium text-[var(--text-muted)]">
+                                      {item.product_unit}
                                     </span>
-                                    <Badge variant="outline" className="text-xs">
-                                      Suggested
-                                    </Badge>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-xs"
-                                      onClick={() => {
-                                        toast.success('Adding to cart...', {
-                                          duration: 2000,
-                                        })
-                                        // TODO: Navigate to products page with search pre-filled
-                                      }}
-                                    >
-                                      Order
-                                    </Button>
+                                  </p>
+                                </div>
+                              ) : null}
+                            </div>
+
+                            <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[var(--app-border)] pt-3">
+                              <Button
+                                variant="outline"
+                                size="touch"
+                                onClick={() => handleOpenAdjustDialog(item, 'ADD')}
+                              >
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                Add
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="touch"
+                                onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
+                              >
+                                <Minus className="mr-1.5 h-4 w-4" />
+                                Reduce
+                              </Button>
+                              <Button
+                                variant={isPinned ? 'default' : 'outline'}
+                                size="touch"
+                                onClick={() => handlePinToggle(item.product_id)}
+                              >
+                                <Pin
+                                  className={`mr-1.5 h-4 w-4 ${isPinned ? 'fill-current' : ''}`}
+                                />
+                                {isPinned ? 'Pinned' : 'Pin'}
+                              </Button>
+                              {wasteTrackingEnabled ? (
+                                <Button
+                                  variant="outline"
+                                  size="touch"
+                                  className="border-[var(--amber-mid)]/40 text-[var(--amber-mid)]"
+                                  onClick={() => {
+                                    setWastePreselectProductId(item.product_id)
+                                    setActiveTab('waste')
+                                  }}
+                                >
+                                  <Recycle className="mr-1.5 h-4 w-4" />
+                                  Waste
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Desktop: table */}
+                    <div className="hidden overflow-x-auto rounded-lg border border-[var(--app-border)] md:block">
+                      <table className="w-full">
+                        <thead className="bg-[var(--brand-ultra)]">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                              Product
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                              Supplier
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                              Quantity
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                              Suggested Reorder
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                              Status
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                              Last Updated
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--app-border)]">
+                          {filteredInventory.map((item: any) => {
+                            const status = getStockStatus(item.quantity, item.low_stock_threshold)
+                            const reorderQty = calculateReorderQuantity(item)
+                            return (
+                              <tr key={item.id} className="hover:bg-[var(--brand-ultra)]">
+                                <td className="px-4 py-4">
+                                  <div>
+                                    <p className="font-medium text-[var(--text)]">
+                                      {item.product_name}
+                                    </p>
+                                    <p className="text-sm text-[var(--text-muted)]">
+                                      {item.product_sku}
+                                    </p>
                                   </div>
-                                ) : (
-                                  <span className="text-[var(--text-muted)]">-</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-4">
-                                <Badge variant={getStatusColor(status)}>
-                                  {status.replace('_', ' ')}
-                                </Badge>
-                              </td>
-                              <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                                {new Date(item.updated_at).toLocaleDateString()}
-                              </td>
-                              <td className="px-4 py-4">
-                                <div className="flex gap-2">
-                                  <Button
-                                    variant={
-                                      pinnedItems.has(item.product_id) ? 'default' : 'outline'
-                                    }
-                                    size="sm"
-                                    onClick={() => handlePinToggle(item.product_id)}
-                                    title={
-                                      pinnedItems.has(item.product_id) ? 'Unpin item' : 'Pin to top'
-                                    }
-                                  >
-                                    <Pin
-                                      className={`h-4 w-4 ${pinnedItems.has(item.product_id) ? 'fill-current' : ''}`}
-                                    />
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleOpenAdjustDialog(item, 'ADD')}
-                                    title="Add inventory"
-                                  >
-                                    <Plus className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
-                                    title="Count correction (reduce stock)"
-                                  >
-                                    <Minus className="h-4 w-4" />
-                                  </Button>
-                                  {wasteTrackingEnabled ? (
+                                </td>
+                                <td className="px-4 py-4 text-sm text-[var(--text)]">
+                                  {item.supplier_name}
+                                </td>
+                                <td className="px-4 py-4">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold">{item.quantity}</span>
+                                    <span className="text-sm text-[var(--text-muted)]">
+                                      {item.product_unit}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4">
+                                  {reorderQty > 0 ? (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold text-[var(--amber)]">
+                                        {reorderQty}
+                                      </span>
+                                      <Badge variant="outline" className="text-xs">
+                                        Suggested
+                                      </Badge>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-xs"
+                                        onClick={() => {
+                                          toast.success('Adding to cart...', {
+                                            duration: 2000,
+                                          })
+                                          // TODO: Navigate to products page with search pre-filled
+                                        }}
+                                      >
+                                        Order
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[var(--text-muted)]">-</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-4">
+                                  <Badge variant={getStatusColor(status)}>
+                                    {status.replace('_', ' ')}
+                                  </Badge>
+                                </td>
+                                <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
+                                  {new Date(item.updated_at).toLocaleDateString()}
+                                </td>
+                                <td className="px-4 py-4">
+                                  <div className="flex gap-2">
+                                    <Button
+                                      variant={
+                                        pinnedItems.has(item.product_id) ? 'default' : 'outline'
+                                      }
+                                      size="sm"
+                                      onClick={() => handlePinToggle(item.product_id)}
+                                      title={
+                                        pinnedItems.has(item.product_id)
+                                          ? 'Unpin item'
+                                          : 'Pin to top'
+                                      }
+                                    >
+                                      <Pin
+                                        className={`h-4 w-4 ${pinnedItems.has(item.product_id) ? 'fill-current' : ''}`}
+                                      />
+                                    </Button>
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="text-[var(--amber-mid)] border-[var(--amber-mid)]/40"
-                                      onClick={() => {
-                                        setWastePreselectProductId(item.product_id)
-                                        setActiveTab('waste')
-                                      }}
-                                      title="Log waste or spoilage"
+                                      onClick={() => handleOpenAdjustDialog(item, 'ADD')}
+                                      title="Add inventory"
                                     >
-                                      <Recycle className="h-4 w-4" />
+                                      <Plus className="h-4 w-4" />
                                     </Button>
-                                  ) : null}
-                                </div>
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
+                                      title="Count correction (reduce stock)"
+                                    >
+                                      <Minus className="h-4 w-4" />
+                                    </Button>
+                                    {wasteTrackingEnabled ? (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="text-[var(--amber-mid)] border-[var(--amber-mid)]/40"
+                                        onClick={() => {
+                                          setWastePreselectProductId(item.product_id)
+                                          setActiveTab('waste')
+                                        }}
+                                        title="Log waste or spoilage"
+                                      >
+                                        <Recycle className="h-4 w-4" />
+                                      </Button>
+                                    ) : null}
+                                  </div>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -761,35 +922,23 @@ export function RestaurantInventoryPage() {
                 <CardDescription>Recent inventory changes and adjustments</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-4 mb-4">
-                  <div>
-                    <label className="text-sm text-[var(--text-muted)] mr-2">Source</label>
-                    <select
-                      onChange={(e) => {
-                        const val = e.target.value
-                        const table = document.getElementById(
-                          'history-table-body'
-                        ) as HTMLTableSectionElement | null
-                        if (!table) return
-                        const rows = Array.from(
-                          table.querySelectorAll('tr')
-                        ) as HTMLTableRowElement[]
-                        rows.forEach((row) => {
-                          const cell = row.querySelector(
-                            '[data-col="source"]'
-                          ) as HTMLElement | null
-                          if (!cell) return
-                          const src = cell.dataset?.value || cell.textContent || ''
-                          row.style.display = val === 'ALL' || src === val ? '' : 'none'
-                        })
-                      }}
-                      className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
-                    >
-                      <option value="ALL">All</option>
-                      <option value="Order">Order</option>
-                      <option value="Manual">Manual</option>
-                    </select>
-                  </div>
+                <div className="mb-4 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+                  <label
+                    htmlFor="history-source-filter"
+                    className="text-sm text-[var(--text-muted)]"
+                  >
+                    Source
+                  </label>
+                  <select
+                    id="history-source-filter"
+                    value={historySource}
+                    onChange={(e) => setHistorySource(e.target.value)}
+                    className={`${filterSelectClass} sm:w-48`}
+                  >
+                    <option value="ALL">All</option>
+                    <option value="Order">Order</option>
+                    <option value="Manual">Manual</option>
+                  </select>
                 </div>
                 {isLoadingHistory ? (
                   <div className="text-center py-12">Loading history...</div>
@@ -798,119 +947,136 @@ export function RestaurantInventoryPage() {
                     <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
                     <p className="text-[var(--text-muted)]">No inventory movements yet</p>
                   </div>
+                ) : filteredHistory.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] py-12 text-center">
+                    <p className="text-[var(--text-muted)]">No movements match this filter.</p>
+                  </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-[var(--brand-ultra)]">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                            Date
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                            Product
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                            Type
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                            Source
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                            Quantity
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                            Balance Before
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                            Balance After
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                            Reason
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody
-                        id="history-table-body"
-                        className="divide-y divide-[var(--app-border)]"
-                      >
-                        {history.map((movement: any) => {
-                          const source =
-                            movement.reference_type === 'RECEIVING_REPORT'
-                              ? 'Order'
-                              : movement.reference_type === 'MANUAL_ADD'
-                                ? 'Manual'
-                                : movement.reference_type || '—'
-                          const typeLabel = (() => {
-                            const t = (movement.type || '').toUpperCase()
-                            if (source === 'Order') return 'ADD'
-                            if (t === 'ORDER' || t === 'RECEIVED') return 'ADD'
-                            if (t === 'ADD') return 'ADD'
-                            if (t === 'SUBTRACT') return 'SUBTRACT'
-                            if (t === 'COUNT_CORRECTION') return 'ADJUST'
-                            if (t === 'WASTAGE') return 'WASTE'
-                            if (t === 'SPOILAGE') return 'SPOIL'
-                            return t || '—'
-                          })()
-                          return (
-                            <tr key={movement.id} className="hover:bg-[var(--brand-ultra)]">
-                              <td className="px-4 py-4 text-sm text-[var(--text)]">
-                                {new Date(movement.created_at).toLocaleString()}
-                              </td>
-                              <td className="px-4 py-4">
-                                <div>
-                                  <p className="font-medium text-[var(--text)]">
-                                    {movement.product_name}
-                                  </p>
-                                  <p className="text-sm text-[var(--text-muted)]">
-                                    {movement.product_sku}
-                                  </p>
-                                </div>
-                              </td>
-                              <td className="px-4 py-4">
-                                <Badge
-                                  variant={
-                                    typeLabel === 'ADD'
-                                      ? 'default'
-                                      : typeLabel === 'ADJUST'
-                                        ? 'secondary'
-                                        : typeLabel === 'WASTE' || typeLabel === 'SPOIL'
-                                          ? 'destructive'
-                                          : 'destructive'
-                                  }
-                                >
-                                  {typeLabel === 'WASTE'
-                                    ? 'Wastage'
-                                    : typeLabel === 'SPOIL'
-                                      ? 'Spoilage'
-                                      : typeLabel}
-                                </Badge>
-                              </td>
-                              <td
-                                className="px-4 py-4 text-sm text-[var(--text)]"
-                                data-col="source"
-                                data-value={source}
+                  <>
+                    {/* Mobile: card list */}
+                    <div className="space-y-3 md:hidden">
+                      {filteredHistory.map((movement: any) => {
+                        const source = getMovementSource(movement)
+                        const typeLabel = getMovementTypeLabel(movement, source)
+                        return (
+                          <div
+                            key={movement.id}
+                            className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate font-semibold text-[var(--text)]">
+                                  {movement.product_name}
+                                </p>
+                                <p className="truncate text-xs text-[var(--text-muted)]">
+                                  {movement.product_sku} · {source}
+                                </p>
+                              </div>
+                              <Badge
+                                variant={getMovementBadgeVariant(typeLabel)}
+                                className="shrink-0"
                               >
-                                {source}
-                              </td>
-                              <td className="px-4 py-4 text-sm text-[var(--text)]">
+                                {getMovementTypeText(typeLabel)}
+                              </Badge>
+                            </div>
+                            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                              <span className="font-semibold text-[var(--text)]">
                                 {movement.quantity > 0 ? '+' : ''}
                                 {movement.quantity}
-                              </td>
-                              <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                                {movement.balance_before}
-                              </td>
-                              <td className="px-4 py-4 text-sm font-medium text-[var(--text)]">
-                                {movement.balance_after}
-                              </td>
-                              <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                                {movement.reason || '-'}
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                              </span>
+                              <span className="text-[var(--text-muted)]">
+                                {movement.balance_before} → {movement.balance_after}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-xs text-[var(--text-muted)]">
+                              {new Date(movement.created_at).toLocaleString()}
+                            </p>
+                            {movement.reason ? (
+                              <p className="mt-1 text-xs text-[var(--text-mid)]">
+                                {movement.reason}
+                              </p>
+                            ) : null}
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Desktop: table */}
+                    <div className="hidden overflow-x-auto md:block">
+                      <table className="w-full">
+                        <thead className="bg-[var(--brand-ultra)]">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                              Date
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                              Product
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                              Type
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                              Source
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                              Quantity
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                              Balance Before
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                              Balance After
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                              Reason
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--app-border)]">
+                          {filteredHistory.map((movement: any) => {
+                            const source = getMovementSource(movement)
+                            const typeLabel = getMovementTypeLabel(movement, source)
+                            return (
+                              <tr key={movement.id} className="hover:bg-[var(--brand-ultra)]">
+                                <td className="px-4 py-4 text-sm text-[var(--text)]">
+                                  {new Date(movement.created_at).toLocaleString()}
+                                </td>
+                                <td className="px-4 py-4">
+                                  <div>
+                                    <p className="font-medium text-[var(--text)]">
+                                      {movement.product_name}
+                                    </p>
+                                    <p className="text-sm text-[var(--text-muted)]">
+                                      {movement.product_sku}
+                                    </p>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4">
+                                  <Badge variant={getMovementBadgeVariant(typeLabel)}>
+                                    {getMovementTypeText(typeLabel)}
+                                  </Badge>
+                                </td>
+                                <td className="px-4 py-4 text-sm text-[var(--text)]">{source}</td>
+                                <td className="px-4 py-4 text-sm text-[var(--text)]">
+                                  {movement.quantity > 0 ? '+' : ''}
+                                  {movement.quantity}
+                                </td>
+                                <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
+                                  {movement.balance_before}
+                                </td>
+                                <td className="px-4 py-4 text-sm font-medium text-[var(--text)]">
+                                  {movement.balance_after}
+                                </td>
+                                <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
+                                  {movement.reason || '-'}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -923,66 +1089,113 @@ export function RestaurantInventoryPage() {
                 <CardDescription>Current stock per product and last update source</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-[var(--brand-ultra)]">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Product
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Current Total
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Unit
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Last Source
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
-                          Last Change
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--app-border)]">
+                {inventory.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] py-12 text-center">
+                    <p className="text-[var(--text-muted)]">No inventory yet.</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Mobile: card list */}
+                    <div className="space-y-3 md:hidden">
                       {inventory.map((item: any) => {
                         const lastMovement = history.find(
                           (m: any) => m.product_id === item.product_id
                         )
-                        const source =
-                          lastMovement?.reference_type === 'RECEIVING_REPORT'
-                            ? 'Order'
-                            : lastMovement?.reference_type === 'MANUAL_ADD'
-                              ? 'Manual'
-                              : lastMovement?.reference_type || '—'
+                        const source = lastMovement ? getMovementSource(lastMovement) : '—'
                         return (
-                          <tr key={item.id} className="hover:bg-[var(--brand-ultra)]">
-                            <td className="px-4 py-4">
-                              <div>
-                                <p className="font-medium text-[var(--text)]">
+                          <div
+                            key={item.id}
+                            className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate font-semibold text-[var(--text)]">
                                   {item.product_name}
                                 </p>
-                                <p className="text-sm text-[var(--text-muted)]">
+                                <p className="truncate text-xs text-[var(--text-muted)]">
                                   {item.product_sku}
                                 </p>
                               </div>
-                            </td>
-                            <td className="px-4 py-4 font-semibold">{item.quantity}</td>
-                            <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                              {item.product_unit}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-[var(--text)]">{source}</td>
-                            <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                              {lastMovement
-                                ? new Date(lastMovement.created_at).toLocaleString()
-                                : '—'}
-                            </td>
-                          </tr>
+                              <p className="shrink-0 text-right text-lg font-bold text-[var(--text)]">
+                                {item.quantity}{' '}
+                                <span className="text-sm font-medium text-[var(--text-muted)]">
+                                  {item.product_unit}
+                                </span>
+                              </p>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--text-muted)]">
+                              <span>
+                                Last source: <span className="text-[var(--text)]">{source}</span>
+                              </span>
+                              <span>
+                                {lastMovement
+                                  ? new Date(lastMovement.created_at).toLocaleString()
+                                  : '—'}
+                              </span>
+                            </div>
+                          </div>
                         )
                       })}
-                    </tbody>
-                  </table>
-                </div>
+                    </div>
+
+                    {/* Desktop: table */}
+                    <div className="hidden overflow-x-auto md:block">
+                      <table className="w-full">
+                        <thead className="bg-[var(--brand-ultra)]">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                              Product
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                              Current Total
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                              Unit
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                              Last Source
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
+                              Last Change
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--app-border)]">
+                          {inventory.map((item: any) => {
+                            const lastMovement = history.find(
+                              (m: any) => m.product_id === item.product_id
+                            )
+                            const source = lastMovement ? getMovementSource(lastMovement) : '—'
+                            return (
+                              <tr key={item.id} className="hover:bg-[var(--brand-ultra)]">
+                                <td className="px-4 py-4">
+                                  <div>
+                                    <p className="font-medium text-[var(--text)]">
+                                      {item.product_name}
+                                    </p>
+                                    <p className="text-sm text-[var(--text-muted)]">
+                                      {item.product_sku}
+                                    </p>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4 font-semibold">{item.quantity}</td>
+                                <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
+                                  {item.product_unit}
+                                </td>
+                                <td className="px-4 py-4 text-sm text-[var(--text)]">{source}</td>
+                                <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
+                                  {lastMovement
+                                    ? new Date(lastMovement.created_at).toLocaleString()
+                                    : '—'}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
