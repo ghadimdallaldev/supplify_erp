@@ -1,10 +1,23 @@
 import { jwtVerify, createRemoteJWKSet } from 'jose'
+import http from 'http'
+import https from 'https'
 import { config } from '../config/env.js'
 import { logger } from './logger.js'
 import axios from 'axios'
 
 /** Timeout for outbound HTTP calls to Keycloak (ms). Prevents hung requests. */
 const KEYCLOAK_HTTP_TIMEOUT_MS = 10000
+
+/**
+ * Dedicated HTTP client for Keycloak with keepAlive agents so login / token-refresh /
+ * userinfo calls reuse the TLS connection instead of a fresh handshake per request.
+ * Keycloak is a separate Railway service, so connection reuse cuts auth latency.
+ */
+const keycloakHttp = axios.create({
+  timeout: KEYCLOAK_HTTP_TIMEOUT_MS,
+  httpAgent: new http.Agent({ keepAlive: true, maxSockets: 50 }),
+  httpsAgent: new https.Agent({ keepAlive: true, maxSockets: 50 }),
+})
 
 let keycloakConfig = null
 /** @type {Promise<object> | null} */
@@ -52,7 +65,7 @@ async function loadKeycloakConfig() {
   logger.debug('Fetching Keycloak config', { url: WELL_KNOWN_URL })
 
   try {
-    const response = await axios.get(WELL_KNOWN_URL, { timeout: KEYCLOAK_HTTP_TIMEOUT_MS })
+    const response = await keycloakHttp.get(WELL_KNOWN_URL, { timeout: KEYCLOAK_HTTP_TIMEOUT_MS })
     keycloakConfig = response.data
     logger.debug('Keycloak configuration loaded')
     return keycloakConfig
@@ -103,7 +116,7 @@ export async function exchangeCodeForTokens(code, redirectUri) {
       redirect_uri: redirectUri,
     })
 
-    const response = await axios.post(config.token_endpoint, params, {
+    const response = await keycloakHttp.post(config.token_endpoint, params, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
@@ -143,7 +156,7 @@ export async function exchangePasswordForTokens(username, password) {
     scope: 'openid profile email',
   })
 
-  const response = await axios.post(config.token_endpoint, params, {
+  const response = await keycloakHttp.post(config.token_endpoint, params, {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     timeout: KEYCLOAK_HTTP_TIMEOUT_MS,
   })
@@ -163,7 +176,7 @@ export async function refreshAccessToken(refreshToken) {
       refresh_token: refreshToken,
     })
 
-    const response = await axios.post(config.token_endpoint, params, {
+    const response = await keycloakHttp.post(config.token_endpoint, params, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
@@ -299,7 +312,7 @@ export async function getUserInfo(accessToken, idToken = null) {
       config.userinfo_endpoint ||
       `${getKeycloakValues().KEYCLOAK_BASE_URL}/realms/${getKeycloakValues().KEYCLOAK_REALM}/protocol/openid-connect/userinfo`
 
-    const response = await axios.get(USERINFO_URL, {
+    const response = await keycloakHttp.get(USERINFO_URL, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
@@ -342,7 +355,7 @@ export async function revokeToken(token) {
       token,
     })
 
-    const response = await axios.post(config.revocation_endpoint, params, {
+    const response = await keycloakHttp.post(config.revocation_endpoint, params, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },

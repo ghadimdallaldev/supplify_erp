@@ -9,12 +9,12 @@ import {
 } from './auth.js'
 import { createRemoteJWKSet } from 'jose'
 
-vi.mock('axios', () => ({
-  default: {
-    get: vi.fn(),
-    post: vi.fn(),
-  },
-}))
+vi.mock('axios', () => {
+  // create() returns the same mock so keycloakHttp.get/post share these spies
+  const mock = { get: vi.fn(), post: vi.fn() }
+  mock.create = vi.fn(() => mock)
+  return { default: mock }
+})
 
 vi.mock('../config/env.js', () => ({
   config: {
