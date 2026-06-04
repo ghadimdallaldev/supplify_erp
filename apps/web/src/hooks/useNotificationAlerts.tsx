@@ -15,7 +15,6 @@ import {
 import { registerServiceWorker } from '../lib/registerServiceWorker'
 import { getAppSocket } from '../lib/appSocket'
 
-const POLL_CONNECTED_MS = 60_000
 const POLL_DISCONNECTED_MS = 30_000
 const PERMISSION_PROMPT_KEY = 'supplify_notif_permission_asked'
 
@@ -100,13 +99,11 @@ export function useNotificationAlerts() {
     seenIdsRef.current = new Set()
   }, [user?.id])
 
-  const pollMs = socketConnected ? POLL_CONNECTED_MS : POLL_DISCONNECTED_MS
-
   const { data } = useGetNotificationsQuery(
     { limit: 25, offset: 0 },
     {
       skip: !user,
-      pollingInterval: pollMs,
+      pollingInterval: socketConnected ? undefined : POLL_DISCONNECTED_MS,
       skipPollingIfUnfocused: true,
       refetchOnFocus: false,
       refetchOnReconnect: true,

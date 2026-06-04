@@ -1,6 +1,7 @@
 import { query } from './db.js'
 import { logger } from './logger.js'
 import { getCache, setCache, deleteCache } from './cache.js'
+import { singleflight } from './singleflight.js'
 import {
   ALL_FEATURE_KEYS,
   featureDisplayName,
@@ -99,64 +100,69 @@ export async function resolveAllFeaturesForTenant(tenantId, tenantType, planFeat
   const cached = await getCache(cacheKey)
   if (cached !== null) return cached
 
-  const keys = getAllowedFeatureKeys(tenantType)
-  /** @type {Record<string, boolean|null>} */
-  const globalMap = {}
-  /** @type {Record<string, boolean>} */
-  const tenantMap = {}
+  return singleflight(cacheKey, async () => {
+    const again = await getCache(cacheKey)
+    if (again !== null) return again
 
-  try {
-    const { rows } = await query(
-      `SELECT feature_key, global_override FROM feature_flag WHERE feature_key = ANY($1::text[])`,
-      [keys]
-    )
-    for (const row of rows) {
-      globalMap[row.feature_key] = row.global_override
-    }
-  } catch (error) {
-    if (error.code !== '42P01') throw error
-  }
+    const keys = getAllowedFeatureKeys(tenantType)
+    /** @type {Record<string, boolean|null>} */
+    const globalMap = {}
+    /** @type {Record<string, boolean>} */
+    const tenantMap = {}
 
-  try {
-    const { rows } = await query(
-      `SELECT feature_key, is_enabled FROM feature_flag_override WHERE tenant_id = $1 AND tenant_type = $2 AND feature_key = ANY($3::text[])`,
-      [tenantId, tenantType, keys]
-    )
-    for (const row of rows) {
-      tenantMap[row.feature_key] = row.is_enabled === true
+    try {
+      const { rows } = await query(
+        `SELECT feature_key, global_override FROM feature_flag WHERE feature_key = ANY($1::text[])`,
+        [keys]
+      )
+      for (const row of rows) {
+        globalMap[row.feature_key] = row.global_override
+      }
+    } catch (error) {
+      if (error.code !== '42P01') throw error
     }
-  } catch (error) {
-    if (error.code !== '42P01') throw error
-  }
 
-  const features = {}
-  const featureSources = {}
-  for (const key of keys) {
-    if (Object.prototype.hasOwnProperty.call(tenantMap, key)) {
-      features[key] = tenantMap[key]
-      featureSources[key] = 'tenant_override'
-      continue
+    try {
+      const { rows } = await query(
+        `SELECT feature_key, is_enabled FROM feature_flag_override WHERE tenant_id = $1 AND tenant_type = $2 AND feature_key = ANY($3::text[])`,
+        [tenantId, tenantType, keys]
+      )
+      for (const row of rows) {
+        tenantMap[row.feature_key] = row.is_enabled === true
+      }
+    } catch (error) {
+      if (error.code !== '42P01') throw error
     }
-    if (Object.prototype.hasOwnProperty.call(globalMap, key) && globalMap[key] !== null) {
-      features[key] = globalMap[key] === true
-      featureSources[key] = 'global'
-      continue
-    }
-    if (planFeatures && typeof planFeatures === 'object' && key in planFeatures) {
-      const raw = planFeatures[key]
-      const enabled = evaluatePlanFeatureValue(raw)
-      // Preserve tier strings (e.g. quick_lists full_schedule) for clients that read features.*
-      features[key] = enabled ? raw : false
-      featureSources[key] = 'plan'
-    } else {
-      features[key] = false
-      featureSources[key] = 'default'
-    }
-  }
 
-  const result = { features, featureSources }
-  await setCache(cacheKey, result, FF_CACHE_TTL).catch(() => {})
-  return result
+    const features = {}
+    const featureSources = {}
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(tenantMap, key)) {
+        features[key] = tenantMap[key]
+        featureSources[key] = 'tenant_override'
+        continue
+      }
+      if (Object.prototype.hasOwnProperty.call(globalMap, key) && globalMap[key] !== null) {
+        features[key] = globalMap[key] === true
+        featureSources[key] = 'global'
+        continue
+      }
+      if (planFeatures && typeof planFeatures === 'object' && key in planFeatures) {
+        const raw = planFeatures[key]
+        const enabled = evaluatePlanFeatureValue(raw)
+        // Preserve tier strings (e.g. quick_lists full_schedule) for clients that read features.*
+        features[key] = enabled ? raw : false
+        featureSources[key] = 'plan'
+      } else {
+        features[key] = false
+        featureSources[key] = 'default'
+      }
+    }
+
+    const result = { features, featureSources }
+    await setCache(cacheKey, result, FF_CACHE_TTL).catch(() => {})
+    return result
+  })
 }
 
 /** Used by requireFeature middleware (via subscription.js). */

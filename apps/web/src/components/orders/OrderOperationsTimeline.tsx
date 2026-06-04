@@ -199,8 +199,8 @@ export function OrderOperationsTimeline({
       : 'Order progress from placement through delivery, receiving, and billing.'
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[1fr_220px] gap-6">
-      <Card>
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_220px]">
+      <Card className="xl:order-1">
         <CardHeader>
           <CardTitle>Operations timeline</CardTitle>
           <CardDescription>{description}</CardDescription>
@@ -218,7 +218,7 @@ export function OrderOperationsTimeline({
         </CardContent>
       </Card>
 
-      <Card className="h-fit hidden xl:block">
+      <Card className="h-fit xl:order-2">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
             Order lifecycle

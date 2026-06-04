@@ -127,6 +127,8 @@ export function InviteAcceptPage() {
     try {
       const result = await accept({ token, type, legalAcceptance: legalPayload }).unwrap()
       dispatch(api.util.resetApiState())
+      const { refetchAppSession } = await import('../lib/refetchAppSession')
+      await refetchAppSession(dispatch)
       finishInviteAcceptNavigation(result, navigate, searchParams)
     } catch (err) {
       setError(
@@ -168,6 +170,8 @@ export function InviteAcceptPage() {
         legalAcceptance: legalPayload,
       }).unwrap()
       dispatch(api.util.resetApiState())
+      const { refetchAppSession } = await import('../lib/refetchAppSession')
+      await refetchAppSession(dispatch)
       finishInviteAcceptNavigation(result, navigate, searchParams)
     } catch (err) {
       setError(

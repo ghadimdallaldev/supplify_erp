@@ -20,6 +20,7 @@ import {
   assignDefaultRoleForTenant,
 } from '../lib/rbac.js'
 import { getRolesForUser, getPermissionsForUser } from '../lib/permissions.js'
+import { getTenantProfileRow } from '../lib/tenant-profile-cache.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
@@ -261,20 +262,15 @@ router.get('/me', requireAuth, async (req, res) => {
         }
       } else {
         // roles, permissions, workspace assignment, and tenant data are all independent reads.
-        const [rolesResult, permsResult, assignment, tenantDataRows] = await Promise.all([
+        const [rolesResult, permsResult, assignment, tenantProfileRow] = await Promise.all([
           getRolesForUser(user.id, tenant.tenantId, tenant.tenantType),
           getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType),
           getTenantAssignmentForUser(user.id, user.role),
-          tenant.tenantType === 'SUPPLIER'
-            ? query('SELECT * FROM supplier WHERE id = $1', [tenant.tenantId]).then((r) => r.rows)
-            : tenant.tenantType === 'RESTAURANT'
-              ? query('SELECT * FROM restaurant WHERE id = $1', [tenant.tenantId]).then(
-                  (r) => r.rows
-                )
-              : Promise.resolve([]),
+          getTenantProfileRow(tenant.tenantType, tenant.tenantId),
         ])
         tenantRoles = rolesResult
         tenantPermissions = permsResult
+        const tenantDataRows = tenantProfileRow ? [tenantProfileRow] : []
 
         if (tenantRoles.length === 0 && (user.role === 'RESTAURANT' || user.role === 'SUPPLIER')) {
           const isPrimary = await isPrimaryTenantContact(

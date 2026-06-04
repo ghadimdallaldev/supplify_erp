@@ -510,7 +510,7 @@ export function SupplierSettingsPage() {
 
   return (
     <RequirePermission permission="SETTINGS_VIEW" title="supplier settings">
-      <div className="space-y-6 p-6">
+      <div className="space-y-4 sm:space-y-6">
         <div>
           <h1 className="text-[21px] font-black text-[var(--text)]">Supplier Settings</h1>
           <p className="text-[var(--text-muted)] mt-2">Manage your business profile and settings</p>
@@ -582,45 +582,21 @@ export function SupplierSettingsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="flex h-auto w-full flex-wrap gap-1 p-1">
-            <TabsTrigger value="profile" className="flex-1 min-w-[5.5rem] sm:flex-none">
-              Profile
-            </TabsTrigger>
-            <TabsTrigger value="contacts" className="flex-1 min-w-[5.5rem] sm:flex-none">
-              Contacts
-            </TabsTrigger>
+          <TabsList className="justify-start">
+            <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="contacts">Contacts</TabsTrigger>
             {(can('STAFF_VIEW') || can('SETTINGS_VIEW')) && (
-              <TabsTrigger value="team" className="flex-1 min-w-[5.5rem] sm:flex-none">
-                Team & roles
-              </TabsTrigger>
+              <TabsTrigger value="team">Team & roles</TabsTrigger>
             )}
-            <TabsTrigger value="business" className="flex-1 min-w-[5.5rem] sm:flex-none">
-              Business
-            </TabsTrigger>
-            {can('WAREHOUSES_VIEW') && (
-              <TabsTrigger value="warehouses" className="flex-1 min-w-[5.5rem] sm:flex-none">
-                Warehouses
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="delivery" className="flex-1 min-w-[5.5rem] sm:flex-none">
-              Delivery Zones
-            </TabsTrigger>
-            <TabsTrigger value="drivers" className="flex-1 min-w-[5.5rem] sm:flex-none">
-              Drivers
-            </TabsTrigger>
-            <TabsTrigger value="branches" className="flex-1 min-w-[5.5rem] sm:flex-none">
-              Branches
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex-1 min-w-[5.5rem] sm:flex-none">
-              Notifications
-            </TabsTrigger>
-            <TabsTrigger value="plan" className="flex-1 min-w-[5.5rem] sm:flex-none">
-              Plan & usage
-            </TabsTrigger>
+            <TabsTrigger value="business">Business</TabsTrigger>
+            {can('WAREHOUSES_VIEW') && <TabsTrigger value="warehouses">Warehouses</TabsTrigger>}
+            <TabsTrigger value="delivery">Delivery Zones</TabsTrigger>
+            <TabsTrigger value="drivers">Drivers</TabsTrigger>
+            <TabsTrigger value="branches">Branches</TabsTrigger>
+            <TabsTrigger value="notifications">Notifications</TabsTrigger>
+            <TabsTrigger value="plan">Plan & usage</TabsTrigger>
             {can('SETTINGS_VIEW') && tenantAuditEnabled && (
-              <TabsTrigger value="activity" className="flex-1 min-w-[5.5rem] sm:flex-none">
-                Activity
-              </TabsTrigger>
+              <TabsTrigger value="activity">Activity</TabsTrigger>
             )}
           </TabsList>
 
@@ -694,7 +670,7 @@ export function SupplierSettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Company Name *</Label>
                     <Input
@@ -737,7 +713,7 @@ export function SupplierSettingsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="contact_email">Contact Email *</Label>
                     <div className="relative">
@@ -798,7 +774,7 @@ export function SupplierSettingsPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="street">Street Address</Label>
                     <Input
@@ -857,7 +833,11 @@ export function SupplierSettingsPage() {
                   </div>
                 </div>
 
-                <Button onClick={handleSaveProfile} disabled={isUpdating}>
+                <Button
+                  onClick={handleSaveProfile}
+                  disabled={isUpdating}
+                  className="w-full sm:w-auto"
+                >
                   {isUpdating ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -877,7 +857,7 @@ export function SupplierSettingsPage() {
           <TabsContent value="contacts" className="space-y-4">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <Building2 className="h-5 w-5" />
@@ -885,7 +865,7 @@ export function SupplierSettingsPage() {
                     </CardTitle>
                     <CardDescription>Manage business contact information</CardDescription>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
                       <Upload className="h-4 w-4 mr-2" />
                       Upload CSV/Excel
@@ -900,25 +880,25 @@ export function SupplierSettingsPage() {
               <CardContent>
                 <div className="space-y-4">
                   <div className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
                           <h4 className="font-semibold">John Doe</h4>
                           <Badge variant="secondary">Sales Manager</Badge>
                           <Badge className="bg-[var(--brand)] text-white">Primary</Badge>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-[var(--text-muted)]">
-                          <span className="flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            john.doe@freshproduce.com
+                        <div className="flex flex-col gap-2 text-sm text-[var(--text-muted)] sm:flex-row sm:items-center sm:gap-4">
+                          <span className="flex items-center gap-1 min-w-0">
+                            <Mail className="h-3 w-3 shrink-0" />
+                            <span className="truncate">john.doe@freshproduce.com</span>
                           </span>
                           <span className="flex items-center gap-1">
-                            <Phone className="h-3 w-3" />
+                            <Phone className="h-3 w-3 shrink-0" />
                             +1 (555) 123-4567
                           </span>
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 shrink-0">
                         <Button variant="outline" size="sm">
                           Edit
                         </Button>
@@ -934,24 +914,24 @@ export function SupplierSettingsPage() {
                   </div>
 
                   <div className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
                           <h4 className="font-semibold">Jane Smith</h4>
                           <Badge variant="secondary">Operations Lead</Badge>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-[var(--text-muted)]">
-                          <span className="flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            jane.smith@freshproduce.com
+                        <div className="flex flex-col gap-2 text-sm text-[var(--text-muted)] sm:flex-row sm:items-center sm:gap-4">
+                          <span className="flex items-center gap-1 min-w-0">
+                            <Mail className="h-3 w-3 shrink-0" />
+                            <span className="truncate">jane.smith@freshproduce.com</span>
                           </span>
                           <span className="flex items-center gap-1">
-                            <Phone className="h-3 w-3" />
+                            <Phone className="h-3 w-3 shrink-0" />
                             +1 (555) 987-6543
                           </span>
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 shrink-0">
                         <Button variant="outline" size="sm">
                           Edit
                         </Button>
@@ -1005,13 +985,23 @@ export function SupplierSettingsPage() {
                     ].map((day) => (
                       <div
                         key={day}
-                        className="flex items-center gap-4 p-3 border rounded-lg hover:bg-[var(--brand-ultra)]"
+                        className="flex flex-col gap-3 p-3 border rounded-lg hover:bg-[var(--brand-ultra)] sm:flex-row sm:items-center sm:gap-4"
                       >
-                        <div className="w-28 font-medium">{day}</div>
-                        <Input type="time" className="w-32" placeholder="09:00" />
-                        <span className="text-[var(--text-muted)]">to</span>
-                        <Input type="time" className="w-32" placeholder="17:00" />
-                        <Button variant="outline" size="sm" className="ml-auto">
+                        <div className="w-full font-medium sm:w-28">{day}</div>
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                          <Input
+                            type="time"
+                            className="w-full min-w-[7rem] flex-1 sm:w-32 sm:flex-none"
+                            placeholder="09:00"
+                          />
+                          <span className="text-[var(--text-muted)]">to</span>
+                          <Input
+                            type="time"
+                            className="w-full min-w-[7rem] flex-1 sm:w-32 sm:flex-none"
+                            placeholder="17:00"
+                          />
+                        </div>
+                        <Button variant="outline" size="sm" className="w-full sm:ml-auto sm:w-auto">
                           Closed
                         </Button>
                       </div>
@@ -1024,7 +1014,7 @@ export function SupplierSettingsPage() {
                     <h3 className="font-semibold text-lg">Business Policies</h3>
                     <Badge variant="outline">Terms & Conditions</Badge>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Minimum Order Value ($)</Label>
                       <Input type="number" placeholder="100.00" />
@@ -1039,11 +1029,11 @@ export function SupplierSettingsPage() {
                         e.g., Net 30, Cash on Delivery
                       </p>
                     </div>
-                    <div className="space-y-2 col-span-2">
+                    <div className="space-y-2 md:col-span-2">
                       <Label>Return Policy</Label>
                       <Textarea placeholder="7 days return window for damaged goods..." rows={3} />
                     </div>
-                    <div className="space-y-2 col-span-2">
+                    <div className="space-y-2 md:col-span-2">
                       <Label>Terms & Conditions</Label>
                       <Textarea placeholder="Your terms and conditions for orders..." rows={4} />
                     </div>
@@ -1252,7 +1242,7 @@ export function SupplierSettingsPage() {
           <TabsContent value="delivery" className="space-y-4">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <MapPin className="h-5 w-5" />
@@ -1260,7 +1250,10 @@ export function SupplierSettingsPage() {
                     </CardTitle>
                     <CardDescription>Manage delivery coverage areas and pricing</CardDescription>
                   </div>
-                  <Button onClick={() => setShowAddZone(true)}>
+                  <Button
+                    onClick={() => setShowAddZone(true)}
+                    className="w-full sm:w-auto shrink-0"
+                  >
                     <MapPin className="h-4 w-4 mr-2" />
                     Add Zone
                   </Button>
@@ -1272,7 +1265,7 @@ export function SupplierSettingsPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <h4 className="font-semibold mb-2">Downtown Zone</h4>
-                        <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3 sm:gap-4">
                           <div>
                             <span className="text-[var(--text-muted)]">Fee:</span>
                             <span className="ml-2 font-medium">$10.00</span>
@@ -1326,7 +1319,7 @@ export function SupplierSettingsPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="warehouse-name">Warehouse Name *</Label>
                   <Input
@@ -1345,7 +1338,7 @@ export function SupplierSettingsPage() {
                     onChange={(e) => setWarehouseForm({ ...warehouseForm, code: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2 col-span-2">
+                <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="warehouse-address">Street Address</Label>
                   <Input
                     id="warehouse-address"
@@ -1376,7 +1369,7 @@ export function SupplierSettingsPage() {
                     }
                   />
                 </div>
-                <div className="flex items-center space-x-2 col-span-2">
+                <div className="flex items-center space-x-2 md:col-span-2">
                   <input
                     type="checkbox"
                     id="isMain"
@@ -1421,7 +1414,7 @@ export function SupplierSettingsPage() {
                   onChange={(e) => setZoneForm({ ...zoneForm, name: e.target.value })}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="delivery-fee">Delivery Fee ($)</Label>
                   <Input
@@ -1492,7 +1485,7 @@ export function SupplierSettingsPage() {
                   onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="contact-email">Email *</Label>
                   <Input

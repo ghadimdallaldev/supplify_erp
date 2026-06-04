@@ -181,8 +181,8 @@ export function ContractPricingPage() {
           <CardHeader>
             <CardTitle className="text-base">Filters</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-[200px]">
+          <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:flex lg:flex-wrap">
+            <div className="w-full lg:min-w-[200px] lg:flex-1">
               <Label htmlFor="search">Search</Label>
               <div className="relative mt-1">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-[var(--text-muted)]" />
@@ -195,7 +195,7 @@ export function ContractPricingPage() {
                 />
               </div>
             </div>
-            <div className="min-w-[180px]">
+            <div className="w-full sm:max-w-none lg:min-w-[180px]">
               <Label htmlFor="restaurant">Restaurant</Label>
               <select
                 id="restaurant"
@@ -211,7 +211,7 @@ export function ContractPricingPage() {
                 ))}
               </select>
             </div>
-            <div className="min-w-[140px]">
+            <div className="w-full sm:max-w-none lg:min-w-[140px]">
               <Label htmlFor="status">Status</Label>
               <select
                 id="status"
@@ -239,82 +239,141 @@ export function ContractPricingPage() {
                 No contract prices match your filters.
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--app-border)] text-left text-[var(--text-muted)]">
-                      <th className="px-4 py-3 font-medium">Restaurant</th>
-                      <th className="px-4 py-3 font-medium">Product</th>
-                      <th className="px-4 py-3 font-medium">Catalog</th>
-                      <th className="px-4 py-3 font-medium">Contract</th>
-                      <th className="px-4 py-3 font-medium">Valid</th>
-                      <th className="px-4 py-3 font-medium">Status</th>
-                      <th className="px-4 py-3 font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pricing.map((row) => {
-                      const active = row.is_active !== false
-                      return (
-                        <tr key={String(row.id)} className="border-b border-[var(--app-border)]">
-                          <td className="px-4 py-3">{String(row.restaurant_name)}</td>
-                          <td className="px-4 py-3">
-                            <div>{String(row.product_name)}</div>
-                            <div className="text-xs text-[var(--text-muted)]">
-                              {row.product_sku}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            {row.catalog_price != null
-                              ? formatPrice(Number(row.catalog_price))
-                              : '—'}
-                          </td>
-                          <td className="px-4 py-3 font-semibold">
-                            {formatPrice(Number(row.price))}
-                            {row.contract_discount_percentage != null && (
-                              <Badge variant="outline" className="ml-2 text-xs">
-                                {row.contract_discount_percentage}% off
-                              </Badge>
+              <>
+                <div className="divide-y md:hidden">
+                  {pricing.map((row) => {
+                    const active = row.is_active !== false
+                    return (
+                      <div key={String(row.id)} className="space-y-3 p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-medium">{String(row.product_name)}</p>
+                            <p className="text-xs text-[var(--text-muted)]">{row.product_sku}</p>
+                            <p className="mt-1 text-sm">{String(row.restaurant_name)}</p>
+                          </div>
+                          <Badge variant={active ? 'default' : 'secondary'}>
+                            {active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <p className="text-xs text-[var(--text-muted)]">Catalog</p>
+                            <p>
+                              {row.catalog_price != null
+                                ? formatPrice(Number(row.catalog_price))
+                                : '—'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-[var(--text-muted)]">Contract</p>
+                            <p className="font-semibold">{formatPrice(Number(row.price))}</p>
+                          </div>
+                        </div>
+                        {canManage && (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => openEdit(row)}
+                            >
+                              <Pencil className="mr-1 h-3 w-3" />
+                              Edit
+                            </Button>
+                            {active && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1"
+                                onClick={() => handleDeactivate(String(row.id))}
+                              >
+                                <Ban className="mr-1 h-3 w-3" />
+                                Deactivate
+                              </Button>
                             )}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-[var(--text-muted)]">
-                            {row.contract_start_date
-                              ? String(row.contract_start_date).slice(0, 10)
-                              : '—'}{' '}
-                            →{' '}
-                            {row.contract_end_date
-                              ? String(row.contract_end_date).slice(0, 10)
-                              : '—'}
-                          </td>
-                          <td className="px-4 py-3">
-                            <Badge variant={active ? 'default' : 'secondary'}>
-                              {active ? 'Active' : 'Inactive'}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3">
-                            {canManage && (
-                              <div className="flex gap-2">
-                                <Button size="sm" variant="outline" onClick={() => openEdit(row)}>
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                                {active && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleDeactivate(String(row.id))}
-                                  >
-                                    <Ban className="h-3 w-3" />
-                                  </Button>
-                                )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--app-border)] text-left text-[var(--text-muted)]">
+                        <th className="px-4 py-3 font-medium">Restaurant</th>
+                        <th className="px-4 py-3 font-medium">Product</th>
+                        <th className="px-4 py-3 font-medium">Catalog</th>
+                        <th className="px-4 py-3 font-medium">Contract</th>
+                        <th className="px-4 py-3 font-medium">Valid</th>
+                        <th className="px-4 py-3 font-medium">Status</th>
+                        <th className="px-4 py-3 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pricing.map((row) => {
+                        const active = row.is_active !== false
+                        return (
+                          <tr key={String(row.id)} className="border-b border-[var(--app-border)]">
+                            <td className="px-4 py-3">{String(row.restaurant_name)}</td>
+                            <td className="px-4 py-3">
+                              <div>{String(row.product_name)}</div>
+                              <div className="text-xs text-[var(--text-muted)]">
+                                {row.product_sku}
                               </div>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              {row.catalog_price != null
+                                ? formatPrice(Number(row.catalog_price))
+                                : '—'}
+                            </td>
+                            <td className="px-4 py-3 font-semibold">
+                              {formatPrice(Number(row.price))}
+                              {row.contract_discount_percentage != null && (
+                                <Badge variant="outline" className="ml-2 text-xs">
+                                  {row.contract_discount_percentage}% off
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-[var(--text-muted)]">
+                              {row.contract_start_date
+                                ? String(row.contract_start_date).slice(0, 10)
+                                : '—'}{' '}
+                              →{' '}
+                              {row.contract_end_date
+                                ? String(row.contract_end_date).slice(0, 10)
+                                : '—'}
+                            </td>
+                            <td className="px-4 py-3">
+                              <Badge variant={active ? 'default' : 'secondary'}>
+                                {active ? 'Active' : 'Inactive'}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3">
+                              {canManage && (
+                                <div className="flex gap-2">
+                                  <Button size="sm" variant="outline" onClick={() => openEdit(row)}>
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                  {active && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleDeactivate(String(row.id))}
+                                    >
+                                      <Ban className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -372,7 +431,7 @@ export function ContractPricingPage() {
                   onChange={(e) => setForm({ ...form, price: e.target.value })}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Discount % (optional)</Label>
                   <Input
@@ -395,7 +454,7 @@ export function ContractPricingPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Start date</Label>
                   <Input

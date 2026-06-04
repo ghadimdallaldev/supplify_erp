@@ -107,45 +107,84 @@ export function FulfillmentPickListsTab() {
             status.
           </div>
         ) : (
-          <div className="overflow-x-auto -mx-1 px-1">
-            <table className="w-full min-w-[560px] text-sm" data-testid="picklists-table">
-              <thead>
-                <tr className="border-b text-left text-[var(--text-muted)]">
-                  <th className="p-2 font-medium">Order</th>
-                  <th className="p-2 font-medium">Restaurant</th>
-                  <th className="p-2 font-medium">Items</th>
-                  <th className="p-2 font-medium">Total</th>
-                  <th className="p-2 font-medium">Warehouse</th>
-                  <th className="p-2 font-medium">Status</th>
-                  <th className="p-2 font-medium text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pickOrders.map((order) => (
-                  <tr
-                    key={order.id}
-                    className="border-b border-[var(--app-border)] hover:bg-[var(--brand-ultra)]"
-                  >
-                    <td className="p-2 font-mono text-xs">#{order.orderRef}</td>
-                    <td className="p-2">{order.restaurantName}</td>
-                    <td className="p-2 tabular-nums">{order.itemCount}</td>
-                    <td className="p-2 tabular-nums">{formatPrice(order.totalAmount)}</td>
-                    <td className="p-2 text-[var(--text-muted)]">{order.warehouseName || '—'}</td>
-                    <td className="p-2">
-                      <Badge variant={order.status === 'SHIPPED' ? 'default' : 'secondary'}>
-                        {order.status}
-                      </Badge>
-                    </td>
-                    <td className="p-2 text-right">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link to={`/app/orders/${order.id}`}>Open</Link>
-                      </Button>
-                    </td>
+          <>
+            <div className="space-y-3 md:hidden" data-testid="picklists-cards">
+              {pickOrders.map((order) => (
+                <div
+                  key={order.id}
+                  className="rounded-lg border border-[var(--app-border)] p-4 space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-mono text-xs text-[var(--text-muted)]">
+                        #{order.orderRef}
+                      </p>
+                      <p className="font-medium">{order.restaurantName}</p>
+                    </div>
+                    <Badge variant={order.status === 'SHIPPED' ? 'default' : 'secondary'}>
+                      {order.status}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Items</p>
+                      <p>{order.itemCount}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Total</p>
+                      <p>{formatPrice(order.totalAmount)}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-xs text-[var(--text-muted)]">Warehouse</p>
+                      <p>{order.warehouseName || '—'}</p>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" className="w-full" asChild>
+                    <Link to={`/app/orders/${order.id}`}>Open order</Link>
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto -mx-1 px-1 md:block">
+              <table className="w-full min-w-[560px] text-sm" data-testid="picklists-table">
+                <thead>
+                  <tr className="border-b text-left text-[var(--text-muted)]">
+                    <th className="p-2 font-medium">Order</th>
+                    <th className="p-2 font-medium">Restaurant</th>
+                    <th className="p-2 font-medium">Items</th>
+                    <th className="p-2 font-medium">Total</th>
+                    <th className="p-2 font-medium">Warehouse</th>
+                    <th className="p-2 font-medium">Status</th>
+                    <th className="p-2 font-medium text-right">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {pickOrders.map((order) => (
+                    <tr
+                      key={order.id}
+                      className="border-b border-[var(--app-border)] hover:bg-[var(--brand-ultra)]"
+                    >
+                      <td className="p-2 font-mono text-xs">#{order.orderRef}</td>
+                      <td className="p-2">{order.restaurantName}</td>
+                      <td className="p-2 tabular-nums">{order.itemCount}</td>
+                      <td className="p-2 tabular-nums">{formatPrice(order.totalAmount)}</td>
+                      <td className="p-2 text-[var(--text-muted)]">{order.warehouseName || '—'}</td>
+                      <td className="p-2">
+                        <Badge variant={order.status === 'SHIPPED' ? 'default' : 'secondary'}>
+                          {order.status}
+                        </Badge>
+                      </td>
+                      <td className="p-2 text-right">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link to={`/app/orders/${order.id}`}>Open</Link>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

@@ -1,5 +1,5 @@
 import { query, withTransaction } from './db.js'
-import { assignDefaultRoleForTenant } from './rbac.js'
+import { invalidateUserAuthCaches } from './access-cache.js'
 import { ensureOrgSystemRoles, assignOrgUserRole } from './supplier-org.js'
 import { ensureRestaurantOrgSystemRoles, assignRestaurantOrgUserRole } from './restaurant-org.js'
 import { ensureTenantSystemRoles, assignOwnerRoleForUser } from './tenant-roles.js'
@@ -261,46 +261,46 @@ export async function completeTenantRegistration({
     return registrationResult
   })
 
+  // Role changes in DB; invalidate auth/tenant/billing caches before the client refetches.
+  await invalidateUserAuthCaches({
+    userId,
+    keycloakSub,
+    tenantId: result.tenant.id,
+    tenantType: result.tenantType,
+  })
+
   if (result.tenantType === 'RESTAURANT') {
     const { invalidateRestaurantOrgPermissionCaches } = await import('./restaurant-org.js')
-    const { invalidateUserPermissionCache } = await import('./permissions.js')
     if (result.organizationId) {
       await invalidateRestaurantOrgPermissionCaches(userId, result.organizationId)
     }
-    await invalidateUserPermissionCache(userId, result.tenant.id, 'RESTAURANT')
   } else {
     const { invalidateOrgPermissionCaches } = await import('./supplier-org.js')
-    const { invalidateUserPermissionCache } = await import('./permissions.js')
     await invalidateOrgPermissionCaches(userId, result.organizationId)
-    await invalidateUserPermissionCache(userId, result.tenant.id, 'SUPPLIER')
   }
 
-  await ensureKeycloakRealmRole(normalizedEmail, kcRole)
-
-  try {
-    await sendNotification({
-      userId,
-      userType: result.tenantType,
-      notificationType: 'SYSTEM',
-      notificationCategory: 'system_updates',
-      title: 'Welcome to Supplify',
-      message:
-        result.tenantType === 'SUPPLIER'
-          ? `Your supplier account "${name}" is ready.`
-          : `Your restaurant account "${name}" is ready.`,
-      referenceId: result.tenant.id,
-      referenceType: 'TENANT',
-      metadata: { tenantId: result.tenant.id, tenantType: result.tenantType, tenantName: name },
-    })
-    notifyAdminNewTenant({
-      tenantId: result.tenant.id,
-      tenantType: result.tenantType,
-      tenantName: name,
-      contactEmail: normalizedEmail,
-    }).catch(() => {})
-  } catch {
-    // Non-blocking welcome notification
-  }
+  // Keycloak + welcome email are not required to finish signup; do not block the HTTP response.
+  void ensureKeycloakRealmRole(normalizedEmail, kcRole)
+  void sendNotification({
+    userId,
+    userType: result.tenantType,
+    notificationType: 'SYSTEM',
+    notificationCategory: 'system_updates',
+    title: 'Welcome to Supplify',
+    message:
+      result.tenantType === 'SUPPLIER'
+        ? `Your supplier account "${name}" is ready.`
+        : `Your restaurant account "${name}" is ready.`,
+    referenceId: result.tenant.id,
+    referenceType: 'TENANT',
+    metadata: { tenantId: result.tenant.id, tenantType: result.tenantType, tenantName: name },
+  }).catch(() => {})
+  void notifyAdminNewTenant({
+    tenantId: result.tenant.id,
+    tenantType: result.tenantType,
+    tenantName: name,
+    contactEmail: normalizedEmail,
+  }).catch(() => {})
 
   return result
 }

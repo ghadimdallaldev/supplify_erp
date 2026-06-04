@@ -12,13 +12,13 @@ if (config.REDIS_URL) {
     redisClient.on('error', (error) => {
       const log = logger.warn ?? logger.info ?? logger.error
       if (typeof log === 'function') {
-        log.call(logger, 'Redis connection error for calendar cache', { error: error.message })
+        log.call(logger, 'Redis cache connection error', { error: error.message })
       }
     })
 
     redisClient.on('connect', () => {
       if (typeof logger.info === 'function') {
-        logger.info('Redis connection established for calendar cache')
+        logger.info('Redis cache connection established (shared cross-request cache enabled)')
       }
     })
   } catch (error) {
@@ -30,6 +30,15 @@ if (config.REDIS_URL) {
     }
     redisClient = null
   }
+} else if (typeof logger.warn === 'function') {
+  logger.warn(
+    'REDIS_URL is not set — API caches use in-process memory only (no cross-replica sharing)'
+  )
+}
+
+/** @returns {boolean} */
+export function isRedisCacheEnabled() {
+  return redisClient != null
 }
 
 const memoryCache = new Map()

@@ -9,6 +9,7 @@ import {
 } from '../lib/rbac.js'
 import { requireStaffPortalAuth, requirePlatformAppAccess } from '../lib/staff-portal-auth.js'
 import { staffMutationGuard } from '../lib/route-permissions.js'
+import { cachedStaffList, staffListCacheInvalidationMiddleware } from '../lib/staff-list-cache.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { getRestaurantIdByEmail } from '../lib/tenant.js'
@@ -803,25 +804,29 @@ router.use(
   requirePlatformAppAccess,
   resolveTenantContext,
   requirePermission('STAFF_VIEW'),
-  staffMutationGuard
+  staffMutationGuard,
+  staffListCacheInvalidationMiddleware
 )
 
 router.get('/members', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const restaurantId = await resolveRestaurantId(req)
-    const { rows } = await query(
-      `
+    const data = await cachedStaffList('members', restaurantId, req, async () => {
+      const { rows } = await query(
+        `
           SELECT *
           FROM staff_member
           WHERE restaurant_id = $1
           ORDER BY display_name NULLS LAST, first_name, last_name
         `,
-      [restaurantId]
-    )
+        [restaurantId]
+      )
+      return rows.map(mapStaffRow)
+    })
 
     res.json({
       ok: true,
-      data: rows.map(mapStaffRow),
+      data,
       error: null,
       requestId: req.requestId,
     })
@@ -1545,20 +1550,23 @@ router.post(
 router.get('/pto', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const restaurantId = await resolveRestaurantId(req)
-    const { rows } = await query(
-      `
+    const data = await cachedStaffList('pto', restaurantId, req, async () => {
+      const { rows } = await query(
+        `
           SELECT p.*, m.display_name AS staff_name, m.role AS staff_role
           FROM staff_pto_request p
           JOIN staff_member m ON m.id = p.staff_id
           WHERE p.restaurant_id = $1
           ORDER BY p.created_at DESC
         `,
-      [restaurantId]
-    )
+        [restaurantId]
+      )
+      return rows.map(mapPtoRow)
+    })
 
     res.json({
       ok: true,
-      data: rows.map(mapPtoRow),
+      data,
       error: null,
       requestId: req.requestId,
     })
@@ -1827,8 +1835,9 @@ router.post(
 router.get('/swaps', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const restaurantId = await resolveRestaurantId(req)
-    const { rows } = await query(
-      `
+    const data = await cachedStaffList('swaps', restaurantId, req, async () => {
+      const { rows } = await query(
+        `
           SELECT s.*,
                  sh.role AS shift_role,
                  sh.starts_at AS shift_starts_at,
@@ -1844,12 +1853,14 @@ router.get('/swaps', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
           WHERE s.restaurant_id = $1
           ORDER BY s.created_at DESC
         `,
-      [restaurantId]
-    )
+        [restaurantId]
+      )
+      return rows.map(mapSwapRow)
+    })
 
     res.json({
       ok: true,
-      data: rows.map(mapSwapRow),
+      data,
       error: null,
       requestId: req.requestId,
     })
@@ -2555,19 +2566,22 @@ router.post(
 router.get('/payroll', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const restaurantId = await resolveRestaurantId(req)
-    const { rows } = await query(
-      `
+    const data = await cachedStaffList('payroll', restaurantId, req, async () => {
+      const { rows } = await query(
+        `
           SELECT *
           FROM staff_payroll_export
           WHERE restaurant_id = $1
           ORDER BY period_end DESC
         `,
-      [restaurantId]
-    )
+        [restaurantId]
+      )
+      return rows.map(mapPayrollExportRow)
+    })
 
     res.json({
       ok: true,
-      data: rows.map(mapPayrollExportRow),
+      data,
       error: null,
       requestId: req.requestId,
     })

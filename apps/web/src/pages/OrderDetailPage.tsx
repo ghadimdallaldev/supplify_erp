@@ -583,7 +583,7 @@ export function OrderDetailPage() {
                     <CardTitle>Order Information</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm text-[var(--text-muted)]">Order ID</p>
                         <p className="font-medium">{order.id}</p>
@@ -868,7 +868,7 @@ export function OrderDetailPage() {
                                 </Badge>
                               )}
                             </div>
-                            <div className="grid grid-cols-2 gap-4 text-sm text-[var(--text-muted)]">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-[var(--text-muted)]">
                               <div>
                                 <span className="font-medium">Quantity:</span> {item.quantity}
                               </div>
@@ -1219,7 +1219,7 @@ export function OrderDetailPage() {
                     </div>
 
                     {/* Ship To */}
-                    <div className="grid grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
                       <div>
                         <p className="text-sm font-bold text-[var(--text-muted)] mb-2">SHIP TO:</p>
                         <p className="font-semibold">{order.restaurant_name}</p>

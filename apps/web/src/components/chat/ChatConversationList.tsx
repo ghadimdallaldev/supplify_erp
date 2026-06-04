@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Building2, Clock, MessageSquare, Pin } from 'lucide-react'
+import { Building2, Clock, MessageSquare, Pin, Plus, ShoppingCart } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -23,6 +23,8 @@ type Props = {
   userRole?: string
   formatConversationDate: (date: string) => string
   className?: string
+  canStartConversation?: boolean
+  onStartConversation?: () => void
 }
 
 export function ChatConversationList({
@@ -34,6 +36,8 @@ export function ChatConversationList({
   userRole,
   formatConversationDate,
   className = '',
+  canStartConversation = false,
+  onStartConversation,
 }: Props) {
   const filtered = listFilter.trim()
     ? conversations.filter((c) =>
@@ -50,10 +54,18 @@ export function ChatConversationList({
   return (
     <Card className={`flex flex-col min-h-0 ${className}`}>
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <MessageSquare className="h-5 w-5" />
-          Conversations
-        </CardTitle>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <MessageSquare className="h-5 w-5" />
+            Conversations
+          </CardTitle>
+          {canStartConversation && onStartConversation ? (
+            <Button type="button" size="sm" className="shrink-0" onClick={onStartConversation}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              New
+            </Button>
+          ) : null}
+        </div>
         <div className="relative mt-2">
           <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
           <Input
@@ -82,15 +94,39 @@ export function ChatConversationList({
               <p className="font-medium">
                 {listFilter ? 'No matching conversations' : 'No conversations yet'}
               </p>
-              {userRole === 'RESTAURANT' && !listFilter && (
+              {!listFilter && userRole === 'RESTAURANT' && (
                 <>
-                  <p className="text-xs">Browse suppliers and click Message to start chatting</p>
-                  <Link to="/app/suppliers">
-                    <Button variant="outline" size="sm" className="mt-2">
-                      <Building2 className="mr-2 h-4 w-4" />
-                      Browse Suppliers
+                  <p className="text-xs px-2">
+                    Start a chat by messaging a supplier. Tap New above or pick one below.
+                  </p>
+                  <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-center">
+                    {onStartConversation ? (
+                      <Button size="sm" onClick={onStartConversation}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        New message
+                      </Button>
+                    ) : null}
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to="/app/suppliers">
+                        <Building2 className="mr-2 h-4 w-4" />
+                        Browse suppliers
+                      </Link>
                     </Button>
-                  </Link>
+                  </div>
+                </>
+              )}
+              {!listFilter && userRole === 'SUPPLIER' && (
+                <>
+                  <p className="text-xs px-2">
+                    Restaurants start conversations with you. When someone messages, it will appear
+                    here.
+                  </p>
+                  <Button variant="outline" size="sm" className="mt-1" asChild>
+                    <Link to="/app/orders">
+                      <ShoppingCart className="mr-2 h-4 w-4" />
+                      View orders
+                    </Link>
+                  </Button>
                 </>
               )}
             </div>

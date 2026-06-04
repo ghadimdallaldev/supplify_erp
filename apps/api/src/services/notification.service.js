@@ -1,5 +1,6 @@
 import { query } from '../lib/db.js'
 import { getCache, setCache, deleteCache } from '../lib/cache.js'
+import { singleflight } from '../lib/singleflight.js'
 import { logger } from '../lib/logger.js'
 import { buildWhatsAppUrl } from '../lib/whatsapp.js'
 import { getEntitlements, isFeatureEnabled } from '../lib/subscription.js'
@@ -650,18 +651,56 @@ export function notificationListCacheKey(userId, userType, limit, offset, unread
   return `notif:list:${userId}:${userType}:${limit}:${offset}:${unreadOnly ? '1' : '0'}`
 }
 
+export function notificationUnreadCacheKey(userId, userType) {
+  return `notif:unread:${userId}:${userType}`
+}
+
 export async function invalidateUserNotificationsListCache(userId, userType = null) {
   if (!userId) return
   const userTypes = userType ? [userType] : ['RESTAURANT', 'SUPPLIER', 'ADMIN', 'PENDING']
   const limits = [25, 50]
   const keys = []
   for (const type of userTypes) {
+    keys.push(notificationUnreadCacheKey(userId, type))
     for (const limit of limits) {
       keys.push(notificationListCacheKey(userId, type, limit, 0, false))
       keys.push(notificationListCacheKey(userId, type, limit, 0, true))
     }
   }
   await Promise.all(keys.map((key) => deleteCache(key).catch(() => {})))
+}
+
+const NOTIFICATION_UNREAD_CACHE_TTL_SECONDS = 30
+
+/**
+ * Lightweight unread count for badge polling (no list payload).
+ */
+export async function getUnreadNotificationCount(userId, userType) {
+  const cacheKey = notificationUnreadCacheKey(userId, userType)
+  const cached = await getCache(cacheKey)
+  if (cached !== null && typeof cached === 'object' && typeof cached.unreadCount === 'number') {
+    return cached
+  }
+
+  return singleflight(cacheKey, async () => {
+    const again = await getCache(cacheKey)
+    if (again !== null && typeof again === 'object' && typeof again.unreadCount === 'number') {
+      return again
+    }
+
+    const { rows } = await query(
+      `
+    SELECT COUNT(*)::int AS count
+    FROM notification_log
+    WHERE user_id = $1 AND user_type = $2 AND is_read = false
+  `,
+      [userId, userType]
+    )
+
+    const result = { unreadCount: rows[0]?.count ?? 0 }
+    await setCache(cacheKey, result, NOTIFICATION_UNREAD_CACHE_TTL_SECONDS).catch(() => {})
+    return result
+  })
 }
 
 /**
@@ -678,43 +717,50 @@ export async function getUserNotifications(
     return cached
   }
 
-  let whereClause = 'user_id = $1 AND user_type = $2'
-  const params = [userId, userType]
-  let paramIndex = 3
+  return singleflight(cacheKey, async () => {
+    const again = await getCache(cacheKey)
+    if (again && typeof again === 'object' && Array.isArray(again.notifications)) {
+      return again
+    }
 
-  if (unreadOnly) {
-    whereClause += ` AND is_read = false`
-  }
+    let whereClause = 'user_id = $1 AND user_type = $2'
+    const params = [userId, userType]
+    let paramIndex = 3
 
-  const listQuery = query(
-    `
+    if (unreadOnly) {
+      whereClause += ` AND is_read = false`
+    }
+
+    const listQuery = query(
+      `
     SELECT ${NOTIFICATION_LIST_COLUMNS}
     FROM notification_log
     WHERE ${whereClause}
     ORDER BY created_at DESC
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
   `,
-    [...params, limit, offset]
-  )
+      [...params, limit, offset]
+    )
 
-  const countQuery = query(
-    `
+    const countQuery = query(
+      `
     SELECT COUNT(*)::int AS count
     FROM notification_log
     WHERE user_id = $1 AND user_type = $2 AND is_read = false
   `,
-    [userId, userType]
-  )
+      [userId, userType]
+    )
 
-  const [{ rows }, { rows: countRows }] = await Promise.all([listQuery, countQuery])
+    const [{ rows }, { rows: countRows }] = await Promise.all([listQuery, countQuery])
 
-  const result = {
-    notifications: rows,
-    unreadCount: countRows[0]?.count ?? 0,
-  }
+    const result = {
+      notifications: rows,
+      unreadCount: countRows[0]?.count ?? 0,
+    }
 
-  await setCache(cacheKey, result, NOTIFICATION_LIST_CACHE_TTL_SECONDS).catch(() => {})
-  return result
+    await setCache(cacheKey, result, NOTIFICATION_LIST_CACHE_TTL_SECONDS).catch(() => {})
+    return result
+  })
 }
 
 export async function sendWhatsAppMessage(phone, message) {

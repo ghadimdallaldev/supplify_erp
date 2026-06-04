@@ -595,13 +595,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
           <div className="overflow-x-auto mb-1">
-            <TabsList
-              className={
-                initialTab === 'suppliers' || initialTab === 'restaurants'
-                  ? 'grid grid-cols-3 min-w-max'
-                  : 'flex w-max gap-0'
-              }
-            >
+            <TabsList className="justify-start min-w-max">
               {initialTab !== 'suppliers' && initialTab !== 'restaurants' && (
                 <>
                   {canAdminTab.overview && <TabsTrigger value="overview">Overview</TabsTrigger>}
@@ -1289,7 +1283,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           placeholder="Optional"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <Label>Price / month ($)</Label>
                           <Input
@@ -1478,7 +1472,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         placeholder="Optional"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label>Price / month ($)</Label>
                         <Input
@@ -1508,7 +1502,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label>Trial days</Label>
                         <Input

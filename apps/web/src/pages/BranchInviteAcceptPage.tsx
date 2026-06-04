@@ -112,6 +112,8 @@ export function BranchInviteAcceptPage() {
     try {
       const result = await accept({ token, legalAcceptance: legalPayload }).unwrap()
       dispatch(api.util.resetApiState())
+      const { refetchAppSession } = await import('../lib/refetchAppSession')
+      await refetchAppSession(dispatch)
       finishInviteAcceptNavigation(result, navigate, searchParams)
     } catch (err) {
       setError(
@@ -152,6 +154,8 @@ export function BranchInviteAcceptPage() {
         legalAcceptance: legalPayload,
       }).unwrap()
       dispatch(api.util.resetApiState())
+      const { refetchAppSession } = await import('../lib/refetchAppSession')
+      await refetchAppSession(dispatch)
       finishInviteAcceptNavigation(result, navigate, searchParams)
     } catch (err) {
       setError(
