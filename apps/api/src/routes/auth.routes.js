@@ -260,50 +260,58 @@ router.get('/me', requireAuth, async (req, res) => {
           tenantRoles = ['Owner (impersonation)']
         }
       } else {
-        tenantRoles = await getRolesForUser(user.id, tenant.tenantId, tenant.tenantType)
-        tenantPermissions = await getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType)
-      }
-      if (tenantRoles.length === 0 && (user.role === 'RESTAURANT' || user.role === 'SUPPLIER')) {
-        const isPrimary = await isPrimaryTenantContact(
-          user.id,
-          user.email,
-          tenant.tenantId,
-          tenant.tenantType
-        )
-        if (isPrimary) {
-          await assignDefault(user.id, tenant.tenantId, tenant.tenantType)
-          tenantRoles = await getRolesForUser(user.id, tenant.tenantId, tenant.tenantType)
-          tenantPermissions = await getPermissionsForUser(
+        // roles, permissions, workspace assignment, and tenant data are all independent reads.
+        const [rolesResult, permsResult, assignment, tenantDataRows] = await Promise.all([
+          getRolesForUser(user.id, tenant.tenantId, tenant.tenantType),
+          getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType),
+          getTenantAssignmentForUser(user.id, user.role),
+          tenant.tenantType === 'SUPPLIER'
+            ? query('SELECT * FROM supplier WHERE id = $1', [tenant.tenantId]).then((r) => r.rows)
+            : tenant.tenantType === 'RESTAURANT'
+              ? query('SELECT * FROM restaurant WHERE id = $1', [tenant.tenantId]).then(
+                  (r) => r.rows
+                )
+              : Promise.resolve([]),
+        ])
+        tenantRoles = rolesResult
+        tenantPermissions = permsResult
+
+        if (tenantRoles.length === 0 && (user.role === 'RESTAURANT' || user.role === 'SUPPLIER')) {
+          const isPrimary = await isPrimaryTenantContact(
             user.id,
+            user.email,
             tenant.tenantId,
             tenant.tenantType
           )
+          if (isPrimary) {
+            await assignDefault(user.id, tenant.tenantId, tenant.tenantType)
+            ;[tenantRoles, tenantPermissions] = await Promise.all([
+              getRolesForUser(user.id, tenant.tenantId, tenant.tenantType),
+              getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType),
+            ])
+          }
         }
-      }
 
-      const assignment = await getTenantAssignmentForUser(user.id, user.role)
-      workspace = {
-        tenantId: tenant.tenantId,
-        tenantType: tenant.tenantType,
-        tenantName: tenant.tenantName || assignment?.tenantName || '',
-        roleName: assignment?.roleName || tenantRoles[0] || null,
-      }
+        workspace = {
+          tenantId: tenant.tenantId,
+          tenantType: tenant.tenantType,
+          tenantName: tenant.tenantName || assignment?.tenantName || '',
+          roleName: assignment?.roleName || tenantRoles[0] || null,
+        }
 
-      if (tenant.tenantType === 'SUPPLIER') {
-        const { rows: suppliers } = await query('SELECT * FROM supplier WHERE id = $1', [
-          tenant.tenantId,
-        ])
-        if (suppliers.length > 0) additionalData.supplier = suppliers[0]
-      } else if (tenant.tenantType === 'RESTAURANT') {
-        const { rows: restaurants } = await query('SELECT * FROM restaurant WHERE id = $1', [
-          tenant.tenantId,
-        ])
-        if (restaurants.length > 0) additionalData.restaurant = restaurants[0]
+        if (tenant.tenantType === 'SUPPLIER' && tenantDataRows.length > 0) {
+          additionalData.supplier = tenantDataRows[0]
+        } else if (tenant.tenantType === 'RESTAURANT' && tenantDataRows.length > 0) {
+          additionalData.restaurant = tenantDataRows[0]
+        }
       }
     }
     if (user.role === 'ADMIN') {
-      adminRoles = await getRolesForUser(user.id, null, 'ADMIN')
-      adminPermissions = await getPermissionsForUser(user.id, null, 'ADMIN')
+      // Admin roles and permissions are independent reads.
+      ;[adminRoles, adminPermissions] = await Promise.all([
+        getRolesForUser(user.id, null, 'ADMIN'),
+        getPermissionsForUser(user.id, null, 'ADMIN'),
+      ])
     }
 
     const accessType = user.role === 'STAFF_PORTAL' ? 'staff_portal' : 'platform'

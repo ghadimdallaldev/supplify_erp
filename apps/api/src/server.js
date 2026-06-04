@@ -1,6 +1,7 @@
 import express from 'express'
 import http from 'http'
 import cors from 'cors'
+import compression from 'compression'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import cookieParser from 'cookie-parser'
@@ -81,6 +82,7 @@ import { runCronJob, CRON_JOBS } from './lib/cron-runner.js'
 import path from 'node:path'
 import { ensureStorageReady, checkStorageHealth } from './services/storage/storage.service.js'
 import { pool, closePool, warmupPool, startPoolKeepalive, stopPoolKeepalive } from './lib/db.js'
+import { getKeycloakConfig } from './lib/auth.js'
 import { requestTimingMiddleware } from './middlewares/request-timing.js'
 import { disconnectCache, isRedisConnected } from './lib/cache.js'
 import { runFullStartupMigrations } from './lib/startup-migrations.js'
@@ -138,6 +140,13 @@ if (config.TRUST_PROXY) {
 
 // Per-request timing — slow requests (>SLOW_REQUEST_MS) log structured stage breakdown.
 app.use(requestTimingMiddleware)
+
+// Gzip/deflate response compression. Big win on Railway where JSON list payloads
+// (orders, products, reports) cross the public network to the browser uncompressed.
+// Uses the `compressible` content-type filter (skips images/PDF/already-compressed),
+// default 1kb threshold (skips tiny bodies). API responses never embed the CSRF token
+// (header-based defense), so there is no BREACH exposure from compressing them.
+app.use(compression())
 
 // Security middleware
 app.use(
@@ -233,6 +242,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 app.use(cookieParser())
 
 // Session configuration (PostgreSQL store for OAuth state across instances)
+// Scoped to /auth only — sessions are only needed for OAuth state (login/callback/logout).
+// Applying session globally would hit the PostgreSQL store on every API request (~15-25ms on Railway).
 const sessionStore = createSessionStore()
 
 const sessionCookie = {
@@ -245,15 +256,14 @@ if (config.COOKIE_DOMAIN) {
   sessionCookie.domain = config.COOKIE_DOMAIN
 }
 
-app.use(
-  session({
-    store: sessionStore,
-    secret: config.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: sessionCookie,
-  })
-)
+const sessionMiddleware = session({
+  store: sessionStore,
+  secret: config.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: sessionCookie,
+})
+app.use('/auth', sessionMiddleware)
 
 app.use(requestContext)
 if (config.ENABLE_REQUEST_LOGGING) {
@@ -470,6 +480,11 @@ server.listen(PORT, HOST, () => {
     .catch((error) => {
       logger.warn('Database pool warmup failed', { error: error.message })
     })
+
+  // Pre-warm Keycloak OIDC config so the first user request doesn't pay the network round-trip.
+  getKeycloakConfig().catch((err) => {
+    logger.warn('Keycloak config pre-warm failed', { error: err?.message })
+  })
 
   runStartupSchemaTasks().catch((error) => {
     logger.error('Startup schema tasks failed', { error: error.message })

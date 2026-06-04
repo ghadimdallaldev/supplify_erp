@@ -356,23 +356,25 @@ describe('Subscription lib', () => {
       }
       mockQuery.mockImplementation((sql, params) => {
         const text = typeof sql === 'string' ? sql : ''
-        if (text.includes('plan_limit_override')) return Promise.resolve({ rows: [] })
-        if (text.includes('tenant_limit_override')) {
-          if (params?.[2] === 'chats_per_day') {
-            return Promise.resolve({
-              rows: [
-                {
-                  override_value: 20,
-                  is_active: true,
-                  expiration_date: null,
-                  reason: 'promo',
-                  id: 'o1',
-                },
-              ],
-            })
-          }
+        if (text.includes('plan_limit_override') && text.includes('ANY')) {
           return Promise.resolve({ rows: [] })
         }
+        if (text.includes('tenant_limit_override') && text.includes('ANY')) {
+          return Promise.resolve({
+            rows: [
+              {
+                limit_type: 'chats_per_day',
+                override_value: 20,
+                is_active: true,
+                expiration_date: null,
+                reason: 'promo',
+                id: 'o1',
+              },
+            ],
+          })
+        }
+        if (text.includes('plan_limit_override')) return Promise.resolve({ rows: [] })
+        if (text.includes('tenant_limit_override')) return Promise.resolve({ rows: [] })
         if (text.includes('pending_plan_id') && text.includes('FROM subscription'))
           return Promise.resolve({
             rows: [

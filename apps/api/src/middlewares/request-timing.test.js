@@ -12,10 +12,12 @@ vi.mock('../lib/db.js', () => ({
 }))
 
 vi.mock('../config/env.js', () => ({
-  config: { SLOW_REQUEST_MS: 100 },
+  config: { SLOW_REQUEST_MS: 100, IDLE_PERF_LOG_MS: 0 },
 }))
 
-const { requestTimingMiddleware } = await import('./request-timing.js')
+const { requestTimingMiddleware, buildSlowBreakdown, noteCacheHit, noteCacheMiss } = await import(
+  './request-timing.js'
+)
 
 function mockReqRes() {
   const req = { method: 'GET', path: '/api/test', originalUrl: '/api/test', requestId: 'r1' }
@@ -47,7 +49,38 @@ describe('requestTimingMiddleware', () => {
     res.emit('finish')
     vi.useRealTimers()
     expect(loggerWarn).toHaveBeenCalledWith(
-      expect.objectContaining({ event: 'http.request.slow_breakdown' })
+      expect.objectContaining({
+        event: 'http.request.slow_breakdown',
+        authMs: 150,
+        totalMs: expect.any(Number),
+      })
     )
+  })
+
+  it('buildSlowBreakdown exposes canonical phase fields', () => {
+    const req = {
+      _perf: {
+        stages: { auth: 40, tenant: 30, billing: 20, tenantContext: 80, feature: 10, handler: 200 },
+        queryMsTotal: 120,
+        queryCount: 3,
+      },
+    }
+    const b = buildSlowBreakdown(req, 500)
+    expect(b.authMs).toBe(40)
+    expect(b.tenantLookupMs).toBe(30)
+    expect(b.subscriptionMs).toBe(20)
+    expect(b.rbacMs).toBe(60)
+    expect(b.queryMs).toBe(120)
+    expect(b.handlerMs).toBe(200)
+    expect(b.totalMs).toBe(500)
+    expect(b.dbConnectMs).toBe(0)
+  })
+
+  it('tracks cache hits and misses on the request', () => {
+    const req = { _perf: { cacheHits: {}, cacheMisses: {} } }
+    noteCacheHit(req, 'entitlements')
+    noteCacheMiss(req, 'subscription')
+    expect(req._perf.cacheHits.entitlements).toBe(true)
+    expect(req._perf.cacheMisses.subscription).toBe(true)
   })
 })

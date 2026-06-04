@@ -104,8 +104,7 @@ describe('Orders Routes', () => {
 
   describe('GET /api/orders', () => {
     it('should return list of orders for restaurant', async () => {
-      // Mock: restaurant lookup, orders query, order items query
-      // The orders query uses DISTINCT and LEFT JOINs, so we need to mock it properly
+      // Mock order: restaurant lookup, then list+count run in parallel, then items batch.
       db.query
         .mockResolvedValueOnce({
           rows: [{ id: 'restaurant-1' }], // Restaurant lookup
@@ -124,6 +123,9 @@ describe('Orders Routes', () => {
           ],
         })
         .mockResolvedValueOnce({
+          rows: [{ total: '1' }], // Count query (parallel with list)
+        })
+        .mockResolvedValueOnce({
           rows: [
             {
               id: 'item-1',
@@ -135,9 +137,6 @@ describe('Orders Routes', () => {
             },
           ],
         })
-        .mockResolvedValueOnce({
-          rows: [{ total: '1' }], // Count query for pagination
-        })
 
       const response = await request(app).get('/api/orders').expect(200)
 
@@ -146,6 +145,7 @@ describe('Orders Routes', () => {
     })
 
     it('should filter orders by search query', async () => {
+      // Mock order: list+count run in parallel, then items batch.
       db.query
         .mockResolvedValueOnce({
           rows: [
@@ -161,8 +161,8 @@ describe('Orders Routes', () => {
             },
           ],
         })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ total: '1' }] })
+        .mockResolvedValueOnce({ rows: [{ total: '1' }] }) // count (parallel with list)
+        .mockResolvedValueOnce({ rows: [] }) // items batch
 
       const response = await request(app).get('/api/orders?q=Cafe').expect(200)
 

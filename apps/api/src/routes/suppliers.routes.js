@@ -31,8 +31,11 @@ const router = express.Router()
 async function attachReviewFields(suppliers) {
   return Promise.all(
     suppliers.map(async (s) => {
-      const summary = await getSupplierRatingSummary(s.id)
-      const recent_reviews = await getRecentReviewsForSupplier(s.id, 3)
+      // rating summary and recent reviews are independent — fetch in parallel.
+      const [summary, recent_reviews] = await Promise.all([
+        getSupplierRatingSummary(s.id),
+        getRecentReviewsForSupplier(s.id, 3),
+      ])
       return {
         ...s,
         avg_overall: Number(summary.avg_overall) || 0,
