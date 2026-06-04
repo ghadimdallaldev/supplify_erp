@@ -65,9 +65,20 @@ export function LoginPage() {
     <div className="min-h-screen flex">
       {/* Left side - Branding and Features */}
       <div
-        className="hidden lg:flex lg:flex-1 text-white p-12 flex-col justify-between"
+        className="relative hidden lg:flex lg:flex-1 text-white p-12 flex-col justify-between overflow-hidden"
         style={{ background: 'linear-gradient(145deg, #5b21b6 0%, #4c1d95 50%, #1e0b3a 100%)' }}
       >
+        {/* Ambient depth glows */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full"
+          style={{ background: 'radial-gradient(circle, rgba(167,139,250,0.28), transparent 70%)' }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-32 -left-16 h-96 w-96 rounded-full"
+          style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.18), transparent 70%)' }}
+        />
         <div>
           <div className="mb-10">
             <SupplifyLogo size={48} variant="lockup" theme="dark" tagline={true} />
@@ -105,6 +116,7 @@ export function LoginPage() {
           {features.map((feature, idx) => (
             <div
               key={idx}
+              className="hover-lift"
               style={{
                 background: 'rgba(255,255,255,0.08)',
                 backdropFilter: 'blur(8px)',
@@ -148,6 +160,7 @@ export function LoginPage() {
           </div>
 
           <Card
+            className="animate-rise-in"
             style={{
               border: '1px solid var(--app-border)',
               boxShadow: '0 8px 32px rgba(91,33,182,0.10)',

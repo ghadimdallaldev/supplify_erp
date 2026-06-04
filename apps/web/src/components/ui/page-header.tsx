@@ -16,7 +16,10 @@ export function PageHeader({
 }) {
   return (
     <div
-      className={cn('flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between', className)}
+      className={cn(
+        'animate-fade-in flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between',
+        className
+      )}
       data-testid={testId}
     >
       <div className="min-w-0">
