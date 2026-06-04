@@ -1266,7 +1266,7 @@ router.patch('/subscriptions/:id', async (req, res) => {
       )
     }
 
-    invalidateTenantSubscriptionCache(existing.tenant_id, existing.tenant_type).catch(() => {})
+    await invalidateTenantSubscriptionCache(existing.tenant_id, existing.tenant_type)
     try {
       const { emitEntitlementsRefreshNotice } = await import('../lib/socket.js')
       emitEntitlementsRefreshNotice({
@@ -1365,7 +1365,7 @@ router.post('/subscriptions/:id/extend-free-trial', async (req, res) => {
       },
     })
 
-    invalidateTenantSubscriptionCache(existing.tenant_id, existing.tenant_type).catch(() => {})
+    await invalidateTenantSubscriptionCache(existing.tenant_id, existing.tenant_type)
     try {
       const { emitEntitlementsRefreshNotice } = await import('../lib/socket.js')
       emitEntitlementsRefreshNotice({
@@ -1489,7 +1489,7 @@ router.post('/subscriptions/:id/unlock', async (req, res) => {
       payload_json: { reason, adminUserId: req.userData.id },
     })
 
-    invalidateTenantSubscriptionCache(existing.tenant_id, existing.tenant_type).catch(() => {})
+    await invalidateTenantSubscriptionCache(existing.tenant_id, existing.tenant_type)
     try {
       const { emitEntitlementsRefreshNotice } = await import('../lib/socket.js')
       emitEntitlementsRefreshNotice({

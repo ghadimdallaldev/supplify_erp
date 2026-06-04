@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useGetMeQuery, useGetRegisterStatusQuery } from '../services/api'
 import { useAppDispatch } from '../hooks/redux'
 import { setUser, clearUser, setLoading } from '../features/auth/authSlice'
+import { refetchAppSession, hasStaleRegistrationState } from '../lib/refetchAppSession'
 import type { ReactNode } from 'react'
 
 interface AuthGuardProps {
@@ -38,6 +39,17 @@ export function AuthGuard({ children }: AuthGuardProps) {
     isAppRoute &&
     data &&
     (data.role === 'PENDING' || (registerStatus?.needsSetup === true && data.role !== 'ADMIN'))
+
+  const staleRegistrationState =
+    isAppRoute &&
+    data &&
+    hasStaleRegistrationState({ role: data.role, needsSetup: registerStatus?.needsSetup })
+
+  useEffect(() => {
+    if (staleRegistrationState) {
+      void refetchAppSession(dispatch)
+    }
+  }, [staleRegistrationState, dispatch])
 
   useEffect(() => {
     if (isLoading) {

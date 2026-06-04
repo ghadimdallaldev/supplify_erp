@@ -12,6 +12,7 @@ import {
 } from '../services/api'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { SupplifyLogo } from './SupplifyLogo'
+import { BranchSwitcher } from './BranchSwitcher'
 import {
   LayoutDashboard,
   Package,
@@ -663,6 +664,10 @@ export function Sidebar({
           </div>
         ))}
       </nav>
+
+      <div className="border-t border-[var(--app-border)] p-3 lg:hidden [&>div]:max-w-none [&>div]:w-full [&_select]:max-w-none">
+        <BranchSwitcher />
+      </div>
 
       {/* User footer */}
       <div

@@ -21,9 +21,9 @@ export function BranchSwitcher() {
 
   if (!isLoading && accounts.length <= 1 && activeAccount) {
     return (
-      <div className="hidden md:flex items-center gap-2 rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-2 py-1 text-sm">
-        <Building2 className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
-        <span className="max-w-[180px] truncate">{activeAccount.name}</span>
+      <div className="flex max-w-[min(42vw,180px)] items-center gap-1.5 rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-1.5 py-1 text-sm sm:max-w-[180px] sm:gap-2 sm:px-2">
+        <Building2 className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+        <span className="truncate">{activeAccount.name}</span>
       </div>
     )
   }
@@ -33,13 +33,13 @@ export function BranchSwitcher() {
   }
 
   return (
-    <div className="hidden md:flex items-center gap-2 rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-2 py-1 text-sm">
-      <Building2 className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
+    <div className="flex max-w-[min(48vw,220px)] items-center gap-1.5 rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-1.5 py-1 text-sm sm:max-w-none sm:gap-2 sm:px-2">
+      <Building2 className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
       {(isLoading || isSwitching) && (
         <Loader2 className="h-3 w-3 animate-spin text-[var(--text-muted)]" />
       )}
       <select
-        className="bg-transparent border-none outline-none text-sm max-w-[180px] truncate cursor-pointer"
+        className="min-w-0 max-w-[min(36vw,140px)] cursor-pointer truncate border-none bg-transparent text-sm outline-none sm:max-w-[180px]"
         value={activeAccountId ?? ''}
         onChange={(event) => {
           const nextId = event.target.value || null
@@ -58,7 +58,7 @@ export function BranchSwitcher() {
       {(isEffectiveSupplier || isEffectiveRestaurant) && isOrgScope && accounts.length > 1 && (
         <Link
           to="/app/org"
-          className="text-xs text-[var(--brand)] whitespace-nowrap hover:underline"
+          className="hidden text-xs text-[var(--brand)] whitespace-nowrap hover:underline sm:inline"
           title="Organization overview"
         >
           Manage
