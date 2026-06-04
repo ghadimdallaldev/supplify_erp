@@ -85,6 +85,8 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
         p.name AS product_name,
         p.sku AS product_sku,
         p.unit AS product_unit,
+        p.category AS product_category_legacy,
+        pc.name AS product_category,
         p.supplier_id,
         s.name AS supplier_name,
         COALESCE(ri.low_stock_threshold, 0) AS low_stock_threshold,
@@ -105,6 +107,7 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
         END AS suggested_reorder_qty
       FROM restaurant_inventory ri
       JOIN product p ON p.id = ri.product_id
+      LEFT JOIN product_category pc ON pc.id = p.category_id
       JOIN supplier s ON s.id = p.supplier_id
       LEFT JOIN branch b ON b.id = ri.branch_id
       LEFT JOIN usage u
