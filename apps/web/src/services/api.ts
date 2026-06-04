@@ -2106,6 +2106,7 @@ export const api = createApi({
         params,
       }),
       providesTags: ['Notification'],
+      keepUnusedDataFor: 60,
     }),
     getNotificationPreferences: builder.query<any, void>({
       query: () => '/api/notifications/preferences',

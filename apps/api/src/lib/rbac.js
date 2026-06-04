@@ -4,6 +4,7 @@ import { query } from './db.js'
 import { logger } from './logger.js'
 import { syncRequestLogContext } from './request-log-context.js'
 import { getCache, setCache, deleteCache } from './cache.js'
+import { singleflight } from './singleflight.js'
 import { startStage, mark, noteCacheHit } from '../middlewares/request-timing.js'
 import {
   resolveRequestBillingSubscription,
@@ -540,41 +541,49 @@ export async function getRequestTenant(req) {
       return finish(cachedTenant === 'null' ? null : cachedTenant)
     }
 
-    let resolved = null
+    const resolved = await singleflight(processCacheKey, async () => {
+      const again = await getCache(processCacheKey)
+      if (again !== null) return again === 'null' ? null : again
 
-    const assignment = await getTenantAssignmentForUser(userId, tenantType)
-    if (assignment?.tenantId) {
-      const allowed = await userCanAccessTenant(
-        userId,
-        req.userData.email,
-        assignment.tenantId,
-        assignment.tenantType
-      )
-      if (allowed) {
-        resolved = {
-          tenantId: assignment.tenantId,
-          tenantType: assignment.tenantType,
-          tenantName: assignment.tenantName || '',
-        }
-      }
-    }
+      let tenantResolved = null
 
-    if (!resolved) {
-      const email = (req.userData.email || '').trim().toLowerCase()
-      if (email) {
-        const primary = await getPrimaryTenantForUser(email, tenantType)
-        if (primary) {
-          resolved = {
-            tenantId: primary.id,
-            tenantType,
-            tenantName: primary.name || '',
+      const assignment = await getTenantAssignmentForUser(userId, tenantType)
+      if (assignment?.tenantId) {
+        const allowed = await userCanAccessTenant(
+          userId,
+          req.userData.email,
+          assignment.tenantId,
+          assignment.tenantType
+        )
+        if (allowed) {
+          tenantResolved = {
+            tenantId: assignment.tenantId,
+            tenantType: assignment.tenantType,
+            tenantName: assignment.tenantName || '',
           }
         }
       }
-    }
 
-    // Cache null as the sentinel string 'null' so a getCache miss (returns null) is distinguishable
-    await setCache(processCacheKey, resolved ?? 'null', TENANT_REQ_CACHE_TTL).catch(() => {})
+      if (!tenantResolved) {
+        const email = (req.userData.email || '').trim().toLowerCase()
+        if (email) {
+          const primary = await getPrimaryTenantForUser(email, tenantType)
+          if (primary) {
+            tenantResolved = {
+              tenantId: primary.id,
+              tenantType,
+              tenantName: primary.name || '',
+            }
+          }
+        }
+      }
+
+      await setCache(processCacheKey, tenantResolved ?? 'null', TENANT_REQ_CACHE_TTL).catch(
+        () => {}
+      )
+      return tenantResolved
+    })
+
     return finish(resolved)
   }
   // --- End process-level cache ---
