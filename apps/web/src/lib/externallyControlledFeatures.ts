@@ -88,3 +88,24 @@ export function getPlanTierDisabledFeatures(entitlements: Entitlements): PlanTie
 export function settingsFeaturesTabPath(tenantType: Entitlements['tenantType']): string {
   return tenantType === 'SUPPLIER' ? '/app/settings?tab=plan' : '/app/settings?tab=subscription'
 }
+
+/** Normalize API upgrade URLs so bare `/app/settings` opens Plan & usage, not profile. */
+export function resolveUpgradeUrl(
+  upgradeUrl: string | undefined | null,
+  tenantType?: Entitlements['tenantType'] | string | null,
+  userRole?: string | null
+): string {
+  const type: Entitlements['tenantType'] =
+    tenantType === 'SUPPLIER' || tenantType === 'RESTAURANT'
+      ? tenantType
+      : userRole === 'SUPPLIER'
+        ? 'SUPPLIER'
+        : 'RESTAURANT'
+  const fallback = settingsFeaturesTabPath(type)
+  if (!upgradeUrl) return fallback
+  const normalized = upgradeUrl.startsWith('/') ? upgradeUrl : `/app/${upgradeUrl}`
+  if (normalized === '/app/settings' || !normalized.includes('tab=')) {
+    return fallback
+  }
+  return normalized
+}

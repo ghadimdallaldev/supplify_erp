@@ -108,7 +108,9 @@ async function respondLimitExceeded(req, res, limitCheck, limitKey, restaurantId
     limitCheck,
     limitKey,
     subscription?.plan_name || subscription?.plan_display_name,
-    recommendedPlans
+    recommendedPlans,
+    undefined,
+    'RESTAURANT'
   )
   return res.status(403).json({
     ok: false,
@@ -788,7 +790,9 @@ router.post(
             'quick_lists',
             subscription?.plan_name || subscription?.plan_display_name,
             'Silver',
-            recommendedPlans
+            recommendedPlans,
+            undefined,
+            'RESTAURANT'
           ),
           requestId: req.requestId,
         })

@@ -45,6 +45,8 @@ server {
         return 404;
     }
 
+    include /etc/nginx/conf.d/proxy-api.conf;
+
     # Handle client-side routing
     location / {
         try_files $uri $uri/ /index.html;

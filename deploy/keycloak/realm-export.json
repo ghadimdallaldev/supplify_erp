@@ -21,7 +21,8 @@
         "http://localhost:4000/auth/callback",
         "http://localhost:5173/auth/callback",
         "http://localhost:8180/auth/callback",
-        "https://supplify-api-dev-development.up.railway.app/auth/callback"
+        "https://supplify-api-dev-development.up.railway.app/auth/callback",
+        "https://supplify-web-dev-development.up.railway.app/auth/callback"
       ],
       "webOrigins": ["+"],
       "protocol": "openid-connect",
@@ -43,7 +44,8 @@
         "http://localhost:4000/auth/callback",
         "http://localhost:5173/auth/callback",
         "http://localhost:8180/auth/callback",
-        "https://supplify-api-dev-development.up.railway.app/auth/callback"
+        "https://supplify-api-dev-development.up.railway.app/auth/callback",
+        "https://supplify-web-dev-development.up.railway.app/auth/callback"
       ],
       "webOrigins": ["+"],
       "protocol": "openid-connect",
