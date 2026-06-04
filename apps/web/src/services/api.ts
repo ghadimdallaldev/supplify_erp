@@ -11,6 +11,7 @@ import {
   normalizeResolvedContractPrices,
 } from '../lib/contractPricingResponse'
 import { normalizeReportResponse } from '../lib/reportResponse'
+import { resolveUpgradeUrl } from '../lib/externallyControlledFeatures'
 import type { LegalAcceptancePayload } from '../lib/legalDocuments'
 import type {
   User,
@@ -173,8 +174,15 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
             /* @vite-ignore */ '../features/monetization/monetizationSlice'
           )
           const details = (respErr as { details?: Record<string, unknown> }).details || {}
+          const userRole = (api.getState() as { auth?: { user?: { role?: string } } })?.auth?.user
+            ?.role
           const isLimit =
             respErr.name === 'LIMIT_EXCEEDED' || respErr.name === 'BRANCH_LIMIT_REACHED'
+          const normalizedUpgradeUrl = resolveUpgradeUrl(
+            details.upgradeUrl as string | undefined,
+            (details.tenantType as string | undefined) ?? null,
+            userRole
+          )
           api.dispatch(
             showMonetizationBlock({
               type: isLimit ? 'limit' : 'feature',
@@ -185,9 +193,12 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
                     currentUsage: Number(details.currentUsage ?? details.current ?? 0),
                     currentPlan: (details.currentPlan as string) ?? null,
                     recommendedPlans: (details.recommendedPlans as string[]) ?? ['Gold'],
-                    upgradeUrl: (details.upgradeUrl as string) ?? '/app/settings?tab=subscription',
+                    upgradeUrl: normalizedUpgradeUrl,
                   }
-                : details) as
+                : {
+                    ...details,
+                    upgradeUrl: normalizedUpgradeUrl,
+                  }) as
                 | import('../features/monetization/monetizationSlice').LimitExceededPayload
                 | import('../features/monetization/monetizationSlice').FeatureNotAvailablePayload,
             })

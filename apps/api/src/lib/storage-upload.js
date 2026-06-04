@@ -36,21 +36,21 @@ export async function meterStorageFromRequest(req, sizeBytes) {
     current: result.current,
     limit: result.limit,
   }
-  const details = buildLimitExceededPayload(
+  const err = buildLimitExceededPayload(
     limitCheck,
     'storage_mb',
     subscription?.plan_name || subscription?.plan_display_name,
-    recommendedPlans
+    recommendedPlans,
+    undefined,
+    tenant.tenantType
   )
-  details.upgradeUrl = '/app/settings?tab=subscription'
 
   return {
     ok: false,
     status: 403,
     error: {
-      name: 'LIMIT_EXCEEDED',
+      ...err,
       message: `Upload would exceed your storage limit (${result.current}/${result.limit} MB used). Upgrade your plan for more storage.`,
-      details,
     },
   }
 }

@@ -1101,7 +1101,12 @@ export async function decrementUsage(tenantId, tenantType, meterType, decrement 
 }
 
 /** Default front-route for upgrade CTA (monetization UX) */
-const DEFAULT_UPGRADE_PATH = '/app/settings'
+const DEFAULT_UPGRADE_PATH = '/app/settings?tab=subscription'
+
+/** Plan & usage tab in settings for a tenant type */
+export function getUpgradePathForTenant(tenantType) {
+  return tenantType === 'SUPPLIER' ? '/app/settings?tab=plan' : DEFAULT_UPGRADE_PATH
+}
 
 /** Plan codes in tier order (free < silver < gold < platinum); exclude enterprise for self-serve */
 const PLAN_ORDER = [...PLAN_TIER_ORDER]
@@ -1369,8 +1374,11 @@ export function buildLimitExceededPayload(
   meterType,
   currentPlanName,
   recommendedPlans,
-  upgradeUrl = DEFAULT_UPGRADE_PATH
+  upgradeUrl,
+  tenantType
 ) {
+  const resolvedUpgradeUrl =
+    upgradeUrl || (tenantType ? getUpgradePathForTenant(tenantType) : DEFAULT_UPGRADE_PATH)
   return {
     name: 'LIMIT_EXCEEDED',
     message: `You have reached your plan limit for ${meterType}`,
@@ -1380,7 +1388,7 @@ export function buildLimitExceededPayload(
       currentUsage: limitCheck.current,
       currentPlan: currentPlanName || null,
       recommendedPlans: recommendedPlans || [],
-      upgradeUrl: upgradeUrl || DEFAULT_UPGRADE_PATH,
+      upgradeUrl: resolvedUpgradeUrl,
     },
   }
 }
@@ -1405,8 +1413,11 @@ export function buildFeatureNotAvailablePayload(
   currentPlanName,
   requiredPlan,
   recommendedPlans,
-  upgradeUrl = DEFAULT_UPGRADE_PATH
+  upgradeUrl,
+  tenantType
 ) {
+  const resolvedUpgradeUrl =
+    upgradeUrl || (tenantType ? getUpgradePathForTenant(tenantType) : DEFAULT_UPGRADE_PATH)
   return {
     name: 'FEATURE_NOT_AVAILABLE',
     message: 'This feature is not available in your current plan',
@@ -1415,7 +1426,7 @@ export function buildFeatureNotAvailablePayload(
       currentPlan: currentPlanName || null,
       requiredPlan: requiredPlan || null,
       recommendedPlans: recommendedPlans || [],
-      upgradeUrl: upgradeUrl || DEFAULT_UPGRADE_PATH,
+      upgradeUrl: resolvedUpgradeUrl,
     },
   }
 }
@@ -1452,7 +1463,9 @@ export function requireWithinLimit(meterType, getTenantId, getTenantType) {
             limitCheck,
             meterType,
             subscription?.plan_name || subscription?.plan_display_name,
-            recommendedPlans
+            recommendedPlans,
+            undefined,
+            tenantType
           ),
           requestId: req.requestId,
         })
@@ -1522,7 +1535,9 @@ export function requireFeature(featureKey, getTenantId, getTenantType) {
             featureKey,
             subscription?.plan_name || subscription?.plan_display_name,
             null,
-            recommendedPlans
+            recommendedPlans,
+            undefined,
+            tenantType
           ),
           requestId: req.requestId,
         })

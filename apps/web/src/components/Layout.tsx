@@ -300,7 +300,12 @@ export function Layout() {
                   <button
                     type="button"
                     className="shrink-0 self-start font-medium text-slate-900 underline hover:no-underline sm:ml-4"
-                    onClick={() => openBrowseUpgrade(dispatch, { currentPlan: e?.plan?.name })}
+                    onClick={() =>
+                      openBrowseUpgrade(dispatch, {
+                        currentPlan: e?.plan?.name,
+                        upgradeUrl: settingsFeaturesTabPath(e.tenantType),
+                      })
+                    }
                   >
                     Compare plans
                   </button>
@@ -316,7 +321,7 @@ export function Layout() {
                     currentUsage={current}
                     limitValue={limit}
                     currentPlan={e?.plan?.name ?? null}
-                    upgradeUrl="/app/settings?tab=subscription"
+                    upgradeUrl={e ? settingsFeaturesTabPath(e.tenantType) : undefined}
                   />
                 ))}
               </div>
@@ -331,7 +336,11 @@ export function Layout() {
                   <button
                     type="button"
                     className="font-medium underline hover:no-underline"
-                    onClick={() => navigate('/app/settings')}
+                    onClick={() =>
+                      navigate(
+                        e ? settingsFeaturesTabPath(e.tenantType) : '/app/settings?tab=subscription'
+                      )
+                    }
                   >
                     View usage
                   </button>
@@ -355,7 +364,9 @@ export function Layout() {
                             currentUsage: first.current,
                             currentPlan: e?.plan?.name ?? null,
                             recommendedPlans: [],
-                            upgradeUrl: '/app/settings',
+                            upgradeUrl: e
+                              ? settingsFeaturesTabPath(e.tenantType)
+                              : '/app/settings?tab=subscription',
                           },
                         })
                       )
@@ -376,7 +387,10 @@ export function Layout() {
                     className="font-medium underline hover:no-underline shrink-0"
                     onClick={() => {
                       recordConversionEvent({ eventType: 'VIEW_PLANS' }).catch(() => {})
-                      openBrowseUpgrade(dispatch, { currentPlan: e?.plan?.name })
+                      openBrowseUpgrade(dispatch, {
+                        currentPlan: e?.plan?.name,
+                        upgradeUrl: settingsFeaturesTabPath(e.tenantType),
+                      })
                     }}
                   >
                     View plans

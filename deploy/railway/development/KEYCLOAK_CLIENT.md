@@ -6,9 +6,13 @@ Preprod: [`../preprod/KEYCLOAK_CLIENT.md`](../preprod/KEYCLOAK_CLIENT.md) · Pro
 ## Valid redirect URIs
 
 ```text
+https://supplify-web-dev-development.up.railway.app/auth/callback
+https://supplify-web-dev-development.up.railway.app/*
 https://supplify-api-dev-development.up.railway.app/auth/callback
 https://supplify-api-dev-development.up.railway.app/*
 ```
+
+The **web** callback is used in normal login (same-origin proxy). Keep the API URIs for direct API links and tooling.
 
 ## Valid post logout redirect URIs
 
