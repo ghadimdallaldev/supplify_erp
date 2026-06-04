@@ -29,6 +29,11 @@ import {
   invalidateUserPermissionCache,
 } from './permissions.js'
 import {
+  canUseCrossRequestTenantCaches,
+  getTenantContextBundle,
+  setTenantContextBundle,
+} from './tenant-context-cache.js'
+import {
   ensureTenantSystemRoles,
   assignOwnerRoleForUser,
   userHasOwnerRole,
@@ -45,6 +50,12 @@ function userBySubCacheKey(sub) {
 export async function invalidateUserBySubCache(sub) {
   if (!sub) return
   await deleteCache(userBySubCacheKey(sub)).catch(() => {})
+}
+
+/** Clear cached tenant resolution for a user (role change, workspace bind, invite accept). */
+export async function invalidateRequestTenantCache(userId, tenantType) {
+  if (!userId || !tenantType) return
+  await deleteCache(`tenant:req:${userId}:${tenantType}`).catch(() => {})
 }
 
 // Extract token from cookie
@@ -99,16 +110,24 @@ export async function getUserBySub(sub, req = null) {
       return cached === 'null' ? null : cached
     }
 
-    const lookupStart = req?._perf ? process.hrtime.bigint() : null
-    const result = await query('SELECT * FROM app_user WHERE keycloak_sub = $1', [sub], req)
-    if (lookupStart != null && req?._perf) {
-      req._perf.stages.userLookup = Math.round(
-        Number(process.hrtime.bigint() - lookupStart) / 1_000_000
-      )
-    }
-    const user = result.rows[0] || null
-    await setCache(cacheKey, user ?? 'null', USER_BY_SUB_CACHE_TTL).catch(() => {})
-    return user
+    return singleflight(cacheKey, async () => {
+      const again = await getCache(cacheKey)
+      if (again !== null) {
+        if (req?._perf) noteCacheHit(req, 'userBySub')
+        return again === 'null' ? null : again
+      }
+
+      const lookupStart = req?._perf ? process.hrtime.bigint() : null
+      const result = await query('SELECT * FROM app_user WHERE keycloak_sub = $1', [sub], req)
+      if (lookupStart != null && req?._perf) {
+        req._perf.stages.userLookup = Math.round(
+          Number(process.hrtime.bigint() - lookupStart) / 1_000_000
+        )
+      }
+      const user = result.rows[0] || null
+      await setCache(cacheKey, user ?? 'null', USER_BY_SUB_CACHE_TTL).catch(() => {})
+      return user
+    })
   } catch (error) {
     logger.error('Error getting user by sub', { error: error.message })
     throw error
@@ -724,11 +743,30 @@ export function resolveTenantContext(req, res, next) {
         })
       }
 
-      // Fetch roles first so we can skip "ensure" setup queries on the hot path.
-      // ensurePrimaryContactOwnerRole and ensureTenantSystemRoles are idempotent setup
-      // helpers that write to the DB; running them on every request is expensive. We
-      // only need them when the user has no roles yet (first login / new tenant).
-      let roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType, req)
+      const effectiveTenant = getEffectiveTenant(req)
+      const useBundleCache =
+        canUseCrossRequestTenantCaches(req) && !(req.userData.role === 'ADMIN' && effectiveTenant)
+
+      let roles
+      let permissions
+
+      if (useBundleCache) {
+        const bundle = await getTenantContextBundle(
+          req.userData.id,
+          tenant.tenantId,
+          tenant.tenantType,
+          req
+        )
+        roles = bundle.roles
+        permissions = bundle.permissions
+      } else {
+        roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType, req)
+        permissions = await getPermissionsForUser(
+          req.userData.id,
+          tenant.tenantId,
+          tenant.tenantType
+        )
+      }
 
       if (roles.length === 0) {
         // Cold path: user has no roles — run setup helpers then re-fetch.
@@ -740,14 +778,13 @@ export function resolveTenantContext(req, res, next) {
         )
         await ensureTenantSystemRoles(tenant.tenantId, tenant.tenantType).catch(() => {})
         roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType, req)
+        permissions = await getPermissionsForUser(
+          req.userData.id,
+          tenant.tenantId,
+          tenant.tenantType
+        )
       }
 
-      let permissions = await getPermissionsForUser(
-        req.userData.id,
-        tenant.tenantId,
-        tenant.tenantType
-      )
-      const effectiveTenant = getEffectiveTenant(req)
       if (req.userData.role === 'ADMIN' && effectiveTenant) {
         permissions = await getImpersonationEffectivePermissions(
           effectiveTenant.tenantId,
@@ -782,6 +819,16 @@ export function resolveTenantContext(req, res, next) {
             tenant.tenantType
           )
         }
+      }
+
+      if (useBundleCache && roles.length > 0) {
+        await setTenantContextBundle(
+          req.userData.id,
+          tenant.tenantId,
+          tenant.tenantType,
+          roles,
+          permissions
+        )
       }
       req.tenantContext = {
         tenantId: tenant.tenantId,

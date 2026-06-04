@@ -12,6 +12,7 @@ import {
   invalidateUserNotificationsListCache,
   getUserNotifications,
   getUserPreferences,
+  getUnreadNotificationCount,
   sendNotification,
 } from '../services/notification.service.js'
 
@@ -86,6 +87,39 @@ router.get('/', async (req, res) => {
       error: {
         name: 'INTERNAL_ERROR',
         message: 'Failed to get notifications',
+        details: error.message,
+      },
+      requestId: req.requestId,
+    })
+  }
+})
+
+// Lightweight unread count for badge polling
+router.get('/unread-count', async (req, res) => {
+  try {
+    const userId = req.userData.id
+    const userType = req.userData.role
+
+    const result = await getUnreadNotificationCount(userId, userType)
+
+    res.json({
+      ok: true,
+      data: result,
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error({
+      message: 'Get unread notification count error',
+      error: error.message,
+      stack: error.stack,
+    })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get unread notification count',
         details: error.message,
       },
       requestId: req.requestId,

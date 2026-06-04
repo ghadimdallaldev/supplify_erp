@@ -3,7 +3,7 @@
  * Role always comes from the invitation row (never from the client).
  */
 import { ValidationError } from '../middlewares/errorHandler.js'
-import { invalidateUserPermissionCache } from './permissions.js'
+import { invalidateUserAuthCaches } from './access-cache.js'
 
 export function normalizeInvitationEmail(email) {
   return (email || '').trim().toLowerCase()
@@ -94,7 +94,7 @@ export async function assignInvitationTenantRole(
      DO UPDATE SET role_id = EXCLUDED.role_id, assigned_by = EXCLUDED.assigned_by, assigned_at = NOW()`,
     [userId, roleId, tenantType, tenantId, assignedBy]
   )
-  await invalidateUserPermissionCache(userId, tenantId, tenantType)
+  await invalidateUserAuthCaches({ userId, tenantId, tenantType })
 }
 
 export function keycloakRealmRoleForWorkspace(workspaceType) {

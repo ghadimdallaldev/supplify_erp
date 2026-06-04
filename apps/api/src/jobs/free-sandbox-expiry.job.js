@@ -28,7 +28,15 @@ export async function runFreeSandboxExpiryJob() {
   )
 
   for (const row of rows) {
-    await invalidateTenantSubscriptionCache(row.tenant_id, row.tenant_type).catch(() => {})
+    try {
+      await invalidateTenantSubscriptionCache(row.tenant_id, row.tenant_type)
+    } catch (err) {
+      logger.error('Failed to invalidate subscription cache after free sandbox expiry', {
+        tenantId: row.tenant_id,
+        tenantType: row.tenant_type,
+        error: err.message,
+      })
+    }
     notifyBillingAccountLocked({
       tenantId: row.tenant_id,
       tenantType: row.tenant_type,

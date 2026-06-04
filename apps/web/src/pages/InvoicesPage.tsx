@@ -717,7 +717,7 @@ export function InvoicesPage() {
                   ) : invoiceDetail?.invoice ? (
                     <>
                       {/* Invoice Header */}
-                      <div className="grid grid-cols-2 gap-6 border-b pb-6">
+                      <div className="grid grid-cols-1 gap-6 border-b pb-6 sm:grid-cols-2">
                         <div>
                           <h3 className="font-semibold mb-2">Bill From:</h3>
                           <p className="font-medium">{invoiceDetail.invoice.supplier_name}</p>
@@ -1075,7 +1075,7 @@ export function InvoicesPage() {
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label>Payment Method *</Label>
                         <Select value={paymentMethod} onValueChange={setPaymentMethod}>
@@ -1158,7 +1158,7 @@ export function InvoicesPage() {
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label>Payment Method *</Label>
                         <Select value={paymentMethod} onValueChange={setPaymentMethod}>

@@ -2,8 +2,21 @@
  * Resolve which supplier/restaurant tenant a user belongs to (workspace + role assignment).
  */
 import { query } from './db.js'
+import { getCache, setCache, deleteCache } from './cache.js'
+import { singleflight } from './singleflight.js'
 
-export async function getTenantAssignmentForUser(userId, appRole) {
+const WS_ASSIGN_CACHE_TTL_SECONDS = 180
+
+export function workspaceAssignmentCacheKey(userId, tenantType) {
+  return `ws:assign:${userId}:${tenantType}`
+}
+
+export async function invalidateWorkspaceAssignmentCache(userId, tenantType) {
+  if (!userId || !tenantType) return
+  await deleteCache(workspaceAssignmentCacheKey(userId, tenantType)).catch(() => {})
+}
+
+async function loadTenantAssignmentForUser(userId, appRole) {
   if (!userId || (appRole !== 'RESTAURANT' && appRole !== 'SUPPLIER')) return null
 
   const tenantType = appRole
@@ -58,6 +71,24 @@ export async function getTenantAssignmentForUser(userId, appRole) {
   }
 
   return null
+}
+
+export async function getTenantAssignmentForUser(userId, appRole) {
+  if (!userId || (appRole !== 'RESTAURANT' && appRole !== 'SUPPLIER')) return null
+
+  const tenantType = appRole
+  const cacheKey = workspaceAssignmentCacheKey(userId, tenantType)
+  const cached = await getCache(cacheKey)
+  if (cached !== null) return cached === 'null' ? null : cached
+
+  return singleflight(cacheKey, async () => {
+    const again = await getCache(cacheKey)
+    if (again !== null) return again === 'null' ? null : again
+
+    const assignment = await loadTenantAssignmentForUser(userId, appRole)
+    await setCache(cacheKey, assignment ?? 'null', WS_ASSIGN_CACHE_TTL_SECONDS).catch(() => {})
+    return assignment
+  })
 }
 
 export async function isPrimaryTenantContact(userId, email, tenantId, tenantType) {

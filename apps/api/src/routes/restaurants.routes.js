@@ -9,6 +9,7 @@ import { ensureTenantSystemRoles } from '../lib/tenant-roles.js'
 import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../lib/safe-update.js'
 import { deliveredOrderStatusInSql } from '../lib/order-statuses.js'
+import { invalidateTenantProfileCache } from '../lib/tenant-profile-cache.js'
 
 const router = express.Router()
 
@@ -450,6 +451,8 @@ router.post(
         actor: req.userData.id,
       })
 
+      await invalidateTenantProfileCache(id, 'RESTAURANT')
+
       res.json({
         ok: true,
         data: { restaurant: rows[0] },
@@ -555,6 +558,8 @@ router.patch('/:id', requireAuth, async (req, res) => {
       restaurantId: rows[0].id,
       actor: req.userData.id,
     })
+
+    await invalidateTenantProfileCache(id, 'RESTAURANT')
 
     res.json({
       ok: true,

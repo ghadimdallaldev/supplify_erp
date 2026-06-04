@@ -5,10 +5,11 @@ import {
   useMarkAllNotificationsReadMutation,
   useGetEntitlementsQuery,
   useRecordConversionEventMutation,
+  api,
 } from '../services/api'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { Button } from './ui/button'
-import { Bell, X, TrendingUp, Settings, ChevronRight, Menu } from 'lucide-react'
+import { Bell, X, TrendingUp, Settings, ChevronRight, Menu, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { BranchSwitcher } from './BranchSwitcher'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -112,6 +113,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
   const handleLogout = async () => {
     try {
       const data = await logout().unwrap()
+      dispatch(api.util.resetApiState())
       toast.success('Logged out successfully')
       if (data?.keycloakLogoutUrl) {
         window.location.href = data.keycloakLogoutUrl
@@ -183,40 +185,64 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         <BranchSwitcher />
 
         {showUpgrade && (
-          <Button
-            variant={hasUrgency ? 'default' : 'outline'}
-            size="sm"
-            onClick={handleNavUpgrade}
-            className="relative hidden min-h-9 sm:inline-flex"
-            style={
-              hasUrgency
-                ? { background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }
-                : { borderColor: 'var(--app-border-mid)', color: 'var(--text-mid)' }
-            }
-          >
-            <TrendingUp style={{ width: 14, height: 14, marginRight: 4 }} />
-            {hasUrgency ? 'Upgrade' : 'Plans'}
-            {hasUrgency && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: -2,
-                  right: -2,
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: 'var(--amber-mid)',
-                  border: '2px solid var(--surface)',
-                }}
+          <>
+            <Button
+              variant={hasUrgency ? 'default' : 'outline'}
+              size="sm"
+              onClick={handleNavUpgrade}
+              className="relative hidden min-h-9 sm:inline-flex"
+              style={
+                hasUrgency
+                  ? { background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }
+                  : { borderColor: 'var(--app-border-mid)', color: 'var(--text-mid)' }
+              }
+            >
+              <TrendingUp style={{ width: 14, height: 14, marginRight: 4 }} />
+              {hasUrgency ? 'Upgrade' : 'Plans'}
+              {hasUrgency && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: -2,
+                    right: -2,
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: 'var(--amber-mid)',
+                    border: '2px solid var(--surface)',
+                  }}
+                />
+              )}
+            </Button>
+            <button
+              type="button"
+              className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--app-border)] sm:hidden"
+              aria-label={hasUrgency ? 'Upgrade plan' : 'View plans'}
+              onClick={handleNavUpgrade}
+            >
+              <TrendingUp
+                size={16}
+                style={{ color: hasUrgency ? 'var(--brand)' : 'var(--text-muted)' }}
               />
-            )}
-          </Button>
+              {hasUrgency && (
+                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--amber-mid)]" />
+              )}
+            </button>
+          </>
         )}
 
         {/* Quick jump to catalog */}
         <button
           type="button"
-          className="hidden h-[34px] min-w-[140px] items-center gap-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-2.5 text-left transition-colors hover:border-[var(--app-border-mid)] md:flex lg:min-w-[200px] cursor-pointer"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] md:hidden"
+          aria-label="Go to products catalog"
+          onClick={() => navigate('/app/products')}
+        >
+          <Search size={16} style={{ color: 'var(--text-muted)' }} />
+        </button>
+        <button
+          type="button"
+          className="hidden h-[34px] min-w-[140px] cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-2.5 text-left transition-colors hover:border-[var(--app-border-mid)] md:flex lg:min-w-[200px]"
           aria-label="Go to products catalog"
           onClick={() => navigate('/app/products')}
         >

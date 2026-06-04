@@ -1,5 +1,6 @@
 import type { AppDispatch } from '../store'
 import { api } from '../services/api'
+import { refetchAppSession } from './refetchAppSession'
 import { openCheckoutPayment } from './openPaymentModal'
 
 type SubscriptionPlanRow = {
@@ -35,6 +36,7 @@ export async function activateFreePlanFromPlans(
       })
     ).unwrap()
     dispatch(api.util.invalidateTags(['Subscription', 'Billing', 'User']))
+    await refetchAppSession(dispatch)
     return { ok: true }
   } catch (e: unknown) {
     const message =

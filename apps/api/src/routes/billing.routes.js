@@ -247,7 +247,7 @@ router.post(
         tenant_id: tenant.tenantId,
         payload_json: { planId: body.planId, billingCycle: body.billingCycle },
       })
-      invalidateTenantSubscriptionCache(tenant.tenantId, tenant.tenantType).catch(() => {})
+      await invalidateTenantSubscriptionCache(tenant.tenantId, tenant.tenantType)
       res.json({ ok: true, data: result, error: null, requestId: req.requestId })
     } catch (error) {
       if (error.name === 'ZodError') {
@@ -321,7 +321,7 @@ router.post(
         tenant_type: tenant.tenantType,
         tenant_id: tenant.tenantId,
       })
-      invalidateTenantSubscriptionCache(tenant.tenantId, tenant.tenantType).catch(() => {})
+      await invalidateTenantSubscriptionCache(tenant.tenantId, tenant.tenantType)
       res.json({ ok: true, data: result, error: null, requestId: req.requestId })
     } catch (error) {
       if (error.name === 'ZodError') {
