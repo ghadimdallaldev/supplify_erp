@@ -29,6 +29,7 @@ import {
   ShoppingCart,
   Recycle,
   Search,
+  X,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import {
@@ -46,12 +47,37 @@ import { ExpiryInventoryTab } from '../components/inventory/ExpiryInventoryTab'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
 import { EmptyState } from '../components/ui/empty-state'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select'
+
+type SortOption =
+  | 'updated_desc'
+  | 'name_asc'
+  | 'name_desc'
+  | 'quantity_asc'
+  | 'quantity_desc'
+  | 'status'
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'updated_desc', label: 'Recently updated' },
+  { value: 'name_asc', label: 'Name (A–Z)' },
+  { value: 'name_desc', label: 'Name (Z–A)' },
+  { value: 'quantity_asc', label: 'Quantity (low first)' },
+  { value: 'quantity_desc', label: 'Quantity (high first)' },
+  { value: 'status', label: 'Stock status' },
+]
 
 export function RestaurantInventoryPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [supplierFilter, setSupplierFilter] = useState('ALL')
   const [categoryFilter, setCategoryFilter] = useState('ALL')
+  const [sortBy, setSortBy] = useState<SortOption>('updated_desc')
   const [showAdjustDialog, setShowAdjustDialog] = useState(false)
   const [showAddProductDialog, setShowAddProductDialog] = useState(false)
   const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false)
@@ -143,12 +169,13 @@ export function RestaurantInventoryPage() {
 
   const handleExportCSV = () => {
     const csv = [
-      ['Product Name', 'SKU', 'Supplier', 'Quantity', 'Unit', 'Status', 'Last Updated'],
+      ['Product Name', 'SKU', 'Category', 'Supplier', 'Quantity', 'Unit', 'Status', 'Last Updated'],
       ...inventory.map((item: any) => {
         const status = getStockStatus(item.quantity, item.low_stock_threshold)
         return [
           item.product_name,
           item.product_sku,
+          getItemCategory(item),
           item.supplier_name,
           item.quantity,
           item.product_unit,
@@ -221,36 +248,66 @@ export function RestaurantInventoryPage() {
     return 'IN_STOCK'
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'IN_STOCK':
-        return 'default'
-      case 'LOW_STOCK':
-        return 'secondary'
-      case 'OUT_OF_STOCK':
-        return 'destructive'
-      default:
-        return 'secondary'
-    }
+  const getItemCategory = (item: { product_category?: string; product_category_legacy?: string }) =>
+    item.product_category || item.product_category_legacy || ''
+
+  const getStatusSortRank = (status: string) => {
+    if (status === 'OUT_OF_STOCK') return 0
+    if (status === 'LOW_STOCK') return 1
+    return 2
   }
 
   const calculateReorderQuantity = (item: any) => {
+    if (item.suggested_reorder_qty != null && item.suggested_reorder_qty > 0) {
+      return Math.ceil(Number(item.suggested_reorder_qty))
+    }
     const { quantity, low_stock_threshold } = item
     if (!low_stock_threshold || quantity > low_stock_threshold) return 0
     const suggested = low_stock_threshold * 3 - quantity
     return Math.ceil(suggested)
   }
 
+  const uniqueSuppliers = Array.from(
+    new Set<string>(
+      inventory
+        .map((item: { supplier_name?: string }) => item.supplier_name)
+        .filter((s): s is string => Boolean(s))
+    )
+  ).sort()
+
+  const uniqueCategories = Array.from(
+    new Set<string>(
+      inventory.map((item: any) => getItemCategory(item)).filter((c): c is string => Boolean(c))
+    )
+  ).sort()
+
+  const hasActiveFilters =
+    search !== '' || statusFilter !== 'ALL' || supplierFilter !== 'ALL' || categoryFilter !== 'ALL'
+
+  const clearFilters = () => {
+    setSearch('')
+    setStatusFilter('ALL')
+    setSupplierFilter('ALL')
+    setCategoryFilter('ALL')
+  }
+
+  const handleSummaryCardClick = (status: 'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK') => {
+    setStatusFilter((current) => (current === status ? 'ALL' : status))
+  }
+
   const filteredInventory = inventory
     .filter((item: any) => {
+      const itemCategory = getItemCategory(item)
       const matchesSearch =
+        !search ||
         item.product_name.toLowerCase().includes(search.toLowerCase()) ||
-        item.product_sku.toLowerCase().includes(search.toLowerCase())
+        item.product_sku.toLowerCase().includes(search.toLowerCase()) ||
+        itemCategory.toLowerCase().includes(search.toLowerCase())
       const matchesStatus =
         statusFilter === 'ALL' ||
         getStockStatus(item.quantity, item.low_stock_threshold) === statusFilter
       const matchesSupplier = supplierFilter === 'ALL' || item.supplier_name === supplierFilter
-      const matchesCategory = categoryFilter === 'ALL' || item.product_category === categoryFilter
+      const matchesCategory = categoryFilter === 'ALL' || itemCategory === categoryFilter
       return matchesSearch && matchesStatus && matchesSupplier && matchesCategory
     })
     .sort((a: any, b: any) => {
@@ -258,7 +315,25 @@ export function RestaurantInventoryPage() {
       const bPinned = pinnedItems.has(b.product_id)
       if (aPinned && !bPinned) return -1
       if (!aPinned && bPinned) return 1
-      return 0
+
+      switch (sortBy) {
+        case 'name_asc':
+          return a.product_name.localeCompare(b.product_name)
+        case 'name_desc':
+          return b.product_name.localeCompare(a.product_name)
+        case 'quantity_asc':
+          return a.quantity - b.quantity
+        case 'quantity_desc':
+          return b.quantity - a.quantity
+        case 'status': {
+          const aRank = getStatusSortRank(getStockStatus(a.quantity, a.low_stock_threshold))
+          const bRank = getStatusSortRank(getStockStatus(b.quantity, b.low_stock_threshold))
+          return aRank - bRank || a.product_name.localeCompare(b.product_name)
+        }
+        case 'updated_desc':
+        default:
+          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      }
     })
 
   const summary = {
@@ -278,6 +353,22 @@ export function RestaurantInventoryPage() {
     historySource === 'ALL'
       ? history
       : history.filter((m: any) => getMovementSource(m) === historySource)
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'IN_STOCK':
+        return 'default'
+      case 'LOW_STOCK':
+        return 'secondary'
+      case 'OUT_OF_STOCK':
+        return 'destructive'
+      default:
+        return 'secondary'
+    }
+  }
+
+  const summaryCardClass = (active: boolean) =>
+    `cursor-pointer transition-all hover:shadow-md ${active ? 'ring-2 ring-[var(--brand-mid)] ring-offset-2' : ''}`
 
   if (isLoading) {
     return (
@@ -403,9 +494,15 @@ export function RestaurantInventoryPage() {
               </CardContent>
             </Card>
 
-            {/* Summary Cards */}
+            {/* Summary Cards — click to filter by status */}
             <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
-              <Card>
+              <Card
+                className={summaryCardClass(statusFilter === 'ALL')}
+                onClick={() => handleSummaryCardClick('ALL')}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && handleSummaryCardClick('ALL')}
+              >
                 <CardContent className="p-4 sm:pt-6">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
@@ -420,7 +517,13 @@ export function RestaurantInventoryPage() {
                   </div>
                 </CardContent>
               </Card>
-              <Card>
+              <Card
+                className={summaryCardClass(statusFilter === 'IN_STOCK')}
+                onClick={() => handleSummaryCardClick('IN_STOCK')}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && handleSummaryCardClick('IN_STOCK')}
+              >
                 <CardContent className="p-4 sm:pt-6">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
@@ -437,7 +540,13 @@ export function RestaurantInventoryPage() {
                   </div>
                 </CardContent>
               </Card>
-              <Card>
+              <Card
+                className={summaryCardClass(statusFilter === 'LOW_STOCK')}
+                onClick={() => handleSummaryCardClick('LOW_STOCK')}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && handleSummaryCardClick('LOW_STOCK')}
+              >
                 <CardContent className="p-4 sm:pt-6">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
@@ -454,7 +563,13 @@ export function RestaurantInventoryPage() {
                   </div>
                 </CardContent>
               </Card>
-              <Card>
+              <Card
+                className={summaryCardClass(statusFilter === 'OUT_OF_STOCK')}
+                onClick={() => handleSummaryCardClick('OUT_OF_STOCK')}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && handleSummaryCardClick('OUT_OF_STOCK')}
+              >
                 <CardContent className="p-4 sm:pt-6">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
@@ -475,63 +590,171 @@ export function RestaurantInventoryPage() {
 
             {/* Filters */}
             <Card className="shadow-sm">
-              <CardContent className="space-y-4 p-4 pt-6">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12 lg:items-end">
-                  <div className="min-w-0 sm:col-span-2 lg:col-span-6">
-                    <Label htmlFor="inventory-search" className="sr-only">
-                      Search products
-                    </Label>
+              <CardContent className="space-y-3 p-4 pt-6">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_auto] lg:items-end">
+                  <div className="min-w-0 sm:col-span-2 lg:col-span-1">
+                    <label
+                      htmlFor="inventory-search"
+                      className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]"
+                    >
+                      Search
+                    </label>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
                       <Input
                         id="inventory-search"
-                        placeholder="Search products..."
+                        placeholder="Search by name, SKU, or category..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="h-10 pl-10"
+                        className="h-10 pl-10 pr-9"
                       />
+                      {search ? (
+                        <button
+                          type="button"
+                          onClick={() => setSearch('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text)]"
+                          aria-label="Clear search"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      ) : null}
                     </div>
                   </div>
-                  <div className="min-w-0 lg:col-span-3">
-                    <Label htmlFor="inventory-supplier-filter" className="sr-only">
+
+                  <div className="min-w-0">
+                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                      Category
+                    </span>
+                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                      <SelectTrigger id="inventory-category-filter" className="w-full">
+                        <SelectValue placeholder="All Categories" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">All Categories</SelectItem>
+                        {uniqueCategories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="min-w-0">
+                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                       Supplier
-                    </Label>
-                    <select
-                      id="inventory-supplier-filter"
-                      value={supplierFilter}
-                      onChange={(e) => setSupplierFilter(e.target.value)}
-                      className={filterSelectClass}
-                    >
-                      <option value="ALL">All Suppliers</option>
-                      {Array.from(
-                        new Set<string>(
-                          inventory
-                            .map((item: { supplier_name?: string }) => item.supplier_name)
-                            .filter((s): s is string => Boolean(s))
-                        )
-                      ).map((supplier) => (
-                        <option key={supplier} value={supplier}>
-                          {supplier}
-                        </option>
-                      ))}
-                    </select>
+                    </span>
+                    <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+                      <SelectTrigger id="inventory-supplier-filter" className="w-full">
+                        <SelectValue placeholder="All Suppliers" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">All Suppliers</SelectItem>
+                        {uniqueSuppliers.map((supplier) => (
+                          <SelectItem key={supplier} value={supplier}>
+                            {supplier}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="min-w-0 lg:col-span-3">
-                    <Label htmlFor="inventory-status-filter" className="sr-only">
+
+                  <div className="min-w-0">
+                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                       Status
-                    </Label>
-                    <select
-                      id="inventory-status-filter"
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className={filterSelectClass}
-                    >
-                      <option value="ALL">All Status</option>
-                      <option value="IN_STOCK">In Stock</option>
-                      <option value="LOW_STOCK">Low Stock</option>
-                      <option value="OUT_OF_STOCK">Out of Stock</option>
-                    </select>
+                    </span>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger id="inventory-status-filter" className="w-full">
+                        <SelectValue placeholder="All Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">All Status</SelectItem>
+                        <SelectItem value="IN_STOCK">In Stock</SelectItem>
+                        <SelectItem value="LOW_STOCK">Low Stock</SelectItem>
+                        <SelectItem value="OUT_OF_STOCK">Out of Stock</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
+                  <div className="min-w-0">
+                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                      Sort by
+                    </span>
+                    <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                      <SelectTrigger id="inventory-sort" className="w-full">
+                        <SelectValue placeholder="Sort" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SORT_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-end sm:col-span-2 lg:col-span-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full sm:w-auto"
+                      onClick={clearFilters}
+                      disabled={!hasActiveFilters}
+                    >
+                      Clear filters
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 border-t border-[var(--app-border)] pt-3 text-sm">
+                  <span className="text-[var(--text-muted)]">
+                    Showing{' '}
+                    <span className="font-semibold text-[var(--text)]">
+                      {filteredInventory.length}
+                    </span>{' '}
+                    of {inventory.length} items
+                  </span>
+                  {statusFilter !== 'ALL' ? (
+                    <Badge variant="secondary" className="gap-1">
+                      {statusFilter.replace(/_/g, ' ')}
+                      <button
+                        type="button"
+                        onClick={() => setStatusFilter('ALL')}
+                        className="ml-0.5 rounded-sm hover:bg-[var(--app-border)]"
+                        aria-label="Remove status filter"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ) : null}
+                  {categoryFilter !== 'ALL' ? (
+                    <Badge variant="secondary" className="gap-1">
+                      {categoryFilter}
+                      <button
+                        type="button"
+                        onClick={() => setCategoryFilter('ALL')}
+                        className="ml-0.5 rounded-sm hover:bg-[var(--app-border)]"
+                        aria-label="Remove category filter"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ) : null}
+                  {supplierFilter !== 'ALL' ? (
+                    <Badge variant="secondary" className="gap-1">
+                      {supplierFilter}
+                      <button
+                        type="button"
+                        onClick={() => setSupplierFilter('ALL')}
+                        className="ml-0.5 rounded-sm hover:bg-[var(--app-border)]"
+                        aria-label="Remove supplier filter"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ) : null}
                 </div>
               </CardContent>
             </Card>
@@ -585,15 +808,7 @@ export function RestaurantInventoryPage() {
                           </Link>
                         </Button>
                       ) : (
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setSearch('')
-                            setStatusFilter('ALL')
-                            setSupplierFilter('ALL')
-                            setCategoryFilter('ALL')
-                          }}
-                        >
+                        <Button variant="outline" onClick={clearFilters}>
                           Clear filters
                         </Button>
                       )
@@ -619,6 +834,7 @@ export function RestaurantInventoryPage() {
                                 </p>
                                 <p className="truncate text-xs text-[var(--text-muted)]">
                                   {item.product_sku}
+                                  {getItemCategory(item) ? ` · ${getItemCategory(item)}` : ''}
                                   {item.supplier_name ? ` · ${item.supplier_name}` : ''}
                                 </p>
                               </div>
@@ -710,6 +926,9 @@ export function RestaurantInventoryPage() {
                               Product
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                              Category
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
                               Supplier
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
@@ -745,6 +964,9 @@ export function RestaurantInventoryPage() {
                                     </p>
                                   </div>
                                 </td>
+                                <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
+                                  {getItemCategory(item) || '—'}
+                                </td>
                                 <td className="px-4 py-4 text-sm text-[var(--text)]">
                                   {item.supplier_name}
                                 </td>
@@ -754,6 +976,11 @@ export function RestaurantInventoryPage() {
                                     <span className="text-sm text-[var(--text-muted)]">
                                       {item.product_unit}
                                     </span>
+                                    {item.days_of_stock != null ? (
+                                      <span className="text-xs text-[var(--text-muted)]">
+                                        (~{Math.round(Number(item.days_of_stock))}d left)
+                                      </span>
+                                    ) : null}
                                   </div>
                                 </td>
                                 <td className="px-4 py-4">
