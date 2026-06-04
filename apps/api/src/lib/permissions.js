@@ -5,6 +5,7 @@
 import { query } from './db.js'
 import { logger } from './logger.js'
 import { getCache, setCache, deleteCache } from './cache.js'
+import { singleflight } from './singleflight.js'
 import { PERMISSION_KEYS } from './permission-keys.js'
 import { getOrgRolePermissions } from './supplier-org.js'
 import { getRestaurantOrgRolePermissions } from './restaurant-org.js'
@@ -145,99 +146,104 @@ export async function getPermissionsForUser(userId, tenantId, tenantType) {
     const cached = await getCache(cacheKey)
     if (Array.isArray(cached)) return cached
 
-    let named = []
-    let legacy = []
+    return singleflight(cacheKey, async () => {
+      const again = await getCache(cacheKey)
+      if (Array.isArray(again)) return again
 
-    let orgPerms = []
-    let hasOrgRole = false
+      let named = []
+      let legacy = []
 
-    if (tenantType === 'SUPPLIER') {
-      try {
-        const { rows: orgRows } = await query(
-          `SELECT organization_id FROM supplier WHERE id = $1`,
-          [tenantId]
-        )
-        const organizationId = orgRows[0]?.organization_id
-        if (organizationId) {
-          const { rows: orgMembership } = await query(
-            `SELECT 1 FROM org_user_roles WHERE user_id = $1 AND organization_id = $2`,
-            [userId, organizationId]
+      let orgPerms = []
+      let hasOrgRole = false
+
+      if (tenantType === 'SUPPLIER') {
+        try {
+          const { rows: orgRows } = await query(
+            `SELECT organization_id FROM supplier WHERE id = $1`,
+            [tenantId]
           )
-          hasOrgRole = orgMembership.length > 0
-          if (hasOrgRole) {
-            orgPerms = await getOrgRolePermissions(userId, organizationId, tenantId)
+          const organizationId = orgRows[0]?.organization_id
+          if (organizationId) {
+            const { rows: orgMembership } = await query(
+              `SELECT 1 FROM org_user_roles WHERE user_id = $1 AND organization_id = $2`,
+              [userId, organizationId]
+            )
+            hasOrgRole = orgMembership.length > 0
+            if (hasOrgRole) {
+              orgPerms = await getOrgRolePermissions(userId, organizationId, tenantId)
+            }
           }
+        } catch (err) {
+          if (err.code !== '42P01') throw err
         }
-      } catch (err) {
-        if (err.code !== '42P01') throw err
       }
-    }
 
-    if (tenantType === 'RESTAURANT') {
-      try {
-        const { rows: orgRows } = await query(
-          `SELECT organization_id FROM restaurant WHERE id = $1`,
-          [tenantId]
-        )
-        const organizationId = orgRows[0]?.organization_id
-        if (organizationId) {
-          const { rows: orgMembership } = await query(
-            `SELECT 1 FROM restaurant_org_user_roles WHERE user_id = $1 AND organization_id = $2`,
-            [userId, organizationId]
+      if (tenantType === 'RESTAURANT') {
+        try {
+          const { rows: orgRows } = await query(
+            `SELECT organization_id FROM restaurant WHERE id = $1`,
+            [tenantId]
           )
-          hasOrgRole = orgMembership.length > 0
-          if (hasOrgRole) {
-            orgPerms = await getRestaurantOrgRolePermissions(userId, organizationId, tenantId)
+          const organizationId = orgRows[0]?.organization_id
+          if (organizationId) {
+            const { rows: orgMembership } = await query(
+              `SELECT 1 FROM restaurant_org_user_roles WHERE user_id = $1 AND organization_id = $2`,
+              [userId, organizationId]
+            )
+            hasOrgRole = orgMembership.length > 0
+            if (hasOrgRole) {
+              orgPerms = await getRestaurantOrgRolePermissions(userId, organizationId, tenantId)
+            }
           }
+        } catch (err) {
+          if (err.code !== '42P01') throw err
         }
-      } catch (err) {
-        if (err.code !== '42P01') throw err
       }
-    }
 
-    if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
+      if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
+        try {
+          named = await getTenantNamedPermissionsForUser(userId, tenantId, tenantType)
+        } catch (err) {
+          if (err.code !== '42P01') throw err
+        }
+      }
+
       try {
-        named = await getTenantNamedPermissionsForUser(userId, tenantId, tenantType)
+        legacy = await getLegacyPermissionsForUser(userId, tenantId, tenantType)
       } catch (err) {
         if (err.code !== '42P01') throw err
       }
-    }
 
-    try {
-      legacy = await getLegacyPermissionsForUser(userId, tenantId, tenantType)
-    } catch (err) {
-      if (err.code !== '42P01') throw err
-    }
+      // When user has a named tenant role assignment, use ONLY that role's permissions (strict RBAC).
+      // Legacy user_role grants must not expand Viewer/Accountant into full owner access.
+      let hasNamedAssignment = false
+      if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
+        const { rows: tur } = await query(
+          `SELECT 1 FROM tenant_user_roles WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = $3 LIMIT 1`,
+          [userId, tenantId, tenantType]
+        )
+        hasNamedAssignment = tur.length > 0
+      }
 
-    // When user has a named tenant role assignment, use ONLY that role's permissions (strict RBAC).
-    // Legacy user_role grants must not expand Viewer/Accountant into full owner access.
-    let hasNamedAssignment = false
-    if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
-      const { rows: tur } = await query(
-        `SELECT 1 FROM tenant_user_roles WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = $3 LIMIT 1`,
-        [userId, tenantId, tenantType]
-      )
-      hasNamedAssignment = tur.length > 0
-    }
+      const branchPerms = hasNamedAssignment ? named : mergeUniquePermissions(named, legacy)
 
-    const branchPerms = hasNamedAssignment ? named : mergeUniquePermissions(named, legacy)
+      if ((tenantType === 'SUPPLIER' || tenantType === 'RESTAURANT') && hasOrgRole) {
+        const permissions = hasNamedAssignment
+          ? mergeUniquePermissions(orgPerms, named)
+          : mergeUniquePermissions(orgPerms, branchPerms)
+        await setCache(cacheKey, permissions, PERMISSION_CACHE_TTL_SECONDS)
+        return permissions
+      }
 
-    if ((tenantType === 'SUPPLIER' || tenantType === 'RESTAURANT') && hasOrgRole) {
-      const permissions = hasNamedAssignment
-        ? mergeUniquePermissions(orgPerms, named)
-        : mergeUniquePermissions(orgPerms, branchPerms)
+      if (tenantType === 'SUPPLIER' && !hasOrgRole && branchPerms.length === 0) {
+        await setCache(cacheKey, [], PERMISSION_CACHE_TTL_SECONDS)
+        return []
+      }
+
+      const permissions = branchPerms
       await setCache(cacheKey, permissions, PERMISSION_CACHE_TTL_SECONDS)
       return permissions
-    }
-
-    if (tenantType === 'SUPPLIER' && !hasOrgRole && branchPerms.length === 0) {
-      await setCache(cacheKey, [], PERMISSION_CACHE_TTL_SECONDS)
-      return []
-    }
-
-    const permissions = branchPerms
-    await setCache(cacheKey, permissions, PERMISSION_CACHE_TTL_SECONDS)
-    return permissions
+    })
   } catch (err) {
     if (err.code === '42P01') return []
     logger.error('getPermissionsForUser error', { error: err.message })

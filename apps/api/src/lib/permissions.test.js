@@ -35,9 +35,11 @@ import {
   getPermissionsForTenantRole,
 } from './permissions.js'
 import { getCache, setCache, deleteCache } from './cache.js'
+import { resetSingleflightForTests } from './singleflight.js'
 
 describe('permissions resolution', () => {
   beforeEach(() => {
+    resetSingleflightForTests()
     queryMock.mockReset()
     getOrgRolePermissionsMock.mockReset()
     vi.mocked(getCache).mockResolvedValue(null)
@@ -138,6 +140,7 @@ describe('permissions resolution', () => {
   it('denies supplier access when no org or branch roles', async () => {
     queryMock
       .mockResolvedValueOnce({ rows: [{ organization_id: 'org-1' }] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })

@@ -5,6 +5,7 @@ import {
   sendWhatsAppMessage,
   listTenantUserIds,
   notifyTenantUsers,
+  getUserNotifications,
 } from './notification.service.js'
 
 const queryMock = vi.fn()
@@ -315,6 +316,34 @@ describe('Notification Service', () => {
     it('returns a wa.me URL instead of sending server-side', async () => {
       const url = await sendWhatsAppMessage('+96176911906', 'Hello')
       expect(url).toBe('https://wa.me/96176911906?text=Hello')
+    })
+  })
+
+  describe('getUserNotifications', () => {
+    it('fetches list and unread count in parallel and caches the payload', async () => {
+      const { getCache, setCache } = await import('../lib/cache.js')
+      vi.mocked(getCache).mockResolvedValue(null)
+
+      queryMock.mockImplementation((sql) => {
+        if (String(sql).includes('COUNT(*)')) {
+          return Promise.resolve({ rows: [{ count: 1 }] })
+        }
+        return Promise.resolve({
+          rows: [{ id: 'n1', title: 'Hi', is_read: false, created_at: new Date().toISOString() }],
+        })
+      })
+
+      const first = await getUserNotifications('user-1', 'RESTAURANT', { limit: 25, offset: 0 })
+      expect(first.notifications).toHaveLength(1)
+      expect(first.unreadCount).toBe(1)
+      expect(queryMock).toHaveBeenCalledTimes(2)
+      expect(setCache).toHaveBeenCalled()
+
+      vi.mocked(getCache).mockResolvedValue(first)
+      queryMock.mockClear()
+      const second = await getUserNotifications('user-1', 'RESTAURANT', { limit: 25, offset: 0 })
+      expect(second).toEqual(first)
+      expect(queryMock).not.toHaveBeenCalled()
     })
   })
 })
