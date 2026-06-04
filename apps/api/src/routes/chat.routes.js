@@ -612,7 +612,9 @@ router.post(
             limitCheck,
             'chats_per_day',
             subscription?.plan_name || subscription?.plan_display_name,
-            recommendedPlans
+            recommendedPlans,
+            undefined,
+            tenantType
           )
           err.name = 'CHAT_LIMIT_EXCEEDED'
           err.message = `Daily chat limit reached (${usageResult.current}/${usageResult.limit}). Upgrade your plan to send more chats.`

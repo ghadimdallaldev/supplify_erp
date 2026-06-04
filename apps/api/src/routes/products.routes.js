@@ -487,7 +487,9 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
           limitCheck,
           'supplier_products_skus',
           subscription?.plan_name || subscription?.plan_display_name,
-          recommendedPlans
+          recommendedPlans,
+          undefined,
+          'SUPPLIER'
         )
         return res.status(403).json({
           ok: false,

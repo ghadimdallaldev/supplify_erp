@@ -23,6 +23,7 @@ vi.mock('../lib/rbac.js', () => ({
   }),
   requireRole: () => (req, res, next) => next(),
   requireOwnership: () => (req, res, next) => next(),
+  getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
   checkPermission: vi.fn().mockResolvedValue(true),
   upsertUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com' }),
   setAuthCookies: vi.fn(),
