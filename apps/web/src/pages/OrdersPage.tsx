@@ -837,7 +837,8 @@ export function OrdersPage() {
               <DialogHeader>
                 <DialogTitle>Create Manual Order</DialogTitle>
                 <DialogDescription>
-                  Create an order for a restaurant (for phone calls, chat orders, etc.)
+                  Create an order for a restaurant that follows you or has ordered from you before
+                  (phone calls, chat orders, etc.)
                 </DialogDescription>
               </DialogHeader>
 
@@ -851,13 +852,23 @@ export function OrdersPage() {
                     value={selectedRestaurant}
                     onChange={(e) => setSelectedRestaurant(e.target.value)}
                   >
-                    <option value="">Select a restaurant</option>
+                    <option value="">
+                      {(restaurantsData?.restaurants?.length ?? 0) === 0
+                        ? 'No eligible restaurants yet'
+                        : 'Select a restaurant'}
+                    </option>
                     {restaurantsData?.restaurants?.map((restaurant: any) => (
                       <option key={restaurant.id} value={restaurant.id}>
                         {restaurant.name}
                       </option>
                     ))}
                   </select>
+                  {(restaurantsData?.restaurants?.length ?? 0) === 0 && (
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Restaurants appear here after they follow your supplier profile or place their
+                      first order with you.
+                    </p>
+                  )}
                 </div>
 
                 {/* Order Notes */}

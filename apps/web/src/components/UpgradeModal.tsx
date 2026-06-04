@@ -32,6 +32,8 @@ import {
   normalizePlanCode,
   formatPlanDisplayName,
 } from '../lib/planComparison'
+import { resolveUpgradeUrl } from '../lib/externallyControlledFeatures'
+import type { AppDispatch } from '../store'
 
 const PLAN_PRICE_FALLBACK: Record<string, string> = {
   free: '$0 trial',
@@ -80,6 +82,36 @@ const UPGRADE_SUPPORT_EMAIL = import.meta.env.VITE_UPGRADE_SUPPORT_EMAIL || 'adm
 
 function normalizeUpgradePath(url: string): string {
   return url.startsWith('/') ? url : `/app/${url}`
+}
+
+function findPlanByCode(plans: any[], code: string | null | undefined) {
+  if (!code) return undefined
+  return plans.find((p) => normalizePlanCode(p.code) === normalizePlanCode(code))
+}
+
+function findNextUpgradePlan(plans: any[], currentCode: string, recommendedCode: string | null) {
+  if (recommendedCode && recommendedCode !== currentCode) {
+    const recommended = findPlanByCode(plans, recommendedCode)
+    if (recommended) return recommended
+  }
+  const currentPlanIndex = plans.findIndex((p) => normalizePlanCode(p.code) === currentCode)
+  if (currentPlanIndex >= 0 && currentPlanIndex < plans.length - 1) {
+    return plans[currentPlanIndex + 1]
+  }
+  return plans.find((p) => normalizePlanCode(p.code) !== currentCode)
+}
+
+function openPlanCheckout(dispatch: AppDispatch, plan: any, planLabel: string, onDone: () => void) {
+  const monthly = Number(plan.price_per_month ?? 0)
+  const yearly = plan.price_per_year != null ? Number(plan.price_per_year) : monthly * 12
+  onDone()
+  openCheckoutPayment(dispatch, {
+    planId: plan.id,
+    planCode: (plan.code || '').toLowerCase(),
+    planName: plan.name || planLabel,
+    priceMonthly: monthly,
+    priceYearly: yearly,
+  })
 }
 
 function isOnUpgradeDestination(path: string, search: string, target: string): boolean {
@@ -193,12 +225,12 @@ export function UpgradeModal() {
     if (!payload) return
 
     const upgradePath = normalizeUpgradePath(
-      (payload as { upgradeUrl?: string }).upgradeUrl || '/app/settings?tab=subscription'
+      resolveUpgradeUrl((payload as { upgradeUrl?: string }).upgradeUrl, tenantType)
     )
     const onUpgradePage = isOnUpgradeDestination(location.pathname, location.search, upgradePath)
     const code = targetCode ?? recommendedCode ?? null
     const planLabel = code
-      ? formatPlanDisplayName(code, plans.find((p) => normalizePlanCode(p.code) === code)?.name)
+      ? formatPlanDisplayName(code, findPlanByCode(plans, code)?.name)
       : (recommendation?.recommendedPlanName ?? 'a paid plan')
     const currentPlan =
       (payload as { currentPlan?: string }).currentPlan ??
@@ -218,13 +250,17 @@ export function UpgradeModal() {
 
     if (!canUpgrade) return
 
-    const targetPlan = code
-      ? plans.find((p) => normalizePlanCode(p.code) === code)
-      : plans.find((p) => normalizePlanCode(p.code) === (recommendedCode ?? ''))
-
-    if (targetPlan?.id && (targetPlan.code || '').toLowerCase() === 'free') {
+    const finishAndClose = () => {
       dispatch(closeMonetizationModal())
       schedulePayloadReset()
+    }
+
+    const targetPlan =
+      findPlanByCode(plans, code) ??
+      (showPlans ? findNextUpgradePlan(plans, currentCode, recommendedCode) : undefined)
+
+    if (targetPlan?.id && (targetPlan.code || '').toLowerCase() === 'free') {
+      finishAndClose()
       void activateFreePlanFromPlans(dispatch, plans).then((result) => {
         if (result.ok) {
           toast.success(
@@ -240,19 +276,13 @@ export function UpgradeModal() {
       return
     }
 
-    if (targetPlan && targetPlan.id) {
-      const monthly = Number(targetPlan.price_per_month ?? 0)
-      const yearly =
-        targetPlan.price_per_year != null ? Number(targetPlan.price_per_year) : monthly * 12
-      dispatch(closeMonetizationModal())
-      schedulePayloadReset()
-      openCheckoutPayment(dispatch, {
-        planId: targetPlan.id,
-        planCode: (targetPlan.code || '').toLowerCase(),
-        planName: targetPlan.name || planLabel,
-        priceMonthly: monthly,
-        priceYearly: yearly,
-      })
+    if (targetPlan?.id) {
+      openPlanCheckout(dispatch, targetPlan, planLabel, finishAndClose)
+      return
+    }
+
+    if (showPlans) {
+      toast.error('We could not start checkout for that plan. Try again or contact support.')
       return
     }
 
@@ -265,8 +295,7 @@ export function UpgradeModal() {
       return
     }
 
-    dispatch(closeMonetizationModal())
-    schedulePayloadReset()
+    finishAndClose()
     navigate(upgradePath)
   }
 
@@ -278,9 +307,14 @@ export function UpgradeModal() {
     (payload as { featureKey: string }).featureKey === 'upgrade_prompt'
 
   const upgradePath = normalizeUpgradePath(
-    (payload as { upgradeUrl?: string }).upgradeUrl || '/app/settings?tab=subscription'
+    resolveUpgradeUrl((payload as { upgradeUrl?: string }).upgradeUrl, tenantType)
   )
   const onUpgradePage = isOnUpgradeDestination(location.pathname, location.search, upgradePath)
+  const nextUpgradePlan = showPlans
+    ? findNextUpgradePlan(plans, currentCode, recommendedCode)
+    : undefined
+  const nextUpgradeCode = nextUpgradePlan ? normalizePlanCode(nextUpgradePlan.code) : null
+  const nextUpgradeName = nextUpgradePlan?.name ?? null
 
   const currentPlanName =
     (payload as { currentPlan?: string }).currentPlan ?? entitlements?.plan?.name ?? 'Current plan'
@@ -647,7 +681,24 @@ export function UpgradeModal() {
           )}
           {canUpgrade &&
             (!recommendedCode || recommendedCode === currentCode) &&
-            !isBrowseUpgrade && (
+            !isBrowseUpgrade &&
+            showPlans &&
+            nextUpgradeCode &&
+            nextUpgradeCode !== currentCode && (
+              <Button
+                type="button"
+                onClick={() => handleUpgrade(nextUpgradeCode)}
+                className="touch-target w-full sm:w-auto sm:min-w-[10rem]"
+              >
+                {onUpgradePage
+                  ? `Request ${nextUpgradeName ?? 'upgrade'}`
+                  : `Upgrade to ${nextUpgradeName ?? 'next plan'}`}
+              </Button>
+            )}
+          {canUpgrade &&
+            (!recommendedCode || recommendedCode === currentCode) &&
+            !isBrowseUpgrade &&
+            !showPlans && (
               <Button
                 type="button"
                 onClick={() => handleUpgrade()}

@@ -3,9 +3,13 @@
 **Do not duplicate** `api.env` / `web.env` in the dashboard unless overriding a single value.
 **Never set `PORT`** in the dashboard.
 
-## Cross-origin cookies (Railway)
+## Same-origin auth (Railway web nginx proxy)
 
-Web (`supplify-web-…`) and API (`supplify-api-…`) are **different hosts**. Auth cookies need `COOKIE_SAME_SITE=none` and `COOKIE_SECURE=true` (set in `development/api.env` from git). Do not override to `lax` in the dashboard.
+The dev web build **does not set `VITE_API_URL`**. Nginx on the web service proxies `/auth`, `/api`, and `/socket.io` to `NGINX_API_UPSTREAM` (see `development/web.env`) so session cookies are **first-party** on the web host. This is required for **mobile Chrome** login (third-party cookies on `*.up.railway.app` are often blocked).
+
+After changing `NGINX_API_UPSTREAM` or re-enabling `VITE_API_URL`, redeploy **web** and add the web callback URI in Keycloak (below).
+
+API still uses `COOKIE_SAME_SITE=none` in `development/api.env` for direct API hits; do not override to `lax` in the dashboard.
 
 ## API service — keep only these in Raw Editor
 
