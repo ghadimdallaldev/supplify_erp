@@ -45,6 +45,7 @@ import { RestaurantWastePanel } from '../components/inventory/RestaurantWastePan
 import { ExpiryInventoryTab } from '../components/inventory/ExpiryInventoryTab'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
+import { EmptyState } from '../components/ui/empty-state'
 
 export function RestaurantInventoryPage() {
   const [search, setSearch] = useState('')
@@ -352,16 +353,18 @@ export function RestaurantInventoryPage() {
                 <CardDescription>Visual overview of your inventory movements</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--brand-pale)] bg-[var(--brand-pale)]/40 p-4">
+                    <div className="min-w-0">
                       <p className="text-sm text-[var(--text-muted)]">Total Movements</p>
-                      <p className="text-2xl font-bold">{history.length}</p>
+                      <p className="text-2xl font-bold text-[var(--text)]">{history.length}</p>
                     </div>
-                    <FileText className="h-8 w-8 text-[var(--brand-mid)]" />
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)] shadow-sm">
+                      <FileText className="h-6 w-6 text-[var(--brand-mid)]" />
+                    </span>
                   </div>
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--mint-pale)] bg-[var(--mint-pale)]/40 p-4">
+                    <div className="min-w-0">
                       <p className="text-sm text-[var(--text-muted)]">Recent Additions</p>
                       <p className="text-2xl font-bold text-[var(--mint)]">
                         {
@@ -374,10 +377,12 @@ export function RestaurantInventoryPage() {
                         }
                       </p>
                     </div>
-                    <TrendingUp className="h-8 w-8 text-[var(--mint)]" />
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)] shadow-sm">
+                      <TrendingUp className="h-6 w-6 text-[var(--mint)]" />
+                    </span>
                   </div>
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--red-pale)] bg-[var(--red-pale)]/40 p-4">
+                    <div className="min-w-0">
                       <p className="text-sm text-[var(--text-muted)]">Recent Subtractions</p>
                       <p className="text-2xl font-bold text-[var(--red)]">
                         {
@@ -390,7 +395,9 @@ export function RestaurantInventoryPage() {
                         }
                       </p>
                     </div>
-                    <TrendingDown className="h-8 w-8 text-[var(--red)]" />
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)] shadow-sm">
+                      <TrendingDown className="h-6 w-6 text-[var(--red)]" />
+                    </span>
                   </div>
                 </div>
               </CardContent>
@@ -561,38 +568,37 @@ export function RestaurantInventoryPage() {
               </CardHeader>
               <CardContent>
                 {filteredInventory.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)]/90 px-4 py-12 text-center">
-                    <Package className="mx-auto mb-4 h-16 w-16 text-[var(--text-muted)]" />
-                    <p className="font-medium text-[var(--text-muted)]">
-                      {inventory.length === 0 ? 'No inventory yet' : 'No matching items'}
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--text-muted)]">
-                      {inventory.length === 0
+                  <EmptyState
+                    icon={<Package className="h-6 w-6" />}
+                    title={inventory.length === 0 ? 'No inventory yet' : 'No matching items'}
+                    description={
+                      inventory.length === 0
                         ? 'Place an order and receive goods to see inventory here.'
-                        : 'Try adjusting your search or filters.'}
-                    </p>
-                    {inventory.length === 0 ? (
-                      <Button asChild className="mt-4">
-                        <Link to="/app/cart">
-                          <ShoppingCart className="mr-2 h-4 w-4" />
-                          Create first order
-                        </Link>
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        className="mt-4"
-                        onClick={() => {
-                          setSearch('')
-                          setStatusFilter('ALL')
-                          setSupplierFilter('ALL')
-                          setCategoryFilter('ALL')
-                        }}
-                      >
-                        Clear filters
-                      </Button>
-                    )}
-                  </div>
+                        : 'Try adjusting your search or filters.'
+                    }
+                    action={
+                      inventory.length === 0 ? (
+                        <Button asChild>
+                          <Link to="/app/cart">
+                            <ShoppingCart className="mr-2 h-4 w-4" />
+                            Create first order
+                          </Link>
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setSearch('')
+                            setStatusFilter('ALL')
+                            setSupplierFilter('ALL')
+                            setCategoryFilter('ALL')
+                          }}
+                        >
+                          Clear filters
+                        </Button>
+                      )
+                    }
+                  />
                 ) : (
                   <>
                     {/* Mobile: card list */}
