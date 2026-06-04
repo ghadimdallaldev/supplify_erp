@@ -1,6 +1,7 @@
 import express from 'express'
 import http from 'http'
 import cors from 'cors'
+import compression from 'compression'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import cookieParser from 'cookie-parser'
@@ -139,6 +140,13 @@ if (config.TRUST_PROXY) {
 
 // Per-request timing — slow requests (>SLOW_REQUEST_MS) log structured stage breakdown.
 app.use(requestTimingMiddleware)
+
+// Gzip/deflate response compression. Big win on Railway where JSON list payloads
+// (orders, products, reports) cross the public network to the browser uncompressed.
+// Uses the `compressible` content-type filter (skips images/PDF/already-compressed),
+// default 1kb threshold (skips tiny bodies). API responses never embed the CSRF token
+// (header-based defense), so there is no BREACH exposure from compressing them.
+app.use(compression())
 
 // Security middleware
 app.use(
