@@ -97,6 +97,7 @@ export interface ProductFilters {
   category?: string
   supplier?: string
   inStock?: boolean
+  includeStock?: boolean
   limit?: number
   offset?: number
 }

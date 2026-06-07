@@ -85,6 +85,11 @@ const productListSchema = z.object({
     .string()
     .transform((val) => val === 'true')
     .optional(),
+  /** When true, include real available_qty in list rows (no filter). Opt-in for performance. */
+  includeStock: z
+    .string()
+    .transform((val) => val === 'true')
+    .optional(),
   minPrice: z
     .string()
     .transform((val) => (val ? parseFloat(val) : undefined))
@@ -262,15 +267,15 @@ router.get('/', async (req, res) => {
     }
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
-    const needsInventory = Boolean(params.inStock)
-    const inventoryJoin = needsInventory
+    const needsInventoryJoin = Boolean(params.inStock || params.includeStock)
+    const inventoryJoin = needsInventoryJoin
       ? `LEFT JOIN (
         SELECT product_id, SUM(available_qty) as total_available
         FROM inventory
         GROUP BY product_id
       ) inv ON inv.product_id = p.id`
       : ''
-    const availableQtyExpr = needsInventory
+    const availableQtyExpr = needsInventoryJoin
       ? 'COALESCE(inv.total_available, 0) as available_qty'
       : '0::int as available_qty'
 
@@ -301,11 +306,20 @@ router.get('/', async (req, res) => {
 
     queryParams.push(params.limit, params.offset)
 
-    const countSql = needsInventory
+    const countSql = params.inStock
       ? `
       SELECT COUNT(DISTINCT p.id) as total
       FROM product p
-      LEFT JOIN inventory i ON i.product_id = p.id
+      JOIN supplier s ON s.id = p.supplier_id
+      ${inventoryJoin}
+      LEFT JOIN LATERAL (
+        SELECT amount
+        FROM price
+        WHERE price.product_id = p.id
+          AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
+        ORDER BY valid_from DESC
+        LIMIT 1
+      ) pr ON true
       ${whereClause}
     `
       : `
