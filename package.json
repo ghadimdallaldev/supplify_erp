@@ -58,6 +58,8 @@
     "deploy:preprod": "bash deploy/scripts/deploy-preprod.sh",
     "deploy:prod": "bash deploy/scripts/deploy-prod.sh",
     "railway:keycloak:sync": "node scripts/railway-sync-keycloak.mjs",
+    "vapid:generate": "node scripts/generate-vapid-keys.mjs",
+    "railway:vapid:sync": "node scripts/railway-sync-vapid.mjs",
     "promote:preprod": "node scripts/promote-release.mjs --tier preprod",
     "promote:prod": "node scripts/promote-release.mjs --tier prod",
     "local:up": "node scripts/run-local.mjs up",

@@ -95,4 +95,17 @@ describe('Push Service', () => {
     const removed = await removePushSubscription('user-1', 'https://push.example/1')
     expect(removed).toBe(true)
   })
+
+  it('treats CHANGE_ME placeholders as not configured', async () => {
+    vi.doMock('../config/env.js', () => ({
+      config: {
+        VAPID_PUBLIC_KEY: 'CHANGE_ME',
+        VAPID_PRIVATE_KEY: 'CHANGE_ME',
+        VAPID_EMAIL: 'notifications@supplify.local',
+      },
+    }))
+    const { getVapidPublicKey, isPushConfigured } = await import('./push.service.js')
+    expect(getVapidPublicKey()).toBeNull()
+    expect(isPushConfigured()).toBe(false)
+  })
 })
