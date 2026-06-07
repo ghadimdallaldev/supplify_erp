@@ -162,6 +162,31 @@ describe('Fulfillment routes — delivery route planning', () => {
     expect(sqlCalls.some((sql) => sql.includes('LIMIT'))).toBe(true)
   })
 
+  it('GET /routes/active works for driver-only permissions without FULFILLMENT_VIEW', async () => {
+    const { getDriverActiveRoute } = await import('../services/delivery-routes.service.js')
+    getDriverActiveRoute.mockResolvedValueOnce({ id: 'route-1', stops: [] })
+
+    const driverApp = express()
+    driverApp.use(express.json())
+    driverApp.use((req, res, next) => {
+      req.requestId = 'test-req'
+      req.userData = { id: 'driver-user', email: 'd@test.com', role: 'SUPPLIER' }
+      req.tenantContext = {
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: ['DRIVER_DELIVERIES_VIEW', 'DRIVER_DELIVERIES_MANAGE'],
+      }
+      next()
+    })
+    driverApp.use('/api/fulfillment', fulfillmentRoutes)
+    driverApp.use(errorHandler)
+
+    const res = await request(driverApp).get('/api/fulfillment/routes/active').expect(200)
+
+    expect(res.body.ok).toBe(true)
+    expect(getDriverActiveRoute).toHaveBeenCalledWith('supplier-1', 'driver-a')
+  })
+
   it('GET /routes lists only scoped routes for driver-only users', async () => {
     listDeliveryRoutesMock.mockResolvedValueOnce([])
 

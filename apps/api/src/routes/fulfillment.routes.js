@@ -6,6 +6,8 @@ import {
   getRequestTenant,
   requirePermission,
 } from '../lib/rbac.js'
+import { hasPermission } from '../lib/permissions.js'
+import { PERMISSION_KEYS as P } from '../lib/permission-keys.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { isFeatureEnabled, requireFeature } from '../lib/subscription.js'
@@ -36,12 +38,35 @@ const fulfillmentFeature = requireFeature(
   (req) => req.tenantContext?.tenantType || 'SUPPLIER'
 )
 
+/** Fulfillment board for staff; driver-only endpoints use DRIVER_DELIVERIES_* instead. */
+function requireFulfillmentAccess(req, res, next) {
+  const perms = req.tenantContext?.permissions ?? []
+  const path = req.path
+
+  if (req.method === 'GET' && path === '/routes/active') {
+    if (hasPermission(perms, P.DRIVER_DELIVERIES_VIEW)) return next()
+    return requirePermission('FULFILLMENT_VIEW')(req, res, next)
+  }
+
+  if (req.method === 'PATCH' && /^\/routes\/[^/]+\/stops\/[^/]+$/.test(path)) {
+    if (
+      hasPermission(perms, P.DRIVER_DELIVERIES_MANAGE) ||
+      hasPermission(perms, P.FULFILLMENT_MANAGE)
+    ) {
+      return next()
+    }
+    return requirePermission('FULFILLMENT_VIEW')(req, res, next)
+  }
+
+  return requirePermission('FULFILLMENT_VIEW')(req, res, next)
+}
+
 router.use(
   requireAuth,
   resolveTenantContext,
   requireRole(['SUPPLIER', 'ADMIN']),
-  requirePermission('FULFILLMENT_VIEW'),
-  fulfillmentFeature
+  fulfillmentFeature,
+  requireFulfillmentAccess
 )
 
 function parseWarehouseFilter(req) {
@@ -710,11 +735,11 @@ router.get('/routes/active', async (req, res, next) => {
       })
     }
     const perms = req.tenantContext?.permissions ?? []
-    if (!isDriverOnlyPermissions(perms)) {
+    if (!hasPermission(perms, P.DRIVER_DELIVERIES_VIEW)) {
       return res.status(403).json({
         ok: false,
         data: null,
-        error: { name: 'FORBIDDEN', message: 'Drivers only' },
+        error: { name: 'FORBIDDEN', message: 'Driver delivery access required' },
         requestId: req.requestId,
       })
     }

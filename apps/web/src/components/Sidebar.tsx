@@ -95,7 +95,7 @@ export function Sidebar({
     skip: !shouldLoadTenantEntitlements,
   })
   const { data: statsData } = useGetDashboardStatsQuery(undefined, {
-    skip: isPlatformAdmin && !isImpersonating,
+    skip: (isPlatformAdmin && !isImpersonating) || isDriverRole,
   })
   const { unreadCount: notificationUnreadCount } = useNotificationBadge()
 
@@ -121,7 +121,7 @@ export function Sidebar({
     skipPollingIfUnfocused: true,
   })
   const { data: supplierDisputesData } = useGetIncomingDisputesQuery(undefined, {
-    skip: !disputesEnabled || !isSupplier || !user,
+    skip: !disputesEnabled || !isSupplier || !user || isDriverRole,
     pollingInterval: 30_000,
     skipPollingIfUnfocused: true,
   })
