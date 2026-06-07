@@ -4,17 +4,17 @@ Configure this **once** in Keycloak before running the Supplify mobile app again
 
 ## Client settings
 
-| Setting                       | Value                               |
-| ----------------------------- | ----------------------------------- |
-| **Client ID**                 | `supplify-mobile`                   |
-| **Client type**               | OpenID Connect                      |
-| **Access type**               | Public (no client secret)           |
-| **Standard flow**             | Enabled                             |
-| **Direct access grants**      | Disabled (use PKCE only)            |
-| **PKCE**                      | Required (S256)                     |
-| **Valid redirect URIs**       | `supplify://auth/callback`          |
-| **Web origins**               | Leave empty (native app)            |
-| **Post logout redirect URIs** | `supplify://auth/logout` (optional) |
+| Setting                       | Value                                                                                                                                        |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Client ID**                 | `supplify-mobile`                                                                                                                            |
+| **Client type**               | OpenID Connect                                                                                                                               |
+| **Access type**               | Public (no client secret)                                                                                                                    |
+| **Standard flow**             | Enabled                                                                                                                                      |
+| **Direct access grants**      | Disabled (use PKCE only)                                                                                                                     |
+| **PKCE**                      | Required (S256)                                                                                                                              |
+| **Valid redirect URIs**       | `supplify://auth/callback` (native); `exp://localhost:8081/--/auth/callback` (Expo Go); `http://localhost:8081/auth/callback` (Expo web dev) |
+| **Web origins**               | Leave empty (native app)                                                                                                                     |
+| **Post logout redirect URIs** | `supplify://auth/logout` (optional)                                                                                                          |
 
 ## Realm
 
