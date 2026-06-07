@@ -110,8 +110,9 @@ async function runStartupSchemaTasks() {
     await runFullStartupMigrations()
     await ensureOrderCancellationColumns()
   } catch (error) {
-    logger.error('Database migration failed after listen — shutting down', {
+    logger.error(`Database migration failed after listen — shutting down: ${error.message}`, {
       error: error.message,
+      code: error.code,
     })
     process.exit(1)
   }
