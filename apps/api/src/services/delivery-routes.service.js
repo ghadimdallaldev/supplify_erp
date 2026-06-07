@@ -411,6 +411,7 @@ export async function createDeliveryRoute({
          VALUES ($1, $2, $3, 'PLANNED', $4)`,
         [route.id, orderId, seq++, orderRows[0]?.address_json ?? null]
       )
+      await syncDriverAssignment(client, { supplierId, orderId, driverId, userId })
     }
 
     const stops = await loadRouteStops(route.id, client)
@@ -442,10 +443,8 @@ async function activateRouteDispatch(client, { supplierId, route, userId }) {
     activated.push(stop.orderId)
   }
 
-  if (activated.length === 0) {
-    throw new ValidationError(
-      'No orders on this route are ready for dispatch. Wait until orders are ready for delivery, or remove stops that are still being prepared.'
-    )
+  if (activated.length === 0 && waiting.length === 0) {
+    throw new ValidationError('No orders remain on this route')
   }
 
   return { activated, waiting }
@@ -500,6 +499,14 @@ export async function addOrdersToPlannedRoute({ supplierId, routeId, orderIds, u
          VALUES ($1, $2, $3, 'PLANNED', $4)`,
         [routeId, orderId, seq++, orderRows[0]?.address_json ?? null]
       )
+      if (route.driverId) {
+        await syncDriverAssignment(client, {
+          supplierId,
+          orderId,
+          driverId: route.driverId,
+          userId,
+        })
+      }
     }
 
     return getDeliveryRoute(supplierId, routeId)

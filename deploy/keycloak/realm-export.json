@@ -65,9 +65,9 @@
       "redirectUris": [
         "supplify://auth/callback",
         "exp://127.0.0.1:8081/--/auth/callback",
+        "exp://127.0.0.1:8081/*",
         "exp://localhost:8081/--/auth/callback",
-        "http://localhost:8081/auth/callback",
-        "http://127.0.0.1:8081/auth/callback",
+        "exp://localhost:8081/*",
         "http://localhost:8081/*",
         "http://127.0.0.1:8081/*"
       ],

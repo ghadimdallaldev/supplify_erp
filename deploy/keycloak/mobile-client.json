@@ -8,7 +8,9 @@
   "redirectUris": [
     "supplify://auth/callback",
     "exp://127.0.0.1:8081/--/auth/callback",
-    "exp://localhost:8081/--/auth/callback"
+    "exp://127.0.0.1:8081/*",
+    "exp://localhost:8081/--/auth/callback",
+    "exp://localhost:8081/*"
   ],
   "webOrigins": ["+"],
   "protocol": "openid-connect",
