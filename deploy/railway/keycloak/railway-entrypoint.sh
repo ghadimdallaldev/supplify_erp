@@ -131,7 +131,8 @@ SQL
 }
 
 optimized_build_is_postgres() {
-  [ -f /opt/keycloak/conf/keycloak.conf ] && grep -qE '^db=postgres' /opt/keycloak/conf/keycloak.conf
+  # kc.sh build --db=postgres succeeds even when keycloak.conf has no ^db= line (Keycloak 24).
+  /opt/keycloak/bin/kc.sh show-config 2>/dev/null | grep -qE '(^|[[:space:]])db[= ]postgres'
 }
 
 ensure_postgres_optimized_build() {

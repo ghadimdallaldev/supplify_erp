@@ -18,7 +18,7 @@ ARG REALM_IMPORT_FILENAME=Supplify-realm.json
 # Build-time only; override per env via railway.json buildArgs.
 ARG KC_METRICS_ENABLED=false
 # Bump to invalidate Railway Docker layer cache when build logic changes.
-ARG KEYCLOAK_BUILD_ID=postgres-v2
+ARG KEYCLOAK_BUILD_ID=postgres-v3
 
 COPY ${REALM_EXPORT_FILE} /opt/keycloak/data/import/${REALM_IMPORT_FILENAME}
 RUN test -s "/opt/keycloak/data/import/${REALM_IMPORT_FILENAME}"
@@ -31,11 +31,12 @@ RUN chmod +x /opt/keycloak/bin/railway-entrypoint.sh
 USER 1000
 
 # kc.db is fixed at build time. Without --db=postgres the optimized image defaults to H2.
+# Do not grep keycloak.conf — Keycloak 24 persists build options separately; build exit code is authoritative.
 RUN echo "Keycloak build id: ${KEYCLOAK_BUILD_ID}" \
   && /opt/keycloak/bin/kc.sh build \
        --db=postgres \
        --health-enabled=true \
        --metrics-enabled="${KC_METRICS_ENABLED}" \
-  && grep -qE '^db=postgres' /opt/keycloak/conf/keycloak.conf
+  && echo "Keycloak postgres build complete"
 
 ENTRYPOINT ["/opt/keycloak/bin/railway-entrypoint.sh"]
