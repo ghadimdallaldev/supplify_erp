@@ -923,6 +923,66 @@ export const api = createApi({
         { type: 'Restaurant', id: 'LIST' },
       ],
     }),
+    getRestaurantDeliveryLocations: builder.query<
+      {
+        restaurant: {
+          id: string
+          name: string
+          deliveryLatitude?: number | null
+          deliveryLongitude?: number | null
+          deliveryLocationLabel?: string | null
+          deliveryAddressNotes?: string | null
+          coordinatesAvailable?: boolean
+        }
+        branches: Array<{
+          id: string
+          name: string
+          code?: string | null
+          deliveryLatitude?: number | null
+          deliveryLongitude?: number | null
+          deliveryLocationLabel?: string | null
+          deliveryAddressNotes?: string | null
+          coordinatesAvailable?: boolean
+        }>
+      },
+      void
+    >({
+      query: () => '/api/restaurants/me/delivery-locations',
+      providesTags: ['Restaurant'],
+    }),
+    updateRestaurantDeliveryLocation: builder.mutation<
+      { location: Record<string, unknown> },
+      {
+        deliveryLatitude?: number | null
+        deliveryLongitude?: number | null
+        deliveryLocationLabel?: string | null
+        deliveryAddressNotes?: string | null
+      }
+    >({
+      query: (body) => ({
+        url: '/api/restaurants/me/delivery-location',
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Restaurant'],
+    }),
+    updateBranchDeliveryLocation: builder.mutation<
+      { location: Record<string, unknown> },
+      {
+        branchId: string
+        deliveryLatitude?: number | null
+        deliveryLongitude?: number | null
+        deliveryLocationLabel?: string | null
+        deliveryAddressNotes?: string | null
+      }
+    >({
+      query: ({ branchId, ...body }) => ({
+        url: `/api/restaurants/branches/${branchId}/delivery-location`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Restaurant', 'Branch'],
+    }),
 
     // Price endpoints
     getPrices: builder.query<Price[], string>({
@@ -3785,6 +3845,9 @@ export const {
   useUploadSupplierLogoMutation,
   useGetRestaurantMeQuery,
   useUpdateRestaurantMutation,
+  useGetRestaurantDeliveryLocationsQuery,
+  useUpdateRestaurantDeliveryLocationMutation,
+  useUpdateBranchDeliveryLocationMutation,
   useUploadRestaurantLogoMutation,
   useGetPresignedUrlMutation,
   useGetRestaurantsQuery,

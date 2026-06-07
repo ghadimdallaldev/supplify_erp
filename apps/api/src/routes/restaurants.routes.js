@@ -3,7 +3,7 @@ import { requireAuth, requireRole, getSupplierIdForRequest } from '../lib/rbac.j
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
-import { ValidationError } from '../middlewares/errorHandler.js'
+import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { createPendingActivationSubscription } from '../lib/billing/subscription-activation.js'
 import { ensureTenantSystemRoles } from '../lib/tenant-roles.js'
 import { z } from 'zod'
@@ -264,6 +264,145 @@ router.get('/me', requireAuth, requireRole(['RESTAURANT']), async (req, res) => 
     })
   }
 })
+
+// Delivery destination coordinates (ETA readiness)
+router.get('/me/delivery-locations', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
+  try {
+    const { getRestaurantIdForRequest } = await import('../lib/rbac.js')
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Restaurant workspace not found for user' },
+        requestId: req.requestId,
+      })
+    }
+    const { listRestaurantDeliveryLocations } = await import(
+      '../services/restaurant-delivery-location.service.js'
+    )
+    const data = await listRestaurantDeliveryLocations(restaurantId)
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('GET /api/restaurants/me/delivery-locations error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to load delivery locations' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.patch(
+  '/me/delivery-location',
+  requireAuth,
+  requireRole(['RESTAURANT']),
+  async (req, res) => {
+    try {
+      const { getRestaurantIdForRequest } = await import('../lib/rbac.js')
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Restaurant workspace not found for user' },
+          requestId: req.requestId,
+        })
+      }
+      const { updateRestaurantDeliveryLocation } = await import(
+        '../services/restaurant-delivery-location.service.js'
+      )
+      const location = await updateRestaurantDeliveryLocation(restaurantId, req.body)
+      res.json({ ok: true, data: { location }, error: null, requestId: req.requestId })
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof NotFoundError) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      logger.error('PATCH /api/restaurants/me/delivery-location error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to update delivery location' },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
+
+router.patch(
+  '/branches/:branchId/delivery-location',
+  requireAuth,
+  requireRole(['RESTAURANT']),
+  async (req, res) => {
+    try {
+      const { getRestaurantIdForRequest } = await import('../lib/rbac.js')
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Restaurant workspace not found for user' },
+          requestId: req.requestId,
+        })
+      }
+      const { updateBranchDeliveryLocation } = await import(
+        '../services/restaurant-delivery-location.service.js'
+      )
+      const location = await updateBranchDeliveryLocation(
+        restaurantId,
+        req.params.branchId,
+        req.body
+      )
+      res.json({ ok: true, data: { location }, error: null, requestId: req.requestId })
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof NotFoundError) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      logger.error('PATCH /api/restaurants/branches/:branchId/delivery-location error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to update branch delivery location' },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
 
 // Get restaurant by ID
 router.get('/:id', requireAuth, async (req, res) => {

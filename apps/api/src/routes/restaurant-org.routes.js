@@ -365,7 +365,16 @@ router.patch('/branches/:restaurantId', async (req, res) => {
       })
     }
 
-    const { name, branch_code, phone, address_json } = req.body
+    const {
+      name,
+      branch_code,
+      phone,
+      address_json,
+      deliveryLatitude,
+      deliveryLongitude,
+      deliveryLocationLabel,
+      deliveryAddressNotes,
+    } = req.body
     const updates = []
     const values = []
     let idx = 1
@@ -385,7 +394,25 @@ router.patch('/branches/:restaurantId', async (req, res) => {
       updates.push(`address_json = $${idx++}::jsonb`)
       values.push(JSON.stringify(address_json))
     }
-    if (!updates.length) {
+    const hasDeliveryPatch =
+      deliveryLatitude !== undefined ||
+      deliveryLongitude !== undefined ||
+      deliveryLocationLabel !== undefined ||
+      deliveryAddressNotes !== undefined
+
+    if (hasDeliveryPatch) {
+      const { updateRestaurantDeliveryLocation } = await import(
+        '../services/restaurant-delivery-location.service.js'
+      )
+      await updateRestaurantDeliveryLocation(restaurantId, {
+        deliveryLatitude,
+        deliveryLongitude,
+        deliveryLocationLabel,
+        deliveryAddressNotes,
+      })
+    }
+
+    if (!updates.length && !hasDeliveryPatch) {
       return res.status(400).json({
         ok: false,
         data: null,
@@ -393,6 +420,17 @@ router.patch('/branches/:restaurantId', async (req, res) => {
         requestId: req.requestId,
       })
     }
+
+    if (!updates.length) {
+      const { rows } = await query(`SELECT * FROM restaurant WHERE id = $1`, [restaurantId])
+      return res.json({
+        ok: true,
+        data: { branch: rows[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    }
+
     updates.push('updated_at = NOW()')
     values.push(restaurantId)
     const { rows } = await query(

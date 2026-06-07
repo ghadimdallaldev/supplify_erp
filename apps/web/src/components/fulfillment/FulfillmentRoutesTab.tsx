@@ -103,7 +103,9 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
                           : '—'}
                       </td>
                       <td className="p-2 text-[var(--text-muted)]">{route.area || '—'}</td>
-                      <td className="p-2 tabular-nums">{route.stops}</td>
+                      <td className="p-2 tabular-nums">
+                        {Array.isArray(route.stops) ? route.stops.length : route.stops}
+                      </td>
                       <td className="p-2 text-xs text-[var(--text-muted)]">
                         {route.completedStops} done · {route.failedStops} failed
                         {route.rescheduledStops > 0 ? ` · ${route.rescheduledStops} resched` : ''}
