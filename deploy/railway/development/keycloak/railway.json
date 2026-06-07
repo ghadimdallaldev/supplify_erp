@@ -6,12 +6,13 @@
     "buildArgs": {
       "REALM_EXPORT_FILE": "deploy/keycloak/realm-export.json",
       "REALM_IMPORT_FILENAME": "Supplify-realm.json",
-      "KC_PRODUCTION": "false"
+      "KC_PRODUCTION": "true",
+      "KC_METRICS_ENABLED": "false"
     },
     "watchPatterns": ["deploy/keycloak/**", "deploy/railway/keycloak/**"]
   },
   "deploy": {
-    "startCommand": "/opt/keycloak/bin/kc.sh start-dev --import-realm",
+    "startCommand": "/opt/keycloak/bin/kc.sh start --import-realm",
     "healthcheckPath": "/health/ready",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
