@@ -1053,24 +1053,51 @@ export function RestaurantOnboardingPage() {
                         Get real-time alerts even when Supplify is in the background.
                       </p>
                       {push.pushAvailable ? (
-                        <div className="flex items-center justify-between rounded-xl border p-4">
-                          <span className="text-sm">Enable push notifications</span>
-                          <Button
-                            type="button"
-                            variant={push.subscribed ? 'outline' : 'default'}
-                            size="sm"
-                            disabled={push.subscribing || push.unsubscribing}
-                            onClick={() => {
-                              const action = push.subscribed
-                                ? push.disablePush()
-                                : push.enablePush()
-                              action.catch((err: Error) =>
-                                toast.error(err?.message || 'Could not update push notifications')
-                              )
-                            }}
-                          >
-                            {push.subscribed ? 'Disable' : 'Enable'}
-                          </Button>
+                        <div className="space-y-3">
+                          {push.pushPermissionBlocked ? (
+                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+                              <p className="font-medium">Notifications blocked by your browser</p>
+                              <p className="mt-1">{push.pushPermissionBlockedReason}</p>
+                              <ol className="mt-2 list-decimal space-y-1 pl-4">
+                                <li>
+                                  Click the <strong>lock / tune icon</strong> left of the address
+                                  bar
+                                </li>
+                                <li>
+                                  Open <strong>Permissions</strong> → set{' '}
+                                  <strong>Notifications</strong> to <strong>Allow</strong>
+                                </li>
+                                <li>Reload this page, then click Enable below</li>
+                              </ol>
+                              <p className="mt-2 text-[var(--text-muted)]">
+                                In Edge: Settings → Cookies and site permissions → All permissions →
+                                Notifications → remove this site if listed as blocked.
+                              </p>
+                            </div>
+                          ) : null}
+                          <div className="flex items-center justify-between rounded-xl border p-4">
+                            <span className="text-sm">Enable push notifications</span>
+                            <Button
+                              type="button"
+                              variant={push.subscribed ? 'outline' : 'default'}
+                              size="sm"
+                              disabled={
+                                push.subscribing ||
+                                push.unsubscribing ||
+                                (push.pushPermissionBlocked && !push.subscribed)
+                              }
+                              onClick={() => {
+                                const action = push.subscribed
+                                  ? push.disablePush()
+                                  : push.enablePush()
+                                action.catch((err: Error) =>
+                                  toast.error(err?.message || 'Could not update push notifications')
+                                )
+                              }}
+                            >
+                              {push.subscribed ? 'Disable' : 'Enable'}
+                            </Button>
+                          </div>
                         </div>
                       ) : (
                         <p className="text-xs text-amber-800 dark:text-amber-200">
