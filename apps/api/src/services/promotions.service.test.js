@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { activeRestaurantDeal } from '../test/factories/deal-promotion.js'
 import {
   calculatePromotionDiscount,
   filterEligibleLineItems,
+  hasActiveSupplierOrderPromotions,
   isPromotionEligible,
   selectBestPromotion,
 } from './promotions.service.js'
@@ -133,6 +134,28 @@ describe('promotions.service', () => {
         { ...basePromo, id: 'f', type: 'featured_listing', discount_value: 99, applies_to: 'all' },
       ]
       expect(selectBestPromotion(promos, 100, [])).toBeNull()
+    })
+  })
+
+  describe('hasActiveSupplierOrderPromotions', () => {
+    it('accepts the pool query helper function', async () => {
+      const queryFn = vi.fn().mockResolvedValue({ rows: [{ '?column?': 1 }] })
+
+      await expect(
+        hasActiveSupplierOrderPromotions(queryFn, 'supplier-1', 'restaurant-1')
+      ).resolves.toBe(true)
+
+      expect(queryFn).toHaveBeenCalledOnce()
+    })
+
+    it('accepts a transaction client with query()', async () => {
+      const client = {
+        query: vi.fn().mockResolvedValue({ rows: [] }),
+      }
+
+      await expect(
+        hasActiveSupplierOrderPromotions(client, 'supplier-1', 'restaurant-1')
+      ).resolves.toBe(false)
     })
   })
 })

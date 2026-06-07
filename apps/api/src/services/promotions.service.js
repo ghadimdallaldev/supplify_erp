@@ -2,6 +2,16 @@ import { query } from '../lib/db.js'
 import { isRestaurantVisibleDeal, buildDealConfigSnapshot } from './deal-lifecycle.service.js'
 import { isFeatureEnabled } from '../lib/subscription.js'
 
+function runQuery(db, text, params) {
+  if (db && typeof db.query === 'function') {
+    return db.query(text, params)
+  }
+  if (typeof db === 'function') {
+    return db(text, params)
+  }
+  throw new Error('Invalid database handle')
+}
+
 const ORDER_DISCOUNT_TYPES = new Set([
   'percentage_discount',
   'fixed_discount',
@@ -117,7 +127,8 @@ export function selectBestPromotion(promotions, subtotal, lineItems, context = {
  * Load active promotions for a supplier visible to a restaurant.
  */
 async function fetchActivePromotionsForSupplier(db, supplierId, restaurantId) {
-  const { rows } = await db.query(
+  const { rows } = await runQuery(
+    db,
     `
     SELECT p.*,
       COALESCE(
@@ -178,7 +189,7 @@ const ACTIVE_ORDER_PROMO_EXISTS_SQL = `
 
 /** Fast EXISTS check — skip heavy promotion scan when supplier has no eligible deals. */
 export async function hasActiveSupplierOrderPromotions(db, supplierId, restaurantId) {
-  const { rows } = await db.query(ACTIVE_ORDER_PROMO_EXISTS_SQL, [supplierId, restaurantId])
+  const { rows } = await runQuery(db, ACTIVE_ORDER_PROMO_EXISTS_SQL, [supplierId, restaurantId])
   return rows.length > 0
 }
 
