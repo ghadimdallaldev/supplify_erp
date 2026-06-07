@@ -19,8 +19,19 @@ export async function reserveWarehouseStockBatch(client, warehouseId, lineItems)
 
   if (!items.length) return
 
-  const productIds = items.map((item) => item.productId)
-  const quantities = items.map((item) => item.quantity)
+  const aggregated = new Map()
+  for (const item of items) {
+    const existing = aggregated.get(item.productId)
+    if (existing) {
+      existing.quantity += item.quantity
+    } else {
+      aggregated.set(item.productId, { ...item })
+    }
+  }
+  const lines = [...aggregated.values()]
+
+  const productIds = lines.map((item) => item.productId)
+  const quantities = lines.map((item) => item.quantity)
 
   const { rows } = await client.query(
     `SELECT product_id, quantity_available FROM warehouse_inventory
@@ -33,7 +44,7 @@ export async function reserveWarehouseStockBatch(client, warehouseId, lineItems)
     rows.map((row) => [row.product_id, Number(row.quantity_available)])
   )
 
-  for (const item of items) {
+  for (const item of lines) {
     const available = availableByProduct.get(item.productId)
     if (available == null) continue
     if (available < item.quantity) {
