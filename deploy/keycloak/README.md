@@ -37,11 +37,10 @@ In the Keycloak Railway service **Variables**, set (from `deploy/railway/develop
 
 ```env
 KC_HOSTNAME=keycloak-development-4942.up.railway.app
-KC_PROXY=edge
 KC_PROXY_HEADERS=xforwarded
 ```
 
-Redeploy Keycloak, then open `https://keycloak-development-4942.up.railway.app/admin` (master realm, user `admin`, password = `KEYCLOAK_ADMIN_PASSWORD`).
+Do **not** set deprecated `KC_PROXY=edge`. Sync full vars: `pnpm railway:keycloak:sync -- development`.
 
 ### 2. Import realm without Admin UI (Railway Shell)
 
@@ -68,8 +67,8 @@ Verify:
 
 Then confirm `https://keycloak-development-4942.up.railway.app/realms/Supplify/.well-known/openid-configuration` returns JSON (not 404).
 
-### 3. First-boot auto-import (optional)
+### 3. First-boot auto-import
 
-Start command: `/opt/keycloak/bin/kc.sh start --import-realm` (development uses optimized `start`, not `start-dev`)  
-Mount `realm-export.json` as `/opt/keycloak/data/import/Supplify-realm.json`.  
-Import runs only when that realm name is not already in the database; wiping the Keycloak Postgres plugin data triggers a clean import.
+Start command (Railway): `/opt/keycloak/bin/railway-entrypoint.sh start --import-realm`  
+Entrypoint blocks `start-dev`; non-prod uses runtime `--db=postgres` (`KEYCLOAK_USE_OPTIMIZED=false`).  
+Realm JSON is baked at `/opt/keycloak/data/import/<name>-realm.json`. Import skips if realm already exists in DB.

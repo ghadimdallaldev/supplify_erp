@@ -48,10 +48,11 @@ GPS tracking works without this key (fallback link still works).
 
 ## Keycloak (automatic realm import)
 
-Build from `deploy/railway/development/keycloak/railway.json` — realm **Supplify** imports on first boot (`--import-realm`).  
-Set `KEYCLOAK_ADMIN_PASSWORD` on **Keycloak** and **API** (same value). See [`../keycloak/RAILWAY_SETUP.md`](../keycloak/RAILWAY_SETUP.md).
+Build from `deploy/railway/development/keycloak/railway.json` — realm **Supplify** imports on first boot.  
+Sync vars: `pnpm railway:keycloak:sync -- development` (includes JVM caps, `KEYCLOAK_USE_OPTIMIZED=false`).  
+Set `KEYCLOAK_ADMIN_PASSWORD` on **Keycloak** and **API** (same value).
 
-After pulling memory fixes, paste **`development/keycloak.env`** into the Keycloak service Raw Editor (includes `KC_DB_*` + JVM caps). See [`../KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](../KEYCLOAK_RAILWAY_MEMORY_NOTES.md) and [`../KEYCLOAK_RAILWAY_DB_NOTES.md`](../KEYCLOAK_RAILWAY_DB_NOTES.md).
+Remove legacy dashboard vars: `KC_PROXY`, `KC_DB`. See [`../keycloak/RAILWAY_SETUP.md`](../keycloak/RAILWAY_SETUP.md), [`../KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](../KEYCLOAK_RAILWAY_MEMORY_NOTES.md), [`../../docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`](../../docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md).
 
 ## Wrong values that break login (not 502)
 
