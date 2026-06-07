@@ -39,6 +39,14 @@ import {
   userHasOwnerRole,
 } from './tenant-roles.js'
 import { assertStaffPortalRouteAccess, STAFF_PORTAL_APP_ROLE } from './staff-portal-auth.js'
+import {
+  extractAccessToken,
+  extractBearerToken,
+  extractRefreshToken,
+  isBearerAuthRequest,
+} from './mobile-auth.js'
+
+export { extractBearerToken, extractAccessToken, isBearerAuthRequest } from './mobile-auth.js'
 
 const TENANT_REQ_CACHE_TTL = 180 // seconds
 const USER_BY_SUB_CACHE_TTL = 300 // seconds
@@ -209,7 +217,9 @@ export async function upsertUser(userInfo, roles = []) {
 export async function requireAuth(req, res, next) {
   startStage(req, 'auth')
   try {
-    const accessToken = extractTokenFromCookie(req)
+    const bearerToken = extractBearerToken(req)
+    const accessToken = extractAccessToken(req)
+    req.authMethod = bearerToken ? 'bearer' : accessToken ? 'cookie' : null
 
     if (!accessToken) {
       return res.status(401).json({
@@ -256,7 +266,21 @@ export async function requireAuth(req, res, next) {
     } catch (error) {
       logger.debug('Token verification failed, attempting refresh')
 
-      // Token is invalid or expired, try to refresh
+      // Bearer clients refresh via POST /auth/mobile/refresh — no cookie refresh here.
+      if (bearerToken) {
+        clearAuthCookies(res)
+        return res.status(401).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'JWT_EXPIRED',
+            message: 'Access token expired. Refresh via POST /auth/mobile/refresh.',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      // Token is invalid or expired, try to refresh (cookie / web clients)
       const refreshToken = extractRefreshTokenFromCookie(req)
 
       if (!refreshToken) {
@@ -345,7 +369,8 @@ export async function requireAuth(req, res, next) {
 // Optional authentication middleware - doesn't fail if token is missing, but sets req.userData if available
 export async function optionalAuth(req, res, next) {
   try {
-    const accessToken = extractTokenFromCookie(req)
+    const bearerToken = extractBearerToken(req)
+    const accessToken = extractAccessToken(req)
 
     if (!accessToken) {
       // No token, continue without authentication
@@ -365,7 +390,12 @@ export async function optionalAuth(req, res, next) {
         syncRequestLogContext(req)
       }
     } catch (error) {
-      // Token is invalid or expired, try to refresh
+      // Bearer clients do not silently refresh in optionalAuth.
+      if (bearerToken) {
+        return next()
+      }
+
+      // Token is invalid or expired, try to refresh (cookie / web clients)
       const refreshToken = extractRefreshTokenFromCookie(req)
 
       if (refreshToken) {
