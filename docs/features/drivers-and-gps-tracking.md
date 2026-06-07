@@ -78,11 +78,59 @@ Dispatch, delivery board, route detail, command center, and `GET /api/orders/:id
 
 ### Privacy
 
+- Restaurants see live map only after dispatch starts (`picked_up` / `out_for_delivery`), not for planned routes or driver-assigned-but-not-dispatched states
 - Restaurants see latest point only for their order (no history, no route stops, driver phone hidden by default)
 - No email per GPS ping
-- Tracking only for assignment statuses: `assigned`, `picked_up`, `out_for_delivery`
+- Driver/supplier GPS polling uses assignment statuses: `assigned`, `picked_up`, `out_for_delivery`
 
-### Limitations / later work
+---
+
+## Planned route assignment before dispatch
+
+Suppliers can **plan** delivery routes before orders are dispatch-ready. This is separate from **active** dispatch.
+
+| Phase       | `delivery_route.status`   | `driver_assignments`                  | Live GPS / restaurant map  | Driver app                |
+| ----------- | ------------------------- | ------------------------------------- | -------------------------- | ------------------------- |
+| **Planned** | `PLANNED`                 | **None** (not created at plan time)   | Off                        | No active route           |
+| **Active**  | `IN_PROGRESS`             | Created for dispatch-ready stops only | On when driver sends pings | Active route + deliveries |
+| **Done**    | `COMPLETED` / `CANCELLED` | Terminal                              | Off                        | —                         |
+
+### Eligible order statuses
+
+| Action                                        | `customer_order.status` values                                        |
+| --------------------------------------------- | --------------------------------------------------------------------- |
+| Add to **planned** route                      | `PLACED`, `PENDING_APPROVAL`, `ACKNOWLEDGED`, `PROCESSING`, `SHIPPED` |
+| **Activate** route (assign driver + dispatch) | `PROCESSING`, `SHIPPED` only                                          |
+
+Mapping from ops language: CONFIRMED/ACCEPTED → `ACKNOWLEDGED`; PREPARING → `PROCESSING`; READY_FOR_DELIVERY → `SHIPPED`.
+
+### Supplier UI
+
+- Dispatch board: **Assign to planned route** (multi-select → planned route dialog)
+- Badge: **Planned route** or **Route planned — waiting for order to be ready**
+- Routes tab: **Activate route (start dispatch)** on a `PLANNED` route
+
+### APIs
+
+| Method | Path                                                    | Notes                                                     |
+| ------ | ------------------------------------------------------- | --------------------------------------------------------- |
+| POST   | `/api/fulfillment/routes`                               | Creates `PLANNED` route + stops; **no** driver assignment |
+| POST   | `/api/fulfillment/routes/:id/stops`                     | Add orders to existing planned route                      |
+| DELETE | `/api/fulfillment/routes/:id/stops/:orderId`            | Remove from planned route                                 |
+| PATCH  | `/api/fulfillment/routes/:id` `{ status: IN_PROGRESS }` | Activates dispatch for ready stops                        |
+
+### Edge cases
+
+- **Cancelled order:** removed from planned routes (`releaseOrderFromPlannedRoutes`)
+- **Non-ready stops on activate:** stay on route as planned stops; ready stops get driver assignments
+- **Duplicate routing:** an order cannot be on two `PLANNED`/`IN_PROGRESS` routes
+
+### Rollback notes
+
+- Revert `createDeliveryRoute` deferral of `syncDriverAssignment` restores old “assigned on create” behavior
+- Restaurant live-tracking guard is in `driver-location.service.js` (`picked_up` / `out_for_delivery` only)
+
+---
 
 - No route optimization or ETA engine
 - No Socket.io live map stream (polling on tracking query)

@@ -93,7 +93,15 @@ export function RestaurantOrderTrackingPanel({ orderId, orderStatus }: Props) {
           {message}
         </p>
 
-        {showMap && <DeliveryTrackingMap latitude={loc?.latitude} longitude={loc?.longitude} />}
+        {showMap && (
+          <DeliveryTrackingMap
+            latitude={loc?.latitude}
+            longitude={loc?.longitude}
+            live={Boolean(data.tracking?.hasLocation && !data.tracking?.isStale)}
+            recordedAt={loc?.recordedAt ?? null}
+            heightClassName="h-64"
+          />
+        )}
 
         {data?.trackingEnabled && data.delivery?.status !== 'delivered' && (
           <p className="text-xs text-[var(--text-muted)]" data-testid="restaurant-tracking-eta">

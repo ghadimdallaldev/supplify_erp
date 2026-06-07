@@ -13,9 +13,11 @@ type Props = {
   pollIntervalMs?: number
 }
 
-const ACTIVE_ASSIGNMENT_STATUSES = new Set(['assigned', 'picked_up', 'out_for_delivery'])
+const ACTIVE_ASSIGNMENT_STATUSES = LIVE_TRACKING_ASSIGNMENT_STATUSES
 
-export function OrderDeliveryTrackingPanel({ orderId, pollIntervalMs = 30_000 }: Props) {
+const LIVE_TRACKING_ASSIGNMENT_STATUSES = new Set(['picked_up', 'out_for_delivery'])
+
+export function OrderDeliveryTrackingPanel({ orderId, pollIntervalMs = 15_000 }: Props) {
   const [pollMs, setPollMs] = useState(pollIntervalMs)
   const { data, isLoading, isError } = useGetOrderTrackingQuery(orderId, {
     pollingInterval: pollMs,
@@ -89,7 +91,13 @@ export function OrderDeliveryTrackingPanel({ orderId, pollIntervalMs = 30_000 }:
             {getGpsStatusLabel(tracking)}
           </Badge>
         </div>
-        <DeliveryTrackingMap latitude={loc?.latitude} longitude={loc?.longitude} />
+        <DeliveryTrackingMap
+          latitude={loc?.latitude}
+          longitude={loc?.longitude}
+          live={Boolean(tracking?.hasLocation && !tracking?.isStale)}
+          recordedAt={loc?.recordedAt ?? null}
+          heightClassName="h-64"
+        />
         <p className="text-xs text-[var(--text-muted)]">ETA not available yet</p>
       </CardContent>
     </Card>

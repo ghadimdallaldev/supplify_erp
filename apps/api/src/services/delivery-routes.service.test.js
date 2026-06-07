@@ -168,8 +168,10 @@ describe('delivery-routes.service', () => {
     queryMock
       .mockResolvedValueOnce({ rows: [routeRow] })
       .mockResolvedValueOnce({ rows: stopRows })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [routeRow] })
       .mockResolvedValueOnce({ rows: stopRows })
+      .mockResolvedValueOnce({ rows: [] })
 
     clientQueryMock.mockResolvedValue({ rowCount: 1 })
 
@@ -199,7 +201,9 @@ describe('delivery-routes.service', () => {
       .mockResolvedValueOnce({ rows: [{ ...baseRoute, driver_name: 'Alex' }] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ ...baseRoute, status: 'CANCELLED' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ ...baseRoute, status: 'CANCELLED', driver_name: 'Alex' }] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
 
     const route = await cancelDeliveryRoute('s1', 'r1')

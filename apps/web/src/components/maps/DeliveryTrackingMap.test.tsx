@@ -10,12 +10,9 @@ describe('DeliveryTrackingMap', () => {
     )
   })
 
-  it('shows fallback link when map key missing', () => {
-    render(<DeliveryTrackingMap latitude={33.8938} longitude={35.5018} />)
-    expect(screen.getByTestId('delivery-tracking-map-fallback')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Open in Google Maps/i })).toHaveAttribute(
-      'href',
-      expect.stringContaining('33.8938')
-    )
+  it('embeds live map when coordinates exist', () => {
+    render(<DeliveryTrackingMap latitude={33.8938} longitude={35.5018} live />)
+    expect(screen.getByTestId('delivery-tracking-map-embed')).toBeInTheDocument()
+    expect(screen.getByTestId('delivery-tracking-map-live')).toHaveTextContent(/Live/i)
   })
 })

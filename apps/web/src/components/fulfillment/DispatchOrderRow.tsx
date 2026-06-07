@@ -86,6 +86,16 @@ export function DispatchOrderRow({
             >
               {gpsLabel}
             </Badge>
+            {order.route_planning_label ? (
+              <Badge variant="outline" data-testid="dispatch-planned-route-badge">
+                {order.route_planning_label}
+                {order.active_route_number ? ` · ${order.active_route_number}` : ''}
+              </Badge>
+            ) : order.active_route_number && order.active_route_status === 'PLANNED' ? (
+              <Badge variant="outline" data-testid="dispatch-planned-route-badge">
+                Planned route · {order.active_route_number}
+              </Badge>
+            ) : null}
           </div>
 
           <p className="text-xs text-[var(--text-muted)]">
