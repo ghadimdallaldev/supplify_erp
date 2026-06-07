@@ -1,4 +1,5 @@
 import { config } from '../config/env.js'
+import { query } from '../lib/db.js'
 
 const ETA_ACTIVE_ASSIGNMENT_STATUSES = new Set(['picked_up', 'out_for_delivery'])
 const TERMINAL_DELIVERY_STATUSES = new Set(['delivered', 'failed', 'cancelled'])
@@ -32,7 +33,77 @@ export function getDeliveryEtaConfig() {
     speedKmh: config.DELIVERY_ETA_CITY_SPEED_KMH ?? 20,
     minMultiplier: config.DELIVERY_ETA_MIN_MULTIPLIER ?? 1.0,
     maxMultiplier: config.DELIVERY_ETA_MAX_MULTIPLIER ?? 1.5,
+    serviceTimeMinutes: config.DELIVERY_ETA_SERVICE_TIME_MINUTES ?? 5,
   }
+}
+
+const FIXED_ROUTE_STOP_STATUSES = new Set(['COMPLETED', 'FAILED'])
+
+/**
+ * Build route-aware ETA context from ordered route stops (DB status values).
+ * Returns null when the order is not on an active route.
+ */
+export function buildRouteEtaContext(routeStops, targetOrderId) {
+  if (!Array.isArray(routeStops) || !routeStops.length || !targetOrderId) return null
+
+  const ordered = [...routeStops].sort(
+    (a, b) =>
+      (a.sequence_number ?? a.sequenceNumber ?? 0) - (b.sequence_number ?? b.sequenceNumber ?? 0)
+  )
+  const active = ordered.filter((s) => !FIXED_ROUTE_STOP_STATUSES.has(s.status))
+  const targetIdx = active.findIndex(
+    (s) => s.order_id === targetOrderId || s.orderId === targetOrderId
+  )
+  if (targetIdx < 0) return null
+
+  const priorStops = active.slice(0, targetIdx).map((s) => ({
+    orderId: s.order_id ?? s.orderId,
+    latitude: s.latitude ?? s.destinationLatitude ?? null,
+    longitude: s.longitude ?? s.destinationLongitude ?? null,
+  }))
+
+  const positionInRoute = ordered.findIndex(
+    (s) => s.order_id === targetOrderId || s.orderId === targetOrderId
+  )
+
+  return {
+    priorStops,
+    stopsBefore: targetIdx,
+    nextStop: targetIdx === 0,
+    routePosition: positionInRoute >= 0 ? positionInRoute + 1 : null,
+    routePositionTotal: ordered.length,
+  }
+}
+
+/** Ordered route stops with coordinates for route-aware ETA (avoids circular imports). */
+export async function loadRouteStopsForEta(orderId, supplierId) {
+  const { rows } = await query(
+    `
+    SELECT
+      rs.order_id,
+      rs.sequence_number,
+      rs.status,
+      COALESCE(b.delivery_latitude, r.delivery_latitude) AS latitude,
+      COALESCE(b.delivery_longitude, r.delivery_longitude) AS longitude
+    FROM route_stop rs
+    JOIN delivery_route dr ON dr.id = rs.route_id
+    JOIN customer_order o ON o.id = rs.order_id
+    JOIN restaurant r ON r.id = o.restaurant_id
+    LEFT JOIN branch b ON b.id = o.branch_id
+    WHERE dr.id = (
+      SELECT dr2.id
+      FROM route_stop rs2
+      JOIN delivery_route dr2 ON dr2.id = rs2.route_id
+      WHERE rs2.order_id = $1
+        AND dr2.supplier_id = $2
+        AND dr2.status IN ('PLANNED', 'IN_PROGRESS')
+      LIMIT 1
+    )
+    ORDER BY rs.sequence_number ASC
+    `,
+    [orderId, supplierId]
+  )
+  return rows
 }
 
 function unavailable(reason) {
@@ -56,6 +127,7 @@ export function calculateDeliveryEta({
   assignmentStatus = null,
   orderStatus = null,
   etaConfig = null,
+  routeContext = null,
 } = {}) {
   const deliveryStatus = String(assignmentStatus || 'pending').toLowerCase()
   const normalizedOrderStatus = String(orderStatus || '').toUpperCase()
@@ -78,26 +150,55 @@ export function calculateDeliveryEta({
     return unavailable('driver_location_missing')
   }
 
-  const { speedKmh, minMultiplier, maxMultiplier } = etaConfig ?? getDeliveryEtaConfig()
-  const distanceKm = haversineDistanceKm(
-    Number(loc.latitude),
-    Number(loc.longitude),
+  const { speedKmh, minMultiplier, maxMultiplier, serviceTimeMinutes } =
+    etaConfig ?? getDeliveryEtaConfig()
+
+  let fromLat = Number(loc.latitude)
+  let fromLng = Number(loc.longitude)
+  let distanceKm = 0
+  let serviceMinutes = 0
+
+  const priorStops = routeContext?.priorStops ?? []
+  for (const stop of priorStops) {
+    if (stop?.latitude == null || stop?.longitude == null) continue
+    distanceKm += haversineDistanceKm(
+      fromLat,
+      fromLng,
+      Number(stop.latitude),
+      Number(stop.longitude)
+    )
+    fromLat = Number(stop.latitude)
+    fromLng = Number(stop.longitude)
+    serviceMinutes += serviceTimeMinutes
+  }
+
+  distanceKm += haversineDistanceKm(
+    fromLat,
+    fromLng,
     Number(destination.latitude),
     Number(destination.longitude)
   )
 
-  const baseMinutes = (distanceKm / speedKmh) * 60
+  const baseMinutes = (distanceKm / speedKmh) * 60 + serviceMinutes
   const etaMinutesMin = roundMinutes(baseMinutes * minMultiplier)
   const etaMinutesMax = roundMinutes(baseMinutes * maxMultiplier)
+
+  const hasRouteContext = routeContext != null
+  const stopsBefore = hasRouteContext ? (routeContext.stopsBefore ?? 0) : 0
+  const nextStop = hasRouteContext ? Boolean(routeContext.nextStop) : true
 
   return {
     etaAvailable: true,
     etaMinutesMin,
     etaMinutesMax: Math.max(etaMinutesMin, etaMinutesMax),
-    distanceKm,
+    distanceKm: roundDistanceKm(distanceKm),
     confidence: tracking?.isStale ? 'LOW' : 'MEDIUM',
     calculatedAt: new Date().toISOString(),
     unavailableReason: null,
+    stopsBefore,
+    nextStop,
+    routePosition: routeContext?.routePosition ?? null,
+    routePositionTotal: routeContext?.routePositionTotal ?? null,
   }
 }
 
@@ -112,11 +213,14 @@ export function sanitizeEtaForRestaurant(eta) {
       calculatedAt: null,
     }
   }
-  return {
+  const sanitized = {
     etaAvailable: Boolean(eta.etaAvailable),
     etaMinutesMin: eta.etaMinutesMin ?? null,
     etaMinutesMax: eta.etaMinutesMax ?? null,
     distanceKm: eta.distanceKm ?? null,
     calculatedAt: eta.calculatedAt ?? null,
   }
+  if (eta.stopsBefore != null) sanitized.stopsBefore = eta.stopsBefore
+  if (eta.nextStop != null) sanitized.nextStop = eta.nextStop
+  return sanitized
 }

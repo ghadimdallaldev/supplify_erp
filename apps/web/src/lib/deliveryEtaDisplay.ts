@@ -12,13 +12,34 @@ export function formatDistanceKm(km?: number | null): string | null {
   return `${km.toFixed(1)} km away`
 }
 
+export function formatSupplierDistanceKm(km?: number | null): string | null {
+  if (km == null) return null
+  return `Distance ${km.toFixed(1)} km`
+}
+
 export function getRestaurantEtaPrimaryText(
   data: RestaurantOrderTrackingResponse | undefined
 ): string | null {
   if (!data?.etaAvailable) return null
   const range = formatEtaRange(data.etaMinutesMin, data.etaMinutesMax)
   if (!range) return null
-  return `Arriving in about ${range.replace(' min', ' minutes')}`
+  const minutes = range.replace(' min', ' minutes')
+  if (data.nextStop === false && (data.stopsBefore ?? 0) > 0) {
+    const stopWord = data.stopsBefore === 1 ? 'stop' : 'stops'
+    return `Your delivery is planned after ${data.stopsBefore} ${stopWord}`
+  }
+  return `Arriving in about ${minutes}`
+}
+
+export function getRestaurantEtaSecondaryText(
+  data: RestaurantOrderTrackingResponse | undefined
+): string | null {
+  if (!data?.etaAvailable) return null
+  if (data.nextStop === false && (data.stopsBefore ?? 0) > 0) {
+    const range = formatEtaRange(data.etaMinutesMin, data.etaMinutesMax)
+    if (range) return `Estimated arrival: ${range.replace(' min', ' minutes')}`
+  }
+  return formatDistanceKm(data.distanceKm)
 }
 
 export function getSupplierEtaPrimaryText(
@@ -28,6 +49,23 @@ export function getSupplierEtaPrimaryText(
   const range = formatEtaRange(data.etaMinutesMin, data.etaMinutesMax)
   if (!range) return null
   return `ETA ${range}`
+}
+
+export function getSupplierEtaSecondaryText(
+  data: SupplierOrderTrackingResponse | undefined
+): string | null {
+  if (!data?.etaAvailable) return null
+  const parts: string[] = []
+  if ((data.stopsBefore ?? 0) > 0) {
+    const stopWord = data.stopsBefore === 1 ? 'stop' : 'stops'
+    parts.push(`${data.stopsBefore} ${stopWord} before this order`)
+  }
+  if (data.routePosition != null && data.routePositionTotal != null) {
+    parts.push(`Route position ${data.routePosition} of ${data.routePositionTotal}`)
+  }
+  const distance = formatSupplierDistanceKm(data.distanceKm)
+  if (distance) parts.push(distance)
+  return parts.length ? parts.join(' · ') : null
 }
 
 function isPreActiveDeliveryStatus(status: string | null | undefined): boolean {

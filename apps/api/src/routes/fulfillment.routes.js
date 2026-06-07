@@ -19,6 +19,8 @@ import {
   createDeliveryRoute,
   updateDeliveryRoute,
   reorderRouteStops,
+  reorderRouteStopsByOrder,
+  setNextRouteStop,
   updateRouteStop,
   cancelDeliveryRoute,
   getDriverActiveRoute,
@@ -33,6 +35,32 @@ import {
 import { buildTrackingPayload, buildDriverLastSeenAlias } from '../lib/delivery-tracking-payload.js'
 
 const router = express.Router()
+
+async function resolveRouteReorderAccess(req, routeId) {
+  const supplierId = await resolveSupplierId(req)
+  if (!supplierId) {
+    return { error: { status: 403, message: 'Supplier not found' } }
+  }
+  const perms = req.tenantContext?.permissions ?? []
+  const canSupplier = hasPermission(perms, P.FULFILLMENT_MANAGE)
+  const canDriver =
+    hasPermission(perms, P.DRIVER_DELIVERIES_MANAGE) ||
+    (isDriverOnlyPermissions(perms) && hasPermission(perms, P.DRIVER_DELIVERIES_MANAGE))
+
+  if (!canSupplier && !canDriver) {
+    return { error: { status: 403, message: 'Insufficient permission' } }
+  }
+
+  let driverScope = null
+  if (!canSupplier) {
+    driverScope = await getLinkedDriverId(req.userData.id, supplierId)
+    if (!driverScope) {
+      return { error: { status: 403, message: 'Driver profile not linked' } }
+    }
+  }
+
+  return { supplierId, driverScope }
+}
 
 const fulfillmentFeature = requireFeature(
   'fulfillment',
@@ -735,6 +763,42 @@ router.post(
   }
 )
 
+router.get('/routes/today', async (req, res, next) => {
+  try {
+    const supplierId = await resolveSupplierId(req)
+    if (!supplierId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+        requestId: req.requestId,
+      })
+    }
+    const perms = req.tenantContext?.permissions ?? []
+    if (!hasPermission(perms, P.DRIVER_DELIVERIES_VIEW)) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Driver delivery access required' },
+        requestId: req.requestId,
+      })
+    }
+    const driverId = await getLinkedDriverId(req.userData.id, supplierId)
+    if (!driverId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Driver profile not linked' },
+        requestId: req.requestId,
+      })
+    }
+    const route = await getDriverActiveRoute(supplierId, driverId)
+    res.json({ ok: true, data: { route }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
 router.get('/routes/active', async (req, res, next) => {
   try {
     const supplierId = await resolveSupplierId(req)
@@ -952,28 +1016,79 @@ router.delete('/routes/:id', requirePermission('FULFILLMENT_MANAGE'), async (req
   }
 })
 
-router.post(
-  '/routes/:id/stops/reorder',
-  requirePermission('FULFILLMENT_MANAGE'),
-  async (req, res, next) => {
-    try {
-      const supplierId = await resolveSupplierId(req)
-      if (!supplierId) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
-          requestId: req.requestId,
-        })
-      }
-      const body = z.object({ stop_ids: z.array(z.string().uuid()).min(1) }).parse(req.body ?? {})
-      const route = await reorderRouteStops(supplierId, req.params.id, body.stop_ids)
-      res.json({ ok: true, data: { route }, error: null, requestId: req.requestId })
-    } catch (err) {
-      next(err)
+router.post('/routes/:id/stops/reorder', async (req, res, next) => {
+  try {
+    const access = await resolveRouteReorderAccess(req, req.params.id)
+    if (access.error) {
+      return res.status(access.error.status).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: access.error.message },
+        requestId: req.requestId,
+      })
     }
+    const body = z.object({ stop_ids: z.array(z.string().uuid()).min(1) }).parse(req.body ?? {})
+    const route = await reorderRouteStops(access.supplierId, req.params.id, body.stop_ids, {
+      driverIdScope: access.driverScope,
+    })
+    res.json({ ok: true, data: { route }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
   }
-)
+})
+
+const reorderStopsByOrderSchema = z.object({
+  stops: z
+    .array(
+      z.object({
+        orderId: z.string().uuid(),
+        stopSequence: z.number().int().positive(),
+      })
+    )
+    .min(1),
+})
+
+router.patch('/routes/:id/stops/reorder', async (req, res, next) => {
+  try {
+    const access = await resolveRouteReorderAccess(req, req.params.id)
+    if (access.error) {
+      return res.status(access.error.status).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: access.error.message },
+        requestId: req.requestId,
+      })
+    }
+    const body = reorderStopsByOrderSchema.parse(req.body ?? {})
+    const route = await reorderRouteStopsByOrder(access.supplierId, req.params.id, body.stops, {
+      driverIdScope: access.driverScope,
+    })
+    res.json({ ok: true, data: { route }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.patch('/routes/:id/next-stop', async (req, res, next) => {
+  try {
+    const access = await resolveRouteReorderAccess(req, req.params.id)
+    if (access.error) {
+      return res.status(access.error.status).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: access.error.message },
+        requestId: req.requestId,
+      })
+    }
+    const body = z.object({ orderId: z.string().uuid() }).parse(req.body ?? {})
+    const route = await setNextRouteStop(access.supplierId, req.params.id, body.orderId, {
+      driverIdScope: access.driverScope,
+    })
+    res.json({ ok: true, data: { route }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
 
 const stopStatusSchema = z.enum(['PLANNED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'FAILED'])
 
