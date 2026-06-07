@@ -61,6 +61,12 @@ export async function runAllSqlMigrations() {
       if (error.code === '42P07') {
         logger.warn({ event: 'db.migration.exists', file })
       } else {
+        logger.error(`SQL migration failed: ${file}`, {
+          event: 'db.migration.failed',
+          file,
+          code: error.code,
+          error: error.message,
+        })
         throw error
       }
     }
