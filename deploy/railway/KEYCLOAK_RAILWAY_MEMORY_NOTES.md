@@ -1,112 +1,105 @@
-# Keycloak on Railway — memory notes (development)
+# Keycloak on Railway — memory & JVM (all environments)
 
-Applies to **all** Railway Keycloak services. Development, preprod, and staging use explicit heap caps (`-Xmx384m`); production uses `MaxRAMPercentage` for larger plans.
+Applies to **all** Railway Keycloak services. See also [`docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`](../../docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md) for the full incident write-up.
+
+## Per-environment settings (current)
+
+| Setting                            | **dev**                     | **preprod**      | **staging**      | **prod**                           |
+| ---------------------------------- | --------------------------- | ---------------- | ---------------- | ---------------------------------- |
+| `KEYCLOAK_USE_OPTIMIZED`           | `false`                     | `false`          | `false`          | `true`                             |
+| Start mode                         | Runtime `--db=postgres`     | Runtime postgres | Runtime postgres | Optimized (after Dockerfile build) |
+| `JAVA_OPTS_APPEND`                 | `-Xmx512m` fixed            | `-Xmx512m` fixed | `-Xmx512m` fixed | `MaxRAMPercentage=60`              |
+| `KC_METRICS_ENABLED` (build + env) | `false`                     | `false`          | `false`          | `true`                             |
+| Dockerfile build                   | `kc.sh build --db=postgres` | same             | same             | same                               |
+
+**Non-prod (dev / preprod / staging):** `KEYCLOAK_USE_OPTIMIZED=false` — entrypoint runs `kc.sh start --db=postgres` with JDBC from Postgres refs. Reliable on Railway; avoids H2/optimized cache mismatches.
+
+**Production:** `KEYCLOAK_USE_OPTIMIZED=true` — uses pre-built postgres image + `--optimized` for faster boot and metrics.
 
 ## Why Keycloak uses memory when Supplify is not open
 
 Keycloak is a long-running JVM process. It does **not** need users to open the Supplify web app to consume memory.
 
-Typical causes of high memory or OOM on Railway dev:
+| Source                              | What happens                                                                                                          |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **`start-dev` profile**             | Quarkus dev mode; RSS often exceeds 700 MiB–1 GiB without a heap cap. **Blocked** by `railway-entrypoint.sh`.         |
+| **No JVM heap limit**               | JVM grows until Railway kills the container (OOM).                                                                    |
+| **OOM → restart loop**              | `ON_FAILURE` restart policy redeploys; each boot re-initializes caches.                                               |
+| **Stale optimized image (H2)**      | `--optimized` with H2 build rejects Postgres JDBC — use runtime postgres on non-prod or rebuild with `--db=postgres`. |
+| **API startup (once per redeploy)** | OIDC config pre-warm + optional admin client setup — **not** periodic.                                                |
+| **Crons / DB keepalive**            | Do **not** call Keycloak. Frontend `/auth/me` polling only when app is open.                                          |
 
-| Source                                  | What happens                                                                                                                                                                                                                                   |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`start-dev` profile**                 | Quarkus dev mode keeps extra tooling hot and avoids the optimized server image. RSS often exceeds 700 MiB–1 GiB without a heap cap.                                                                                                            |
-| **No JVM heap limit**                   | Without `JAVA_OPTS_APPEND`, the JVM can grow until Railway kills the container (OOM).                                                                                                                                                          |
-| **OOM → restart loop**                  | Railway `ON_FAILURE` restart policy redeploys the container. Each boot re-initializes caches and logs “Profile dev activated” / import checks — looks like repeated startups in logs even with zero user traffic.                              |
-| **Railway deploy healthcheck**          | `/health/ready` is probed during deploy. In `start-dev`, health endpoints often return **404** (health extension not active), which can prolong failed deploy windows and retries. Optimized `start` with `KC_HEALTH_ENABLED=true` fixes this. |
-| **API startup (once per API redeploy)** | On boot, the API pre-warms OIDC config (`getKeycloakConfig`) and may call Keycloak admin once (`ensureApiClientDirectAccessGrants`). This is **not** periodic polling.                                                                         |
-| **Crons / DB keepalive**                | API crons and Postgres pool keepalive do **not** call Keycloak. Frontend `/auth/me` polling only runs when a user has the app open in a browser.                                                                                               |
+## Keycloak service variables (`keycloak.env`)
 
-So “idle for 3 days” can still OOM if the JVM slowly grows or if an earlier OOM triggered restart storms — not because Supplify was actively used.
+Sync: `pnpm railway:keycloak:sync -- <env>`
 
-## Changes made (development)
-
-### Railway config (`development/keycloak/railway.json`)
-
-| Setting                        | Before                     | After                                                                                         |
-| ------------------------------ | -------------------------- | --------------------------------------------------------------------------------------------- |
-| `KC_PRODUCTION` build arg      | `false`                    | `true` → runs `kc.sh build` in Dockerfile (optimized image, no Quarkus rebuild on every boot) |
-| `KC_METRICS_ENABLED` build arg | _(default true)_           | `false` (smaller footprint)                                                                   |
-| `startCommand`                 | `start-dev --import-realm` | `start --optimized --import-realm`                                                            |
-
-### Keycloak service variables (`development/keycloak.env` → paste into Railway Raw Editor)
-
-| Variable                     | Value                                                                                              | Purpose                           |
-| ---------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------- |
-| `JAVA_OPTS_APPEND`           | `-Xms128m -Xmx512m -XX:MaxMetaspaceSize=192m -XX:+UseContainerSupport -XX:+ExitOnOutOfMemoryError` | Hard cap; target RSS ~350–700 MiB |
-| `KC_LOG_LEVEL`               | `warn`                                                                                             | Less log volume                   |
-| `KC_HTTP_ACCESS_LOG_ENABLED` | `false`                                                                                            | Disable HTTP access log           |
-
-**If your Keycloak service has ≥ 1 GiB RAM**, you may replace `JAVA_OPTS_APPEND` with:
+### Non-prod (dev, preprod, staging)
 
 ```env
-JAVA_OPTS_APPEND=-XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=25 -XX:+UseContainerSupport -XX:+ExitOnOutOfMemoryError
+JAVA_OPTS_APPEND=-Xms128m -Xmx512m -XX:MaxMetaspaceSize=192m -XX:+UseContainerSupport -XX:+ExitOnOutOfMemoryError
+KC_LOG_LEVEL=warn
+KC_HTTP_ACCESS_LOG_ENABLED=false
+KEYCLOAK_USE_OPTIMIZED=false
+KC_PROXY_HEADERS=xforwarded
 ```
 
-**Unchanged (do not break login):** `KC_HOSTNAME`, `KC_PROXY_HEADERS`, realm DB (`KC_DB_*`), `KEYCLOAK_ADMIN_PASSWORD`, redirect URIs, clients, admin user.
+### Production
 
-Full write-up: [`docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`](../../docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md).
+```env
+JAVA_OPTS_APPEND=-XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=25 -XX:MaxMetaspaceSize=256m -XX:+UseContainerSupport -XX:+ExitOnOutOfMemoryError
+KEYCLOAK_USE_OPTIMIZED=true
+KC_METRICS_ENABLED=true
+KC_PROXY_HEADERS=xforwarded
+```
 
-### Dockerfile (`deploy/railway/keycloak/Dockerfile`)
+### Do **not** set on Railway Keycloak service
 
-- `KC_METRICS_ENABLED` is now a build arg (dev passes `false`; production keeps default `true`).
-- Optimized build still runs only when `KC_PRODUCTION=true`.
+| Variable         | Why                                                                               |
+| ---------------- | --------------------------------------------------------------------------------- |
+| `KC_PROXY=edge`  | Deprecated — use `KC_PROXY_HEADERS=xforwarded` only                               |
+| `KC_DB=postgres` | Build-time in optimized mode; runtime postgres start sets `--db=postgres` via CLI |
+| `DATABASE_URL`   | Points at app DB — use `PGHOST`/`PGUSER`/`PGPASSWORD` refs                        |
 
-### API networking (optional, not required for memory fix)
+## Railway deploy settings (all envs)
 
-| Variable              | Role                                                                                                                                           |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `KEYCLOAK_PUBLIC_URL` | **Must stay public** — browser OAuth login, logout, registration redirects.                                                                    |
-| `KEYCLOAK_URL`        | Server-side token/userinfo/admin calls. May be set to Railway private URL in dashboard: `http://${{Keycloak-dev.RAILWAY_PRIVATE_DOMAIN}}:8080` |
+| Setting        | Value                                                          |
+| -------------- | -------------------------------------------------------------- |
+| Start command  | `/opt/keycloak/bin/railway-entrypoint.sh start --import-realm` |
+| Healthcheck    | `/health/ready`, timeout **600**                               |
+| Config file    | `deploy/railway/<env>/keycloak/railway.json`                   |
+| Root Directory | _(empty — repo root)_                                          |
 
-The Keycloak **service** must keep its public Railway hostname for browser redirects. Only the API can use private networking for back-channel calls.
+**Good runtime logs:**
 
-## Expected memory usage (after deploy)
+```text
+Keycloak railway-entrypoint.sh v3
+Keycloak start mode: runtime postgres (no --optimized)   # non-prod
+Keycloak start mode: optimized + postgres                # prod
+Listening on: http://0.0.0.0:8080
+```
 
-| Mode                 | Typical steady RSS (512 MiB plan)            |
-| -------------------- | -------------------------------------------- |
-| `start-dev`, no cap  | 700 MiB–1.2 GiB → OOM risk                   |
-| `start` + `-Xmx384m` | ~350–450 MiB RSS (heap + metaspace + native) |
+## Expected memory (non-prod, 512 MiB–1 GiB plan)
 
-Monitor in Railway → Keycloak service → Metrics. If you see frequent restarts or GC thrashing, bump the service to 1 GiB or lower `-Xmx` to `-Xmx320m`.
+| Mode                          | Typical steady RSS                |
+| ----------------------------- | --------------------------------- |
+| `start-dev`, no cap           | 700 MiB–10 GiB → OOM (old config) |
+| Runtime postgres + `-Xmx512m` | **350–700 MB**                    |
+
+Monitor: Railway → Keycloak service → Metrics.
 
 ## Apply on Railway
 
-1. Merge/deploy this repo so Keycloak rebuilds with `KC_PRODUCTION=true`.
-2. Keycloak service → **Variables** → Raw Editor: merge `deploy/railway/development/keycloak.env` (especially `JAVA_OPTS_APPEND`, `KC_LOG_LEVEL`, `KC_HTTP_ACCESS_LOG_ENABLED`).
-3. Confirm **Start command** is `/opt/keycloak/bin/railway-entrypoint.sh start --optimized --import-realm` (from `railway.json`).
-4. Redeploy Keycloak, then verify (below).
-
-Existing realm data in Postgres is preserved; `--import-realm` skips when **Supplify** already exists.
-
-## Verify (does not break login)
-
-```text
-# OIDC discovery
-https://keycloak-development-4942.up.railway.app/realms/Supplify/.well-known/openid-configuration
-
-# Health (should be 200 after optimized start)
-https://keycloak-development-4942.up.railway.app/health/ready
-
-# Login redirect (302 to Keycloak)
-https://supplify-web-dev-development.up.railway.app/auth/login
-```
-
-Complete a manual login in the browser after deploy.
-
-## Rollback
-
-1. **Start command:** `/opt/keycloak/bin/kc.sh start-dev --import-realm`
-2. **Build arg:** set `KC_PRODUCTION` to `false` in `development/keycloak/railway.json` and redeploy (or use previous image).
-3. **Remove** `JAVA_OPTS_APPEND`, `KC_LOG_LEVEL`, `KC_HTTP_ACCESS_LOG_ENABLED` from Keycloak variables (or restore previous values).
-4. Redeploy Keycloak.
-
-Realm and users in Postgres are not deleted by rollback.
+1. Push branch for that environment (`dev`, `preprod`, `staging`, `prod`).
+2. `KEYCLOAK_ADMIN_PASSWORD=<secret> pnpm railway:keycloak:sync -- <env>`
+3. Remove legacy `KC_PROXY` and `KC_DB` from dashboard if present.
+4. Redeploy Keycloak (clear build cache if H2 errors persist).
+5. Verify `/health/ready` and OIDC discovery URL.
 
 ## Related files
 
-- `deploy/railway/development/keycloak/railway.json`
-- `deploy/railway/development/keycloak.env`
+- `deploy/railway/<env>/keycloak.env`
+- `deploy/railway/<env>/keycloak/railway.json`
 - `deploy/railway/keycloak/Dockerfile`
+- `deploy/railway/keycloak/railway-entrypoint.sh`
 - `deploy/railway/keycloak/RAILWAY_SETUP.md`
-- `deploy/railway/development/DASHBOARD.md`
+- `docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`

@@ -11,7 +11,8 @@ Realm **`supplify-preprod`** is imported automatically on first boot — no Admi
 | Start command  | `/opt/keycloak/bin/railway-entrypoint.sh start --import-realm` (from `railway.json`) |
 | Healthcheck    | `/health/ready`, timeout **600**                                                     |
 
-Variables: `pnpm railway:keycloak:sync -- preprod` or paste `deploy/railway/preprod/keycloak.env` + `KEYCLOAK_ADMIN_PASSWORD` (same on Keycloak and API).
+Variables: `pnpm railway:keycloak:sync -- preprod` or paste `deploy/railway/preprod/keycloak.env` + `KEYCLOAK_ADMIN_PASSWORD` (same on Keycloak and API).  
+Non-prod uses `KEYCLOAK_USE_OPTIMIZED=false` (runtime postgres start). Remove `KC_PROXY` / `KC_DB` from dashboard if present.
 
 Postgres DB **`keycloak`** is auto-created on boot — see [`../KEYCLOAK_RAILWAY_DB_NOTES.md`](../KEYCLOAK_RAILWAY_DB_NOTES.md). **Do not** set `DATABASE_URL` on the Keycloak service.
 
