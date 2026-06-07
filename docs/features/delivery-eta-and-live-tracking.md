@@ -29,13 +29,44 @@ Default speed and multipliers are configurable (see below). This is a **straight
 
 ### Environment (API)
 
-| Variable                      | Default | Purpose                    |
-| ----------------------------- | ------- | -------------------------- |
-| `DELIVERY_ETA_CITY_SPEED_KMH` | `20`    | Assumed average city speed |
-| `DELIVERY_ETA_MIN_MULTIPLIER` | `1.0`   | Lower bound on ETA range   |
-| `DELIVERY_ETA_MAX_MULTIPLIER` | `1.5`   | Upper bound on ETA range   |
+| Variable                            | Default | Purpose                                   |
+| ----------------------------------- | ------- | ----------------------------------------- |
+| `DELIVERY_ETA_CITY_SPEED_KMH`       | `20`    | Assumed average city speed                |
+| `DELIVERY_ETA_MIN_MULTIPLIER`       | `1.0`   | Lower bound on ETA range                  |
+| `DELIVERY_ETA_MAX_MULTIPLIER`       | `1.5`   | Upper bound on ETA range                  |
+| `DELIVERY_ETA_SERVICE_TIME_MINUTES` | `5`     | Minutes added per prior stop on the route |
 
 Configured in dev via [`deploy/railway/development/api.env`](../../deploy/railway/development/api.env).
+
+### Route-aware ETA (manual stop order)
+
+When an order is on a `PLANNED` or `IN_PROGRESS` route with a known stop sequence:
+
+1. **Next active stop** — ETA = driver GPS → that order’s destination (same as direct ETA).
+2. **Later stops** — ETA = driver → each prior active stop → target stop, using haversine legs plus `DELIVERY_ETA_SERVICE_TIME_MINUTES` per prior stop.
+
+If no route order exists (standalone delivery), behavior is unchanged (direct ETA).
+
+Extra payload fields:
+
+| Field                | Restaurant | Supplier |
+| -------------------- | ---------- | -------- |
+| `stopsBefore`        | ✓          | ✓        |
+| `nextStop`           | ✓          | ✓        |
+| `routePosition`      | omitted    | ✓        |
+| `routePositionTotal` | omitted    | ✓        |
+
+Restaurant copy examples:
+
+- Next stop: “Arriving in about 12–18 minutes”
+- Later on route: “Your delivery is planned after 2 stops” + “Estimated arrival: 35–50 minutes”
+
+Supplier copy examples:
+
+- “ETA 35–50 min”
+- “2 stops before this order · Route position 3 of 10”
+
+Limitation: straight-line distance only — no paid routing API yet.
 
 ### Gating (when `etaAvailable` is false)
 
@@ -83,26 +114,28 @@ When driver GPS is stale (`tracking.isStale === true`), ETA **remains available*
 
 ### Visibility matrix
 
-| Field                             | Restaurant view | Supplier view       |
-| --------------------------------- | --------------- | ------------------- |
-| `destinationCoordinatesAvailable` | ✓               | ✓                   |
-| `destinationLabel`                | ✓ (safe label)  | ✓                   |
-| `destination.latitude/longitude`  | omitted         | ✓ (fulfillment map) |
-| `etaAvailable`                    | ✓               | ✓                   |
-| `etaMinutesMin` / `etaMinutesMax` | ✓               | ✓                   |
-| `distanceKm`                      | ✓               | ✓                   |
-| `calculatedAt`                    | ✓               | ✓                   |
-| `confidence`                      | omitted         | ✓                   |
-| `unavailableReason`               | omitted         | ✓ (when blocked)    |
+| Field                                  | Restaurant view | Supplier view       |
+| -------------------------------------- | --------------- | ------------------- |
+| `destinationCoordinatesAvailable`      | ✓               | ✓                   |
+| `destinationLabel`                     | ✓ (safe label)  | ✓                   |
+| `destination.latitude/longitude`       | omitted         | ✓ (fulfillment map) |
+| `etaAvailable`                         | ✓               | ✓                   |
+| `etaMinutesMin` / `etaMinutesMax`      | ✓               | ✓                   |
+| `distanceKm`                           | ✓               | ✓                   |
+| `calculatedAt`                         | ✓               | ✓                   |
+| `stopsBefore` / `nextStop`             | ✓               | ✓                   |
+| `routePosition` / `routePositionTotal` | omitted         | ✓                   |
+| `confidence`                           | omitted         | ✓                   |
+| `unavailableReason`                    | omitted         | ✓ (when blocked)    |
 
 ### Frontend display
 
 Helpers: [`deliveryEtaDisplay.ts`](../../apps/web/src/lib/deliveryEtaDisplay.ts)
 
-| Audience   | ETA available copy                           |
-| ---------- | -------------------------------------------- |
-| Restaurant | “Arriving in about 12–18 minutes” + distance |
-| Supplier   | “ETA 12–18 min · 4.2 km away” + LOW badge    |
+| Audience   | ETA available copy                                                                             |
+| ---------- | ---------------------------------------------------------------------------------------------- |
+| Restaurant | Next stop: “Arriving in about 12–18 minutes”. Later: “planned after N stops” + estimated range |
+| Supplier   | “ETA 12–18 min” + stops before / route position + distance + LOW badge                         |
 
 Panels: `RestaurantOrderTrackingPanel`, `OrderDeliveryTrackingPanel`, `DeliveryTrackingDrawer`.
 

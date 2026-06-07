@@ -145,7 +145,52 @@ Mapping from ops language: CONFIRMED/ACCEPTED → `ACKNOWLEDGED`; PREPARING → 
 
 ---
 
-- No route optimization or ETA engine
+## Manual route stop ordering
+
+Drivers and suppliers can **manually order delivery stops** on a route. There is no automatic route optimization yet — stop order is whatever the driver or supplier sets.
+
+### Data model
+
+- `route_stop.sequence_number` (migration `0006_fulfillment_logistics.sql`) — integer order per route, indexed on `(route_id, sequence_number)`.
+- Standalone deliveries (not on a route) have no sequence; ETA falls back to direct driver → destination.
+
+### Who can reorder
+
+| Actor    | Permission                          | Scope                     |
+| -------- | ----------------------------------- | ------------------------- |
+| Supplier | `FULFILLMENT_MANAGE`                | Routes they own           |
+| Driver   | `DRIVER_DELIVERIES_MANAGE` (linked) | Only their assigned route |
+
+Completed or failed stops stay fixed; active stops can be reordered.
+
+### APIs
+
+| Method | Path                                        | Body / notes                                      |
+| ------ | ------------------------------------------- | ------------------------------------------------- |
+| GET    | `/api/fulfillment/routes/today`             | Alias of `/routes/active` — driver’s route today  |
+| GET    | `/api/fulfillment/routes/active`            | `IN_PROGRESS` or today’s `PLANNED` route          |
+| POST   | `/api/fulfillment/routes/:id/stops/reorder` | `{ stop_ids: uuid[] }` — full list (legacy)       |
+| PATCH  | `/api/fulfillment/routes/:id/stops/reorder` | `{ stops: [{ orderId, stopSequence }] }`          |
+| PATCH  | `/api/fulfillment/routes/:id/next-stop`     | `{ orderId }` — move one stop to next active slot |
+
+Stop payloads include `sequenceNumber`, `isNext`, `isCompleted`, `orderNumber`, and `destinationCoordinatesAvailable`.
+
+### Frontend
+
+- **Driver portal** (`DriverDeliveriesPage` / `DriverRoutePanel`): “Today’s deliveries”, next-stop card, move up/down, set as next.
+- **Supplier fulfillment** (`FulfillmentRouteDetailPanel`): ordered stop list, badges (Next delivery, Completed, On the way, Waiting), reorder controls.
+
+### ETA
+
+When an order is on an active route, ETA uses the manual stop order — see [delivery-eta-and-live-tracking.md](./delivery-eta-and-live-tracking.md). Restaurants see `stopsBefore` and friendly copy only (no route IDs or internal route details).
+
+### Future
+
+Automatic route optimization (Mapbox/Google Directions, traffic, etc.) can be added later without changing the stop-order model.
+
+---
+
+- No paid turn-by-turn routing API (straight-line ETA only)
 - No Socket.io live map stream (polling on tracking query)
 - GPS coordinates are client-reported (no device attestation or geofence validation)
 - `delivery_wave` / legacy `delivery_exception` tables still unused

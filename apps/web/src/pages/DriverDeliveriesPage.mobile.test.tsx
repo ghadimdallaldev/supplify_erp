@@ -46,6 +46,8 @@ vi.mock('../services/api', () => ({
   }),
   useUpdateOrderDeliveryStatusMutation: () => [vi.fn(), { isLoading: false }],
   useUpdateFulfillmentRouteStopMutation: () => [vi.fn()],
+  useReorderFulfillmentRouteStopsMutation: () => [vi.fn(), { isLoading: false }],
+  useSetNextFulfillmentRouteStopMutation: () => [vi.fn(), { isLoading: false }],
   useSendDriverLocationMutation: () => [vi.fn(), { isLoading: false }],
 }))
 

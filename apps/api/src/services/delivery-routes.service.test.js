@@ -226,6 +226,123 @@ describe('delivery-routes.service', () => {
     expect(clientQueryMock).toHaveBeenCalled()
   })
 
+  it('rejects reorder on completed route', async () => {
+    const { reorderRouteStops } = await import('./delivery-routes.service.js')
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'r1',
+          route_number: 'R-1',
+          route_label: 'R-1',
+          area: null,
+          driver_id: 'd1',
+          driver_name: 'Alex',
+          driver_name_legacy: null,
+          vehicle_info: null,
+          status: 'COMPLETED',
+          scheduled_date: '2026-05-28',
+          started_at: null,
+          completed_at: null,
+        },
+      ],
+    })
+    queryMock.mockResolvedValueOnce({ rows: [] })
+    queryMock.mockResolvedValueOnce({ rows: [] })
+
+    await expect(reorderRouteStops('s1', 'r1', ['stop-a'])).rejects.toThrow(/finished route/i)
+  })
+
+  it('driver cannot reorder another drivers route', async () => {
+    const { reorderRouteStops } = await import('./delivery-routes.service.js')
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'r1',
+          route_number: 'R-1',
+          route_label: 'R-1',
+          area: null,
+          driver_id: 'other-driver',
+          driver_name: 'Other',
+          driver_name_legacy: null,
+          vehicle_info: null,
+          status: 'PLANNED',
+          scheduled_date: '2026-05-28',
+          started_at: null,
+          completed_at: null,
+        },
+      ],
+    })
+
+    await expect(
+      reorderRouteStops('s1', 'r1', ['stop-a'], { driverIdScope: 'my-driver' })
+    ).rejects.toThrow(/own routes/i)
+  })
+
+  it('setNextRouteStop moves target to front of active stops', async () => {
+    const { setNextRouteStop } = await import('./delivery-routes.service.js')
+    const routeRow = {
+      id: 'r1',
+      route_number: 'R-1',
+      route_label: 'R-1',
+      area: null,
+      driver_id: 'd1',
+      driver_name: 'Alex',
+      driver_name_legacy: null,
+      vehicle_info: null,
+      status: 'IN_PROGRESS',
+      scheduled_date: '2026-05-28',
+      started_at: null,
+      completed_at: null,
+    }
+    const stopRows = [
+      {
+        id: 'stop-a',
+        route_id: 'r1',
+        order_id: '11111111-1111-4111-8111-111111111111',
+        sequence_number: 1,
+        status: 'PLANNED',
+        restaurant_name: 'A',
+        address_json: {},
+        destination_latitude: null,
+        destination_longitude: null,
+        total_amount: 0,
+        item_count: 0,
+        notes: null,
+        completed_at: null,
+        assignment_status: null,
+      },
+      {
+        id: 'stop-b',
+        route_id: 'r1',
+        order_id: '22222222-2222-4222-8222-222222222222',
+        sequence_number: 2,
+        status: 'PLANNED',
+        restaurant_name: 'B',
+        address_json: {},
+        destination_latitude: null,
+        destination_longitude: null,
+        total_amount: 0,
+        item_count: 0,
+        notes: null,
+        completed_at: null,
+        assignment_status: null,
+      },
+    ]
+
+    queryMock
+      .mockResolvedValueOnce({ rows: [routeRow] })
+      .mockResolvedValueOnce({ rows: stopRows })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [routeRow] })
+      .mockResolvedValueOnce({ rows: stopRows })
+      .mockResolvedValueOnce({ rows: [] })
+
+    clientQueryMock.mockResolvedValue({ rowCount: 1 })
+
+    await setNextRouteStop('s1', 'r1', '22222222-2222-4222-8222-222222222222')
+    expect(clientQueryMock).toHaveBeenCalled()
+  })
+
   it('cancelled route sets status CANCELLED', async () => {
     const { cancelDeliveryRoute } = await import('./delivery-routes.service.js')
     const baseRoute = {

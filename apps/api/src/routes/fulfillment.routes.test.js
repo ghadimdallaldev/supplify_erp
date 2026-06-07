@@ -55,6 +55,8 @@ vi.mock('../services/delivery-routes.service.js', () => ({
   createDeliveryRoute: (...args) => createDeliveryRouteMock(...args),
   updateDeliveryRoute: vi.fn(),
   reorderRouteStops: vi.fn(),
+  reorderRouteStopsByOrder: vi.fn(),
+  setNextRouteStop: vi.fn(),
   updateRouteStop: vi.fn(),
   cancelDeliveryRoute: vi.fn(),
   getDriverActiveRoute: vi.fn(),

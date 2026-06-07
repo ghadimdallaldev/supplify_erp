@@ -13,7 +13,11 @@ import {
   buildRestaurantTrackingDisabledResponse,
 } from '../lib/restaurant-tracking-payload.js'
 import { buildDestinationPayload } from '../lib/delivery-coordinates.js'
-import { calculateDeliveryEta } from './delivery-eta.service.js'
+import {
+  calculateDeliveryEta,
+  buildRouteEtaContext,
+  loadRouteStopsForEta,
+} from './delivery-eta.service.js'
 import {
   loadOrderDestination,
   loadOrderDestinationForSupplier,
@@ -398,12 +402,19 @@ export async function getOrderTracking({
 
     const destination = await loadOrderDestination(orderId)
 
+    let routeContext = null
+    if (assignment?.supplier_id) {
+      const routeStops = await loadRouteStopsForEta(orderId, assignment.supplier_id)
+      routeContext = buildRouteEtaContext(routeStops, orderId)
+    }
+
     return buildRestaurantTrackingResponse({
       orderId,
       orderStatus: orderRow.status,
       assignment,
       tracking,
       destination,
+      routeContext,
     })
   }
 
@@ -442,11 +453,19 @@ export async function getOrderTracking({
 
   const destination = await loadOrderDestinationForSupplier(orderId, supplierId)
   const destinationPayload = buildDestinationPayload(destination, { includeCoordinates: true })
+
+  let routeContext = null
+  if (routeCtx?.route_id) {
+    const routeStops = await loadRouteStopsForEta(orderId, supplierId)
+    routeContext = buildRouteEtaContext(routeStops, orderId)
+  }
+
   const eta = calculateDeliveryEta({
     tracking,
     destination,
     assignmentStatus: assignment?.status ?? null,
     orderStatus: orderRow.status,
+    routeContext,
   })
 
   return {

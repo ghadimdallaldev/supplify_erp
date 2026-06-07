@@ -83,6 +83,42 @@ describe('deliveryEtaDisplay', () => {
     ).toBe('ETA will appear once the driver starts delivery.')
   })
 
+  it('shows restaurant copy when delivery is later on route', () => {
+    expect(
+      getRestaurantEtaPrimaryText({
+        ...restaurantBase,
+        etaAvailable: true,
+        etaMinutesMin: 35,
+        etaMinutesMax: 50,
+        nextStop: false,
+        stopsBefore: 2,
+      })
+    ).toBe('Your delivery is planned after 2 stops')
+    expect(
+      getRestaurantEtaSecondaryText({
+        ...restaurantBase,
+        etaAvailable: true,
+        etaMinutesMin: 35,
+        etaMinutesMax: 50,
+        nextStop: false,
+        stopsBefore: 2,
+      })
+    ).toBe('Estimated arrival: 35–50 minutes')
+  })
+
+  it('shows supplier route position hints', () => {
+    expect(
+      getSupplierEtaSecondaryText({
+        ...supplierBase,
+        etaAvailable: true,
+        distanceKm: 7.8,
+        stopsBefore: 2,
+        routePosition: 3,
+        routePositionTotal: 10,
+      })
+    ).toBe('2 stops before this order · Route position 3 of 10 · Distance 7.8 km')
+  })
+
   it('shows low confidence badge hint for supplier', () => {
     expect(
       shouldShowEtaConfidence({
