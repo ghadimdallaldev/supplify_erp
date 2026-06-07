@@ -459,16 +459,49 @@ router.post('/bulk', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (r
     }
 
     const created = []
-    for (const item of bulkData.items) {
-      const {
-        rows: [pricing],
-      } = await query(
+    const items = bulkData.items
+    if (items.length > 0) {
+      const { rows: inserted } = await query(
         `
         INSERT INTO restaurant_pricing (
           supplier_id, restaurant_id, product_id, price, currency,
           contract_discount_percentage, contract_start_date, contract_end_date,
           agreement_type, min_order_quantity, notes, is_active
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true)
+        )
+        SELECT
+          $1,
+          $2,
+          t.product_id,
+          t.price,
+          t.currency,
+          t.contract_discount_percentage,
+          t.contract_start_date,
+          t.contract_end_date,
+          t.agreement_type,
+          t.min_order_quantity,
+          t.notes,
+          true
+        FROM unnest(
+          $3::uuid[],
+          $4::numeric[],
+          $5::text[],
+          $6::numeric[],
+          $7::date[],
+          $8::date[],
+          $9::text[],
+          $10::numeric[],
+          $11::text[]
+        ) AS t(
+          product_id,
+          price,
+          currency,
+          contract_discount_percentage,
+          contract_start_date,
+          contract_end_date,
+          agreement_type,
+          min_order_quantity,
+          notes
+        )
         ON CONFLICT (supplier_id, restaurant_id, product_id)
         DO UPDATE SET
           price = EXCLUDED.price,
@@ -486,18 +519,18 @@ router.post('/bulk', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (r
         [
           supplierId,
           bulkData.restaurantId,
-          item.productId,
-          item.price,
-          item.currency || 'USD',
-          item.contractDiscountPercentage ?? null,
-          item.contractStartDate || null,
-          item.contractEndDate || null,
-          item.agreementType || 'CUSTOM',
-          item.minOrderQuantity ?? null,
-          item.notes || null,
+          items.map((i) => i.productId),
+          items.map((i) => i.price),
+          items.map((i) => i.currency || 'USD'),
+          items.map((i) => i.contractDiscountPercentage ?? null),
+          items.map((i) => i.contractStartDate || null),
+          items.map((i) => i.contractEndDate || null),
+          items.map((i) => i.agreementType || 'CUSTOM'),
+          items.map((i) => i.minOrderQuantity ?? null),
+          items.map((i) => i.notes || null),
         ]
       )
-      created.push(mapPricingRow(pricing))
+      created.push(...inserted.map(mapPricingRow))
     }
 
     res.json({

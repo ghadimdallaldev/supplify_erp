@@ -115,7 +115,6 @@ export function useNotificationAlerts() {
     seenIdsRef.current.add(item.id)
     if (item.is_read) return
     if (shouldSuppressChatToast(item, location.pathname, activeConversationIdRef.current)) {
-      dispatch(api.util.invalidateTags(['Notification']))
       return
     }
     playNotificationSound()

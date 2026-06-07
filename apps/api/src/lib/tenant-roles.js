@@ -145,6 +145,18 @@ async function insertRolePermissions(roleId, permissions, db = query) {
   )
 }
 
+async function rolePermissionsUnchanged(roleId, expectedPerms, db) {
+  const { rows } = await db(
+    `SELECT permission FROM tenant_role_permissions WHERE role_id = $1 ORDER BY permission`,
+    [roleId]
+  )
+  const current = rows.map((r) => r.permission)
+  const expected = [...expectedPerms].sort()
+  current.sort()
+  if (current.length !== expected.length) return false
+  return current.every((p, i) => p === expected[i])
+}
+
 async function replaceRolePermissions(roleId, permissions, db) {
   await db(`DELETE FROM tenant_role_permissions WHERE role_id = $1`, [roleId])
   await insertRolePermissions(roleId, permissions, db)
@@ -198,7 +210,9 @@ export async function ensureTenantSystemRoles(tenantId, tenantType, client = nul
       }
 
       const perms = resolveRolePermissionList(def, tenantType)
-      await replaceRolePermissions(roleId, perms, db)
+      if (!(await rolePermissionsUnchanged(roleId, perms, db))) {
+        await replaceRolePermissions(roleId, perms, db)
+      }
     }
   } catch (err) {
     if (err.code === '42P01') return

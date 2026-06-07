@@ -5,7 +5,7 @@ import { useGetBillingStatusQuery, useGetSubscriptionPlansQuery } from '../servi
 import { useAppDispatch, useAppSelector } from '../hooks/redux'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { activateFreePlanFromPlans } from '../lib/activateFreePlan'
-import { canLeaveActivationPage, refetchAppSession } from '../lib/refetchAppSession'
+import { canLeaveActivationPage } from '../lib/refetchAppSession'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -34,7 +34,6 @@ export function AccountActivationPage() {
     const result = await activateFreePlanFromPlans(dispatch, plansData?.plans)
     setActivatingFree(false)
     if (result.ok) {
-      await refetchAppSession(dispatch)
       toast.success('Your free plan is active.')
       navigate('/app', { replace: true })
       return

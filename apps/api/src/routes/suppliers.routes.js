@@ -25,26 +25,31 @@ import { buildWhitelistedUpdate } from '../lib/safe-update.js'
 import {
   getSupplierRatingSummary,
   getRecentReviewsForSupplier,
+  getSupplierRatingSummariesBatch,
+  getRecentReviewsForSuppliersBatch,
 } from '../services/reviews.service.js'
 
 const router = express.Router()
 
 async function attachReviewFields(suppliers) {
-  return Promise.all(
-    suppliers.map(async (s) => {
-      // rating summary and recent reviews are independent — fetch in parallel.
-      const [summary, recent_reviews] = await Promise.all([
-        getSupplierRatingSummary(s.id),
-        getRecentReviewsForSupplier(s.id, 3),
-      ])
-      return {
-        ...s,
-        avg_overall: Number(summary.avg_overall) || 0,
-        review_count: summary.review_count ?? 0,
-        recent_reviews,
-      }
-    })
-  )
+  if (!suppliers.length) return suppliers
+  const ids = suppliers.map((s) => s.id)
+  const [summaries, reviewsBySupplier] = await Promise.all([
+    getSupplierRatingSummariesBatch(ids),
+    getRecentReviewsForSuppliersBatch(ids, 3),
+  ])
+  return suppliers.map((s) => {
+    const summary = summaries.get(s.id) || {
+      avg_overall: 0,
+      review_count: 0,
+    }
+    return {
+      ...s,
+      avg_overall: Number(summary.avg_overall) || 0,
+      review_count: summary.review_count ?? 0,
+      recent_reviews: reviewsBySupplier.get(s.id) || [],
+    }
+  })
 }
 
 // Validation schemas

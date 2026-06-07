@@ -27,6 +27,7 @@ import { resolveEffectiveLimit } from '../lib/limit-resolution.js'
 import {
   resolveOrgBillingTenantId,
   resolveActiveBillingSubscription,
+  resolveActiveBillingSubscriptionsBatch,
 } from '../lib/org-billing-tenant.js'
 import { clearActiveTenantCookie } from '../lib/tenant-switch.js'
 import {
@@ -2003,23 +2004,21 @@ router.post('/users/reset-password', async (req, res) => {
 
 /** Align admin tenant rows with the subscription row used for entitlements (org main branch). */
 async function attachBillingSubscriptionFields(rows, tenantType) {
-  await Promise.all(
-    rows.map(async (row) => {
-      const billing = await resolveActiveBillingSubscription(row.id, tenantType)
-      if (!billing.subscription) return
-      row.subscription_id = billing.subscription.id
-      row.uses_org_billing = billing.usesOrgBilling
-      row.billing_tenant_id = billing.billingTenantId
-      row.subscription_status = billing.subscription.status
-      row.plan_name = billing.subscription.plan_name
-      if (billing.subscription.plan_id) {
-        const { rows: planRows } = await query('SELECT code FROM subscription_plan WHERE id = $1', [
-          billing.subscription.plan_id,
-        ])
-        row.plan_code = planRows[0]?.code ?? row.plan_code
-      }
-    })
+  if (!rows.length) return
+  const batch = await resolveActiveBillingSubscriptionsBatch(
+    rows.map((row) => row.id),
+    tenantType
   )
+  for (const row of rows) {
+    const billing = batch.get(row.id)
+    if (!billing?.subscription) continue
+    row.subscription_id = billing.subscription.id
+    row.uses_org_billing = billing.usesOrgBilling
+    row.billing_tenant_id = billing.billingTenantId
+    row.subscription_status = billing.subscription.status
+    row.plan_name = billing.subscription.plan_name
+    row.plan_code = billing.plan_code ?? row.plan_code
+  }
 }
 
 // Get suppliers with detailed info

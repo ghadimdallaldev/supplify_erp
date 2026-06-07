@@ -49,14 +49,12 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     data: supplierOrgData,
     isLoading: supplierOrgLoading,
     isError: supplierOrgError,
-    refetch: refetchSupplierOrg,
   } = useGetOrgBranchesQuery(undefined, { skip: !isSupplier })
 
   const {
     data: restaurantOrgData,
     isLoading: restaurantOrgLoading,
     isError: restaurantOrgError,
-    refetch: refetchRestaurantOrg,
   } = useGetRestaurantOrgBranchesQuery(undefined, { skip: !isRestaurant })
 
   const useSupplierOrgBranches =
@@ -67,11 +65,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
 
   const useOrgBranches = useSupplierOrgBranches || useRestaurantOrgBranches
 
-  const {
-    data: linkedData,
-    isLoading: linkedLoading,
-    refetch: refetchLinked,
-  } = useGetBranchesQuery(undefined, { skip: !isTenantUser || useOrgBranches })
+  const { data: linkedData, isLoading: linkedLoading } = useGetBranchesQuery(undefined, {
+    skip: !isTenantUser || useOrgBranches,
+  })
   const [switchBranchAccount, { isLoading: isSwitchingLinked }] = useSwitchBranchAccountMutation()
   const [switchSupplierOrgBranch, { isLoading: isSwitchingSupplierOrg }] =
     useSwitchOrgBranchContextMutation()
@@ -89,11 +85,6 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       ? isSwitchingSupplierOrg
       : isSwitchingRestaurantOrg
     : isSwitchingLinked
-  const refetch = useOrgBranches
-    ? useSupplierOrgBranches
-      ? refetchSupplierOrg
-      : refetchRestaurantOrg
-    : refetchLinked
 
   const rawBranches = useOrgBranches
     ? (orgData?.branches ?? [])
@@ -127,11 +118,6 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     () => accounts.find((account) => account.id === activeAccountId) ?? primaryAccount,
     [accounts, activeAccountId, primaryAccount]
   )
-
-  useEffect(() => {
-    if (!isTenantUser) return
-    refetch()
-  }, [isTenantUser, refetch])
 
   const switchAccount = useCallback(
     async (accountId: string | null) => {

@@ -87,10 +87,14 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return <>{children}</>
   }
 
-  if (isLoading || (data?.role !== 'PENDING' && registerStatusLoading && !registerStatus)) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]" />
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
+        <div className="w-full max-w-md space-y-4 px-6">
+          <div className="h-8 w-48 animate-pulse rounded-md bg-[var(--surface-muted)]" />
+          <div className="h-4 w-full animate-pulse rounded bg-[var(--surface-muted)]" />
+          <div className="h-4 w-3/4 animate-pulse rounded bg-[var(--surface-muted)]" />
+        </div>
       </div>
     )
   }
@@ -99,10 +103,24 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return null
   }
 
+  if (data?.role === 'PENDING' && registerStatusLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
+        <div className="w-full max-w-md space-y-4 px-6">
+          <div className="h-8 w-48 animate-pulse rounded-md bg-[var(--surface-muted)]" />
+          <div className="h-4 w-full animate-pulse rounded bg-[var(--surface-muted)]" />
+        </div>
+      </div>
+    )
+  }
+
   if (needsRegister) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]" />
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
+        <div className="w-full max-w-md space-y-4 px-6">
+          <div className="h-8 w-48 animate-pulse rounded-md bg-[var(--surface-muted)]" />
+          <div className="h-4 w-full animate-pulse rounded bg-[var(--surface-muted)]" />
+        </div>
       </div>
     )
   }

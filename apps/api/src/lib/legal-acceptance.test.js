@@ -53,7 +53,7 @@ describe('legal-acceptance', () => {
   })
 
   describe('recordRegistrationLegalAcceptances', () => {
-    it('inserts one row per accepted document', async () => {
+    it('inserts all accepted documents in one bulk statement', async () => {
       const calls = []
       const client = {
         query: (...args) => {
@@ -75,8 +75,10 @@ describe('legal-acceptance', () => {
         },
         client
       )
-      expect(calls).toHaveLength(required.length)
+      expect(calls).toHaveLength(1)
       expect(calls[0][0]).toContain('INSERT INTO legal_acceptance')
+      expect(calls[0][0]).toContain('unnest')
+      expect(calls[0][1][3]).toHaveLength(required.length)
     })
   })
 })

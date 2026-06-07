@@ -2,9 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { activateFreePlanFromPlans, openFreePlanCheckout } from './activateFreePlan'
 
 const checkoutInitiateMock = vi.fn()
-const invalidateTagsMock = vi.fn()
 const openPaymentModalMock = vi.fn()
-const refetchAppSessionMock = vi.fn()
 
 vi.mock('../services/api', () => ({
   api: {
@@ -13,14 +11,7 @@ vi.mock('../services/api', () => ({
         initiate: (...args: unknown[]) => checkoutInitiateMock(...args),
       },
     },
-    util: {
-      invalidateTags: (...args: unknown[]) => invalidateTagsMock(...args),
-    },
   },
-}))
-
-vi.mock('./refetchAppSession', () => ({
-  refetchAppSession: (...args: unknown[]) => refetchAppSessionMock(...args),
 }))
 
 vi.mock('./openPaymentModal', () => ({
@@ -33,10 +24,7 @@ describe('activateFreePlan', () => {
 
   beforeEach(() => {
     checkoutInitiateMock.mockReset()
-    invalidateTagsMock.mockReset()
     openPaymentModalMock.mockReset()
-    refetchAppSessionMock.mockReset()
-    refetchAppSessionMock.mockResolvedValue(undefined)
     unwrap.mockReset()
     unwrap.mockResolvedValue({ success: true })
   })
@@ -64,8 +52,6 @@ describe('activateFreePlan', () => {
           idempotencyKey: expect.any(String),
         })
       )
-      expect(invalidateTagsMock).toHaveBeenCalledWith(['Subscription', 'Billing', 'User'])
-      expect(refetchAppSessionMock).toHaveBeenCalledWith(dispatch)
     })
 
     it('returns API error message on checkout failure', async () => {

@@ -33,6 +33,19 @@ const mockResolveActiveBillingSubscription = vi.fn()
 vi.mock('../lib/org-billing-tenant.js', () => ({
   resolveOrgBillingTenantId: vi.fn(async (tenantId) => tenantId),
   resolveActiveBillingSubscription: (...args) => mockResolveActiveBillingSubscription(...args),
+  resolveActiveBillingSubscriptionsBatch: vi.fn(async (tenantIds, tenantType) => {
+    const map = new Map()
+    for (const id of tenantIds) {
+      const billing = await mockResolveActiveBillingSubscription(id, tenantType)
+      map.set(id, {
+        billingTenantId: billing?.billingTenantId ?? id,
+        usesOrgBilling: billing?.usesOrgBilling ?? false,
+        subscription: billing?.subscription ?? null,
+        plan_code: billing?.subscription?.plan_code,
+      })
+    }
+    return map
+  }),
 }))
 vi.mock('../lib/audit.js', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('../lib/billing/billing-service.js', () => ({
