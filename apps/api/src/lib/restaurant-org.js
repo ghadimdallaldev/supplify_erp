@@ -3,6 +3,7 @@
  */
 import { query, withTransaction } from './db.js'
 import { PERMISSION_KEYS } from './permission-keys.js'
+import { replaceOrgRolePermissions } from './org-role-permissions.js'
 import { logger } from './logger.js'
 import { ensureTenantSystemRoles, assignOwnerRoleForUser, getOwnerRoleId } from './tenant-roles.js'
 import { slugifyName } from './register-account.js'
@@ -125,15 +126,12 @@ export async function ensureRestaurantOrgSystemRoles(organizationId, client = nu
       roleId = inserted[0].id
     }
     const perms = resolveOrgRolePermissions(def)
-    await db(`DELETE FROM restaurant_org_role_permissions WHERE role_id = $1`, [roleId])
-    for (const permission of perms) {
-      await db(
-        `INSERT INTO restaurant_org_role_permissions (role_id, permission, branch_scope)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (role_id, permission) DO UPDATE SET branch_scope = EXCLUDED.branch_scope`,
-        [roleId, permission, def.branchScope]
-      )
-    }
+    await replaceOrgRolePermissions(db, {
+      permissionsTable: 'restaurant_org_role_permissions',
+      roleId,
+      permissions: perms,
+      branchScope: def.branchScope,
+    })
   }
 }
 
