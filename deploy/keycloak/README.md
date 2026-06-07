@@ -70,6 +70,6 @@ Then confirm `https://keycloak-development-4942.up.railway.app/realms/Supplify/.
 
 ### 3. First-boot auto-import (optional)
 
-Start command: `/opt/keycloak/bin/kc.sh start-dev --import-realm`  
+Start command: `/opt/keycloak/bin/kc.sh start --import-realm` (development uses optimized `start`, not `start-dev`)  
 Mount `realm-export.json` as `/opt/keycloak/data/import/Supplify-realm.json`.  
 Import runs only when that realm name is not already in the database; wiping the Keycloak Postgres plugin data triggers a clean import.
