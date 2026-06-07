@@ -3,7 +3,7 @@
  */
 import { query, withTransaction } from './db.js'
 import { PERMISSION_KEYS } from './permission-keys.js'
-import { replaceOrgRolePermissions } from './org-role-permissions.js'
+import { orgRolePermissionsUnchanged, replaceOrgRolePermissions } from './org-role-permissions.js'
 import { logger } from './logger.js'
 import { ensureTenantSystemRoles, assignOwnerRoleForUser, getOwnerRoleId } from './tenant-roles.js'
 import { slugifyName } from './register-account.js'
@@ -126,12 +126,15 @@ export async function ensureRestaurantOrgSystemRoles(organizationId, client = nu
       roleId = inserted[0].id
     }
     const perms = resolveOrgRolePermissions(def)
-    await replaceOrgRolePermissions(db, {
+    const permArgs = {
       permissionsTable: 'restaurant_org_role_permissions',
       roleId,
       permissions: perms,
       branchScope: def.branchScope,
-    })
+    }
+    if (!(await orgRolePermissionsUnchanged(db, permArgs))) {
+      await replaceOrgRolePermissions(db, permArgs)
+    }
   }
 }
 
@@ -369,9 +372,9 @@ export async function invalidateRestaurantOrgPermissionCaches(userId, organizati
   const { rows } = await query(`SELECT id FROM restaurant WHERE organization_id = $1`, [
     organizationId,
   ])
-  for (const branch of rows) {
-    await invalidateUserPermissionCache(userId, branch.id, 'RESTAURANT')
-  }
+  await Promise.all(
+    rows.map((branch) => invalidateUserPermissionCache(userId, branch.id, 'RESTAURANT'))
+  )
 }
 
 async function uniqueRestaurantSlug(client, baseSlug) {

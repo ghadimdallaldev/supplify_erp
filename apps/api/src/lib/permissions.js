@@ -162,78 +162,83 @@ export async function getPermissionsForUser(userId, tenantId, tenantType) {
 
       let named = []
       let legacy = []
-
       let orgPerms = []
       let hasOrgRole = false
-
-      if (tenantType === 'SUPPLIER') {
-        try {
-          const { rows: orgRows } = await query(
-            `SELECT organization_id FROM supplier WHERE id = $1`,
-            [tenantId]
-          )
-          const organizationId = orgRows[0]?.organization_id
-          if (organizationId) {
-            const { rows: orgMembership } = await query(
-              `SELECT 1 FROM org_user_roles WHERE user_id = $1 AND organization_id = $2`,
-              [userId, organizationId]
-            )
-            hasOrgRole = orgMembership.length > 0
-            if (hasOrgRole) {
-              orgPerms = await getOrgRolePermissions(userId, organizationId, tenantId)
-            }
-          }
-        } catch (err) {
-          if (err.code !== '42P01') throw err
-        }
-      }
-
-      if (tenantType === 'RESTAURANT') {
-        try {
-          const { rows: orgRows } = await query(
-            `SELECT organization_id FROM restaurant WHERE id = $1`,
-            [tenantId]
-          )
-          const organizationId = orgRows[0]?.organization_id
-          if (organizationId) {
-            const { rows: orgMembership } = await query(
-              `SELECT 1 FROM restaurant_org_user_roles WHERE user_id = $1 AND organization_id = $2`,
-              [userId, organizationId]
-            )
-            hasOrgRole = orgMembership.length > 0
-            if (hasOrgRole) {
-              orgPerms = await getRestaurantOrgRolePermissions(userId, organizationId, tenantId)
-            }
-          }
-        } catch (err) {
-          if (err.code !== '42P01') throw err
-        }
-      }
-
-      if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
-        try {
-          named = await getTenantNamedPermissionsForUser(userId, tenantId, tenantType)
-        } catch (err) {
-          if (err.code !== '42P01') throw err
-        }
-      }
-
-      try {
-        legacy = await getLegacyPermissionsForUser(userId, tenantId, tenantType)
-      } catch (err) {
-        if (err.code !== '42P01') throw err
-      }
-
-      // When user has a named tenant role assignment, use ONLY that role's permissions (strict RBAC).
-      // Legacy user_role grants must not expand Viewer/Accountant into full owner access.
       let hasNamedAssignment = false
-      if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
-        const { rows: tur } = await query(
-          `SELECT 1 FROM tenant_user_roles WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = $3 LIMIT 1`,
-          [userId, tenantId, tenantType]
-        )
-        hasNamedAssignment = tur.length > 0
-      }
+
+      const orgLookupPromise =
+        tenantType === 'SUPPLIER'
+          ? query(`SELECT organization_id FROM supplier WHERE id = $1`, [tenantId]).then(
+              async ({ rows: orgRows }) => {
+                const organizationId = orgRows[0]?.organization_id
+                if (!organizationId) return { hasOrgRole: false, orgPerms: [] }
+                const { rows: orgMembership } = await query(
+                  `SELECT 1 FROM org_user_roles WHERE user_id = $1 AND organization_id = $2`,
+                  [userId, organizationId]
+                )
+                if (!orgMembership.length) return { hasOrgRole: false, orgPerms: [] }
+                const orgPerms = await getOrgRolePermissions(userId, organizationId, tenantId)
+                return { hasOrgRole: true, orgPerms }
+              }
+            )
+          : tenantType === 'RESTAURANT'
+            ? query(`SELECT organization_id FROM restaurant WHERE id = $1`, [tenantId]).then(
+                async ({ rows: orgRows }) => {
+                  const organizationId = orgRows[0]?.organization_id
+                  if (!organizationId) return { hasOrgRole: false, orgPerms: [] }
+                  const { rows: orgMembership } = await query(
+                    `SELECT 1 FROM restaurant_org_user_roles WHERE user_id = $1 AND organization_id = $2`,
+                    [userId, organizationId]
+                  )
+                  if (!orgMembership.length) return { hasOrgRole: false, orgPerms: [] }
+                  const orgPerms = await getRestaurantOrgRolePermissions(
+                    userId,
+                    organizationId,
+                    tenantId
+                  )
+                  return { hasOrgRole: true, orgPerms }
+                }
+              )
+            : Promise.resolve({ hasOrgRole: false, orgPerms: [] })
+
+      const namedPromise =
+        tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER'
+          ? getTenantNamedPermissionsForUser(userId, tenantId, tenantType).catch((err) => {
+              if (err.code === '42P01') return []
+              throw err
+            })
+          : Promise.resolve([])
+
+      const legacyPromise = getLegacyPermissionsForUser(userId, tenantId, tenantType).catch(
+        (err) => {
+          if (err.code === '42P01') return []
+          throw err
+        }
+      )
+
+      const assignmentPromise =
+        tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER'
+          ? query(
+              `SELECT 1 FROM tenant_user_roles WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = $3 LIMIT 1`,
+              [userId, tenantId, tenantType]
+            ).then(({ rows }) => rows.length > 0)
+          : Promise.resolve(false)
+
+      const [orgResult, namedResult, legacyResult, assigned] = await Promise.all([
+        orgLookupPromise.catch((err) => {
+          if (err.code === '42P01') return { hasOrgRole: false, orgPerms: [] }
+          throw err
+        }),
+        namedPromise,
+        legacyPromise,
+        assignmentPromise,
+      ])
+
+      hasOrgRole = orgResult.hasOrgRole
+      orgPerms = orgResult.orgPerms
+      named = namedResult
+      legacy = legacyResult
+      hasNamedAssignment = assigned
 
       const branchPerms = hasNamedAssignment ? named : mergeUniquePermissions(named, legacy)
 

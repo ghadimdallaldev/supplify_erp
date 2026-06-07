@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import {
   useGetDashboardStatsQuery,
   useGetOrdersQuery,
@@ -34,14 +34,17 @@ import { useImpersonation } from '../hooks/useImpersonation'
 import { featureEnabled } from '../lib/planLimits'
 import { canUseFinanceInvoices, canUseGlobalReports } from '../lib/planFeatureGates'
 import { formatPlanDisplayName } from '../lib/planComparison'
+import { formatCurrency } from '../utils/format'
 /** Vertical rhythm between dashboard sections (KPIs, cards row, calendar). */
 const DASHBOARD_STACK_GAP = 24
 /** Horizontal gap between KPI cards and between the three content cards. */
 const DASHBOARD_GRID_GAP = 20
 /** Extra space above the calendar so it separates clearly from the cards row. */
 const DASHBOARD_CALENDAR_EXTRA_GAP = 12
-import { CalendarView } from '../components/CalendarView'
-import { formatCurrency } from '../utils/format'
+
+const CalendarView = lazy(() =>
+  import('../components/CalendarView').then((m) => ({ default: m.CalendarView }))
+)
 
 // ─── Tiny helpers ────────────────────────────────────────────────────────────
 
@@ -267,13 +270,9 @@ export function DashboardPage() {
   const isRestaurant = isEffectiveRestaurant
   const isSupplier = isEffectiveSupplier
 
-  const { data: recentOrders } = useGetOrdersQuery(
-    { limit: 7, offset: 0 },
+  const { data: ordersData } = useGetOrdersQuery(
+    { limit: isRestaurant ? 200 : 7, offset: 0 },
     { skip: isAdminNotImpersonating }
-  )
-  const { data: spendOrdersData } = useGetOrdersQuery(
-    { limit: 200, offset: 0 },
-    { skip: isAdminNotImpersonating || !isRestaurant }
   )
   const { data: inventoryData } = useGetInventoryListQuery(undefined, {
     skip: isAdminNotImpersonating || !isSupplier,
@@ -386,7 +385,7 @@ export function DashboardPage() {
   }
 
   // ── Derived data ─────────────────────────────────────────────────────────
-  const orders = recentOrders?.orders || []
+  const orders = (ordersData?.orders || []).slice(0, 7)
   const orderAmounts = orders.map((o: any) => Number(o.total_amount) || 0)
   const syntheticRamp = (n: number, peak: number) =>
     Array.from({ length: 7 }, (_, i) =>
@@ -409,7 +408,7 @@ export function DashboardPage() {
         value: Number(p.total) || 0,
       }))
     : []
-  const orderSpendTrend = buildOrderSpendTrend(spendOrdersData?.orders || [])
+  const orderSpendTrend = buildOrderSpendTrend(isRestaurant ? ordersData?.orders || [] : [])
   const spendTrendSource: 'invoices' | 'orders' | null =
     invoiceSpendTrend.length > 0 ? 'invoices' : orderSpendTrend.length > 0 ? 'orders' : null
   const spendTrend = spendTrendSource === 'invoices' ? invoiceSpendTrend : orderSpendTrend
@@ -1212,16 +1211,25 @@ export function DashboardPage() {
           overflow: 'hidden',
         }}
       >
-        <CalendarView
-          role={
-            effectiveRole === 'ADMIN' ||
-            effectiveRole === 'RESTAURANT' ||
-            effectiveRole === 'SUPPLIER'
-              ? effectiveRole
-              : null
+        <Suspense
+          fallback={
+            <div className="p-6">
+              <Skeleton className="h-8 w-48 mb-4" />
+              <Skeleton className="h-64 w-full" />
+            </div>
           }
-          isAdmin={user?.role === 'ADMIN'}
-        />
+        >
+          <CalendarView
+            role={
+              effectiveRole === 'ADMIN' ||
+              effectiveRole === 'RESTAURANT' ||
+              effectiveRole === 'SUPPLIER'
+                ? effectiveRole
+                : null
+            }
+            isAdmin={user?.role === 'ADMIN'}
+          />
+        </Suspense>
       </div>
     </div>
   )

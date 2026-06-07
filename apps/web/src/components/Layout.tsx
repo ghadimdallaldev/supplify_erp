@@ -50,19 +50,19 @@ export function Layout() {
 
   useNotificationAlerts()
 
-  // Prefetch the most-visited route chunks after auth so first navigation is instant.
-  // Runs once on mount with a 2 s delay to avoid competing with the initial page load.
+  // Prefetch common route chunks after initial load settles (idle + delay).
   useEffect(() => {
-    const t = setTimeout(() => {
+    const prefetch = () => {
       import('../pages/DashboardPage')
       import('../pages/OrdersPage')
       import('../pages/StaffPage')
       import('../pages/InventoryPage')
-      import('../pages/disputes/DisputesPage')
-      import('../pages/reports/ReportsPage')
-      import('../pages/ProductsPage')
-      import('../pages/ReservationsPage')
-    }, 500)
+    }
+    const schedule =
+      typeof requestIdleCallback === 'function'
+        ? (cb: () => void) => requestIdleCallback(cb, { timeout: 4000 })
+        : (cb: () => void) => window.setTimeout(cb, 2500)
+    const t = window.setTimeout(() => schedule(prefetch), 2500)
     return () => clearTimeout(t)
   }, [])
 

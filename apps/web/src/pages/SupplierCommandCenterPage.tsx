@@ -46,23 +46,26 @@ function KpiCard({
   icon: Icon,
   href,
   testId,
+  extra,
 }: {
   label: string
   value: string | number
   icon: typeof Package
   href?: string
   testId: string
+  extra?: ReactNode
 }) {
   const inner = (
     <div
       data-testid={testId}
-      className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5 flex flex-col gap-2 min-h-[88px]"
+      className="flex min-h-[88px] flex-col gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5"
     >
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-[var(--text-muted)]">{label}</span>
-        <Icon size={16} className="text-[var(--brand)] shrink-0" />
+        <Icon size={16} className="shrink-0 text-[var(--brand)]" />
       </div>
       <span className="text-xl font-extrabold text-[var(--text)]">{value}</span>
+      {extra}
     </div>
   )
   if (href) {
@@ -202,7 +205,7 @@ export function SupplierCommandCenterPage() {
         />
 
         <nav
-          className="action-bar rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-2.5"
+          className="-mx-1 flex gap-2 overflow-x-auto overscroll-x-contain rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-2.5 sm:mx-0 sm:flex-wrap"
           aria-label="Quick actions"
           data-testid="command-center-quick-actions"
         >
@@ -211,7 +214,7 @@ export function SupplierCommandCenterPage() {
               key={testId}
               to={href}
               data-testid={testId}
-              className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-[var(--text)] no-underline transition-colors hover:border-[var(--brand-light)] hover:bg-[var(--brand-ultra)]"
+              className="inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-[var(--text)] no-underline transition-colors hover:border-[var(--brand-light)] hover:bg-[var(--brand-ultra)] sm:shrink"
             >
               <Icon size={14} className="text-[var(--brand)]" />
               {label}
@@ -227,54 +230,54 @@ export function SupplierCommandCenterPage() {
             icon={Package}
             href="/app/orders"
           />
-          <div className="space-y-2">
-            <KpiCard
-              testId="kpi-deliveries-pending"
-              label="Deliveries pending"
-              value={kpis?.deliveriesPendingToday ?? 0}
-              icon={Truck}
-              href="/app/fulfillment"
-            />
-            {previews?.deliveryGpsSummary && (
-              <div
-                data-testid="delivery-gps-summary"
-                className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2.5 text-xs"
-              >
-                <p className="font-semibold text-[var(--text-muted)] mb-1.5">GPS today</p>
-                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[var(--text)]">
-                  <span>
-                    <span className="text-[var(--mint)] font-bold">
-                      {previews.deliveryGpsSummary.live ?? 0}
-                    </span>{' '}
-                    Live
-                  </span>
-                  <span>
-                    <span className="text-amber-600 font-bold">
-                      {previews.deliveryGpsSummary.stale ?? 0}
-                    </span>{' '}
-                    Stale
-                  </span>
-                  <span>
-                    <span className="font-bold">{previews.deliveryGpsSummary.noGps ?? 0}</span> No
-                    GPS
-                  </span>
-                  <span>
-                    <span className="text-[var(--red)] font-bold">
-                      {previews.deliveryGpsSummary.failed ?? 0}
-                    </span>{' '}
-                    Failed
-                  </span>
-                </div>
-                <Link
-                  to="/app/fulfillment?tab=tracking"
-                  className="mt-2 inline-flex items-center gap-1 text-[var(--brand-mid)] font-semibold hover:underline"
+          <KpiCard
+            testId="kpi-deliveries-pending"
+            label="Deliveries pending"
+            value={kpis?.deliveriesPendingToday ?? 0}
+            icon={Truck}
+            href="/app/fulfillment"
+            extra={
+              previews?.deliveryGpsSummary ? (
+                <div
+                  data-testid="delivery-gps-summary"
+                  className="mt-1 border-t border-[var(--app-border)] pt-2 text-xs"
                 >
-                  Open tracking
-                  <ArrowRight className="h-3 w-3" aria-hidden />
-                </Link>
-              </div>
-            )}
-          </div>
+                  <p className="mb-1.5 font-semibold text-[var(--text-muted)]">GPS today</p>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[var(--text)]">
+                    <span>
+                      <span className="font-bold text-[var(--mint)]">
+                        {previews.deliveryGpsSummary.live ?? 0}
+                      </span>{' '}
+                      Live
+                    </span>
+                    <span>
+                      <span className="font-bold text-amber-600">
+                        {previews.deliveryGpsSummary.stale ?? 0}
+                      </span>{' '}
+                      Stale
+                    </span>
+                    <span>
+                      <span className="font-bold">{previews.deliveryGpsSummary.noGps ?? 0}</span> No
+                      GPS
+                    </span>
+                    <span>
+                      <span className="font-bold text-[var(--red)]">
+                        {previews.deliveryGpsSummary.failed ?? 0}
+                      </span>{' '}
+                      Failed
+                    </span>
+                  </div>
+                  <Link
+                    to="/app/fulfillment?tab=tracking"
+                    className="mt-2 inline-flex items-center gap-1 font-semibold text-[var(--brand-mid)] hover:underline"
+                  >
+                    Open tracking
+                    <ArrowRight className="h-3 w-3" aria-hidden />
+                  </Link>
+                </div>
+              ) : undefined
+            }
+          />
           <KpiCard
             testId="kpi-unpaid-balance"
             label="Unpaid balance"

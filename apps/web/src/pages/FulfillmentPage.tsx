@@ -29,7 +29,9 @@ export function FulfillmentPage() {
   const warehouseFilter =
     multiWarehouseActive && selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined
 
-  const { data: exceptionsResponse } = useGetFulfillmentExceptionsQuery(warehouseFilter)
+  const { data: exceptionsResponse } = useGetFulfillmentExceptionsQuery(warehouseFilter, {
+    skip: activeTab !== 'exceptions',
+  })
 
   return (
     <RequirePermission permission="FULFILLMENT_VIEW" title="fulfillment">

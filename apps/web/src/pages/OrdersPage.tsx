@@ -104,10 +104,10 @@ export function OrdersPage() {
       offset: 0,
     },
     {
-      refetchOnMountOrArgChange: true,
+      refetchOnMountOrArgChange: false,
       refetchOnFocus: false,
       refetchOnReconnect: true,
-      pollingInterval: 30_000,
+      pollingInterval: 60_000,
       skipPollingIfUnfocused: true,
     }
   )
@@ -119,19 +119,20 @@ export function OrdersPage() {
   )
   const { data: restaurantDisputesData } = useGetDisputesQuery(undefined, {
     skip: isSupplier || !disputesEnabled,
-    pollingInterval: 30_000,
-    skipPollingIfUnfocused: true,
+    pollingInterval: 0,
   })
   const { data: supplierDisputesData } = useGetIncomingDisputesQuery(undefined, {
     skip: !isSupplier || !disputesEnabled,
-    pollingInterval: 30_000,
-    skipPollingIfUnfocused: true,
+    pollingInterval: 0,
   })
   const allDisputes =
     (isSupplier ? supplierDisputesData?.disputes : restaurantDisputesData?.disputes) ?? []
 
   const { data: restaurantsData } = useGetRestaurantsQuery(undefined, { skip: !isSupplier })
-  const { data: productsData } = useGetProductsQuery({ limit: 1000 }, { skip: !isSupplier })
+  const { data: productsData } = useGetProductsQuery(
+    { limit: 100 },
+    { skip: !isSupplier || !showManualOrderDialog }
+  )
   const [updateOrder] = useUpdateOrderMutation()
   const [createManualOrder, { isLoading: isCreatingManualOrder }] = useCreateManualOrderMutation()
   const [sendReminder] = useSendOrderReminderMutation()

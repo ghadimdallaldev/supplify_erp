@@ -3,7 +3,7 @@
  */
 import { query, withTransaction } from './db.js'
 import { PERMISSION_KEYS } from './permission-keys.js'
-import { replaceOrgRolePermissions } from './org-role-permissions.js'
+import { orgRolePermissionsUnchanged, replaceOrgRolePermissions } from './org-role-permissions.js'
 import { logger } from './logger.js'
 import { ensureTenantSystemRoles, assignOwnerRoleForUser, getOwnerRoleId } from './tenant-roles.js'
 import { slugifyName } from './register-account.js'
@@ -114,12 +114,15 @@ export async function ensureOrgSystemRoles(organizationId, client = null) {
       roleId = inserted[0].id
     }
     const perms = resolveOrgRolePermissions(def)
-    await replaceOrgRolePermissions(db, {
+    const permArgs = {
       permissionsTable: 'org_role_permissions',
       roleId,
       permissions: perms,
       branchScope: def.branchScope,
-    })
+    }
+    if (!(await orgRolePermissionsUnchanged(db, permArgs))) {
+      await replaceOrgRolePermissions(db, permArgs)
+    }
   }
 }
 
@@ -362,9 +365,9 @@ export async function invalidateOrgPermissionCaches(userId, organizationId) {
   const { rows } = await query(`SELECT id FROM supplier WHERE organization_id = $1`, [
     organizationId,
   ])
-  for (const branch of rows) {
-    await invalidateUserPermissionCache(userId, branch.id, 'SUPPLIER')
-  }
+  await Promise.all(
+    rows.map((branch) => invalidateUserPermissionCache(userId, branch.id, 'SUPPLIER'))
+  )
 }
 
 async function uniqueSupplierSlug(client, baseSlug) {

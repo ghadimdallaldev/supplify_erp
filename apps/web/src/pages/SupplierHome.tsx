@@ -2,9 +2,8 @@ import { Navigate } from 'react-router-dom'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { usePermissions } from '../hooks/usePermissions'
-import { DashboardPage } from './DashboardPage'
 
-/** Default app home: drivers → deliveries; other suppliers → Command Center. */
+/** Default app home: drivers → deliveries; other suppliers → Command Center; restaurants → dashboard. */
 export function SupplierHome() {
   const { isEffectiveSupplier, isPlatformAdmin, isImpersonating } = useImpersonation()
   const { isDriverRole } = useWorkspaceRole()
@@ -31,5 +30,5 @@ export function SupplierHome() {
     }
   }
 
-  return <DashboardPage />
+  return <Navigate to="/app/dashboard" replace />
 }

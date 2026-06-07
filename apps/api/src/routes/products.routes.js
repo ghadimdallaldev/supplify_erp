@@ -301,16 +301,6 @@ router.get('/', async (req, res) => {
 
     queryParams.push(params.limit, params.offset)
 
-    let { rows } = await query(sql, queryParams)
-
-    if (tenant?.tenantType === 'RESTAURANT') {
-      const restaurantId = tenant.tenantId
-      if (restaurantId) {
-        rows = await enrichProductsWithResolvedPricing(rows, restaurantId)
-      }
-    }
-
-    // Get total count for pagination (skip inventory join unless filtering by stock)
     const countSql = needsInventory
       ? `
       SELECT COUNT(DISTINCT p.id) as total
@@ -333,8 +323,20 @@ router.get('/', async (req, res) => {
       ${whereClause}
     `
 
-    const countParams = queryParams.slice(0, -2) // Remove limit and offset
-    const { rows: countRows } = await query(countSql, countParams)
+    const countParams = queryParams.slice(0, -2)
+    const [mainResult, countResult] = await Promise.all([
+      query(sql, queryParams),
+      query(countSql, countParams),
+    ])
+    let { rows } = mainResult
+    const { rows: countRows } = countResult
+
+    if (tenant?.tenantType === 'RESTAURANT') {
+      const restaurantId = tenant.tenantId
+      if (restaurantId) {
+        rows = await enrichProductsWithResolvedPricing(rows, restaurantId)
+      }
+    }
 
     res.json({
       ok: true,

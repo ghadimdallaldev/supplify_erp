@@ -56,13 +56,19 @@ export function ReservationsPage() {
     refetchOnFocus: false,
     refetchOnReconnect: true,
   })
-  const { data: analytics, refetch: refetchAnalytics } = useGetReservationAnalyticsQuery({
-    range,
-    ...(branchId ? { branchId } : {}),
-  })
-  const { data: guestIntel, isLoading: guestIntelLoading } = useGetGuestIntelligenceQuery({
-    ...(branchId ? { branchId } : {}),
-  })
+  const { data: analytics, refetch: refetchAnalytics } = useGetReservationAnalyticsQuery(
+    {
+      range,
+      ...(branchId ? { branchId } : {}),
+    },
+    { skip: boardLoading }
+  )
+  const { data: guestIntel, isLoading: guestIntelLoading } = useGetGuestIntelligenceQuery(
+    {
+      ...(branchId ? { branchId } : {}),
+    },
+    { skip: boardLoading }
+  )
   const {
     data: waitlistData,
     isLoading: waitlistLoading,
@@ -72,7 +78,10 @@ export function ReservationsPage() {
   const branches = branchesData?.branches ?? branchesData?.accounts ?? []
   const [promoteWaitlist, { isLoading: promoting }] = useManuallyPromoteWaitlistMutation()
   const { data: restaurantMe } = useGetRestaurantMeQuery()
-  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
+  })
   const waitlistAutoPromoEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.waitlist_auto_promo
   )

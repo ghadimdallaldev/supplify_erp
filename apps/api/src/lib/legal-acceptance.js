@@ -36,30 +36,6 @@ export function validateLegalAcceptancePayload({
 }
 
 /**
- * @param {import('pg').PoolClient | typeof query} db
- */
-async function insertAcceptance(db, row) {
-  const run = typeof db === 'function' ? db : db.query.bind(db)
-  await run(
-    `INSERT INTO legal_acceptance (
-      user_id, tenant_id, tenant_type, context, document_slug, document_version,
-      ip_address, user_agent, metadata
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)`,
-    [
-      row.userId,
-      row.tenantId ?? null,
-      row.tenantType ?? null,
-      row.context,
-      row.documentSlug,
-      row.documentVersion,
-      row.ipAddress ?? null,
-      row.userAgent ?? null,
-      JSON.stringify(row.metadata ?? {}),
-    ]
-  )
-}
-
-/**
  * Persist legal acceptances for registration.
  * @param {object} params
  * @param {string} params.userId
@@ -92,19 +68,32 @@ export async function recordRegistrationLegalAcceptances(
     packVersion,
   })
   const db = client || query
-  for (const documentSlug of accepted) {
-    await insertAcceptance(db, {
+  const run = typeof db === 'function' ? db : db.query.bind(db)
+  const slugs = [...accepted]
+  const versions = slugs.map(() => packVersion || LEGAL_PACK_VERSION)
+  const contexts = slugs.map(() => 'registration')
+  const metadataJson = JSON.stringify({
+    packVersion: packVersion || LEGAL_PACK_VERSION,
+  })
+  await run(
+    `INSERT INTO legal_acceptance (
+      user_id, tenant_id, tenant_type, context, document_slug, document_version,
+      ip_address, user_agent, metadata
+    )
+    SELECT $1, $2, $3, ctx, slug, ver, $7, $8, $9::jsonb
+    FROM unnest($4::text[], $5::text[], $6::text[]) AS t(slug, ver, ctx)`,
+    [
       userId,
-      tenantId,
-      tenantType,
-      context: 'registration',
-      documentSlug,
-      documentVersion: packVersion || LEGAL_PACK_VERSION,
-      ipAddress,
-      userAgent,
-      metadata: { packVersion: packVersion || LEGAL_PACK_VERSION },
-    })
-  }
+      tenantId ?? null,
+      tenantType ?? null,
+      slugs,
+      versions,
+      contexts,
+      ipAddress ?? null,
+      userAgent ?? null,
+      metadataJson,
+    ]
+  )
 }
 
 /**
@@ -129,15 +118,20 @@ export async function recordInviteLegalAcceptances(
     packVersion,
   })
   const db = client || query
-  for (const documentSlug of accepted) {
-    await insertAcceptance(db, {
-      userId,
-      context: 'invite',
-      documentSlug,
-      documentVersion: packVersion || LEGAL_PACK_VERSION,
-      ipAddress,
-      userAgent,
-      metadata: { packVersion: packVersion || LEGAL_PACK_VERSION },
-    })
-  }
+  const run = typeof db === 'function' ? db : db.query.bind(db)
+  const slugs = [...accepted]
+  const versions = slugs.map(() => packVersion || LEGAL_PACK_VERSION)
+  const contexts = slugs.map(() => 'invite')
+  const metadataJson = JSON.stringify({
+    packVersion: packVersion || LEGAL_PACK_VERSION,
+  })
+  await run(
+    `INSERT INTO legal_acceptance (
+      user_id, tenant_id, tenant_type, context, document_slug, document_version,
+      ip_address, user_agent, metadata
+    )
+    SELECT $1, NULL, NULL, ctx, slug, ver, $4, $5, $6::jsonb
+    FROM unnest($2::text[], $3::text[], $7::text[]) AS t(slug, ver, ctx)`,
+    [userId, slugs, versions, ipAddress ?? null, userAgent ?? null, metadataJson, contexts]
+  )
 }

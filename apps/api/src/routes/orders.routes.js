@@ -813,7 +813,7 @@ async function loadOrderWarehouseAssignments(orderId) {
 }
 
 // Order warehouse assignments (no extra feature gate — exists in single-warehouse mode too)
-router.get('/:id/warehouses', requireAuth, async (req, res, next) => {
+router.get('/:id/warehouses', async (req, res, next) => {
   try {
     const { id } = req.params
     const { rows: orders } = await query(`SELECT restaurant_id FROM customer_order WHERE id = $1`, [
@@ -852,7 +852,6 @@ router.get('/:id/warehouses', requireAuth, async (req, res, next) => {
 
 router.patch(
   '/:id/warehouses/:assignmentId',
-  requireAuth,
   requireRole(['SUPPLIER']),
   requirePermission('ORDERS_MANAGE'),
   async (req, res) => {
@@ -910,7 +909,6 @@ router.patch(
 
 router.post(
   '/:id/warehouses/:assignmentId/dispatch',
-  requireAuth,
   requireRole(['SUPPLIER']),
   requirePermission('ORDERS_MANAGE'),
   async (req, res) => {
@@ -949,7 +947,7 @@ router.post(
 )
 
 // Get order by ID
-router.get('/:id', requireAuth, async (req, res, next) => {
+router.get('/:id', async (req, res, next) => {
   try {
     const { id } = req.params
 
@@ -1146,7 +1144,6 @@ router.get('/:id', requireAuth, async (req, res, next) => {
 // Create order (restaurant only)
 router.post(
   '/',
-  requireAuth,
   requireRole(['RESTAURANT']),
   requirePermission('ORDERS_CREATE'),
   async (req, res) => {
@@ -1514,7 +1511,6 @@ router.post(
 // Create order manually by supplier (for phone orders, chat orders, etc.)
 router.post(
   '/manual',
-  requireAuth,
   requireRole(['SUPPLIER']),
   requirePermission('ORDERS_CREATE'),
   async (req, res) => {
@@ -2104,7 +2100,7 @@ router.patch('/:id', async (req, res) => {
 })
 
 // Send reminder to supplier (restaurant only)
-router.post('/:id/remind', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+router.post('/:id/remind', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const { id } = req.params
 
@@ -2277,7 +2273,6 @@ router.post('/:id/remind', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), as
 // Get packing slip as PDF (must be before /:id/packing-slip so path matches)
 router.get(
   '/:id/packing-slip/pdf',
-  requireAuth,
   requireRole(['SUPPLIER', 'RESTAURANT', 'ADMIN']),
   async (req, res) => {
     try {
@@ -2351,7 +2346,6 @@ router.get(
 // Get packing slip (JSON)
 router.get(
   '/:id/packing-slip',
-  requireAuth,
   requireRole(['SUPPLIER', 'RESTAURANT', 'ADMIN']),
   async (req, res) => {
     try {
