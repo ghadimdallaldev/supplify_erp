@@ -142,6 +142,30 @@ export async function getUserBySub(sub, req = null) {
   }
 }
 
+function rolesFromAccessPayload(payload) {
+  const realmRoles = payload.realm_access?.roles || []
+  const azp = payload.azp
+  const clientRoles =
+    azp && payload.resource_access?.[azp]?.roles ? payload.resource_access[azp].roles : []
+  return [...new Set([...realmRoles, ...clientRoles])]
+}
+
+/** Mobile/native bearer: link Keycloak JWT to app_user (same as web OAuth callback upsert). */
+export async function ensureUserForAccessPayload(payload, req = null) {
+  let user = await getUserBySub(payload.sub, req)
+  if (user) return user
+
+  return upsertUser(
+    {
+      sub: payload.sub,
+      email: payload.email ?? payload.preferred_username,
+      given_name: payload.given_name,
+      family_name: payload.family_name,
+    },
+    rolesFromAccessPayload(payload)
+  )
+}
+
 // Create or update user in database
 export async function upsertUser(userInfo, roles = []) {
   try {
@@ -239,8 +263,10 @@ export async function requireAuth(req, res, next) {
       req.user = payload
       req.userSub = payload.sub
 
-      // Get user from database
-      const user = await getUserBySub(payload.sub, req)
+      // Get user from database (mobile bearer upserts on first login)
+      const user = bearerToken
+        ? await ensureUserForAccessPayload(payload, req)
+        : await getUserBySub(payload.sub, req)
       if (!user) {
         mark(req, 'auth')
         return res.status(401).json({

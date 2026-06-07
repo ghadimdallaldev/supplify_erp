@@ -21,7 +21,7 @@ describe('delivery-routes planned assignment', () => {
     clientQueryMock.mockReset()
   })
 
-  it('allows PLACED orders on planned route without driver assignment', async () => {
+  it('creates driver assignments when planning a route', async () => {
     const { createDeliveryRoute } = await import('./delivery-routes.service.js')
 
     queryMock
@@ -50,6 +50,9 @@ describe('delivery-routes planned assignment', () => {
       .mockResolvedValueOnce({ rows: [{ address_json: {} }] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 'wh1' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'da1', status: 'assigned' }] })
+      .mockResolvedValueOnce({ rows: [] })
 
     const route = await createDeliveryRoute({
       supplierId: 's1',
@@ -62,10 +65,10 @@ describe('delivery-routes planned assignment', () => {
     const assignmentInsert = clientQueryMock.mock.calls.find(
       (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO driver_assignments')
     )
-    expect(assignmentInsert).toBeUndefined()
+    expect(assignmentInsert).toBeDefined()
   })
 
-  it('rejects route activation when no orders are dispatch-ready', async () => {
+  it('allows route activation when orders are not yet dispatch-ready', async () => {
     const { updateDeliveryRoute } = await import('./delivery-routes.service.js')
     const routeRow = {
       id: 'r1',
@@ -101,6 +104,9 @@ describe('delivery-routes planned assignment', () => {
       .mockResolvedValueOnce({ rows: [{ ...routeRow }] })
       .mockResolvedValueOnce({ rows: [stopRow] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ ...routeRow, status: 'IN_PROGRESS' }] })
+      .mockResolvedValueOnce({ rows: [stopRow] })
+      .mockResolvedValueOnce({ rows: [] })
 
     clientQueryMock
       .mockResolvedValueOnce({ rowCount: 1 })
@@ -108,8 +114,9 @@ describe('delivery-routes planned assignment', () => {
       .mockResolvedValueOnce({ rows: [stopRow] })
       .mockResolvedValueOnce({ rows: [{ status: 'PLACED' }] })
 
-    await expect(
-      updateDeliveryRoute('s1', 'r1', { status: 'IN_PROGRESS', userId: 'u1' })
-    ).rejects.toThrow(/ready for dispatch/i)
+    const updated = await updateDeliveryRoute('s1', 'r1', { status: 'IN_PROGRESS', userId: 'u1' })
+    expect(updated.status).toBe('IN_PROGRESS')
+    expect(updated.activation?.waiting).toHaveLength(1)
+    expect(updated.activation?.activated).toHaveLength(0)
   })
 })

@@ -102,45 +102,47 @@ See [delivery-eta-and-live-tracking.md](./delivery-eta-and-live-tracking.md) for
 
 Suppliers can **plan** delivery routes before orders are dispatch-ready. This is separate from **active** dispatch.
 
-| Phase       | `delivery_route.status`   | `driver_assignments`                  | Live GPS / restaurant map  | Driver app                |
-| ----------- | ------------------------- | ------------------------------------- | -------------------------- | ------------------------- |
-| **Planned** | `PLANNED`                 | **None** (not created at plan time)   | Off                        | No active route           |
-| **Active**  | `IN_PROGRESS`             | Created for dispatch-ready stops only | On when driver sends pings | Active route + deliveries |
-| **Done**    | `COMPLETED` / `CANCELLED` | Terminal                              | Off                        | —                         |
+| Phase       | `delivery_route.status`   | `driver_assignments`                                   | Live GPS / restaurant map  | Driver app                |
+| ----------- | ------------------------- | ------------------------------------------------------ | -------------------------- | ------------------------- |
+| **Planned** | `PLANNED`                 | Created when route is planned (status `assigned`)      | Off                        | No active route           |
+| **Active**  | `IN_PROGRESS`             | Ready stops confirmed; non-ready stops stay `assigned` | On when driver sends pings | Active route + deliveries |
+| **Done**    | `COMPLETED` / `CANCELLED` | Terminal                                               | Off                        | —                         |
 
 ### Eligible order statuses
 
-| Action                                        | `customer_order.status` values                                        |
-| --------------------------------------------- | --------------------------------------------------------------------- |
-| Add to **planned** route                      | `PLACED`, `PENDING_APPROVAL`, `ACKNOWLEDGED`, `PROCESSING`, `SHIPPED` |
-| **Activate** route (assign driver + dispatch) | `PROCESSING`, `SHIPPED` only                                          |
+| Action                              | `customer_order.status` values                                                                        |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Add to **planned** route            | `PLACED`, `PENDING_APPROVAL`, `ACKNOWLEDGED`, `PROCESSING`, `SHIPPED`                                 |
+| **Activate** route (start dispatch) | `PROCESSING`, `SHIPPED` get live dispatch sync; route can start even if all stops are still preparing |
 
 Mapping from ops language: CONFIRMED/ACCEPTED → `ACKNOWLEDGED`; PREPARING → `PROCESSING`; READY_FOR_DELIVERY → `SHIPPED`.
 
 ### Supplier UI
 
-- Dispatch board: **Assign to planned route** (multi-select → planned route dialog)
-- Badge: **Planned route** or **Route planned — waiting for order to be ready**
-- Routes tab: **Activate route (start dispatch)** on a `PLANNED` route
+- Dispatch board: **Assign to planned route** (multi-select → planned route dialog). Orders appear in **Assigned** with the route driver; badge **Planned route**.
+- Badge (legacy): **Route planned — waiting for order to be ready** only when on a route without a driver assignment record
+- Routes tab: **Activate ready orders** on a `PLANNED` route (starts route; ready stops go live, others wait on route)
 
 ### APIs
 
-| Method | Path                                                    | Notes                                                     |
-| ------ | ------------------------------------------------------- | --------------------------------------------------------- |
-| POST   | `/api/fulfillment/routes`                               | Creates `PLANNED` route + stops; **no** driver assignment |
-| POST   | `/api/fulfillment/routes/:id/stops`                     | Add orders to existing planned route                      |
-| DELETE | `/api/fulfillment/routes/:id/stops/:orderId`            | Remove from planned route                                 |
-| PATCH  | `/api/fulfillment/routes/:id` `{ status: IN_PROGRESS }` | Activates dispatch for ready stops                        |
+| Method | Path                                                    | Notes                                                |
+| ------ | ------------------------------------------------------- | ---------------------------------------------------- |
+| POST   | `/api/fulfillment/routes`                               | Creates `PLANNED` route + stops + driver assignments |
+| POST   | `/api/fulfillment/routes/:id/stops`                     | Add orders to existing planned route (+ assignments) |
+| DELETE | `/api/fulfillment/routes/:id/stops/:orderId`            | Remove from planned route                            |
+| PATCH  | `/api/fulfillment/routes/:id` `{ status: IN_PROGRESS }` | Starts route; syncs dispatch-ready stops             |
 
 ### Edge cases
 
 - **Cancelled order:** removed from planned routes (`releaseOrderFromPlannedRoutes`)
-- **Non-ready stops on activate:** stay on route as planned stops; ready stops get driver assignments
+- **Non-ready stops on activate:** route still moves to `IN_PROGRESS`; waiting stops keep `assigned` until order reaches `PROCESSING`/`SHIPPED`
 - **Duplicate routing:** an order cannot be on two `PLANNED`/`IN_PROGRESS` routes
+- **Dispatch board selection:** checkbox disabled when order is already on a route, or status is not eligible for planning
 
 ### Rollback notes
 
-- Revert `createDeliveryRoute` deferral of `syncDriverAssignment` restores old “assigned on create” behavior
+- Revert `createDeliveryRoute` / `addOrdersToPlannedRoute` calling `syncDriverAssignment` restores defer-until-activate assignment behavior
+- Revert `activateRouteDispatch` empty-activated guard to block activation when no stops are dispatch-ready
 - Restaurant live-tracking guard is in `driver-location.service.js` (`picked_up` / `out_for_delivery` only)
 
 ---
