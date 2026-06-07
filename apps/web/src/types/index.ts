@@ -210,6 +210,8 @@ export interface RestaurantOrderTrackingResponse {
   trackingEnabled: boolean
   reason?: string
   etaAvailable: boolean
+  destinationCoordinatesAvailable?: boolean
+  destinationLabel?: string | null
   delivery?: {
     status: string
     label: string
@@ -228,6 +230,13 @@ export interface SupplierOrderTrackingResponse {
   restaurantName?: string | null
   trackingEnabled: boolean
   etaAvailable?: boolean
+  destinationCoordinatesAvailable?: boolean
+  destinationLabel?: string | null
+  destination?: {
+    latitude: number
+    longitude: number
+    label?: string | null
+  } | null
   routeId?: string | null
   routeStopId?: string | null
   routeNumber?: string | null

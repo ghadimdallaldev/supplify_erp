@@ -10,6 +10,7 @@ vi.mock('../../services/api', () => ({
       orderReference: 'ORD-order-1',
       trackingEnabled: true,
       etaAvailable: false,
+      destinationCoordinatesAvailable: true,
       delivery: { status: 'out_for_delivery', label: 'Out for delivery' },
       tracking: {
         enabled: true,
@@ -38,6 +39,9 @@ describe('RestaurantOrderTrackingPanel', () => {
     )
     expect(screen.getByTestId('restaurant-order-tracking-panel')).toBeInTheDocument()
     expect(screen.getByTestId('restaurant-tracking-message')).toHaveTextContent(/on the way/i)
-    expect(screen.getByTestId('delivery-tracking-map-fallback')).toBeInTheDocument()
+    expect(screen.getByTestId('delivery-tracking-map-embed')).toBeInTheDocument()
+    expect(screen.getByTestId('restaurant-tracking-eta')).toHaveTextContent(
+      /ETA not available yet/i
+    )
   })
 })

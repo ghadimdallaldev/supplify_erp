@@ -44,8 +44,12 @@ describe('restaurant-tracking-payload', () => {
         isStale: false,
         latestLocation: { latitude: 33.89, longitude: 35.5, recordedAt: '2026-06-03T10:00:00Z' },
       },
+      destination: { latitude: 33.9, longitude: 35.51, label: 'Gate A' },
     })
     expect(res.delivery?.status).toBe('out_for_delivery')
+    expect(res.destinationCoordinatesAvailable).toBe(true)
+    expect(res.destinationLabel).toBe('Gate A')
+    expect(res.etaAvailable).toBe(true)
     expect(res.delivery?.label).toBe('Out for delivery')
     expect(res.driver?.name).toBe('Ali Hassan')
     expect(res.driver?.phone).toBeUndefined()

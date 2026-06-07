@@ -67,6 +67,52 @@ describe('delivery-routes.service', () => {
     expect(routes).toHaveLength(1)
     expect(routes[0].routeLabel).toBe('Run A')
     expect(routes[0].area).toBe('North')
+    expect(routes[0].stops).toBe(0)
+    expect(Array.isArray(routes[0].stops)).toBe(false)
+  })
+
+  it('listDeliveryRoutes returns stop count not stop objects', async () => {
+    const { listDeliveryRoutes } = await import('./delivery-routes.service.js')
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'r1',
+            route_number: 'R-1',
+            route_label: 'Run A',
+            area: 'North',
+            driver_id: 'd1',
+            driver_name: 'Alex',
+            driver_name_legacy: null,
+            vehicle_info: null,
+            status: 'IN_PROGRESS',
+            scheduled_date: '2026-05-28',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'stop-1',
+            route_id: 'r1',
+            order_id: 'o1',
+            sequence_number: 1,
+            status: 'PLANNED',
+            restaurant_name: 'Cafe One',
+            delivery_area: 'Downtown',
+            address_json: {},
+            total_amount: 100,
+            item_count: 3,
+            notes: null,
+            completed_at: null,
+            assignment_status: 'assigned',
+          },
+        ],
+      })
+
+    const routes = await listDeliveryRoutes('s1')
+    expect(routes[0].stops).toBe(1)
+    expect(typeof routes[0].stops).toBe('number')
   })
 
   it('getActiveRouteForOrder returns route when on active run', async () => {

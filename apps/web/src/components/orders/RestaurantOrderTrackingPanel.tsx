@@ -13,6 +13,7 @@ import {
   getRestaurantTrackingMessage,
   shouldPollRestaurantTracking,
 } from '../../lib/restaurantTrackingMessages'
+import { getEtaUnavailableMessage } from '../../lib/deliveryEtaMessages'
 import { isRestaurantOrderTracking } from '../../types'
 
 type Props = {
@@ -103,11 +104,23 @@ export function RestaurantOrderTrackingPanel({ orderId, orderStatus }: Props) {
           />
         )}
 
-        {data?.trackingEnabled && data.delivery?.status !== 'delivered' && (
-          <p className="text-xs text-[var(--text-muted)]" data-testid="restaurant-tracking-eta">
-            ETA not available yet
-          </p>
-        )}
+        {data?.trackingEnabled && data.delivery?.status !== 'delivered'
+          ? (() => {
+              const etaMessage = getEtaUnavailableMessage(data)
+              return etaMessage ? (
+                <p
+                  className={`text-xs ${
+                    etaMessage.includes('delivery location is not set')
+                      ? 'text-amber-800 dark:text-amber-200'
+                      : 'text-[var(--text-muted)]'
+                  }`}
+                  data-testid="restaurant-tracking-eta"
+                >
+                  {etaMessage}
+                </p>
+              ) : null
+            })()
+          : null}
 
         {showReceive && (
           <Button className="w-full sm:w-auto" asChild data-testid="restaurant-receive-order-cta">

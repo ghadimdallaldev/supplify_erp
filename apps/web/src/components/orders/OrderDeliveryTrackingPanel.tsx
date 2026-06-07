@@ -6,6 +6,7 @@ import { Skeleton } from '../ui/skeleton'
 import { useGetOrderTrackingQuery } from '../../services/api'
 import { formatDeliveryStatus } from '../../lib/deliveryStatusLabels'
 import { getGpsStatusLabel } from '../../lib/deliveryTrackingLabels'
+import { getEtaUnavailableMessage } from '../../lib/deliveryEtaMessages'
 import { DeliveryTrackingMap } from '../maps/DeliveryTrackingMap'
 
 type Props = {
@@ -13,9 +14,9 @@ type Props = {
   pollIntervalMs?: number
 }
 
-const ACTIVE_ASSIGNMENT_STATUSES = LIVE_TRACKING_ASSIGNMENT_STATUSES
-
 const LIVE_TRACKING_ASSIGNMENT_STATUSES = new Set(['picked_up', 'out_for_delivery'])
+
+const ACTIVE_ASSIGNMENT_STATUSES = LIVE_TRACKING_ASSIGNMENT_STATUSES
 
 export function OrderDeliveryTrackingPanel({ orderId, pollIntervalMs = 15_000 }: Props) {
   const [pollMs, setPollMs] = useState(pollIntervalMs)
@@ -98,7 +99,21 @@ export function OrderDeliveryTrackingPanel({ orderId, pollIntervalMs = 15_000 }:
           recordedAt={loc?.recordedAt ?? null}
           heightClassName="h-64"
         />
-        <p className="text-xs text-[var(--text-muted)]">ETA not available yet</p>
+        {(() => {
+          const etaMessage = getEtaUnavailableMessage(data)
+          return etaMessage ? (
+            <p
+              className={`text-xs ${
+                etaMessage.includes('delivery location is not set')
+                  ? 'text-amber-800 dark:text-amber-200'
+                  : 'text-[var(--text-muted)]'
+              }`}
+              data-testid="order-delivery-tracking-eta"
+            >
+              {etaMessage}
+            </p>
+          ) : null
+        })()}
       </CardContent>
     </Card>
   )

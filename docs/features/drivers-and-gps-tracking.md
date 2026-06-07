@@ -85,6 +85,19 @@ Dispatch, delivery board, route detail, command center, and `GET /api/orders/:id
 
 ---
 
+## Restaurant delivery location coordinates
+
+Destination GPS for ETA is stored on **`branch`** (per operational location) and **`restaurant`** (tenant fallback). Text `address_json` alone is not used for ETA.
+
+- Migration: `0143_restaurant_delivery_coordinates.sql`
+- Restaurant settings: **Profile → Delivery location** (latitude, longitude, label, notes)
+- APIs: `GET/PATCH /api/restaurants/me/delivery-location`, `PATCH /api/restaurants/branches/:branchId/delivery-location`
+- Tracking: `destinationCoordinatesAvailable`, `destinationLabel`, `etaAvailable` on `GET /api/orders/:id/tracking`
+
+See [delivery-eta-and-live-tracking.md](./delivery-eta-and-live-tracking.md) for full ETA readiness details.
+
+---
+
 ## Planned route assignment before dispatch
 
 Suppliers can **plan** delivery routes before orders are dispatch-ready. This is separate from **active** dispatch.

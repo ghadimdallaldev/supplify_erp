@@ -21,6 +21,11 @@ vi.mock('./driver-fulfillment.service.js', () => ({
   assertSupplierOwnsOrder: vi.fn(),
 }))
 
+vi.mock('./restaurant-delivery-location.service.js', () => ({
+  loadOrderDestination: vi.fn().mockResolvedValue(null),
+  loadOrderDestinationForSupplier: vi.fn().mockResolvedValue(null),
+}))
+
 import { query } from '../lib/db.js'
 import { getActiveDriverAssignment } from './driver-fulfillment.service.js'
 import {
@@ -248,6 +253,89 @@ describe('driver-location.service', () => {
       })
 
       expect(result.tracking?.hasLocation).toBe(false)
+    })
+
+    it('sets etaAvailable when destination and driver GPS exist', async () => {
+      const { loadOrderDestination } = await import('./restaurant-delivery-location.service.js')
+      loadOrderDestination.mockResolvedValueOnce({
+        latitude: 33.9,
+        longitude: 35.5,
+        label: 'Main gate',
+      })
+
+      query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'o1', status: 'SHIPPED', restaurant_id: 'r1' }],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'da-1',
+              status: 'out_for_delivery',
+              driver_id: 'd1',
+              driver_name: 'Ali',
+              assigned_at: '2026-06-03T09:00:00Z',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              order_id: 'o1',
+              latitude: '33.89',
+              longitude: '35.5',
+              recorded_at: new Date().toISOString(),
+            },
+          ],
+        })
+
+      const result = await getOrderTracking({
+        orderId: 'o1',
+        restaurantId: 'r1',
+      })
+
+      expect(result.destinationCoordinatesAvailable).toBe(true)
+      expect(result.destinationLabel).toBe('Main gate')
+      expect(result.etaAvailable).toBe(true)
+    })
+
+    it('marks ETA unavailable when destination coordinates missing', async () => {
+      const { loadOrderDestination } = await import('./restaurant-delivery-location.service.js')
+      loadOrderDestination.mockResolvedValueOnce(null)
+
+      query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'o1', status: 'SHIPPED', restaurant_id: 'r1' }],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'da-1',
+              status: 'out_for_delivery',
+              driver_id: 'd1',
+              driver_name: 'Ali',
+              assigned_at: '2026-06-03T09:00:00Z',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              order_id: 'o1',
+              latitude: '33.89',
+              longitude: '35.5',
+              recorded_at: new Date().toISOString(),
+            },
+          ],
+        })
+
+      const result = await getOrderTracking({
+        orderId: 'o1',
+        restaurantId: 'r1',
+      })
+
+      expect(result.destinationCoordinatesAvailable).toBe(false)
+      expect(result.etaAvailable).toBe(false)
     })
   })
 
