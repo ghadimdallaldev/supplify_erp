@@ -22,9 +22,9 @@ CREATE INDEX IF NOT EXISTS idx_app_user_email_lower
 CREATE INDEX IF NOT EXISTS idx_customer_order_restaurant_status_created
   ON customer_order (restaurant_id, status, created_at DESC);
 
--- Subscription daily order limit metering (DATE(placed_at) predicate)
+-- Subscription daily order limit metering (UTC calendar day; timestamptz::date is not immutable)
 CREATE INDEX IF NOT EXISTS idx_customer_order_restaurant_placed_day
-  ON customer_order (restaurant_id, (DATE(placed_at)))
+  ON customer_order (restaurant_id, ((placed_at AT TIME ZONE 'UTC')::date))
   WHERE status = 'PLACED' AND placed_at IS NOT NULL;
 
 -- Fulfillment dispatch: EXISTS probe on order_id + warehouse_id
