@@ -1,6 +1,7 @@
 import { query } from '../lib/db.js'
 import { getCache, setCache, deleteCache } from '../lib/cache.js'
 import { singleflight } from '../lib/singleflight.js'
+import { mapWithConcurrency } from '../lib/concurrency.js'
 import { logger } from '../lib/logger.js'
 import { buildWhatsAppUrl } from '../lib/whatsapp.js'
 import { getEntitlements, isFeatureEnabled } from '../lib/subscription.js'
@@ -385,8 +386,12 @@ export async function listTenantUserIds(tenantId, tenantType) {
   return rows.map((row) => row.id).filter(Boolean)
 }
 
+/** Max parallel sendNotification calls per tenant fan-out. */
+export const NOTIFY_TENANT_USERS_CONCURRENCY = 5
+
 /**
  * Fan-out in-app / push / email to every user on the tenant account.
+ * Returns the sent notification rows; array also carries recipientCount, failedCount, durationMs.
  */
 export async function notifyTenantUsers({
   tenantId,
@@ -398,15 +403,18 @@ export async function notifyTenantUsers({
   referenceId = null,
   referenceType = null,
   metadata = null,
+  concurrency = NOTIFY_TENANT_USERS_CONCURRENCY,
 }) {
   const userIds = await listTenantUserIds(tenantId, tenantType)
   if (!userIds.length) {
     logger.warn('notifyTenantUsers: no recipients', { tenantId, tenantType, notificationCategory })
-    return []
+    const empty = []
+    Object.assign(empty, { recipientCount: 0, failedCount: 0, durationMs: 0 })
+    return empty
   }
 
-  const sent = []
-  for (const userId of userIds) {
+  const startedAt = performance.now()
+  const results = await mapWithConcurrency(userIds, concurrency, async (userId) => {
     try {
       const row = await sendNotification({
         userId,
@@ -419,7 +427,7 @@ export async function notifyTenantUsers({
         referenceType,
         metadata,
       })
-      if (row) sent.push(row)
+      return { ok: true, row }
     } catch (error) {
       logger.error('notifyTenantUsers: recipient failed', {
         userId,
@@ -427,8 +435,38 @@ export async function notifyTenantUsers({
         notificationCategory,
         error: error.message,
       })
+      return { ok: false, row: null }
+    }
+  })
+
+  const sent = []
+  let failedCount = 0
+  for (const result of results) {
+    if (result?.ok && result.row) {
+      sent.push(result.row)
+    } else if (result && !result.ok) {
+      failedCount += 1
     }
   }
+
+  const durationMs = Math.round(performance.now() - startedAt)
+  Object.assign(sent, {
+    recipientCount: userIds.length,
+    failedCount,
+    durationMs,
+  })
+
+  logger.info({
+    event: 'notification.tenant_users.complete',
+    tenantId,
+    tenantType,
+    notificationCategory,
+    recipientCount: userIds.length,
+    sentCount: sent.length,
+    failedCount,
+    durationMs,
+  })
+
   return sent
 }
 

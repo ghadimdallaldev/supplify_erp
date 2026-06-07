@@ -27,6 +27,7 @@ vi.mock('./email/email.service.js', () => ({
 
 vi.mock('../lib/subscription.js', () => ({
   getEntitlements: vi.fn(),
+  isFeatureEnabled: vi.fn().mockResolvedValue(false),
 }))
 
 vi.mock('./whatsapp.service.js', () => ({
@@ -310,6 +311,103 @@ describe('Notification Service', () => {
       })
 
       expect(sent.length).toBeGreaterThan(0)
+      expect(sent.recipientCount).toBe(2)
+      expect(sent.failedCount).toBe(0)
+      expect(typeof sent.durationMs).toBe('number')
+    })
+
+    it('isolates per-user failures and reports failedCount', async () => {
+      queryMock.mockImplementation(async (sql, params) => {
+        if (String(sql).includes('tenant_user_roles')) {
+          return { rows: [{ id: 'user-a' }, { id: 'user-b' }, { id: 'user-c' }] }
+        }
+        if (params?.[0] === 'user-b' && String(sql).includes('notification_preferences')) {
+          throw new Error('prefs unavailable')
+        }
+        if (String(sql).includes('INSERT INTO notification_log')) {
+          return { rows: [{ id: `notif-${params[0]}`, user_id: params[0] }] }
+        }
+        if (String(sql).includes('FROM restaurant')) {
+          return { rows: [{ tenant_id: 'rest-1', email: 'owner@test.com', phone: null }] }
+        }
+        if (String(sql).includes('restaurant_contact_info')) {
+          return { rows: [{ email: 'owner@test.com', phone: null }] }
+        }
+        if (String(sql).includes('tenant_id')) {
+          return { rows: [{ tenant_id: 'rest-1' }] }
+        }
+        return { rows: [{ ...basePrefs }] }
+      })
+
+      const { getEntitlements } = await import('../lib/subscription.js')
+      getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_only' } })
+
+      const sent = await notifyTenantUsers({
+        tenantId: 'rest-1',
+        tenantType: 'RESTAURANT',
+        notificationType: 'ORDER',
+        notificationCategory: 'PLACED',
+        title: 'New order',
+        message: 'Order placed',
+        referenceId: 'order-1',
+        referenceType: 'ORDER',
+      })
+
+      expect(sent.recipientCount).toBe(3)
+      expect(sent.failedCount).toBe(1)
+      expect(sent.length).toBe(2)
+    })
+
+    it('keeps array return shape for callers using sent[0]', async () => {
+      const { getEntitlements } = await import('../lib/subscription.js')
+      getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_only' } })
+
+      queryMock.mockResolvedValueOnce({ rows: [{ id: 'user-a' }] }).mockResolvedValue({
+        rows: [{ ...basePrefs, in_app_enabled: true, notify_order_new: true }],
+      })
+
+      const sent = await notifyTenantUsers({
+        tenantId: 'rest-1',
+        tenantType: 'RESTAURANT',
+        notificationType: 'ORDER',
+        notificationCategory: 'PLACED',
+        title: 'New order',
+        message: 'Order placed',
+        referenceId: 'order-1',
+        referenceType: 'ORDER',
+      })
+
+      expect(Array.isArray(sent)).toBe(true)
+      expect(sent[0]).toBeDefined()
+      expect(sent.length).toBe(1)
+      expect(sent.recipientCount).toBe(1)
+    })
+
+    it('uses configured concurrency limit for fan-out', async () => {
+      const concurrency = await import('../lib/concurrency.js')
+      const mapSpy = vi.spyOn(concurrency, 'mapWithConcurrency')
+
+      queryMock.mockResolvedValueOnce({
+        rows: [{ id: 'user-a' }, { id: 'user-b' }],
+      })
+
+      mapSpy.mockResolvedValueOnce([
+        { ok: true, row: { id: 'n1' } },
+        { ok: true, row: { id: 'n2' } },
+      ])
+
+      const sent = await notifyTenantUsers({
+        tenantId: 'rest-1',
+        tenantType: 'RESTAURANT',
+        notificationType: 'ORDER',
+        notificationCategory: 'PLACED',
+        title: 'New order',
+        message: 'Order placed',
+      })
+
+      expect(mapSpy).toHaveBeenCalledWith(['user-a', 'user-b'], 5, expect.any(Function))
+      expect(sent.length).toBe(2)
+      mapSpy.mockRestore()
     })
   })
 

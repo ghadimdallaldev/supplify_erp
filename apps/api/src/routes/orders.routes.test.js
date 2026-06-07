@@ -393,6 +393,443 @@ describe('Orders Routes', () => {
       expect(response.body.data.order).toBeDefined()
     })
 
+    it('should return 201 when notifyOrderStatusChange rejects in background', async () => {
+      const productId = '550e8400-e29b-41d4-a716-446655440000'
+      const supplierId = '660e8400-e29b-41d4-a716-446655440001'
+      const restaurantId = '770e8400-e29b-41d4-a716-446655440002'
+
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValueOnce(restaurantId)
+
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: productId,
+            supplier_id: supplierId,
+            sku: 'SKU001',
+            current_price: 10.05,
+            currency: 'USD',
+          },
+        ],
+      })
+
+      const { resolveProductPricesBatch } = await import(
+        '../services/resolve-product-price.service.js'
+      )
+      vi.mocked(resolveProductPricesBatch).mockResolvedValueOnce([
+        {
+          productId,
+          supplierId,
+          quantity: 10,
+          unitPrice: 10.05,
+          source: 'DEFAULT_PRICE',
+          defaultPrice: 10.05,
+          contractPriceId: null,
+        },
+      ])
+
+      const { checkAndIncrementUsage } = await import('../lib/subscription.js')
+      vi.mocked(checkAndIncrementUsage).mockResolvedValueOnce({
+        allowed: true,
+        current: 0,
+        limit: 100,
+      })
+
+      const { withTransaction } = await import('../lib/db.js')
+      vi.mocked(withTransaction).mockImplementation(async (handler) => {
+        const mockClient = {
+          query: vi
+            .fn()
+            .mockResolvedValueOnce({
+              rows: [
+                {
+                  id: 'order-1',
+                  status: 'PLACED',
+                  total_amount: 0,
+                  restaurant_id: restaurantId,
+                },
+              ],
+            })
+            .mockResolvedValueOnce({
+              rows: [
+                {
+                  id: 'item-1',
+                  order_id: 'order-1',
+                  product_id: productId,
+                  supplier_id: supplierId,
+                  quantity: 10,
+                  unit_price: 10.05,
+                  line_total: 100.5,
+                },
+              ],
+            })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({
+              rows: [
+                { id: supplierId, multi_warehouse_enabled: false, fulfillment_mode: 'single' },
+              ],
+            }),
+        }
+        return handler(mockClient)
+      })
+
+      const { notifyOrderStatusChange } = await import('../services/notification.service.js')
+      vi.mocked(notifyOrderStatusChange).mockRejectedValueOnce(new Error('notify failed'))
+
+      const response = await request(app)
+        .post('/api/orders')
+        .send({
+          items: [{ productId, quantity: 10 }],
+        })
+        .expect(201)
+
+      expect(response.body.ok).toBe(true)
+      expect(notifyOrderStatusChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'order-1',
+          supplier_id: supplierId,
+          restaurant_id: restaurantId,
+        }),
+        'PLACED'
+      )
+
+      await new Promise((resolve) => setImmediate(resolve))
+
+      const { logger } = await import('../lib/logger.js')
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'order.notification.background_failed',
+          orderId: 'order-1',
+          supplierId,
+          error: 'notify failed',
+        })
+      )
+    })
+
+    it('should return 201 when notifyOrderStatusChange throws synchronously in background', async () => {
+      const productId = '550e8400-e29b-41d4-a716-446655440000'
+      const supplierId = '660e8400-e29b-41d4-a716-446655440001'
+      const restaurantId = '770e8400-e29b-41d4-a716-446655440002'
+
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValueOnce(restaurantId)
+
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: productId,
+            supplier_id: supplierId,
+            sku: 'SKU001',
+            current_price: 10.05,
+            currency: 'USD',
+          },
+        ],
+      })
+
+      const { resolveProductPricesBatch } = await import(
+        '../services/resolve-product-price.service.js'
+      )
+      vi.mocked(resolveProductPricesBatch).mockResolvedValueOnce([
+        {
+          productId,
+          supplierId,
+          quantity: 10,
+          unitPrice: 10.05,
+          source: 'DEFAULT_PRICE',
+          defaultPrice: 10.05,
+          contractPriceId: null,
+        },
+      ])
+
+      const { checkAndIncrementUsage } = await import('../lib/subscription.js')
+      vi.mocked(checkAndIncrementUsage).mockResolvedValueOnce({
+        allowed: true,
+        current: 0,
+        limit: 100,
+      })
+
+      const { withTransaction } = await import('../lib/db.js')
+      vi.mocked(withTransaction).mockImplementation(async (handler) => {
+        const mockClient = {
+          query: vi
+            .fn()
+            .mockResolvedValueOnce({
+              rows: [
+                {
+                  id: 'order-1',
+                  status: 'PLACED',
+                  total_amount: 0,
+                  restaurant_id: restaurantId,
+                },
+              ],
+            })
+            .mockResolvedValueOnce({
+              rows: [
+                {
+                  id: 'item-1',
+                  order_id: 'order-1',
+                  product_id: productId,
+                  supplier_id: supplierId,
+                  quantity: 10,
+                  unit_price: 10.05,
+                  line_total: 100.5,
+                },
+              ],
+            })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({
+              rows: [
+                { id: supplierId, multi_warehouse_enabled: false, fulfillment_mode: 'single' },
+              ],
+            }),
+        }
+        return handler(mockClient)
+      })
+
+      const { notifyOrderStatusChange } = await import('../services/notification.service.js')
+      vi.mocked(notifyOrderStatusChange).mockImplementationOnce(() => {
+        throw new Error('sync notify failed')
+      })
+
+      await request(app)
+        .post('/api/orders')
+        .send({
+          items: [{ productId, quantity: 10 }],
+        })
+        .expect(201)
+
+      await new Promise((resolve) => setImmediate(resolve))
+
+      const { logger } = await import('../lib/logger.js')
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'order.notification.background_failed',
+          error: 'sync notify failed',
+        })
+      )
+    })
+
+    it('should await audit log before returning 201', async () => {
+      const productId = '550e8400-e29b-41d4-a716-446655440000'
+      const supplierId = '660e8400-e29b-41d4-a716-446655440001'
+      const restaurantId = '770e8400-e29b-41d4-a716-446655440002'
+
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValueOnce(restaurantId)
+
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: productId,
+            supplier_id: supplierId,
+            sku: 'SKU001',
+            current_price: 10.05,
+            currency: 'USD',
+          },
+        ],
+      })
+
+      const { resolveProductPricesBatch } = await import(
+        '../services/resolve-product-price.service.js'
+      )
+      vi.mocked(resolveProductPricesBatch).mockResolvedValueOnce([
+        {
+          productId,
+          supplierId,
+          quantity: 10,
+          unitPrice: 10.05,
+          source: 'DEFAULT_PRICE',
+          defaultPrice: 10.05,
+          contractPriceId: null,
+        },
+      ])
+
+      const { checkAndIncrementUsage } = await import('../lib/subscription.js')
+      vi.mocked(checkAndIncrementUsage).mockResolvedValueOnce({
+        allowed: true,
+        current: 0,
+        limit: 100,
+      })
+
+      const { withTransaction } = await import('../lib/db.js')
+      vi.mocked(withTransaction).mockImplementation(async (handler) => {
+        const mockClient = {
+          query: vi
+            .fn()
+            .mockResolvedValueOnce({
+              rows: [
+                {
+                  id: 'order-1',
+                  status: 'PLACED',
+                  total_amount: 0,
+                  restaurant_id: restaurantId,
+                },
+              ],
+            })
+            .mockResolvedValueOnce({
+              rows: [
+                {
+                  id: 'item-1',
+                  order_id: 'order-1',
+                  product_id: productId,
+                  supplier_id: supplierId,
+                  quantity: 10,
+                  unit_price: 10.05,
+                  line_total: 100.5,
+                },
+              ],
+            })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({
+              rows: [
+                { id: supplierId, multi_warehouse_enabled: false, fulfillment_mode: 'single' },
+              ],
+            }),
+        }
+        return handler(mockClient)
+      })
+
+      let resolveAudit
+      const auditDone = new Promise((resolve) => {
+        resolveAudit = resolve
+      })
+      const { writeAuditLog } = await import('../lib/audit.js')
+      vi.mocked(writeAuditLog).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => {
+              resolve(undefined)
+              resolveAudit()
+            }, 30)
+          })
+      )
+
+      const response = await request(app)
+        .post('/api/orders')
+        .send({
+          items: [{ productId, quantity: 10 }],
+        })
+        .expect(201)
+
+      expect(response.body.ok).toBe(true)
+      expect(writeAuditLog).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          action_type: 'order.created',
+          target_id: 'order-1',
+        })
+      )
+      await auditDone
+    })
+
+    it('should schedule notifyOrderStatusChange for PLACED orders without awaiting it', async () => {
+      const productId = '550e8400-e29b-41d4-a716-446655440000'
+      const supplierId = '660e8400-e29b-41d4-a716-446655440001'
+      const restaurantId = '770e8400-e29b-41d4-a716-446655440002'
+
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValueOnce(restaurantId)
+
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: productId,
+            supplier_id: supplierId,
+            sku: 'SKU001',
+            current_price: 10.05,
+            currency: 'USD',
+          },
+        ],
+      })
+
+      const { resolveProductPricesBatch } = await import(
+        '../services/resolve-product-price.service.js'
+      )
+      vi.mocked(resolveProductPricesBatch).mockResolvedValueOnce([
+        {
+          productId,
+          supplierId,
+          quantity: 10,
+          unitPrice: 10.05,
+          source: 'DEFAULT_PRICE',
+          defaultPrice: 10.05,
+          contractPriceId: null,
+        },
+      ])
+
+      const { checkAndIncrementUsage } = await import('../lib/subscription.js')
+      vi.mocked(checkAndIncrementUsage).mockResolvedValueOnce({
+        allowed: true,
+        current: 0,
+        limit: 100,
+      })
+
+      const { withTransaction } = await import('../lib/db.js')
+      vi.mocked(withTransaction).mockImplementation(async (handler) => {
+        const mockClient = {
+          query: vi
+            .fn()
+            .mockResolvedValueOnce({
+              rows: [
+                {
+                  id: 'order-1',
+                  status: 'PLACED',
+                  total_amount: 0,
+                  restaurant_id: restaurantId,
+                },
+              ],
+            })
+            .mockResolvedValueOnce({
+              rows: [
+                {
+                  id: 'item-1',
+                  order_id: 'order-1',
+                  product_id: productId,
+                  supplier_id: supplierId,
+                  quantity: 10,
+                  unit_price: 10.05,
+                  line_total: 100.5,
+                },
+              ],
+            })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({
+              rows: [
+                { id: supplierId, multi_warehouse_enabled: false, fulfillment_mode: 'single' },
+              ],
+            }),
+        }
+        return handler(mockClient)
+      })
+
+      let resolveNotify
+      const notifyDone = new Promise((resolve) => {
+        resolveNotify = resolve
+      })
+      const { notifyOrderStatusChange } = await import('../services/notification.service.js')
+      vi.mocked(notifyOrderStatusChange).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => {
+              resolve([])
+              resolveNotify()
+            }, 50)
+          })
+      )
+
+      const response = await request(app)
+        .post('/api/orders')
+        .send({
+          items: [{ productId, quantity: 10 }],
+        })
+        .expect(201)
+
+      expect(response.body.ok).toBe(true)
+      expect(notifyOrderStatusChange).toHaveBeenCalledTimes(1)
+
+      await notifyDone
+    })
+
     it('should validate required fields', async () => {
       const response = await request(app)
         .post('/api/orders')
