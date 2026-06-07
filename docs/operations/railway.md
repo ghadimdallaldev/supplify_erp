@@ -176,14 +176,18 @@ See `apps/web/.env.railway.example` for local Vite development.
 
 ## 4. Keycloak (optional)
 
-Each environment has a Railway Keycloak service that **builds** `deploy/railway/keycloak/Dockerfile` and runs `--import-realm` (realm JSON baked in; no manual Admin import). See [`deploy/railway/keycloak/RAILWAY_SETUP.md`](deploy/railway/keycloak/RAILWAY_SETUP.md).
+Each environment can run a Railway Keycloak service that **builds** `deploy/railway/keycloak/Dockerfile` and runs `railway-entrypoint.sh start --import-realm`.
 
-Options if not using Railway Docker Keycloak:
+| Doc                                                                                                        | Purpose                             |
+| ---------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| [`deploy/railway/keycloak/RAILWAY_SETUP.md`](../../deploy/railway/keycloak/RAILWAY_SETUP.md)               | Per-env config, realms, verify URLs |
+| [`deploy/railway/KEYCLOAK_RAILWAY_DB_NOTES.md`](../../deploy/railway/KEYCLOAK_RAILWAY_DB_NOTES.md)         | Postgres `keycloak` DB              |
+| [`deploy/railway/KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](../../deploy/railway/KEYCLOAK_RAILWAY_MEMORY_NOTES.md) | JVM caps, start modes               |
+| [`docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`](../infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md)                     | OOM / H2 fix write-up               |
 
-- Run Keycloak on a separate Railway service or VM using `deploy/keycloak/realm-export.json`
-- Use a managed IdP and map claims to Supplify roles
+Sync: `pnpm railway:keycloak:sync -- <env>`. Non-prod: `KEYCLOAK_USE_OPTIMIZED=false`. Prod: `true`.
 
-Set `KEYCLOAK_*` on the API to match your deployment.
+Set matching `KEYCLOAK_*` on the API. Alternatives: external IdP or VM using `deploy/keycloak/realm-export*.json`.
 
 ## 5. Connect frontend to API
 

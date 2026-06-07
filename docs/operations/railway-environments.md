@@ -209,10 +209,16 @@ Port comes from `docker/.env` → `REDIS_PORT` (default `6379`).
 
 ## K. Keycloak per environment
 
-- Separate realm per env: **`Supplify`** (dev), **`supplify-preprod`** (preprod + Railway **staging**), **`supplify-prod`**
-- Build Keycloak from `deploy/railway/<env>/keycloak/Dockerfile` (realm JSON baked for `--import-realm`) — see [`deploy/railway/keycloak/RAILWAY_SETUP.md`](deploy/railway/keycloak/RAILWAY_SETUP.md)
-- Redirect / post-logout URIs: `deploy/railway/{development,preprod,production}/KEYCLOAK_CLIENT.md`
-- `KEYCLOAK_URL` = server-side URL; `KEYCLOAK_PUBLIC_URL` = browser URL; set `KC_HOSTNAME` + `KC_PROXY_HEADERS=xforwarded` on the Keycloak service
+- Realms: **`Supplify`** (dev), **`supplify-preprod`** (preprod + Railway **staging**), **`supplify-prod`**
+- Build: `deploy/railway/keycloak/Dockerfile` + `deploy/railway/<env>/keycloak/railway.json` — [`deploy/railway/keycloak/RAILWAY_SETUP.md`](../../deploy/railway/keycloak/RAILWAY_SETUP.md)
+- Sync: `pnpm railway:keycloak:sync -- <env>` from `deploy/railway/<env>/keycloak.env`
+- Redirect URIs: `deploy/railway/{development,preprod,production}/KEYCLOAK_CLIENT.md`
+- API: `KEYCLOAK_URL` (server-side), `KEYCLOAK_PUBLIC_URL` (browser)
+- Keycloak service: `KC_HOSTNAME`, `KC_PROXY_HEADERS=xforwarded` — not deprecated `KC_PROXY=edge`
+- **Start modes:** dev / preprod / staging → `KEYCLOAK_USE_OPTIMIZED=false`; prod → `true`
+- Memory / JVM: [`deploy/railway/KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](../../deploy/railway/KEYCLOAK_RAILWAY_MEMORY_NOTES.md)
+- Postgres DB `keycloak`: [`deploy/railway/KEYCLOAK_RAILWAY_DB_NOTES.md`](../../deploy/railway/KEYCLOAK_RAILWAY_DB_NOTES.md)
+- Incident write-up: [`docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`](../infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md)
 
 ## L. Storage per environment
 
