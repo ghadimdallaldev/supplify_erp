@@ -6,15 +6,15 @@ Manual steps Railway cannot do from git alone: create the Railway project, conne
 
 ## Golden rules
 
-| Rule                                                 | Why                                                                                                       |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| **Dedicated Postgres database `keycloak`**           | App uses `railway`; Keycloak must use **`keycloak`**. Mixing them corrupts both.                          |
-| **Never set `DATABASE_URL` on the Keycloak service** | Railway’s reference points at the **`railway`** DB. Keycloak will write IdP tables into the app database. |
-| **Always use Postgres reference vars**               | `PGHOST=${{Postgres-<env>.PGHOST}}` etc. in `keycloak.env` — entrypoint wires `KC_DB_*`                   |
-| **Build from GitHub + `railway.json`**               | Stock `quay.io/keycloak/keycloak` has no realm import and defaults to dev mode.                           |
-| **Root Directory = empty (repo root)**               | Otherwise `realm-export.json` is missing at build time.                                                   |
-| **Start command = `start --import-realm`**           | Not `start-dev` (see memory notes for JVM caps on dev).                                                   |
-| **Link Keycloak → Postgres in Railway graph**        | Ensures `${{Postgres-<env>.PGHOST}}` references resolve.                                                  |
+| Rule                                                   | Why                                                                                                       |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| **Dedicated Postgres database `keycloak`**             | App uses `railway`; Keycloak must use **`keycloak`**. Mixing them corrupts both.                          |
+| **Never set `DATABASE_URL` on the Keycloak service**   | Railway’s reference points at the **`railway`** DB. Keycloak will write IdP tables into the app database. |
+| **Always use Postgres reference vars**                 | `PGHOST=${{Postgres-<env>.PGHOST}}` etc. in `keycloak.env` — entrypoint wires `KC_DB_*`                   |
+| **Build from GitHub + `railway.json`**                 | Stock `quay.io/keycloak/keycloak` has no realm import and defaults to dev mode.                           |
+| **Root Directory = empty (repo root)**                 | Otherwise `realm-export.json` is missing at build time.                                                   |
+| **Start command = `start --optimized --import-realm`** | Not `start-dev` (entrypoint blocks dev mode). See memory docs for JVM caps.                               |
+| **Link Keycloak → Postgres in Railway graph**          | Ensures `${{Postgres-<env>.PGHOST}}` references resolve.                                                  |
 
 ## One-time Postgres setup (each environment)
 

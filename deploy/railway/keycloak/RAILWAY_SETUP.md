@@ -8,12 +8,12 @@ Do **not** deploy the stock Keycloak image without building these Dockerfiles.
 
 ## Per-environment Railway settings
 
-| Environment     | Config file                                         | Realm              | Start command                                |
-| --------------- | --------------------------------------------------- | ------------------ | -------------------------------------------- |
-| **development** | `/deploy/railway/development/keycloak/railway.json` | `Supplify`         | `railway-entrypoint.sh start --import-realm` |
-| **preprod**     | `/deploy/railway/preprod/keycloak/railway.json`     | `supplify-preprod` | `railway-entrypoint.sh start --import-realm` |
-| **staging**     | `/deploy/railway/staging/keycloak/railway.json`     | `supplify-preprod` | `railway-entrypoint.sh start --import-realm` |
-| **production**  | `/deploy/railway/production/keycloak/railway.json`  | `supplify-prod`    | `railway-entrypoint.sh start --import-realm` |
+| Environment     | Config file                                         | Realm              | Start command                                            |
+| --------------- | --------------------------------------------------- | ------------------ | -------------------------------------------------------- |
+| **development** | `/deploy/railway/development/keycloak/railway.json` | `Supplify`         | `railway-entrypoint.sh start --optimized --import-realm` |
+| **preprod**     | `/deploy/railway/preprod/keycloak/railway.json`     | `supplify-preprod` | `railway-entrypoint.sh start --optimized --import-realm` |
+| **staging**     | `/deploy/railway/staging/keycloak/railway.json`     | `supplify-preprod` | `railway-entrypoint.sh start --optimized --import-realm` |
+| **production**  | `/deploy/railway/production/keycloak/railway.json`  | `supplify-prod`    | `railway-entrypoint.sh start --optimized --import-realm` |
 
 All environments build **`deploy/railway/keycloak/Dockerfile`** (shared image: realm JSON, `railway-entrypoint.sh`, psql via ubi-micro stage; `railway.json` sets `buildArgs`).
 
