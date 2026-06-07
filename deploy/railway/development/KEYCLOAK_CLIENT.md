@@ -1,7 +1,7 @@
 # Keycloak client setup — Railway development
 
 Realm: **Supplify** · Client: **supplify-api**  
-Preprod: [`../preprod/KEYCLOAK_CLIENT.md`](../preprod/KEYCLOAK_CLIENT.md) · Prod: [`../production/KEYCLOAK_CLIENT.md`](../production/KEYCLOAK_CLIENT.md)
+Preprod/prod redirect URIs: `deploy/keycloak/realm-export.preprod.json` and `realm-export.prod.json`
 
 ## Valid redirect URIs
 
