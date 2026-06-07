@@ -2,9 +2,12 @@ import { describe, it, expect } from 'vitest'
 import {
   formatDistanceKm,
   formatEtaRange,
+  formatSupplierDistanceKm,
   getEtaUnavailableMessage,
   getRestaurantEtaPrimaryText,
+  getRestaurantEtaSecondaryText,
   getSupplierEtaPrimaryText,
+  getSupplierEtaSecondaryText,
   shouldShowEtaConfidence,
 } from './deliveryEtaDisplay'
 import type { RestaurantOrderTrackingResponse, SupplierOrderTrackingResponse } from '../types'
@@ -30,6 +33,7 @@ describe('deliveryEtaDisplay', () => {
   it('formats ETA range and distance', () => {
     expect(formatEtaRange(12, 18)).toBe('12–18 min')
     expect(formatDistanceKm(4.2)).toBe('4.2 km away')
+    expect(formatSupplierDistanceKm(7.8)).toBe('Distance 7.8 km')
   })
 
   it('shows restaurant primary ETA text when available', () => {
@@ -52,6 +56,13 @@ describe('deliveryEtaDisplay', () => {
         etaMinutesMax: 18,
       })
     ).toBe('ETA 12–18 min')
+    expect(
+      getSupplierEtaSecondaryText({
+        ...supplierBase,
+        etaAvailable: true,
+        distanceKm: 7.8,
+      })
+    ).toBe('Distance 7.8 km')
   })
 
   it('shows missing destination warning', () => {

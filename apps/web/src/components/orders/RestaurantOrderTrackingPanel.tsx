@@ -7,17 +7,16 @@ import { Skeleton } from '../ui/skeleton'
 import { useEffect, useState } from 'react'
 import { useGetOrderTrackingQuery } from '../../services/api'
 import { DeliveryTrackingMap } from '../maps/DeliveryTrackingMap'
-import { getGpsStatusLabel } from '../../lib/deliveryTrackingLabels'
+import { getGpsStatusLabel, getLiveDeliveryStatusLine } from '../../lib/deliveryTrackingLabels'
 import {
   canShowRestaurantReceiveCta,
   getRestaurantTrackingMessage,
   shouldPollRestaurantTracking,
 } from '../../lib/restaurantTrackingMessages'
 import {
-  formatDistanceKm,
-  getEtaUnavailableMessage,
-  getRestaurantEtaPrimaryText,
-} from '../../lib/deliveryEtaDisplay'
+  DeliveryTrackingEtaSection,
+  getDestinationLabelText,
+} from '../maps/DeliveryTrackingEtaSection'
 import { isRestaurantOrderTracking } from '../../types'
 
 type Props = {
@@ -67,6 +66,9 @@ export function RestaurantOrderTrackingPanel({ orderId, orderStatus }: Props) {
     data?.trackingEnabled &&
     data?.delivery?.status &&
     !['pending', 'delivered', 'failed'].includes(data.delivery.status)
+  const destinationLabel = getDestinationLabelText(data, 'restaurant')
+  const liveStatusLine = getLiveDeliveryStatusLine(data?.delivery?.status)
+  const showEta = Boolean(data?.trackingEnabled && data.delivery?.status !== 'delivered')
 
   return (
     <Card data-testid="restaurant-order-tracking-panel">
@@ -98,6 +100,15 @@ export function RestaurantOrderTrackingPanel({ orderId, orderStatus }: Props) {
           {message}
         </p>
 
+        {destinationLabel ? (
+          <p
+            className="text-sm text-[var(--text-primary)]"
+            data-testid="restaurant-tracking-destination"
+          >
+            {destinationLabel}
+          </p>
+        ) : null}
+
         {showMap && (
           <DeliveryTrackingMap
             latitude={loc?.latitude}
@@ -105,48 +116,17 @@ export function RestaurantOrderTrackingPanel({ orderId, orderStatus }: Props) {
             live={Boolean(data.tracking?.hasLocation && !data.tracking?.isStale)}
             recordedAt={loc?.recordedAt ?? null}
             heightClassName="h-64"
+            liveStatusLine={liveStatusLine}
+            beforeFooter={
+              <DeliveryTrackingEtaSection
+                data={data}
+                audience="restaurant"
+                testId="restaurant-tracking-eta"
+                show={showEta}
+              />
+            }
           />
         )}
-
-        {data?.trackingEnabled && data.delivery?.status !== 'delivered'
-          ? (() => {
-              const etaPrimary = getRestaurantEtaPrimaryText(data)
-              if (etaPrimary) {
-                const distanceText = formatDistanceKm(data.distanceKm)
-                return (
-                  <div className="space-y-0.5" data-testid="restaurant-tracking-eta">
-                    <p
-                      className="text-sm font-medium text-[var(--text-primary)]"
-                      data-testid="restaurant-tracking-eta-primary"
-                    >
-                      {etaPrimary}
-                    </p>
-                    {distanceText ? (
-                      <p
-                        className="text-xs text-[var(--text-muted)]"
-                        data-testid="restaurant-tracking-eta-distance"
-                      >
-                        {distanceText}
-                      </p>
-                    ) : null}
-                  </div>
-                )
-              }
-              const etaMessage = getEtaUnavailableMessage(data)
-              return etaMessage ? (
-                <p
-                  className={`text-xs ${
-                    etaMessage.includes('delivery location is not set')
-                      ? 'text-amber-800 dark:text-amber-200'
-                      : 'text-[var(--text-muted)]'
-                  }`}
-                  data-testid="restaurant-tracking-eta"
-                >
-                  {etaMessage}
-                </p>
-              ) : null
-            })()
-          : null}
 
         {showReceive && (
           <Button className="w-full sm:w-auto" asChild data-testid="restaurant-receive-order-cta">

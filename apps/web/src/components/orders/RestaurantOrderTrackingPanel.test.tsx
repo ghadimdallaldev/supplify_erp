@@ -46,8 +46,11 @@ describe('RestaurantOrderTrackingPanel', () => {
     expect(screen.getByTestId('restaurant-tracking-eta-primary')).toHaveTextContent(
       /Arriving in about 12–18 minutes/i
     )
-    expect(screen.getByTestId('restaurant-tracking-eta-distance')).toHaveTextContent(
+    expect(screen.getByTestId('restaurant-tracking-eta-secondary')).toHaveTextContent(
       /4\.2 km away/i
+    )
+    expect(screen.getByTestId('delivery-tracking-map-status')).toHaveTextContent(
+      /On the way · Live now/i
     )
   })
 })

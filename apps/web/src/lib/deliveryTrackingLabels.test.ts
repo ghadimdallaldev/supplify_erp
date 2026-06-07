@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { getGpsStatusLabel, getGpsDisplayStatus } from './deliveryTrackingLabels'
+import {
+  getGpsStatusLabel,
+  getGpsDisplayStatus,
+  getLiveDeliveryStatusLine,
+} from './deliveryTrackingLabels'
 import type { DeliveryTrackingInfo } from '../types'
 
 const liveTracking: DeliveryTrackingInfo = {
@@ -49,5 +53,11 @@ describe('deliveryTrackingLabels', () => {
         latestLocation: null,
       })
     ).toBe('Tracking off')
+  })
+
+  it('returns live delivery status lines for active assignments', () => {
+    expect(getLiveDeliveryStatusLine('picked_up')).toBe('Picked up · Live now')
+    expect(getLiveDeliveryStatusLine('out_for_delivery')).toBe('On the way · Live now')
+    expect(getLiveDeliveryStatusLine('assigned')).toBeNull()
   })
 })

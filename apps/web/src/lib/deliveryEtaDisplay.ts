@@ -12,6 +12,25 @@ export function formatDistanceKm(km?: number | null): string | null {
   return `${km.toFixed(1)} km away`
 }
 
+export function formatSupplierDistanceKm(km?: number | null): string | null {
+  if (km == null) return null
+  return `Distance ${km.toFixed(1)} km`
+}
+
+export function getRestaurantEtaSecondaryText(
+  data: RestaurantOrderTrackingResponse | undefined
+): string | null {
+  if (!data?.etaAvailable) return null
+  return formatDistanceKm(data.distanceKm)
+}
+
+export function getSupplierEtaSecondaryText(
+  data: SupplierOrderTrackingResponse | undefined
+): string | null {
+  if (!data?.etaAvailable) return null
+  return formatSupplierDistanceKm(data.distanceKm)
+}
+
 export function getRestaurantEtaPrimaryText(
   data: RestaurantOrderTrackingResponse | undefined
 ): string | null {
