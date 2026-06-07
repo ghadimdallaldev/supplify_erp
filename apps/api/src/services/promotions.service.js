@@ -1,5 +1,6 @@
 import { query } from '../lib/db.js'
 import { isRestaurantVisibleDeal, buildDealConfigSnapshot } from './deal-lifecycle.service.js'
+import { isFeatureEnabled } from '../lib/subscription.js'
 
 const ORDER_DISCOUNT_TYPES = new Set([
   'percentage_discount',
@@ -155,6 +156,32 @@ async function fetchActivePromotionsForSupplier(db, supplierId, restaurantId) {
   return rows
 }
 
+const ACTIVE_ORDER_PROMO_EXISTS_SQL = `
+  SELECT 1
+  FROM promotions p
+  WHERE p.supplier_id = $1
+    AND p.status = 'active'
+    AND p.type <> 'featured_listing'
+    AND COALESCE(p.payment_status, 'not_required') IN ('not_required', 'paid')
+    AND p.starts_at <= NOW()
+    AND (p.ends_at IS NULL OR p.ends_at > NOW())
+    AND (p.usage_limit IS NULL OR p.usage_count < p.usage_limit)
+    AND (
+      NOT EXISTS (SELECT 1 FROM promotion_restaurant_targets prt WHERE prt.promotion_id = p.id)
+      OR EXISTS (
+        SELECT 1 FROM promotion_restaurant_targets prt
+        WHERE prt.promotion_id = p.id AND prt.restaurant_id = $2
+      )
+    )
+  LIMIT 1
+`
+
+/** Fast EXISTS check — skip heavy promotion scan when supplier has no eligible deals. */
+export async function hasActiveSupplierOrderPromotions(db, supplierId, restaurantId) {
+  const { rows } = await db.query(ACTIVE_ORDER_PROMO_EXISTS_SQL, [supplierId, restaurantId])
+  return rows.length > 0
+}
+
 export async function loadActivePromotionsForSupplier(supplierId, restaurantId) {
   return fetchActivePromotionsForSupplier(query, supplierId, restaurantId)
 }
@@ -169,10 +196,15 @@ export async function applyBestPromotionToOrder({
   restaurantId,
   subtotal,
   lineItems,
+  skipDealPreflight = false,
 }) {
-  const { isFeatureEnabled } = await import('../lib/subscription.js')
-  const dealsEnabled = await isFeatureEnabled(restaurantId, 'RESTAURANT', 'supplier_deals')
-  if (!dealsEnabled) return null
+  if (!skipDealPreflight) {
+    const dealsEnabled = await isFeatureEnabled(restaurantId, 'RESTAURANT', 'supplier_deals')
+    if (!dealsEnabled) return null
+
+    const hasDeals = await hasActiveSupplierOrderPromotions(client, supplierId, restaurantId)
+    if (!hasDeals) return null
+  }
 
   const promotions = await fetchActivePromotionsForSupplier(client, supplierId, restaurantId)
   const selected = selectBestPromotion(promotions, subtotal, lineItems, { restaurantId })

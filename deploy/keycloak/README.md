@@ -1,10 +1,10 @@
 # Keycloak realm exports
 
-| Environment | Realm name         | Import file                 | Client URI checklist                            |
-| ----------- | ------------------ | --------------------------- | ----------------------------------------------- |
-| **dev**     | `Supplify`         | `realm-export.json`         | `deploy/railway/development/KEYCLOAK_CLIENT.md` |
-| **preprod** | `supplify-preprod` | `realm-export.preprod.json` | `deploy/railway/preprod/KEYCLOAK_CLIENT.md`     |
-| **prod**    | `supplify-prod`    | `realm-export.prod.json`    | `deploy/railway/production/KEYCLOAK_CLIENT.md`  |
+| Environment | Realm name         | Import file                 | Client URI checklist                                        |
+| ----------- | ------------------ | --------------------------- | ----------------------------------------------------------- |
+| **dev**     | `Supplify`         | `realm-export.json`         | `deploy/railway/development/KEYCLOAK_CLIENT.md`             |
+| **preprod** | `supplify-preprod` | `realm-export.preprod.json` | `deploy/keycloak/realm-export.preprod.json` (redirect URIs) |
+| **prod**    | `supplify-prod`    | `realm-export.prod.json`    | `deploy/keycloak/realm-export.prod.json` (redirect URIs)    |
 
 ## Import on Railway (recommended)
 
@@ -21,7 +21,7 @@ Shared image: `deploy/railway/keycloak/Dockerfile` (realm JSON baked per env via
 
 Setup: [`deploy/railway/keycloak/RAILWAY_SETUP.md`](../railway/keycloak/RAILWAY_SETUP.md)
 
-After deploy, apply redirect URIs from the matching `KEYCLOAK_CLIENT.md` if URLs change. Set API `KEYCLOAK_CLIENT_SECRET` (`changeme` for dev import; strong secrets for preprod/prod).
+After deploy, apply redirect URIs from the matching realm export if URLs change. Set API `KEYCLOAK_CLIENT_SECRET` (`changeme` for dev import; strong secrets for preprod/prod).
 
 ## Local Docker
 
