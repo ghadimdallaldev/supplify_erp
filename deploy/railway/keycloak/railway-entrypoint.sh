@@ -53,7 +53,6 @@ resolve_postgres() {
     fi
     PG_USER="$KC_DB_USERNAME"
     PG_PASS="$KC_DB_PASSWORD"
-    export KC_DB="${KC_DB:-postgres}"
     return 0
   fi
 
@@ -89,10 +88,10 @@ EOF
     exit 1
   fi
 
-  export KC_DB="${KC_DB:-postgres}"
   export KC_DB_USERNAME="$PG_USER"
   export KC_DB_PASSWORD="$PG_PASS"
   export KC_DB_URL="jdbc:postgresql://${PG_HOST}:${PG_PORT}/${KEYCLOAK_DB_NAME}"
+  # kc.db is build-time only; runtime uses KC_DB_URL / KC_DB_USERNAME / KC_DB_PASSWORD.
 }
 
 wait_for_postgres() {
@@ -127,6 +126,7 @@ GRANT ALL ON SCHEMA public TO public;
 SQL
 
   echo "Keycloak database '${KEYCLOAK_DB_NAME}' ready at ${PG_HOST}:${PG_PORT}"
+  echo "Keycloak JDBC (runtime): jdbc:postgresql://${PG_HOST}:${PG_PORT}/${KEYCLOAK_DB_NAME}"
 }
 
 resolve_postgres

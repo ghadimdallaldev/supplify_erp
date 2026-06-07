@@ -7,11 +7,14 @@
 
 Railway metrics showed **Keycloak alone** climbing from ~2–4 GB to **7–10 GB**, then dropping (OOM kill / restart), then climbing again. Supplify API, web, Postgres, and Redis stayed flat near zero.
 
+A separate boot failure (`URL format error ... jdbc:postgresql` with H2 driver) happens when the optimized image was built **without `--db=postgres`**: runtime `KC_DB_URL` is ignored for DB vendor; only JDBC URL/credentials apply at runtime after a postgres build.
+
 Contributing factors:
 
 | Factor                                        | Effect                                                                                                                |
 | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | **`start-dev` on Railway**                    | Quarkus dev profile (`Profile dev activated`). Extra tooling, no optimized server image, health endpoints often 404.  |
+| **Missing `--db=postgres` in `kc.sh build`**  | Optimized image defaults to **H2**; runtime `KC_DB_URL=jdbc:postgresql://...` fails with “URL format error”.          |
 | **Missing `--optimized` after `kc.sh build`** | Even with `start` (not dev), Quarkus can **re-augment at runtime** on every boot — large transient + retained memory. |
 | **No hard JVM heap / metaspace cap**          | Without `JAVA_OPTS_APPEND`, the JVM grows until Railway kills the container.                                          |
 | **Deprecated `KC_PROXY=edge`**                | Replaced by `KC_PROXY_HEADERS=xforwarded` (Keycloak 24).                                                              |
@@ -35,7 +38,7 @@ This is **not** caused by Supplify API crons, Postgres keepalive, or idle web ta
 /opt/keycloak/bin/railway-entrypoint.sh start --optimized --import-realm
 ```
 
-- Dockerfile build arg `KC_PRODUCTION=true` runs `kc.sh build` at **image build time** (no Quarkus rebuild on boot).
+- Dockerfile build arg `KC_PRODUCTION=true` runs `kc.sh build --db=postgres --health-enabled=true` at **image build time**.
 - `railway-entrypoint.sh` **blocks `start-dev`** and auto-injects `--optimized` if missing.
 
 ### 2. JVM memory caps (development)
@@ -114,7 +117,7 @@ Monitor: Railway → project → **keycloak** service → **Metrics** → Memory
    - Config file: `deploy/railway/development/keycloak/railway.json`
    - Root Directory: **empty** (repo root)
    - Health check path: `/health/ready`
-4. **Redeploy** Keycloak only. Wait for first boot (~3–5 min if fresh DB migrations).
+4. **Redeploy** Keycloak only with **clear build cache** if the H2/Postgres error persists (Settings → Redeploy → clear cache). Wait for first boot (~3–5 min if fresh DB migrations).
 5. **Optional:** Set Railway service memory limit to **1 GB** so OOM is predictable if JVM misconfigured.
 
 ## Verify (does not change realms/clients)
@@ -141,6 +144,7 @@ https://supplify-web-dev-development.up.railway.app/auth/login
 
 - `Profile dev activated` → still on `start-dev`; fix start command
 - Quarkus augmentation on every boot → missing `KC_PRODUCTION=true` build or missing `--optimized`
+- `URL format error ... jdbc:postgresql` with H2 message → image built without `--db=postgres`; redeploy with cache clear
 
 **Metrics:** Memory stable for 10–15 minutes with no Supplify usage.
 
