@@ -1,4 +1,4 @@
-import { query } from './db.js'
+import { query, withTransaction } from './db.js'
 
 let cachedSupplierCol = null
 let cachedOwnerInsert = null
@@ -139,5 +139,5 @@ export async function ensureDefaultWarehouseForPaidSupplier(supplierId) {
   const { rows: supplierRows } = await query(`SELECT * FROM supplier WHERE id = $1`, [supplierId])
   if (!supplierRows.length) return null
 
-  return createDefaultWarehouseForSupplier(query, supplierRows[0])
+  return withTransaction((client) => createDefaultWarehouseForSupplier(client, supplierRows[0]))
 }
