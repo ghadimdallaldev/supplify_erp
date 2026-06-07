@@ -3,28 +3,55 @@
  */
 
 export async function reserveWarehouseStock(client, warehouseId, productId, quantity) {
-  const qty = Number(quantity)
-  if (!qty || qty <= 0) return
+  await reserveWarehouseStockBatch(client, warehouseId, [{ productId, quantity }])
+}
+
+/**
+ * Reserve warehouse stock for multiple lines (single lock + batch update).
+ */
+export async function reserveWarehouseStockBatch(client, warehouseId, lineItems) {
+  const items = (lineItems || [])
+    .map((item) => ({
+      productId: item.productId ?? item.product_id,
+      quantity: Number(item.quantity),
+    }))
+    .filter((item) => item.productId && item.quantity > 0)
+
+  if (!items.length) return
+
+  const productIds = items.map((item) => item.productId)
+  const quantities = items.map((item) => item.quantity)
 
   const { rows } = await client.query(
-    `SELECT id, quantity_available, quantity_reserved FROM warehouse_inventory
-     WHERE warehouse_id = $1 AND product_id = $2 FOR UPDATE`,
-    [warehouseId, productId]
+    `SELECT product_id, quantity_available FROM warehouse_inventory
+     WHERE warehouse_id = $1 AND product_id = ANY($2)
+     FOR UPDATE`,
+    [warehouseId, productIds]
   )
-  if (rows.length === 0) return
 
-  const available = Number(rows[0].quantity_available)
-  if (available < qty) {
-    throw new Error(`Insufficient stock at warehouse for product ${productId}`)
+  const availableByProduct = new Map(
+    rows.map((row) => [row.product_id, Number(row.quantity_available)])
+  )
+
+  for (const item of items) {
+    const available = availableByProduct.get(item.productId)
+    if (available == null) continue
+    if (available < item.quantity) {
+      throw new Error(`Insufficient stock at warehouse for product ${item.productId}`)
+    }
   }
 
   await client.query(
-    `UPDATE warehouse_inventory
-     SET quantity_available = quantity_available - $1,
-         quantity_reserved = quantity_reserved + $1,
-         updated_at = now()
-     WHERE warehouse_id = $2 AND product_id = $3`,
-    [qty, warehouseId, productId]
+    `
+    UPDATE warehouse_inventory wi
+    SET
+      quantity_available = wi.quantity_available - v.quantity,
+      quantity_reserved = wi.quantity_reserved + v.quantity,
+      updated_at = now()
+    FROM unnest($2::uuid[], $3::numeric[]) AS v(product_id, quantity)
+    WHERE wi.warehouse_id = $1 AND wi.product_id = v.product_id
+    `,
+    [warehouseId, productIds, quantities]
   )
 }
 

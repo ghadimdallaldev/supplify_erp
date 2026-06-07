@@ -396,11 +396,64 @@ Order commit + audit log are **required** for a correct `201`. Supplier alerts a
 1. Revert `scheduleOrderPlacedNotification` to `await notifyOrderStatusChange(...)` in `orders.routes.js` if suppliers must not place orders until notify completes (not recommended).
 2. Revert `notifyTenantUsers` sequential loop if concurrent sends cause DB pool pressure (unlikely at concurrency 5).
 
+---
+
+## Order creation pass 2 — transaction batching (2026-06-07)
+
+### Log analysis (Railway dev)
+
+Railway CLI was not linked in the agent environment (`railway logs` unavailable). Analysis is based on:
+
+1. **`order.create.timing` instrumentation** already emitted on every `POST /api/orders`.
+2. **Code-path review** of synchronous buckets after the notification background fix.
+3. **Expected dominant buckets** when `totalHandlerMs` remains ~5–6s post-notify fix:
+   - **`orderTransactionMs`** — per-line inventory `FOR UPDATE` + per-line `order_item` INSERT + warehouse reservation loops + promotion scan.
+   - **`dailyLimitCheckMs`** — separate `withTransaction` on `usage_meter` before order commit (extra RTT on Railway Postgres).
+   - **`promotionMs`** (sub-bucket) — full `fetchActivePromotionsForSupplier` even when supplier has zero active deals.
+
+After deploy, confirm in Railway API logs:
+
+```text
+event:"order.create.timing"
+```
+
+Compare 3 slow requests; `orderTransactionMs` + `dailyLimitCheckMs` should drop most.
+
+### Fixes applied
+
+| Bucket                                     | Change                                                                                                                                    | Files                                               |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `dailyLimitCheckMs` / `orderTransactionMs` | Resolve subscription/limit **outside** tx; increment `usage_meter` **inside** the same order transaction (removes one dedicated usage tx) | `subscription.js`, `orders.routes.js`               |
+| `orderTransactionMs`                       | Batch supplier stock deduct (`assertAndDeductSupplierStockBatch`)                                                                         | `supplier-inventory.service.js`, `orders.routes.js` |
+| `orderTransactionMs`                       | Batch `order_item` insert via `unnest`                                                                                                    | `order-create.service.js`, `orders.routes.js`       |
+| `warehouseMs`                              | Batch `warehouse_inventory` reservation in single-warehouse mode                                                                          | `warehouseInventory.js`, `warehouseRouting.js`      |
+| `promotionMs`                              | `hasActiveSupplierOrderPromotions` EXISTS pre-check; skip promotion block when no deals; `skipDealPreflight` on best-deal apply           | `promotions.service.js`, `orders.routes.js`         |
+
+### Expected impact (Railway dev)
+
+| Bucket                         | Before (typical)                           | After (target)                    |
+| ------------------------------ | ------------------------------------------ | --------------------------------- |
+| `dailyLimitCheckMs`            | 300–800ms (separate tx + limit resolution) | 50–200ms (resolution only)        |
+| `orderTransactionMs` (5 lines) | ~2–4s (10+ stock/item round trips)         | ~0.8–1.5s (batched locks/inserts) |
+| `promotionMs`                  | 200–1500ms when no deals                   | ~0–5ms (skipped)                  |
+| `totalHandlerMs`               | ~5–6s                                      | **~1–3s**                         |
+
+### Tests
+
+```bash
+cd apps/api && npx vitest run src/routes/orders.routes.test.js src/services/supplier-inventory.service.test.js
+```
+
+### Rollback
+
+1. Revert `orders.routes.js` transaction to per-line stock/item loops + pre-tx `checkAndIncrementUsage`.
+2. Revert `subscription.js` helpers if chat/orders usage metering regresses.
+
 ### Logging
 
-| Event                                    | When                          | Fields                                                                                                                                                    |
-| ---------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `order.create.timing`                    | Every restaurant order create | `productPriceLookupMs`, `dailyLimitCheckMs`, `orderTransactionMs`, `promotionMs`, `warehouseMs`, `auditLogMs`, `notificationScheduleMs`, `totalHandlerMs` |
-| `order.notification.background_complete` | Background notify finished    | `orderId`, `supplierId`, `recipientCount`, `failedRecipientCount`, `notificationDurationMs`                                                               |
-| `order.notification.background_failed`   | Background notify rejected    | `orderId`, `supplierId`, `error`                                                                                                                          |
-| `notification.tenant_users.complete`     | Fan-out finished              | `recipientCount`, `sentCount`, `failedCount`, `durationMs`                                                                                                |
+| Event                                    | When                          | Fields                                                                                                                                                                    |
+| ---------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `order.create.timing`                    | Every restaurant order create | `middlewareMs`, `productPriceLookupMs`, `dailyLimitCheckMs`, `orderTransactionMs`, `promotionMs`, `warehouseMs`, `auditLogMs`, `notificationScheduleMs`, `totalHandlerMs` |
+| `order.notification.background_complete` | Background notify finished    | `orderId`, `supplierId`, `recipientCount`, `failedRecipientCount`, `notificationDurationMs`                                                                               |
+| `order.notification.background_failed`   | Background notify rejected    | `orderId`, `supplierId`, `error`                                                                                                                                          |
+| `notification.tenant_users.complete`     | Fan-out finished              | `recipientCount`, `sentCount`, `failedCount`, `durationMs`                                                                                                                |

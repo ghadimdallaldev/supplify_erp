@@ -501,18 +501,25 @@ export async function evaluateScheduledOrderLimit(restaurantId, ordersToCreate) 
 }
 
 /**
- * Atomic check and increment for daily usage meters (orders_per_day, chats_per_day).
- * Uses transaction + row lock to avoid race conditions. Use this instead of checkLimit + incrementUsage for these meters.
- * @param {string} tenantId - Tenant ID
- * @param {string} tenantType - 'SUPPLIER' or 'RESTAURANT'
- * @param {string} meterType - e.g. 'orders_per_day', 'chats_per_day'
- * @param {number} increment - Amount to add (default: 1)
- * @returns {Promise<{ allowed: boolean, current?: number, limit?: number|null }>}
+ * Thrown when a daily meter increment would exceed the effective plan limit.
  */
-export async function checkAndIncrementUsage(tenantId, tenantType, meterType, increment = 1) {
+export class DailyUsageLimitExceededError extends Error {
+  constructor(current, limit) {
+    super('Daily usage limit exceeded')
+    this.name = 'DailyUsageLimitExceededError'
+    this.allowed = false
+    this.current = current
+    this.limit = limit
+  }
+}
+
+/**
+ * Resolve subscription + effective daily limit without opening a usage_meter transaction.
+ */
+export async function resolveDailyMeterEnforcement(tenantId, tenantType, meterType) {
   const subscription = await getTenantSubscription(tenantId, tenantType)
   if (!subscription) {
-    return { allowed: false, current: 0, limit: 0 }
+    return { subscription: null, resolved: null }
   }
   const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
   const planLimits = getEnforcementPlanLimits(subscription, tenantType)
@@ -523,57 +530,102 @@ export async function checkAndIncrementUsage(tenantId, tenantType, meterType, in
     planId: subscription.plan_id,
     planLimits,
   })
-  if (resolved.isUnlimited) {
-    const res = await withTransaction(async (client) => {
-      await client.query(
-        `
-        INSERT INTO usage_meter (tenant_id, tenant_type, meter_type, current_value, period_type, period_start_date)
-        VALUES ($1, $2, $3, 0, 'DAILY', CURRENT_DATE)
-        ON CONFLICT (tenant_id, tenant_type, meter_type, period_start_date) DO NOTHING
-      `,
-        [tenantId, tenantType, meterType]
-      )
-      await client.query(
-        `UPDATE usage_meter SET current_value = current_value + $4, last_updated = now()
-         WHERE tenant_id = $1 AND tenant_type = $2 AND meter_type = $3 AND period_start_date = CURRENT_DATE`,
-        [tenantId, tenantType, meterType, increment]
-      )
-      return { allowed: true }
-    })
-    return res
-  }
-  const effectiveLimit = resolved.effectiveLimit
+  return { subscription, resolved }
+}
 
-  return withTransaction(async (client) => {
+/**
+ * Increment a daily usage meter inside an existing transaction (row lock + update).
+ */
+export async function incrementDailyUsageMeterInTransaction(
+  client,
+  tenantId,
+  tenantType,
+  meterType,
+  increment,
+  resolved
+) {
+  if (!resolved) {
+    return { allowed: false, current: 0, limit: 0 }
+  }
+
+  if (resolved.isUnlimited) {
     await client.query(
       `
+      INSERT INTO usage_meter (tenant_id, tenant_type, meter_type, current_value, period_type, period_start_date)
+      VALUES ($1, $2, $3, 0, 'DAILY', CURRENT_DATE)
+      ON CONFLICT (tenant_id, tenant_type, meter_type, period_start_date) DO NOTHING
+    `,
+      [tenantId, tenantType, meterType]
+    )
+    await client.query(
+      `UPDATE usage_meter SET current_value = current_value + $4, last_updated = now()
+       WHERE tenant_id = $1 AND tenant_type = $2 AND meter_type = $3 AND period_start_date = CURRENT_DATE`,
+      [tenantId, tenantType, meterType, increment]
+    )
+    return { allowed: true }
+  }
+
+  const effectiveLimit = resolved.effectiveLimit
+
+  await client.query(
+    `
       INSERT INTO usage_meter (tenant_id, tenant_type, meter_type, current_value, period_type, period_start_date, limit_value)
       VALUES ($1, $2, $3, 0, 'DAILY', CURRENT_DATE, $4)
       ON CONFLICT (tenant_id, tenant_type, meter_type, period_start_date) DO NOTHING
     `,
-      [tenantId, tenantType, meterType, effectiveLimit]
-    )
-    const { rows } = await client.query(
-      `SELECT current_value FROM usage_meter
+    [tenantId, tenantType, meterType, effectiveLimit]
+  )
+  const { rows } = await client.query(
+    `SELECT current_value FROM usage_meter
        WHERE tenant_id = $1 AND tenant_type = $2 AND meter_type = $3 AND period_start_date = CURRENT_DATE
        FOR UPDATE`,
-      [tenantId, tenantType, meterType]
-    )
-    const current = rows.length > 0 ? parseInt(rows[0].current_value || 0) : 0
-    if (current + increment > effectiveLimit) {
-      throw { allowed: false, current, limit: effectiveLimit }
-    }
-    await client.query(
-      `UPDATE usage_meter SET current_value = current_value + $4, last_updated = now(),
+    [tenantId, tenantType, meterType]
+  )
+  const current = rows.length > 0 ? parseInt(rows[0].current_value || 0, 10) : 0
+  if (current + increment > effectiveLimit) {
+    throw new DailyUsageLimitExceededError(current, effectiveLimit)
+  }
+  await client.query(
+    `UPDATE usage_meter SET current_value = current_value + $4, last_updated = now(),
         is_over_limit = (current_value + $4) >= $5
        WHERE tenant_id = $1 AND tenant_type = $2 AND meter_type = $3 AND period_start_date = CURRENT_DATE`,
-      [tenantId, tenantType, meterType, increment, effectiveLimit]
+    [tenantId, tenantType, meterType, increment, effectiveLimit]
+  )
+  return { allowed: true, current: current + increment, limit: effectiveLimit }
+}
+
+/**
+ * Atomic check and increment for daily usage meters (orders_per_day, chats_per_day).
+ * Uses transaction + row lock to avoid race conditions. Use this instead of checkLimit + incrementUsage for these meters.
+ * @param {string} tenantId - Tenant ID
+ * @param {string} tenantType - 'SUPPLIER' or 'RESTAURANT'
+ * @param {string} meterType - e.g. 'orders_per_day', 'chats_per_day'
+ * @param {number} increment - Amount to add (default: 1)
+ * @returns {Promise<{ allowed: boolean, current?: number, limit?: number|null }>}
+ */
+export async function checkAndIncrementUsage(tenantId, tenantType, meterType, increment = 1) {
+  const enforcement = await resolveDailyMeterEnforcement(tenantId, tenantType, meterType)
+  if (!enforcement.subscription) {
+    return { allowed: false, current: 0, limit: 0 }
+  }
+
+  try {
+    return await withTransaction(async (client) =>
+      incrementDailyUsageMeterInTransaction(
+        client,
+        tenantId,
+        tenantType,
+        meterType,
+        increment,
+        enforcement.resolved
+      )
     )
-    return { allowed: true, current: current + increment, limit: effectiveLimit }
-  }).catch((err) => {
-    if (err && typeof err === 'object' && 'allowed' in err) return err
+  } catch (err) {
+    if (err instanceof DailyUsageLimitExceededError) {
+      return { allowed: false, current: err.current, limit: err.limit }
+    }
     throw err
-  })
+  }
 }
 
 /**
