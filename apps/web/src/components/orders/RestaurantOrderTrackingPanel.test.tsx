@@ -42,7 +42,7 @@ describe('RestaurantOrderTrackingPanel', () => {
     )
     expect(screen.getByTestId('restaurant-order-tracking-panel')).toBeInTheDocument()
     expect(screen.getByTestId('restaurant-tracking-message')).toHaveTextContent(/on the way/i)
-    expect(screen.getByTestId('delivery-tracking-map-embed')).toBeInTheDocument()
+    expect(screen.getByTestId('delivery-tracking-map')).toBeInTheDocument()
     expect(screen.getByTestId('restaurant-tracking-eta-primary')).toHaveTextContent(
       /Arriving in about 12–18 minutes/i
     )

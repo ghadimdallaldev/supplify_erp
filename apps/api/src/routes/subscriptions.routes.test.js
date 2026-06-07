@@ -18,6 +18,9 @@ vi.mock('../lib/rbac.js', () => ({
   }),
   requireRole: vi.fn(() => (req, res, next) => next()),
   resolveTenantContext: (req, res, next) => {
+    if (req.tenantContext?.tenantId === null) {
+      return next()
+    }
     req.tenantContext = req.tenantContext || {
       permissions: ['SUBSCRIPTIONS_VIEW'],
       tenantId: 'rest-1',
@@ -372,7 +375,18 @@ describe('Subscriptions Routes', () => {
       const rbac = await import('../lib/rbac.js')
       vi.mocked(rbac.getRequestTenant).mockResolvedValueOnce(null)
 
-      await request(app).get('/api/subscriptions/recommendation').expect(404)
+      const noTenantApp = express()
+      noTenantApp.use(express.json())
+      noTenantApp.use((req, res, next) => {
+        req.requestId = 'test-req'
+        req.userData = mockUser
+        req.tenantContext = { permissions: [], tenantId: null, tenantType: 'RESTAURANT' }
+        next()
+      })
+      const { subscriptionsRoutes } = await import('./subscriptions.routes.js')
+      noTenantApp.use('/api/subscriptions', subscriptionsRoutes)
+
+      await request(noTenantApp).get('/api/subscriptions/recommendation').expect(404)
     })
   })
 

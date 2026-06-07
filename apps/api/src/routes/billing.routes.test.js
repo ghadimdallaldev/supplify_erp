@@ -57,6 +57,10 @@ vi.mock('../lib/logger.js', () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
 
+vi.mock('../lib/subscription.js', () => ({
+  invalidateTenantSubscriptionCache: vi.fn().mockResolvedValue(undefined),
+}))
+
 describe('billing.routes', () => {
   let app
 
@@ -126,7 +130,7 @@ describe('billing.routes', () => {
     const res = await request(app)
       .post('/api/billing/checkout')
       .send({
-        planId: '00000000-0000-4000-8000-000000000099',
+        planId: '11111111-1111-4111-8111-111111111111',
         billingCycle: 'MONTHLY',
         idempotencyKey: 'free-activate-test-key-01',
       })
@@ -138,7 +142,7 @@ describe('billing.routes', () => {
       expect.objectContaining({
         tenantId: 'rest-1',
         tenantType: 'RESTAURANT',
-        planId: '00000000-0000-4000-8000-000000000099',
+        planId: '11111111-1111-4111-8111-111111111111',
         billingCycle: 'MONTHLY',
         paymentMethodId: undefined,
       })
@@ -155,7 +159,7 @@ describe('billing.routes', () => {
     const res = await request(app)
       .post('/api/billing/checkout')
       .send({
-        planId: '00000000-0000-4000-8000-000000000099',
+        planId: '11111111-1111-4111-8111-111111111111',
         billingCycle: 'MONTHLY',
         idempotencyKey: 'impersonation-blocked-key',
       })

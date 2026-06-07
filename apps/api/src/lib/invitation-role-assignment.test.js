@@ -12,7 +12,7 @@ const createKeycloakUserWithPassword = vi.fn()
 const resolveWorkspaceScope = vi.fn()
 const assertUserCanJoinWorkspace = vi.fn()
 const bindUserToWorkspace = vi.fn()
-const invalidateUserPermissionCache = vi.fn()
+const invalidateUserAuthCaches = vi.fn()
 
 vi.mock('./db.js', () => ({
   query: (...args) => queryMock(...args),
@@ -34,13 +34,9 @@ vi.mock('./workspace-membership.js', async (importOriginal) => {
   }
 })
 
-vi.mock('./permissions.js', async (importOriginal) => {
-  const actual = await importOriginal()
-  return {
-    ...actual,
-    invalidateUserPermissionCache: (...args) => invalidateUserPermissionCache(...args),
-  }
-})
+vi.mock('./access-cache.js', () => ({
+  invalidateUserAuthCaches: (...args) => invalidateUserAuthCaches(...args),
+}))
 
 import { acceptBranchInvitation } from './branch-invitations.js'
 import { acceptRestaurantMemberInvitation } from './restaurant-invitations.js'
@@ -118,7 +114,7 @@ describe('acceptBranchInvitation role assignment', () => {
     resolveWorkspaceScope.mockReset()
     assertUserCanJoinWorkspace.mockReset()
     bindUserToWorkspace.mockReset()
-    invalidateUserPermissionCache.mockReset()
+    invalidateUserAuthCaches.mockReset()
 
     createKeycloakUserWithPassword.mockResolvedValue({ userId: 'kc-1', created: true })
     resolveWorkspaceScope.mockResolvedValue({
@@ -144,7 +140,7 @@ describe('acceptBranchInvitation role assignment', () => {
     expect(createKeycloakUserWithPassword).toHaveBeenCalledWith(
       expect.objectContaining({ realmRoleName: 'supplier' })
     )
-    expect(invalidateUserPermissionCache).toHaveBeenCalled()
+    expect(invalidateUserAuthCaches).toHaveBeenCalled()
   })
 
   it('assigns Accountant role from invitation record', async () => {

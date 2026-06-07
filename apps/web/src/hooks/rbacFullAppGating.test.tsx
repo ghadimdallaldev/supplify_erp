@@ -45,6 +45,10 @@ vi.mock('./useNotificationBadge', () => ({
   useNotificationBadge: () => ({ unreadCount: 0 }),
 }))
 
+vi.mock('../components/BranchSwitcher', () => ({
+  BranchSwitcher: () => null,
+}))
+
 vi.mock('../services/api', () => ({
   useGetEntitlementsQuery: () => ({
     data: { entitlements: { plan: { code: 'gold' }, features: { finance_invoices: true } } },

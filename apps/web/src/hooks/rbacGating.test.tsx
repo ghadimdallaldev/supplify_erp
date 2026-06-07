@@ -28,6 +28,24 @@ vi.mock('./useImpersonation', () => ({
   }),
 }))
 
+vi.mock('./useWorkspaceRole', () => ({
+  useWorkspaceRole: () => ({ roleName: 'Driver', isDriverRole: true, isReadOnlyViewer: false }),
+}))
+
+vi.mock('./usePermissions', () => ({
+  usePermissions: () => ({
+    can: (key: string) => key === 'DRIVER_DELIVERIES_VIEW' || key === 'DRIVER_DELIVERIES_MANAGE',
+    canAny: (...keys: string[]) =>
+      keys.some((k) => k === 'DRIVER_DELIVERIES_VIEW' || k === 'DRIVER_DELIVERIES_MANAGE'),
+    isViewOnly: () => false,
+    isWorkspaceViewer: false,
+  }),
+}))
+
+vi.mock('../components/BranchSwitcher', () => ({
+  BranchSwitcher: () => null,
+}))
+
 vi.mock('./useNotificationBadge', () => ({
   useNotificationBadge: () => ({ unreadCount: 0 }),
 }))

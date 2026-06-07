@@ -91,12 +91,24 @@ describe('permissions resolution', () => {
       'ORDERS_VIEW',
       'RESERVATIONS_VIEW',
     ])
-    queryMock
-      .mockResolvedValueOnce({ rows: [{ organization_id: 'org-1' }] })
-      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
-      .mockResolvedValueOnce({ rows: [{ permission: 'SETTINGS_VIEW' }] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
+    queryMock.mockImplementation((sql) => {
+      if (sql.includes('organization_id FROM restaurant')) {
+        return Promise.resolve({ rows: [{ organization_id: 'org-1' }] })
+      }
+      if (sql.includes('restaurant_org_user_roles')) {
+        return Promise.resolve({ rows: [{ '?column?': 1 }] })
+      }
+      if (sql.includes('tenant_role_permissions')) {
+        return Promise.resolve({ rows: [{ permission: 'SETTINGS_VIEW' }] })
+      }
+      if (sql.includes('FROM user_role ur')) {
+        return Promise.resolve({ rows: [] })
+      }
+      if (sql.includes('FROM tenant_user_roles WHERE')) {
+        return Promise.resolve({ rows: [{ '?column?': 1 }] })
+      }
+      return Promise.resolve({ rows: [] })
+    })
 
     const perms = await getPermissionsForUser('u1', 'rest-1', 'RESTAURANT')
     expect(perms).toContain('ORDERS_VIEW')
@@ -123,14 +135,25 @@ describe('permissions resolution', () => {
   })
 
   it('merges org and branch permissions for supplier users', async () => {
-    queryMock
-      .mockResolvedValueOnce({ rows: [{ organization_id: 'org-1' }] })
-      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
     getOrgRolePermissionsMock.mockResolvedValue(['ORDERS_VIEW', 'CATALOG_VIEW'])
-    queryMock
-      .mockResolvedValueOnce({ rows: [{ permission: 'INVENTORY_VIEW' }] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
+    queryMock.mockImplementation((sql) => {
+      if (sql.includes('organization_id FROM supplier')) {
+        return Promise.resolve({ rows: [{ organization_id: 'org-1' }] })
+      }
+      if (sql.includes('org_user_roles')) {
+        return Promise.resolve({ rows: [{ '?column?': 1 }] })
+      }
+      if (sql.includes('tenant_role_permissions')) {
+        return Promise.resolve({ rows: [{ permission: 'INVENTORY_VIEW' }] })
+      }
+      if (sql.includes('FROM user_role ur')) {
+        return Promise.resolve({ rows: [] })
+      }
+      if (sql.includes('FROM tenant_user_roles WHERE')) {
+        return Promise.resolve({ rows: [] })
+      }
+      return Promise.resolve({ rows: [] })
+    })
 
     const perms = await getPermissionsForUser('u1', 'supplier-1', 'SUPPLIER')
     expect(perms).toContain('ORDERS_VIEW')
