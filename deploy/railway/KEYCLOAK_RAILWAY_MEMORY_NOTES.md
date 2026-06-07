@@ -27,15 +27,15 @@ So “idle for 3 days” can still OOM if the JVM slowly grows or if an earlier 
 | ------------------------------ | -------------------------- | --------------------------------------------------------------------------------------------- |
 | `KC_PRODUCTION` build arg      | `false`                    | `true` → runs `kc.sh build` in Dockerfile (optimized image, no Quarkus rebuild on every boot) |
 | `KC_METRICS_ENABLED` build arg | _(default true)_           | `false` (smaller footprint)                                                                   |
-| `startCommand`                 | `start-dev --import-realm` | `start --import-realm`                                                                        |
+| `startCommand`                 | `start-dev --import-realm` | `start --optimized --import-realm`                                                            |
 
 ### Keycloak service variables (`development/keycloak.env` → paste into Railway Raw Editor)
 
-| Variable                     | Value                                                                    | Purpose                             |
-| ---------------------------- | ------------------------------------------------------------------------ | ----------------------------------- |
-| `JAVA_OPTS_APPEND`           | `-Xms128m -Xmx384m -XX:+UseContainerSupport -XX:+ExitOnOutOfMemoryError` | Hard cap for ~512 MiB Railway plans |
-| `KC_LOG_LEVEL`               | `warn`                                                                   | Less log volume                     |
-| `KC_HTTP_ACCESS_LOG_ENABLED` | `false`                                                                  | Disable HTTP access log             |
+| Variable                     | Value                                                                                              | Purpose                           |
+| ---------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `JAVA_OPTS_APPEND`           | `-Xms128m -Xmx512m -XX:MaxMetaspaceSize=192m -XX:+UseContainerSupport -XX:+ExitOnOutOfMemoryError` | Hard cap; target RSS ~350–700 MiB |
+| `KC_LOG_LEVEL`               | `warn`                                                                                             | Less log volume                   |
+| `KC_HTTP_ACCESS_LOG_ENABLED` | `false`                                                                                            | Disable HTTP access log           |
 
 **If your Keycloak service has ≥ 1 GiB RAM**, you may replace `JAVA_OPTS_APPEND` with:
 
@@ -43,7 +43,9 @@ So “idle for 3 days” can still OOM if the JVM slowly grows or if an earlier 
 JAVA_OPTS_APPEND=-XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=25 -XX:+UseContainerSupport -XX:+ExitOnOutOfMemoryError
 ```
 
-**Unchanged (do not break login):** `KC_HOSTNAME`, `KC_PROXY`, `KC_PROXY_*`, realm DB (`KC_DB_*`), `KEYCLOAK_ADMIN_PASSWORD`, redirect URIs, clients, admin user.
+**Unchanged (do not break login):** `KC_HOSTNAME`, `KC_PROXY_HEADERS`, realm DB (`KC_DB_*`), `KEYCLOAK_ADMIN_PASSWORD`, redirect URIs, clients, admin user.
+
+Full write-up: [`docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`](../../docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md).
 
 ### Dockerfile (`deploy/railway/keycloak/Dockerfile`)
 
@@ -72,7 +74,7 @@ Monitor in Railway → Keycloak service → Metrics. If you see frequent restart
 
 1. Merge/deploy this repo so Keycloak rebuilds with `KC_PRODUCTION=true`.
 2. Keycloak service → **Variables** → Raw Editor: merge `deploy/railway/development/keycloak.env` (especially `JAVA_OPTS_APPEND`, `KC_LOG_LEVEL`, `KC_HTTP_ACCESS_LOG_ENABLED`).
-3. Confirm **Start command** is `/opt/keycloak/bin/kc.sh start --import-realm` (from `railway.json`).
+3. Confirm **Start command** is `/opt/keycloak/bin/railway-entrypoint.sh start --optimized --import-realm` (from `railway.json`).
 4. Redeploy Keycloak, then verify (below).
 
 Existing realm data in Postgres is preserved; `--import-realm` skips when **Supplify** already exists.
