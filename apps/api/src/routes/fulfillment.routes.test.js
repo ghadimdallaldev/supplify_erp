@@ -60,6 +60,7 @@ vi.mock('../services/delivery-routes.service.js', () => ({
   updateRouteStop: vi.fn(),
   cancelDeliveryRoute: vi.fn(),
   getDriverActiveRoute: vi.fn(),
+  buildDriverRouteFromAssignments: vi.fn(),
 }))
 
 vi.mock('../lib/driver-rbac.js', () => ({

@@ -190,6 +190,61 @@ Automatic route optimization (Mapbox/Google Directions, traffic, etc.) can be ad
 
 ---
 
+## Driver-built route from assigned deliveries
+
+When a supplier assigns orders individually (no planned route), drivers can group **standalone** deliveries into their own route.
+
+### When it appears
+
+Driver portal (`/app/driver/deliveries`): if the driver has **2+ active standalone assignments** and **no route today**, a card offers **Build my route**.
+
+### API
+
+| Method | Path                                             | Access                     |
+| ------ | ------------------------------------------------ | -------------------------- |
+| POST   | `/api/fulfillment/routes/build-from-assignments` | `DRIVER_DELIVERIES_MANAGE` |
+
+Optional body: `{ "date": "YYYY-MM-DD" }` (defaults to today).
+
+### Behavior
+
+- Finds the driver’s assigned / picked up / out-for-delivery orders not already on a `PLANNED` or `IN_PROGRESS` route.
+- Requires at least **2** eligible orders.
+- Creates an `IN_PROGRESS` route labeled `{Driver name} — Today's route`, or merges into an existing today route.
+- Repeated calls are idempotent (no duplicate stops).
+- Supplier fulfillment → Routes shows the driver-built route like any other route.
+- Stop reordering and route-aware ETA apply once the route exists.
+
+---
+
+## Map markers and all-deliveries map
+
+Interactive maps use **Leaflet + OpenStreetMap tiles** (no turn-by-turn routing API).
+
+### Single-order maps (`DeliveryTrackingMap`)
+
+| Marker      | Who sees it          | Notes                                      |
+| ----------- | -------------------- | ------------------------------------------ |
+| Driver GPS  | Supplier, restaurant | Green = live, amber = stale, gray = no fix |
+| Destination | **Supplier only**    | Orange pin; label from `destinationLabel`  |
+| Recenter    | Both                 | Fits all visible markers; mobile-friendly  |
+
+**Restaurant privacy:** tracking API does **not** expose destination latitude/longitude. Restaurant maps show the **driver pin only** plus ETA copy.
+
+Supplier tracking drawer, order detail panel, and driver portal use the same map component with destination pins where allowed.
+
+### All active deliveries map (supplier)
+
+**Fulfillment → Delivery Tracking** tab: toggle **Board** / **Map**.
+
+- Includes assignments in `assigned`, `picked_up`, `out_for_delivery`.
+- Each delivery: driver marker (live / stale / no GPS) and destination marker when coordinates exist.
+- Summary counts: live GPS, stale GPS, no GPS, ETA available.
+- Click a marker or list row → existing **View tracking** drawer for that order.
+- Board query: `GET /api/supplier/deliveries/board?status=active_delivery` (includes destination coords for supplier ops only).
+
+---
+
 - No paid turn-by-turn routing API (straight-line ETA only)
 - No Socket.io live map stream (polling on tracking query)
 - GPS coordinates are client-reported (no device attestation or geofence validation)
@@ -224,7 +279,8 @@ Automatic route optimization (Mapbox/Google Directions, traffic, etc.) can be ad
 | `apps/api/src/services/driver-location.service.js`                          | Ping ingest + tracking read              |
 | `apps/api/src/routes/orders-driver.routes.js`                               | Location + tracking routes               |
 | `apps/web/src/hooks/useDriverLocationTracking.ts`                           | Browser geolocation                      |
-| `apps/web/src/components/orders/OrderDeliveryTrackingPanel.tsx`             | Order detail tracking UI                 |
+| `apps/web/src/components/maps/DeliveryTrackingMap.tsx`                      | Interactive map + recenter + markers     |
+| `apps/web/src/components/maps/ActiveDeliveriesMap.tsx`                      | Supplier all-deliveries map view         |
 | `docs/features/drivers-and-gps-tracking.md`                                 | This document                            |
 | [fulfillment-logistics (archived)](../archive/old/fulfillment-logistics.md) | Exceptions, POD, env tables              |
 

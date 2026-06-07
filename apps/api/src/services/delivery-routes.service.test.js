@@ -372,4 +372,98 @@ describe('delivery-routes.service', () => {
     const route = await cancelDeliveryRoute('s1', 'r1')
     expect(route.status).toBe('CANCELLED')
   })
+
+  it('buildDriverRouteFromAssignments requires at least 2 eligible deliveries', async () => {
+    const { buildDriverRouteFromAssignments } = await import('./delivery-routes.service.js')
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [{ id: 'd1', full_name: 'Alex', vehicle_type: null, vehicle_plate: null }],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            order_id: 'o1',
+            assignment_status: 'assigned',
+            created_at: new Date(),
+            order_status: 'SHIPPED',
+            address_json: {},
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+
+    await expect(buildDriverRouteFromAssignments('s1', 'd1')).rejects.toThrow(/at least 2/i)
+  })
+
+  it('buildDriverRouteFromAssignments returns existing route when already sufficient', async () => {
+    const { buildDriverRouteFromAssignments } = await import('./delivery-routes.service.js')
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [{ id: 'd1', full_name: 'Alex', vehicle_type: null, vehicle_plate: null }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 'r1' }] })
+
+    const routeRow = {
+      id: 'r1',
+      route_number: 'R-1',
+      route_label: "Alex — Today's route",
+      area: null,
+      driver_id: 'd1',
+      driver_name: 'Alex',
+      driver_name_legacy: null,
+      vehicle_info: null,
+      status: 'IN_PROGRESS',
+      scheduled_date: '2026-06-07',
+      started_at: null,
+      completed_at: null,
+    }
+    const stopRows = [
+      {
+        id: 'stop-a',
+        route_id: 'r1',
+        order_id: 'o1',
+        sequence_number: 1,
+        status: 'PLANNED',
+        restaurant_name: 'A',
+        address_json: {},
+        total_amount: 0,
+        item_count: 0,
+        notes: null,
+        completed_at: null,
+        assignment_status: 'assigned',
+        destination_latitude: null,
+        destination_longitude: null,
+        delivery_area: 'Area',
+      },
+      {
+        id: 'stop-b',
+        route_id: 'r1',
+        order_id: 'o2',
+        sequence_number: 2,
+        status: 'PLANNED',
+        restaurant_name: 'B',
+        address_json: {},
+        total_amount: 0,
+        item_count: 0,
+        notes: null,
+        completed_at: null,
+        assignment_status: 'assigned',
+        destination_latitude: null,
+        destination_longitude: null,
+        delivery_area: 'Area',
+      },
+    ]
+
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ ...routeRow, driver_name: 'Alex' }] })
+      .mockResolvedValueOnce({ rows: stopRows })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ ...routeRow, driver_name: 'Alex' }] })
+      .mockResolvedValueOnce({ rows: stopRows })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const route = await buildDriverRouteFromAssignments('s1', 'd1')
+    expect(route.stops.length).toBe(2)
+  })
 })

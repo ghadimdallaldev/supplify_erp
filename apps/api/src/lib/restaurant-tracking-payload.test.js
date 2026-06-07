@@ -60,6 +60,9 @@ describe('restaurant-tracking-payload', () => {
     expect(res.driver?.phone).toBeUndefined()
     expect(res).not.toHaveProperty('routeId')
     expect(res).not.toHaveProperty('assignment')
+    expect(res).not.toHaveProperty('destination')
+    expect(res).not.toHaveProperty('destinationLatitude')
+    expect(res).not.toHaveProperty('destinationLongitude')
   })
 
   it('omits driver name when config disabled', async () => {

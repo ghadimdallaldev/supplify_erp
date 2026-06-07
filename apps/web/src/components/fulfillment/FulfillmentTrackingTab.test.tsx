@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { FulfillmentTrackingTab } from './FulfillmentTrackingTab'
 
 vi.mock('../../services/api', () => ({
@@ -14,6 +14,9 @@ vi.mock('../../services/api', () => ({
           deliveryArea: 'Downtown',
           scheduledAt: '2026-06-03T10:00:00Z',
           deliveryStatus: 'out_for_delivery',
+          destinationLatitude: 33.91,
+          destinationLongitude: 35.52,
+          etaAvailable: true,
           tracking: {
             enabled: true,
             hasLocation: true,
@@ -35,11 +38,34 @@ vi.mock('../../services/api', () => ({
   }),
 }))
 
+vi.mock('../maps/ActiveDeliveriesMap', () => ({
+  ActiveDeliveriesMap: ({ onSelectOrder }: { onSelectOrder: (id: string) => void }) => (
+    <button
+      type="button"
+      data-testid="active-deliveries-map-mock"
+      onClick={() => onSelectOrder('order-abc-1234')}
+    >
+      Map mock
+    </button>
+  ),
+}))
+
 describe('FulfillmentTrackingTab', () => {
-  it('renders GPS column and opens tracking drawer', () => {
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('renders GPS column and opens tracking drawer from board', () => {
     render(<FulfillmentTrackingTab />)
     expect(screen.getByTestId('tracking-gps-status')).toHaveTextContent(/Live/i)
     fireEvent.click(screen.getByTestId('tracking-view-order-abc-1234'))
+    expect(screen.getByTestId('delivery-tracking-drawer')).toBeInTheDocument()
+  })
+
+  it('switches to map view and opens drawer from map selection', () => {
+    render(<FulfillmentTrackingTab />)
+    fireEvent.click(screen.getByTestId('fulfillment-tracking-map-view'))
+    fireEvent.click(screen.getByTestId('active-deliveries-map-mock'))
     expect(screen.getByTestId('delivery-tracking-drawer')).toBeInTheDocument()
   })
 })

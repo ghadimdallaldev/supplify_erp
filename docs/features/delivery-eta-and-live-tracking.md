@@ -68,7 +68,19 @@ Supplier copy examples:
 
 Limitation: straight-line distance only — no paid routing API yet.
 
-### Gating (when `etaAvailable` is false)
+### Driver-built routes and ETA
+
+When a driver uses **Build my route** (see [drivers-and-gps-tracking.md](./drivers-and-gps-tracking.md)), standalone assignments are grouped into a `delivery_route`. ETA then uses the same route-aware logic as supplier-planned routes — later stops include prior legs and service time.
+
+### Map display (ETA unchanged)
+
+Maps are separate from ETA math:
+
+- **Supplier** single-order maps show driver + destination pins with a **Recenter** control.
+- **Restaurant** maps show driver pin only (destination coordinates are not exposed in the API).
+- **Fulfillment → Delivery Tracking → Map** shows all active deliveries for the supplier.
+
+---
 
 | Condition                                            | Supplier `unavailableReason` |
 | ---------------------------------------------------- | ---------------------------- |

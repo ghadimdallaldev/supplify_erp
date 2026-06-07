@@ -108,7 +108,11 @@ export function OrderDeliveryTrackingPanel({ orderId, pollIntervalMs = 15_000 }:
         <DeliveryTrackingMap
           latitude={loc?.latitude}
           longitude={loc?.longitude}
+          destinationLatitude={data.destination?.latitude}
+          destinationLongitude={data.destination?.longitude}
+          destinationLabel={data.destinationLabel ?? data.destination?.label}
           live={Boolean(tracking?.hasLocation && !tracking?.isStale)}
+          gpsStale={Boolean(tracking?.isStale)}
           recordedAt={loc?.recordedAt ?? null}
           heightClassName="h-64"
           liveStatusLine={liveStatusLine}
