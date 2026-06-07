@@ -450,6 +450,66 @@ router.post('/refresh', async (req, res) => {
   }
 })
 
+/**
+ * Mobile/native refresh — returns JSON tokens (no HttpOnly cookies).
+ * Web clients should continue using POST /auth/refresh with cookies.
+ */
+router.post('/mobile/refresh', async (req, res) => {
+  try {
+    const refreshToken =
+      typeof req.body?.refresh_token === 'string' ? req.body.refresh_token.trim() : null
+
+    if (!refreshToken) {
+      return res.status(401).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'UNAUTHORIZED',
+          message: 'No refresh token provided',
+        },
+        requestId: req.requestId,
+      })
+    }
+
+    const newTokens = await refreshAccessToken(refreshToken)
+
+    if (!newTokens) {
+      return res.status(401).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'UNAUTHORIZED',
+          message: 'Token refresh failed',
+        },
+        requestId: req.requestId,
+      })
+    }
+
+    res.json({
+      ok: true,
+      data: {
+        access_token: newTokens.access_token,
+        refresh_token: newTokens.refresh_token,
+        expires_in: newTokens.expires_in ?? 3600,
+        token_type: 'Bearer',
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Mobile refresh error', { error: error.message })
+    res.status(401).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'UNAUTHORIZED',
+        message: 'Token refresh failed',
+      },
+      requestId: req.requestId,
+    })
+  }
+})
+
 // Logout: revoke tokens, clear cookies and session, return Keycloak logout URL so frontend
 // can redirect the user to clear Keycloak SSO session (user must re-enter credentials next login).
 router.post('/logout', requireAuth, async (req, res) => {

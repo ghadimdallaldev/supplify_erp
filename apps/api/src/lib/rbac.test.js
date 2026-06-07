@@ -57,6 +57,7 @@ describe('RBAC Utilities', () => {
     vi.clearAllMocks()
     req = {
       cookies: {},
+      headers: {},
       user: null,
       userData: null,
       requestId: 'test-req-id',
@@ -96,6 +97,43 @@ describe('RBAC Utilities', () => {
       await requireAuth(req, res, next)
 
       expect(res.status).toHaveBeenCalledWith(401)
+      expect(next).not.toHaveBeenCalled()
+    })
+
+    it('should allow bearer-authenticated user', async () => {
+      req.headers = { authorization: 'Bearer valid-bearer-token' }
+      req.requestId = 'test-request-id'
+
+      const { verifyToken } = await import('./auth.js')
+      const { query } = await import('./db.js')
+
+      verifyToken.mockResolvedValueOnce({ sub: 'sub-123' })
+      query.mockResolvedValueOnce({
+        rows: [
+          { id: 'user-1', email: 'test@example.com', keycloak_sub: 'sub-123', role: 'RESTAURANT' },
+        ],
+      })
+
+      await requireAuth(req, res, next)
+
+      expect(verifyToken).toHaveBeenCalledWith('valid-bearer-token')
+      expect(req.authMethod).toBe('bearer')
+      expect(next).toHaveBeenCalled()
+      expect(res.status).not.toHaveBeenCalled()
+    })
+
+    it('should reject expired bearer without cookie refresh', async () => {
+      req.headers = { authorization: 'Bearer expired-token' }
+      req.requestId = 'test-request-id'
+
+      const { verifyToken } = await import('./auth.js')
+
+      verifyToken.mockRejectedValueOnce(new Error('expired'))
+
+      await requireAuth(req, res, next)
+
+      expect(res.status).toHaveBeenCalledWith(401)
+      expect(res.json.mock.calls[0][0].error.name).toBe('JWT_EXPIRED')
       expect(next).not.toHaveBeenCalled()
     })
   })

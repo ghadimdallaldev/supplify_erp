@@ -78,13 +78,17 @@ The API is **largely mobile-ready** for restaurant ordering/tracking, supplier f
 
 ## Auth / session complexity
 
-| Topic          | Current web                        | Mobile implication                                                           |
-| -------------- | ---------------------------------- | ---------------------------------------------------------------------------- |
-| Keycloak       | OAuth redirect + HTTP-only cookies | Use PKCE + secure storage; avoid WebView login where possible                |
-| CSRF           | Required on mutating `/api/*`      | Mobile client must send CSRF token from session bootstrap or use bearer path |
-| Tenant context | Workspace cookie + branch header   | Persist active tenant id; send `X-Active-Tenant` / branch header             |
-| Impersonation  | Admin cookie                       | N/A on mobile v1                                                             |
-| STAFF_PORTAL   | Separate realm                     | Out of scope v1                                                              |
+| Topic          | Current web                        | Mobile implication                                                        |
+| -------------- | ---------------------------------- | ------------------------------------------------------------------------- |
+| Keycloak       | OAuth redirect + HTTP-only cookies | PKCE public client `supplify-mobile`; see `KEYCLOAK_MOBILE_CLIENT.md`     |
+| CSRF           | Required on mutating `/api/*`      | Skipped for valid `Authorization: Bearer`; cookie path unchanged          |
+| Bearer auth    | N/A                                | `extractAccessToken()` — Bearer first, cookie fallback (`mobile-auth.js`) |
+| Mobile refresh | Cookie `POST /auth/refresh`        | JSON `POST /auth/mobile/refresh` with `{ refresh_token }`                 |
+| Tenant context | Workspace cookie + branch header   | `X-Active-Tenant-Token` header or `X-Branch-Id` (supplier)                |
+| Impersonation  | Admin cookie                       | N/A on mobile v1                                                          |
+| STAFF_PORTAL   | Separate realm                     | Out of scope v1                                                           |
+
+**Status (2026-06-07):** Mobile auth unblocker implemented in API — Bearer + mobile refresh + tenant header. Proceed with Expo app (Phase 2).
 
 ## PWA baseline (existing)
 
@@ -92,4 +96,4 @@ See `docs/archive/audits/pwa-mobile-readiness-audit.md` — driver/receiving pag
 
 ## Recommendation
 
-**Proceed with mobile v1** focused on **driver app first**, then restaurant order/track/receive. Supplier mobile can follow or remain web for v1. Blockers are **auth token strategy** and **CSRF/session bootstrap**, not core fulfillment APIs.
+**Proceed with mobile v1** focused on **driver app first**, then restaurant order/track/receive. Supplier mobile can follow or remain web for v1. ~~Blockers are **auth token strategy** and **CSRF/session bootstrap**~~ Auth unblocker complete — see `KEYCLOAK_MOBILE_CLIENT.md`.

@@ -438,4 +438,33 @@ describe('Auth Routes', () => {
       expect(response.body.error.name).toBe('UNAUTHORIZED')
     })
   })
+
+  describe('POST /auth/mobile/refresh', () => {
+    it('returns JSON tokens for mobile clients', async () => {
+      const { refreshAccessToken } = await import('../lib/auth.js')
+
+      vi.mocked(refreshAccessToken).mockResolvedValueOnce({
+        access_token: 'new-access-token',
+        refresh_token: 'new-refresh-token',
+        expires_in: 3600,
+      })
+
+      const response = await request(app)
+        .post('/auth/mobile/refresh')
+        .send({ refresh_token: 'valid-refresh-token' })
+        .expect(200)
+
+      expect(refreshAccessToken).toHaveBeenCalledWith('valid-refresh-token')
+      expect(response.body.ok).toBe(true)
+      expect(response.body.data.access_token).toBe('new-access-token')
+      expect(response.body.data.refresh_token).toBe('new-refresh-token')
+      expect(response.body.data.token_type).toBe('Bearer')
+    })
+
+    it('rejects missing refresh token', async () => {
+      const response = await request(app).post('/auth/mobile/refresh').send({}).expect(401)
+
+      expect(response.body.error.name).toBe('UNAUTHORIZED')
+    })
+  })
 })
