@@ -14,8 +14,7 @@ import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import {
   DailyUsageLimitExceededError,
-  resolveDailyMeterEnforcement,
-  incrementDailyUsageMeterInTransaction,
+  resolveDailyMeterEnforcementFromSubscription,
   getTenantSubscription,
   getRecommendedPlanNames,
   buildLimitExceededPayload,
@@ -43,11 +42,13 @@ import {
   getSupplierIdForOrder,
   orderHasProofOfDelivery,
 } from '../lib/driver-delivery.js'
-import { resolveProductPricesBatch } from '../services/resolve-product-price.service.js'
-import { insertOrderItemsBatch } from '../services/order-create.service.js'
+import {
+  resolveProductPricesBatch,
+  getDefaultCatalogPricesBatch,
+} from '../services/resolve-product-price.service.js'
+import { createRestaurantOrdersInTransaction } from '../services/restaurant-order-create.service.js'
 import {
   assertAndDeductSupplierStock,
-  assertAndDeductSupplierStockBatch,
   restoreSupplierStockForOrder,
 } from '../services/supplier-inventory.service.js'
 import { ordersRouterMutationGuard } from '../lib/route-permissions.js'
@@ -1217,24 +1218,20 @@ router.post(
       // Group items by supplier - split into separate orders per supplier
       const orderStatus = orderData.status || 'PLACED'
 
-      // Batch-fetch all products and current prices (avoids N+1)
+      // Batch-fetch products + catalog prices in parallel (avoids LATERAL + duplicate catalog query)
       phaseStart = performance.now()
       const productIds = [...new Set(orderData.items.map((item) => item.productId))]
-      const { rows: products } = await query(
-        `
-      SELECT p.*, pr.amount as current_price, pr.currency
-      FROM product p
-      LEFT JOIN LATERAL (
-        SELECT amount, currency FROM price pr
-        WHERE pr.product_id = p.id
-          AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
-        ORDER BY pr.valid_from DESC
-        LIMIT 1
-      ) pr ON true
-      WHERE p.id = ANY($1)
+      const [{ rows: products }, catalogByProductId] = await Promise.all([
+        query(
+          `
+      SELECT id, supplier_id, sku, category_id, name
+      FROM product
+      WHERE id = ANY($1)
       `,
-        [productIds]
-      )
+          [productIds]
+        ),
+        getDefaultCatalogPricesBatch(productIds),
+      ])
 
       const productMap = new Map(products.map((p) => [p.id, p]))
 
@@ -1242,13 +1239,14 @@ router.post(
         const product = productMap.get(item.productId)
         return {
           productId: item.productId,
-          supplierId: product.supplier_id,
+          supplierId: product?.supplier_id,
           quantity: item.quantity,
         }
       })
       const resolvedPrices = await resolveProductPricesBatch({
         restaurantId,
-        items: resolveItems,
+        items: resolveItems.filter((item) => item.supplierId),
+        catalogByProductId,
       })
       const resolvedMap = new Map(resolvedPrices.map((r) => [r.productId, r]))
       orderCreateTimings.productPriceLookupMs = elapsedMsSince(phaseStart)
@@ -1279,19 +1277,42 @@ router.post(
       }
       orderCreateTimings.itemGroupingMs = elapsedMsSince(phaseStart)
 
-      // Resolve daily limit metadata (subscription + effective limit) without a separate usage_meter transaction.
+      // Resolve daily limit + supplier preflight (reuse req.subscription when available)
       phaseStart = performance.now()
       let dailyMeterEnforcement = null
       let restaurantDealsEnabled = false
       const supplierPromoEligibility = new Map()
       const supplierMultiWarehouse = new Map()
+      let supplierProfiles = new Map()
 
       if (orderStatus === 'PLACED') {
-        dailyMeterEnforcement = await resolveDailyMeterEnforcement(
-          restaurantId,
-          'RESTAURANT',
-          'orders_per_day'
-        )
+        const { resolveRequestSubscription } = await import('../lib/request-subscription.js')
+        const { resolveOrgBillingTenantId } = await import('../lib/org-billing-tenant.js')
+        const { resolveFeatureEnabled } = await import('../lib/feature-flags.js')
+
+        const subscription = await resolveRequestSubscription(req, {
+          tenantId: restaurantId,
+          tenantType: 'RESTAURANT',
+        })
+        const billingTenantId = await resolveOrgBillingTenantId(restaurantId, 'RESTAURANT')
+
+        const [enforcement, dealsFeature] = await Promise.all([
+          resolveDailyMeterEnforcementFromSubscription(
+            subscription,
+            restaurantId,
+            'RESTAURANT',
+            'orders_per_day'
+          ),
+          resolveFeatureEnabled(
+            billingTenantId,
+            'RESTAURANT',
+            'supplier_deals',
+            subscription?.features
+          ),
+        ])
+        dailyMeterEnforcement = enforcement
+        restaurantDealsEnabled = dealsFeature.enabled
+
         if (!dailyMeterEnforcement.subscription) {
           return res.status(403).json({
             ok: false,
@@ -1304,183 +1325,126 @@ router.post(
           })
         }
 
-        restaurantDealsEnabled = await isFeatureEnabled(
-          restaurantId,
-          'RESTAURANT',
-          'supplier_deals'
-        )
+        const supplierIds = [...supplierGroups.keys()]
+        if (supplierIds.length) {
+          const { rows: supplierRows } = await query(
+            `SELECT id, default_warehouse_id, fulfillment_mode, multi_warehouse_enabled, name
+             FROM supplier WHERE id = ANY($1::uuid[])`,
+            [supplierIds]
+          )
+          supplierProfiles = new Map(supplierRows.map((row) => [row.id, row]))
 
-        await Promise.all(
-          [...supplierGroups.keys()].map(async (supplierId) => {
-            const [hasPromos, multiWarehouseActive] = await Promise.all([
-              restaurantDealsEnabled
-                ? hasActiveSupplierOrderPromotions(query, supplierId, restaurantId)
-                : Promise.resolve(false),
-              isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse'),
+          const supplierSubscriptions = await Promise.all(
+            supplierIds.map(async (supplierId) => [
+              supplierId,
+              await getTenantSubscription(supplierId, 'SUPPLIER'),
             ])
-            supplierPromoEligibility.set(supplierId, hasPromos)
-            supplierMultiWarehouse.set(supplierId, multiWarehouseActive)
-          })
-        )
+          )
+          const supplierSubById = new Map(supplierSubscriptions)
+
+          await Promise.all(
+            supplierIds.map(async (supplierId) => {
+              const supplierSub = supplierSubById.get(supplierId)
+              const supplierBillingId = await resolveOrgBillingTenantId(supplierId, 'SUPPLIER')
+              const [hasPromos, multiWarehouseFeature] = await Promise.all([
+                restaurantDealsEnabled
+                  ? hasActiveSupplierOrderPromotions(query, supplierId, restaurantId)
+                  : Promise.resolve(false),
+                resolveFeatureEnabled(
+                  supplierBillingId,
+                  'SUPPLIER',
+                  'multi_warehouse',
+                  supplierSub?.features
+                ),
+              ])
+              supplierPromoEligibility.set(supplierId, hasPromos)
+              supplierMultiWarehouse.set(supplierId, multiWarehouseFeature.enabled)
+            })
+          )
+        }
       }
       orderCreateTimings.dailyLimitCheckMs = elapsedMsSince(phaseStart)
 
       // Create separate order for each supplier
-      const createdOrders = []
       const txPhaseTimings = { promotionMs: 0, warehouseMs: 0 }
+      let transactionTiming = null
 
       phaseStart = performance.now()
       let result
       try {
         result = await withTransaction(async (client) => {
-          if (orderStatus === 'PLACED') {
-            await incrementDailyUsageMeterInTransaction(
-              client,
-              restaurantId,
-              'RESTAURANT',
-              'orders_per_day',
-              supplierGroups.size,
-              dailyMeterEnforcement.resolved
-            )
-          }
-
-          for (const [supplierId, items] of supplierGroups.entries()) {
-            const {
-              rows: [order],
-            } = await client.query(
-              `
-          INSERT INTO customer_order (restaurant_id, currency, status)
-          VALUES ($1, 'USD', $2)
-          RETURNING *
-        `,
-              [restaurantId, orderStatus]
-            )
-
-            await assertAndDeductSupplierStockBatch(
-              client,
-              items.map((item) => ({
-                productId: item.productId,
-                quantity: item.quantity,
-                sku: item.product.sku,
-              }))
-            )
-
-            const orderItems = await insertOrderItemsBatch(client, order.id, supplierId, items)
-            let totalAmount = orderItems.reduce((sum, row) => sum + Number(row.line_total), 0)
-
-            if (orderStatus === 'PLACED') {
-              await client.query(
-                `
-            UPDATE customer_order 
-            SET total_amount = $1, placed_at = now()
-            WHERE id = $2
-          `,
-                [totalAmount, order.id]
-              )
-            } else {
-              await client.query(
-                `
-            UPDATE customer_order 
-            SET total_amount = $1
-            WHERE id = $2
-          `,
-                [totalAmount, order.id]
-              )
-            }
-
-            let appliedPromotion = null
-            const supplierHasPromos = supplierPromoEligibility.get(supplierId) === true
-            const shouldApplyPromotions =
-              orderStatus === 'PLACED' &&
-              (orderData.promotionId || orderData.couponCode || supplierHasPromos)
-            if (shouldApplyPromotions) {
-              const promoLines = items.map((item) => ({
-                productId: item.productId,
-                categoryId: item.product.category_id,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice,
-                lineTotal: item.unitPrice * item.quantity,
-              }))
-
-              const promoPhaseStart = performance.now()
-              if (orderData.promotionId) {
-                appliedPromotion = await applyPromotionByIdToOrder({
-                  client,
-                  promotionId: orderData.promotionId,
-                  orderId: order.id,
-                  supplierId,
-                  restaurantId,
-                  subtotal: totalAmount,
-                  lineItems: promoLines,
-                })
-              } else if (orderData.couponCode) {
-                const couponMatch = await validateCouponForOrder({
-                  couponCode: orderData.couponCode,
-                  supplierId,
-                  restaurantId,
-                  subtotal: totalAmount,
-                  lineItems: promoLines,
-                })
-                if (couponMatch) {
+          const txResult = await createRestaurantOrdersInTransaction({
+            client,
+            restaurantId,
+            orderStatus,
+            supplierGroups,
+            supplierProfiles,
+            supplierPromoEligibility,
+            supplierMultiWarehouse,
+            dailyMeterEnforcement,
+            orderData,
+            promotionHandlers: {
+              applyPromotions: async ({
+                client: txClient,
+                order,
+                supplierId,
+                restaurantId: restId,
+                orderData: payload,
+                totalAmount,
+                promoLines,
+              }) => {
+                let appliedPromotion = null
+                if (payload.promotionId) {
                   appliedPromotion = await applyPromotionByIdToOrder({
-                    client,
-                    promotionId: couponMatch.promotion.id,
+                    client: txClient,
+                    promotionId: payload.promotionId,
                     orderId: order.id,
                     supplierId,
-                    restaurantId,
+                    restaurantId: restId,
                     subtotal: totalAmount,
                     lineItems: promoLines,
                   })
+                } else if (payload.couponCode) {
+                  const couponMatch = await validateCouponForOrder({
+                    couponCode: payload.couponCode,
+                    supplierId,
+                    restaurantId: restId,
+                    subtotal: totalAmount,
+                    lineItems: promoLines,
+                  })
+                  if (couponMatch) {
+                    appliedPromotion = await applyPromotionByIdToOrder({
+                      client: txClient,
+                      promotionId: couponMatch.promotion.id,
+                      orderId: order.id,
+                      supplierId,
+                      restaurantId: restId,
+                      subtotal: totalAmount,
+                      lineItems: promoLines,
+                    })
+                  }
                 }
-              }
 
-              if (!appliedPromotion) {
-                appliedPromotion = await applyBestPromotionToOrder({
-                  client,
-                  orderId: order.id,
-                  supplierId,
-                  restaurantId,
-                  subtotal: totalAmount,
-                  lineItems: promoLines,
-                  skipDealPreflight: true,
-                })
-              }
+                if (!appliedPromotion) {
+                  appliedPromotion = await applyBestPromotionToOrder({
+                    client: txClient,
+                    orderId: order.id,
+                    supplierId,
+                    restaurantId: restId,
+                    subtotal: totalAmount,
+                    lineItems: promoLines,
+                    skipDealPreflight: true,
+                  })
+                }
+                return appliedPromotion
+              },
+            },
+          })
 
-              if (appliedPromotion) {
-                totalAmount = appliedPromotion.totalAfterDiscount
-              }
-              txPhaseTimings.promotionMs += elapsedMsSince(promoPhaseStart)
-            }
-
-            let finalOrder = {
-              ...order,
-              total_amount: totalAmount,
-              items: orderItems,
-              status: orderStatus,
-              appliedPromotion,
-            }
-
-            const { rows: supplierRows } = await client.query(
-              `SELECT * FROM supplier WHERE id = $1`,
-              [supplierId]
-            )
-            if (supplierRows.length) {
-              const multiActive = supplierMultiWarehouse.get(supplierId) === true
-              const warehousePhaseStart = performance.now()
-              const fulfillment = await assignWarehousesToOrder(client, {
-                order: { ...order, restaurant_id: restaurantId },
-                orderItems,
-                supplier: supplierRows[0],
-                multiWarehouseActive: multiActive,
-              })
-              txPhaseTimings.warehouseMs += elapsedMsSince(warehousePhaseStart)
-              finalOrder = { ...finalOrder, warehouseFulfillment: fulfillment }
-            }
-
-            createdOrders.push(finalOrder)
-          }
-
-          return createdOrders
+          transactionTiming = txResult
+          txPhaseTimings.promotionMs = txResult.timings.promotionMs
+          txPhaseTimings.warehouseMs = txResult.timings.warehouseRoutingMs
+          return txResult.orders
         })
       } catch (txError) {
         if (txError instanceof DailyUsageLimitExceededError) {
@@ -1510,6 +1474,27 @@ router.post(
       orderCreateTimings.orderTransactionMs = elapsedMsSince(phaseStart)
       orderCreateTimings.promotionMs = txPhaseTimings.promotionMs
       orderCreateTimings.warehouseMs = txPhaseTimings.warehouseMs
+
+      if (transactionTiming) {
+        logger.info({
+          event: 'order.create.transaction_timing',
+          requestId: req.requestId,
+          restaurantId,
+          orderId: transactionTiming.orders.length === 1 ? transactionTiming.orders[0].id : null,
+          orderIds: transactionTiming.orders.map((order) => order.id),
+          lineCount: transactionTiming.lineCount,
+          supplierCount: transactionTiming.supplierCount,
+          totalTransactionMs: transactionTiming.totalTransactionMs,
+          transactionQueryCount: transactionTiming.transactionQueryCount,
+          usageMeterMs: transactionTiming.timings.usageMeterMs,
+          orderHeaderInsertMs: transactionTiming.timings.orderHeaderInsertMs,
+          orderItemsInsertMs: transactionTiming.timings.orderItemsInsertMs,
+          stockLockAndReserveMs: transactionTiming.timings.stockLockAndReserveMs,
+          warehouseRoutingMs: transactionTiming.timings.warehouseRoutingMs,
+          orderTotalsUpdateMs: transactionTiming.timings.orderTotalsUpdateMs,
+          promotionMs: transactionTiming.timings.promotionMs,
+        })
+      }
 
       // If only one order was created, return it directly. Otherwise, return array of orders
       const singleOrder = result.length === 1 ? result[0] : null

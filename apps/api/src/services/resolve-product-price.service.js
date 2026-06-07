@@ -145,13 +145,16 @@ export async function resolveProductPrice(
  * @param {Function} dbQuery
  */
 export async function resolveProductPricesBatch(
-  { restaurantId, items, date = new Date() },
+  { restaurantId, items, date = new Date(), catalogByProductId = null },
   dbQuery = query
 ) {
   if (!items?.length) return []
 
   const productIds = [...new Set(items.map((i) => i.productId))]
-  const catalogMap = await getDefaultCatalogPricesBatch(productIds, dbQuery)
+  const catalogMap =
+    catalogByProductId instanceof Map
+      ? catalogByProductId
+      : await getDefaultCatalogPricesBatch(productIds, dbQuery)
 
   const asOf = toDateOnly(date)
   const dateStr = asOf.toISOString().slice(0, 10)
@@ -164,7 +167,10 @@ export async function resolveProductPricesBatch(
 
   const { rows: contracts } = await dbQuery(
     `
-    SELECT *
+    SELECT
+      id, supplier_id, product_id, price, currency,
+      contract_discount_percentage, contract_start_date, contract_end_date,
+      min_order_quantity, updated_at
     FROM restaurant_pricing
     WHERE restaurant_id = $1
       AND supplier_id = ANY($2::uuid[])

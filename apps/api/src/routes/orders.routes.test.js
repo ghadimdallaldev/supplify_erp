@@ -21,20 +21,36 @@ vi.mock('../lib/rbac.js', async (importOriginal) => {
   return loadRbacRouteMock(importOriginal)
 })
 
+vi.mock('../lib/request-subscription.js', () => ({
+  resolveRequestSubscription: vi.fn().mockResolvedValue({
+    plan_id: 'plan-1',
+    plan_name: 'gold',
+    features: {},
+  }),
+}))
+
+vi.mock('../lib/org-billing-tenant.js', () => ({
+  resolveOrgBillingTenantId: vi.fn().mockImplementation(async (tenantId) => tenantId),
+}))
+
+vi.mock('../lib/feature-flags.js', () => ({
+  resolveFeatureEnabled: vi.fn().mockResolvedValue({ enabled: false, source: 'plan' }),
+}))
+
 vi.mock('../lib/subscription.js', () => ({
   checkLimit: vi
     .fn()
     .mockResolvedValue({ allowed: true, current: 0, limit: 100, isOverLimit: false }),
   checkAndIncrementUsage: vi.fn().mockResolvedValue({ allowed: true }),
-  resolveDailyMeterEnforcement: vi.fn().mockResolvedValue({
-    subscription: { plan_name: 'gold', plan_display_name: 'Gold' },
+  resolveDailyMeterEnforcementFromSubscription: vi.fn().mockResolvedValue({
+    subscription: { plan_name: 'gold', plan_display_name: 'Gold', plan_id: 'plan-1', features: {} },
     resolved: { isUnlimited: true },
   }),
   incrementDailyUsageMeterInTransaction: vi.fn().mockResolvedValue({ allowed: true }),
   incrementUsage: vi.fn().mockResolvedValue(true),
   isFeatureEnabled: vi.fn().mockResolvedValue(false),
   requireFeature: () => (req, res, next) => next(),
-  getTenantSubscription: vi.fn().mockResolvedValue({ plan_name: 'gold' }),
+  getTenantSubscription: vi.fn().mockResolvedValue({ plan_name: 'gold', features: {} }),
   getRecommendedPlanNames: vi.fn().mockResolvedValue([]),
   buildLimitExceededPayload: vi.fn(),
 }))
@@ -74,6 +90,11 @@ vi.mock('../services/warehouseInventory.js', () => ({
 
 vi.mock('../services/resolve-product-price.service.js', () => ({
   resolveProductPricesBatch: vi.fn(),
+  getDefaultCatalogPricesBatch: vi.fn().mockResolvedValue(new Map()),
+}))
+
+vi.mock('../services/restaurant-order-create.service.js', () => ({
+  createRestaurantOrdersInTransaction: vi.fn(),
 }))
 
 vi.mock('../services/supplier-inventory.service.js', () => ({
@@ -123,6 +144,45 @@ describe('Orders Routes', () => {
           unit_price: item.unitPrice,
           line_total: item.unitPrice * item.quantity,
         }))
+    )
+
+    const { createRestaurantOrdersInTransaction } = await import(
+      '../services/restaurant-order-create.service.js'
+    )
+    vi.mocked(createRestaurantOrdersInTransaction).mockImplementation(
+      async ({ restaurantId, supplierGroups }) => {
+        const orders = []
+        for (const [supplierId, items] of supplierGroups.entries()) {
+          orders.push({
+            id: 'order-1',
+            status: 'PLACED',
+            total_amount: items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
+            restaurant_id: restaurantId,
+            items: items.map((item, idx) => ({
+              id: `item-${idx + 1}`,
+              supplier_id: supplierId,
+              product_id: item.productId,
+              quantity: item.quantity,
+            })),
+          })
+        }
+        return {
+          orders,
+          timings: {
+            usageMeterMs: 1,
+            orderHeaderInsertMs: 1,
+            stockLockAndReserveMs: 1,
+            orderItemsInsertMs: 1,
+            orderTotalsUpdateMs: 1,
+            promotionMs: 0,
+            warehouseRoutingMs: 0,
+          },
+          lineCount: orders.reduce((n, o) => n + o.items.length, 0),
+          supplierCount: supplierGroups.size,
+          totalTransactionMs: 5,
+          transactionQueryCount: 4,
+        }
+      }
     )
   })
 
@@ -355,30 +415,16 @@ describe('Orders Routes', () => {
         },
       ])
 
-      // Mock transaction - withTransaction is used, and it returns createdOrders array
-      const { withTransaction } = await import('../lib/db.js')
-      vi.mocked(withTransaction).mockImplementation(async (handler) => {
-        const mockClient = {
-          query: vi
-            .fn()
-            .mockResolvedValueOnce({
-              rows: [
-                {
-                  id: 'order-1',
-                  status: 'PLACED',
-                  total_amount: 0,
-                  restaurant_id: restaurantId,
-                },
-              ],
-            }) // INSERT order
-            .mockResolvedValueOnce({ rows: [] }) // UPDATE order total + placed_at
-            .mockResolvedValueOnce({
-              rows: [
-                { id: supplierId, multi_warehouse_enabled: false, fulfillment_mode: 'single' },
-              ],
-            }), // supplier for warehouse assignment
-        }
-        return handler(mockClient)
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: supplierId,
+            default_warehouse_id: 'wh-1',
+            fulfillment_mode: 'single',
+            multi_warehouse_enabled: false,
+            name: 'Supplier',
+          },
+        ],
       })
 
       const response = await request(app)
@@ -395,6 +441,19 @@ describe('Orders Routes', () => {
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.order).toBeDefined()
+
+      const { logger } = await import('../lib/logger.js')
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'order.create.transaction_timing',
+          requestId: 'test-request-id',
+          lineCount: 1,
+          supplierCount: 1,
+          totalTransactionMs: expect.any(Number),
+          transactionQueryCount: expect.any(Number),
+          stockLockAndReserveMs: expect.any(Number),
+        })
+      )
     })
 
     it('should return 201 when notifyOrderStatusChange rejects in background', async () => {
@@ -432,29 +491,16 @@ describe('Orders Routes', () => {
         },
       ])
 
-      const { withTransaction } = await import('../lib/db.js')
-      vi.mocked(withTransaction).mockImplementation(async (handler) => {
-        const mockClient = {
-          query: vi
-            .fn()
-            .mockResolvedValueOnce({
-              rows: [
-                {
-                  id: 'order-1',
-                  status: 'PLACED',
-                  total_amount: 0,
-                  restaurant_id: restaurantId,
-                },
-              ],
-            })
-            .mockResolvedValueOnce({ rows: [] }) // UPDATE order total + placed_at
-            .mockResolvedValueOnce({
-              rows: [
-                { id: supplierId, multi_warehouse_enabled: false, fulfillment_mode: 'single' },
-              ],
-            }),
-        }
-        return handler(mockClient)
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: supplierId,
+            default_warehouse_id: 'wh-1',
+            fulfillment_mode: 'single',
+            multi_warehouse_enabled: false,
+            name: 'Supplier',
+          },
+        ],
       })
 
       const { notifyOrderStatusChange } = await import('../services/notification.service.js')
@@ -525,29 +571,16 @@ describe('Orders Routes', () => {
         },
       ])
 
-      const { withTransaction } = await import('../lib/db.js')
-      vi.mocked(withTransaction).mockImplementation(async (handler) => {
-        const mockClient = {
-          query: vi
-            .fn()
-            .mockResolvedValueOnce({
-              rows: [
-                {
-                  id: 'order-1',
-                  status: 'PLACED',
-                  total_amount: 0,
-                  restaurant_id: restaurantId,
-                },
-              ],
-            })
-            .mockResolvedValueOnce({ rows: [] }) // UPDATE order total + placed_at
-            .mockResolvedValueOnce({
-              rows: [
-                { id: supplierId, multi_warehouse_enabled: false, fulfillment_mode: 'single' },
-              ],
-            }),
-        }
-        return handler(mockClient)
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: supplierId,
+            default_warehouse_id: 'wh-1',
+            fulfillment_mode: 'single',
+            multi_warehouse_enabled: false,
+            name: 'Supplier',
+          },
+        ],
       })
 
       const { notifyOrderStatusChange } = await import('../services/notification.service.js')
@@ -608,29 +641,16 @@ describe('Orders Routes', () => {
         },
       ])
 
-      const { withTransaction } = await import('../lib/db.js')
-      vi.mocked(withTransaction).mockImplementation(async (handler) => {
-        const mockClient = {
-          query: vi
-            .fn()
-            .mockResolvedValueOnce({
-              rows: [
-                {
-                  id: 'order-1',
-                  status: 'PLACED',
-                  total_amount: 0,
-                  restaurant_id: restaurantId,
-                },
-              ],
-            })
-            .mockResolvedValueOnce({ rows: [] }) // UPDATE order total + placed_at
-            .mockResolvedValueOnce({
-              rows: [
-                { id: supplierId, multi_warehouse_enabled: false, fulfillment_mode: 'single' },
-              ],
-            }),
-        }
-        return handler(mockClient)
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: supplierId,
+            default_warehouse_id: 'wh-1',
+            fulfillment_mode: 'single',
+            multi_warehouse_enabled: false,
+            name: 'Supplier',
+          },
+        ],
       })
 
       let resolveAudit
@@ -701,29 +721,16 @@ describe('Orders Routes', () => {
         },
       ])
 
-      const { withTransaction } = await import('../lib/db.js')
-      vi.mocked(withTransaction).mockImplementation(async (handler) => {
-        const mockClient = {
-          query: vi
-            .fn()
-            .mockResolvedValueOnce({
-              rows: [
-                {
-                  id: 'order-1',
-                  status: 'PLACED',
-                  total_amount: 0,
-                  restaurant_id: restaurantId,
-                },
-              ],
-            })
-            .mockResolvedValueOnce({ rows: [] }) // UPDATE order total + placed_at
-            .mockResolvedValueOnce({
-              rows: [
-                { id: supplierId, multi_warehouse_enabled: false, fulfillment_mode: 'single' },
-              ],
-            }),
-        }
-        return handler(mockClient)
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: supplierId,
+            default_warehouse_id: 'wh-1',
+            fulfillment_mode: 'single',
+            multi_warehouse_enabled: false,
+            name: 'Supplier',
+          },
+        ],
       })
 
       let resolveNotify

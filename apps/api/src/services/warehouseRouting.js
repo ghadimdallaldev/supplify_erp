@@ -205,10 +205,31 @@ export async function assignWarehousesToOrder(
   const { getWarehouseSupplierColumn, isDefaultWarehouse } = await import(
     '../lib/warehouse-helpers.js'
   )
+
+  const useMulti =
+    multiWarehouseActive &&
+    supplier.fulfillment_mode === 'multi' &&
+    supplier.multi_warehouse_enabled
+
+  if (!useMulti && supplier.default_warehouse_id) {
+    const warehouseId = supplier.default_warehouse_id
+    const assignment = await insertAssignment(client, {
+      orderId: order.id,
+      orderItemId: null,
+      warehouseId,
+    })
+    await reserveWarehouseStockBatch(
+      client,
+      warehouseId,
+      orderItems.map((item) => ({ productId: item.product_id, quantity: item.quantity }))
+    )
+    return { mode: 'single', warehouseId, assignments: [assignment] }
+  }
+
   const supplierCol = await getWarehouseSupplierColumn((sql, params) => client.query(sql, params))
 
   const { rows: warehouses } = await client.query(
-    `SELECT * FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE ORDER BY created_at`,
+    `SELECT id, is_default, is_main, is_active FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE ORDER BY created_at`,
     [supplier.id]
   )
 
@@ -220,11 +241,6 @@ export async function assignWarehousesToOrder(
   if (!defaultWarehouseId && warehouses.length === 0) {
     return { mode: 'none', assignments: [] }
   }
-
-  const useMulti =
-    multiWarehouseActive &&
-    supplier.fulfillment_mode === 'multi' &&
-    supplier.multi_warehouse_enabled
 
   if (!useMulti) {
     const warehouseId = defaultWarehouseId

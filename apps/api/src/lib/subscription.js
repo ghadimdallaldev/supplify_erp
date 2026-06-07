@@ -518,6 +518,18 @@ export class DailyUsageLimitExceededError extends Error {
  */
 export async function resolveDailyMeterEnforcement(tenantId, tenantType, meterType) {
   const subscription = await getTenantSubscription(tenantId, tenantType)
+  return resolveDailyMeterEnforcementFromSubscription(subscription, tenantId, tenantType, meterType)
+}
+
+/**
+ * Resolve daily meter enforcement when subscription is already loaded (e.g. req.subscription).
+ */
+export async function resolveDailyMeterEnforcementFromSubscription(
+  subscription,
+  tenantId,
+  tenantType,
+  meterType
+) {
   if (!subscription) {
     return { subscription: null, resolved: null }
   }
@@ -548,21 +560,23 @@ export async function incrementDailyUsageMeterInTransaction(
     return { allowed: false, current: 0, limit: 0 }
   }
 
+  const inc = Number(increment) || 0
+  if (inc <= 0) return { allowed: true }
+
   if (resolved.isUnlimited) {
-    await client.query(
+    const { rows } = await client.query(
       `
       INSERT INTO usage_meter (tenant_id, tenant_type, meter_type, current_value, period_type, period_start_date)
-      VALUES ($1, $2, $3, 0, 'DAILY', CURRENT_DATE)
-      ON CONFLICT (tenant_id, tenant_type, meter_type, period_start_date) DO NOTHING
+      VALUES ($1, $2, $3, $4, 'DAILY', CURRENT_DATE)
+      ON CONFLICT (tenant_id, tenant_type, meter_type, period_start_date)
+      DO UPDATE SET
+        current_value = usage_meter.current_value + EXCLUDED.current_value,
+        last_updated = now()
+      RETURNING current_value
     `,
-      [tenantId, tenantType, meterType]
+      [tenantId, tenantType, meterType, inc]
     )
-    await client.query(
-      `UPDATE usage_meter SET current_value = current_value + $4, last_updated = now()
-       WHERE tenant_id = $1 AND tenant_type = $2 AND meter_type = $3 AND period_start_date = CURRENT_DATE`,
-      [tenantId, tenantType, meterType, increment]
-    )
-    return { allowed: true }
+    return { allowed: true, current: parseInt(rows[0]?.current_value || inc, 10) }
   }
 
   const effectiveLimit = resolved.effectiveLimit
@@ -575,23 +589,55 @@ export async function incrementDailyUsageMeterInTransaction(
     `,
     [tenantId, tenantType, meterType, effectiveLimit]
   )
-  const { rows } = await client.query(
+
+  const { rows: updated } = await client.query(
+    `UPDATE usage_meter SET current_value = current_value + $4, last_updated = now(),
+        is_over_limit = (current_value + $4) >= $5,
+        limit_value = COALESCE(limit_value, $5)
+       WHERE tenant_id = $1 AND tenant_type = $2 AND meter_type = $3 AND period_start_date = CURRENT_DATE
+         AND current_value + $4 <= $5
+       RETURNING current_value`,
+    [tenantId, tenantType, meterType, inc, effectiveLimit]
+  )
+
+  if (updated.length) {
+    return {
+      allowed: true,
+      current: parseInt(updated[0].current_value, 10),
+      limit: effectiveLimit,
+    }
+  }
+
+  const { rows: locked } = await client.query(
     `SELECT current_value FROM usage_meter
        WHERE tenant_id = $1 AND tenant_type = $2 AND meter_type = $3 AND period_start_date = CURRENT_DATE
        FOR UPDATE`,
     [tenantId, tenantType, meterType]
   )
-  const current = rows.length > 0 ? parseInt(rows[0].current_value || 0, 10) : 0
-  if (current + increment > effectiveLimit) {
+  const current = locked.length > 0 ? parseInt(locked[0].current_value || 0, 10) : 0
+  if (current + inc > effectiveLimit) {
     throw new DailyUsageLimitExceededError(current, effectiveLimit)
   }
-  await client.query(
+
+  const { rows: retry } = await client.query(
     `UPDATE usage_meter SET current_value = current_value + $4, last_updated = now(),
-        is_over_limit = (current_value + $4) >= $5
-       WHERE tenant_id = $1 AND tenant_type = $2 AND meter_type = $3 AND period_start_date = CURRENT_DATE`,
-    [tenantId, tenantType, meterType, increment, effectiveLimit]
+        is_over_limit = (current_value + $4) >= $5,
+        limit_value = COALESCE(limit_value, $5)
+       WHERE tenant_id = $1 AND tenant_type = $2 AND meter_type = $3 AND period_start_date = CURRENT_DATE
+         AND current_value + $4 <= $5
+       RETURNING current_value`,
+    [tenantId, tenantType, meterType, inc, effectiveLimit]
   )
-  return { allowed: true, current: current + increment, limit: effectiveLimit }
+
+  if (!retry.length) {
+    throw new DailyUsageLimitExceededError(current, effectiveLimit)
+  }
+
+  return {
+    allowed: true,
+    current: parseInt(retry[0].current_value, 10),
+    limit: effectiveLimit,
+  }
 }
 
 /**
