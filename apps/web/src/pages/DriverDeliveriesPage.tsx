@@ -17,6 +17,7 @@ import { formatOrderRef } from '../components/fulfillment/fulfillmentDispatchUti
 import { formatPrice } from '../utils/format'
 import toast from 'react-hot-toast'
 import { useDriverLocationTracking } from '../hooks/useDriverLocationTracking'
+import { isTrackableDeliveryStatus } from '../lib/driverGpsTracking'
 
 const DRIVER_STATUSES = [
   { value: 'out_for_delivery', label: 'Out for delivery' },
@@ -43,7 +44,7 @@ export function DriverDeliveriesPage() {
   const activeRoute = routeData?.route ?? null
 
   const trackableDeliveries = orders
-    .filter((o) => ['assigned', 'picked_up', 'out_for_delivery'].includes(o.deliveryStatus))
+    .filter((o) => isTrackableDeliveryStatus(o.deliveryStatus))
     .map((o) => ({ orderId: o.orderId, deliveryStatus: o.deliveryStatus }))
 
   const { trackingActive, gpsError, permissionDenied, trackableCount } =

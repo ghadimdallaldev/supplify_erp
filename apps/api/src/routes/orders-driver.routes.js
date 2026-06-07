@@ -36,6 +36,8 @@ import { PERMISSION_KEYS as P } from '../lib/permission-keys.js'
 
 const router = express.Router({ mergeParams: true })
 
+router.use(requireAuth, resolveTenantContext)
+
 const fulfillmentFeature = requireFeature(
   'fulfillment',
   (req) => req.tenantContext?.tenantId,
