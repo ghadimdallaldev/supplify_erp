@@ -66,7 +66,7 @@ import {
   useGetRestaurantTeamQuery,
   useDeleteRestaurantTeamMemberMutation,
 } from '../services/api'
-import { BranchAccountsPanel } from '../components/BranchAccountsPanel'
+import { RestaurantDeliveryLocationCard } from '../components/restaurant/RestaurantDeliveryLocationCard'
 import { TeamRolesPanel } from '../components/TeamRolesPanel'
 import { RestaurantAddBranchModal } from '../components/org/RestaurantAddBranchModal'
 import { RestaurantMemberInviteModal } from '../components/org/RestaurantMemberInviteModal'
@@ -838,6 +838,8 @@ export function RestaurantOnboardingPage() {
               </Button>
             </CardContent>
           </Card>
+
+          <RestaurantDeliveryLocationCard />
         </TabsContent>
 
         {/* Team Tab */}

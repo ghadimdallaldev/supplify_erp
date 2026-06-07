@@ -212,10 +212,7 @@ export async function listDeliveryRoutes(
   const routeIds = rows.map((row) => row.id)
   const stopsByRoute = await loadRouteStopsForRoutes(routeIds)
 
-  return rows.map((row) => {
-    const stops = stopsByRoute.get(row.id) ?? []
-    return { ...mapRouteSummary(row, stops), stops }
-  })
+  return rows.map((row) => mapRouteSummary(row, stopsByRoute.get(row.id) ?? []))
 }
 
 export async function getDeliveryRoute(supplierId, routeId, { driverIdScope = null } = {}) {
