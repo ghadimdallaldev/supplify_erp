@@ -14,7 +14,8 @@ Non-secret configuration for Railway lives here. On deploy, the API and web Dock
 | **production**  | `production/`  | `production/web.env`    | `production/keycloak/railway.json` → `supplify-prod`   |
 
 Keycloak Railway setup (all envs): [`keycloak/RAILWAY_SETUP.md`](keycloak/RAILWAY_SETUP.md).  
-Development memory / JVM: [`KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](KEYCLOAK_RAILWAY_MEMORY_NOTES.md).
+Development memory / JVM: [`KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](KEYCLOAK_RAILWAY_MEMORY_NOTES.md).  
+Database / persistence (all envs): [`KEYCLOAK_RAILWAY_DB_NOTES.md`](KEYCLOAK_RAILWAY_DB_NOTES.md).
 
 Each folder: `api.env`, `web.env`, `secrets.env.example`, `keycloak.env`.
 
@@ -23,7 +24,7 @@ Each folder: `api.env`, `web.env`, `secrets.env.example`, `keycloak.env`.
 1. **API** service → Variables → Raw Editor → paste contents of `development/secrets.env.example` and fill `CHANGE_ME` values.
 2. Add reference: `DATABASE_URL=${{Postgres-dev.DATABASE_URL}}` (service name must match your Postgres plugin).
 3. **Web** service — no runtime vars required if you deploy from this repo (build uses `development/web.env`). Optionally set secrets if you add any later.
-4. **Keycloak** service → config `deploy/railway/<env>/keycloak/railway.json` (auto-import realm; see `keycloak/RAILWAY_SETUP.md`); paste `<env>/keycloak.env` + Postgres `KC_DB_*` + `KEYCLOAK_ADMIN_PASSWORD` on **Keycloak and API**.
+4. **Keycloak** service → config `deploy/railway/<env>/keycloak/railway.json`; sync vars: `pnpm railway:keycloak:sync -- <env>` (or paste `keycloak.env`). Postgres link + DB bootstrap are automatic on boot — [`KEYCLOAK_RAILWAY_DB_NOTES.md`](KEYCLOAK_RAILWAY_DB_NOTES.md).
 5. Clear any dashboard **`PORT`** override on API (let Railway inject `PORT`).
 6. Push to git → redeploy all services.
 7. After deploy, run **`pnpm db:migrate`** against that environment’s Postgres (see [railway-environments.md](../../docs/operations/railway-environments.md) § H). Restaurant ops + GPS need migrations **0133–0137** applied once per environment.
