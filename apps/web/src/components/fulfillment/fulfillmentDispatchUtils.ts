@@ -141,9 +141,9 @@ export function canSelectOrderForRoute(order: {
   if (order.active_route_id) {
     return { ok: false, reason: 'Already on a route' }
   }
-  const deliverable = ['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED']
-  if (order.status && !deliverable.includes(order.status)) {
-    return { ok: false, reason: 'Not ready for routing' }
+  const plannedEligible = ['PLACED', 'PENDING_APPROVAL', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED']
+  if (order.status && !plannedEligible.includes(order.status)) {
+    return { ok: false, reason: 'Not eligible for route planning' }
   }
   return { ok: true }
 }

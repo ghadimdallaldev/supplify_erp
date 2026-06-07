@@ -31,7 +31,7 @@ export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
     }
     const active =
       data?.assignment?.status && ACTIVE_ASSIGNMENT_STATUSES.has(data.assignment.status)
-    setPollMs(active ? 30_000 : 0)
+    setPollMs(active ? 15_000 : 0)
   }, [open, orderId, data?.assignment?.status])
 
   return (
@@ -92,6 +92,16 @@ export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
             <DeliveryTrackingMap
               latitude={data.tracking?.latestLocation?.latitude ?? data.latestLocation?.latitude}
               longitude={data.tracking?.latestLocation?.longitude ?? data.latestLocation?.longitude}
+              live={Boolean(
+                data.tracking?.hasLocation &&
+                  !data.tracking?.isStale &&
+                  data.assignment?.status &&
+                  ['picked_up', 'out_for_delivery'].includes(data.assignment.status)
+              )}
+              recordedAt={
+                data.tracking?.latestLocation?.recordedAt ?? data.latestLocation?.recordedAt ?? null
+              }
+              heightClassName="h-64"
             />
 
             <p className="text-xs text-[var(--text-muted)]" data-testid="tracking-drawer-eta">

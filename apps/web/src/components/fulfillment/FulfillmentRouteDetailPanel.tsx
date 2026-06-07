@@ -106,9 +106,15 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
       </div>
 
       {canManage && route.status === 'PLANNED' && (
-        <Button size="sm" onClick={startRoute} disabled={updatingRoute}>
-          Start route
-        </Button>
+        <div className="space-y-2">
+          <Button size="sm" onClick={startRoute} disabled={updatingRoute}>
+            Activate route (start dispatch)
+          </Button>
+          <p className="text-xs text-[var(--text-muted)]">
+            Assigns drivers to dispatch-ready stops only. Orders still being prepared stay planned
+            on the route until they are ready.
+          </p>
+        </div>
       )}
 
       <ol className="space-y-3">
