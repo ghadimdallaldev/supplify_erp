@@ -8,7 +8,7 @@ Do **not** deploy the stock Keycloak image without building these Dockerfiles.
 
 | Environment     | Config file                                         | Realm              | Start command              |
 | --------------- | --------------------------------------------------- | ------------------ | -------------------------- |
-| **development** | `/deploy/railway/development/keycloak/railway.json` | `Supplify`         | `start-dev --import-realm` |
+| **development** | `/deploy/railway/development/keycloak/railway.json` | `Supplify`         | `start --import-realm`     |
 | **preprod**     | `/deploy/railway/preprod/keycloak/railway.json`     | `supplify-preprod` | `start-dev --import-realm` |
 | **staging**     | `/deploy/railway/staging/keycloak/railway.json`     | `supplify-preprod` | `start-dev --import-realm` |
 | **production**  | `/deploy/railway/production/keycloak/railway.json`  | `supplify-prod`    | `start --import-realm`     |
@@ -24,6 +24,8 @@ For every Keycloak service:
 | **Variables**      | Paste `deploy/railway/<env>/keycloak.env` + `KEYCLOAK_ADMIN_PASSWORD` + `KC_DB_*` from that env’s Postgres plugin |
 
 Set **`KC_HOSTNAME`** in `keycloak.env` to your real public hostname (no `https://` prefix).
+
+Development uses **optimized `start`** (not `start-dev`) with JVM caps — see [`KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](../KEYCLOAK_RAILWAY_MEMORY_NOTES.md).
 
 ## Verify after deploy
 
