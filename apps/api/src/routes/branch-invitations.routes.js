@@ -26,52 +26,60 @@ const multiBranchFeature = requireFeature(
 )
 
 async function resolveOrgContextFromTenant(req, res, next) {
-  if (req.userData?.role === 'ADMIN') {
-    const orgId = req.query.organization_id || req.body?.organization_id
-    if (orgId) {
-      const { rows } = await query(
-        `SELECT id FROM supplier WHERE organization_id = $1 AND is_main_branch = true LIMIT 1`,
-        [orgId]
-      )
-      req.orgContext = {
-        organizationId: orgId,
-        primarySupplierId: rows[0]?.id || null,
+  try {
+    if (req.userData?.role === 'ADMIN') {
+      const orgId = req.query.organization_id || req.body?.organization_id
+      if (orgId) {
+        const { rows } = await query(
+          `SELECT id FROM supplier WHERE organization_id = $1 AND is_main_branch = true LIMIT 1`,
+          [orgId]
+        )
+        req.orgContext = {
+          organizationId: orgId,
+          primarySupplierId: rows[0]?.id || null,
+        }
       }
+      return next()
     }
-    return next()
-  }
 
-  const tenantId = req.tenantContext?.tenantId
-  if (!tenantId) {
-    return res.status(403).json({
-      ok: false,
-      data: null,
-      error: { name: 'FORBIDDEN', message: 'Supplier context required' },
-      requestId: req.requestId,
-    })
-  }
+    const tenantId = req.tenantContext?.tenantId
+    if (!tenantId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Supplier context required' },
+        requestId: req.requestId,
+      })
+    }
 
-  const { rows } = await query(`SELECT organization_id FROM supplier WHERE id = $1`, [tenantId])
-  const organizationId = rows[0]?.organization_id
-  if (!organizationId) {
-    return res.status(403).json({
-      ok: false,
-      data: null,
-      error: { name: 'FORBIDDEN', message: 'Organization context required for branch invitations' },
-      requestId: req.requestId,
-    })
-  }
+    const { rows } = await query(`SELECT organization_id FROM supplier WHERE id = $1`, [tenantId])
+    const organizationId = rows[0]?.organization_id
+    if (!organizationId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'FORBIDDEN',
+          message: 'Organization context required for branch invitations',
+        },
+        requestId: req.requestId,
+      })
+    }
 
-  const { rows: mainRows } = await query(
-    `SELECT id FROM supplier WHERE organization_id = $1 AND is_main_branch = true LIMIT 1`,
-    [organizationId]
-  )
+    const { rows: mainRows } = await query(
+      `SELECT id FROM supplier WHERE organization_id = $1 AND is_main_branch = true LIMIT 1`,
+      [organizationId]
+    )
 
-  req.orgContext = {
-    organizationId,
-    primarySupplierId: mainRows[0]?.id || null,
+    req.orgContext = {
+      organizationId,
+      primarySupplierId: mainRows[0]?.id || null,
+    }
+    next()
+  } catch (error) {
+    logger.error('resolveOrgContextFromTenant error:', error)
+    next(error)
   }
-  next()
 }
 
 router.use(
@@ -204,6 +212,17 @@ router.get('/roles', async (req, res) => {
 
 router.get('/', async (req, res) => {
   try {
+    if (!req.orgContext?.organizationId) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'BAD_REQUEST',
+          message: 'Organization context required for branch invitations',
+        },
+        requestId: req.requestId,
+      })
+    }
     const supplierId = req.query.supplier_id || null
     const invitations = await listBranchInvitations(req.orgContext.organizationId, {
       supplierId,
