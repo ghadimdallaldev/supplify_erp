@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSendDriverLocationMutation } from '../services/api'
-
-const TRACKING_STATUSES = new Set(['assigned', 'picked_up', 'out_for_delivery'])
+import { isTrackableDeliveryStatus } from '../lib/driverGpsTracking'
 
 export function getGpsUpdateIntervalMs() {
   const sec = Number(import.meta.env.VITE_GPS_UPDATE_INTERVAL_SECONDS ?? 15)
@@ -26,7 +25,7 @@ export function useDriverLocationTracking(activeDeliveries: ActiveDelivery[]) {
   const [gpsError, setGpsError] = useState<string | null>(null)
   const [permissionDenied, setPermissionDenied] = useState(false)
 
-  const trackable = activeDeliveries.filter((d) => TRACKING_STATUSES.has(d.deliveryStatus))
+  const trackable = activeDeliveries.filter((d) => isTrackableDeliveryStatus(d.deliveryStatus))
 
   useEffect(() => {
     if (!isGpsTrackingEnabledClient() || trackable.length === 0) {
@@ -62,8 +61,12 @@ export function useDriverLocationTracking(activeDeliveries: ActiveDelivery[]) {
         speedMps: pos.coords.speed ?? undefined,
         headingDegrees: pos.coords.heading ?? undefined,
         recordedAt: new Date(pos.timestamp).toISOString(),
-      }).catch(() => {
-        /* network errors surfaced elsewhere */
+      }).catch((err: unknown) => {
+        const msg =
+          (err as { data?: { error?: { message?: string } } })?.data?.error?.message ||
+          'Could not send GPS update to the server'
+        setGpsError(msg)
+        setTrackingActive(false)
       })
     }
 
