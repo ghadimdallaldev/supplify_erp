@@ -4,6 +4,8 @@
 `/opt/keycloak/data/import/<realm>-realm.json`.  
 Do **not** deploy the stock Keycloak image without building these Dockerfiles.
 
+**Database / persistence (required):** dedicated Postgres database **`keycloak`**, never `DATABASE_URL` on the Keycloak service — [`KEYCLOAK_RAILWAY_DB_NOTES.md`](../KEYCLOAK_RAILWAY_DB_NOTES.md).
+
 ## Per-environment Railway settings
 
 | Environment     | Config file                                         | Realm              | Start command              |
@@ -17,11 +19,14 @@ All environments build **`deploy/railway/keycloak/Dockerfile`** (realm JSON copi
 
 For every Keycloak service:
 
-| Setting            | Value                                                                                                             |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| **Root Directory** | _(empty — repo root)_                                                                                             |
-| **Public port**    | `8080`                                                                                                            |
-| **Variables**      | Paste `deploy/railway/<env>/keycloak.env` + `KEYCLOAK_ADMIN_PASSWORD` + `KC_DB_*` from that env’s Postgres plugin |
+| Setting            | Value                                                                                     |
+| ------------------ | ----------------------------------------------------------------------------------------- |
+| **Root Directory** | _(empty — repo root)_                                                                     |
+| **Config file**    | `deploy/railway/<env>/keycloak/railway.json`                                              |
+| **Public port**    | `8080`                                                                                    |
+| **Variables**      | `pnpm railway:keycloak:sync -- <env>` or paste `keycloak.env` + `KEYCLOAK_ADMIN_PASSWORD` |
+
+Boot script **`railway-entrypoint.sh`** (in Dockerfile) auto-creates Postgres database `keycloak` and sets `KC_DB_*` when Postgres is linked via `PGHOST`/`PGUSER`/`PGPASSWORD`. See [`KEYCLOAK_RAILWAY_DB_NOTES.md`](../KEYCLOAK_RAILWAY_DB_NOTES.md).
 
 Set **`KC_HOSTNAME`** in `keycloak.env` to your real public hostname (no `https://` prefix).
 

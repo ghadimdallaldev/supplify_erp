@@ -10,14 +10,9 @@ Realm **`supplify-prod`** is imported automatically on first boot — no Admin U
 | Config file    | `/deploy/railway/production/keycloak/railway.json` |
 | Start command  | `/opt/keycloak/bin/kc.sh start --import-realm`     |
 
-Variables: `deploy/railway/production/keycloak.env` + secrets:
+Variables: paste full `deploy/railway/production/keycloak.env` (includes dedicated `KC_DB_*` for database **`keycloak`**) + strong `KEYCLOAK_ADMIN_PASSWORD` (same on Keycloak and API).
 
-```env
-KEYCLOAK_ADMIN=admin
-KEYCLOAK_ADMIN_PASSWORD=<strong; same on Keycloak AND API>
-KC_DB=postgres
-KC_DB_URL=${{Postgres-prod.DATABASE_URL}}
-```
+One-time on Postgres: `CREATE DATABASE keycloak;` — see [`../KEYCLOAK_RAILWAY_DB_NOTES.md`](../KEYCLOAK_RAILWAY_DB_NOTES.md). **Do not** set `DATABASE_URL` on the Keycloak service.
 
 Set **`KC_HOSTNAME`** to production Keycloak host (e.g. `keycloak.yourdomain.com`).
 

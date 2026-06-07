@@ -11,9 +11,9 @@
     "watchPatterns": ["deploy/keycloak/**", "deploy/railway/keycloak/**"]
   },
   "deploy": {
-    "startCommand": "/opt/keycloak/bin/kc.sh start-dev --import-realm",
+    "startCommand": "/opt/keycloak/bin/railway-entrypoint.sh start-dev --import-realm",
     "healthcheckPath": "/health/ready",
-    "healthcheckTimeout": 300,
+    "healthcheckTimeout": 600,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }

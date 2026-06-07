@@ -16,6 +16,13 @@ ENV KC_DB=postgres
 COPY ${REALM_EXPORT_FILE} /opt/keycloak/data/import/${REALM_IMPORT_FILENAME}
 RUN test -s "/opt/keycloak/data/import/${REALM_IMPORT_FILENAME}"
 
+COPY deploy/railway/keycloak/railway-entrypoint.sh /opt/keycloak/bin/railway-entrypoint.sh
+
+USER root
+RUN microdnf install -y postgresql && microdnf clean all \
+  && chmod +x /opt/keycloak/bin/railway-entrypoint.sh
+USER 1000
+
 RUN if [ "$KC_PRODUCTION" = "true" ]; then /opt/keycloak/bin/kc.sh build; fi
 
-ENTRYPOINT ["/opt/keycloak/bin/kc.sh"]
+ENTRYPOINT ["/opt/keycloak/bin/railway-entrypoint.sh"]
