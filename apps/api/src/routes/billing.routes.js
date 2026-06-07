@@ -60,7 +60,13 @@ const payNowSchema = z.object({
 
 router.get('/status', async (req, res) => {
   try {
-    const tenant = await getRequestTenant(req)
+    const tenant = req.tenantContext?.tenantId
+      ? {
+          tenantId: req.tenantContext.tenantId,
+          tenantType: req.tenantContext.tenantType,
+          tenantName: req.tenantContext.tenantName,
+        }
+      : await getRequestTenant(req)
     if (!tenant) {
       return res.status(404).json({
         ok: false,
@@ -92,7 +98,13 @@ router.get('/status', async (req, res) => {
 
 router.get('/payment-methods', async (req, res) => {
   try {
-    const tenant = await getRequestTenant(req)
+    const tenant = req.tenantContext?.tenantId
+      ? {
+          tenantId: req.tenantContext.tenantId,
+          tenantType: req.tenantContext.tenantType,
+          tenantName: req.tenantContext.tenantName,
+        }
+      : await getRequestTenant(req)
     if (!tenant) {
       return res.status(404).json({
         ok: false,
@@ -132,7 +144,13 @@ router.post(
   rejectImpersonationMutation(IMPERSONATION_RESTRICTED_ACTIONS.BILLING_MUTATION),
   async (req, res) => {
     try {
-      const tenant = await getRequestTenant(req)
+      const tenant = req.tenantContext?.tenantId
+        ? {
+            tenantId: req.tenantContext.tenantId,
+            tenantType: req.tenantContext.tenantType,
+            tenantName: req.tenantContext.tenantName,
+          }
+        : await getRequestTenant(req)
       if (!tenant) {
         return res.status(404).json({
           ok: false,
@@ -186,7 +204,13 @@ router.delete(
   rejectImpersonationMutation(IMPERSONATION_RESTRICTED_ACTIONS.BILLING_MUTATION),
   async (req, res) => {
     try {
-      const tenant = await getRequestTenant(req)
+      const tenant = req.tenantContext?.tenantId
+        ? {
+            tenantId: req.tenantContext.tenantId,
+            tenantType: req.tenantContext.tenantType,
+            tenantName: req.tenantContext.tenantName,
+          }
+        : await getRequestTenant(req)
       if (!tenant) {
         return res.status(404).json({
           ok: false,
@@ -222,7 +246,13 @@ router.post(
   rejectImpersonationMutation(IMPERSONATION_RESTRICTED_ACTIONS.BILLING_MUTATION),
   async (req, res) => {
     try {
-      const tenant = await getRequestTenant(req)
+      const tenant = req.tenantContext?.tenantId
+        ? {
+            tenantId: req.tenantContext.tenantId,
+            tenantType: req.tenantContext.tenantType,
+            tenantName: req.tenantContext.tenantName,
+          }
+        : await getRequestTenant(req)
       if (!tenant) {
         return res.status(404).json({
           ok: false,
@@ -287,7 +317,13 @@ router.post(
   rejectImpersonationMutation(IMPERSONATION_RESTRICTED_ACTIONS.BILLING_MUTATION),
   async (req, res) => {
     try {
-      const tenant = await getRequestTenant(req)
+      const tenant = req.tenantContext?.tenantId
+        ? {
+            tenantId: req.tenantContext.tenantId,
+            tenantType: req.tenantContext.tenantType,
+            tenantName: req.tenantContext.tenantName,
+          }
+        : await getRequestTenant(req)
       if (!tenant) {
         return res.status(404).json({
           ok: false,
@@ -348,7 +384,13 @@ router.patch(
   rejectImpersonationMutation(IMPERSONATION_RESTRICTED_ACTIONS.BILLING_MUTATION),
   async (req, res) => {
     try {
-      const tenant = await getRequestTenant(req)
+      const tenant = req.tenantContext?.tenantId
+        ? {
+            tenantId: req.tenantContext.tenantId,
+            tenantType: req.tenantContext.tenantType,
+            tenantName: req.tenantContext.tenantName,
+          }
+        : await getRequestTenant(req)
       if (!tenant) {
         return res.status(404).json({
           ok: false,

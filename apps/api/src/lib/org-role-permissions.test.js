@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { replaceOrgRolePermissions } from './org-role-permissions.js'
+import { orgRolePermissionsUnchanged, replaceOrgRolePermissions } from './org-role-permissions.js'
 
 describe('replaceOrgRolePermissions', () => {
   it('deletes existing permissions and batch-inserts with branch_scope', async () => {
@@ -45,5 +45,34 @@ describe('replaceOrgRolePermissions', () => {
 
     expect(db).toHaveBeenCalledTimes(1)
     expect(db.mock.calls[0][0]).toContain('DELETE FROM org_role_permissions')
+  })
+
+  it('orgRolePermissionsUnchanged returns true when permissions match', async () => {
+    const db = vi.fn(async () => ({
+      rows: [
+        { permission: 'ORDERS_VIEW', branch_scope: 'all' },
+        { permission: 'ORDERS_CREATE', branch_scope: 'all' },
+      ],
+    }))
+    const unchanged = await orgRolePermissionsUnchanged(db, {
+      permissionsTable: 'org_role_permissions',
+      roleId: 'role-1',
+      permissions: ['ORDERS_CREATE', 'ORDERS_VIEW'],
+      branchScope: 'all',
+    })
+    expect(unchanged).toBe(true)
+  })
+
+  it('orgRolePermissionsUnchanged returns false when branch_scope differs', async () => {
+    const db = vi.fn(async () => ({
+      rows: [{ permission: 'ORDERS_VIEW', branch_scope: 'assigned' }],
+    }))
+    const unchanged = await orgRolePermissionsUnchanged(db, {
+      permissionsTable: 'org_role_permissions',
+      roleId: 'role-1',
+      permissions: ['ORDERS_VIEW'],
+      branchScope: 'all',
+    })
+    expect(unchanged).toBe(false)
   })
 })

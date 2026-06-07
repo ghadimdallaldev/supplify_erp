@@ -1,5 +1,6 @@
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit'
 import { api } from '../services/api'
+import { perfLog } from './perfLog'
 
 type AppDispatch = ThunkDispatch<unknown, unknown, UnknownAction>
 
@@ -8,6 +9,7 @@ type AppDispatch = ThunkDispatch<unknown, unknown, UnknownAction>
  * that change workspace access (signup, activation, checkout, unlock).
  */
 export async function refetchAppSession(dispatch: AppDispatch): Promise<void> {
+  const t0 = performance.now()
   await Promise.all([
     dispatch(api.endpoints.getMe.initiate(undefined, { forceRefetch: true })).unwrap(),
     dispatch(api.endpoints.getRegisterStatus.initiate(undefined, { forceRefetch: true })).unwrap(),
@@ -16,6 +18,7 @@ export async function refetchAppSession(dispatch: AppDispatch): Promise<void> {
       .unwrap()
       .catch(() => undefined),
   ])
+  perfLog('session.refetch', { durationMs: Math.round(performance.now() - t0) })
 }
 
 /** True when cached user role and register status disagree (stale userBySub cache). */

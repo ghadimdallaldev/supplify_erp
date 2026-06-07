@@ -279,8 +279,6 @@ export const api = createApi({
       query: () => '/auth/me',
       providesTags: ['User'],
       keepUnusedDataFor: 120,
-      refetchOnFocus: false,
-      refetchOnMountOrArgChange: false,
     }),
     getInviteSession: builder.query<
       { id: string; email: string; displayName: string } | null,
@@ -319,16 +317,6 @@ export const api = createApi({
       }),
       transformResponse: (response: { data?: { tenantType: string; tenant: unknown } }) =>
         response.data as { tenantType: string; tenant: unknown },
-      invalidatesTags: ['User', 'RegisterStatus', 'Billing', 'Subscription'],
-      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
-        try {
-          await queryFulfilled
-          const { refetchAppSession } = await import('../lib/refetchAppSession')
-          await refetchAppSession(dispatch)
-        } catch {
-          // Leave cache as-is on failure
-        }
-      },
     }),
 
     // Product endpoints
@@ -3139,9 +3127,6 @@ export const api = createApi({
       query: () => '/api/subscriptions/entitlements',
       providesTags: ['Subscription'],
       keepUnusedDataFor: 120,
-      refetchOnMountOrArgChange: false,
-      refetchOnFocus: false,
-      refetchOnReconnect: true,
     }),
     getSubscriptionUsage: builder.query<UsageMeter & { meterType: string }, string>({
       query: (meterType) => `/api/subscriptions/usage/${meterType}`,
@@ -3188,8 +3173,6 @@ export const api = createApi({
       query: () => '/api/billing/status',
       providesTags: ['Billing', 'Subscription'],
       keepUnusedDataFor: 120,
-      refetchOnFocus: false,
-      refetchOnMountOrArgChange: false,
     }),
     getBillingPaymentMethods: builder.query<{ paymentMethods: BillingPaymentMethod[] }, void>({
       query: () => '/api/billing/payment-methods',
@@ -3238,7 +3221,6 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['Billing', 'Subscription'],
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled
@@ -3258,7 +3240,6 @@ export const api = createApi({
         method: 'POST',
         body: body ?? {},
       }),
-      invalidatesTags: ['Billing', 'Subscription'],
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled

@@ -236,6 +236,7 @@ router.get('/session', optionalAuth, async (req, res) => {
 // Get current user info (includes tenant-scoped roles and permissions for RBAC)
 router.get('/me', requireAuth, async (req, res) => {
   try {
+    const meT0 = process.hrtime.bigint()
     const user = req.userData
 
     // Get additional user data based on role
@@ -258,9 +259,9 @@ router.get('/me', requireAuth, async (req, res) => {
       const { isPrimaryTenantContact, getTenantAssignmentForUser } = await import(
         '../lib/workspace-tenant.js'
       )
-      await ensurePrimaryContactOwnerRole(user.id, user.email, tenant.tenantId, tenant.tenantType)
 
       if (user.role === 'ADMIN' && effectiveTenant) {
+        await ensurePrimaryContactOwnerRole(user.id, user.email, tenant.tenantId, tenant.tenantType)
         tenantPermissions = await getImpersonationEffectivePermissions(
           effectiveTenant.tenantId,
           effectiveTenant.tenantType,
@@ -275,18 +276,27 @@ router.get('/me', requireAuth, async (req, res) => {
           tenantRoles = ['Owner (impersonation)']
         }
       } else {
-        // roles, permissions, workspace assignment, and tenant data are all independent reads.
-        const [rolesResult, permsResult, assignment, tenantProfileRow] = await Promise.all([
-          getRolesForUser(user.id, tenant.tenantId, tenant.tenantType),
-          getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType),
-          getTenantAssignmentForUser(user.id, user.role),
-          getTenantProfileRow(tenant.tenantType, tenant.tenantId),
-        ])
+        const [ownerAssigned, rolesResult, permsResult, assignment, tenantProfileRow] =
+          await Promise.all([
+            ensurePrimaryContactOwnerRole(user.id, user.email, tenant.tenantId, tenant.tenantType),
+            getRolesForUser(user.id, tenant.tenantId, tenant.tenantType),
+            getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType),
+            getTenantAssignmentForUser(user.id, user.role),
+            getTenantProfileRow(tenant.tenantType, tenant.tenantId),
+          ])
         tenantRoles = rolesResult
         tenantPermissions = permsResult
         const tenantDataRows = tenantProfileRow ? [tenantProfileRow] : []
 
-        if (tenantRoles.length === 0 && (user.role === 'RESTAURANT' || user.role === 'SUPPLIER')) {
+        if (ownerAssigned) {
+          ;[tenantRoles, tenantPermissions] = await Promise.all([
+            getRolesForUser(user.id, tenant.tenantId, tenant.tenantType),
+            getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType),
+          ])
+        } else if (
+          tenantRoles.length === 0 &&
+          (user.role === 'RESTAURANT' || user.role === 'SUPPLIER')
+        ) {
           const isPrimary = await isPrimaryTenantContact(
             user.id,
             user.email,
@@ -336,6 +346,17 @@ router.get('/me', requireAuth, async (req, res) => {
           displayName: staffMember.display_name,
         }
       }
+    }
+
+    const meMs = Number(process.hrtime.bigint() - meT0) / 1e6
+    if (meMs >= 400) {
+      logger.info({
+        event: 'auth.me.timing',
+        durationMs: Math.round(meMs),
+        userId: user.id,
+        tenantId: tenant?.tenantId ?? null,
+        requestId: req.requestId,
+      })
     }
 
     res.json({
