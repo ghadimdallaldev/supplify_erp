@@ -67,22 +67,36 @@ export async function assertAndDeductSupplierStockBatch(client, lineItems) {
     }
   }
 
-  const productIds = normalized.map((item) => item.productId)
+  // PostgreSQL UPDATE ... FROM unnest fails if the same product_id appears twice.
+  const aggregated = new Map()
+  for (const item of normalized) {
+    const existing = aggregated.get(item.productId)
+    if (existing) {
+      existing.quantity += item.quantity
+      existing.reserve = existing.reserve || item.reserve
+      if (!existing.sku && item.sku) existing.sku = item.sku
+    } else {
+      aggregated.set(item.productId, { ...item })
+    }
+  }
+  const lines = [...aggregated.values()]
+
+  const productIds = lines.map((item) => item.productId)
   const { rows } = await client.query(
     `SELECT product_id, available_qty FROM inventory WHERE product_id = ANY($1) FOR UPDATE`,
     [productIds]
   )
   const availableByProduct = new Map(rows.map((row) => [row.product_id, Number(row.available_qty)]))
 
-  for (const item of normalized) {
+  for (const item of lines) {
     const available = availableByProduct.get(item.productId)
     if (available == null || available < item.quantity) {
       throw new ValidationError(`Insufficient inventory for product ${item.sku || item.productId}`)
     }
   }
 
-  const quantities = normalized.map((item) => item.quantity)
-  const reserveFlags = normalized.map((item) => item.reserve)
+  const quantities = lines.map((item) => item.quantity)
+  const reserveFlags = lines.map((item) => item.reserve)
 
   await client.query(
     `

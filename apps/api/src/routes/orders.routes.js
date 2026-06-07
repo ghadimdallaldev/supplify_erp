@@ -1596,13 +1596,28 @@ router.post(
         })
       }
 
+      if (error instanceof ValidationError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: error.message,
+          },
+          requestId: req.requestId,
+        })
+      }
+
       logger.error('Create order error:', error)
+      const exposeDetail = process.env.APP_ENV === 'dev' || process.env.NODE_ENV === 'development'
       res.status(500).json({
         ok: false,
         data: null,
         error: {
           name: 'INTERNAL_ERROR',
-          message: 'Failed to create order',
+          message: exposeDetail
+            ? error.message || 'Failed to create order'
+            : 'Failed to create order',
         },
         requestId: req.requestId,
       })
