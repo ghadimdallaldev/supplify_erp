@@ -1,4 +1,5 @@
 import { query, withTransaction } from './db.js'
+import { performance } from 'node:perf_hooks'
 import { invalidateUserAuthCaches } from './access-cache.js'
 import { ensureOrgSystemRoles, assignOrgUserRole } from './supplier-org.js'
 import { ensureRestaurantOrgSystemRoles, assignRestaurantOrgUserRole } from './restaurant-org.js'
@@ -13,8 +14,21 @@ import {
 import { createPendingActivationSubscription } from './billing/subscription-activation.js'
 import { sendNotification, notifyAdminNewTenant } from '../services/notification.service.js'
 import { recordRegistrationLegalAcceptances } from './legal-acceptance.js'
+import { logger } from './logger.js'
 
 const KC_ROLE = { RESTAURANT: 'restaurant', SUPPLIER: 'supplier', ADMIN: 'admin' }
+
+function createRegistrationPhaseTimer() {
+  let lapStart = performance.now()
+  const phases = {}
+  return {
+    lap(phase) {
+      phases[phase] = Math.round(performance.now() - lapStart)
+      lapStart = performance.now()
+    },
+    phases,
+  }
+}
 
 export function slugifyName(name) {
   const base = String(name)
@@ -52,8 +66,11 @@ export async function userNeedsTenantSetup(user) {
 
 async function completeSupplierRegistration(
   client,
-  { userId, keycloakSub, normalizedEmail, name, slug, phone }
+  { userId, keycloakSub, normalizedEmail, name, slug, phone },
+  lap
 ) {
+  lap?.('createTenantAndOrg')
+
   const { rows: supplierRows } = await client.query(
     `INSERT INTO supplier (name, slug, contact_email, phone, address_json)
      VALUES ($1, $2, $3, $4, '{}'::jsonb)
@@ -84,7 +101,10 @@ async function completeSupplierRegistration(
   )
 
   await ensureOrgSystemRoles(organization.id, client)
+  lap?.('ensureOrgRoles')
+
   await ensureTenantSystemRoles(tenant.id, 'SUPPLIER', client)
+  lap?.('ensureTenantRoles')
 
   await assignOrgUserRole({
     userId,
@@ -93,7 +113,10 @@ async function completeSupplierRegistration(
     client,
   })
 
-  await assignOwnerRoleForUser(userId, tenant.id, 'SUPPLIER', null, client)
+  await assignOwnerRoleForUser(userId, tenant.id, 'SUPPLIER', null, client, {
+    rolesAlreadyEnsured: true,
+  })
+  lap?.('assignOwnerRole')
 
   await client.query(
     `UPDATE app_user SET role = 'SUPPLIER', keycloak_sub = COALESCE(keycloak_sub, $1), updated_at = now() WHERE id = $2`,
@@ -101,14 +124,18 @@ async function completeSupplierRegistration(
   )
 
   await createPendingActivationSubscription(client, tenant.id, 'SUPPLIER', 'free')
+  lap?.('subscription')
 
   return { tenant, tenantType: 'SUPPLIER', organizationId: organization.id }
 }
 
 async function completeRestaurantRegistration(
   client,
-  { userId, keycloakSub, normalizedEmail, name, slug, phone, type }
+  { userId, keycloakSub, normalizedEmail, name, slug, phone, type },
+  lap
 ) {
+  lap?.('createTenantAndOrg')
+
   const { rows } = await client.query(
     `INSERT INTO restaurant (name, slug, contact_email, phone, address_json)
      VALUES ($1, $2, $3, $4, '{}'::jsonb)
@@ -134,7 +161,10 @@ async function completeRestaurantRegistration(
   )
 
   await ensureRestaurantOrgSystemRoles(organization.id, client)
+  lap?.('ensureOrgRoles')
+
   await ensureTenantSystemRoles(tenant.id, 'RESTAURANT', client)
+  lap?.('ensureTenantRoles')
 
   await assignRestaurantOrgUserRole({
     userId,
@@ -143,7 +173,10 @@ async function completeRestaurantRegistration(
     client,
   })
 
-  await assignOwnerRoleForUser(userId, tenant.id, 'RESTAURANT', null, client)
+  await assignOwnerRoleForUser(userId, tenant.id, 'RESTAURANT', null, client, {
+    rolesAlreadyEnsured: true,
+  })
+  lap?.('assignOwnerRole')
 
   await client.query(
     `UPDATE app_user SET role = $1, keycloak_sub = COALESCE(keycloak_sub, $2), updated_at = now() WHERE id = $3`,
@@ -151,6 +184,7 @@ async function completeRestaurantRegistration(
   )
 
   await createPendingActivationSubscription(client, tenant.id, type, 'free')
+  lap?.('subscription')
 
   return { tenant, tenantType: type, organizationId: organization.id }
 }
@@ -173,6 +207,9 @@ export async function completeTenantRegistration({
   const type = accountType === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
   const name = businessName.trim()
   if (!name) throw new ValidationError('Business name is required')
+
+  const registrationStarted = performance.now()
+  const timer = createRegistrationPhaseTimer()
 
   const existingUser = await query('SELECT id, role FROM app_user WHERE id = $1', [userId])
   if (existingUser.rows.length === 0) throw new ValidationError('User not found')
@@ -203,30 +240,42 @@ export async function completeTenantRegistration({
   const baseSlug = slugifyName(name)
   const kcRole = KC_ROLE[type]
 
+  timer.lap('preflight')
+
   const result = await withTransaction(async (client) => {
     const slug = await uniqueSlug(client, tenantTable, baseSlug)
 
     let registrationResult
     if (type === 'SUPPLIER') {
-      registrationResult = await completeSupplierRegistration(client, {
-        userId,
-        keycloakSub,
-        normalizedEmail,
-        name,
-        slug,
-        phone,
-      })
+      registrationResult = await completeSupplierRegistration(
+        client,
+        {
+          userId,
+          keycloakSub,
+          normalizedEmail,
+          name,
+          slug,
+          phone,
+        },
+        timer.lap.bind(timer)
+      )
     } else {
-      registrationResult = await completeRestaurantRegistration(client, {
-        userId,
-        keycloakSub,
-        normalizedEmail,
-        name,
-        slug,
-        phone,
-        type,
-      })
+      registrationResult = await completeRestaurantRegistration(
+        client,
+        {
+          userId,
+          keycloakSub,
+          normalizedEmail,
+          name,
+          slug,
+          phone,
+          type,
+        },
+        timer.lap.bind(timer)
+      )
     }
+
+    timer.lap('workspaceAndLegal')
 
     const scope = await resolveWorkspaceScope(
       registrationResult.tenant.id,
@@ -261,6 +310,8 @@ export async function completeTenantRegistration({
     return registrationResult
   })
 
+  timer.lap('postTransaction')
+
   // Role changes in DB; invalidate auth/tenant/billing caches before the client refetches.
   await invalidateUserAuthCaches({
     userId,
@@ -278,6 +329,15 @@ export async function completeTenantRegistration({
     const { invalidateOrgPermissionCaches } = await import('./supplier-org.js')
     await invalidateOrgPermissionCaches(userId, result.organizationId)
   }
+
+  timer.lap('invalidateCaches')
+
+  logger.info('Tenant registration timing', {
+    tenantType: result.tenantType,
+    tenantId: result.tenant.id,
+    phases: timer.phases,
+    totalMs: Math.round(performance.now() - registrationStarted),
+  })
 
   // Keycloak + welcome email are not required to finish signup; do not block the HTTP response.
   void ensureKeycloakRealmRole(normalizedEmail, kcRole)

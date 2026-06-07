@@ -61,6 +61,7 @@ export function RegisterCompletePage() {
   const [acceptedLegal, setAcceptedLegal] = useState<Set<LegalDocumentSlug>>(new Set())
   const [electronicSigned, setElectronicSigned] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [submitMessage, setSubmitMessage] = useState('Creating your workspace…')
 
   const legalComplete = isLegalAcceptanceComplete(
     'registration',
@@ -88,6 +89,16 @@ export function RegisterCompletePage() {
     }
   }, [userError, statusError, navigate])
 
+  useEffect(() => {
+    if (!submitting) {
+      setSubmitMessage('Creating your workspace…')
+      return
+    }
+    setSubmitMessage('Creating your workspace…')
+    const timer = window.setTimeout(() => setSubmitMessage('Almost done…'), 3000)
+    return () => window.clearTimeout(timer)
+  }, [submitting])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -106,7 +117,7 @@ export function RegisterCompletePage() {
         phone: phone.trim() || undefined,
         legalAcceptance: buildLegalAcceptancePayload(acceptedLegal),
       }).unwrap()
-      await refetchAppSession(dispatch)
+      void refetchAppSession(dispatch)
       navigate('/app/activate', { replace: true })
     } catch (err: unknown) {
       const fetchErr = err as FetchBaseQueryError
@@ -254,7 +265,7 @@ export function RegisterCompletePage() {
               {submitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating organization...
+                  {submitMessage}
                 </>
               ) : (
                 'Continue to Supplify'

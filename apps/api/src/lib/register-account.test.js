@@ -162,6 +162,16 @@ describe('register-account', () => {
         'free'
       )
 
+      const { assignOwnerRoleForUser } = await import('./tenant-roles.js')
+      expect(assignOwnerRoleForUser).toHaveBeenCalledWith(
+        'u1',
+        'rest-1',
+        'RESTAURANT',
+        null,
+        expect.anything(),
+        { rolesAlreadyEnsured: true }
+      )
+
       const { invalidateUserAuthCaches } = await import('./access-cache.js')
       expect(invalidateUserAuthCaches).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -216,6 +226,16 @@ describe('register-account', () => {
         'sup-1',
         'SUPPLIER',
         'free'
+      )
+
+      const { assignOwnerRoleForUser } = await import('./tenant-roles.js')
+      expect(assignOwnerRoleForUser).toHaveBeenCalledWith(
+        'u2',
+        'sup-1',
+        'SUPPLIER',
+        null,
+        expect.anything(),
+        { rolesAlreadyEnsured: true }
       )
 
       const { createDefaultWarehouseForSupplier } = await import('./warehouse-helpers.js')
