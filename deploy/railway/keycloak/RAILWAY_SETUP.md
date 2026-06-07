@@ -2,41 +2,59 @@
 
 `--import-realm` only imports JSON files baked into the image at  
 `/opt/keycloak/data/import/<realm>-realm.json`.  
-Do **not** deploy the stock Keycloak image without building these Dockerfiles.
+Do **not** deploy the stock Keycloak image without building `deploy/railway/keycloak/Dockerfile`.
 
-**Database / persistence (required):** dedicated Postgres database **`keycloak`**, never `DATABASE_URL` on the Keycloak service — [`KEYCLOAK_RAILWAY_DB_NOTES.md`](../KEYCLOAK_RAILWAY_DB_NOTES.md).
+**Database:** [`KEYCLOAK_RAILWAY_DB_NOTES.md`](../KEYCLOAK_RAILWAY_DB_NOTES.md) — dedicated Postgres DB `keycloak`.  
+**Memory / JVM:** [`KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](../KEYCLOAK_RAILWAY_MEMORY_NOTES.md) — caps and start modes.  
+**Incident write-up:** [`docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`](../../docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md).
 
 ## Per-environment Railway settings
 
-| Environment     | Config file                                         | Realm              | Start command                                            |
-| --------------- | --------------------------------------------------- | ------------------ | -------------------------------------------------------- |
-| **development** | `/deploy/railway/development/keycloak/railway.json` | `Supplify`         | `railway-entrypoint.sh start --optimized --import-realm` |
-| **preprod**     | `/deploy/railway/preprod/keycloak/railway.json`     | `supplify-preprod` | `railway-entrypoint.sh start --optimized --import-realm` |
-| **staging**     | `/deploy/railway/staging/keycloak/railway.json`     | `supplify-preprod` | `railway-entrypoint.sh start --optimized --import-realm` |
-| **production**  | `/deploy/railway/production/keycloak/railway.json`  | `supplify-prod`    | `railway-entrypoint.sh start --optimized --import-realm` |
+| Environment     | Config file                         | Realm export                | Realm name         | Optimized start                     |
+| --------------- | ----------------------------------- | --------------------------- | ------------------ | ----------------------------------- |
+| **development** | `development/keycloak/railway.json` | `realm-export.json`         | `Supplify`         | No (`KEYCLOAK_USE_OPTIMIZED=false`) |
+| **preprod**     | `preprod/keycloak/railway.json`     | `realm-export.preprod.json` | `supplify-preprod` | No                                  |
+| **staging**     | `staging/keycloak/railway.json`     | `realm-export.preprod.json` | `supplify-preprod` | No                                  |
+| **production**  | `production/keycloak/railway.json`  | `realm-export.prod.json`    | `supplify-prod`    | Yes (`KEYCLOAK_USE_OPTIMIZED=true`) |
 
-All environments build **`deploy/railway/keycloak/Dockerfile`** (shared image: realm JSON, `railway-entrypoint.sh`, psql via ubi-micro stage; `railway.json` sets `buildArgs`).
+All environments share **`deploy/railway/keycloak/Dockerfile`** (realm JSON, `railway-entrypoint.sh`, psql, `kc.sh build --db=postgres`). Per-env differences are in `railway.json` `buildArgs` and `keycloak.env`.
 
-For every Keycloak service:
+## Every Keycloak service
 
-| Setting            | Value                                                                                     |
-| ------------------ | ----------------------------------------------------------------------------------------- |
-| **Root Directory** | _(empty — repo root)_                                                                     |
-| **Config file**    | `deploy/railway/<env>/keycloak/railway.json`                                              |
-| **Public port**    | `8080`                                                                                    |
-| **Variables**      | `pnpm railway:keycloak:sync -- <env>` or paste `keycloak.env` + `KEYCLOAK_ADMIN_PASSWORD` |
+| Setting            | Value                                                             |
+| ------------------ | ----------------------------------------------------------------- |
+| **Root Directory** | _(empty — repo root)_                                             |
+| **Config file**    | `deploy/railway/<env>/keycloak/railway.json`                      |
+| **Start command**  | `/opt/keycloak/bin/railway-entrypoint.sh start --import-realm`    |
+| **Healthcheck**    | `/health/ready`, timeout **600**                                  |
+| **Public port**    | `8080`                                                            |
+| **Variables**      | `pnpm railway:keycloak:sync -- <env>` + `KEYCLOAK_ADMIN_PASSWORD` |
 
-Boot script **`railway-entrypoint.sh`** (in Dockerfile) auto-creates Postgres database `keycloak` and sets `KC_DB_*` when Postgres is linked via `PGHOST`/`PGUSER`/`PGPASSWORD`. See [`KEYCLOAK_RAILWAY_DB_NOTES.md`](../KEYCLOAK_RAILWAY_DB_NOTES.md).
+Set **`KC_HOSTNAME`** in `keycloak.env` to the public hostname (no `https://` prefix). Use **`KC_PROXY_HEADERS=xforwarded`** only — do not set deprecated `KC_PROXY=edge`.
 
-Set **`KC_HOSTNAME`** in `keycloak.env` to your real public hostname (no `https://` prefix).
+## Boot flow (`railway-entrypoint.sh` v3)
 
-All environments use **optimized `start`** (not `start-dev`) with JVM caps in `keycloak.env` — see [`KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](../KEYCLOAK_RAILWAY_MEMORY_NOTES.md).
+1. Wait for Postgres; create database **`keycloak`** if missing.
+2. Set runtime JDBC: `KC_DB_URL`, `KC_DB_USERNAME`, `KC_DB_PASSWORD`.
+3. Block `start-dev`.
+4. On `start`:
+   - **`KEYCLOAK_USE_OPTIMIZED=true`** (prod): `kc.sh start --optimized` + JDBC args.
+   - **`KEYCLOAK_USE_OPTIMIZED=false`** (dev/preprod/staging): `kc.sh start --db=postgres` + JDBC args.
+
+## Sync variables
+
+```bash
+railway login && railway link
+KEYCLOAK_ADMIN_PASSWORD=secret pnpm railway:keycloak:sync -- development
+KEYCLOAK_ADMIN_PASSWORD=secret pnpm railway:keycloak:sync -- preprod
+KEYCLOAK_ADMIN_PASSWORD=secret pnpm railway:keycloak:sync -- staging
+KEYCLOAK_ADMIN_PASSWORD=secret pnpm railway:keycloak:sync -- production
+```
 
 ## Verify after deploy
 
-Replace host and realm:
-
 ```text
+https://<KC_HOSTNAME>/health/ready
 https://<KC_HOSTNAME>/realms/<realm>/.well-known/openid-configuration
 ```
 
@@ -48,18 +66,14 @@ https://<KC_HOSTNAME>/realms/<realm>/.well-known/openid-configuration
 
 ## API + web must match
 
-| env               | API `KEYCLOAK_REALM` | Web `VITE_KEYCLOAK_REALM` | Client secret               |
-| ----------------- | -------------------- | ------------------------- | --------------------------- |
-| dev               | `Supplify`           | `Supplify`                | `changeme` (import default) |
-| preprod / staging | `supplify-preprod`   | `supplify-preprod`        | strong secret in dashboard  |
-| prod              | `supplify-prod`      | `supplify-prod`           | strong secret in dashboard  |
+| env               | API `KEYCLOAK_REALM` | Web `VITE_KEYCLOAK_REALM` |
+| ----------------- | -------------------- | ------------------------- |
+| dev               | `Supplify`           | `Supplify`                |
+| preprod / staging | `supplify-preprod`   | `supplify-preprod`        |
+| prod              | `supplify-prod`      | `supplify-prod`           |
 
 Redirect URIs: `deploy/railway/<env>/KEYCLOAK_CLIENT.md`.
 
-## Realm missing after switching to Dockerfile
-
-`--import-realm` skips realms already in the DB. **Non-prod:** delete the Keycloak Postgres plugin (not app DB) and redeploy. **Prod:** plan a maintenance window before wiping IdP data.
-
 ## Staging vs preprod
 
-This repo’s EC2 “staging” stack equals **preprod** on Railway: same realm export (`realm-export.preprod.json`). Use the **staging** Dockerfile path only if your Railway project environment is literally named staging; otherwise use **preprod**.
+Railway **staging** uses the same realm export as **preprod** (`realm-export.preprod.json`). Use the staging config path only if your Railway project has a literal `staging` environment.
