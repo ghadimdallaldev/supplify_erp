@@ -55,6 +55,10 @@ import { ordersRouterMutationGuard } from '../lib/route-permissions.js'
 
 const router = express.Router()
 
+// Driver fulfillment routes use DRIVER_DELIVERIES_* permissions, not ORDERS_VIEW.
+// Mount before the ORDERS_VIEW gate so drivers can PATCH delivery-status and POST location.
+router.use(ordersDriverRoutes)
+
 function elapsedMsSince(startMs) {
   return Math.round(performance.now() - startMs)
 }
@@ -842,7 +846,6 @@ router.get('/', async (req, res) => {
 })
 
 router.use('/:orderId/amendments', orderAmendmentsRouter)
-router.use(ordersDriverRoutes)
 
 async function loadOrderWarehouseAssignments(orderId) {
   const { rows } = await query(
