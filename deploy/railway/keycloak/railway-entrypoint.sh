@@ -132,4 +132,26 @@ SQL
 resolve_postgres
 ensure_keycloak_database
 
+# Railway must never run Quarkus dev mode — it grows heap unbounded and re-augmentates on boot.
+if [ "${1:-}" = "start-dev" ]; then
+  echo "ERROR: start-dev is forbidden on Railway. Use: start --optimized --import-realm" >&2
+  exit 1
+fi
+
+# When the image was built with `kc.sh build` (KC_PRODUCTION=true), require optimized start
+# so Quarkus does not re-augment at runtime (major memory spike + slow boot).
+if [ "${1:-}" = "start" ]; then
+  has_optimized=false
+  for arg in "$@"; do
+    if [ "$arg" = "--optimized" ]; then
+      has_optimized=true
+      break
+    fi
+  done
+  if [ "$has_optimized" = false ]; then
+    echo "Injecting --optimized (image built with kc.sh build; avoids runtime Quarkus augmentation)" >&2
+    set -- start --optimized "${@:2}"
+  fi
+fi
+
 exec /opt/keycloak/bin/kc.sh "$@"
