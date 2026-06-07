@@ -13,7 +13,9 @@ import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import {
-  checkAndIncrementUsage,
+  DailyUsageLimitExceededError,
+  resolveDailyMeterEnforcement,
+  incrementDailyUsageMeterInTransaction,
   getTenantSubscription,
   getRecommendedPlanNames,
   buildLimitExceededPayload,
@@ -22,7 +24,10 @@ import {
 } from '../lib/subscription.js'
 import { z } from 'zod'
 import { notifyOrderStatusChange } from '../services/notification.service.js'
-import { applyBestPromotionToOrder } from '../services/promotions.service.js'
+import {
+  applyBestPromotionToOrder,
+  hasActiveSupplierOrderPromotions,
+} from '../services/promotions.service.js'
 import {
   applyPromotionByIdToOrder,
   validateCouponForOrder,
@@ -39,8 +44,10 @@ import {
   orderHasProofOfDelivery,
 } from '../lib/driver-delivery.js'
 import { resolveProductPricesBatch } from '../services/resolve-product-price.service.js'
+import { insertOrderItemsBatch } from '../services/order-create.service.js'
 import {
   assertAndDeductSupplierStock,
+  assertAndDeductSupplierStockBatch,
   restoreSupplierStockForOrder,
 } from '../services/supplier-inventory.service.js'
 import { ordersRouterMutationGuard } from '../lib/route-permissions.js'
@@ -1272,38 +1279,49 @@ router.post(
       }
       orderCreateTimings.itemGroupingMs = elapsedMsSince(phaseStart)
 
-      // Atomic check and reserve usage slots before creating orders (avoids race conditions)
+      // Resolve daily limit metadata (subscription + effective limit) without a separate usage_meter transaction.
       phaseStart = performance.now()
+      let dailyMeterEnforcement = null
+      let restaurantDealsEnabled = false
+      const supplierPromoEligibility = new Map()
+      const supplierMultiWarehouse = new Map()
+
       if (orderStatus === 'PLACED') {
-        const ordersToCreate = supplierGroups.size
-        const usageResult = await checkAndIncrementUsage(
+        dailyMeterEnforcement = await resolveDailyMeterEnforcement(
           restaurantId,
           'RESTAURANT',
-          'orders_per_day',
-          ordersToCreate
+          'orders_per_day'
         )
-        if (!usageResult.allowed) {
-          const [subscription, recommendedPlans] = await Promise.all([
-            getTenantSubscription(restaurantId, 'RESTAURANT'),
-            getRecommendedPlanNames('RESTAURANT'),
-          ])
-          const limitCheck = { current: usageResult.current, limit: usageResult.limit }
-          const err = buildLimitExceededPayload(
-            limitCheck,
-            'orders_per_day',
-            subscription?.plan_name || subscription?.plan_display_name,
-            recommendedPlans,
-            undefined,
-            'RESTAURANT'
-          )
-          err.details.requested = ordersToCreate
+        if (!dailyMeterEnforcement.subscription) {
           return res.status(403).json({
             ok: false,
             data: null,
-            error: err,
+            error: {
+              name: 'FORBIDDEN',
+              message: 'No active subscription for daily order limit',
+            },
             requestId: req.requestId,
           })
         }
+
+        restaurantDealsEnabled = await isFeatureEnabled(
+          restaurantId,
+          'RESTAURANT',
+          'supplier_deals'
+        )
+
+        await Promise.all(
+          [...supplierGroups.keys()].map(async (supplierId) => {
+            const [hasPromos, multiWarehouseActive] = await Promise.all([
+              restaurantDealsEnabled
+                ? hasActiveSupplierOrderPromotions(query, supplierId, restaurantId)
+                : Promise.resolve(false),
+              isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse'),
+            ])
+            supplierPromoEligibility.set(supplierId, hasPromos)
+            supplierMultiWarehouse.set(supplierId, multiWarehouseActive)
+          })
+        )
       }
       orderCreateTimings.dailyLimitCheckMs = elapsedMsSince(phaseStart)
 
@@ -1312,172 +1330,183 @@ router.post(
       const txPhaseTimings = { promotionMs: 0, warehouseMs: 0 }
 
       phaseStart = performance.now()
-      const result = await withTransaction(async (client) => {
-        for (const [supplierId, items] of supplierGroups.entries()) {
-          // Create order for this supplier
-          const {
-            rows: [order],
-          } = await client.query(
-            `
+      let result
+      try {
+        result = await withTransaction(async (client) => {
+          if (orderStatus === 'PLACED') {
+            await incrementDailyUsageMeterInTransaction(
+              client,
+              restaurantId,
+              'RESTAURANT',
+              'orders_per_day',
+              supplierGroups.size,
+              dailyMeterEnforcement.resolved
+            )
+          }
+
+          for (const [supplierId, items] of supplierGroups.entries()) {
+            const {
+              rows: [order],
+            } = await client.query(
+              `
           INSERT INTO customer_order (restaurant_id, currency, status)
           VALUES ($1, 'USD', $2)
           RETURNING *
         `,
-            [restaurantId, orderStatus]
-          )
-
-          let totalAmount = 0
-          const orderItems = []
-
-          // Process items for this supplier
-          for (const item of items) {
-            await assertAndDeductSupplierStock(client, item.productId, item.quantity, {
-              sku: item.product.sku,
-            })
-
-            // Calculate line total
-            const lineTotal = item.unitPrice * item.quantity
-            totalAmount += lineTotal
-
-            // Create order item
-            const {
-              rows: [orderItem],
-            } = await client.query(
-              `
-            INSERT INTO order_item (
-              order_id, product_id, supplier_id, quantity, unit_price, line_total, notes,
-              pricing_source, contract_price_id, default_catalog_price
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            RETURNING *
-          `,
-              [
-                order.id,
-                item.productId,
-                supplierId,
-                item.quantity,
-                item.unitPrice,
-                lineTotal,
-                item.notes,
-                item.pricingSource || 'DEFAULT_PRICE',
-                item.contractPriceId || null,
-                item.defaultCatalogPrice ?? null,
-              ]
+              [restaurantId, orderStatus]
             )
 
-            orderItems.push(orderItem)
-          }
+            await assertAndDeductSupplierStockBatch(
+              client,
+              items.map((item) => ({
+                productId: item.productId,
+                quantity: item.quantity,
+                sku: item.product.sku,
+              }))
+            )
 
-          // Update order total and placed_at (only if status is PLACED)
-          if (orderStatus === 'PLACED') {
-            await client.query(
-              `
+            const orderItems = await insertOrderItemsBatch(client, order.id, supplierId, items)
+            let totalAmount = orderItems.reduce((sum, row) => sum + Number(row.line_total), 0)
+
+            if (orderStatus === 'PLACED') {
+              await client.query(
+                `
             UPDATE customer_order 
             SET total_amount = $1, placed_at = now()
             WHERE id = $2
           `,
-              [totalAmount, order.id]
-            )
-          } else {
-            // For DRAFT orders, just update total_amount
-            await client.query(
-              `
+                [totalAmount, order.id]
+              )
+            } else {
+              await client.query(
+                `
             UPDATE customer_order 
             SET total_amount = $1
             WHERE id = $2
           `,
-              [totalAmount, order.id]
-            )
-          }
+                [totalAmount, order.id]
+              )
+            }
 
-          let appliedPromotion = null
-          if (orderStatus === 'PLACED') {
-            const promoLines = items.map((item) => ({
-              productId: item.productId,
-              categoryId: item.product.category_id,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              lineTotal: item.unitPrice * item.quantity,
-            }))
+            let appliedPromotion = null
+            const supplierHasPromos = supplierPromoEligibility.get(supplierId) === true
+            const shouldApplyPromotions =
+              orderStatus === 'PLACED' &&
+              (orderData.promotionId || orderData.couponCode || supplierHasPromos)
+            if (shouldApplyPromotions) {
+              const promoLines = items.map((item) => ({
+                productId: item.productId,
+                categoryId: item.product.category_id,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                lineTotal: item.unitPrice * item.quantity,
+              }))
 
-            const promoPhaseStart = performance.now()
-            if (orderData.promotionId) {
-              appliedPromotion = await applyPromotionByIdToOrder({
-                client,
-                promotionId: orderData.promotionId,
-                orderId: order.id,
-                supplierId,
-                restaurantId,
-                subtotal: totalAmount,
-                lineItems: promoLines,
-              })
-            } else if (orderData.couponCode) {
-              const couponMatch = await validateCouponForOrder({
-                couponCode: orderData.couponCode,
-                supplierId,
-                restaurantId,
-                subtotal: totalAmount,
-                lineItems: promoLines,
-              })
-              if (couponMatch) {
+              const promoPhaseStart = performance.now()
+              if (orderData.promotionId) {
                 appliedPromotion = await applyPromotionByIdToOrder({
                   client,
-                  promotionId: couponMatch.promotion.id,
+                  promotionId: orderData.promotionId,
                   orderId: order.id,
                   supplierId,
                   restaurantId,
                   subtotal: totalAmount,
                   lineItems: promoLines,
                 })
+              } else if (orderData.couponCode) {
+                const couponMatch = await validateCouponForOrder({
+                  couponCode: orderData.couponCode,
+                  supplierId,
+                  restaurantId,
+                  subtotal: totalAmount,
+                  lineItems: promoLines,
+                })
+                if (couponMatch) {
+                  appliedPromotion = await applyPromotionByIdToOrder({
+                    client,
+                    promotionId: couponMatch.promotion.id,
+                    orderId: order.id,
+                    supplierId,
+                    restaurantId,
+                    subtotal: totalAmount,
+                    lineItems: promoLines,
+                  })
+                }
               }
+
+              if (!appliedPromotion) {
+                appliedPromotion = await applyBestPromotionToOrder({
+                  client,
+                  orderId: order.id,
+                  supplierId,
+                  restaurantId,
+                  subtotal: totalAmount,
+                  lineItems: promoLines,
+                  skipDealPreflight: true,
+                })
+              }
+
+              if (appliedPromotion) {
+                totalAmount = appliedPromotion.totalAfterDiscount
+              }
+              txPhaseTimings.promotionMs += elapsedMsSince(promoPhaseStart)
             }
 
-            if (!appliedPromotion) {
-              appliedPromotion = await applyBestPromotionToOrder({
-                client,
-                orderId: order.id,
-                supplierId,
-                restaurantId,
-                subtotal: totalAmount,
-                lineItems: promoLines,
+            let finalOrder = {
+              ...order,
+              total_amount: totalAmount,
+              items: orderItems,
+              status: orderStatus,
+              appliedPromotion,
+            }
+
+            const { rows: supplierRows } = await client.query(
+              `SELECT * FROM supplier WHERE id = $1`,
+              [supplierId]
+            )
+            if (supplierRows.length) {
+              const multiActive = supplierMultiWarehouse.get(supplierId) === true
+              const warehousePhaseStart = performance.now()
+              const fulfillment = await assignWarehousesToOrder(client, {
+                order: { ...order, restaurant_id: restaurantId },
+                orderItems,
+                supplier: supplierRows[0],
+                multiWarehouseActive: multiActive,
               })
+              txPhaseTimings.warehouseMs += elapsedMsSince(warehousePhaseStart)
+              finalOrder = { ...finalOrder, warehouseFulfillment: fulfillment }
             }
 
-            if (appliedPromotion) {
-              totalAmount = appliedPromotion.totalAfterDiscount
-            }
-            txPhaseTimings.promotionMs += elapsedMsSince(promoPhaseStart)
+            createdOrders.push(finalOrder)
           }
 
-          let finalOrder = {
-            ...order,
-            total_amount: totalAmount,
-            items: orderItems,
-            status: orderStatus,
-            appliedPromotion,
-          }
-
-          const { rows: supplierRows } = await client.query(
-            `SELECT * FROM supplier WHERE id = $1`,
-            [supplierId]
+          return createdOrders
+        })
+      } catch (txError) {
+        if (txError instanceof DailyUsageLimitExceededError) {
+          const [subscription, recommendedPlans] = await Promise.all([
+            getTenantSubscription(restaurantId, 'RESTAURANT'),
+            getRecommendedPlanNames('RESTAURANT'),
+          ])
+          const limitCheck = { current: txError.current, limit: txError.limit }
+          const err = buildLimitExceededPayload(
+            limitCheck,
+            'orders_per_day',
+            subscription?.plan_name || subscription?.plan_display_name,
+            recommendedPlans,
+            undefined,
+            'RESTAURANT'
           )
-          if (supplierRows.length) {
-            const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
-            const warehousePhaseStart = performance.now()
-            const fulfillment = await assignWarehousesToOrder(client, {
-              order: { ...order, restaurant_id: restaurantId },
-              orderItems,
-              supplier: supplierRows[0],
-              multiWarehouseActive: multiActive,
-            })
-            txPhaseTimings.warehouseMs += elapsedMsSince(warehousePhaseStart)
-            finalOrder = { ...finalOrder, warehouseFulfillment: fulfillment }
-          }
-
-          createdOrders.push(finalOrder)
+          err.details.requested = supplierGroups.size
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: err,
+            requestId: req.requestId,
+          })
         }
-
-        return createdOrders
-      })
+        throw txError
+      }
       orderCreateTimings.orderTransactionMs = elapsedMsSince(phaseStart)
       orderCreateTimings.promotionMs = txPhaseTimings.promotionMs
       orderCreateTimings.warehouseMs = txPhaseTimings.warehouseMs
@@ -1544,7 +1573,7 @@ router.post(
         ...orderCreateTimings,
       })
 
-      // Usage already reserved atomically in checkAndIncrementUsage above (no second increment)
+      // Usage reserved atomically inside order transaction via incrementDailyUsageMeterInTransaction
 
       // Return single order if only one, otherwise return array
       res.status(201).json({

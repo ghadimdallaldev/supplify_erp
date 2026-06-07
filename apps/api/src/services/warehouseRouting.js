@@ -1,7 +1,7 @@
 /**
  * Pure routing logic + transactional assignment helpers for warehouse fulfillment.
  */
-import { reserveWarehouseStock } from './warehouseInventory.js'
+import { reserveWarehouseStock, reserveWarehouseStockBatch } from './warehouseInventory.js'
 
 const RULE_PRIORITY = {
   product: 1,
@@ -236,9 +236,11 @@ export async function assignWarehousesToOrder(
       orderItemId: null,
       warehouseId,
     })
-    for (const item of orderItems) {
-      await reserveWarehouseStock(client, warehouseId, item.product_id, Number(item.quantity))
-    }
+    await reserveWarehouseStockBatch(
+      client,
+      warehouseId,
+      orderItems.map((item) => ({ productId: item.product_id, quantity: item.quantity }))
+    )
     return { mode: 'single', warehouseId, assignments: [assignment] }
   }
 

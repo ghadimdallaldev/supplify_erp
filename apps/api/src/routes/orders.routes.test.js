@@ -26,8 +26,13 @@ vi.mock('../lib/subscription.js', () => ({
     .fn()
     .mockResolvedValue({ allowed: true, current: 0, limit: 100, isOverLimit: false }),
   checkAndIncrementUsage: vi.fn().mockResolvedValue({ allowed: true }),
+  resolveDailyMeterEnforcement: vi.fn().mockResolvedValue({
+    subscription: { plan_name: 'gold', plan_display_name: 'Gold' },
+    resolved: { isUnlimited: true },
+  }),
+  incrementDailyUsageMeterInTransaction: vi.fn().mockResolvedValue({ allowed: true }),
   incrementUsage: vi.fn().mockResolvedValue(true),
-  isFeatureEnabled: vi.fn().mockResolvedValue(true),
+  isFeatureEnabled: vi.fn().mockResolvedValue(false),
   requireFeature: () => (req, res, next) => next(),
   getTenantSubscription: vi.fn().mockResolvedValue({ plan_name: 'gold' }),
   getRecommendedPlanNames: vi.fn().mockResolvedValue([]),
@@ -36,6 +41,7 @@ vi.mock('../lib/subscription.js', () => ({
 
 vi.mock('../services/promotions.service.js', () => ({
   applyBestPromotionToOrder: vi.fn().mockResolvedValue(null),
+  hasActiveSupplierOrderPromotions: vi.fn().mockResolvedValue(false),
 }))
 
 vi.mock('../lib/audit.js', () => ({
@@ -71,8 +77,12 @@ vi.mock('../services/resolve-product-price.service.js', () => ({
 }))
 
 vi.mock('../services/supplier-inventory.service.js', () => ({
-  assertAndDeductSupplierStock: vi.fn().mockResolvedValue(undefined),
+  assertAndDeductSupplierStockBatch: vi.fn().mockResolvedValue(undefined),
   restoreSupplierStockForOrder: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('../services/order-create.service.js', () => ({
+  insertOrderItemsBatch: vi.fn(),
 }))
 
 // Import routes after mocks
@@ -100,6 +110,20 @@ describe('Orders Routes', () => {
     app.use('/api/orders', ordersRoutes)
     const { errorHandler } = await import('../middlewares/errorHandler.js')
     app.use(errorHandler)
+
+    const { insertOrderItemsBatch } = await import('../services/order-create.service.js')
+    vi.mocked(insertOrderItemsBatch).mockImplementation(
+      async (_client, orderId, supplierId, items) =>
+        items.map((item, idx) => ({
+          id: `item-${idx + 1}`,
+          order_id: orderId,
+          product_id: item.productId,
+          supplier_id: supplierId,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          line_total: item.unitPrice * item.quantity,
+        }))
+    )
   })
 
   describe('GET /api/orders', () => {
@@ -331,13 +355,6 @@ describe('Orders Routes', () => {
         },
       ])
 
-      const { checkAndIncrementUsage } = await import('../lib/subscription.js')
-      vi.mocked(checkAndIncrementUsage).mockResolvedValueOnce({
-        allowed: true,
-        current: 0,
-        limit: 100,
-      })
-
       // Mock transaction - withTransaction is used, and it returns createdOrders array
       const { withTransaction } = await import('../lib/db.js')
       vi.mocked(withTransaction).mockImplementation(async (handler) => {
@@ -354,19 +371,6 @@ describe('Orders Routes', () => {
                 },
               ],
             }) // INSERT order
-            .mockResolvedValueOnce({
-              rows: [
-                {
-                  id: 'item-1',
-                  order_id: 'order-1',
-                  product_id: productId,
-                  supplier_id: supplierId,
-                  quantity: 10,
-                  unit_price: 10.05,
-                  line_total: 100.5,
-                },
-              ],
-            }) // INSERT order item
             .mockResolvedValueOnce({ rows: [] }) // UPDATE order total + placed_at
             .mockResolvedValueOnce({
               rows: [
@@ -428,13 +432,6 @@ describe('Orders Routes', () => {
         },
       ])
 
-      const { checkAndIncrementUsage } = await import('../lib/subscription.js')
-      vi.mocked(checkAndIncrementUsage).mockResolvedValueOnce({
-        allowed: true,
-        current: 0,
-        limit: 100,
-      })
-
       const { withTransaction } = await import('../lib/db.js')
       vi.mocked(withTransaction).mockImplementation(async (handler) => {
         const mockClient = {
@@ -450,20 +447,7 @@ describe('Orders Routes', () => {
                 },
               ],
             })
-            .mockResolvedValueOnce({
-              rows: [
-                {
-                  id: 'item-1',
-                  order_id: 'order-1',
-                  product_id: productId,
-                  supplier_id: supplierId,
-                  quantity: 10,
-                  unit_price: 10.05,
-                  line_total: 100.5,
-                },
-              ],
-            })
-            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] }) // UPDATE order total + placed_at
             .mockResolvedValueOnce({
               rows: [
                 { id: supplierId, multi_warehouse_enabled: false, fulfillment_mode: 'single' },
@@ -541,13 +525,6 @@ describe('Orders Routes', () => {
         },
       ])
 
-      const { checkAndIncrementUsage } = await import('../lib/subscription.js')
-      vi.mocked(checkAndIncrementUsage).mockResolvedValueOnce({
-        allowed: true,
-        current: 0,
-        limit: 100,
-      })
-
       const { withTransaction } = await import('../lib/db.js')
       vi.mocked(withTransaction).mockImplementation(async (handler) => {
         const mockClient = {
@@ -563,20 +540,7 @@ describe('Orders Routes', () => {
                 },
               ],
             })
-            .mockResolvedValueOnce({
-              rows: [
-                {
-                  id: 'item-1',
-                  order_id: 'order-1',
-                  product_id: productId,
-                  supplier_id: supplierId,
-                  quantity: 10,
-                  unit_price: 10.05,
-                  line_total: 100.5,
-                },
-              ],
-            })
-            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] }) // UPDATE order total + placed_at
             .mockResolvedValueOnce({
               rows: [
                 { id: supplierId, multi_warehouse_enabled: false, fulfillment_mode: 'single' },
@@ -644,13 +608,6 @@ describe('Orders Routes', () => {
         },
       ])
 
-      const { checkAndIncrementUsage } = await import('../lib/subscription.js')
-      vi.mocked(checkAndIncrementUsage).mockResolvedValueOnce({
-        allowed: true,
-        current: 0,
-        limit: 100,
-      })
-
       const { withTransaction } = await import('../lib/db.js')
       vi.mocked(withTransaction).mockImplementation(async (handler) => {
         const mockClient = {
@@ -666,20 +623,7 @@ describe('Orders Routes', () => {
                 },
               ],
             })
-            .mockResolvedValueOnce({
-              rows: [
-                {
-                  id: 'item-1',
-                  order_id: 'order-1',
-                  product_id: productId,
-                  supplier_id: supplierId,
-                  quantity: 10,
-                  unit_price: 10.05,
-                  line_total: 100.5,
-                },
-              ],
-            })
-            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] }) // UPDATE order total + placed_at
             .mockResolvedValueOnce({
               rows: [
                 { id: supplierId, multi_warehouse_enabled: false, fulfillment_mode: 'single' },
@@ -757,13 +701,6 @@ describe('Orders Routes', () => {
         },
       ])
 
-      const { checkAndIncrementUsage } = await import('../lib/subscription.js')
-      vi.mocked(checkAndIncrementUsage).mockResolvedValueOnce({
-        allowed: true,
-        current: 0,
-        limit: 100,
-      })
-
       const { withTransaction } = await import('../lib/db.js')
       vi.mocked(withTransaction).mockImplementation(async (handler) => {
         const mockClient = {
@@ -779,20 +716,7 @@ describe('Orders Routes', () => {
                 },
               ],
             })
-            .mockResolvedValueOnce({
-              rows: [
-                {
-                  id: 'item-1',
-                  order_id: 'order-1',
-                  product_id: productId,
-                  supplier_id: supplierId,
-                  quantity: 10,
-                  unit_price: 10.05,
-                  line_total: 100.5,
-                },
-              ],
-            })
-            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] }) // UPDATE order total + placed_at
             .mockResolvedValueOnce({
               rows: [
                 { id: supplierId, multi_warehouse_enabled: false, fulfillment_mode: 'single' },
