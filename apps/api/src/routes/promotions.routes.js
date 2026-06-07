@@ -169,16 +169,18 @@ async function loadPromotionForSupplier(promotionId, supplierId) {
 
 async function syncPromotionTargets(client, promotionId, productIds = [], categoryIds = []) {
   await client.query(`DELETE FROM promotion_targets WHERE promotion_id = $1`, [promotionId])
-  for (const productId of productIds) {
-    await client.query(`INSERT INTO promotion_targets (promotion_id, product_id) VALUES ($1, $2)`, [
-      promotionId,
-      productId,
-    ])
-  }
-  for (const categoryId of categoryIds) {
+  if (productIds.length > 0) {
     await client.query(
-      `INSERT INTO promotion_targets (promotion_id, category_id) VALUES ($1, $2)`,
-      [promotionId, categoryId]
+      `INSERT INTO promotion_targets (promotion_id, product_id)
+       SELECT $1, unnest($2::uuid[])`,
+      [promotionId, productIds]
+    )
+  }
+  if (categoryIds.length > 0) {
+    await client.query(
+      `INSERT INTO promotion_targets (promotion_id, category_id)
+       SELECT $1, unnest($2::uuid[])`,
+      [promotionId, categoryIds]
     )
   }
 }
@@ -187,10 +189,11 @@ async function syncRestaurantTargets(client, promotionId, restaurantIds = []) {
   await client.query(`DELETE FROM promotion_restaurant_targets WHERE promotion_id = $1`, [
     promotionId,
   ])
-  for (const restaurantId of restaurantIds) {
+  if (restaurantIds.length > 0) {
     await client.query(
-      `INSERT INTO promotion_restaurant_targets (promotion_id, restaurant_id) VALUES ($1, $2)`,
-      [promotionId, restaurantId]
+      `INSERT INTO promotion_restaurant_targets (promotion_id, restaurant_id)
+       SELECT $1, unnest($2::uuid[])`,
+      [promotionId, restaurantIds]
     )
   }
 }

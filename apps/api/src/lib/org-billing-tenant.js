@@ -76,3 +76,52 @@ export async function resolveActiveBillingSubscription(tenantId, tenantType) {
     subscription: rows[0] || null,
   }
 }
+
+/**
+ * Batch-resolve active billing subscriptions for admin tenant lists (avoids N+1).
+ * @param {string[]} tenantIds
+ * @param {'RESTAURANT' | 'SUPPLIER'} tenantType
+ * @returns {Promise<Map<string, { billingTenantId: string; usesOrgBilling: boolean; subscription: object | null; plan_code?: string }>>}
+ */
+export async function resolveActiveBillingSubscriptionsBatch(tenantIds, tenantType) {
+  const result = new Map()
+  if (!tenantIds?.length) return result
+
+  const uniqueIds = [...new Set(tenantIds.filter(Boolean))]
+  const billingEntries = await Promise.all(
+    uniqueIds.map(async (id) => {
+      const billingTenantId = await resolveOrgBillingTenantId(id, tenantType)
+      return { id, billingTenantId }
+    })
+  )
+
+  const billingIdByTenant = new Map(billingEntries.map((e) => [e.id, e.billingTenantId]))
+  const billingIds = [...new Set(billingEntries.map((e) => e.billingTenantId))]
+
+  const { rows: subs } = await query(
+    `SELECT DISTINCT ON (s.tenant_id)
+       s.*,
+       sp.code AS plan_code
+     FROM subscription s
+     LEFT JOIN subscription_plan sp ON sp.id = s.plan_id
+     WHERE s.tenant_id = ANY($1::uuid[])
+       AND s.tenant_type = $2
+       AND s.status IN ('TRIALING', 'ACTIVE')
+     ORDER BY s.tenant_id, s.created_at DESC`,
+    [billingIds, tenantType]
+  )
+
+  const subsByBillingId = new Map(subs.map((s) => [s.tenant_id, s]))
+
+  for (const id of uniqueIds) {
+    const billingTenantId = billingIdByTenant.get(id)
+    const subscription = subsByBillingId.get(billingTenantId) || null
+    result.set(id, {
+      billingTenantId,
+      usesOrgBilling: billingTenantId !== id,
+      subscription,
+      plan_code: subscription?.plan_code,
+    })
+  }
+  return result
+}

@@ -9,9 +9,13 @@ import { store } from './store/index.ts'
 import './index.css'
 import { registerServiceWorker } from './lib/registerServiceWorker'
 import { assertHostedWebConfig } from './lib/env'
+import { perfLog } from './lib/perfLog'
 
 assertHostedWebConfig()
 registerServiceWorker()
+
+const appLoadT0 = performance.now()
+perfLog('app.bootstrap.start')
 
 const queryClient = new QueryClient()
 
@@ -41,3 +45,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </React.StrictMode>
 )
+
+window.addEventListener('load', () => {
+  perfLog('app.bootstrap.load', { durationMs: Math.round(performance.now() - appLoadT0) })
+})

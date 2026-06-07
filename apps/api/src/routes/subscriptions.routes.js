@@ -33,7 +33,13 @@ router.use(requireAuth, resolveTenantContext, subscriptionRouteGuard)
  */
 router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
-    const tenant = await getRequestTenant(req)
+    const tenant = req.tenantContext?.tenantId
+      ? {
+          tenantId: req.tenantContext.tenantId,
+          tenantType: req.tenantContext.tenantType,
+          tenantName: req.tenantContext.tenantName,
+        }
+      : await getRequestTenant(req)
     if (!tenant) {
       return res.status(404).json({
         ok: false,
@@ -146,7 +152,13 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
  */
 router.get('/current', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
-    const tenant = await getRequestTenant(req)
+    const tenant = req.tenantContext?.tenantId
+      ? {
+          tenantId: req.tenantContext.tenantId,
+          tenantType: req.tenantContext.tenantType,
+          tenantName: req.tenantContext.tenantName,
+        }
+      : await getRequestTenant(req)
     if (!tenant) {
       return res.status(404).json({
         ok: false,
@@ -221,7 +233,13 @@ router.get(
   requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']),
   async (req, res) => {
     try {
-      const tenant = await getRequestTenant(req)
+      const tenant = req.tenantContext?.tenantId
+        ? {
+            tenantId: req.tenantContext.tenantId,
+            tenantType: req.tenantContext.tenantType,
+            tenantName: req.tenantContext.tenantName,
+          }
+        : await getRequestTenant(req)
       if (!tenant) {
         return res.status(404).json({
           ok: false,
@@ -263,7 +281,13 @@ router.get(
  */
 router.get('/plans', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
-    const tenant = await getRequestTenant(req)
+    const tenant = req.tenantContext?.tenantId
+      ? {
+          tenantId: req.tenantContext.tenantId,
+          tenantType: req.tenantContext.tenantType,
+          tenantName: req.tenantContext.tenantName,
+        }
+      : await getRequestTenant(req)
     if (!tenant) {
       return res.status(404).json({
         ok: false,
@@ -313,7 +337,13 @@ router.get(
   requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']),
   async (req, res) => {
     try {
-      const tenant = await getRequestTenant(req)
+      const tenant = req.tenantContext?.tenantId
+        ? {
+            tenantId: req.tenantContext.tenantId,
+            tenantType: req.tenantContext.tenantType,
+            tenantName: req.tenantContext.tenantName,
+          }
+        : await getRequestTenant(req)
       if (!tenant) {
         return res.status(404).json({
           ok: false,
@@ -375,7 +405,13 @@ router.post(
   requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']),
   async (req, res) => {
     try {
-      const tenant = await getRequestTenant(req)
+      const tenant = req.tenantContext?.tenantId
+        ? {
+            tenantId: req.tenantContext.tenantId,
+            tenantType: req.tenantContext.tenantType,
+            tenantName: req.tenantContext.tenantName,
+          }
+        : await getRequestTenant(req)
       if (!tenant) {
         return res.status(404).json({
           ok: false,
@@ -424,7 +460,13 @@ router.get(
   requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']),
   async (req, res) => {
     try {
-      const tenant = await getRequestTenant(req)
+      const tenant = req.tenantContext?.tenantId
+        ? {
+            tenantId: req.tenantContext.tenantId,
+            tenantType: req.tenantContext.tenantType,
+            tenantName: req.tenantContext.tenantName,
+          }
+        : await getRequestTenant(req)
       if (!tenant) {
         return res.status(404).json({
           ok: false,

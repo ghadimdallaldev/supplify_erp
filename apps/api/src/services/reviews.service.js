@@ -34,6 +34,67 @@ export async function getSupplierRatingSummary(supplierId) {
   return rows[0]
 }
 
+export async function getSupplierRatingSummariesBatch(supplierIds) {
+  if (!supplierIds?.length) return new Map()
+  const { rows } = await query(
+    `
+    SELECT supplier_id, review_count, avg_overall, avg_quality, avg_delivery, avg_value, updated_at
+    FROM supplier_rating_summaries
+    WHERE supplier_id = ANY($1::uuid[])
+    `,
+    [supplierIds]
+  )
+  const map = new Map()
+  for (const id of supplierIds) {
+    map.set(id, {
+      supplier_id: id,
+      review_count: 0,
+      avg_overall: 0,
+      avg_quality: null,
+      avg_delivery: null,
+      avg_value: null,
+    })
+  }
+  for (const row of rows) {
+    map.set(row.supplier_id, row)
+  }
+  return map
+}
+
+export async function getRecentReviewsForSuppliersBatch(supplierIds, limitPerSupplier = 3) {
+  if (!supplierIds?.length) return new Map()
+  const { rows } = await query(
+    `
+    SELECT * FROM (
+      SELECT
+        sr.supplier_id,
+        sr.id,
+        sr.overall_rating,
+        sr.quality_rating,
+        sr.delivery_rating,
+        sr.value_rating,
+        sr.comment,
+        sr.created_at,
+        r.name AS restaurant_name,
+        ROW_NUMBER() OVER (PARTITION BY sr.supplier_id ORDER BY sr.created_at DESC) AS rn
+      FROM supplier_reviews sr
+      JOIN restaurant r ON r.id = sr.restaurant_id
+      WHERE sr.supplier_id = ANY($1::uuid[])
+    ) ranked
+    WHERE rn <= $2
+    ORDER BY supplier_id, created_at DESC
+    `,
+    [supplierIds, limitPerSupplier]
+  )
+  const map = new Map()
+  for (const row of rows) {
+    const bucket = map.get(row.supplier_id) || []
+    bucket.push(row)
+    map.set(row.supplier_id, bucket)
+  }
+  return map
+}
+
 export async function getRecentReviewsForSupplier(supplierId, limit = 3) {
   const { rows } = await query(
     `

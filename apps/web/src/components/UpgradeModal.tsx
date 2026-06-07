@@ -150,7 +150,7 @@ export function UpgradeModal() {
     isLoading: plansLoading,
     isError: plansError,
   } = useGetSubscriptionPlansQuery(undefined, {
-    skip: !shouldLoadTenantEntitlements,
+    skip: !open || !shouldLoadTenantEntitlements,
   })
   const { data: billingStatus } = useGetBillingStatusQuery(undefined, { skip: !open })
   const [recordConversionEvent] = useRecordConversionEventMutation()
@@ -420,9 +420,9 @@ export function UpgradeModal() {
             {showPlans && (
               <div
                 className={cn(
-                  'grid gap-3 grid-cols-1 min-w-0',
+                  'grid min-w-0 grid-cols-1 gap-3',
                   colCount >= 2 && 'sm:grid-cols-2',
-                  colCount >= 3 && 'lg:grid-cols-3',
+                  colCount === 3 && 'lg:grid-cols-3',
                   colCount >= 4 && 'xl:grid-cols-4'
                 )}
               >
@@ -667,7 +667,7 @@ export function UpgradeModal() {
         </div>
 
         {/* Bottom actions — outside scroll so taps are not blocked on mobile */}
-        <div className="action-bar shrink-0 border-t border-[var(--app-border)] bg-[var(--surface)] px-4 py-4 sm:px-6">
+        <div className="action-bar shrink-0 flex-col border-t border-[var(--app-border)] bg-[var(--surface)] px-4 py-4 sm:flex-row sm:px-6">
           {canUpgrade && recommendedCode && recommendedCode !== currentCode && (
             <Button
               type="button"

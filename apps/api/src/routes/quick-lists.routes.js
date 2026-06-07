@@ -177,11 +177,12 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
       params
     )
 
-    // Fetch items for each list
-    const quickListsWithItems = await Promise.all(
-      rows.map(async (list) => {
-        const { rows: items } = await query(
-          `
+    // Fetch items for all lists in one query (avoids N+1 per quick list).
+    const listIds = rows.map((list) => list.id)
+    let itemsByListId = new Map()
+    if (listIds.length > 0) {
+      const { rows: allItems } = await query(
+        `
         SELECT 
           qli.*,
           p.name as product_name,
@@ -200,18 +201,22 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
           ORDER BY valid_from DESC
           LIMIT 1
         ) pr ON true
-        WHERE qli.quick_list_id = $1
-        ORDER BY p.name
+        WHERE qli.quick_list_id = ANY($1::uuid[])
+        ORDER BY qli.quick_list_id, p.name
       `,
-          [list.id]
-        )
+        [listIds]
+      )
+      for (const item of allItems) {
+        const bucket = itemsByListId.get(item.quick_list_id) || []
+        bucket.push(item)
+        itemsByListId.set(item.quick_list_id, bucket)
+      }
+    }
 
-        return {
-          ...mapQuickListRow(list),
-          items: items || [],
-        }
-      })
-    )
+    const quickListsWithItems = rows.map((list) => ({
+      ...mapQuickListRow(list),
+      items: itemsByListId.get(list.id) || [],
+    }))
 
     res.json({
       ok: true,
@@ -358,29 +363,30 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
         ]
       )
 
-      // Create items
+      // Verify all products belong to their suppliers in one query, then bulk insert items.
       const items = []
-      for (const item of itemsToCreate) {
-        // Verify product belongs to supplier
-        const { rows: products } = await client.query(
-          `
-          SELECT id FROM product WHERE id = $1 AND supplier_id = $2
-        `,
-          [item.productId, item.supplierId]
+      if (itemsToCreate.length > 0) {
+        const productIds = itemsToCreate.map((i) => i.productId)
+        const supplierIds = [...new Set(itemsToCreate.map((i) => i.supplierId))]
+        const { rows: validProducts } = await client.query(
+          `SELECT id, supplier_id FROM product WHERE id = ANY($1::uuid[]) AND supplier_id = ANY($2::uuid[])`,
+          [productIds, supplierIds]
         )
-
-        if (products.length === 0) {
-          throw new ValidationError(
-            `Product ${item.productId} does not belong to supplier ${item.supplierId}`
-          )
+        const validSet = new Set(validProducts.map((p) => `${p.id}:${p.supplier_id}`))
+        for (const item of itemsToCreate) {
+          if (!validSet.has(`${item.productId}:${item.supplierId}`)) {
+            throw new ValidationError(
+              `Product ${item.productId} does not belong to supplier ${item.supplierId}`
+            )
+          }
         }
 
-        const {
-          rows: [quickListItem],
-        } = await client.query(
+        const { rows: insertedItems } = await client.query(
           `
           INSERT INTO quick_list_item (quick_list_id, product_id, supplier_id, quantity, notes, default_unit)
-          VALUES ($1, $2, $3, $4, $5, $6)
+          SELECT $1, t.product_id, t.supplier_id, t.quantity, t.notes, t.default_unit
+          FROM unnest($2::uuid[], $3::uuid[], $4::numeric[], $5::text[], $6::text[])
+            AS t(product_id, supplier_id, quantity, notes, default_unit)
           ON CONFLICT (quick_list_id, product_id) DO UPDATE SET
             quantity = EXCLUDED.quantity,
             notes = EXCLUDED.notes,
@@ -389,15 +395,14 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
         `,
           [
             quickList.id,
-            item.productId,
-            item.supplierId,
-            item.quantity,
-            item.notes || null,
-            item.defaultUnit || null,
+            itemsToCreate.map((i) => i.productId),
+            itemsToCreate.map((i) => i.supplierId),
+            itemsToCreate.map((i) => i.quantity),
+            itemsToCreate.map((i) => i.notes || null),
+            itemsToCreate.map((i) => i.defaultUnit || null),
           ]
         )
-
-        items.push(quickListItem)
+        items.push(...insertedItems)
       }
 
       return { ...quickList, items }
