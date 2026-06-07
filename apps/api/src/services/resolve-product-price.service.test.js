@@ -122,6 +122,24 @@ describe('resolve-product-price.service', () => {
     expect(results[1].unitPrice).toBe(8)
   })
 
+  it('skips catalog query when catalogByProductId map is provided', async () => {
+    const { resolveProductPricesBatch } = await import('./resolve-product-price.service.js')
+    const catalog = new Map([[PRODUCT_ID, { amount: 10, currency: 'USD' }]])
+
+    queryMock.mockResolvedValueOnce({ rows: [] })
+
+    const results = await resolveProductPricesBatch({
+      restaurantId: RESTAURANT_ID,
+      items: [{ productId: PRODUCT_ID, supplierId: SUPPLIER_ID, quantity: 1 }],
+      catalogByProductId: catalog,
+    })
+
+    expect(results).toHaveLength(1)
+    expect(results[0].unitPrice).toBe(10)
+    expect(queryMock).toHaveBeenCalledTimes(1)
+    expect(String(queryMock.mock.calls[0][0])).toContain('restaurant_pricing')
+  })
+
   it('enriches products with resolved pricing fields', async () => {
     const { enrichProductsWithResolvedPricing } = await import('./resolve-product-price.service.js')
 
