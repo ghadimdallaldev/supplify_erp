@@ -11,6 +11,8 @@ import { DriverRoutePanel } from '../components/driver/DriverRoutePanel'
 import {
   useGetDriverActiveRouteQuery,
   useGetSupplierDeliveryBoardQuery,
+  useReorderFulfillmentRouteStopsMutation,
+  useSetNextFulfillmentRouteStopMutation,
   useUpdateFulfillmentRouteStopMutation,
   useUpdateOrderDeliveryStatusMutation,
 } from '../services/api'
@@ -33,6 +35,8 @@ export function DriverDeliveriesPage() {
   } = useGetDriverActiveRouteQuery()
   const [updateStatus, { isLoading: updating }] = useUpdateOrderDeliveryStatusMutation()
   const [updateRouteStop] = useUpdateFulfillmentRouteStopMutation()
+  const [reorderStops, { isLoading: reordering }] = useReorderFulfillmentRouteStopsMutation()
+  const [setNextStop] = useSetNextFulfillmentRouteStopMutation()
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [showCompleted, setShowCompleted] = useState(false)
 
@@ -89,6 +93,40 @@ export function DriverDeliveriesPage() {
   const handleRefresh = () => {
     refetch()
     refetchRoute()
+  }
+
+  const handleMoveStop = async (index: number, direction: -1 | 1) => {
+    if (!activeRoute) return
+    const next = index + direction
+    if (next < 0 || next >= activeRoute.stops.length) return
+    const ids = activeRoute.stops.map((s) => s.id)
+    const tmp = ids[index]
+    ids[index] = ids[next]
+    ids[next] = tmp
+    try {
+      await reorderStops({ routeId: activeRoute.id, stop_ids: ids }).unwrap()
+      toast.success('Stop order updated')
+      refetchRoute()
+    } catch (e: unknown) {
+      const msg =
+        (e as { data?: { error?: { message?: string } } })?.data?.error?.message ||
+        'Could not reorder stops'
+      toast.error(msg)
+    }
+  }
+
+  const handleSetNext = async (orderId: string) => {
+    if (!activeRoute) return
+    try {
+      await setNextStop({ routeId: activeRoute.id, orderId }).unwrap()
+      toast.success('Next stop updated')
+      refetchRoute()
+    } catch (e: unknown) {
+      const msg =
+        (e as { data?: { error?: { message?: string } } })?.data?.error?.message ||
+        'Could not set next stop'
+      toast.error(msg)
+    }
   }
 
   const handleRouteStopStatus = async (
@@ -211,6 +249,9 @@ export function DriverDeliveriesPage() {
             notes={notes}
             onNotesChange={(orderId, value) => setNotes((prev) => ({ ...prev, [orderId]: value }))}
             onStopStatus={handleRouteStopStatus}
+            onMoveStop={handleMoveStop}
+            onSetNext={handleSetNext}
+            reordering={reordering}
             disabled={updating}
           />
         ) : null}

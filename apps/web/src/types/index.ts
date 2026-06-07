@@ -216,6 +216,8 @@ export interface RestaurantOrderTrackingResponse {
   etaMinutesMax?: number | null
   distanceKm?: number | null
   calculatedAt?: string | null
+  stopsBefore?: number
+  nextStop?: boolean
   delivery?: {
     status: string
     label: string
@@ -242,6 +244,10 @@ export interface SupplierOrderTrackingResponse {
   calculatedAt?: string | null
   confidence?: 'LOW' | 'MEDIUM' | null
   unavailableReason?: string | null
+  stopsBefore?: number
+  nextStop?: boolean
+  routePosition?: number | null
+  routePositionTotal?: number | null
   destination?: {
     latitude: number
     longitude: number
@@ -338,6 +344,7 @@ export interface DeliveryRouteStop {
   id: string
   routeId: string
   orderId: string
+  orderNumber?: string
   sequenceNumber: number
   status: string
   restaurantName: string
@@ -348,6 +355,9 @@ export interface DeliveryRouteStop {
   notes?: string | null
   assignmentStatus?: string | null
   tracking?: DeliveryTrackingInfo | null
+  destinationCoordinatesAvailable?: boolean
+  isNext?: boolean
+  isCompleted?: boolean
 }
 
 export interface DeliveryRouteSummary {

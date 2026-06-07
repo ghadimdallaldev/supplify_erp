@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { MapPin, ExternalLink, Radio } from 'lucide-react'
 import { googleMapsApiKey, mapProvider } from '../../lib/env'
 
@@ -10,6 +10,12 @@ type Props = {
   /** Show live indicator and prefer embedded map (Toters-style in-box tracking). */
   live?: boolean
   recordedAt?: string | null
+  /** Rendered between map and footer (e.g. ETA card). */
+  beforeFooter?: ReactNode
+  /** e.g. "Picked up · Live now" */
+  liveStatusLine?: string | null
+  /** Supplier-only debug coordinates under a collapsible section. */
+  showCoordinateDetails?: boolean
 }
 
 function buildOsmEmbedUrl(lat: number, lng: number) {
@@ -25,6 +31,9 @@ export function DeliveryTrackingMap({
   heightClassName = 'h-56',
   live = false,
   recordedAt,
+  beforeFooter,
+  liveStatusLine,
+  showCoordinateDetails = false,
 }: Props) {
   const hasCoords =
     latitude != null &&
@@ -73,26 +82,57 @@ export function DeliveryTrackingMap({
           data-testid="delivery-tracking-map-embed"
         />
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-muted)]">
-        <span className="font-mono">
-          {lat.toFixed(5)}, {lng.toFixed(5)}
-        </span>
-        {recordedAt ? (
-          <span data-testid="delivery-tracking-map-updated">
-            Updated {new Date(recordedAt).toLocaleTimeString()}
-          </span>
-        ) : null}
-      </div>
+
+      {beforeFooter ? (
+        <div data-testid="delivery-tracking-map-before-footer">{beforeFooter}</div>
+      ) : null}
+
+      {(liveStatusLine || recordedAt) && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-muted)]"
+          data-testid="delivery-tracking-map-status-row"
+        >
+          {liveStatusLine ? (
+            <span
+              className="font-medium text-[var(--text-primary)]"
+              data-testid="delivery-tracking-map-status"
+            >
+              {liveStatusLine}
+            </span>
+          ) : (
+            <span />
+          )}
+          {recordedAt ? (
+            <span data-testid="delivery-tracking-map-updated">
+              Updated {new Date(recordedAt).toLocaleTimeString()}
+            </span>
+          ) : null}
+        </div>
+      )}
+
       <a
         href={mapsUrl}
         target="_blank"
         rel="noreferrer"
         className="inline-flex items-center gap-1 text-xs text-[var(--brand-mid)] underline"
+        data-testid="delivery-tracking-map-open"
       >
         <MapPin className="h-3 w-3" aria-hidden />
         Open in maps
         <ExternalLink className="h-3 w-3" aria-hidden />
       </a>
+
+      {showCoordinateDetails ? (
+        <details
+          className="text-xs text-[var(--text-muted)]"
+          data-testid="delivery-tracking-map-debug"
+        >
+          <summary className="cursor-pointer select-none font-medium">Debug details</summary>
+          <p className="mt-1 font-mono">
+            {lat.toFixed(5)}, {lng.toFixed(5)}
+          </p>
+        </details>
+      ) : null}
     </div>
   )
 }

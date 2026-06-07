@@ -44,6 +44,7 @@ export function buildRestaurantTrackingResponse({
   assignment,
   tracking,
   destination = null,
+  routeContext = null,
 }) {
   const deliveryStatus = assignment?.status ?? 'pending'
   const destinationPayload = buildDestinationPayload(destination, { includeCoordinates: false })
@@ -53,6 +54,7 @@ export function buildRestaurantTrackingResponse({
       destination,
       assignmentStatus: deliveryStatus,
       orderStatus,
+      routeContext,
     })
   )
 

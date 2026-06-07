@@ -739,6 +739,17 @@ export const api = createApi({
       }),
       invalidatesTags: ['Fulfillment', 'Order'],
     }),
+    setNextFulfillmentRouteStop: builder.mutation<
+      { route: DeliveryRouteDetail },
+      { routeId: string; orderId: string }
+    >({
+      query: ({ routeId, orderId }) => ({
+        url: `/api/fulfillment/routes/${routeId}/next-stop`,
+        method: 'PATCH',
+        body: { orderId },
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
     updateFulfillmentRouteStop: builder.mutation<
       { route: DeliveryRouteDetail },
       {
@@ -3859,6 +3870,7 @@ export const {
   useUpdateFulfillmentRouteMutation,
   useCancelFulfillmentRouteMutation,
   useReorderFulfillmentRouteStopsMutation,
+  useSetNextFulfillmentRouteStopMutation,
   useUpdateFulfillmentRouteStopMutation,
   useGetFulfillmentExceptionsQuery,
   useGetFulfillmentDispatchQuery,
