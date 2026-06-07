@@ -1,6 +1,6 @@
 # Delivery ETA and live tracking
 
-Companion to [drivers-and-gps-tracking.md](./drivers-and-gps-tracking.md). Covers ETA **readiness** (not the ETA calculation itself).
+Companion to [drivers-and-gps-tracking.md](./drivers-and-gps-tracking.md). Covers destination coordinates, ETA calculation, and tracking payload fields.
 
 ## Prerequisites for ETA
 
@@ -8,9 +8,103 @@ Companion to [drivers-and-gps-tracking.md](./drivers-and-gps-tracking.md). Cover
 | ----------------------- | -------------------------------------------- | ------------------------------- |
 | Driver latest GPS       | `driver_latest_location` / order-scoped ping | Yes                             |
 | Destination coordinates | Restaurant / branch delivery location        | Yes                             |
+| Active delivery status  | Assignment `picked_up` or `out_for_delivery` | Yes                             |
 | Text address alone      | `address_json`, delivery area name           | No (not geocoded automatically) |
 
 If destination latitude/longitude are missing, live maps can still show the **driver** position, but **ETA stays unavailable**.
+
+---
+
+## ETA calculation
+
+Service: [`delivery-eta.service.js`](../../apps/api/src/services/delivery-eta.service.js)
+
+### Formula
+
+1. **Distance** — haversine great-circle distance between driver GPS and destination (rounded to **1 decimal km**).
+2. **Base time** — `(distanceKm / speedKmh) × 60` minutes.
+3. **Range** — `etaMinutesMin = max(1, round(base × minMultiplier))`, `etaMinutesMax = max(min, round(base × maxMultiplier))`.
+
+Default speed and multipliers are configurable (see below). This is a **straight-line city estimate**, not turn-by-turn routing.
+
+### Environment (API)
+
+| Variable                      | Default | Purpose                    |
+| ----------------------------- | ------- | -------------------------- |
+| `DELIVERY_ETA_CITY_SPEED_KMH` | `20`    | Assumed average city speed |
+| `DELIVERY_ETA_MIN_MULTIPLIER` | `1.0`   | Lower bound on ETA range   |
+| `DELIVERY_ETA_MAX_MULTIPLIER` | `1.5`   | Upper bound on ETA range   |
+
+Configured in dev via [`deploy/railway/development/api.env`](../../deploy/railway/development/api.env).
+
+### Gating (when `etaAvailable` is false)
+
+| Condition                                            | Supplier `unavailableReason` |
+| ---------------------------------------------------- | ---------------------------- |
+| Order `CANCELLED` or delivery `delivered` / `failed` | `order_terminal`             |
+| Assignment not `picked_up` or `out_for_delivery`     | `assignment_not_active`      |
+| No destination coordinates                           | `destination_missing`        |
+| No driver `latestLocation`                           | `driver_location_missing`    |
+
+Restaurant payloads omit `unavailableReason`; UI shows friendly copy instead.
+
+### When ETA is available
+
+**Supplier payload** (full):
+
+```json
+{
+  "etaAvailable": true,
+  "etaMinutesMin": 12,
+  "etaMinutesMax": 18,
+  "distanceKm": 4.2,
+  "confidence": "MEDIUM",
+  "calculatedAt": "2026-06-07T12:00:00.000Z"
+}
+```
+
+**Restaurant payload** (sanitized — no `unavailableReason`, no `confidence`, no destination lat/lng):
+
+```json
+{
+  "etaAvailable": true,
+  "etaMinutesMin": 12,
+  "etaMinutesMax": 18,
+  "distanceKm": 4.2,
+  "calculatedAt": "2026-06-07T12:00:00.000Z",
+  "destinationCoordinatesAvailable": true,
+  "destinationLabel": "Loading dock"
+}
+```
+
+### Stale GPS
+
+When driver GPS is stale (`tracking.isStale === true`), ETA **remains available** with `confidence: "LOW"`. Supplier UI shows a subtle “Low confidence” badge; restaurant UI does not expose confidence.
+
+### Visibility matrix
+
+| Field                             | Restaurant view | Supplier view       |
+| --------------------------------- | --------------- | ------------------- |
+| `destinationCoordinatesAvailable` | ✓               | ✓                   |
+| `destinationLabel`                | ✓ (safe label)  | ✓                   |
+| `destination.latitude/longitude`  | omitted         | ✓ (fulfillment map) |
+| `etaAvailable`                    | ✓               | ✓                   |
+| `etaMinutesMin` / `etaMinutesMax` | ✓               | ✓                   |
+| `distanceKm`                      | ✓               | ✓                   |
+| `calculatedAt`                    | ✓               | ✓                   |
+| `confidence`                      | omitted         | ✓                   |
+| `unavailableReason`               | omitted         | ✓ (when blocked)    |
+
+### Frontend display
+
+Helpers: [`deliveryEtaDisplay.ts`](../../apps/web/src/lib/deliveryEtaDisplay.ts)
+
+| Audience   | ETA available copy                           |
+| ---------- | -------------------------------------------- |
+| Restaurant | “Arriving in about 12–18 minutes” + distance |
+| Supplier   | “ETA 12–18 min · 4.2 km away” + LOW badge    |
+
+Panels: `RestaurantOrderTrackingPanel`, `OrderDeliveryTrackingPanel`, `DeliveryTrackingDrawer`.
 
 ---
 
@@ -68,19 +162,6 @@ Validation:
 
 Suppliers read destination coordinates only through **`GET /api/orders/:id/tracking`** for orders they fulfill (not full restaurant profile).
 
-### Tracking payload
-
-`GET /api/orders/:id/tracking` includes:
-
-| Field                             | Restaurant view | Supplier view                        |
-| --------------------------------- | --------------- | ------------------------------------ |
-| `destinationCoordinatesAvailable` | ✓               | ✓                                    |
-| `destinationLabel`                | ✓ (safe label)  | ✓                                    |
-| `destination.latitude/longitude`  | omitted         | ✓ (for fulfillment map / future ETA) |
-| `etaAvailable`                    | ✓               | ✓                                    |
-
-`etaAvailable` is **true** when live driver GPS **and** destination coordinates are both present. Actual minute-level ETA is a follow-up feature.
-
 ### Fallback when missing
 
 UI shows:
@@ -89,8 +170,4 @@ UI shows:
 
 Order creation is **not** blocked when coordinates are missing.
 
----
-
-## Next step: ETA calculation
-
-Once both sides are available, a future service can compute ETA from haversine or routing without schema changes. Do not geocode `address_json` in the API for this MVP.
+Do not geocode `address_json` in the API for this MVP.

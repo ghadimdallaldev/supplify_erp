@@ -297,6 +297,10 @@ describe('driver-location.service', () => {
       expect(result.destinationCoordinatesAvailable).toBe(true)
       expect(result.destinationLabel).toBe('Main gate')
       expect(result.etaAvailable).toBe(true)
+      expect(result.etaMinutesMin).toBeGreaterThan(0)
+      expect(result.etaMinutesMax).toBeGreaterThanOrEqual(result.etaMinutesMin)
+      expect(result.distanceKm).toBeGreaterThan(0)
+      expect(result).not.toHaveProperty('unavailableReason')
     })
 
     it('marks ETA unavailable when destination coordinates missing', async () => {

@@ -4,6 +4,7 @@ import type { RestaurantOrderTrackingResponse } from '../types'
 
 const base: RestaurantOrderTrackingResponse = {
   orderId: 'o1',
+  orderReference: 'ORD-o1',
   trackingEnabled: true,
   etaAvailable: false,
   destinationCoordinatesAvailable: false,
@@ -17,13 +18,13 @@ describe('deliveryEtaMessages', () => {
     )
   })
 
-  it('shows generic ETA message when destination exists but driver GPS missing', () => {
+  it('shows start delivery message when destination exists but ETA not ready', () => {
     expect(
       getEtaUnavailableMessage({
         ...base,
         destinationCoordinatesAvailable: true,
       })
-    ).toBe('ETA not available yet')
+    ).toBe('ETA will appear once the driver starts delivery.')
   })
 
   it('returns null when ETA is ready', () => {

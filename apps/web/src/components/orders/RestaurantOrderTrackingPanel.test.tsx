@@ -9,7 +9,10 @@ vi.mock('../../services/api', () => ({
       orderId: 'order-1',
       orderReference: 'ORD-order-1',
       trackingEnabled: true,
-      etaAvailable: false,
+      etaAvailable: true,
+      etaMinutesMin: 12,
+      etaMinutesMax: 18,
+      distanceKm: 4.2,
       destinationCoordinatesAvailable: true,
       delivery: { status: 'out_for_delivery', label: 'Out for delivery' },
       tracking: {
@@ -31,7 +34,7 @@ vi.mock('../../services/api', () => ({
 }))
 
 describe('RestaurantOrderTrackingPanel', () => {
-  it('renders live tracking with map fallback', () => {
+  it('renders live tracking with positive ETA', () => {
     render(
       <MemoryRouter>
         <RestaurantOrderTrackingPanel orderId="order-1" orderStatus="SHIPPED" />
@@ -40,8 +43,11 @@ describe('RestaurantOrderTrackingPanel', () => {
     expect(screen.getByTestId('restaurant-order-tracking-panel')).toBeInTheDocument()
     expect(screen.getByTestId('restaurant-tracking-message')).toHaveTextContent(/on the way/i)
     expect(screen.getByTestId('delivery-tracking-map-embed')).toBeInTheDocument()
-    expect(screen.getByTestId('restaurant-tracking-eta')).toHaveTextContent(
-      /ETA not available yet/i
+    expect(screen.getByTestId('restaurant-tracking-eta-primary')).toHaveTextContent(
+      /Arriving in about 12–18 minutes/i
+    )
+    expect(screen.getByTestId('restaurant-tracking-eta-distance')).toHaveTextContent(
+      /4\.2 km away/i
     )
   })
 })

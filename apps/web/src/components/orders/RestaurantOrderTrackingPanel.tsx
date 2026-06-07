@@ -13,7 +13,11 @@ import {
   getRestaurantTrackingMessage,
   shouldPollRestaurantTracking,
 } from '../../lib/restaurantTrackingMessages'
-import { getEtaUnavailableMessage } from '../../lib/deliveryEtaMessages'
+import {
+  formatDistanceKm,
+  getEtaUnavailableMessage,
+  getRestaurantEtaPrimaryText,
+} from '../../lib/deliveryEtaDisplay'
 import { isRestaurantOrderTracking } from '../../types'
 
 type Props = {
@@ -106,6 +110,28 @@ export function RestaurantOrderTrackingPanel({ orderId, orderStatus }: Props) {
 
         {data?.trackingEnabled && data.delivery?.status !== 'delivered'
           ? (() => {
+              const etaPrimary = getRestaurantEtaPrimaryText(data)
+              if (etaPrimary) {
+                const distanceText = formatDistanceKm(data.distanceKm)
+                return (
+                  <div className="space-y-0.5" data-testid="restaurant-tracking-eta">
+                    <p
+                      className="text-sm font-medium text-[var(--text-primary)]"
+                      data-testid="restaurant-tracking-eta-primary"
+                    >
+                      {etaPrimary}
+                    </p>
+                    {distanceText ? (
+                      <p
+                        className="text-xs text-[var(--text-muted)]"
+                        data-testid="restaurant-tracking-eta-distance"
+                      >
+                        {distanceText}
+                      </p>
+                    ) : null}
+                  </div>
+                )
+              }
               const etaMessage = getEtaUnavailableMessage(data)
               return etaMessage ? (
                 <p

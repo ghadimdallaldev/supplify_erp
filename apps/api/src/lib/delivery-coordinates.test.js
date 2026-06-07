@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildDestinationPayload,
-  computeEtaReadiness,
   resolveDestinationFromOrderRow,
   validateDeliveryCoordinates,
 } from './delivery-coordinates.js'
@@ -57,19 +56,6 @@ describe('delivery-coordinates', () => {
 
   it('returns unavailable destination when coords missing', () => {
     expect(buildDestinationPayload(resolveDestinationFromOrderRow({})).coordinatesAvailable).toBe(
-      false
-    )
-  })
-
-  it('computeEtaReadiness requires driver and destination', () => {
-    const tracking = {
-      hasLocation: true,
-      latestLocation: { latitude: 33.89, longitude: 35.5 },
-    }
-    const destination = { latitude: 33.9, longitude: 35.51 }
-    expect(computeEtaReadiness(tracking, destination)).toBe(true)
-    expect(computeEtaReadiness(tracking, null)).toBe(false)
-    expect(computeEtaReadiness({ hasLocation: false, latestLocation: null }, destination)).toBe(
       false
     )
   })

@@ -6,7 +6,12 @@ import { useGetOrderTrackingQuery } from '../../services/api'
 import { formatDeliveryStatus } from '../../lib/deliveryStatusLabels'
 import { formatOrderRef } from './fulfillmentDispatchUtils'
 import { getGpsStatusLabel } from '../../lib/deliveryTrackingLabels'
-import { getEtaUnavailableMessage } from '../../lib/deliveryEtaMessages'
+import {
+  formatDistanceKm,
+  getEtaUnavailableMessage,
+  getSupplierEtaPrimaryText,
+  shouldShowEtaConfidence,
+} from '../../lib/deliveryEtaDisplay'
 import { DeliveryTrackingMap } from '../maps/DeliveryTrackingMap'
 
 type Props = {
@@ -106,6 +111,27 @@ export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
             />
 
             {(() => {
+              const etaPrimary = getSupplierEtaPrimaryText(data)
+              if (etaPrimary) {
+                const distanceText = formatDistanceKm(data.distanceKm)
+                return (
+                  <div className="space-y-1" data-testid="tracking-drawer-eta">
+                    <p className="text-sm font-medium" data-testid="tracking-drawer-eta-primary">
+                      {etaPrimary}
+                      {distanceText ? ` · ${distanceText}` : ''}
+                    </p>
+                    {shouldShowEtaConfidence(data) ? (
+                      <Badge
+                        variant="outline"
+                        className="text-xs"
+                        data-testid="tracking-drawer-eta-confidence"
+                      >
+                        Low confidence
+                      </Badge>
+                    ) : null}
+                  </div>
+                )
+              }
               const etaMessage = getEtaUnavailableMessage(data)
               return etaMessage ? (
                 <p

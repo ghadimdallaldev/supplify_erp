@@ -92,9 +92,9 @@ Destination GPS for ETA is stored on **`branch`** (per operational location) and
 - Migration: `0143_restaurant_delivery_coordinates.sql`
 - Restaurant settings: **Profile → Delivery location** (latitude, longitude, label, notes)
 - APIs: `GET/PATCH /api/restaurants/me/delivery-location`, `PATCH /api/restaurants/branches/:branchId/delivery-location`
-- Tracking: `destinationCoordinatesAvailable`, `destinationLabel`, `etaAvailable` on `GET /api/orders/:id/tracking`
+- Tracking: `destinationCoordinatesAvailable`, `destinationLabel`, `etaAvailable`, minute range, and distance on `GET /api/orders/:id/tracking`
 
-See [delivery-eta-and-live-tracking.md](./delivery-eta-and-live-tracking.md) for full ETA readiness details.
+See [delivery-eta-and-live-tracking.md](./delivery-eta-and-live-tracking.md) for ETA formula, env vars, gating rules, and payload visibility.
 
 ---
 

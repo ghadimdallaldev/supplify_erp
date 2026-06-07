@@ -12,7 +12,8 @@ import {
   buildRestaurantTrackingResponse,
   buildRestaurantTrackingDisabledResponse,
 } from '../lib/restaurant-tracking-payload.js'
-import { buildDestinationPayload, computeEtaReadiness } from '../lib/delivery-coordinates.js'
+import { buildDestinationPayload } from '../lib/delivery-coordinates.js'
+import { calculateDeliveryEta } from './delivery-eta.service.js'
 import {
   loadOrderDestination,
   loadOrderDestinationForSupplier,
@@ -441,7 +442,12 @@ export async function getOrderTracking({
 
   const destination = await loadOrderDestinationForSupplier(orderId, supplierId)
   const destinationPayload = buildDestinationPayload(destination, { includeCoordinates: true })
-  const etaAvailable = computeEtaReadiness(tracking, destination)
+  const eta = calculateDeliveryEta({
+    tracking,
+    destination,
+    assignmentStatus: assignment?.status ?? null,
+    orderStatus: orderRow.status,
+  })
 
   return {
     orderId,
@@ -449,7 +455,7 @@ export async function getOrderTracking({
     orderStatus: orderRow.status,
     restaurantName: orderRow.restaurant_name ?? null,
     trackingEnabled: tracking.enabled,
-    etaAvailable,
+    ...eta,
     destinationCoordinatesAvailable: destinationPayload.coordinatesAvailable,
     destinationLabel: destinationPayload.label,
     destination: destinationPayload.coordinatesAvailable
