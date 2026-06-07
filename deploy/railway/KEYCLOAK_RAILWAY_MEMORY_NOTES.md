@@ -1,6 +1,6 @@
 # Keycloak on Railway — memory notes (development)
 
-Applies to the **development** Keycloak service (`deploy/railway/development/keycloak/`). Production already uses optimized `start`; preprod/staging still use `start-dev` and may benefit from the same pattern later.
+Applies to **all** Railway Keycloak services. Development, preprod, and staging use explicit heap caps (`-Xmx384m`); production uses `MaxRAMPercentage` for larger plans.
 
 ## Why Keycloak uses memory when Supplify is not open
 

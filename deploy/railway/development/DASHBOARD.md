@@ -51,7 +51,7 @@ GPS tracking works without this key (fallback link still works).
 Build from `deploy/railway/development/keycloak/railway.json` — realm **Supplify** imports on first boot (`--import-realm`).  
 Set `KEYCLOAK_ADMIN_PASSWORD` on **Keycloak** and **API** (same value). See [`../keycloak/RAILWAY_SETUP.md`](../keycloak/RAILWAY_SETUP.md).
 
-After pulling memory fixes, paste **`development/keycloak.env`** into the Keycloak service Raw Editor (JVM caps are not baked into the image). See [`../KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](../KEYCLOAK_RAILWAY_MEMORY_NOTES.md).
+After pulling memory fixes, paste **`development/keycloak.env`** into the Keycloak service Raw Editor (includes `KC_DB_*` + JVM caps). See [`../KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](../KEYCLOAK_RAILWAY_MEMORY_NOTES.md) and [`../KEYCLOAK_RAILWAY_DB_NOTES.md`](../KEYCLOAK_RAILWAY_DB_NOTES.md).
 
 ## Wrong values that break login (not 502)
 
