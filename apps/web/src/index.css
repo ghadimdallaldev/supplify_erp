@@ -526,4 +526,38 @@
       transform: none;
     }
   }
+
+  /* Delivery tracking map markers (Leaflet divIcon) */
+  .delivery-map-marker-wrap {
+    background: transparent !important;
+    border: none !important;
+  }
+
+  .delivery-map-marker {
+    width: 18px;
+    height: 18px;
+    border-radius: 9999px;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  }
+
+  .delivery-map-marker-driver-live {
+    background: #059669;
+  }
+
+  .delivery-map-marker-driver-stale {
+    background: #d97706;
+  }
+
+  .delivery-map-marker-driver-none {
+    background: #6b7280;
+  }
+
+  .delivery-map-marker-destination {
+    background: #ea580c;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    transform: rotate(45deg);
+  }
 }

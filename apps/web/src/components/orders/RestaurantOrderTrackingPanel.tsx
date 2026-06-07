@@ -113,7 +113,9 @@ export function RestaurantOrderTrackingPanel({ orderId, orderStatus }: Props) {
           <DeliveryTrackingMap
             latitude={loc?.latitude}
             longitude={loc?.longitude}
+            showDestinationPin={false}
             live={Boolean(data.tracking?.hasLocation && !data.tracking?.isStale)}
+            gpsStale={Boolean(data.tracking?.isStale)}
             recordedAt={loc?.recordedAt ?? null}
             heightClassName="h-64"
             liveStatusLine={liveStatusLine}

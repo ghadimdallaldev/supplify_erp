@@ -1,59 +1,84 @@
 import { useMemo, type ReactNode } from 'react'
-import { MapPin, ExternalLink, Radio } from 'lucide-react'
+import { Crosshair, ExternalLink, MapPin, Radio } from 'lucide-react'
+import { Button } from '../ui/button'
 import { googleMapsApiKey, mapProvider } from '../../lib/env'
+import { googleMapsSearchUrl, isValidCoord, toMapPoint } from '../../lib/deliveryMapUtils'
+import { useDeliveryLeafletMap, type DeliveryMapMarker } from './useDeliveryLeafletMap'
 
 type Props = {
+  /** Driver latest GPS latitude */
   latitude?: number | null
+  /** Driver latest GPS longitude */
   longitude?: number | null
+  /** Destination latitude (supplier only — do not pass for restaurant) */
+  destinationLatitude?: number | null
+  /** Destination longitude (supplier only) */
+  destinationLongitude?: number | null
+  destinationLabel?: string | null
+  /** When false, destination pin is hidden (restaurant privacy). Default true when coords exist. */
+  showDestinationPin?: boolean
   className?: string
   heightClassName?: string
-  /** Show live indicator and prefer embedded map (Toters-style in-box tracking). */
   live?: boolean
+  gpsStale?: boolean
   recordedAt?: string | null
-  /** Rendered between map and footer (e.g. ETA card). */
   beforeFooter?: ReactNode
-  /** e.g. "Picked up · Live now" */
   liveStatusLine?: string | null
-  /** Supplier-only debug coordinates under a collapsible section. */
   showCoordinateDetails?: boolean
-}
-
-function buildOsmEmbedUrl(lat: number, lng: number) {
-  const pad = 0.014
-  const bbox = `${lng - pad},${lat - pad},${lng + pad},${lat + pad}`
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${lat}%2C${lng}`
 }
 
 export function DeliveryTrackingMap({
   latitude,
   longitude,
+  destinationLatitude,
+  destinationLongitude,
+  destinationLabel,
+  showDestinationPin = true,
   className = '',
   heightClassName = 'h-56',
   live = false,
+  gpsStale = false,
   recordedAt,
   beforeFooter,
   liveStatusLine,
   showCoordinateDetails = false,
 }: Props) {
-  const hasCoords =
-    latitude != null &&
-    longitude != null &&
-    Number.isFinite(Number(latitude)) &&
-    Number.isFinite(Number(longitude))
+  const driverPoint = toMapPoint(latitude, longitude)
+  const destinationPoint =
+    showDestinationPin && isValidCoord(destinationLatitude, destinationLongitude)
+      ? toMapPoint(destinationLatitude, destinationLongitude)
+      : null
 
-  const lat = hasCoords ? Number(latitude) : 0
-  const lng = hasCoords ? Number(longitude) : 0
-  const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`
-
-  const embedUrl = useMemo(() => {
-    if (!hasCoords) return null
-    if (mapProvider === 'google' && googleMapsApiKey) {
-      return `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(googleMapsApiKey)}&q=${lat},${lng}&zoom=15`
+  const markers = useMemo((): DeliveryMapMarker[] => {
+    const list: DeliveryMapMarker[] = []
+    if (driverPoint) {
+      list.push({
+        id: 'driver',
+        point: driverPoint,
+        kind: live ? 'driver-live' : gpsStale ? 'driver-stale' : 'driver-none',
+        label: 'Driver',
+        popupHtml: '<strong>Driver</strong><br/>Latest GPS',
+      })
     }
-    return buildOsmEmbedUrl(lat, lng)
-  }, [hasCoords, lat, lng])
+    if (destinationPoint) {
+      const label = destinationLabel?.trim() || 'Delivery location'
+      list.push({
+        id: 'destination',
+        point: destinationPoint,
+        kind: 'destination',
+        label,
+        popupHtml: `<strong>${label.replace(/</g, '&lt;')}</strong>`,
+      })
+    }
+    return list
+  }, [driverPoint, destinationPoint, destinationLabel, live, gpsStale])
 
-  if (!hasCoords) {
+  const { containerRef, fitToMarkers } = useDeliveryLeafletMap({ markers })
+
+  const hasDriver = Boolean(driverPoint)
+  const hasDestination = Boolean(destinationPoint)
+
+  if (!hasDriver && !hasDestination) {
     return (
       <p className="text-sm text-[var(--text-muted)]" data-testid="delivery-tracking-map-empty">
         No GPS location received yet
@@ -61,27 +86,78 @@ export function DeliveryTrackingMap({
     )
   }
 
+  const openMapsTarget = driverPoint ?? destinationPoint!
+  const mapsUrl = googleMapsSearchUrl(openMapsTarget.lat, openMapsTarget.lng)
+  const mapModeLabel =
+    mapProvider === 'google' && googleMapsApiKey ? 'Google Maps' : 'OpenStreetMap'
+
   return (
     <div className={`space-y-2 ${className}`} data-testid="delivery-tracking-map">
       <div className="relative overflow-hidden rounded-lg border border-[var(--app-border)]">
         {live && (
           <span
-            className="absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow"
+            className="absolute left-2 top-2 z-[500] inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow"
             data-testid="delivery-tracking-map-live"
           >
             <Radio className="h-3 w-3" aria-hidden />
             Live
           </span>
         )}
-        <iframe
-          title="Live delivery map"
-          src={embedUrl ?? buildOsmEmbedUrl(lat, lng)}
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="absolute right-2 top-2 z-[500] h-8 gap-1 px-2 text-xs shadow"
+          data-testid="delivery-tracking-map-recenter"
+          onClick={() => fitToMarkers()}
+          aria-label="Recenter map"
+        >
+          <Crosshair className="h-3.5 w-3.5" aria-hidden />
+          Recenter
+        </Button>
+        <div
+          ref={containerRef}
           className={`block w-full ${heightClassName}`}
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-          data-testid="delivery-tracking-map-embed"
+          data-testid="delivery-tracking-map-canvas"
+          role="img"
+          aria-label="Delivery map"
         />
+        <div
+          className="pointer-events-none absolute bottom-1 left-1 z-[500] flex flex-wrap gap-2 px-1 text-[10px]"
+          data-testid="delivery-tracking-map-legend"
+        >
+          {hasDriver ? (
+            <span className="rounded bg-white/90 px-1.5 py-0.5 shadow dark:bg-black/70">
+              <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 align-middle mr-1" />
+              Driver
+            </span>
+          ) : null}
+          {hasDestination ? (
+            <span className="rounded bg-white/90 px-1.5 py-0.5 shadow dark:bg-black/70">
+              <span className="inline-block h-2 w-2 rounded-full bg-orange-500 align-middle mr-1" />
+              {destinationLabel?.trim() || 'Delivery location'}
+            </span>
+          ) : null}
+        </div>
       </div>
+
+      {!hasDriver && hasDestination ? (
+        <p
+          className="text-sm text-[var(--text-muted)]"
+          data-testid="delivery-tracking-map-waiting-gps"
+        >
+          Waiting for driver location.
+        </p>
+      ) : null}
+
+      {showDestinationPin && !hasDestination && hasDriver ? (
+        <p
+          className="text-sm text-[var(--text-muted)]"
+          data-testid="delivery-tracking-map-no-destination"
+        >
+          Delivery location not set
+        </p>
+      ) : null}
 
       {beforeFooter ? (
         <div data-testid="delivery-tracking-map-before-footer">{beforeFooter}</div>
@@ -120,6 +196,7 @@ export function DeliveryTrackingMap({
         <MapPin className="h-3 w-3" aria-hidden />
         Open in maps
         <ExternalLink className="h-3 w-3" aria-hidden />
+        <span className="sr-only">({mapModeLabel})</span>
       </a>
 
       {showCoordinateDetails ? (
@@ -128,9 +205,16 @@ export function DeliveryTrackingMap({
           data-testid="delivery-tracking-map-debug"
         >
           <summary className="cursor-pointer select-none font-medium">Debug details</summary>
-          <p className="mt-1 font-mono">
-            {lat.toFixed(5)}, {lng.toFixed(5)}
-          </p>
+          {driverPoint ? (
+            <p className="mt-1 font-mono">
+              Driver: {driverPoint.lat.toFixed(5)}, {driverPoint.lng.toFixed(5)}
+            </p>
+          ) : null}
+          {destinationPoint ? (
+            <p className="font-mono">
+              Destination: {destinationPoint.lat.toFixed(5)}, {destinationPoint.lng.toFixed(5)}
+            </p>
+          ) : null}
         </details>
       ) : null}
     </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Truck, Navigation } from 'lucide-react'
+import { LayoutGrid, Map, Truck, Navigation } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
@@ -9,11 +9,15 @@ import { formatDeliveryStatus } from '../../lib/deliveryStatusLabels'
 import { getGpsStatusLabel } from '../../lib/deliveryTrackingLabels'
 import { formatOrderRef, formatScheduledAt } from './fulfillmentDispatchUtils'
 import { DeliveryTrackingDrawer } from './DeliveryTrackingDrawer'
+import { ActiveDeliveriesMap } from '../maps/ActiveDeliveriesMap'
+
+type ViewMode = 'board' | 'map'
 
 export function FulfillmentTrackingTab() {
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('board')
   const { data, isLoading, isError, refetch } = useGetSupplierDeliveryBoardQuery(
-    { status: 'out_for_delivery' },
+    { status: 'active_delivery' },
     { pollingInterval: 30_000, skipPollingIfUnfocused: true }
   )
 
@@ -23,13 +27,44 @@ export function FulfillmentTrackingTab() {
     <>
       <Card data-testid="fulfillment-tracking-tab">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Truck className="h-5 w-5" />
-            Delivery Tracking
-          </CardTitle>
-          <CardDescription>
-            Active deliveries picked up or out for delivery (refreshes every 30s)
-          </CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Truck className="h-5 w-5" />
+                Delivery Tracking
+              </CardTitle>
+              <CardDescription>
+                Active deliveries (assigned, picked up, or out for delivery · refreshes every 30s)
+              </CardDescription>
+            </div>
+            <div
+              className="flex rounded-lg border border-[var(--app-border)] p-0.5"
+              data-testid="fulfillment-tracking-view-toggle"
+            >
+              <Button
+                type="button"
+                size="sm"
+                variant={viewMode === 'board' ? 'default' : 'ghost'}
+                className="h-8 gap-1"
+                data-testid="fulfillment-tracking-board-view"
+                onClick={() => setViewMode('board')}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" aria-hidden />
+                Board
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={viewMode === 'map' ? 'default' : 'ghost'}
+                className="h-8 gap-1"
+                data-testid="fulfillment-tracking-map-view"
+                onClick={() => setViewMode('map')}
+              >
+                <Map className="h-3.5 w-3.5" aria-hidden />
+                Map
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -56,8 +91,10 @@ export function FulfillmentTrackingTab() {
               className="py-10 text-center text-sm text-[var(--text-muted)]"
               data-testid="tracking-empty"
             >
-              No deliveries currently in transit.
+              No active deliveries right now.
             </div>
+          ) : viewMode === 'map' ? (
+            <ActiveDeliveriesMap orders={orders} onSelectOrder={setTrackingOrderId} />
           ) : (
             <div className="overflow-x-auto -mx-1 px-1">
               <table className="w-full min-w-[720px] text-sm" data-testid="tracking-table">
