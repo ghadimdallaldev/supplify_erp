@@ -10,6 +10,7 @@ import {
 } from '../services/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { useImpersonation } from '../hooks/useImpersonation'
+import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { multiBranchEnabled } from '../lib/planLimits'
 import { useAppDispatch } from '../hooks/redux'
 
@@ -42,6 +43,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const isTenantUser = isEffectiveTenant
   const isSupplier = isEffectiveSupplier
   const isRestaurant = isEffectiveRestaurant
+  const { isDriverRole } = useWorkspaceRole()
   const { entitlements } = useEntitlements()
   const multiBranchFeature = multiBranchEnabled(entitlements)
 
@@ -49,7 +51,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     data: supplierOrgData,
     isLoading: supplierOrgLoading,
     isError: supplierOrgError,
-  } = useGetOrgBranchesQuery(undefined, { skip: !isSupplier })
+  } = useGetOrgBranchesQuery(undefined, { skip: !isSupplier || isDriverRole })
 
   const {
     data: restaurantOrgData,

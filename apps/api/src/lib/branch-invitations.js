@@ -1,3 +1,4 @@
+import { performance } from 'node:perf_hooks'
 import { query, withTransaction } from './db.js'
 import { createKeycloakUserWithPassword } from './keycloak-admin.js'
 import {
@@ -21,6 +22,7 @@ import {
 } from './invitation-accept.js'
 import { syncDriverLinkForRoleAssignment } from './driver-user-link.js'
 import { sendTeamInvitationEmail } from '../services/invitation-mail.service.js'
+import { logger } from './logger.js'
 
 export function generateBranchInviteToken() {
   return generateInviteToken()
@@ -257,6 +259,10 @@ export async function acceptBranchInvitation({
     existingUserEmail,
   })
 
+  const acceptStarted = performance.now()
+  let keycloakUserMs = 0
+  let dbTransactionMs = 0
+
   let keycloakSub = null
   if (!existingUserId) {
     if (!password || password.length < 8) {
@@ -265,6 +271,7 @@ export async function acceptBranchInvitation({
     const nameParts = (fullName || invitation.invited_name || resolvedEmail).trim().split(/\s+/)
     const firstName = nameParts[0] || ''
     const lastName = nameParts.slice(1).join(' ') || ''
+    const keycloakStart = performance.now()
     const { userId: kcUserId } = await createKeycloakUserWithPassword({
       email: resolvedEmail,
       firstName,
@@ -272,12 +279,14 @@ export async function acceptBranchInvitation({
       password,
       realmRoleName: keycloakRealmRoleForWorkspace('SUPPLIER'),
     })
+    keycloakUserMs = Math.round(performance.now() - keycloakStart)
     keycloakSub = kcUserId
   }
 
   const scope = await resolveWorkspaceScope(invitation.supplier_id, 'SUPPLIER')
 
-  return withTransaction(async (client) => {
+  const dbStart = performance.now()
+  const txResult = await withTransaction(async (client) => {
     const { rows: locked } = await client.query(
       `SELECT * FROM branch_invitations WHERE token = $1 FOR UPDATE`,
       [token]
@@ -387,4 +396,18 @@ export async function acceptBranchInvitation({
       password: existingUserId ? null : password,
     }
   })
+  dbTransactionMs = Math.round(performance.now() - dbStart)
+
+  logger.info({
+    event: 'invitation.accept.timing',
+    invitationType: 'supplier_branch',
+    supplierId: txResult.supplierId,
+    roleName: txResult.roleName,
+    keycloakUserMs,
+    dbTransactionMs,
+    totalAcceptMs: Math.round(performance.now() - acceptStarted),
+    createdKeycloakUser: !existingUserId,
+  })
+
+  return txResult
 }
