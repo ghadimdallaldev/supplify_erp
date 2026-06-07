@@ -1,6 +1,7 @@
 import { config } from '../config/env.js'
 import { buildTrackingPayload } from './delivery-tracking-payload.js'
-import { buildDestinationPayload, computeEtaReadiness } from './delivery-coordinates.js'
+import { buildDestinationPayload } from './delivery-coordinates.js'
+import { calculateDeliveryEta, sanitizeEtaForRestaurant } from '../services/delivery-eta.service.js'
 
 const DELIVERY_STATUS_LABELS = {
   pending: 'Pending',
@@ -43,17 +44,26 @@ export function buildRestaurantTrackingResponse({
   assignment,
   tracking,
   destination = null,
+  routeContext = null,
 }) {
   const deliveryStatus = assignment?.status ?? 'pending'
   const destinationPayload = buildDestinationPayload(destination, { includeCoordinates: false })
-  const etaAvailable = computeEtaReadiness(tracking, destination)
+  const eta = sanitizeEtaForRestaurant(
+    calculateDeliveryEta({
+      tracking,
+      destination,
+      assignmentStatus: deliveryStatus,
+      orderStatus,
+      routeContext,
+    })
+  )
 
   const payload = {
     orderId,
     orderReference: formatOrderReference(orderId),
     orderStatus: orderStatus ?? null,
     trackingEnabled: tracking?.enabled ?? false,
-    etaAvailable,
+    ...eta,
     destinationCoordinatesAvailable: destinationPayload.coordinatesAvailable,
     destinationLabel: destinationPayload.label,
     delivery: assignment

@@ -39,6 +39,14 @@ import {
   userHasOwnerRole,
 } from './tenant-roles.js'
 import { assertStaffPortalRouteAccess, STAFF_PORTAL_APP_ROLE } from './staff-portal-auth.js'
+import {
+  extractAccessToken,
+  extractBearerToken,
+  extractRefreshToken,
+  isBearerAuthRequest,
+} from './mobile-auth.js'
+
+export { extractBearerToken, extractAccessToken, isBearerAuthRequest } from './mobile-auth.js'
 
 const TENANT_REQ_CACHE_TTL = 180 // seconds
 const USER_BY_SUB_CACHE_TTL = 300 // seconds
@@ -134,6 +142,30 @@ export async function getUserBySub(sub, req = null) {
   }
 }
 
+function rolesFromAccessPayload(payload) {
+  const realmRoles = payload.realm_access?.roles || []
+  const azp = payload.azp
+  const clientRoles =
+    azp && payload.resource_access?.[azp]?.roles ? payload.resource_access[azp].roles : []
+  return [...new Set([...realmRoles, ...clientRoles])]
+}
+
+/** Mobile/native bearer: link Keycloak JWT to app_user (same as web OAuth callback upsert). */
+export async function ensureUserForAccessPayload(payload, req = null) {
+  let user = await getUserBySub(payload.sub, req)
+  if (user) return user
+
+  return upsertUser(
+    {
+      sub: payload.sub,
+      email: payload.email ?? payload.preferred_username,
+      given_name: payload.given_name,
+      family_name: payload.family_name,
+    },
+    rolesFromAccessPayload(payload)
+  )
+}
+
 // Create or update user in database
 export async function upsertUser(userInfo, roles = []) {
   try {
@@ -209,7 +241,9 @@ export async function upsertUser(userInfo, roles = []) {
 export async function requireAuth(req, res, next) {
   startStage(req, 'auth')
   try {
-    const accessToken = extractTokenFromCookie(req)
+    const bearerToken = extractBearerToken(req)
+    const accessToken = extractAccessToken(req)
+    req.authMethod = bearerToken ? 'bearer' : accessToken ? 'cookie' : null
 
     if (!accessToken) {
       return res.status(401).json({
@@ -229,8 +263,10 @@ export async function requireAuth(req, res, next) {
       req.user = payload
       req.userSub = payload.sub
 
-      // Get user from database
-      const user = await getUserBySub(payload.sub, req)
+      // Get user from database (mobile bearer upserts on first login)
+      const user = bearerToken
+        ? await ensureUserForAccessPayload(payload, req)
+        : await getUserBySub(payload.sub, req)
       if (!user) {
         mark(req, 'auth')
         return res.status(401).json({
@@ -256,7 +292,21 @@ export async function requireAuth(req, res, next) {
     } catch (error) {
       logger.debug('Token verification failed, attempting refresh')
 
-      // Token is invalid or expired, try to refresh
+      // Bearer clients refresh via POST /auth/mobile/refresh — no cookie refresh here.
+      if (bearerToken) {
+        clearAuthCookies(res)
+        return res.status(401).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'JWT_EXPIRED',
+            message: 'Access token expired. Refresh via POST /auth/mobile/refresh.',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      // Token is invalid or expired, try to refresh (cookie / web clients)
       const refreshToken = extractRefreshTokenFromCookie(req)
 
       if (!refreshToken) {
@@ -345,7 +395,8 @@ export async function requireAuth(req, res, next) {
 // Optional authentication middleware - doesn't fail if token is missing, but sets req.userData if available
 export async function optionalAuth(req, res, next) {
   try {
-    const accessToken = extractTokenFromCookie(req)
+    const bearerToken = extractBearerToken(req)
+    const accessToken = extractAccessToken(req)
 
     if (!accessToken) {
       // No token, continue without authentication
@@ -365,7 +416,12 @@ export async function optionalAuth(req, res, next) {
         syncRequestLogContext(req)
       }
     } catch (error) {
-      // Token is invalid or expired, try to refresh
+      // Bearer clients do not silently refresh in optionalAuth.
+      if (bearerToken) {
+        return next()
+      }
+
+      // Token is invalid or expired, try to refresh (cookie / web clients)
       const refreshToken = extractRefreshTokenFromCookie(req)
 
       if (refreshToken) {

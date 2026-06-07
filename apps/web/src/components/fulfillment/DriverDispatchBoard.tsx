@@ -248,7 +248,7 @@ export function DriverDispatchBoard({
           </Button>
           {selectedOrders.length === 0 && (
             <span className="text-xs text-[var(--text-muted)]">
-              Select unassigned or assigned orders to build a route.
+              Select unassigned or assigned orders (not already on a route) to build a route.
             </span>
           )}
         </div>

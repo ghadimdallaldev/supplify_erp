@@ -96,3 +96,30 @@ EOF
 
 update_client_oidc "supplify-api"
 update_client_oidc "supplify-web"
+
+update_client_mobile() {
+  local uuid
+  uuid="$(get_client_uuid "supplify-mobile")"
+  if [ -z "$uuid" ]; then
+    echo "WARN: client supplify-mobile not found in realm Supplify"
+    return 0
+  fi
+  /opt/keycloak/bin/kcadm.sh update "clients/${uuid}" -r Supplify \
+    -s 'redirectUris=["supplify://auth/callback","exp://127.0.0.1:8081/--/auth/callback","exp://localhost:8081/--/auth/callback","http://localhost:8081/auth/callback","http://127.0.0.1:8081/auth/callback","http://localhost:8081/*","http://127.0.0.1:8081/*"]' \
+    -s 'webOrigins=["+"]' \
+    -s standardFlowEnabled=true \
+    -s directAccessGrantsEnabled=false
+  patch_file="/tmp/kc-post-logout-supplify-mobile.json"
+  cat >"${patch_file}" <<EOF
+{
+  "attributes": {
+    "pkce.code.challenge.method": "S256",
+    "post.logout.redirect.uris": "supplify://auth/logout"
+  }
+}
+EOF
+  /opt/keycloak/bin/kcadm.sh update "clients/${uuid}" -r Supplify -f "${patch_file}"
+  echo "Updated supplify-mobile redirect URIs for Expo/native auth"
+}
+
+update_client_mobile

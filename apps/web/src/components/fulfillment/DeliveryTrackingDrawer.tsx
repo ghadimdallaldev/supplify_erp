@@ -5,9 +5,12 @@ import { Skeleton } from '../ui/skeleton'
 import { useGetOrderTrackingQuery } from '../../services/api'
 import { formatDeliveryStatus } from '../../lib/deliveryStatusLabels'
 import { formatOrderRef } from './fulfillmentDispatchUtils'
-import { getGpsStatusLabel } from '../../lib/deliveryTrackingLabels'
-import { getEtaUnavailableMessage } from '../../lib/deliveryEtaMessages'
+import { getGpsStatusLabel, getLiveDeliveryStatusLine } from '../../lib/deliveryTrackingLabels'
 import { DeliveryTrackingMap } from '../maps/DeliveryTrackingMap'
+import {
+  DeliveryTrackingEtaSection,
+  getDestinationLabelText,
+} from '../maps/DeliveryTrackingEtaSection'
 
 type Props = {
   orderId: string | null
@@ -16,6 +19,7 @@ type Props = {
 }
 
 const ACTIVE_ASSIGNMENT_STATUSES = new Set(['assigned', 'picked_up', 'out_for_delivery'])
+const LIVE_MAP_STATUSES = new Set(['picked_up', 'out_for_delivery'])
 
 export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
   const [pollMs, setPollMs] = useState(0)
@@ -34,6 +38,10 @@ export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
       data?.assignment?.status && ACTIVE_ASSIGNMENT_STATUSES.has(data.assignment.status)
     setPollMs(active ? 15_000 : 0)
   }, [open, orderId, data?.assignment?.status])
+
+  const assignmentStatus = data?.assignment?.status
+  const destinationLabel = getDestinationLabelText(data, 'supplier')
+  const liveStatusLine = getLiveDeliveryStatusLine(assignmentStatus)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -88,38 +96,43 @@ export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
               {data.routeNumber && (
                 <p className="text-xs text-[var(--text-muted)]">Route {data.routeNumber}</p>
               )}
+              {destinationLabel ? (
+                <p
+                  className="text-sm text-[var(--text-primary)]"
+                  data-testid="tracking-drawer-destination"
+                >
+                  {destinationLabel}
+                </p>
+              ) : null}
             </div>
 
             <DeliveryTrackingMap
               latitude={data.tracking?.latestLocation?.latitude ?? data.latestLocation?.latitude}
               longitude={data.tracking?.latestLocation?.longitude ?? data.latestLocation?.longitude}
+              destinationLatitude={data.destination?.latitude}
+              destinationLongitude={data.destination?.longitude}
+              destinationLabel={data.destinationLabel ?? data.destination?.label}
               live={Boolean(
                 data.tracking?.hasLocation &&
                   !data.tracking?.isStale &&
-                  data.assignment?.status &&
-                  ['picked_up', 'out_for_delivery'].includes(data.assignment.status)
+                  assignmentStatus &&
+                  LIVE_MAP_STATUSES.has(assignmentStatus)
               )}
+              gpsStale={Boolean(data.tracking?.isStale)}
               recordedAt={
                 data.tracking?.latestLocation?.recordedAt ?? data.latestLocation?.recordedAt ?? null
               }
               heightClassName="h-64"
+              liveStatusLine={liveStatusLine}
+              showCoordinateDetails
+              beforeFooter={
+                <DeliveryTrackingEtaSection
+                  data={data}
+                  audience="supplier"
+                  testId="tracking-drawer-eta"
+                />
+              }
             />
-
-            {(() => {
-              const etaMessage = getEtaUnavailableMessage(data)
-              return etaMessage ? (
-                <p
-                  className={`text-xs ${
-                    etaMessage.includes('delivery location is not set')
-                      ? 'text-amber-800 dark:text-amber-200'
-                      : 'text-[var(--text-muted)]'
-                  }`}
-                  data-testid="tracking-drawer-eta"
-                >
-                  {etaMessage}
-                </p>
-              ) : null
-            })()}
           </div>
         )}
       </DialogContent>

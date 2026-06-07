@@ -279,25 +279,7 @@ export function OrdersPage() {
           ? 'Order declined'
           : `Order status updated to ${newStatus}`
       toast.success(successLabel)
-
-      // Refetch to get updated data
-      const refetchResult = await refetch()
-
-      // For COMPLETED status, keep button disabled permanently (it will be replaced by disabled "Completed" button)
-      // Don't clear updatingOrderId - let the component re-render with new order.status to show the correct button
-      if (newStatus === 'COMPLETED') {
-        const updatedOrder = refetchResult.data?.orders?.find((o: any) => o.id === orderId)
-        if (updatedOrder?.status === 'COMPLETED') {
-          // Order confirmed as COMPLETED - component will show disabled "Completed" button
-          // Clear updatingOrderId after a delay to allow component to re-render
-          setTimeout(() => {
-            setUpdatingOrderId(null)
-          }, 1000)
-        }
-      } else {
-        // For other statuses, clear immediately
-        setUpdatingOrderId(null)
-      }
+      setUpdatingOrderId(null)
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to update order status')
       setUpdatingOrderId(null)

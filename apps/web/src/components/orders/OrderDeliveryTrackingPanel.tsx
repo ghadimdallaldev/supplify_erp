@@ -5,9 +5,12 @@ import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
 import { useGetOrderTrackingQuery } from '../../services/api'
 import { formatDeliveryStatus } from '../../lib/deliveryStatusLabels'
-import { getGpsStatusLabel } from '../../lib/deliveryTrackingLabels'
-import { getEtaUnavailableMessage } from '../../lib/deliveryEtaMessages'
+import { getGpsStatusLabel, getLiveDeliveryStatusLine } from '../../lib/deliveryTrackingLabels'
 import { DeliveryTrackingMap } from '../maps/DeliveryTrackingMap'
+import {
+  DeliveryTrackingEtaSection,
+  getDestinationLabelText,
+} from '../maps/DeliveryTrackingEtaSection'
 
 type Props = {
   orderId: string
@@ -67,6 +70,8 @@ export function OrderDeliveryTrackingPanel({ orderId, pollIntervalMs = 15_000 }:
   }
 
   const loc = tracking?.latestLocation ?? data.latestLocation
+  const destinationLabel = getDestinationLabelText(data, 'supplier')
+  const liveStatusLine = getLiveDeliveryStatusLine(assignment.status)
 
   return (
     <Card data-testid="order-delivery-tracking-panel">
@@ -92,28 +97,34 @@ export function OrderDeliveryTrackingPanel({ orderId, pollIntervalMs = 15_000 }:
             {getGpsStatusLabel(tracking)}
           </Badge>
         </div>
+        {destinationLabel ? (
+          <p
+            className="text-sm text-[var(--text-primary)]"
+            data-testid="order-delivery-destination"
+          >
+            {destinationLabel}
+          </p>
+        ) : null}
         <DeliveryTrackingMap
           latitude={loc?.latitude}
           longitude={loc?.longitude}
+          destinationLatitude={data.destination?.latitude}
+          destinationLongitude={data.destination?.longitude}
+          destinationLabel={data.destinationLabel ?? data.destination?.label}
           live={Boolean(tracking?.hasLocation && !tracking?.isStale)}
+          gpsStale={Boolean(tracking?.isStale)}
           recordedAt={loc?.recordedAt ?? null}
           heightClassName="h-64"
+          liveStatusLine={liveStatusLine}
+          showCoordinateDetails
+          beforeFooter={
+            <DeliveryTrackingEtaSection
+              data={data}
+              audience="supplier"
+              testId="order-delivery-tracking-eta"
+            />
+          }
         />
-        {(() => {
-          const etaMessage = getEtaUnavailableMessage(data)
-          return etaMessage ? (
-            <p
-              className={`text-xs ${
-                etaMessage.includes('delivery location is not set')
-                  ? 'text-amber-800 dark:text-amber-200'
-                  : 'text-[var(--text-muted)]'
-              }`}
-              data-testid="order-delivery-tracking-eta"
-            >
-              {etaMessage}
-            </p>
-          ) : null
-        })()}
       </CardContent>
     </Card>
   )

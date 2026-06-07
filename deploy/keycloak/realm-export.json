@@ -55,6 +55,30 @@
       },
       "defaultClientScopes": ["web-origins", "profile", "roles", "email"],
       "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
+    },
+    {
+      "clientId": "supplify-mobile",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "supplify://auth/callback",
+        "exp://127.0.0.1:8081/--/auth/callback",
+        "exp://127.0.0.1:8081/*",
+        "exp://localhost:8081/--/auth/callback",
+        "exp://localhost:8081/*",
+        "http://localhost:8081/*",
+        "http://127.0.0.1:8081/*"
+      ],
+      "webOrigins": ["+"],
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "supplify://auth/logout"
+      },
+      "defaultClientScopes": ["web-origins", "profile", "roles", "email"],
+      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
     }
   ],
   "roles": {

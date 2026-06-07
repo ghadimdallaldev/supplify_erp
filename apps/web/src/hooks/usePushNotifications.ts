@@ -54,10 +54,19 @@ export function usePushNotifications() {
     if (!vapidData?.publicKey || !('serviceWorker' in navigator)) {
       throw new Error('Push notifications are not available')
     }
+    if (Notification.permission === 'denied') {
+      throw new Error(
+        'Notifications are blocked for this site. Reset permission in your browser site settings, then try again.'
+      )
+    }
     const perm = await Notification.requestPermission()
     setPermission(perm)
     if (perm !== 'granted') {
-      throw new Error('Notification permission denied')
+      throw new Error(
+        perm === 'denied'
+          ? 'Notifications are blocked for this site. Reset permission in your browser site settings, then try again.'
+          : 'Notification permission was not granted'
+      )
     }
     const registration = await navigator.serviceWorker.ready
     let subscription
@@ -97,6 +106,17 @@ export function usePushNotifications() {
     setSubscribed(false)
   }, [unsubscribePush])
 
+  const pushUnavailableReason = !('serviceWorker' in navigator)
+    ? 'Push requires a supported browser with service workers.'
+    : !vapidData?.publicKey
+      ? 'Push is not configured on this server (VAPID keys missing).'
+      : null
+
+  const pushPermissionBlocked = permission === 'denied'
+  const pushPermissionBlockedReason = pushPermissionBlocked
+    ? 'Notifications are blocked for this site. Reset them in your browser (see instructions below), then click Enable again.'
+    : null
+
   return {
     bannerVisible,
     dismissBanner,
@@ -107,5 +127,8 @@ export function usePushNotifications() {
     unsubscribing,
     permission,
     pushAvailable: Boolean(vapidData?.publicKey),
+    pushUnavailableReason,
+    pushPermissionBlocked,
+    pushPermissionBlockedReason,
   }
 }

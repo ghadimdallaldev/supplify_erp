@@ -32,3 +32,13 @@ export function getGpsStatusShort(tracking?: DeliveryTrackingInfo | null): strin
   if (status === 'off') return 'Off'
   return 'No GPS'
 }
+
+/** Human-friendly live status for active deliveries (modal / map footer). */
+export function getLiveDeliveryStatusLine(status: string | null | undefined): string | null {
+  const normalized = String(status || '')
+    .toLowerCase()
+    .trim()
+  if (normalized === 'picked_up') return 'Picked up · Live now'
+  if (normalized === 'out_for_delivery') return 'On the way · Live now'
+  return null
+}
