@@ -106,6 +106,10 @@ vi.mock('../services/order-create.service.js', () => ({
   insertOrderItemsBatch: vi.fn(),
 }))
 
+vi.mock('../services/delivery-routes.service.js', () => ({
+  releaseOrderFromPlannedRoutes: vi.fn().mockResolvedValue(undefined),
+}))
+
 // Import routes after mocks
 import { ordersRoutes } from './orders.routes.js'
 
@@ -775,7 +779,7 @@ describe('Orders Routes', () => {
 
   describe('PATCH /api/orders/:id', () => {
     it('should update order status', async () => {
-      // Mock: order query, first item query (for supplier_id), restaurant lookup, UPDATE order
+      // Mock: order query, first item query (for supplier_id), UPDATE order
       // RESTAURANT can only cancel orders
       db.query
         .mockResolvedValueOnce({
@@ -791,12 +795,6 @@ describe('Orders Routes', () => {
           rows: [{ product_id: 'prod-1', quantity: 1 }], // Restore stock: order items
         })
         .mockResolvedValueOnce({}) // Restore stock: inventory update
-        .mockResolvedValueOnce({
-          rows: [{ id: 'restaurant-1', name: 'Test Restaurant' }],
-        })
-        .mockResolvedValueOnce({
-          rows: [{ id: 'supplier-1', name: 'Test Supplier' }],
-        })
 
       const response = await request(app)
         .patch('/api/orders/order-1')
@@ -807,6 +805,60 @@ describe('Orders Routes', () => {
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.order.status).toBe('CANCELLED')
+    })
+
+    it('should schedule notifyOrderStatusChange without awaiting it on status update', async () => {
+      let resolveNotify
+      const notifyDone = new Promise((resolve) => {
+        resolveNotify = resolve
+      })
+
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', status: 'PLACED', restaurant_id: 'restaurant-1' }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ supplier_id: 'supplier-1' }],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'order-1',
+              status: 'CANCELLED',
+              total_amount: 100.5,
+              restaurant_id: 'restaurant-1',
+              cancelled_by: 'RESTAURANT',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'restaurant-1', name: 'Test Restaurant' }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'supplier-1', name: 'Test Supplier' }],
+        })
+
+      const { notifyOrderStatusChange } = await import('../services/notification.service.js')
+      vi.mocked(notifyOrderStatusChange).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => {
+              resolve([])
+              resolveNotify()
+            }, 50)
+          })
+      )
+
+      const response = await request(app)
+        .patch('/api/orders/order-1')
+        .send({ status: 'CANCELLED' })
+        .expect(200)
+
+      expect(response.body.ok).toBe(true)
+      expect(response.body.data.order.status).toBe('CANCELLED')
+
+      await notifyDone
+      expect(notifyOrderStatusChange).toHaveBeenCalledTimes(1)
     })
 
     it('should reject invalid status', async () => {

@@ -356,10 +356,29 @@ async function getTenantIdForUser(userId, userType) {
     `SELECT s.id AS tenant_id
      FROM ${table} s
      JOIN app_user u ON u.email = s.contact_email
-     WHERE u.id = $1`,
-    [userId]
+     WHERE u.id = $1
+     UNION
+     SELECT tur.tenant_id
+     FROM tenant_user_roles tur
+     WHERE tur.user_id = $1 AND tur.tenant_type = $2
+     LIMIT 1`,
+    [userId, userType]
   )
   return rows[0]?.tenant_id || null
+}
+
+/** Opt-in/out browser push at the preference layer (paired with push_subscriptions). */
+export async function setPushEnabledPreference(userId, userType, enabled) {
+  await ensureNotificationPreferences(userId, userType)
+  await query(
+    `
+      UPDATE notification_preferences
+      SET push_enabled = $3, updated_at = now()
+      WHERE user_id = $1 AND user_type = $2
+    `,
+    [userId, userType, Boolean(enabled)]
+  )
+  await invalidateNotificationPreferencesCache(userId, userType)
 }
 
 /**
