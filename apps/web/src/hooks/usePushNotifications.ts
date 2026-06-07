@@ -97,6 +97,12 @@ export function usePushNotifications() {
     setSubscribed(false)
   }, [unsubscribePush])
 
+  const pushUnavailableReason = !('serviceWorker' in navigator)
+    ? 'Push requires a supported browser with service workers.'
+    : !vapidData?.publicKey
+      ? 'Push is not configured on this server (VAPID keys missing).'
+      : null
+
   return {
     bannerVisible,
     dismissBanner,
@@ -107,5 +113,6 @@ export function usePushNotifications() {
     unsubscribing,
     permission,
     pushAvailable: Boolean(vapidData?.publicKey),
+    pushUnavailableReason,
   }
 }

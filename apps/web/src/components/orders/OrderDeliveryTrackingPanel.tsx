@@ -6,7 +6,12 @@ import { Skeleton } from '../ui/skeleton'
 import { useGetOrderTrackingQuery } from '../../services/api'
 import { formatDeliveryStatus } from '../../lib/deliveryStatusLabels'
 import { getGpsStatusLabel } from '../../lib/deliveryTrackingLabels'
-import { getEtaUnavailableMessage } from '../../lib/deliveryEtaMessages'
+import {
+  formatDistanceKm,
+  getEtaUnavailableMessage,
+  getSupplierEtaPrimaryText,
+  shouldShowEtaConfidence,
+} from '../../lib/deliveryEtaDisplay'
 import { DeliveryTrackingMap } from '../maps/DeliveryTrackingMap'
 
 type Props = {
@@ -100,6 +105,30 @@ export function OrderDeliveryTrackingPanel({ orderId, pollIntervalMs = 15_000 }:
           heightClassName="h-64"
         />
         {(() => {
+          const etaPrimary = getSupplierEtaPrimaryText(data)
+          if (etaPrimary) {
+            const distanceText = formatDistanceKm(data.distanceKm)
+            return (
+              <div className="space-y-1" data-testid="order-delivery-tracking-eta">
+                <p
+                  className="text-sm font-medium"
+                  data-testid="order-delivery-tracking-eta-primary"
+                >
+                  {etaPrimary}
+                  {distanceText ? ` · ${distanceText}` : ''}
+                </p>
+                {shouldShowEtaConfidence(data) ? (
+                  <Badge
+                    variant="outline"
+                    className="text-xs"
+                    data-testid="order-delivery-tracking-eta-confidence"
+                  >
+                    Low confidence
+                  </Badge>
+                ) : null}
+              </div>
+            )
+          }
           const etaMessage = getEtaUnavailableMessage(data)
           return etaMessage ? (
             <p

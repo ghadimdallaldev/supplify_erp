@@ -64,24 +64,59 @@ function elapsedMsSince(startMs) {
   return Math.round(performance.now() - startMs)
 }
 
-/** Fire-and-forget supplier notification; logs completion or failure without blocking HTTP. */
-function scheduleOrderPlacedNotification(order, supplierId) {
+/** Fire-and-forget order status notification; logs completion or failure without blocking HTTP. */
+function scheduleOrderStatusNotification(orderRow, status, supplierId) {
   void Promise.resolve()
-    .then(() =>
-      notifyOrderStatusChange(
+    .then(async () => {
+      if (status === 'PLACED') {
+        return notifyOrderStatusChange(
+          {
+            id: orderRow.id,
+            total_amount: orderRow.total_amount,
+            restaurant_id: orderRow.restaurant_id,
+            supplier_id: supplierId,
+          },
+          status
+        )
+      }
+
+      let restaurantName = orderRow.restaurant_name
+      let supplierName = orderRow.supplier_name
+
+      if (!restaurantName && orderRow.restaurant_id) {
+        const { rows: restaurantInfo } = await query(
+          `SELECT id, name FROM restaurant WHERE id = $1`,
+          [orderRow.restaurant_id]
+        )
+        restaurantName = restaurantInfo[0]?.name || 'Restaurant'
+      }
+
+      if (!supplierName && supplierId) {
+        const { rows: supplierInfo } = await query(`SELECT id, name FROM supplier WHERE id = $1`, [
+          supplierId,
+        ])
+        supplierName = supplierInfo[0]?.name || 'Supplier'
+      }
+
+      return notifyOrderStatusChange(
         {
-          id: order.id,
-          total_amount: order.total_amount,
-          restaurant_id: order.restaurant_id,
+          id: orderRow.id,
+          total_amount: orderRow.total_amount,
+          restaurant_id: orderRow.restaurant_id,
+          restaurant_name: restaurantName,
           supplier_id: supplierId,
+          supplier_name: supplierName,
+          cancelled_by: orderRow.cancelled_by,
+          cancel_reason: orderRow.cancel_reason,
         },
-        'PLACED'
+        status
       )
-    )
+    })
     .then((sent) => {
       logger.info({
         event: 'order.notification.background_complete',
-        orderId: order.id,
+        orderId: orderRow.id,
+        status,
         supplierId,
         recipientCount: sent?.recipientCount ?? sent?.length ?? 0,
         failedRecipientCount: sent?.failedCount ?? 0,
@@ -91,12 +126,17 @@ function scheduleOrderPlacedNotification(order, supplierId) {
     .catch((error) => {
       logger.warn({
         event: 'order.notification.background_failed',
-        orderId: order.id,
+        orderId: orderRow.id,
+        status,
         supplierId,
         error: error?.message,
         stack: error?.stack,
       })
     })
+}
+
+function scheduleOrderPlacedNotification(order, supplierId) {
+  scheduleOrderStatusNotification(order, 'PLACED', supplierId)
 }
 
 router.use(
@@ -2105,74 +2145,18 @@ router.patch('/:id', async (req, res) => {
     })
 
     if (updateData.status === 'CANCELLED' && order.status !== 'CANCELLED' && order.supplier_id) {
-      await releaseOrderFromPlannedRoutes(id, order.supplier_id).catch(() => {})
+      void releaseOrderFromPlannedRoutes(id, order.supplier_id).catch((error) => {
+        logger.warn({
+          event: 'order.route_release.background_failed',
+          orderId: id,
+          supplierId: order.supplier_id,
+          error: error?.message,
+        })
+      })
     }
 
-    // Send notification if status changed
     if (updateData.status && updateData.status !== order.status) {
-      try {
-        // Get supplier_id from order items (order.supplier_id was set earlier in the function)
-        const supplierIdForNotification = order.supplier_id
-
-        // Get restaurant and supplier info
-        const { rows: restaurantInfo } = await query(
-          `
-          SELECT id, name FROM restaurant WHERE id = $1
-        `,
-          [rows[0].restaurant_id]
-        )
-
-        const { rows: supplierInfo } = await query(
-          `
-          SELECT id, name FROM supplier WHERE id = $1
-        `,
-          [supplierIdForNotification]
-        )
-
-        // Notify both parties based on status
-        if (updateData.status === 'PLACED') {
-          // New order - notify supplier
-          await notifyOrderStatusChange(
-            {
-              id: rows[0].id,
-              total_amount: rows[0].total_amount,
-              restaurant_id: rows[0].restaurant_id,
-              restaurant_name: restaurantInfo[0]?.name || 'Restaurant',
-              supplier_id: supplierIdForNotification,
-            },
-            updateData.status
-          )
-        } else if (updateData.status === 'CANCELLED') {
-          await notifyOrderStatusChange(
-            {
-              id: rows[0].id,
-              total_amount: rows[0].total_amount,
-              restaurant_id: rows[0].restaurant_id,
-              restaurant_name: restaurantInfo[0]?.name || 'Restaurant',
-              supplier_id: supplierIdForNotification,
-              supplier_name: supplierInfo[0]?.name || 'Supplier',
-              cancelled_by: rows[0].cancelled_by,
-              cancel_reason: rows[0].cancel_reason,
-            },
-            updateData.status
-          )
-        } else {
-          // All other status changes - notify restaurant
-          await notifyOrderStatusChange(
-            {
-              id: rows[0].id,
-              total_amount: rows[0].total_amount,
-              restaurant_id: rows[0].restaurant_id,
-              supplier_id: supplierIdForNotification,
-              supplier_name: supplierInfo[0]?.name || 'Supplier',
-            },
-            updateData.status
-          )
-        }
-      } catch (notifError) {
-        // Don't fail the order update if notification fails
-        logger.error('Failed to send notification', { error: notifError.message })
-      }
+      scheduleOrderStatusNotification(rows[0], updateData.status, order.supplier_id)
     }
 
     res.json({

@@ -1060,16 +1060,22 @@ export function RestaurantOnboardingPage() {
                             variant={push.subscribed ? 'outline' : 'default'}
                             size="sm"
                             disabled={push.subscribing || push.unsubscribing}
-                            onClick={() =>
-                              push.subscribed ? push.disablePush() : push.enablePush()
-                            }
+                            onClick={() => {
+                              const action = push.subscribed
+                                ? push.disablePush()
+                                : push.enablePush()
+                              action.catch((err: Error) =>
+                                toast.error(err?.message || 'Could not update push notifications')
+                              )
+                            }}
                           >
                             {push.subscribed ? 'Disable' : 'Enable'}
                           </Button>
                         </div>
                       ) : (
-                        <p className="text-xs text-[var(--text-muted)]">
-                          Push is not configured on this server.
+                        <p className="text-xs text-amber-800 dark:text-amber-200">
+                          {push.pushUnavailableReason ||
+                            'Push is not configured on this server. Ask your admin to set VAPID keys on the API.'}
                         </p>
                       )}
                     </div>

@@ -215,6 +215,33 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
   return result
 }
 
+type OrderDetailCache = { order: Order } | Order
+
+function patchOrderStatusInDetailCache(draft: OrderDetailCache, status: string) {
+  if (draft && typeof draft === 'object' && 'order' in draft && draft.order) {
+    draft.order.status = status as Order['status']
+    return
+  }
+  if (draft && typeof draft === 'object') {
+    ;(draft as Order).status = status as Order['status']
+  }
+}
+
+function mergeOrderIntoDetailCache(draft: OrderDetailCache, updated: unknown) {
+  const order =
+    updated && typeof updated === 'object' && 'order' in updated
+      ? (updated as { order: Order }).order
+      : (updated as Order)
+  if (!order) return
+  if (draft && typeof draft === 'object' && 'order' in draft && draft.order) {
+    Object.assign(draft.order, order)
+    return
+  }
+  if (draft && typeof draft === 'object') {
+    Object.assign(draft as Order, order)
+  }
+}
+
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithUnwrap as any,
@@ -404,22 +431,35 @@ export const api = createApi({
         method: 'PATCH',
         body: data,
       }),
-      async onQueryStarted({ id, data }, { dispatch, queryFulfilled }) {
+      async onQueryStarted({ id, data }, { dispatch, queryFulfilled, getState }) {
         if (data?.status == null) return
-        const patchResult = dispatch(
-          api.util.updateQueryData('getOrder', id, (draft) => {
-            Object.assign(draft, { status: data.status })
-          })
-        )
+        const patchResults = [
+          dispatch(
+            api.util.updateQueryData('getOrder', id, (draft) => {
+              patchOrderStatusInDetailCache(draft, data.status!)
+            })
+          ),
+        ]
+        const cachedListArgs = api.util.selectCachedArgsForQuery(getState(), 'getOrders')
+        for (const args of cachedListArgs) {
+          patchResults.push(
+            dispatch(
+              api.util.updateQueryData('getOrders', args, (draft) => {
+                const order = draft.orders?.find((entry) => entry.id === id)
+                if (order) order.status = data.status! as Order['status']
+              })
+            )
+          )
+        }
         try {
           const { data: updated } = await queryFulfilled
           dispatch(
             api.util.updateQueryData('getOrder', id, (draft) => {
-              Object.assign(draft, updated)
+              mergeOrderIntoDetailCache(draft, updated)
             })
           )
         } catch {
-          patchResult.undo()
+          patchResults.forEach((patch) => patch.undo())
         }
       },
       invalidatesTags: (_result, _error, { id, data }) => {

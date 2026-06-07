@@ -7,6 +7,7 @@ import { resolveNativeDatabaseUrl } from './resolve-database-url.js'
 import {
   envBool,
   envInt,
+  envFloat,
   resolveAppEnv,
   resolveBillingGatewayId,
   resolvePaymentsMode,
@@ -253,6 +254,9 @@ export const config = {
   MAP_PROVIDER: process.env.MAP_PROVIDER || 'google',
   GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || '',
   MAPBOX_ACCESS_TOKEN: process.env.MAPBOX_ACCESS_TOKEN || '',
+  DELIVERY_ETA_CITY_SPEED_KMH: envFloat(process.env.DELIVERY_ETA_CITY_SPEED_KMH, 20),
+  DELIVERY_ETA_MIN_MULTIPLIER: envFloat(process.env.DELIVERY_ETA_MIN_MULTIPLIER, 1.0),
+  DELIVERY_ETA_MAX_MULTIPLIER: envFloat(process.env.DELIVERY_ETA_MAX_MULTIPLIER, 1.5),
 }
 
 if (!config.STORAGE_PUBLIC_URL) {

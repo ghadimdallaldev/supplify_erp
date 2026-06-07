@@ -191,22 +191,7 @@ export function OrderDetailPage() {
           ? 'Order declined'
           : `Order status updated to ${newStatus}`
       toast.success(successLabel)
-
-      // Refetch to get updated data
-      const refetchResult = await refetch()
-
-      // After delivery, keep disabled "Delivered" button visible until refetch settles
-      if (newStatus === 'DELIVERED' || newStatus === 'COMPLETED') {
-        const updated = refetchResult.data?.status
-        if (updated === 'DELIVERED' || updated === 'COMPLETED') {
-          setTimeout(() => {
-            setIsUpdating(false)
-          }, 1000)
-        }
-      } else {
-        // For other statuses, clear immediately
-        setIsUpdating(false)
-      }
+      setIsUpdating(false)
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to update order status')
       setIsUpdating(false)
