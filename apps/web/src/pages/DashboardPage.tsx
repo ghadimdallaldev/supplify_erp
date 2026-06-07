@@ -31,6 +31,7 @@ import { ResponsiveContainer, BarChart, Bar, Tooltip } from 'recharts'
 import { useState } from 'react'
 import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
+import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { featureEnabled } from '../lib/planLimits'
 import { canUseFinanceInvoices, canUseGlobalReports } from '../lib/planFeatureGates'
 import { formatPlanDisplayName } from '../lib/planComparison'
@@ -252,6 +253,7 @@ export function DashboardPage() {
     effectiveRole,
     shouldLoadTenantEntitlements,
   } = useImpersonation()
+  const { isDriverRole } = useWorkspaceRole()
   const isAdminNotImpersonating = isPlatformAdmin && !isImpersonating
 
   useEffect(() => {
@@ -259,12 +261,20 @@ export function DashboardPage() {
       navigate('/app/admin', { replace: true })
     }
   }, [isAdminNotImpersonating, navigate])
+
+  useEffect(() => {
+    if (isDriverRole && !isAdminNotImpersonating) {
+      navigate('/app/driver-deliveries', { replace: true })
+    }
+  }, [isDriverRole, isAdminNotImpersonating, navigate])
+
+  const skipDashboardData = isAdminNotImpersonating || isDriverRole
   const {
     data: stats,
     isLoading,
     error,
   } = useGetDashboardStatsQuery(undefined, {
-    skip: isAdminNotImpersonating,
+    skip: skipDashboardData,
   })
 
   const isRestaurant = isEffectiveRestaurant
@@ -272,10 +282,10 @@ export function DashboardPage() {
 
   const { data: ordersData } = useGetOrdersQuery(
     { limit: isRestaurant ? 200 : 7, offset: 0 },
-    { skip: isAdminNotImpersonating }
+    { skip: skipDashboardData }
   )
   const { data: inventoryData } = useGetInventoryListQuery(undefined, {
-    skip: isAdminNotImpersonating || !isSupplier,
+    skip: skipDashboardData || !isSupplier,
   })
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: !shouldLoadTenantEntitlements,
