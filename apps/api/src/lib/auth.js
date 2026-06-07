@@ -222,8 +222,8 @@ export async function verifyToken(token) {
     const verifyIssuer = payload.iss || config.issuer
     const JWKS = getRemoteJwks(config.jwks_uri)
 
-    // Accept API or Web client (Keycloak may set aud/azp for either depending on flow)
-    const acceptableAudiences = [KEYCLOAK_CLIENT_ID, 'supplify-web']
+    // Accept web, API, and mobile Keycloak clients (azp / aud vary by flow).
+    const acceptableAudiences = [KEYCLOAK_CLIENT_ID, 'supplify-web', 'supplify-mobile']
     const tokenAud = payload.aud
     const tokenAzp = payload.azp
     const audList = Array.isArray(tokenAud) ? tokenAud : tokenAud ? [tokenAud] : []

@@ -64,8 +64,8 @@ export function CreateRouteDialog({ open, onClose, selectedOrders }: Props) {
         </DialogHeader>
         <p className="text-sm text-[var(--text-muted)]">
           {selectedOrders.length} order{selectedOrders.length === 1 ? '' : 's'} will be added to a{' '}
-          <strong>planned</strong> route. Live dispatch and driver assignment start when you
-          activate the route from Fulfillment → Routes.
+          <strong>planned</strong> route and assigned to the selected driver. Activate the route
+          from Fulfillment → Routes when orders are ready for dispatch.
         </p>
         <ul className="max-h-32 overflow-y-auto rounded-md border border-[var(--app-border)] p-2 text-xs space-y-1">
           {selectedOrders.map((o) => (

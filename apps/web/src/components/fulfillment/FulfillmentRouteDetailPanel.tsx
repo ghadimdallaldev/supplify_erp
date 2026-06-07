@@ -64,8 +64,9 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
     try {
       await updateRoute({ id: route.id, status: 'IN_PROGRESS' }).unwrap()
       toast.success('Route started')
-    } catch {
-      toast.error('Could not start route')
+    } catch (e: unknown) {
+      const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
+      toast.error(msg || 'Could not start route')
     }
   }
 
