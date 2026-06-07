@@ -457,3 +457,72 @@ cd apps/api && npx vitest run src/routes/orders.routes.test.js src/services/supp
 | `order.notification.background_complete` | Background notify finished    | `orderId`, `supplierId`, `recipientCount`, `failedRecipientCount`, `notificationDurationMs`                                                                               |
 | `order.notification.background_failed`   | Background notify rejected    | `orderId`, `supplierId`, `error`                                                                                                                                          |
 | `notification.tenant_users.complete`     | Fan-out finished              | `recipientCount`, `sentCount`, `failedCount`, `durationMs`                                                                                                                |
+
+---
+
+## Order transaction second-stage optimization (2026-06-07)
+
+### Timing evidence (Railway dev, post pass 2)
+
+Latest slow checkout (`requestId: 3859db13`, 2 cart lines, 1 supplier):
+
+| Bucket                   | ms       |
+| ------------------------ | -------- |
+| `totalHandlerMs`         | 2915     |
+| `orderTransactionMs`     | **1745** |
+| `dailyLimitCheckMs`      | 587      |
+| `productPriceLookupMs`   | 436      |
+| `warehouseMs`            | 145      |
+| `auditLogMs`             | 146      |
+| `promotionMs`            | 0        |
+| `notificationScheduleMs` | 0        |
+
+Notifications are no longer on the critical path. Remaining latency is synchronous DB work inside and before the order transaction.
+
+### Bottleneck buckets
+
+1. **`orderTransactionMs`** — usage meter increment, order header/items, stock lock/deduct, warehouse assignment/reservation, order total update (Railway ~100ms+ per round trip).
+2. **`dailyLimitCheckMs`** — subscription/limit resolution plus feature-flag and supplier preflight (was bundled into one timer).
+3. **`productPriceLookupMs`** — duplicate catalog price fetch (LATERAL on `product` + `getDefaultCatalogPricesBatch`).
+
+### Changes made
+
+| Area                      | Change                                                                                                                                                                                                            | Files                                                    |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Transaction observability | Sub-phase logs: `order.create.transaction_timing` with `usageMeterMs`, `orderHeaderInsertMs`, `orderItemsInsertMs`, `stockLockAndReserveMs`, `warehouseRoutingMs`, `orderTotalsUpdateMs`, `transactionQueryCount` | `restaurant-order-create.service.js`, `orders.routes.js` |
+| `orderTransactionMs`      | Preload supplier fulfillment fields outside tx; skip in-tx `SELECT * FROM supplier`; fast-path warehouse assign when `default_warehouse_id` set (skip warehouse list query)                                       | `orders.routes.js`, `warehouseRouting.js`                |
+| `orderTransactionMs`      | Usage meter: atomic `UPDATE … RETURNING` on happy path; unlimited plan uses single `INSERT … ON CONFLICT DO UPDATE`                                                                                               | `subscription.js`                                        |
+| `productPriceLookupMs`    | Slim product SELECT (no LATERAL); parallel product + catalog batch; pass `catalogByProductId` into `resolveProductPricesBatch` to avoid duplicate catalog query; slim contract SELECT columns                     | `orders.routes.js`, `resolve-product-price.service.js`   |
+| `dailyLimitCheckMs`       | Reuse `req.subscription` via `resolveDailyMeterEnforcementFromSubscription`; parallel limit + deals feature resolution; parallel supplier preflight with cached subscription features                             | `subscription.js`, `orders.routes.js`                    |
+| Indexes                   | Composite index for batch contract pricing; `price(product_id, valid_from DESC)` for catalog batch                                                                                                                | `0142_order_create_hot_path_indexes.sql`                 |
+
+### Expected impact (Railway dev)
+
+| Bucket                 | Before                                         | Target                               |
+| ---------------------- | ---------------------------------------------- | ------------------------------------ |
+| `productPriceLookupMs` | ~436ms (3 sequential queries)                  | ~150–250ms (2 parallel + 1 contract) |
+| `dailyLimitCheckMs`    | ~587ms (duplicate subscription + serial flags) | ~200–350ms                           |
+| `orderTransactionMs`   | ~1745ms                                        | ~900–1300ms (fewer tx queries)       |
+| `totalHandlerMs`       | ~2915ms                                        | **~1.5–2.0s**                        |
+
+Confirm after deploy with `order.create.timing` and `order.create.transaction_timing` on 2–3 checkouts.
+
+### Risk and rollback
+
+| Risk                                                  | Mitigation                                                                                  |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Usage meter race on limit edge                        | Failed atomic UPDATE falls back to `SELECT … FOR UPDATE` + retry (same semantics as before) |
+| Warehouse fast-path with stale `default_warehouse_id` | Only used in single-warehouse mode when ID is present; multi-warehouse path unchanged       |
+| Pricing without LATERAL join                          | Contract + catalog resolution unchanged; only redundant catalog fetch removed               |
+
+**Rollback:** Revert `restaurant-order-create.service.js` extraction, restore in-route transaction loop, revert `resolveDailyMeterEnforcementFromSubscription` usage, and drop migration `0142` if index build causes deploy issues.
+
+### Tests
+
+```bash
+cd apps/api && npx vitest run \
+  src/routes/orders.routes.test.js \
+  src/services/restaurant-order-create.service.test.js \
+  src/services/resolve-product-price.service.test.js \
+  src/services/supplier-inventory.service.test.js
+```
