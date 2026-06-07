@@ -91,7 +91,6 @@ EOF
   export KC_DB_USERNAME="$PG_USER"
   export KC_DB_PASSWORD="$PG_PASS"
   export KC_DB_URL="jdbc:postgresql://${PG_HOST}:${PG_PORT}/${KEYCLOAK_DB_NAME}"
-  # kc.db is build-time only; runtime uses KC_DB_URL / KC_DB_USERNAME / KC_DB_PASSWORD.
 }
 
 wait_for_postgres() {
@@ -119,7 +118,6 @@ SELECT 'CREATE DATABASE ${KEYCLOAK_DB_NAME}'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${KEYCLOAK_DB_NAME}')\gexec
 SQL
 
-  # DROP SCHEMA public CASCADE removes public entirely; Liquibase needs it.
   PGPASSWORD="$PG_PASS" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$KEYCLOAK_DB_NAME" -v ON_ERROR_STOP=1 <<'SQL'
 CREATE SCHEMA IF NOT EXISTS public;
 GRANT ALL ON SCHEMA public TO public;
@@ -129,29 +127,62 @@ SQL
   echo "Keycloak JDBC (runtime): jdbc:postgresql://${PG_HOST}:${PG_PORT}/${KEYCLOAK_DB_NAME}"
 }
 
+optimized_build_is_postgres() {
+  [ -f /opt/keycloak/conf/keycloak.conf ] && grep -qE '^db=postgres' /opt/keycloak/conf/keycloak.conf
+}
+
+ensure_postgres_optimized_build() {
+  local metrics="${KC_METRICS_ENABLED:-false}"
+
+  if optimized_build_is_postgres; then
+    echo "Keycloak optimized build: postgres (ready)" >&2
+    return 0
+  fi
+
+  echo "Keycloak optimized build missing or H2 — running kc.sh build --db=postgres (1-3 min)..." >&2
+  # Build needs more heap than steady-state; do not inherit Railway runtime -Xmx512m cap.
+  JAVA_OPTS_APPEND="-Xms256m -Xmx768m -XX:+UseContainerSupport" \
+    /opt/keycloak/bin/kc.sh build \
+      --db=postgres \
+      --health-enabled=true \
+      --metrics-enabled="$metrics"
+
+  if ! optimized_build_is_postgres; then
+    echo "ERROR: kc.sh build did not produce db=postgres in /opt/keycloak/conf/keycloak.conf" >&2
+    exit 1
+  fi
+  echo "Keycloak optimized build: postgres (complete)" >&2
+}
+
 resolve_postgres
 ensure_keycloak_database
 
-# Railway must never run Quarkus dev mode — it grows heap unbounded and re-augmentates on boot.
 if [ "${1:-}" = "start-dev" ]; then
   echo "ERROR: start-dev is forbidden on Railway. Use: start --optimized --import-realm" >&2
   exit 1
 fi
 
-# When the image was built with `kc.sh build` (KC_PRODUCTION=true), require optimized start
-# so Quarkus does not re-augment at runtime (major memory spike + slow boot).
 if [ "${1:-}" = "start" ]; then
-  has_optimized=false
-  for arg in "$@"; do
-    if [ "$arg" = "--optimized" ]; then
-      has_optimized=true
-      break
-    fi
+  shift
+  ensure_postgres_optimized_build
+
+  # kc.db / kc.health-enabled / kc.metrics-enabled are build-time only — unset to silence Picocli warnings.
+  unset KC_DB KC_HEALTH_ENABLED KC_METRICS_ENABLED || true
+
+  extra_args=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --optimized) shift ;;
+      --db-url|--db-username|--db-password) shift 2 ;;
+      *) extra_args+=("$1"); shift ;;
+    esac
   done
-  if [ "$has_optimized" = false ]; then
-    echo "Injecting --optimized (image built with kc.sh build; avoids runtime Quarkus augmentation)" >&2
-    set -- start --optimized "${@:2}"
-  fi
+
+  exec /opt/keycloak/bin/kc.sh start --optimized \
+    --db-url="$KC_DB_URL" \
+    --db-username="$KC_DB_USERNAME" \
+    --db-password="$KC_DB_PASSWORD" \
+    "${extra_args[@]}"
 fi
 
 exec /opt/keycloak/bin/kc.sh "$@"

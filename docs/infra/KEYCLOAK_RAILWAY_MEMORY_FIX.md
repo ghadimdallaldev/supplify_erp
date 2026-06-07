@@ -38,7 +38,7 @@ This is **not** caused by Supplify API crons, Postgres keepalive, or idle web ta
 /opt/keycloak/bin/railway-entrypoint.sh start --optimized --import-realm
 ```
 
-- Dockerfile build arg `KC_PRODUCTION=true` runs `kc.sh build --db=postgres --health-enabled=true` at **image build time**.
+- Dockerfile always runs `kc.sh build --db=postgres`; entrypoint rebuilds if cached image still has H2.
 - `railway-entrypoint.sh` **blocks `start-dev`** and auto-injects `--optimized` if missing.
 
 ### 2. JVM memory caps (development)
