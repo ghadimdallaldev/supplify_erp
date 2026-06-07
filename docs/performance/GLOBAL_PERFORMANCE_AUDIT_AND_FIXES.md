@@ -282,13 +282,15 @@ Run `EXPLAIN (ANALYZE, BUFFERS)` on:
 
 ## Logging reference
 
-| Event                         | When                  | Fields                                        |
-| ----------------------------- | --------------------- | --------------------------------------------- |
-| `http.request.slow_breakdown` | API request ≥800ms    | route, durationMs, authMs, rbacMs, queryCount |
-| `auth.me.timing`              | `/auth/me` ≥400ms     | userId, tenantId, durationMs, requestId       |
-| `Tenant registration timing`  | Registration complete | phase breakdown ms                            |
-| `[perf] app.bootstrap.load`   | Dev only              | durationMs since module load                  |
-| `[perf] session.refetch`      | Dev only              | parallel refetch durationMs                   |
+| Event                                    | When                  | Fields                                        |
+| ---------------------------------------- | --------------------- | --------------------------------------------- |
+| `http.request.slow_breakdown`            | API request ≥800ms    | route, durationMs, authMs, rbacMs, queryCount |
+| `order.create.timing`                    | `POST /api/orders`    | phase ms breakdown, `totalHandlerMs`          |
+| `order.notification.background_complete` | Order notify done     | `recipientCount`, `notificationDurationMs`    |
+| `auth.me.timing`                         | `/auth/me` ≥400ms     | userId, tenantId, durationMs, requestId       |
+| `Tenant registration timing`             | Registration complete | phase breakdown ms                            |
+| `[perf] app.bootstrap.load`              | Dev only              | durationMs since module load                  |
+| `[perf] session.refetch`                 | Dev only              | parallel refetch durationMs                   |
 
 Production logs intentionally exclude dev `[perf]` console output.
 
@@ -354,3 +356,51 @@ Both pass after second-pass changes.
 1. Restore `completeRegistration` `invalidatesTags` if register status goes stale.
 2. Restore `activateFreePlan` refetch if checkout race leaves activation stale.
 3. Revert admin billing batch if org-branch plan codes wrong on tenant list.
+
+---
+
+## Order creation response-time fix (2026-06-07)
+
+### Root cause
+
+`POST /api/orders` **awaited** `notifyOrderStatusChange` before returning `201`. That calls `notifyTenantUsers`, which looped supplier team members **sequentially** and ran full `sendNotification` work (preferences, entitlements, `notification_log`, email dedup, cache invalidation, socket emit) on the **critical HTTP path**. On Railway dev this added ~5–8s per order regardless of cold start.
+
+### Files changed
+
+| File                                                 | Change                                                                                                                                                 |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/api/src/routes/orders.routes.js`               | Background `scheduleOrderPlacedNotification` (`Promise.resolve().then(() => notify…)` catches sync + async failures); `order.create.timing` phase logs |
+| `apps/api/src/services/notification.service.js`      | Concurrent fan-out (`NOTIFY_TENANT_USERS_CONCURRENCY = 5`); fan-out stats on return array                                                              |
+| `apps/api/src/lib/concurrency.js`                    | Shared `mapWithConcurrency` helper                                                                                                                     |
+| `apps/api/src/routes/orders.routes.test.js`          | Background notification + non-blocking response tests                                                                                                  |
+| `apps/api/src/services/notification.service.test.js` | Fan-out stats + per-user error isolation                                                                                                               |
+| `apps/api/src/lib/concurrency.test.js`               | Concurrency helper tests                                                                                                                               |
+
+### Why notifications moved to background
+
+Order commit + audit log are **required** for a correct `201`. Supplier alerts are **best-effort** and must not block the restaurant UI. Notifications still run immediately after scheduling (`void` + promise); they simply no longer hold the HTTP connection.
+
+### Expected impact
+
+- **Before:** ~8–10s `POST /api/orders` when supplier team has multiple users.
+- **After:** ~1–3s typical (transaction + audit + pricing/stock); notifications complete shortly after in background.
+- Fan-out concurrency reduces background notification duration when many supplier users exist.
+
+### Risk
+
+- **Low:** Client may see `201` milliseconds before supplier in-app notification/socket event (acceptable for order placement UX).
+- Notification failures are logged (`order.notification.background_failed`) but do not affect order status.
+
+### Rollback
+
+1. Revert `scheduleOrderPlacedNotification` to `await notifyOrderStatusChange(...)` in `orders.routes.js` if suppliers must not place orders until notify completes (not recommended).
+2. Revert `notifyTenantUsers` sequential loop if concurrent sends cause DB pool pressure (unlikely at concurrency 5).
+
+### Logging
+
+| Event                                    | When                          | Fields                                                                                                                                                    |
+| ---------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `order.create.timing`                    | Every restaurant order create | `productPriceLookupMs`, `dailyLimitCheckMs`, `orderTransactionMs`, `promotionMs`, `warehouseMs`, `auditLogMs`, `notificationScheduleMs`, `totalHandlerMs` |
+| `order.notification.background_complete` | Background notify finished    | `orderId`, `supplierId`, `recipientCount`, `failedRecipientCount`, `notificationDurationMs`                                                               |
+| `order.notification.background_failed`   | Background notify rejected    | `orderId`, `supplierId`, `error`                                                                                                                          |
+| `notification.tenant_users.complete`     | Fan-out finished              | `recipientCount`, `sentCount`, `failedCount`, `durationMs`                                                                                                |
