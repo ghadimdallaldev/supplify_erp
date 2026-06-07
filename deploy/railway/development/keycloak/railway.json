@@ -6,8 +6,8 @@
     "buildArgs": {
       "REALM_EXPORT_FILE": "deploy/keycloak/realm-export.json",
       "REALM_IMPORT_FILENAME": "Supplify-realm.json",
-      "KC_PRODUCTION": "true",
-      "KC_METRICS_ENABLED": "false"
+      "KC_METRICS_ENABLED": "false",
+      "KEYCLOAK_BUILD_ID": "postgres-v3"
     },
     "watchPatterns": ["deploy/keycloak/**", "deploy/railway/keycloak/**"]
   },
