@@ -1,0 +1,27 @@
+---
+description: Evaluate web/API changes for Supplify mobile impact
+globs:
+  - apps/api/**
+  - apps/web/**
+  - docs/mobile/**
+alwaysApply: false
+---
+
+# Supplify web/mobile parity
+
+Every Supplify web or API change must be evaluated for mobile impact.
+
+1. If a feature is added or changed on web, check whether mobile needs the same behavior.
+2. If API response types change, update mobile types and API client in `supplify-mobile`.
+3. If auth/session/RBAC/plan gating changes, update mobile guards and navigation.
+4. If order lifecycle changes, update restaurant/supplier/driver mobile flows.
+5. If fulfillment, GPS, ETA, maps, route planning, driver assignment, delivery tracking, or proof-of-delivery changes, update mobile too.
+6. If a web-only change does not apply to mobile, document the reason in `docs/mobile/MOBILE_FEATURE_PARITY.md`.
+7. Do not finish a task until the mobile parity checklist is completed.
+8. Run mobile typecheck/build/tests when mobile-related files are affected (`cd supplify-mobile && npm run typecheck && npm test`).
+9. Keep web and mobile API types aligned with `apps/web/src/types/index.ts`.
+10. Never let delivery/GPS/ETA behavior drift between web and mobile — server is source of truth; mobile uses ported `deliveryEtaDisplay` helpers.
+
+Checklist: [MOBILE_PARITY_CHECKLIST.md](../../docs/mobile/MOBILE_PARITY_CHECKLIST.md)
+
+Mobile app path: `../supplify-mobile` (sibling repo)

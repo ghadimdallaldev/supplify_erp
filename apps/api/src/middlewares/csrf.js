@@ -1,5 +1,7 @@
 import { randomBytes } from 'crypto'
 import { config } from '../config/env.js'
+import { verifyToken } from '../lib/auth.js'
+import { extractBearerToken } from '../lib/mobile-auth.js'
 
 /** Header required on cookie-authenticated state-changing API requests (CSRF defense). */
 export const CSRF_REQUEST_HEADER = 'x-requested-with'
@@ -19,8 +21,29 @@ function isAllowedOrigin(req) {
   return config.WEB_ORIGINS.includes(origin)
 }
 
+async function handleBearerCsrfBypass(req, res) {
+  const bearerToken = extractBearerToken(req)
+  if (!bearerToken) return false
+
+  try {
+    await verifyToken(bearerToken)
+    return true
+  } catch {
+    res.status(401).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'UNAUTHORIZED',
+        message: 'Invalid or expired bearer token',
+      },
+      requestId: req.requestId,
+    })
+    return 'rejected'
+  }
+}
+
 // CSRF protection middleware
-export function csrfProtection(req, res, next) {
+export async function csrfProtection(req, res, next) {
   if (isSafeMethod(req.method)) {
     return next()
   }
@@ -53,6 +76,14 @@ export function csrfProtection(req, res, next) {
   if (req.path.startsWith('/api/')) {
     if (config.NODE_ENV === 'test') {
       return next()
+    }
+
+    const bearerResult = await handleBearerCsrfBypass(req, res)
+    if (bearerResult === true) {
+      return next()
+    }
+    if (bearerResult === 'rejected') {
+      return
     }
 
     const headerValue = req.headers[CSRF_REQUEST_HEADER]
