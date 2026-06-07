@@ -78,6 +78,24 @@ describe('supplier-inventory.service', () => {
     ).rejects.toBeInstanceOf(ValidationError)
   })
 
+  it('aggregates duplicate product lines before batch deduct', async () => {
+    const client = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({
+          rows: [{ product_id: 'prod-1', available_qty: 10 }],
+        })
+        .mockResolvedValueOnce({}),
+    }
+
+    await assertAndDeductSupplierStockBatch(client, [
+      { productId: 'prod-1', quantity: 3, sku: 'SKU-1' },
+      { productId: 'prod-1', quantity: 4, sku: 'SKU-1' },
+    ])
+
+    expect(client.query.mock.calls[1][1][1]).toEqual([7])
+  })
+
   it('restores stock for cancelled order items', async () => {
     const client = {
       query: vi
