@@ -5,23 +5,45 @@ import { logger } from '../lib/logger.js'
 
 let vapidConfigured = false
 
+function isValidVapidValue(value) {
+  if (!value || typeof value !== 'string') return false
+  const trimmed = value.trim()
+  if (!trimmed) return false
+  if (trimmed === 'CHANGE_ME' || trimmed.startsWith('CHANGE_')) return false
+  return true
+}
+
+function getVapidConfig() {
+  const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL } = config
+  if (
+    !isValidVapidValue(VAPID_PUBLIC_KEY) ||
+    !isValidVapidValue(VAPID_PRIVATE_KEY) ||
+    !isValidVapidValue(VAPID_EMAIL)
+  ) {
+    return null
+  }
+  return {
+    publicKey: VAPID_PUBLIC_KEY.trim(),
+    privateKey: VAPID_PRIVATE_KEY.trim(),
+    email: VAPID_EMAIL.trim(),
+  }
+}
+
 function ensureVapid() {
   if (vapidConfigured) return true
-  const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL } = config
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_EMAIL) {
-    return false
-  }
-  webpush.setVapidDetails(`mailto:${VAPID_EMAIL}`, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
+  const vapid = getVapidConfig()
+  if (!vapid) return false
+  webpush.setVapidDetails(`mailto:${vapid.email}`, vapid.publicKey, vapid.privateKey)
   vapidConfigured = true
   return true
 }
 
 export function isPushConfigured() {
-  return !!(config.VAPID_PUBLIC_KEY && config.VAPID_PRIVATE_KEY && config.VAPID_EMAIL)
+  return getVapidConfig() != null
 }
 
 export function getVapidPublicKey() {
-  return config.VAPID_PUBLIC_KEY || null
+  return getVapidConfig()?.publicKey ?? null
 }
 
 export function buildPushPayload({ title, message, url, referenceId, referenceType }) {
