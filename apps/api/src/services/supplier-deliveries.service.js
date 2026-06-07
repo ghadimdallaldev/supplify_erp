@@ -148,6 +148,7 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
     stats: {
       total: orders.length,
       pending: orders.filter((o) => o.deliveryStatus === 'pending').length,
+      assigned: orders.filter((o) => o.deliveryStatus === 'assigned').length,
       outForDelivery: orders.filter((o) => o.deliveryStatus === 'out_for_delivery').length,
       delivered: orders.filter((o) => o.deliveryStatus === 'delivered').length,
       failed: orders.filter((o) => o.deliveryStatus === 'failed').length,
@@ -158,15 +159,10 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
 
 function normalizeDeliveryStatus(raw) {
   const s = String(raw || 'pending').toLowerCase()
-  if (['assigned', 'failed'].includes(s) && s !== 'rescheduled')
-    return s === 'failed' ? 'failed' : 'pending'
+  if (s === 'failed') return 'failed'
   if (s === 'rescheduled') return 'rescheduled'
+  if (s === 'assigned') return 'assigned'
   if (['picked_up', 'out_for_delivery'].includes(s)) return 'out_for_delivery'
   if (s === 'delivered') return 'delivered'
-  if (
-    !['assigned', 'picked_up', 'out_for_delivery', 'delivered', 'failed', 'rescheduled'].includes(s)
-  ) {
-    return 'pending'
-  }
   return 'pending'
 }
