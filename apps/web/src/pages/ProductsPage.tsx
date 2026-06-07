@@ -150,6 +150,7 @@ export function ProductsPage() {
       tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined,
       minPrice: minPrice ? minPrice : undefined,
       maxPrice: maxPrice ? maxPrice : undefined,
+      includeStock: true,
       limit: 100, // Increase limit to show more products
       offset: 0,
     }),

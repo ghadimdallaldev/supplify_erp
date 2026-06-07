@@ -186,6 +186,42 @@ describe('Products Routes', () => {
         expect.arrayContaining([expect.stringContaining('%test%')])
       )
     })
+
+    it('should omit inventory join by default (available_qty placeholder)', async () => {
+      db.query
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] })
+
+      await request(app).get('/api/products').expect(200)
+
+      const listSql = db.query.mock.calls[0][0]
+      expect(listSql).not.toContain('FROM inventory')
+      expect(listSql).toContain('0::int as available_qty')
+    })
+
+    it('should join inventory when includeStock=true', async () => {
+      db.query
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] })
+
+      await request(app).get('/api/products?includeStock=true').expect(200)
+
+      const listSql = db.query.mock.calls[0][0]
+      expect(listSql).toContain('FROM inventory')
+      expect(listSql).toContain('COALESCE(inv.total_available, 0) as available_qty')
+      expect(listSql).not.toContain('0::int as available_qty')
+    })
+
+    it('should filter to in-stock rows when inStock=true', async () => {
+      db.query
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] })
+
+      await request(app).get('/api/products?inStock=true').expect(200)
+
+      const listSql = db.query.mock.calls[0][0]
+      expect(listSql).toContain('inv.total_available > 0')
+    })
   })
 
   describe('GET /api/products/:id', () => {
