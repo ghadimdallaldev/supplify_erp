@@ -6,6 +6,7 @@ import { useGetOrderTrackingQuery } from '../../services/api'
 import { formatDeliveryStatus } from '../../lib/deliveryStatusLabels'
 import { formatOrderRef } from './fulfillmentDispatchUtils'
 import { getGpsStatusLabel } from '../../lib/deliveryTrackingLabels'
+import { getEtaUnavailableMessage } from '../../lib/deliveryEtaMessages'
 import { DeliveryTrackingMap } from '../maps/DeliveryTrackingMap'
 
 type Props = {
@@ -104,9 +105,21 @@ export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
               heightClassName="h-64"
             />
 
-            <p className="text-xs text-[var(--text-muted)]" data-testid="tracking-drawer-eta">
-              ETA not available yet
-            </p>
+            {(() => {
+              const etaMessage = getEtaUnavailableMessage(data)
+              return etaMessage ? (
+                <p
+                  className={`text-xs ${
+                    etaMessage.includes('delivery location is not set')
+                      ? 'text-amber-800 dark:text-amber-200'
+                      : 'text-[var(--text-muted)]'
+                  }`}
+                  data-testid="tracking-drawer-eta"
+                >
+                  {etaMessage}
+                </p>
+              ) : null
+            })()}
           </div>
         )}
       </DialogContent>

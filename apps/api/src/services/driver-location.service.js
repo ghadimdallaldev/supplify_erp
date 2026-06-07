@@ -12,6 +12,11 @@ import {
   buildRestaurantTrackingResponse,
   buildRestaurantTrackingDisabledResponse,
 } from '../lib/restaurant-tracking-payload.js'
+import { buildDestinationPayload, computeEtaReadiness } from '../lib/delivery-coordinates.js'
+import {
+  loadOrderDestination,
+  loadOrderDestinationForSupplier,
+} from './restaurant-delivery-location.service.js'
 
 const LOCATION_TRACKING_STATUSES = ['assigned', 'picked_up', 'out_for_delivery']
 
@@ -390,11 +395,14 @@ export async function getOrderTracking({
       staleAfterSeconds: getGpsStaleAfterSeconds(),
     })
 
+    const destination = await loadOrderDestination(orderId)
+
     return buildRestaurantTrackingResponse({
       orderId,
       orderStatus: orderRow.status,
       assignment,
       tracking,
+      destination,
     })
   }
 
@@ -431,13 +439,26 @@ export async function getOrderTracking({
     staleAfterSeconds: getGpsStaleAfterSeconds(),
   })
 
+  const destination = await loadOrderDestinationForSupplier(orderId, supplierId)
+  const destinationPayload = buildDestinationPayload(destination, { includeCoordinates: true })
+  const etaAvailable = computeEtaReadiness(tracking, destination)
+
   return {
     orderId,
     orderRef: orderId.slice(0, 8),
     orderStatus: orderRow.status,
     restaurantName: orderRow.restaurant_name ?? null,
     trackingEnabled: tracking.enabled,
-    etaAvailable: false,
+    etaAvailable,
+    destinationCoordinatesAvailable: destinationPayload.coordinatesAvailable,
+    destinationLabel: destinationPayload.label,
+    destination: destinationPayload.coordinatesAvailable
+      ? {
+          latitude: destinationPayload.latitude,
+          longitude: destinationPayload.longitude,
+          label: destinationPayload.label,
+        }
+      : null,
     routeId: routeCtx?.route_id ?? null,
     routeStopId: routeCtx?.route_stop_id ?? null,
     routeNumber: routeCtx?.route_number ?? null,
