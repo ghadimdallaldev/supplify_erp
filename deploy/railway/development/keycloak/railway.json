@@ -7,12 +7,12 @@
       "REALM_EXPORT_FILE": "deploy/keycloak/realm-export.json",
       "REALM_IMPORT_FILENAME": "Supplify-realm.json",
       "KC_METRICS_ENABLED": "false",
-      "KEYCLOAK_BUILD_ID": "postgres-v2"
+      "KEYCLOAK_BUILD_ID": "postgres-v3"
     },
     "watchPatterns": ["deploy/keycloak/**", "deploy/railway/keycloak/**"]
   },
   "deploy": {
-    "startCommand": "/opt/keycloak/bin/railway-entrypoint.sh start --optimized --import-realm",
+    "startCommand": "/opt/keycloak/bin/railway-entrypoint.sh start --import-realm",
     "healthcheckPath": "/health/ready",
     "healthcheckTimeout": 600,
     "restartPolicyType": "ON_FAILURE",

@@ -3,6 +3,9 @@
 # Link the Postgres plugin to this service (PGHOST/PGUSER/PGPASSWORD refs) — see keycloak.env.
 set -euo pipefail
 
+RAILWAY_ENTRYPOINT_VERSION=3
+echo "Keycloak railway-entrypoint.sh v${RAILWAY_ENTRYPOINT_VERSION}" >&2
+
 KEYCLOAK_DB_NAME="${KEYCLOAK_DB_NAME:-keycloak}"
 KEYCLOAK_DB_ADMIN="${KEYCLOAK_DB_ADMIN:-${PGDATABASE:-railway}}"
 
@@ -140,7 +143,6 @@ ensure_postgres_optimized_build() {
   fi
 
   echo "Keycloak optimized build missing or H2 — running kc.sh build --db=postgres (1-3 min)..." >&2
-  # Build needs more heap than steady-state; do not inherit Railway runtime -Xmx512m cap.
   JAVA_OPTS_APPEND="-Xms256m -Xmx768m -XX:+UseContainerSupport" \
     /opt/keycloak/bin/kc.sh build \
       --db=postgres \
@@ -154,34 +156,56 @@ ensure_postgres_optimized_build() {
   echo "Keycloak optimized build: postgres (complete)" >&2
 }
 
+strip_start_flags() {
+  extra_args=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --optimized) shift ;;
+      --db-url|--db-username|--db-password)
+        shift 2
+        ;;
+      --db)
+        shift 2
+        ;;
+      *) extra_args+=("$1"); shift ;;
+    esac
+  done
+}
+
 resolve_postgres
 ensure_keycloak_database
 
 if [ "${1:-}" = "start-dev" ]; then
-  echo "ERROR: start-dev is forbidden on Railway. Use: start --optimized --import-realm" >&2
+  echo "ERROR: start-dev is forbidden on Railway. Use: start --import-realm" >&2
   exit 1
 fi
 
 if [ "${1:-}" = "start" ]; then
   shift
-  ensure_postgres_optimized_build
+  strip_start_flags "$@"
 
-  # kc.db / kc.health-enabled / kc.metrics-enabled are build-time only — unset to silence Picocli warnings.
-  unset KC_DB KC_HEALTH_ENABLED KC_METRICS_ENABLED || true
+  # Remove dashboard vars that conflict with CLI or are deprecated.
+  unset KC_DB KC_PROXY KC_HEALTH_ENABLED KC_METRICS_ENABLED || true
 
-  extra_args=()
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      --optimized) shift ;;
-      --db-url|--db-username|--db-password) shift 2 ;;
-      *) extra_args+=("$1"); shift ;;
-    esac
-  done
+  use_optimized="${KEYCLOAK_USE_OPTIMIZED:-false}"
+  if [ "$use_optimized" = "true" ]; then
+    ensure_postgres_optimized_build
+    echo "Keycloak start mode: optimized + postgres" >&2
+    exec /opt/keycloak/bin/kc.sh start --optimized \
+      --db-url="$KC_DB_URL" \
+      --db-username="$KC_DB_USERNAME" \
+      --db-password="$KC_DB_PASSWORD" \
+      "${extra_args[@]}"
+  fi
 
-  exec /opt/keycloak/bin/kc.sh start --optimized \
+  # Default on Railway dev: runtime postgres (avoids H2 baked into stale optimized images).
+  echo "Keycloak start mode: runtime postgres (no --optimized)" >&2
+  exec /opt/keycloak/bin/kc.sh start \
+    --db=postgres \
     --db-url="$KC_DB_URL" \
     --db-username="$KC_DB_USERNAME" \
     --db-password="$KC_DB_PASSWORD" \
+    --health-enabled=true \
     "${extra_args[@]}"
 fi
 
