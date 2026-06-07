@@ -264,9 +264,12 @@ export async function assignOwnerRoleForUser(
   tenantId,
   tenantType,
   assignedBy = null,
-  client = null
+  client = null,
+  options = {}
 ) {
-  await ensureTenantSystemRoles(tenantId, tenantType, client)
+  if (!options.rolesAlreadyEnsured) {
+    await ensureTenantSystemRoles(tenantId, tenantType, client)
+  }
   const ownerRoleId = await getOwnerRoleId(tenantId, tenantType, client)
   if (!ownerRoleId) return false
 
