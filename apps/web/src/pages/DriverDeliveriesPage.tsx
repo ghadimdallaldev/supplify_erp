@@ -18,6 +18,7 @@ import { formatPrice } from '../utils/format'
 import toast from 'react-hot-toast'
 import { useDriverLocationTracking } from '../hooks/useDriverLocationTracking'
 import { isTrackableDeliveryStatus } from '../lib/driverGpsTracking'
+import { getAvailableDriverDeliveryStatuses } from '../lib/driverDeliveryActions'
 
 const DRIVER_STATUSES = [
   { value: 'out_for_delivery', label: 'Out for delivery' },
@@ -298,7 +299,9 @@ export function DriverDeliveriesPage() {
                 onChange={(e) => setNotes((prev) => ({ ...prev, [order.orderId]: e.target.value }))}
               />
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {DRIVER_STATUSES.map((s) => (
+                {DRIVER_STATUSES.filter((s) =>
+                  getAvailableDriverDeliveryStatuses(order.deliveryStatus).includes(s.value)
+                ).map((s) => (
                   <Button
                     key={s.value}
                     size="lg"
