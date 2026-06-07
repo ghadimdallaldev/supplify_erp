@@ -47,6 +47,45 @@ import { ordersRouterMutationGuard } from '../lib/route-permissions.js'
 
 const router = express.Router()
 
+function elapsedMsSince(startMs) {
+  return Math.round(performance.now() - startMs)
+}
+
+/** Fire-and-forget supplier notification; logs completion or failure without blocking HTTP. */
+function scheduleOrderPlacedNotification(order, supplierId) {
+  void Promise.resolve()
+    .then(() =>
+      notifyOrderStatusChange(
+        {
+          id: order.id,
+          total_amount: order.total_amount,
+          restaurant_id: order.restaurant_id,
+          supplier_id: supplierId,
+        },
+        'PLACED'
+      )
+    )
+    .then((sent) => {
+      logger.info({
+        event: 'order.notification.background_complete',
+        orderId: order.id,
+        supplierId,
+        recipientCount: sent?.recipientCount ?? sent?.length ?? 0,
+        failedRecipientCount: sent?.failedCount ?? 0,
+        notificationDurationMs: sent?.durationMs ?? 0,
+      })
+    })
+    .catch((error) => {
+      logger.warn({
+        event: 'order.notification.background_failed',
+        orderId: order.id,
+        supplierId,
+        error: error?.message,
+        stack: error?.stack,
+      })
+    })
+}
+
 router.use(
   requireAuth,
   resolveTenantContext,
@@ -1148,9 +1187,14 @@ router.post(
   requirePermission('ORDERS_CREATE'),
   async (req, res) => {
     try {
+      const handlerStartedAt = performance.now()
+      const orderCreateTimings = {}
+      let phaseStart = performance.now()
+
       const orderData = orderCreateSchema.parse(req.body)
 
       const restaurantId = await getRestaurantIdForRequest(req)
+      orderCreateTimings.restaurantLookupMs = elapsedMsSince(phaseStart)
       if (!restaurantId) {
         return res.status(403).json({
           ok: false,
@@ -1167,6 +1211,7 @@ router.post(
       const orderStatus = orderData.status || 'PLACED'
 
       // Batch-fetch all products and current prices (avoids N+1)
+      phaseStart = performance.now()
       const productIds = [...new Set(orderData.items.map((item) => item.productId))]
       const { rows: products } = await query(
         `
@@ -1199,8 +1244,10 @@ router.post(
         items: resolveItems,
       })
       const resolvedMap = new Map(resolvedPrices.map((r) => [r.productId, r]))
+      orderCreateTimings.productPriceLookupMs = elapsedMsSince(phaseStart)
 
       // Validate and group items by supplier
+      phaseStart = performance.now()
       const supplierGroups = new Map()
       for (const item of orderData.items) {
         const product = productMap.get(item.productId)
@@ -1223,8 +1270,10 @@ router.post(
           defaultCatalogPrice: resolved.defaultPrice,
         })
       }
+      orderCreateTimings.itemGroupingMs = elapsedMsSince(phaseStart)
 
       // Atomic check and reserve usage slots before creating orders (avoids race conditions)
+      phaseStart = performance.now()
       if (orderStatus === 'PLACED') {
         const ordersToCreate = supplierGroups.size
         const usageResult = await checkAndIncrementUsage(
@@ -1256,10 +1305,13 @@ router.post(
           })
         }
       }
+      orderCreateTimings.dailyLimitCheckMs = elapsedMsSince(phaseStart)
 
       // Create separate order for each supplier
       const createdOrders = []
+      const txPhaseTimings = { promotionMs: 0, warehouseMs: 0 }
 
+      phaseStart = performance.now()
       const result = await withTransaction(async (client) => {
         for (const [supplierId, items] of supplierGroups.entries()) {
           // Create order for this supplier
@@ -1347,6 +1399,7 @@ router.post(
               lineTotal: item.unitPrice * item.quantity,
             }))
 
+            const promoPhaseStart = performance.now()
             if (orderData.promotionId) {
               appliedPromotion = await applyPromotionByIdToOrder({
                 client,
@@ -1392,6 +1445,7 @@ router.post(
             if (appliedPromotion) {
               totalAmount = appliedPromotion.totalAfterDiscount
             }
+            txPhaseTimings.promotionMs += elapsedMsSince(promoPhaseStart)
           }
 
           let finalOrder = {
@@ -1408,12 +1462,14 @@ router.post(
           )
           if (supplierRows.length) {
             const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
+            const warehousePhaseStart = performance.now()
             const fulfillment = await assignWarehousesToOrder(client, {
               order: { ...order, restaurant_id: restaurantId },
               orderItems,
               supplier: supplierRows[0],
               multiWarehouseActive: multiActive,
             })
+            txPhaseTimings.warehouseMs += elapsedMsSince(warehousePhaseStart)
             finalOrder = { ...finalOrder, warehouseFulfillment: fulfillment }
           }
 
@@ -1422,11 +1478,14 @@ router.post(
 
         return createdOrders
       })
+      orderCreateTimings.orderTransactionMs = elapsedMsSince(phaseStart)
+      orderCreateTimings.promotionMs = txPhaseTimings.promotionMs
+      orderCreateTimings.warehouseMs = txPhaseTimings.warehouseMs
 
       // If only one order was created, return it directly. Otherwise, return array of orders
       const singleOrder = result.length === 1 ? result[0] : null
 
-      // Log and send notifications for each created order
+      phaseStart = performance.now()
       for (const order of result) {
         logger.info('Order created', {
           orderId: order.id,
@@ -1450,26 +1509,40 @@ router.post(
             },
           })
         }
+      }
+      orderCreateTimings.auditLogMs = elapsedMsSince(phaseStart)
 
-        // Send notification to supplier about new order (only if PLACED, not DRAFT)
+      phaseStart = performance.now()
+      let notificationsScheduled = 0
+      for (const order of result) {
         if (order.status === 'PLACED' && order.items.length > 0) {
-          try {
-            const supplierId = order.items[0].supplier_id
-            await notifyOrderStatusChange(
-              {
-                id: order.id,
-                total_amount: order.total_amount,
-                restaurant_id: order.restaurant_id,
-                supplier_id: supplierId,
-              },
-              'PLACED'
-            )
-          } catch (notifError) {
-            // Don't fail order creation if notification fails
-            logger.error('Failed to send order notification', { error: notifError.message })
-          }
+          const supplierId = order.items[0].supplier_id
+          scheduleOrderPlacedNotification(order, supplierId)
+          notificationsScheduled += 1
         }
       }
+      orderCreateTimings.notificationScheduleMs = elapsedMsSince(phaseStart)
+      orderCreateTimings.notificationsScheduled = notificationsScheduled
+
+      orderCreateTimings.totalHandlerMs = elapsedMsSince(handlerStartedAt)
+      if (req._perf?.stages) {
+        const s = req._perf.stages
+        orderCreateTimings.middlewareMs = Math.round(
+          (s.auth ?? 0) +
+            (s.tenant ?? 0) +
+            (s.tenantContext ?? 0) +
+            (s.billing ?? 0) +
+            (s.feature ?? 0)
+        )
+      }
+
+      logger.info({
+        event: 'order.create.timing',
+        requestId: req.requestId,
+        restaurantId,
+        orderCount: result.length,
+        ...orderCreateTimings,
+      })
 
       // Usage already reserved atomically in checkAndIncrementUsage above (no second increment)
 
