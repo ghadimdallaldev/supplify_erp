@@ -3,9 +3,15 @@ import { NotFoundError, ValidationError, ForbiddenError } from '../middlewares/e
 import { assertSupplierOwnsOrder, updateDeliveryStatus } from './driver-fulfillment.service.js'
 import { getLatestLocationsForDrivers } from './driver-location.service.js'
 import { buildTrackingPayload } from '../lib/delivery-tracking-payload.js'
+import {
+  isPlannedRouteEligibleStatus,
+  isDispatchEligibleStatus,
+  plannedRouteIneligibleReason,
+} from '../lib/delivery-route-order-statuses.js'
 
-const ACTIVE_ROUTE_STATUSES = ['PLANNED', 'IN_PROGRESS']
-const DELIVERABLE_ORDER_STATUSES = ['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED']
+const RESERVATION_ROUTE_STATUSES = ['PLANNED', 'IN_PROGRESS']
+const DRIVER_ACTIVE_ROUTE_STATUSES = ['IN_PROGRESS']
+
 const ROUTABLE_ASSIGNMENT_STATUSES = ['assigned', 'rescheduled', 'failed']
 
 export async function assertDriverBelongsToSupplier(driverId, supplierId) {
@@ -29,7 +35,7 @@ export async function getActiveRouteForOrder(orderId, supplierId) {
       AND dr.status = ANY($3::text[])
     LIMIT 1
     `,
-    [orderId, supplierId, ACTIVE_ROUTE_STATUSES]
+    [orderId, supplierId, RESERVATION_ROUTE_STATUSES]
   )
   return rows[0] ?? null
 }
@@ -265,7 +271,7 @@ export async function getDriverActiveRoute(supplierId, driverId) {
     ORDER BY dr.scheduled_date DESC, dr.created_at DESC
     LIMIT 1
     `,
-    [supplierId, driverId, ACTIVE_ROUTE_STATUSES]
+    [supplierId, driverId, DRIVER_ACTIVE_ROUTE_STATUSES]
   )
   if (!rows.length) return null
   return getDeliveryRoute(supplierId, rows[0].id, { driverIdScope: driverId })
@@ -330,8 +336,9 @@ export async function createDeliveryRoute({
 
   for (const orderId of uniqueOrderIds) {
     const order = await assertSupplierOwnsOrder(supplierId, orderId)
-    if (!DELIVERABLE_ORDER_STATUSES.includes(order.status)) {
-      throw new ValidationError(`Order ${orderId.slice(0, 8)} is not ready for delivery routing`)
+    const ineligible = plannedRouteIneligibleReason(order.status)
+    if (ineligible) {
+      throw new ValidationError(`Order ${orderId.slice(0, 8)}: ${ineligible}`)
     }
     const onRoute = await getActiveRouteForOrder(orderId, supplierId)
     if (onRoute) {
@@ -378,12 +385,108 @@ export async function createDeliveryRoute({
          VALUES ($1, $2, $3, 'PLANNED', $4)`,
         [route.id, orderId, seq++, orderRows[0]?.address_json ?? null]
       )
-      await syncDriverAssignment(client, { supplierId, orderId, driverId, userId })
     }
 
     const stops = await loadRouteStops(route.id, client)
     return { ...mapRouteSummary(route, stops), stops }
   })
+}
+
+async function activateRouteDispatch(client, { supplierId, route, userId }) {
+  const stops = await loadRouteStops(route.id, client)
+  const activated = []
+  const waiting = []
+  const driverId = route.driver_id
+
+  for (const stop of stops) {
+    const { rows: orderRows } = await client.query(
+      `SELECT status FROM customer_order WHERE id = $1`,
+      [stop.orderId]
+    )
+    const orderStatus = orderRows[0]?.status
+    if (orderStatus === 'CANCELLED') {
+      await client.query(`DELETE FROM route_stop WHERE id = $1`, [stop.id])
+      continue
+    }
+    if (!isDispatchEligibleStatus(orderStatus)) {
+      waiting.push({ orderId: stop.orderId, orderStatus })
+      continue
+    }
+    await syncDriverAssignment(client, { supplierId, orderId: stop.orderId, driverId, userId })
+    activated.push(stop.orderId)
+  }
+
+  if (activated.length === 0) {
+    throw new ValidationError(
+      'No orders on this route are ready for dispatch. Wait until orders are ready for delivery, or remove stops that are still being prepared.'
+    )
+  }
+
+  return { activated, waiting }
+}
+
+export async function addOrdersToPlannedRoute({ supplierId, routeId, orderIds, userId }) {
+  const route = await getDeliveryRoute(supplierId, routeId)
+  if (route.status !== 'PLANNED') {
+    throw new ValidationError('Can only add orders to a planned route')
+  }
+  if (!Array.isArray(orderIds) || !orderIds.length) {
+    throw new ValidationError('Select at least one order')
+  }
+
+  const uniqueOrderIds = [...new Set(orderIds)]
+  for (const orderId of uniqueOrderIds) {
+    const order = await assertSupplierOwnsOrder(supplierId, orderId)
+    const ineligible = plannedRouteIneligibleReason(order.status)
+    if (ineligible) {
+      throw new ValidationError(`Order ${orderId.slice(0, 8)}: ${ineligible}`)
+    }
+    const onRoute = await getActiveRouteForOrder(orderId, supplierId)
+    if (onRoute && onRoute.id !== routeId) {
+      throw new ValidationError(
+        `Order ${orderId.slice(0, 8)} is already on route ${onRoute.route_number}`
+      )
+    }
+  }
+
+  return withTransaction(async (client) => {
+    const { rows: maxSeq } = await client.query(
+      `SELECT COALESCE(MAX(sequence_number), 0)::int AS n FROM route_stop WHERE route_id = $1`,
+      [routeId]
+    )
+    let seq = (maxSeq[0]?.n ?? 0) + 1
+
+    for (const orderId of uniqueOrderIds) {
+      const { rows: existing } = await client.query(
+        `SELECT id FROM route_stop WHERE route_id = $1 AND order_id = $2`,
+        [routeId, orderId]
+      )
+      if (existing.length) continue
+
+      const { rows: orderRows } = await client.query(
+        `SELECT r.address_json FROM customer_order o
+         JOIN restaurant r ON r.id = o.restaurant_id
+         WHERE o.id = $1`,
+        [orderId]
+      )
+      await client.query(
+        `INSERT INTO route_stop (route_id, order_id, sequence_number, status, address_json)
+         VALUES ($1, $2, $3, 'PLANNED', $4)`,
+        [routeId, orderId, seq++, orderRows[0]?.address_json ?? null]
+      )
+    }
+
+    return getDeliveryRoute(supplierId, routeId)
+  })
+}
+
+export async function removeOrderFromPlannedRoute({ supplierId, routeId, orderId }) {
+  const route = await getDeliveryRoute(supplierId, routeId)
+  if (route.status !== 'PLANNED') {
+    throw new ValidationError('Can only remove orders from a planned route')
+  }
+  await query(`DELETE FROM route_stop WHERE route_id = $1 AND order_id = $2`, [routeId, orderId])
+  return getDeliveryRoute(supplierId, routeId)
 }
 
 export async function updateDeliveryRoute(supplierId, routeId, patch) {
@@ -438,6 +541,30 @@ export async function updateDeliveryRoute(supplierId, routeId, patch) {
 
   if (!fields.length) return existing
 
+  const activating = patch.status === 'IN_PROGRESS' && existing.status === 'PLANNED'
+
+  if (activating) {
+    return withTransaction(async (client) => {
+      params.push(routeId, supplierId)
+      await client.query(
+        `UPDATE delivery_route SET ${fields.join(', ')}, updated_at = now()
+         WHERE id = $${idx++} AND supplier_id = $${idx}`,
+        params
+      )
+      const { rows: routeRows } = await client.query(
+        `SELECT * FROM delivery_route WHERE id = $1 AND supplier_id = $2`,
+        [routeId, supplierId]
+      )
+      const activation = await activateRouteDispatch(client, {
+        supplierId,
+        route: routeRows[0],
+        userId: patch.userId ?? null,
+      })
+      const detail = await getDeliveryRoute(supplierId, routeId)
+      return { ...detail, activation }
+    })
+  }
+
   params.push(routeId, supplierId)
   await query(
     `UPDATE delivery_route SET ${fields.join(', ')}, updated_at = now()
@@ -450,7 +577,7 @@ export async function updateDeliveryRoute(supplierId, routeId, patch) {
 
 export async function reorderRouteStops(supplierId, routeId, stopIds) {
   const route = await getDeliveryRoute(supplierId, routeId)
-  if (!ACTIVE_ROUTE_STATUSES.includes(route.status)) {
+  if (!RESERVATION_ROUTE_STATUSES.includes(route.status)) {
     throw new ValidationError('Cannot reorder stops on a finished route')
   }
   const existingIds = new Set(route.stops.map((s) => s.id))
@@ -559,10 +686,26 @@ export async function cancelDeliveryRoute(supplierId, routeId) {
   return getDeliveryRoute(supplierId, routeId)
 }
 
+export async function releaseOrderFromPlannedRoutes(orderId, supplierId) {
+  if (!orderId || !supplierId) return
+  await query(
+    `DELETE FROM route_stop rs
+     USING delivery_route dr
+     WHERE rs.route_id = dr.id
+       AND rs.order_id = $1
+       AND dr.supplier_id = $2
+       AND dr.status = 'PLANNED'`,
+    [orderId, supplierId]
+  )
+}
+
 export function orderEligibleForRoute(order) {
-  if (order.active_route_id) return { ok: false, reason: 'Already on an active route' }
-  if (!DELIVERABLE_ORDER_STATUSES.includes(order.status)) {
-    return { ok: false, reason: 'Order not ready for delivery' }
+  if (order.active_route_id) {
+    return { ok: false, reason: 'Already on a route' }
+  }
+  const ineligible = plannedRouteIneligibleReason(order.status)
+  if (ineligible) {
+    return { ok: false, reason: ineligible }
   }
   return { ok: true }
 }

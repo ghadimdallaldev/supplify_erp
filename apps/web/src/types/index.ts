@@ -288,6 +288,9 @@ export interface DispatchOrderCard {
   delivery_status?: string | null
   active_route_id?: string | null
   active_route_number?: string | null
+  active_route_status?: string | null
+  planned_route_only?: boolean
+  route_planning_label?: string | null
   assignment?: {
     id: string
     status: string

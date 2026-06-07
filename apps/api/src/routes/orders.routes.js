@@ -52,6 +52,7 @@ import {
   restoreSupplierStockForOrder,
 } from '../services/supplier-inventory.service.js'
 import { ordersRouterMutationGuard } from '../lib/route-permissions.js'
+import { releaseOrderFromPlannedRoutes } from '../services/delivery-routes.service.js'
 
 const router = express.Router()
 
@@ -2102,6 +2103,10 @@ router.patch('/:id', async (req, res) => {
       status: rows[0].status,
       actor: req.userData.id,
     })
+
+    if (updateData.status === 'CANCELLED' && order.status !== 'CANCELLED' && order.supplier_id) {
+      await releaseOrderFromPlannedRoutes(id, order.supplier_id).catch(() => {})
+    }
 
     // Send notification if status changed
     if (updateData.status && updateData.status !== order.status) {

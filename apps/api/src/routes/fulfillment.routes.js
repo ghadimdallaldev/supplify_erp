@@ -22,6 +22,8 @@ import {
   updateRouteStop,
   cancelDeliveryRoute,
   getDriverActiveRoute,
+  addOrdersToPlannedRoute,
+  removeOrderFromPlannedRoute,
 } from '../services/delivery-routes.service.js'
 import { getLinkedDriverId, isDriverOnlyPermissions } from '../lib/driver-rbac.js'
 import {
@@ -369,6 +371,8 @@ router.get('/routes', async (req, res) => {
 })
 
 function mapDispatchOrder(row) {
+  const plannedOnly =
+    row.active_route_id && row.active_route_status === 'PLANNED' && !row.assignment_id
   return {
     id: row.id,
     status: row.order_status,
@@ -378,6 +382,13 @@ function mapDispatchOrder(row) {
     item_count: row.item_count ?? 0,
     active_route_id: row.active_route_id ?? null,
     active_route_number: row.active_route_number ?? null,
+    active_route_status: row.active_route_status ?? null,
+    planned_route_only: plannedOnly,
+    route_planning_label: plannedOnly
+      ? 'Route planned — waiting for order to be ready'
+      : row.active_route_status === 'PLANNED'
+        ? 'Planned route'
+        : null,
     assignment: row.assignment_id
       ? {
           id: row.assignment_id,
@@ -442,7 +453,8 @@ router.get('/dispatch', async (req, res) => {
         d.vehicle_plate,
         EXISTS (SELECT 1 FROM proof_of_delivery pod WHERE pod.order_id = o.id) AS has_pod,
         ar.route_id AS active_route_id,
-        ar.route_number AS active_route_number
+        ar.route_number AS active_route_number,
+        ar.route_status AS active_route_status
       FROM customer_order o
       JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
       JOIN restaurant r ON r.id = o.restaurant_id
@@ -454,7 +466,7 @@ router.get('/dispatch', async (req, res) => {
       ) da ON true
       LEFT JOIN drivers d ON d.id = da.driver_id
       LEFT JOIN LATERAL (
-        SELECT dr.id AS route_id, dr.route_number
+        SELECT dr.id AS route_id, dr.route_number, dr.status AS route_status
         FROM route_stop rs
         JOIN delivery_route dr ON dr.id = rs.route_id
         WHERE rs.order_id = o.id
@@ -462,7 +474,7 @@ router.get('/dispatch', async (req, res) => {
           AND dr.status IN ('PLANNED', 'IN_PROGRESS')
         LIMIT 1
       ) ar ON true
-      WHERE o.status IN ('ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED')
+      WHERE o.status IN ('PLACED', 'PENDING_APPROVAL', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED')
         ${placedSinceClause}
         ${whFilter.clause}
     `
@@ -480,7 +492,7 @@ router.get('/dispatch', async (req, res) => {
       query(
         `${baseSelect}
            AND (da.id IS NULL OR da.status IN ('failed'))
-           AND o.status IN ('ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')
+           AND o.status IN ('PLACED', 'PENDING_APPROVAL', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')
            ORDER BY o.id, o.created_at DESC
            LIMIT $${limitParamIndex}`,
         limitParams
@@ -827,6 +839,64 @@ router.post('/routes', requirePermission('FULFILLMENT_MANAGE'), async (req, res,
   }
 })
 
+const addRouteStopsSchema = z.object({
+  order_ids: z.array(z.string().uuid()).min(1),
+})
+
+router.post(
+  '/routes/:id/stops',
+  requirePermission('FULFILLMENT_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
+      }
+      const body = addRouteStopsSchema.parse(req.body ?? {})
+      const route = await addOrdersToPlannedRoute({
+        supplierId,
+        routeId: req.params.id,
+        orderIds: body.order_ids,
+        userId: req.userData?.id,
+      })
+      res.status(201).json({ ok: true, data: { route }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.delete(
+  '/routes/:id/stops/:orderId',
+  requirePermission('FULFILLMENT_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
+      }
+      const route = await removeOrderFromPlannedRoute({
+        supplierId,
+        routeId: req.params.id,
+        orderId: req.params.orderId,
+      })
+      res.json({ ok: true, data: { route }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
 router.patch('/routes/:id', requirePermission('FULFILLMENT_MANAGE'), async (req, res, next) => {
   try {
     const supplierId = await resolveSupplierId(req)
@@ -856,6 +926,7 @@ router.patch('/routes/:id', requirePermission('FULFILLMENT_MANAGE'), async (req,
       scheduledDate: body.scheduled_date,
       driverId: body.driver_id,
       status: body.status,
+      userId: req.userData?.id,
     })
     res.json({ ok: true, data: { route }, error: null, requestId: req.requestId })
   } catch (err) {
