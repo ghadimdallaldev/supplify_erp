@@ -1,6 +1,6 @@
 # Keycloak on Railway — database & persistence (all environments)
 
-**Automated (in repo):** the Keycloak Docker image runs `railway-entrypoint.sh` on boot — it waits for Postgres, **creates database `keycloak` if missing**, and sets `KC_DB_*`. Link Postgres to Keycloak with `PGHOST`/`PGUSER`/`PGPASSWORD` reference vars (see `keycloak.env`). Sync vars with one command: `pnpm railway:keycloak:sync -- development`.
+**Automated (in repo):** the Keycloak Docker image runs `railway-entrypoint.sh` on boot — it waits for Postgres, **creates database `keycloak` if missing**, and sets `KC_DB_*`. Link Postgres to Keycloak with `PGHOST`/`PGUSER`/`PGPASSWORD` reference vars (see `keycloak.env`). Sync vars: `pnpm railway:keycloak:sync -- <env>` (`development` | `preprod` | `staging` | `production`).
 
 Manual steps Railway cannot do from git alone: create the Railway project, connect GitHub once, `railway link`, set `KEYCLOAK_ADMIN_PASSWORD` when syncing.
 

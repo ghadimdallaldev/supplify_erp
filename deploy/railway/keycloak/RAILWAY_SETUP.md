@@ -8,14 +8,14 @@ Do **not** deploy the stock Keycloak image without building these Dockerfiles.
 
 ## Per-environment Railway settings
 
-| Environment     | Config file                                         | Realm              | Start command              |
-| --------------- | --------------------------------------------------- | ------------------ | -------------------------- |
-| **development** | `/deploy/railway/development/keycloak/railway.json` | `Supplify`         | `start --import-realm`     |
-| **preprod**     | `/deploy/railway/preprod/keycloak/railway.json`     | `supplify-preprod` | `start-dev --import-realm` |
-| **staging**     | `/deploy/railway/staging/keycloak/railway.json`     | `supplify-preprod` | `start-dev --import-realm` |
-| **production**  | `/deploy/railway/production/keycloak/railway.json`  | `supplify-prod`    | `start --import-realm`     |
+| Environment     | Config file                                         | Realm              | Start command                                |
+| --------------- | --------------------------------------------------- | ------------------ | -------------------------------------------- |
+| **development** | `/deploy/railway/development/keycloak/railway.json` | `Supplify`         | `railway-entrypoint.sh start --import-realm` |
+| **preprod**     | `/deploy/railway/preprod/keycloak/railway.json`     | `supplify-preprod` | `railway-entrypoint.sh start --import-realm` |
+| **staging**     | `/deploy/railway/staging/keycloak/railway.json`     | `supplify-preprod` | `railway-entrypoint.sh start --import-realm` |
+| **production**  | `/deploy/railway/production/keycloak/railway.json`  | `supplify-prod`    | `railway-entrypoint.sh start --import-realm` |
 
-All environments build **`deploy/railway/keycloak/Dockerfile`** (realm JSON copied at build time; `railway.json` sets `buildArgs`).
+All environments build **`deploy/railway/keycloak/Dockerfile`** (shared image: realm JSON, `railway-entrypoint.sh`, psql via ubi-micro stage; `railway.json` sets `buildArgs`).
 
 For every Keycloak service:
 
@@ -30,7 +30,7 @@ Boot script **`railway-entrypoint.sh`** (in Dockerfile) auto-creates Postgres da
 
 Set **`KC_HOSTNAME`** in `keycloak.env` to your real public hostname (no `https://` prefix).
 
-Development uses **optimized `start`** (not `start-dev`) with JVM caps — see [`KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](../KEYCLOAK_RAILWAY_MEMORY_NOTES.md).
+All environments use **optimized `start`** (not `start-dev`) with JVM caps in `keycloak.env` — see [`KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](../KEYCLOAK_RAILWAY_MEMORY_NOTES.md).
 
 ## Verify after deploy
 

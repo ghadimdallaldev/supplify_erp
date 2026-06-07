@@ -4,15 +4,16 @@ Realm **`supplify-prod`** is imported automatically on first boot — no Admin U
 
 ## Keycloak service (one-time)
 
-| Setting        | Value                                              |
-| -------------- | -------------------------------------------------- |
-| Root Directory | _(empty)_                                          |
-| Config file    | `/deploy/railway/production/keycloak/railway.json` |
-| Start command  | `/opt/keycloak/bin/kc.sh start --import-realm`     |
+| Setting        | Value                                                                                |
+| -------------- | ------------------------------------------------------------------------------------ |
+| Root Directory | _(empty)_                                                                            |
+| Config file    | `/deploy/railway/production/keycloak/railway.json`                                   |
+| Start command  | `/opt/keycloak/bin/railway-entrypoint.sh start --import-realm` (from `railway.json`) |
+| Healthcheck    | `/health/ready`, timeout **600**                                                     |
 
-Variables: paste full `deploy/railway/production/keycloak.env` (includes dedicated `KC_DB_*` for database **`keycloak`**) + strong `KEYCLOAK_ADMIN_PASSWORD` (same on Keycloak and API).
+Variables: `pnpm railway:keycloak:sync -- production` or paste `deploy/railway/production/keycloak.env` + strong `KEYCLOAK_ADMIN_PASSWORD` (same on Keycloak and API).
 
-One-time on Postgres: `CREATE DATABASE keycloak;` — see [`../KEYCLOAK_RAILWAY_DB_NOTES.md`](../KEYCLOAK_RAILWAY_DB_NOTES.md). **Do not** set `DATABASE_URL` on the Keycloak service.
+Postgres DB **`keycloak`** is auto-created on boot — see [`../KEYCLOAK_RAILWAY_DB_NOTES.md`](../KEYCLOAK_RAILWAY_DB_NOTES.md). **Do not** set `DATABASE_URL` on the Keycloak service.
 
 Set **`KC_HOSTNAME`** to production Keycloak host (e.g. `keycloak.yourdomain.com`).
 
