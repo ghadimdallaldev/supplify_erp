@@ -109,12 +109,16 @@ export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
             <DeliveryTrackingMap
               latitude={data.tracking?.latestLocation?.latitude ?? data.latestLocation?.latitude}
               longitude={data.tracking?.latestLocation?.longitude ?? data.latestLocation?.longitude}
+              destinationLatitude={data.destination?.latitude}
+              destinationLongitude={data.destination?.longitude}
+              destinationLabel={data.destinationLabel ?? data.destination?.label}
               live={Boolean(
                 data.tracking?.hasLocation &&
                   !data.tracking?.isStale &&
                   assignmentStatus &&
                   LIVE_MAP_STATUSES.has(assignmentStatus)
               )}
+              gpsStale={Boolean(data.tracking?.isStale)}
               recordedAt={
                 data.tracking?.latestLocation?.recordedAt ?? data.latestLocation?.recordedAt ?? null
               }

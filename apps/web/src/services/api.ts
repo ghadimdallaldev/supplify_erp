@@ -686,6 +686,17 @@ export const api = createApi({
       query: () => '/api/fulfillment/routes/active',
       providesTags: ['Fulfillment'],
     }),
+    buildDriverRouteFromAssignments: builder.mutation<
+      { route: DeliveryRouteDetail },
+      { date?: string } | void
+    >({
+      query: (body) => ({
+        url: '/api/fulfillment/routes/build-from-assignments',
+        method: 'POST',
+        body: body ?? {},
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
     createFulfillmentRoute: builder.mutation<
       { route: DeliveryRouteDetail },
       {
@@ -3866,6 +3877,7 @@ export const {
   useGetFulfillmentRoutesQuery,
   useGetFulfillmentRouteQuery,
   useGetDriverActiveRouteQuery,
+  useBuildDriverRouteFromAssignmentsMutation,
   useCreateFulfillmentRouteMutation,
   useUpdateFulfillmentRouteMutation,
   useCancelFulfillmentRouteMutation,

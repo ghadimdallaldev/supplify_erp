@@ -836,3 +836,129 @@ export function orderEligibleForRoute(order) {
   }
   return { ok: true }
 }
+
+const DRIVER_BUILD_ASSIGNMENT_STATUSES = ['assigned', 'picked_up', 'out_for_delivery']
+
+function mapAssignmentStatusToStopStatus(assignmentStatus) {
+  const s = String(assignmentStatus || '').toLowerCase()
+  if (['picked_up', 'out_for_delivery'].includes(s)) return 'IN_TRANSIT'
+  return 'PLANNED'
+}
+
+async function findEligibleStandaloneAssignments(supplierId, driverId, routeDate) {
+  const { rows } = await query(
+    `
+    SELECT DISTINCT ON (da.order_id)
+      da.order_id,
+      da.status AS assignment_status,
+      da.created_at,
+      o.status AS order_status,
+      r.address_json
+    FROM driver_assignments da
+    JOIN customer_order o ON o.id = da.order_id
+    JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
+    JOIN restaurant r ON r.id = o.restaurant_id
+    WHERE da.supplier_id = $1
+      AND da.driver_id = $2
+      AND da.status = ANY($3::text[])
+      AND o.status NOT IN ('CANCELLED', 'COMPLETED', 'DELIVERED')
+      AND COALESCE(o.placed_at, o.created_at)::date <= $4::date
+      AND NOT EXISTS (
+        SELECT 1 FROM route_stop rs
+        JOIN delivery_route dr ON dr.id = rs.route_id
+        WHERE rs.order_id = da.order_id
+          AND dr.supplier_id = $1
+          AND dr.status = ANY($5::text[])
+      )
+    ORDER BY da.order_id, da.created_at DESC
+    `,
+    [supplierId, driverId, DRIVER_BUILD_ASSIGNMENT_STATUSES, routeDate, RESERVATION_ROUTE_STATUSES]
+  )
+  return rows.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+}
+
+async function appendOrdersToRoute(client, routeId, orderRows, startSeq) {
+  let seq = startSeq
+  for (const row of orderRows) {
+    const { rows: existing } = await client.query(
+      `SELECT id FROM route_stop WHERE route_id = $1 AND order_id = $2`,
+      [routeId, row.order_id]
+    )
+    if (existing.length) continue
+    const stopStatus = mapAssignmentStatusToStopStatus(row.assignment_status)
+    await client.query(
+      `INSERT INTO route_stop (route_id, order_id, sequence_number, status, address_json)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [routeId, row.order_id, seq++, stopStatus, row.address_json ?? null]
+    )
+  }
+}
+
+function countActiveRouteStops(route) {
+  return route.stops.filter((s) => !FIXED_STOP_UI_STATUSES.has(s.status)).length
+}
+
+/**
+ * Driver builds a route from today's standalone assignments (no supplier planning step).
+ * Idempotent: merges into existing today route or returns it when already sufficient.
+ */
+export async function buildDriverRouteFromAssignments(
+  supplierId,
+  driverId,
+  { date = null, userId = null } = {}
+) {
+  const routeDate = date || new Date().toISOString().slice(0, 10)
+  const driver = await assertDriverBelongsToSupplier(driverId, supplierId)
+  const routeLabel = `${driver.full_name} — Today's route`
+
+  const eligible = await findEligibleStandaloneAssignments(supplierId, driverId, routeDate)
+  const existingRoute = await getDriverActiveRoute(supplierId, driverId)
+
+  if (existingRoute && RESERVATION_ROUTE_STATUSES.includes(existingRoute.status)) {
+    if (eligible.length) {
+      await withTransaction(async (client) => {
+        const { rows: maxSeq } = await client.query(
+          `SELECT COALESCE(MAX(sequence_number), 0)::int AS n FROM route_stop WHERE route_id = $1`,
+          [existingRoute.id]
+        )
+        await appendOrdersToRoute(client, existingRoute.id, eligible, (maxSeq[0]?.n ?? 0) + 1)
+        if (existingRoute.status === 'PLANNED') {
+          await client.query(
+            `UPDATE delivery_route
+             SET status = 'IN_PROGRESS', started_at = COALESCE(started_at, now()), updated_at = now()
+             WHERE id = $1 AND supplier_id = $2`,
+            [existingRoute.id, supplierId]
+          )
+        }
+      })
+    }
+    const updated = await getDeliveryRoute(supplierId, existingRoute.id, {
+      driverIdScope: driverId,
+    })
+    if (countActiveRouteStops(updated) >= 2) return updated
+  }
+
+  if (eligible.length < 2) {
+    throw new ValidationError(
+      'Need at least 2 assigned deliveries not already on a route to build a route'
+    )
+  }
+
+  const vehicleInfo =
+    [driver.vehicle_type, driver.vehicle_plate].filter(Boolean).join(' · ') || null
+
+  return withTransaction(async (client) => {
+    const routeNumber = await nextRouteNumber(supplierId, client)
+    const { rows: routeRows } = await client.query(
+      `INSERT INTO delivery_route (
+         supplier_id, route_number, route_label, driver_id, driver_name,
+         vehicle_info, scheduled_date, status, started_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7::date, 'IN_PROGRESS', now())
+       RETURNING *`,
+      [supplierId, routeNumber, routeLabel, driverId, driver.full_name, vehicleInfo, routeDate]
+    )
+    const route = routeRows[0]
+    await appendOrdersToRoute(client, route.id, eligible, 1)
+    return getDeliveryRoute(supplierId, route.id, { driverIdScope: driverId })
+  })
+}

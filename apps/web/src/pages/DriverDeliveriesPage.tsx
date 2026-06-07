@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Package } from 'lucide-react'
+import { Loader2, Package, Route } from 'lucide-react'
 import { RequirePermission } from '../components/RequirePermission'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
@@ -9,6 +9,7 @@ import { DriverDeliveriesHeader } from '../components/driver/DriverDeliveriesHea
 import { DriverDeliveryCard } from '../components/driver/DriverDeliveryCard'
 import { DriverRoutePanel } from '../components/driver/DriverRoutePanel'
 import {
+  useBuildDriverRouteFromAssignmentsMutation,
   useGetDriverActiveRouteQuery,
   useGetSupplierDeliveryBoardQuery,
   useReorderFulfillmentRouteStopsMutation,
@@ -37,6 +38,7 @@ export function DriverDeliveriesPage() {
   const [updateRouteStop] = useUpdateFulfillmentRouteStopMutation()
   const [reorderStops, { isLoading: reordering }] = useReorderFulfillmentRouteStopsMutation()
   const [setNextStop] = useSetNextFulfillmentRouteStopMutation()
+  const [buildRoute, { isLoading: buildingRoute }] = useBuildDriverRouteFromAssignmentsMutation()
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [showCompleted, setShowCompleted] = useState(false)
 
@@ -125,6 +127,27 @@ export function DriverDeliveriesPage() {
       const msg =
         (e as { data?: { error?: { message?: string } } })?.data?.error?.message ||
         'Could not set next stop'
+      toast.error(msg)
+    }
+  }
+
+  const standaloneEligibleCount = useMemo(
+    () => activeOrders.filter((o) => isActiveDriverDeliveryStatus(o.deliveryStatus)).length,
+    [activeOrders]
+  )
+
+  const showBuildRouteCard = !activeRoute && !routeLoading && standaloneEligibleCount >= 2
+
+  const handleBuildRoute = async () => {
+    try {
+      await buildRoute({}).unwrap()
+      toast.success('Your route is ready')
+      refetchRoute()
+      refetch()
+    } catch (e: unknown) {
+      const msg =
+        (e as { data?: { error?: { message?: string } } })?.data?.error?.message ||
+        'Could not build route'
       toast.error(msg)
     }
   }
@@ -242,6 +265,36 @@ export function DriverDeliveriesPage() {
             </CardContent>
           </Card>
         )}
+
+        {showBuildRouteCard ? (
+          <Card data-testid="driver-build-route-card">
+            <CardContent className="space-y-3 pt-4">
+              <div className="flex items-start gap-3">
+                <Route className="mt-0.5 h-5 w-5 shrink-0 text-[var(--brand-mid)]" aria-hidden />
+                <div className="space-y-1">
+                  <p className="font-semibold text-[var(--text-primary)]">
+                    You have {standaloneEligibleCount} deliveries today
+                  </p>
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Build a route to choose the delivery order.
+                  </p>
+                </div>
+              </div>
+              <Button
+                className="w-full"
+                size="lg"
+                data-testid="driver-build-route-button"
+                disabled={buildingRoute}
+                onClick={handleBuildRoute}
+              >
+                {buildingRoute ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                ) : null}
+                Build my route
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
 
         {activeRoute && !routeLoading ? (
           <DriverRoutePanel

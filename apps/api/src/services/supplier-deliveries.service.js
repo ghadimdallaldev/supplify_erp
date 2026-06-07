@@ -41,6 +41,8 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
     statusFilter = String(status).toLowerCase()
     if (statusFilter === 'pending') {
       conditions.push(`(da.id IS NULL OR da.status IN ('assigned', 'failed', 'rescheduled'))`)
+    } else if (statusFilter === 'active_delivery') {
+      conditions.push(`da.status IN ('assigned', 'picked_up', 'out_for_delivery')`)
     } else if (statusFilter === 'out_for_delivery') {
       conditions.push(`da.status IN ('picked_up', 'out_for_delivery')`)
     } else if (statusFilter === 'delivered') {
@@ -64,10 +66,14 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
       d.id AS driver_id,
       d.full_name AS driver_name,
       EXISTS (SELECT 1 FROM proof_of_delivery pod WHERE pod.order_id = o.id) AS has_pod,
-      COALESCE(o.placed_at, o.created_at) AS scheduled_at
+      COALESCE(o.placed_at, o.created_at) AS scheduled_at,
+      COALESCE(b.delivery_latitude, r.delivery_latitude) AS destination_latitude,
+      COALESCE(b.delivery_longitude, r.delivery_longitude) AS destination_longitude,
+      COALESCE(b.delivery_location_label, r.delivery_location_label, r.name) AS destination_label
     FROM customer_order o
     JOIN order_item oi ON oi.order_id = o.id
     JOIN restaurant r ON r.id = o.restaurant_id
+    LEFT JOIN branch b ON b.id = o.branch_id
     LEFT JOIN LATERAL (
       SELECT da2.* FROM driver_assignments da2
       WHERE da2.order_id = o.id AND da2.status NOT IN ('reassigned')
@@ -105,18 +111,33 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
         : null,
       allowDriverFallback: true,
     })
+    const destLat = r.destination_latitude != null ? Number(r.destination_latitude) : null
+    const destLng = r.destination_longitude != null ? Number(r.destination_longitude) : null
+    const destinationCoordinatesAvailable =
+      destLat != null && destLng != null && Number.isFinite(destLat) && Number.isFinite(destLng)
+    const deliveryStatus = normalizeDeliveryStatus(r.delivery_status)
+    const etaAvailable =
+      destinationCoordinatesAvailable &&
+      Boolean(tracking?.hasLocation) &&
+      ['assigned', 'out_for_delivery'].includes(deliveryStatus)
+
     return {
       orderId: r.order_id,
       orderStatus: r.order_status,
       restaurantName: r.restaurant_name,
       deliveryArea: r.delivery_area,
-      deliveryStatus: normalizeDeliveryStatus(r.delivery_status),
+      deliveryStatus,
       driverId: r.driver_id,
       driverName: r.driver_name,
       hasPod: r.has_pod,
       scheduledAt: r.scheduled_at,
       tracking,
       driverLastSeen: buildDriverLastSeenAlias(tracking),
+      destinationCoordinatesAvailable,
+      destinationLatitude: destinationCoordinatesAvailable ? destLat : null,
+      destinationLongitude: destinationCoordinatesAvailable ? destLng : null,
+      destinationLabel: destinationCoordinatesAvailable ? r.destination_label : null,
+      etaAvailable,
     }
   })
 

@@ -26,6 +26,7 @@ import {
   getDriverActiveRoute,
   addOrdersToPlannedRoute,
   removeOrderFromPlannedRoute,
+  buildDriverRouteFromAssignments,
 } from '../services/delivery-routes.service.js'
 import { getLinkedDriverId, isDriverOnlyPermissions } from '../lib/driver-rbac.js'
 import {
@@ -830,6 +831,53 @@ router.get('/routes/active', async (req, res, next) => {
     }
     const route = await getDriverActiveRoute(supplierId, driverId)
     res.json({ ok: true, data: { route }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+const buildDriverRouteSchema = z.object({
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+})
+
+router.post('/routes/build-from-assignments', async (req, res, next) => {
+  try {
+    const supplierId = await resolveSupplierId(req)
+    if (!supplierId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+        requestId: req.requestId,
+      })
+    }
+    const perms = req.tenantContext?.permissions ?? []
+    if (!hasPermission(perms, P.DRIVER_DELIVERIES_MANAGE)) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Driver delivery manage access required' },
+        requestId: req.requestId,
+      })
+    }
+    const driverId = await getLinkedDriverId(req.userData.id, supplierId)
+    if (!driverId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Driver profile not linked' },
+        requestId: req.requestId,
+      })
+    }
+    const body = buildDriverRouteSchema.parse(req.body ?? {})
+    const route = await buildDriverRouteFromAssignments(supplierId, driverId, {
+      date: body.date,
+      userId: req.userData.id,
+    })
+    res.status(201).json({ ok: true, data: { route }, error: null, requestId: req.requestId })
   } catch (err) {
     next(err)
   }
