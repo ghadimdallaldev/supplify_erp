@@ -365,8 +365,11 @@ export async function getOrderTracking({
     }
 
     const assignment = await loadAssignmentForTracking(orderId)
+    const liveAssignmentStatuses = ['picked_up', 'out_for_delivery']
+    const showLiveTracking = assignment && liveAssignmentStatuses.includes(assignment.status)
+
     let locationRow = null
-    if (assignment?.driver_id && gpsEnabled) {
+    if (showLiveTracking && assignment?.driver_id && gpsEnabled) {
       // Restaurants only see pings tied to this order_id (no driver-level fallback).
       locationRow = await getLatestLocationRowForOrder(orderId, assignment.driver_id, {
         orderScopedOnly: true,
@@ -383,6 +386,7 @@ export async function getOrderTracking({
           }
         : null,
       allowDriverFallback: false,
+      enabled: showLiveTracking && gpsEnabled,
       staleAfterSeconds: getGpsStaleAfterSeconds(),
     })
 

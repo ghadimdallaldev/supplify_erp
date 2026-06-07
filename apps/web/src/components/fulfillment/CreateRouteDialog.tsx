@@ -45,7 +45,7 @@ export function CreateRouteDialog({ open, onClose, selectedOrders }: Props) {
         route_label: routeLabel.trim() || undefined,
         area: area.trim() || undefined,
       }).unwrap()
-      toast.success('Delivery route created')
+      toast.success('Planned route created')
       onClose()
       setDriverId('')
       setRouteLabel('')
@@ -60,11 +60,12 @@ export function CreateRouteDialog({ open, onClose, selectedOrders }: Props) {
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create delivery route</DialogTitle>
+          <DialogTitle>Assign to planned route</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-[var(--text-muted)]">
-          {selectedOrders.length} order{selectedOrders.length === 1 ? '' : 's'} will be added as
-          stops in sequence.
+          {selectedOrders.length} order{selectedOrders.length === 1 ? '' : 's'} will be added to a{' '}
+          <strong>planned</strong> route. Live dispatch and driver assignment start when you
+          activate the route from Fulfillment → Routes.
         </p>
         <ul className="max-h-32 overflow-y-auto rounded-md border border-[var(--app-border)] p-2 text-xs space-y-1">
           {selectedOrders.map((o) => (
