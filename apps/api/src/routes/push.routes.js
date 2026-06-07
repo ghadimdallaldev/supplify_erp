@@ -7,6 +7,7 @@ import {
   savePushSubscription,
   removePushSubscription,
 } from '../services/push.service.js'
+import { setPushEnabledPreference } from '../services/notification.service.js'
 
 const router = express.Router()
 
@@ -59,6 +60,7 @@ router.post(
         keys: body.keys,
         userAgent: req.headers['user-agent'],
       })
+      await setPushEnabledPreference(req.userData.id, req.userData.role, true)
       res
         .status(201)
         .json({ ok: true, data: { subscription }, error: null, requestId: req.requestId })
@@ -77,6 +79,9 @@ router.delete(
     try {
       const body = unsubscribeSchema.parse(req.body)
       const removed = await removePushSubscription(req.userData.id, body.endpoint)
+      if (removed) {
+        await setPushEnabledPreference(req.userData.id, req.userData.role, false)
+      }
       res.json({ ok: true, data: { removed }, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)

@@ -1,62 +1,59 @@
 import { useEffect, useState } from 'react'
-import { MapPin, Save, Loader2, ExternalLink } from 'lucide-react'
+import { MapPin, Save, Loader2, ExternalLink, CheckCircle2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Textarea } from '../ui/textarea'
+import { Badge } from '../ui/badge'
 import {
   useGetRestaurantDeliveryLocationsQuery,
   useUpdateBranchDeliveryLocationMutation,
   useUpdateRestaurantDeliveryLocationMutation,
 } from '../../services/api'
-
-type LocationForm = {
-  deliveryLatitude: string
-  deliveryLongitude: string
-  deliveryLocationLabel: string
-  deliveryAddressNotes: string
-}
-
-const emptyForm = (): LocationForm => ({
-  deliveryLatitude: '',
-  deliveryLongitude: '',
-  deliveryLocationLabel: '',
-  deliveryAddressNotes: '',
-})
-
-function formFromLocation(
-  location?: {
-    deliveryLatitude?: number | null
-    deliveryLongitude?: number | null
-    deliveryLocationLabel?: string | null
-    deliveryAddressNotes?: string | null
-  } | null
-): LocationForm {
-  if (!location) return emptyForm()
-  return {
-    deliveryLatitude: location.deliveryLatitude != null ? String(location.deliveryLatitude) : '',
-    deliveryLongitude: location.deliveryLongitude != null ? String(location.deliveryLongitude) : '',
-    deliveryLocationLabel: location.deliveryLocationLabel ?? '',
-    deliveryAddressNotes: location.deliveryAddressNotes ?? '',
-  }
-}
+import {
+  buildDeliveryLocationPayload,
+  emptyDeliveryLocationForm,
+  formFromDeliveryLocation,
+  splitCoordinatePair,
+  validateDeliveryLocationForm,
+  type DeliveryLocationForm,
+} from '../../lib/deliveryLocationForm'
 
 function DeliveryLocationFields({
   form,
   onChange,
   idPrefix,
+  coordinatesAvailable,
 }: {
-  form: LocationForm
-  onChange: (next: LocationForm) => void
+  form: DeliveryLocationForm
+  onChange: (next: DeliveryLocationForm) => void
   idPrefix: string
+  coordinatesAvailable?: boolean
 }) {
+  const handleLatitudeChange = (raw: string) => {
+    const pair = splitCoordinatePair(raw)
+    if (pair) {
+      onChange({ ...form, deliveryLatitude: pair.lat, deliveryLongitude: pair.lng })
+      return
+    }
+    onChange({ ...form, deliveryLatitude: raw })
+  }
+
   return (
     <div className="space-y-4">
-      <p className="text-sm text-[var(--text-muted)]">
-        This location is used for delivery ETA and driver navigation.
-      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-sm text-[var(--text-muted)]">
+          This location is used for delivery ETA and driver navigation.
+        </p>
+        {coordinatesAvailable ? (
+          <Badge variant="secondary" className="text-xs">
+            <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden />
+            GPS saved
+          </Badge>
+        ) : null}
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor={`${idPrefix}-lat`}>Latitude</Label>
@@ -65,7 +62,7 @@ function DeliveryLocationFields({
             inputMode="decimal"
             placeholder="e.g. 33.8938"
             value={form.deliveryLatitude}
-            onChange={(e) => onChange({ ...form, deliveryLatitude: e.target.value })}
+            onChange={(e) => handleLatitudeChange(e.target.value)}
           />
         </div>
         <div className="space-y-2">
@@ -105,41 +102,48 @@ function DeliveryLocationFields({
         className="inline-flex items-center gap-1.5 text-sm text-[var(--brand-mid)] hover:underline"
       >
         <ExternalLink className="h-4 w-4" aria-hidden />
-        Paste coordinates from Google Maps
+        Paste coordinates from Google Maps (you can paste both into latitude)
       </a>
     </div>
   )
 }
 
 export function RestaurantDeliveryLocationCard() {
-  const { data, isLoading, refetch } = useGetRestaurantDeliveryLocationsQuery()
+  const { data, isLoading, isError, refetch } = useGetRestaurantDeliveryLocationsQuery()
   const [updateRestaurant, { isLoading: savingRestaurant }] =
     useUpdateRestaurantDeliveryLocationMutation()
   const [updateBranch, { isLoading: savingBranch }] = useUpdateBranchDeliveryLocationMutation()
 
-  const [restaurantForm, setRestaurantForm] = useState<LocationForm>(emptyForm)
-  const [branchForms, setBranchForms] = useState<Record<string, LocationForm>>({})
+  const [restaurantForm, setRestaurantForm] = useState<DeliveryLocationForm>(
+    emptyDeliveryLocationForm()
+  )
+  const [branchForms, setBranchForms] = useState<Record<string, DeliveryLocationForm>>({})
 
   useEffect(() => {
     if (!data) return
-    setRestaurantForm(formFromLocation(data.restaurant))
-    const next: Record<string, LocationForm> = {}
+    setRestaurantForm(formFromDeliveryLocation(data.restaurant))
+    const next: Record<string, DeliveryLocationForm> = {}
     for (const branch of data.branches ?? []) {
-      next[branch.id] = formFromLocation(branch)
+      next[branch.id] = formFromDeliveryLocation(branch)
     }
     setBranchForms(next)
   }, [data])
 
-  const parsePayload = (form: LocationForm) => ({
-    deliveryLatitude: form.deliveryLatitude.trim() ? Number(form.deliveryLatitude) : null,
-    deliveryLongitude: form.deliveryLongitude.trim() ? Number(form.deliveryLongitude) : null,
-    deliveryLocationLabel: form.deliveryLocationLabel.trim() || null,
-    deliveryAddressNotes: form.deliveryAddressNotes.trim() || null,
-  })
-
   const handleSaveRestaurant = async () => {
+    const validationError = validateDeliveryLocationForm(restaurantForm)
+    if (validationError) {
+      toast.error(validationError)
+      return
+    }
     try {
-      await updateRestaurant(parsePayload(restaurantForm)).unwrap()
+      const result = await updateRestaurant(buildDeliveryLocationPayload(restaurantForm)).unwrap()
+      if (result.location) {
+        setRestaurantForm(
+          formFromDeliveryLocation(
+            result.location as Parameters<typeof formFromDeliveryLocation>[0]
+          )
+        )
+      }
       toast.success('Delivery location saved')
       refetch()
     } catch (error: unknown) {
@@ -153,8 +157,24 @@ export function RestaurantDeliveryLocationCard() {
   const handleSaveBranch = async (branchId: string) => {
     const form = branchForms[branchId]
     if (!form) return
+    const validationError = validateDeliveryLocationForm(form)
+    if (validationError) {
+      toast.error(validationError)
+      return
+    }
     try {
-      await updateBranch({ branchId, ...parsePayload(form) }).unwrap()
+      const result = await updateBranch({
+        branchId,
+        ...buildDeliveryLocationPayload(form),
+      }).unwrap()
+      if (result.location) {
+        setBranchForms((prev) => ({
+          ...prev,
+          [branchId]: formFromDeliveryLocation(
+            result.location as Parameters<typeof formFromDeliveryLocation>[0]
+          ),
+        }))
+      }
       toast.success('Branch delivery location saved')
       refetch()
     } catch (error: unknown) {
@@ -175,6 +195,22 @@ export function RestaurantDeliveryLocationCard() {
     )
   }
 
+  if (isError) {
+    return (
+      <Card data-testid="restaurant-delivery-location-error">
+        <CardContent className="pt-6 space-y-3">
+          <p className="text-sm text-amber-800 dark:text-amber-200">
+            Could not load delivery locations. If this persists, the API may need migration 0143
+            (delivery coordinates) applied.
+          </p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
   const branches = data?.branches ?? []
 
   return (
@@ -185,7 +221,8 @@ export function RestaurantDeliveryLocationCard() {
           Delivery location
         </CardTitle>
         <CardDescription>
-          Set GPS coordinates where drivers should deliver orders for this location.
+          Set GPS coordinates where drivers should deliver orders. This is separate from your text
+          address above — ETA and tracking need numeric latitude and longitude.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -193,6 +230,7 @@ export function RestaurantDeliveryLocationCard() {
           idPrefix="restaurant-delivery"
           form={restaurantForm}
           onChange={setRestaurantForm}
+          coordinatesAvailable={data?.restaurant?.coordinatesAvailable}
         />
         <Button
           onClick={handleSaveRestaurant}
@@ -212,11 +250,12 @@ export function RestaurantDeliveryLocationCard() {
           )}
         </Button>
 
-        {branches.length > 1 ? (
+        {branches.length > 0 ? (
           <div className="space-y-4 border-t border-[var(--app-border)] pt-6">
             <h3 className="text-sm font-semibold">Operational branches</h3>
             <p className="text-sm text-[var(--text-muted)]">
-              Orders tied to a branch use that branch&apos;s coordinates when set.
+              Orders tied to a branch use that branch&apos;s coordinates when set; otherwise the
+              default location above is used.
             </p>
             {branches.map((branch) => (
               <div
@@ -227,8 +266,9 @@ export function RestaurantDeliveryLocationCard() {
                 <p className="font-medium">{branch.name}</p>
                 <DeliveryLocationFields
                   idPrefix={`branch-${branch.id}`}
-                  form={branchForms[branch.id] ?? emptyForm()}
+                  form={branchForms[branch.id] ?? emptyDeliveryLocationForm()}
                   onChange={(next) => setBranchForms((prev) => ({ ...prev, [branch.id]: next }))}
+                  coordinatesAvailable={branch.coordinatesAvailable}
                 />
                 <Button
                   variant="outline"

@@ -212,6 +212,10 @@ export interface RestaurantOrderTrackingResponse {
   etaAvailable: boolean
   destinationCoordinatesAvailable?: boolean
   destinationLabel?: string | null
+  etaMinutesMin?: number | null
+  etaMinutesMax?: number | null
+  distanceKm?: number | null
+  calculatedAt?: string | null
   delivery?: {
     status: string
     label: string
@@ -232,6 +236,12 @@ export interface SupplierOrderTrackingResponse {
   etaAvailable?: boolean
   destinationCoordinatesAvailable?: boolean
   destinationLabel?: string | null
+  etaMinutesMin?: number | null
+  etaMinutesMax?: number | null
+  distanceKm?: number | null
+  calculatedAt?: string | null
+  confidence?: 'LOW' | 'MEDIUM' | null
+  unavailableReason?: string | null
   destination?: {
     latitude: number
     longitude: number

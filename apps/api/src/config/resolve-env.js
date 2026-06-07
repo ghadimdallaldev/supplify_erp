@@ -13,6 +13,12 @@ export function envInt(value, defaultValue) {
   return Number.isFinite(n) ? n : defaultValue
 }
 
+export function envFloat(value, defaultValue) {
+  if (value == null || value === '') return defaultValue
+  const n = parseFloat(String(value))
+  return Number.isFinite(n) ? n : defaultValue
+}
+
 export function resolveAppEnv(nodeEnv) {
   const raw = process.env.APP_ENV?.trim().toLowerCase()
   if (raw === 'dev' || raw === 'preprod' || raw === 'prod') return raw

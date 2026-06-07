@@ -79,13 +79,6 @@ export function buildDestinationPayload(destination, { includeCoordinates = fals
   return payload
 }
 
-/** ETA readiness: driver GPS + destination coordinates (ETA calculation is a follow-up). */
-export function computeEtaReadiness(tracking, destination) {
-  const destinationReady = Boolean(destination?.latitude != null && destination?.longitude != null)
-  const driverReady = Boolean(tracking?.hasLocation && tracking?.latestLocation)
-  return destinationReady && driverReady
-}
-
 export function mapDeliveryLocationRow(row) {
   if (!row) return null
   return {
