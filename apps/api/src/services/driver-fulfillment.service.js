@@ -5,7 +5,7 @@ import { syncWarehouseFulfillmentOnOrderStatus } from './warehouseInventory.js'
 import { notifyOrderStatusChange, notifyDriverDeliveryMilestone } from './notification.service.js'
 
 export const DRIVER_STATUS_TRANSITIONS = {
-  assigned: ['picked_up', 'failed', 'reassigned', 'rescheduled'],
+  assigned: ['picked_up', 'out_for_delivery', 'failed', 'reassigned', 'rescheduled'],
   picked_up: ['out_for_delivery', 'failed', 'rescheduled'],
   out_for_delivery: ['delivered', 'failed', 'rescheduled'],
   rescheduled: ['assigned'],
@@ -125,9 +125,15 @@ export async function updateDeliveryStatus({
     throw new ValidationError('No active driver assignment for this order')
   }
 
-  const allowed = DRIVER_STATUS_TRANSITIONS[assignment.status] ?? []
-  if (!allowed.includes(status)) {
-    throw new ValidationError(`Cannot transition from ${assignment.status} to ${status}`)
+  if (assignment.status === status) {
+    if (notes == null && !(status === 'failed' && failureReason)) {
+      return assignment
+    }
+  } else {
+    const allowed = DRIVER_STATUS_TRANSITIONS[assignment.status] ?? []
+    if (!allowed.includes(status)) {
+      throw new ValidationError(`Cannot transition from ${assignment.status} to ${status}`)
+    }
   }
 
   return withTransaction(async (client) => {
@@ -135,6 +141,8 @@ export async function updateDeliveryStatus({
     const params = [status, notes ?? null]
 
     if (status === 'picked_up') {
+      assignmentUpdate += `, picked_up_at = COALESCE(picked_up_at, now())`
+    } else if (status === 'out_for_delivery') {
       assignmentUpdate += `, picked_up_at = COALESCE(picked_up_at, now())`
     } else if (status === 'delivered') {
       assignmentUpdate += `, delivered_at = now()`
