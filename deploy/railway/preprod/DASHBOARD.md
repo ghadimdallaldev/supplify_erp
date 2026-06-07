@@ -4,20 +4,16 @@ Realm **`supplify-preprod`** is imported automatically on first boot — no Admi
 
 ## Keycloak service (one-time)
 
-| Setting        | Value                                              |
-| -------------- | -------------------------------------------------- |
-| Root Directory | _(empty)_                                          |
-| Config file    | `/deploy/railway/preprod/keycloak/railway.json`    |
-| Start command  | `/opt/keycloak/bin/kc.sh start-dev --import-realm` |
+| Setting        | Value                                                                                |
+| -------------- | ------------------------------------------------------------------------------------ |
+| Root Directory | _(empty)_                                                                            |
+| Config file    | `/deploy/railway/preprod/keycloak/railway.json`                                      |
+| Start command  | `/opt/keycloak/bin/railway-entrypoint.sh start --import-realm` (from `railway.json`) |
+| Healthcheck    | `/health/ready`, timeout **600**                                                     |
 
-Variables: `deploy/railway/preprod/keycloak.env` + secrets:
+Variables: `pnpm railway:keycloak:sync -- preprod` or paste `deploy/railway/preprod/keycloak.env` + `KEYCLOAK_ADMIN_PASSWORD` (same on Keycloak and API).
 
-```env
-KEYCLOAK_ADMIN=admin
-KEYCLOAK_ADMIN_PASSWORD=<same on Keycloak AND API>
-KC_DB=postgres
-KC_DB_URL=${{Postgres-preprod.DATABASE_URL}}
-```
+Postgres DB **`keycloak`** is auto-created on boot — see [`../KEYCLOAK_RAILWAY_DB_NOTES.md`](../KEYCLOAK_RAILWAY_DB_NOTES.md). **Do not** set `DATABASE_URL` on the Keycloak service.
 
 Set **`KC_HOSTNAME`** to your real preprod Keycloak host (no `https://`).
 
