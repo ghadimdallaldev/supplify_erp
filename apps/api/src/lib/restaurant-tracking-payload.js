@@ -10,7 +10,7 @@ const DELIVERY_STATUS_LABELS = {
   out_for_delivery: 'Out for delivery',
   delivered: 'Delivered',
   failed: 'Failed',
-  rescheduled: 'Rescheduled',
+  rescheduled: 'Delivery has been rescheduled',
 }
 
 export function formatDeliveryStatusLabel(status) {

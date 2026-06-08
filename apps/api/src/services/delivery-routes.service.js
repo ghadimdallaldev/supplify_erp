@@ -334,8 +334,9 @@ async function syncDriverAssignment(client, { supplierId, orderId, driverId, use
 
   const { rows: inserted } = await client.query(
     `INSERT INTO driver_assignments (
-       order_id, warehouse_assignment_id, driver_id, supplier_id, assigned_by, status
-     ) VALUES ($1, $2, $3, $4, $5, 'assigned')
+       order_id, warehouse_assignment_id, driver_id, supplier_id, assigned_by, status,
+       scheduled_delivery_date
+     ) VALUES ($1, $2, $3, $4, $5, 'assigned', CURRENT_DATE)
      RETURNING *`,
     [orderId, whRows[0]?.id ?? null, driverId, supplierId, userId ?? null]
   )

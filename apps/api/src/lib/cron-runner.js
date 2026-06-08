@@ -14,6 +14,7 @@ export const CRON_JOBS = {
   FULFILLMENT_EXCEPTIONS: 'fulfillment_exceptions',
   OPERATIONAL_REMINDERS: 'operational_reminders',
   DRIVER_LOCATION_RETENTION: 'driver_location_retention',
+  DELIVERY_ROLLOVER: 'delivery_rollover',
 }
 
 const runningJobs = new Set()

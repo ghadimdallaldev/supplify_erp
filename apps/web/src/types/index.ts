@@ -321,6 +321,8 @@ export interface DispatchOrderCard {
     status: string
     assigned_at?: string
     delivered_at?: string
+    scheduled_delivery_date?: string | null
+    rolled_over_at?: string | null
     driver: {
       id: string
       full_name: string

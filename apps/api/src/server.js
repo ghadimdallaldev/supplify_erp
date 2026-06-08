@@ -65,6 +65,7 @@ import { promotionsRoutes } from './routes/promotions.routes.js'
 import { tenantAuditRoutes } from './routes/tenant-audit.routes.js'
 import { runDeactivateExpiredPromotionsJob } from './jobs/promotions-expiry.job.js'
 import { runDriverLocationRetentionJob } from './jobs/driver-location-retention.job.js'
+import { runDeliveryRolloverCron } from './jobs/delivery-rollover.job.js'
 import { runFreeSandboxExpiryJob } from './jobs/free-sandbox-expiry.job.js'
 import { disputesRoutes } from './routes/disputes.routes.js'
 import { creditNotesRoutes } from './routes/credit-notes.routes.js'
@@ -579,6 +580,18 @@ server.listen(PORT, HOST, () => {
   runFulfillmentCron()
   trackInterval(runFulfillmentCron, fulfillmentIntervalMs)
   logger.info('Fulfillment exceptions job started', { intervalMs: fulfillmentIntervalMs })
+
+  const deliveryRolloverIntervalMs = config.CRON_DELIVERY_ROLLOVER_INTERVAL_MS
+  const runDeliveryRolloverJobTick = () =>
+    runCronJob(CRON_JOBS.DELIVERY_ROLLOVER, () => runDeliveryRolloverCron()).catch((err) =>
+      logger.error('Delivery rollover job failed:', err)
+    )
+  runDeliveryRolloverJobTick()
+  trackInterval(runDeliveryRolloverJobTick, deliveryRolloverIntervalMs)
+  logger.info('Delivery rollover job started', {
+    intervalMs: deliveryRolloverIntervalMs,
+    enabled: config.DELIVERY_ROLLOVER_ENABLED,
+  })
 
   const operationalRemindersIntervalMs = config.CRON_OPERATIONAL_REMINDERS_INTERVAL_MS
   const runOperationalRemindersCron = () =>

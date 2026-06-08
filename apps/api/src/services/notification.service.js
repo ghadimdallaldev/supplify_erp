@@ -1046,6 +1046,59 @@ const DRIVER_MILESTONE_MESSAGES = {
     restaurant: (o) => `Delivery failed for order #${o.id.slice(0, 8)}`,
     supplier: (o) => `Delivery failed for order #${o.id.slice(0, 8)}`,
   },
+  delivery_rescheduled: {
+    title: 'Delivery rescheduled',
+    restaurant: (o) => `Delivery for order #${o.id.slice(0, 8)} was rescheduled for tomorrow`,
+    supplier: (o) => `Delivery for order #${o.id.slice(0, 8)} was rescheduled for tomorrow`,
+  },
+}
+
+/** Batch supplier notification after delivery rollover job (one message per supplier). */
+export async function notifyDeliveryRolloverBatch({
+  supplierId,
+  items = [],
+  notifyRestaurant = false,
+}) {
+  if (!supplierId || !items.length) return null
+  const count = items.length
+  const defs = DRIVER_MILESTONE_MESSAGES.delivery_rescheduled
+
+  await notifyTenantUsers({
+    tenantId: supplierId,
+    tenantType: 'SUPPLIER',
+    notificationType: 'ORDER',
+    notificationCategory: 'delivery_rollover',
+    title: 'Deliveries moved to tomorrow',
+    message:
+      count === 1
+        ? '1 delivery was moved to tomorrow.'
+        : `${count} deliveries were moved to tomorrow.`,
+    referenceType: 'SUPPLIER',
+    metadata: { count, order_ids: items.map((i) => i.orderId) },
+  })
+
+  if (!notifyRestaurant) return true
+
+  for (const item of items) {
+    const { rows } = await query(
+      `SELECT o.id, o.restaurant_id FROM customer_order o WHERE o.id = $1`,
+      [item.orderId]
+    )
+    const order = rows[0]
+    if (!order) continue
+    await notifyTenantUsers({
+      tenantId: order.restaurant_id,
+      tenantType: 'RESTAURANT',
+      notificationType: 'ORDER',
+      notificationCategory: 'delivery_rescheduled',
+      title: defs.title,
+      message: defs.restaurant(order),
+      referenceId: order.id,
+      referenceType: 'ORDER',
+      metadata: { order_id: order.id, scheduled_date: item.scheduledDate },
+    })
+  }
+  return true
 }
 
 /** In-app notifications for driver delivery milestones (no email per ping). */
