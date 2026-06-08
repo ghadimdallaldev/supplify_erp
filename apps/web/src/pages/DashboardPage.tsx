@@ -13,6 +13,7 @@ import {
   useGetEntitlementsQuery,
   useGetInventoryListQuery,
 } from '../services/api'
+import { usePermissions } from '../hooks/usePermissions'
 import { Button } from '../components/ui/button'
 import { Skeleton } from '../components/ui/skeleton'
 import {
@@ -34,6 +35,7 @@ import { useImpersonation } from '../hooks/useImpersonation'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { featureEnabled } from '../lib/planLimits'
 import { canUseFinanceInvoices, canUseGlobalReports } from '../lib/planFeatureGates'
+import { getRestaurantDashboardLayout, type DashboardKpiKey } from '../lib/workspaceRoleProfile'
 import { formatPlanDisplayName } from '../lib/planComparison'
 import { formatCurrency } from '../utils/format'
 /** Vertical rhythm between dashboard sections (KPIs, cards row, calendar). */
@@ -119,6 +121,7 @@ function StatusChip({ status }: { status: string }) {
 }
 
 interface KpiCardProps {
+  kpiKey: DashboardKpiKey
   label: string
   value: string | number
   iconBg: string
@@ -253,7 +256,8 @@ export function DashboardPage() {
     effectiveRole,
     shouldLoadTenantEntitlements,
   } = useImpersonation()
-  const { isDriverRole } = useWorkspaceRole()
+  const { isDriverRole, persona } = useWorkspaceRole()
+  const { can } = usePermissions()
   const isAdminNotImpersonating = isPlatformAdmin && !isImpersonating
 
   useEffect(() => {
@@ -268,6 +272,12 @@ export function DashboardPage() {
     }
   }, [isDriverRole, isAdminNotImpersonating, navigate])
 
+  useEffect(() => {
+    if (!persona.dashboard && !isAdminNotImpersonating && !isDriverRole) {
+      navigate(persona.homePath, { replace: true })
+    }
+  }, [persona.dashboard, persona.homePath, isAdminNotImpersonating, isDriverRole, navigate])
+
   const skipDashboardData = isAdminNotImpersonating || isDriverRole
   const {
     data: stats,
@@ -279,13 +289,19 @@ export function DashboardPage() {
 
   const isRestaurant = isEffectiveRestaurant
   const isSupplier = isEffectiveSupplier
+  const restaurantLayout =
+    isRestaurant && persona.restaurantDashboardMode
+      ? getRestaurantDashboardLayout(persona.restaurantDashboardMode, can, persona.readOnly)
+      : null
+  const showRestaurantSection = (flag: keyof NonNullable<typeof restaurantLayout>) =>
+    !isRestaurant || !restaurantLayout || restaurantLayout[flag]
 
   const { data: ordersData } = useGetOrdersQuery(
     { limit: isRestaurant ? 200 : 7, offset: 0 },
     { skip: skipDashboardData }
   )
   const { data: inventoryData } = useGetInventoryListQuery(undefined, {
-    skip: skipDashboardData || !isSupplier,
+    skip: skipDashboardData || !isSupplier || !can('INVENTORY_VIEW'),
   })
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: !shouldLoadTenantEntitlements,
@@ -430,6 +446,7 @@ export function DashboardPage() {
   // ── KPI definitions ──────────────────────────────────────────────────────
   const supplierKpis: KpiCardProps[] = [
     {
+      kpiKey: 'revenue',
       label: 'Revenue',
       value: typeof stats?.totalRevenue === 'number' ? formatCurrency(stats.totalRevenue) : '$0',
       iconBg: 'var(--brand-pale)',
@@ -440,6 +457,7 @@ export function DashboardPage() {
       sparkColor: 'var(--brand)',
     },
     {
+      kpiKey: 'orders',
       label: 'Orders',
       value: stats?.totalOrders ?? 0,
       iconBg: 'var(--mint-pale)',
@@ -450,6 +468,7 @@ export function DashboardPage() {
       sparkColor: 'var(--mint-mid)',
     },
     {
+      kpiKey: 'pending',
       label: 'Pending',
       value: stats?.pendingOrders ?? 0,
       iconBg: 'var(--amber-pale)',
@@ -460,6 +479,7 @@ export function DashboardPage() {
       sparkColor: 'var(--amber-mid)',
     },
     {
+      kpiKey: 'counterpart',
       label: 'Restaurants',
       value: stats?.totalRestaurants ?? 0,
       iconBg: 'var(--brand-pale)',
@@ -473,6 +493,7 @@ export function DashboardPage() {
 
   const restaurantKpis: KpiCardProps[] = [
     {
+      kpiKey: 'revenue',
       label: 'Total Spent',
       value: typeof stats?.totalSpent === 'number' ? formatCurrency(stats.totalSpent) : '$0',
       iconBg: 'var(--brand-pale)',
@@ -483,6 +504,7 @@ export function DashboardPage() {
       sparkColor: 'var(--brand)',
     },
     {
+      kpiKey: 'orders',
       label: 'My Orders',
       value: stats?.totalOrders ?? 0,
       iconBg: 'var(--mint-pale)',
@@ -493,6 +515,7 @@ export function DashboardPage() {
       sparkColor: 'var(--mint-mid)',
     },
     {
+      kpiKey: 'pending',
       label: 'Pending',
       value: stats?.pendingOrders ?? 0,
       iconBg: 'var(--amber-pale)',
@@ -503,6 +526,7 @@ export function DashboardPage() {
       sparkColor: 'var(--amber-mid)',
     },
     {
+      kpiKey: 'counterpart',
       label: 'Suppliers',
       value: stats?.totalSuppliers ?? 0,
       iconBg: 'var(--brand-pale)',
@@ -514,7 +538,16 @@ export function DashboardPage() {
     },
   ]
 
-  const kpis = isSupplier ? supplierKpis : restaurantKpis
+  const baseKpis = isSupplier ? supplierKpis : restaurantKpis
+  const dashboardConfig = persona.dashboard
+  const kpis = dashboardConfig
+    ? baseKpis
+        .filter((kpi) => dashboardConfig.kpiKeys.includes(kpi.kpiKey))
+        .map((kpi) => {
+          const override = dashboardConfig.kpiLabels[kpi.kpiKey]
+          return override ? { ...kpi, label: override.label, meta: override.meta } : kpi
+        })
+    : baseKpis
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
@@ -527,42 +560,61 @@ export function DashboardPage() {
         fontFamily: "'Inter', system-ui, sans-serif",
       }}
     >
-      {/* Post-onboarding CTAs */}
-      {isRestaurant && (stats?.totalOrders ?? 0) === 0 && (
-        <div
+      {persona.readOnly && (
+        <p
           style={{
-            background: 'var(--brand-pale)',
-            border: '1px solid var(--brand-light)',
-            borderRadius: 12,
-            padding: '14px 16px',
-            gap: 12,
+            borderRadius: 8,
+            border: '1px solid var(--app-border)',
+            background: 'var(--brand-ultra)',
+            padding: '10px 12px',
+            fontSize: 12,
+            color: 'var(--text-muted)',
+            margin: 0,
           }}
-          className="dashboard-split-row"
+          role="status"
         >
-          <div className="min-w-0">
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-              You&apos;re all set
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-              Create your first order to start receiving from suppliers.
-            </div>
-          </div>
-          <Button
-            asChild
-            style={{
-              background: 'var(--brand)',
-              borderColor: 'var(--brand)',
-              color: '#fff',
-              flexShrink: 0,
-            }}
-          >
-            <Link to="/app/cart">
-              <ShoppingCart style={{ width: 14, height: 14, marginRight: 6 }} />
-              Create first order
-            </Link>
-          </Button>
-        </div>
+          Read-only workspace · {persona.roleLabel}
+        </p>
       )}
+
+      {/* Post-onboarding CTAs */}
+      {isRestaurant &&
+        showRestaurantSection('showPostOnboardingCta') &&
+        (stats?.totalOrders ?? 0) === 0 && (
+          <div
+            style={{
+              background: 'var(--brand-pale)',
+              border: '1px solid var(--brand-light)',
+              borderRadius: 12,
+              padding: '14px 16px',
+              gap: 12,
+            }}
+            className="dashboard-split-row"
+          >
+            <div className="min-w-0">
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                You&apos;re all set
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                Create your first order to start receiving from suppliers.
+              </div>
+            </div>
+            <Button
+              asChild
+              style={{
+                background: 'var(--brand)',
+                borderColor: 'var(--brand)',
+                color: '#fff',
+                flexShrink: 0,
+              }}
+            >
+              <Link to="/app/cart">
+                <ShoppingCart style={{ width: 14, height: 14, marginRight: 6 }} />
+                Create first order
+              </Link>
+            </Button>
+          </div>
+        )}
       {isSupplier && (stats?.totalProducts ?? 0) === 0 && (
         <div
           style={{
@@ -603,11 +655,11 @@ export function DashboardPage() {
       <div className="dashboard-page-header">
         <div className="min-w-0">
           <h1 style={{ fontSize: 21, fontWeight: 900, color: 'var(--text)', margin: 0 }}>
-            {greeting}, {firstName} ☀️
+            {dashboardConfig?.title ?? `${greeting}, ${firstName}`}
           </h1>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-            {formattedDate} &nbsp;·&nbsp; {effectiveRole?.toLowerCase() ?? 'user'} &nbsp;·&nbsp;{' '}
-            {planName}
+            {dashboardConfig?.description ?? formattedDate} &nbsp;·&nbsp; {persona.roleLabel}{' '}
+            &nbsp;·&nbsp; {planName}
           </p>
         </div>
         {/* Period selector — UI only */}
@@ -653,93 +705,95 @@ export function DashboardPage() {
       {/* 3-col content row */}
       <div className="dashboard-content-grid">
         {/* Col 1 — Recent Orders */}
-        <SectionCard
-          title="Recent Orders"
-          action={
-            <Link
-              to="/app/orders"
-              style={{
-                fontSize: 11,
-                color: 'var(--brand)',
-                textDecoration: 'none',
-                fontWeight: 600,
-              }}
-            >
-              View all →
-            </Link>
-          }
-        >
-          {/* Order list */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {orders.length === 0 ? (
-              <p
+        {showRestaurantSection('showRecentOrders') && (
+          <SectionCard
+            title="Recent Orders"
+            action={
+              <Link
+                to="/app/orders"
                 style={{
-                  fontSize: 12,
-                  color: 'var(--text-muted)',
-                  textAlign: 'center',
-                  padding: '16px 0',
+                  fontSize: 11,
+                  color: 'var(--brand)',
+                  textDecoration: 'none',
+                  fontWeight: 600,
                 }}
               >
-                No recent orders
-              </p>
-            ) : (
-              orders.slice(0, 3).map((o: any) => (
-                <Link
-                  key={o.id}
-                  to={`/app/orders/${o.id}`}
-                  className="dashboard-split-row"
+                View all →
+              </Link>
+            }
+          >
+            {/* Order list */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {orders.length === 0 ? (
+                <p
                   style={{
-                    padding: '8px 4px',
-                    borderBottom: '1px solid var(--app-border)',
-                    textDecoration: 'none',
+                    fontSize: 12,
+                    color: 'var(--text-muted)',
+                    textAlign: 'center',
+                    padding: '16px 0',
                   }}
                 >
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: 'var(--text)',
-                        fontFamily: "'JetBrains Mono', monospace",
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      #{o.id.slice(0, 8).toUpperCase()}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: 'var(--text-muted)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        marginTop: 1,
-                      }}
-                    >
-                      {isSupplier
-                        ? o.restaurant_name || o.restaurantName || 'Customer'
-                        : `From: ${o.supplier_name || o.supplierName || 'Supplier'}`}
-                    </div>
-                  </div>
-                  <div
+                  No recent orders
+                </p>
+              ) : (
+                orders.slice(0, 3).map((o: any) => (
+                  <Link
+                    key={o.id}
+                    to={`/app/orders/${o.id}`}
+                    className="dashboard-split-row"
                     style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-end',
-                      gap: 3,
-                      flexShrink: 0,
+                      padding: '8px 4px',
+                      borderBottom: '1px solid var(--app-border)',
+                      textDecoration: 'none',
                     }}
                   >
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
-                      {formatCurrency(o.total_amount)}
-                    </span>
-                    <StatusChip status={o.status} />
-                  </div>
-                </Link>
-              ))
-            )}
-          </div>
-        </SectionCard>
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: 'var(--text)',
+                          fontFamily: "'JetBrains Mono', monospace",
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        #{o.id.slice(0, 8).toUpperCase()}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: 'var(--text-muted)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          marginTop: 1,
+                        }}
+                      >
+                        {isSupplier
+                          ? o.restaurant_name || o.restaurantName || 'Customer'
+                          : `From: ${o.supplier_name || o.supplierName || 'Supplier'}`}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-end',
+                        gap: 3,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+                        {formatCurrency(o.total_amount)}
+                      </span>
+                      <StatusChip status={o.status} />
+                    </div>
+                  </Link>
+                ))
+              )}
+            </div>
+          </SectionCard>
+        )}
 
         {/* Col 2 — Supplier: order status bars | Restaurant: spend trend */}
         {isSupplier ? (
@@ -823,7 +877,7 @@ export function DashboardPage() {
               </div>
             </div>
           </SectionCard>
-        ) : (
+        ) : showRestaurantSection('showSpendTrend') ? (
           <SectionCard
             title="Spend Trend"
             action={<span style={{ fontSize: 10, color: 'var(--text-muted)' }}>30 days</span>}
@@ -896,153 +950,69 @@ export function DashboardPage() {
               </span>
             </div>
           </SectionCard>
-        )}
+        ) : null}
 
         {/* Col 3 — Restaurant: reorder | Supplier: low stock */}
-        <SectionCard
-          title={isSupplier ? 'Low Stock' : 'Reorder Alerts'}
-          action={
-            isSupplier && lowStockItems.length > 0 ? (
-              <Link
-                to="/app/inventory"
-                style={{
-                  fontSize: 11,
-                  color: 'var(--brand)',
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                }}
-              >
-                View all →
-              </Link>
-            ) : isRestaurant && (reorderSuggestions?.suggestions?.length ?? 0) > 0 ? (
-              <Link
-                to="/app/quick-lists"
-                style={{
-                  fontSize: 11,
-                  color: 'var(--brand)',
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                }}
-              >
-                Add all →
-              </Link>
-            ) : undefined
-          }
-        >
-          {isSupplier ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {lowStockItems.length === 0 ? (
-                <p
+        {(isSupplier || showRestaurantSection('showReorderAlerts')) && (
+          <SectionCard
+            title={isSupplier ? 'Low Stock' : 'Reorder Alerts'}
+            action={
+              isSupplier && lowStockItems.length > 0 ? (
+                <Link
+                  to="/app/inventory"
                   style={{
-                    fontSize: 12,
-                    color: 'var(--text-muted)',
-                    textAlign: 'center',
-                    padding: '16px 0',
+                    fontSize: 11,
+                    color: 'var(--brand)',
+                    textDecoration: 'none',
+                    fontWeight: 600,
                   }}
                 >
-                  All products are above their stock thresholds
-                </p>
-              ) : (
-                lowStockItems.map((item: any) => (
-                  <Link
-                    key={item.product_id}
-                    to="/app/inventory"
+                  View all →
+                </Link>
+              ) : isRestaurant && (reorderSuggestions?.suggestions?.length ?? 0) > 0 ? (
+                <Link
+                  to="/app/quick-lists"
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--brand)',
+                    textDecoration: 'none',
+                    fontWeight: 600,
+                  }}
+                >
+                  Add all →
+                </Link>
+              ) : undefined
+            }
+          >
+            {isSupplier ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                {lowStockItems.length === 0 ? (
+                  <p
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      padding: '8px 0',
-                      borderBottom: '1px solid var(--app-border)',
-                      textDecoration: 'none',
-                      color: 'inherit',
+                      fontSize: 12,
+                      color: 'var(--text-muted)',
+                      textAlign: 'center',
+                      padding: '16px 0',
                     }}
                   >
-                    <Warehouse size={16} style={{ color: 'var(--amber)', flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: 'var(--text)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {item.product_name || item.name || 'Product'}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                        Available: {item.available_qty ?? 0}
-                        {item.low_stock_threshold != null
-                          ? ` · Threshold: ${item.low_stock_threshold}`
-                          : ''}
-                      </div>
-                    </div>
-                  </Link>
-                ))
-              )}
-            </div>
-          ) : isRestaurant ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {(reorderSuggestions?.suggestions?.length ?? 0) === 0 ? (
-                <p
-                  style={{
-                    fontSize: 12,
-                    color: 'var(--text-muted)',
-                    textAlign: 'center',
-                    padding: '16px 0',
-                  }}
-                >
-                  No reorder suggestions
-                </p>
-              ) : (
-                reorderSuggestions!.suggestions.slice(0, 3).map((s: any, idx: number) => {
-                  const qty =
-                    s.suggested_reorder_qty ?? Math.max(1, Math.ceil(s.avg_daily_usage_30day * 3))
-                  const urgencyColor =
-                    idx === 0 ? 'var(--red)' : idx === 1 ? 'var(--amber)' : 'var(--mint-mid)'
-                  const isAdding = addingSuggestionId === s.id
-
-                  const handleAdd = async () => {
-                    const lists = quickListsData?.quickLists || []
-                    if (lists.length === 0) {
-                      toast.error('Create a quick list first')
-                      return
-                    }
-                    setAddingSuggestionId(s.id)
-                    try {
-                      await addItemToQuickList({
-                        quickListId: lists[0].id,
-                        body: { productId: s.product_id, supplierId: s.supplier_id, quantity: qty },
-                      }).unwrap()
-                      toast.success(`Added ${s.product_name} (${qty}) to ${lists[0].name}`)
-                    } catch (e: any) {
-                      toast.error(e?.data?.error?.message || 'Failed to add to quick list')
-                    } finally {
-                      setAddingSuggestionId(null)
-                    }
-                  }
-
-                  return (
-                    <div
-                      key={s.id}
+                    All products are above their stock thresholds
+                  </p>
+                ) : (
+                  lowStockItems.map((item: any) => (
+                    <Link
+                      key={item.product_id}
+                      to="/app/inventory"
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: 10,
                         padding: '8px 0',
                         borderBottom: '1px solid var(--app-border)',
+                        textDecoration: 'none',
+                        color: 'inherit',
                       }}
                     >
-                      <div
-                        style={{
-                          width: 4,
-                          height: 36,
-                          borderRadius: '0 2px 2px 0',
-                          background: urgencyColor,
-                          flexShrink: 0,
-                        }}
-                      />
+                      <Warehouse size={16} style={{ color: 'var(--amber)', flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div
                           style={{
@@ -1054,44 +1024,145 @@ export function DashboardPage() {
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          {s.product_name}
+                          {item.product_name || item.name || 'Product'}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                          Current: {s.current_qty} · Suggest: {qty}
+                          Available: {item.available_qty ?? 0}
+                          {item.low_stock_threshold != null
+                            ? ` · Threshold: ${item.low_stock_threshold}`
+                            : ''}
                         </div>
                       </div>
-                      <button
-                        disabled={isAdding}
-                        onClick={handleAdd}
+                    </Link>
+                  ))
+                )}
+              </div>
+            ) : isRestaurant ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                {(reorderSuggestions?.suggestions?.length ?? 0) === 0 ? (
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: 'var(--text-muted)',
+                      textAlign: 'center',
+                      padding: '16px 0',
+                    }}
+                  >
+                    No reorder suggestions
+                  </p>
+                ) : (
+                  reorderSuggestions!.suggestions.slice(0, 3).map((s: any, idx: number) => {
+                    const qty =
+                      s.suggested_reorder_qty ?? Math.max(1, Math.ceil(s.avg_daily_usage_30day * 3))
+                    const urgencyColor =
+                      idx === 0 ? 'var(--red)' : idx === 1 ? 'var(--amber)' : 'var(--mint-mid)'
+                    const isAdding = addingSuggestionId === s.id
+
+                    const handleAdd = async () => {
+                      const lists = quickListsData?.quickLists || []
+                      if (lists.length === 0) {
+                        toast.error('Create a quick list first')
+                        return
+                      }
+                      setAddingSuggestionId(s.id)
+                      try {
+                        await addItemToQuickList({
+                          quickListId: lists[0].id,
+                          body: {
+                            productId: s.product_id,
+                            supplierId: s.supplier_id,
+                            quantity: qty,
+                          },
+                        }).unwrap()
+                        toast.success(`Added ${s.product_name} (${qty}) to ${lists[0].name}`)
+                      } catch (e: any) {
+                        toast.error(e?.data?.error?.message || 'Failed to add to quick list')
+                      } finally {
+                        setAddingSuggestionId(null)
+                      }
+                    }
+
+                    return (
+                      <div
+                        key={s.id}
                         style={{
-                          background: 'var(--brand-pale)',
-                          color: 'var(--brand)',
-                          border: 'none',
-                          borderRadius: 6,
-                          padding: '4px 8px',
-                          fontSize: 11,
-                          fontWeight: 700,
-                          cursor: isAdding ? 'not-allowed' : 'pointer',
-                          fontFamily: 'inherit',
-                          flexShrink: 0,
                           display: 'flex',
                           alignItems: 'center',
-                          gap: 4,
+                          gap: 10,
+                          padding: '8px 0',
+                          borderBottom: '1px solid var(--app-border)',
                         }}
                       >
-                        {isAdding ? <Loader2 size={11} className="animate-spin" /> : '+ Add'}
-                      </button>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          ) : null}
-        </SectionCard>
+                        <div
+                          style={{
+                            width: 4,
+                            height: 36,
+                            borderRadius: '0 2px 2px 0',
+                            background: urgencyColor,
+                            flexShrink: 0,
+                          }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: 'var(--text)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {s.product_name}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                            Current: {s.current_qty} · Suggest: {qty}
+                          </div>
+                        </div>
+                        <button
+                          disabled={
+                            isAdding ||
+                            (isRestaurant &&
+                              restaurantLayout &&
+                              !restaurantLayout.allowReorderActions)
+                          }
+                          onClick={handleAdd}
+                          style={{
+                            background: 'var(--brand-pale)',
+                            color: 'var(--brand)',
+                            border: 'none',
+                            borderRadius: 6,
+                            padding: '4px 8px',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: isAdding ? 'not-allowed' : 'pointer',
+                            fontFamily: 'inherit',
+                            flexShrink: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          {isAdding ? <Loader2 size={11} className="animate-spin" /> : '+ Add'}
+                        </button>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            ) : null}
+          </SectionCard>
+        )}
       </div>
 
-      {(isRestaurant && inventoryMgmtEnabled && expirySummaryData?.summary) ||
-      (isRestaurant && smartReorderEnabled && (reorderRemindersData?.reminders?.length ?? 0) > 0) ||
+      {(isRestaurant &&
+        showRestaurantSection('showExpiry') &&
+        inventoryMgmtEnabled &&
+        expirySummaryData?.summary) ||
+      (isRestaurant &&
+        showRestaurantSection('showReorderReminders') &&
+        smartReorderEnabled &&
+        (reorderRemindersData?.reminders?.length ?? 0) > 0) ||
       (isSupplier && (atRiskData?.atRisk?.length ?? 0) > 0) ? (
         <div
           style={{
@@ -1212,35 +1283,37 @@ export function DashboardPage() {
       ) : null}
 
       {/* Calendar row */}
-      <div
-        style={{
-          marginTop: DASHBOARD_CALENDAR_EXTRA_GAP,
-          background: 'var(--surface)',
-          border: '1px solid var(--app-border)',
-          borderRadius: 12,
-          overflow: 'hidden',
-        }}
-      >
-        <Suspense
-          fallback={
-            <div className="p-6">
-              <Skeleton className="h-8 w-48 mb-4" />
-              <Skeleton className="h-64 w-full" />
-            </div>
-          }
+      {showRestaurantSection('showCalendar') && (
+        <div
+          style={{
+            marginTop: DASHBOARD_CALENDAR_EXTRA_GAP,
+            background: 'var(--surface)',
+            border: '1px solid var(--app-border)',
+            borderRadius: 12,
+            overflow: 'hidden',
+          }}
         >
-          <CalendarView
-            role={
-              effectiveRole === 'ADMIN' ||
-              effectiveRole === 'RESTAURANT' ||
-              effectiveRole === 'SUPPLIER'
-                ? effectiveRole
-                : null
+          <Suspense
+            fallback={
+              <div className="p-6">
+                <Skeleton className="h-8 w-48 mb-4" />
+                <Skeleton className="h-64 w-full" />
+              </div>
             }
-            isAdmin={user?.role === 'ADMIN'}
-          />
-        </Suspense>
-      </div>
+          >
+            <CalendarView
+              role={
+                effectiveRole === 'ADMIN' ||
+                effectiveRole === 'RESTAURANT' ||
+                effectiveRole === 'SUPPLIER'
+                  ? effectiveRole
+                  : null
+              }
+              isAdmin={user?.role === 'ADMIN'}
+            />
+          </Suspense>
+        </div>
+      )}
     </div>
   )
 }

@@ -477,6 +477,90 @@ export async function getDealAnalytics(dealId, supplierId) {
   }
 }
 
+/** Aggregate deal performance across all supplier promotions (for promotions workspace dashboard). */
+export async function getSupplierDealsAnalyticsSummary(supplierId, { days = 30 } = {}) {
+  const daysInt = Math.min(Math.max(Number(days) || 30, 1), 365)
+
+  const { rows: dealCounts } = await query(
+    `
+    SELECT
+      COUNT(*)::int AS total_deals,
+      COUNT(*) FILTER (WHERE status = 'active')::int AS active_deals,
+      COUNT(*) FILTER (WHERE status IN ('pending_approval', 'pending_admin_approval'))::int AS pending_deals
+    FROM promotions
+    WHERE supplier_id = $1
+    `,
+    [supplierId]
+  )
+
+  const { rows: interactionRows } = await query(
+    `
+    SELECT interaction_type, COUNT(*)::int AS count
+    FROM deal_interactions
+    WHERE supplier_id = $1
+      AND created_at >= NOW() - ($2::int * INTERVAL '1 day')
+    GROUP BY interaction_type
+    `,
+    [supplierId, daysInt]
+  )
+
+  const { rows: usageRows } = await query(
+    `
+    SELECT
+      COUNT(DISTINCT pu.order_id)::int AS orders_influenced,
+      COALESCE(SUM(pu.discount_applied), 0)::numeric AS total_discount,
+      COUNT(*)::int AS usage_count
+    FROM promotion_usages pu
+    JOIN promotions p ON p.id = pu.promotion_id
+    WHERE p.supplier_id = $1
+      AND pu.applied_at >= NOW() - ($2::int * INTERVAL '1 day')
+    `,
+    [supplierId, daysInt]
+  )
+
+  const { rows: topDeals } = await query(
+    `
+    SELECT p.id, p.name, p.status,
+      COUNT(di.id) FILTER (WHERE di.interaction_type = 'view')::int AS views,
+      COUNT(di.id) FILTER (WHERE di.interaction_type = 'click')::int AS clicks,
+      COUNT(DISTINCT pu.order_id)::int AS orders_influenced
+    FROM promotions p
+    LEFT JOIN deal_interactions di ON di.deal_id = p.id
+      AND di.created_at >= NOW() - ($2::int * INTERVAL '1 day')
+    LEFT JOIN promotion_usages pu ON pu.promotion_id = p.id
+      AND pu.applied_at >= NOW() - ($2::int * INTERVAL '1 day')
+    WHERE p.supplier_id = $1
+    GROUP BY p.id, p.name, p.status
+    ORDER BY views DESC, clicks DESC
+    LIMIT 5
+    `,
+    [supplierId, daysInt]
+  )
+
+  const interactionMap = Object.fromEntries(
+    interactionRows.map((r) => [r.interaction_type, r.count])
+  )
+  const views = interactionMap.view || 0
+  const clicks = interactionMap.click || 0
+  const orders = usageRows[0]?.orders_influenced || 0
+  const conversionRate = views > 0 ? Math.round((orders / views) * 10000) / 100 : 0
+
+  return {
+    periodDays: daysInt,
+    totalDeals: dealCounts[0]?.total_deals || 0,
+    activeDeals: dealCounts[0]?.active_deals || 0,
+    pendingDeals: dealCounts[0]?.pending_deals || 0,
+    views,
+    clicks,
+    ordersInfluenced: orders,
+    couponUses: interactionMap.coupon_used || 0,
+    messages: interactionMap.message || 0,
+    totalDiscount: Number(usageRows[0]?.total_discount || 0),
+    conversionRate,
+    topDeals,
+  }
+}
+
 async function insertPromotionUsageSnapshot(
   client,
   { promotion, orderId, restaurantId, discountAmount }

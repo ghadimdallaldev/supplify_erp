@@ -24,6 +24,7 @@ import { LimitExceededBanner } from '../components/LimitExceededBanner'
 import { pageHeaderRowClass, splitRowClass } from '../components/ui/card-layout'
 import { ShoppingCart, Trash2, Plus, Minus, Save, Calendar, FileText } from 'lucide-react'
 import { useCartActions } from '../hooks/useCartActions'
+import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import {
   formatOrderPlaceGateMessage,
   getOrderPlaceGate,
@@ -44,6 +45,10 @@ export function CartPage() {
   const { groups, total, drafts } = useAppSelector((state) => state.cart)
   const { user } = useAppSelector((state) => state.auth)
   const { shouldLoadTenantEntitlements } = useImpersonation()
+  const { persona } = useWorkspaceRole()
+  const cartTitle = persona.pageCopy?.cart?.title ?? 'Shopping Cart'
+  const cartDescription =
+    persona.pageCopy?.cart?.description ?? 'Review your order before placing it'
   const { can } = usePermissions()
   const canPlaceOrders = can('ORDERS_CREATE')
   const { data: dealsData } = useGetActivePromotionsQuery()
@@ -259,7 +264,7 @@ export function CartPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-[21px] font-black text-[var(--text)]">Shopping Cart</h1>
+          <h1 className="text-[21px] font-black text-[var(--text)]">{cartTitle}</h1>
           <p className="text-[var(--text-muted)] mt-2">Your cart is empty</p>
         </div>
 
@@ -279,8 +284,8 @@ export function CartPage() {
       <div className="space-y-6" data-testid="cart-page">
         <div className={pageHeaderRowClass}>
           <div className="min-w-0">
-            <h1 className="text-[21px] font-black text-[var(--text)]">Shopping Cart</h1>
-            <p className="text-[var(--text-muted)] mt-2">Review your order before placing it</p>
+            <h1 className="text-[21px] font-black text-[var(--text)]">{cartTitle}</h1>
+            <p className="text-[var(--text-muted)] mt-2">{cartDescription}</p>
           </div>
           <div className="flex flex-wrap gap-2 shrink-0">
             {drafts.length > 0 && (

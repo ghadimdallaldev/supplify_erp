@@ -27,6 +27,7 @@ import {
   useGetEntitlementsQuery,
 } from '../../services/api'
 import { useImpersonation } from '../../hooks/useImpersonation'
+import { usePermissions } from '../../hooks/usePermissions'
 import { RequirePermission } from '../../components/RequirePermission'
 import { isEntitlementFeatureEnabled } from '../../lib/planLimits'
 import {
@@ -62,6 +63,8 @@ type DisputeRow = {
 
 export function DisputesPage() {
   const { isEffectiveSupplier: isSupplier } = useImpersonation()
+  const { can } = usePermissions()
+  const canManageSupplierDisputes = can('FULFILLMENT_MANAGE')
   const [searchParams, setSearchParams] = useSearchParams()
   const orderIdFromUrl = searchParams.get('orderId') || ''
   const supplierIdFromUrl = searchParams.get('supplierId') || ''
@@ -97,7 +100,10 @@ export function DisputesPage() {
     data: supplierData,
     isLoading: loadingSupplier,
     refetch: refetchSupplier,
-  } = useGetIncomingDisputesQuery({ status: statusFilter || undefined }, { skip: !isSupplier })
+  } = useGetIncomingDisputesQuery(
+    { status: statusFilter || undefined },
+    { skip: !isSupplier || !can('FULFILLMENT_VIEW') }
+  )
 
   const [reviewDispute] = useReviewDisputeMutation()
   const [resolveDispute, { isLoading: resolving }] = useResolveDisputeMutation()
@@ -258,7 +264,10 @@ export function DisputesPage() {
   }
 
   return (
-    <RequirePermission permission="ORDERS_VIEW" title="disputes">
+    <RequirePermission
+      permission={isSupplier ? 'FULFILLMENT_VIEW' : 'ORDERS_VIEW'}
+      title="disputes"
+    >
       <div className="page-stack">
         <PageHeader
           title="Disputes"
@@ -330,9 +339,13 @@ export function DisputesPage() {
                   disputes={disputes as DisputeRow[]}
                   isSupplier={isSupplier}
                   formatAmount={(n) => `$${formatPrice(n)}`}
-                  onReview={isSupplier ? handleReview : undefined}
-                  onResolve={isSupplier ? (id) => setResolveId(id) : undefined}
-                  onReject={isSupplier ? (id) => setRejectId(id) : undefined}
+                  onReview={isSupplier && canManageSupplierDisputes ? handleReview : undefined}
+                  onResolve={
+                    isSupplier && canManageSupplierDisputes ? (id) => setResolveId(id) : undefined
+                  }
+                  onReject={
+                    isSupplier && canManageSupplierDisputes ? (id) => setRejectId(id) : undefined
+                  }
                 />
                 <TableScroll aria-label="Disputes table" className="hidden md:block">
                   <table className="w-full min-w-[720px] text-sm">
@@ -393,16 +406,19 @@ export function DisputesPage() {
                             </td>
                             <td className="px-4 py-3 pr-5 text-right">
                               <div className="flex flex-wrap justify-end gap-2">
-                                {isSupplier && dispute.status === 'open' && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleReview(String(dispute.id))}
-                                  >
-                                    Review
-                                  </Button>
-                                )}
                                 {isSupplier &&
+                                  canManageSupplierDisputes &&
+                                  dispute.status === 'open' && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleReview(String(dispute.id))}
+                                    >
+                                      Review
+                                    </Button>
+                                  )}
+                                {isSupplier &&
+                                  canManageSupplierDisputes &&
                                   (dispute.status === 'open' ||
                                     dispute.status === 'under_review') && (
                                     <>

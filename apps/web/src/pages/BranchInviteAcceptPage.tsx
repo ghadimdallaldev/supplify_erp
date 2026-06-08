@@ -13,6 +13,7 @@ import {
   inviteFormEmailMismatchMessage,
   inviteSessionEmailMismatch,
   invitationAcceptErrorMessage,
+  isInvitationSessionExpiredError,
   finishInviteAcceptNavigation,
 } from '../lib/invite-session'
 import { InviteEmailMismatchCard } from '../components/invite/InviteEmailMismatchCard'
@@ -28,7 +29,11 @@ export function BranchInviteAcceptPage() {
   const token = searchParams.get('token') || ''
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
-  const { data: sessionUser, isLoading: sessionLoading } = useGetInviteSessionQuery()
+  const {
+    data: sessionUser,
+    isLoading: sessionLoading,
+    refetch: refetchInviteSession,
+  } = useGetInviteSessionQuery(undefined, { refetchOnMountOrArgChange: true })
 
   const { data, isLoading, isError } = useValidateBranchInviteQuery(token, { skip: !token })
   const [accept, { isLoading: accepting }] = useAcceptBranchInviteMutation()
@@ -40,6 +45,7 @@ export function BranchInviteAcceptPage() {
   const [acceptedLegal, setAcceptedLegal] = useState<Set<LegalDocumentSlug>>(new Set())
   const [electronicSigned, setElectronicSigned] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sessionExpired, setSessionExpired] = useState(false)
 
   const legalComplete = isLegalAcceptanceComplete('invite', null, acceptedLegal, electronicSigned)
   const legalPayload = legalComplete ? buildLegalAcceptancePayload(acceptedLegal) : undefined
@@ -110,12 +116,20 @@ export function BranchInviteAcceptPage() {
       return
     }
     try {
-      const result = await accept({ token, legalAcceptance: legalPayload }).unwrap()
+      const session = await refetchInviteSession().unwrap()
+      const result = await accept({
+        token,
+        email: session?.email,
+        legalAcceptance: legalPayload,
+      }).unwrap()
       dispatch(api.util.resetApiState())
       const { refetchAppSession } = await import('../lib/refetchAppSession')
       await refetchAppSession(dispatch)
       finishInviteAcceptNavigation(result, navigate, searchParams)
     } catch (err) {
+      if (isInvitationSessionExpiredError(err)) {
+        setSessionExpired(true)
+      }
       setError(
         invitationAcceptErrorMessage(
           err,
@@ -170,7 +184,7 @@ export function BranchInviteAcceptPage() {
   const emailMismatch =
     sessionUser && inviteSessionEmailMismatch(invite.invited_email, sessionUser.email)
 
-  if (sessionUser) {
+  if (sessionUser && !sessionExpired) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="max-w-xl w-full space-y-4 border border-[var(--app-border)] rounded-lg p-6">

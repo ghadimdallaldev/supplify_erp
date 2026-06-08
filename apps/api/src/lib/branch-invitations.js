@@ -21,6 +21,7 @@ import {
   normalizeInvitationEmail,
 } from './invitation-accept.js'
 import { syncDriverLinkForRoleAssignment } from './driver-user-link.js'
+import { assignOrgUserRole, invalidateOrgPermissionCaches } from './supplier-org.js'
 import { sendTeamInvitationEmail } from '../services/invitation-mail.service.js'
 import { logger } from './logger.js'
 
@@ -278,6 +279,7 @@ export async function acceptBranchInvitation({
       lastName,
       password,
       realmRoleName: keycloakRealmRoleForWorkspace('SUPPLIER'),
+      resetPasswordOnExisting: true,
     })
     keycloakUserMs = Math.round(performance.now() - keycloakStart)
     keycloakSub = kcUserId
@@ -339,6 +341,24 @@ export async function acceptBranchInvitation({
       )
     }
 
+    if (scope.organizationId) {
+      await assignOrgUserRole({
+        userId,
+        organizationId: scope.organizationId,
+        roleName: 'Regional Manager',
+        assignedBy: row.invited_by,
+        client,
+      })
+      await client.query(
+        `
+        INSERT INTO org_user_branch_access (user_id, supplier_id, organization_id, granted_by)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (user_id, supplier_id) DO NOTHING
+        `,
+        [userId, row.supplier_id, scope.organizationId, row.invited_by]
+      )
+    }
+
     await assignInvitationTenantRole(client, {
       userId,
       roleId: row.role_id,
@@ -397,6 +417,12 @@ export async function acceptBranchInvitation({
     }
   })
   dbTransactionMs = Math.round(performance.now() - dbStart)
+
+  if (scope.organizationId) {
+    await invalidateOrgPermissionCaches(txResult.userId, scope.organizationId)
+  }
+  const { invalidateUserPermissionCache } = await import('./permissions.js')
+  await invalidateUserPermissionCache(txResult.userId, txResult.supplierId, 'SUPPLIER')
 
   logger.info({
     event: 'invitation.accept.timing',

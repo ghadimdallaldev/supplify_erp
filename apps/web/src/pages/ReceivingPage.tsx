@@ -7,6 +7,7 @@ import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
+import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { RequirePermission } from '../components/RequirePermission'
 import {
   PackageCheck,
@@ -61,6 +62,11 @@ export function ReceivingPage() {
   const orderIdFromUrl = searchParams.get('order')
   const { user } = useAppSelector((state) => state.auth)
   const { can } = usePermissions()
+  const { persona } = useWorkspaceRole()
+  const receivingTitle = persona.pageCopy?.receiving?.title ?? 'Receiving & Quality Control'
+  const receivingDescription =
+    persona.pageCopy?.receiving?.description ??
+    'Confirm deliveries, record quality issues, and open disputes when needed.'
   const canReceive = can('RECEIVING_MANAGE')
   const canOpenDispute = can('ORDERS_CREATE') || can('RECEIVING_MANAGE')
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
@@ -323,10 +329,7 @@ export function ReceivingPage() {
         <div className="page-stack overflow-x-hidden" data-testid="receiving-page">
           <Card className="shadow-sm">
             <CardContent className="space-y-4 p-4 md:p-5">
-              <PageHeader
-                title="Receiving & Quality Control"
-                description="Confirm deliveries, record quality issues, and open disputes when needed."
-              />
+              <PageHeader title={receivingTitle} description={receivingDescription} />
 
               <Tabs defaultValue="pending" className="space-y-4">
                 <TabsList className="tabs-scroll h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">

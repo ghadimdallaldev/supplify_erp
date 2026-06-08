@@ -11,9 +11,15 @@ import {
   useGetBranchesQuery,
   useGetEntitlementsQuery,
 } from '../../services/api'
-import { useAppSelector } from '../../hooks/redux'
+import { useImpersonation } from '../../hooks/useImpersonation'
+import { useWorkspaceRole } from '../../hooks/useWorkspaceRole'
 import { RequirePermission } from '../../components/RequirePermission'
 import { canUseGlobalReports } from '../../lib/planFeatureGates'
+import {
+  RESTAURANT_REPORTS_ANY_OF,
+  SUPPLIER_ANALYTICS_ANY_OF,
+} from '../../lib/workspaceRoleProfile'
+import { Navigate } from 'react-router-dom'
 import { downloadCsv, reportRowsToCsv } from '../../utils/csvExport'
 import { reportErrorMessage } from '../../lib/reportResponse'
 import { Loader2, Download, AlertCircle } from 'lucide-react'
@@ -277,8 +283,9 @@ function ReportPanel({
 }
 
 export function ReportsPage() {
-  const { user } = useAppSelector((state) => state.auth)
-  const isRestaurant = user?.role === 'RESTAURANT'
+  const { isEffectiveRestaurant } = useImpersonation()
+  const { persona } = useWorkspaceRole()
+  const isRestaurant = isEffectiveRestaurant
   const range = defaultRange()
   const [from, setFrom] = useState(range.from)
   const [to, setTo] = useState(range.to)
@@ -294,10 +301,17 @@ export function ReportsPage() {
   const branches = branchesData?.branches || []
   const defs = isRestaurant ? RESTAURANT_REPORTS : SUPPLIER_REPORTS
   const current = defs.find((d) => d.key === activeReport) || defs[0]
+  const reportsPermissionGate = isRestaurant
+    ? { anyOf: [...RESTAURANT_REPORTS_ANY_OF] }
+    : { anyOf: [...SUPPLIER_ANALYTICS_ANY_OF] }
+
+  if (isRestaurant && !persona.showGlobalReports) {
+    return <Navigate to={persona.homePath} replace />
+  }
 
   if (!reportsEnabled) {
     return (
-      <RequirePermission permission="ORDERS_VIEW" title="reports">
+      <RequirePermission {...reportsPermissionGate} title="reports">
         <div className="space-y-4">
           <PageHeader title="Reports" />
           <Card>
@@ -311,7 +325,7 @@ export function ReportsPage() {
   }
 
   return (
-    <RequirePermission permission="ORDERS_VIEW" title="reports">
+    <RequirePermission {...reportsPermissionGate} title="reports">
       <div className="space-y-6">
         <PageHeader
           title="Reports & Analytics"

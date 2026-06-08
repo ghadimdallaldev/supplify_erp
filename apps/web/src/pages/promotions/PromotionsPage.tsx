@@ -31,6 +31,8 @@ import {
 } from '../../components/deals/DealTargetingPickers'
 import toast from 'react-hot-toast'
 import { RequirePermission } from '../../components/RequirePermission'
+import { DealsPerformanceSummary } from '../../components/promotions/DealsPerformanceSummary'
+import { useWorkspaceRole } from '../../hooks/useWorkspaceRole'
 import { Loader2, Plus, BarChart3, Send } from 'lucide-react'
 
 const CTA_TYPES = [
@@ -47,7 +49,12 @@ const PROMO_TYPES = [
   'buy_x_get_y',
 ] as const
 
+const FORM_SELECT_CLASS =
+  'h-10 w-full rounded-lg border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30'
+
 export function PromotionsPage() {
+  const { persona } = useWorkspaceRole()
+  const copy = persona.promotionsCopy
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const promotionsEnabled = isEntitlementFeatureEnabled(
     entitlementsData?.entitlements,
@@ -171,18 +178,20 @@ export function PromotionsPage() {
   return (
     <RequirePermission anyOf={['PROMOTIONS_VIEW', 'PROMOTIONS_MANAGE']} title="promotions">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-[21px] font-black text-[var(--text)]">Deals & Promotions</h1>
-            <p className="text-xs text-[var(--text-muted)] mt-1">
-              Create deals and boost visibility to new restaurants
-            </p>
+            <h1 className="text-[21px] font-black text-[var(--text)]">{copy.title}</h1>
+            <p className="text-xs text-[var(--text-muted)] mt-1">{copy.subtitle}</p>
           </div>
-          <Button onClick={() => setShowCreate(true)} disabled={!promotionGate.canCreate}>
-            <Plus className="h-4 w-4 mr-2" />
-            {promotionGate.canCreate ? 'New promotion' : 'Deal limit reached'}
-          </Button>
+          {!persona.readOnly && (
+            <Button onClick={() => setShowCreate(true)} disabled={!promotionGate.canCreate}>
+              <Plus className="h-4 w-4 mr-2" />
+              {promotionGate.canCreate ? copy.newButton : 'Deal limit reached'}
+            </Button>
+          )}
         </div>
+
+        <DealsPerformanceSummary title={copy.performanceTitle} />
 
         {!promotionGate.canCreate && promotionGate.limit != null ? (
           <div
@@ -198,28 +207,28 @@ export function PromotionsPage() {
         ) : null}
 
         <Card>
-          <CardContent className="pt-6">
-            <Label>Status filter</Label>
-            <select
-              className="mt-1 h-10 rounded-md border px-3 text-sm"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="">All</option>
-              <option value="draft">Draft</option>
-              <option value="pending_approval">Pending approval</option>
-              <option value="rejected">Rejected</option>
-              <option value="approved_pending_payment">Awaiting payment</option>
-              <option value="active">Live</option>
-              <option value="paused">Paused</option>
-              <option value="expired">Expired</option>
-            </select>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Your promotions</CardTitle>
+          <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <CardTitle>{copy.listTitle}</CardTitle>
+            <div className="w-full max-w-xs shrink-0">
+              <Label htmlFor="promotion-status-filter" className="text-xs text-[var(--text-muted)]">
+                Status filter
+              </Label>
+              <select
+                id="promotion-status-filter"
+                className={`mt-1.5 ${FORM_SELECT_CLASS}`}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="">All</option>
+                <option value="draft">Draft</option>
+                <option value="pending_approval">Pending approval</option>
+                <option value="rejected">Rejected</option>
+                <option value="approved_pending_payment">Awaiting payment</option>
+                <option value="active">Live</option>
+                <option value="paused">Paused</option>
+                <option value="expired">Expired</option>
+              </select>
+            </div>
           </CardHeader>
           <CardContent>
             {error ? (
