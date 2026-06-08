@@ -356,6 +356,9 @@ export interface DeliveryRouteStop {
   assignmentStatus?: string | null
   tracking?: DeliveryTrackingInfo | null
   destinationCoordinatesAvailable?: boolean
+  etaAvailable?: boolean
+  etaMinutesMin?: number | null
+  etaMinutesMax?: number | null
   isNext?: boolean
   isCompleted?: boolean
 }

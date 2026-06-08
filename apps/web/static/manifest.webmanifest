@@ -1,8 +1,9 @@
 {
-  "name": "Supplify",
+  "name": "Supplify — Orders & Deliveries",
   "short_name": "Supplify",
-  "description": "Restaurant & F&B supplier marketplace — orders, fulfillment, receiving, and reservations.",
+  "description": "Orders, deliveries, receiving, and fulfillment for restaurants and suppliers.",
   "start_url": "/app/dashboard",
+  "display_override": ["standalone", "browser"],
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",

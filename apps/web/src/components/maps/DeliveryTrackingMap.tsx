@@ -100,19 +100,19 @@ export function DeliveryTrackingMap({
             data-testid="delivery-tracking-map-live"
           >
             <Radio className="h-3 w-3" aria-hidden />
-            Live
+            Live now
           </span>
         )}
         <Button
           type="button"
           size="sm"
           variant="secondary"
-          className="absolute right-2 top-2 z-[500] h-8 gap-1 px-2 text-xs shadow"
+          className="absolute right-2 top-2 z-[500] min-h-[44px] gap-1.5 px-3 text-sm font-semibold shadow"
           data-testid="delivery-tracking-map-recenter"
           onClick={() => fitToMarkers()}
           aria-label="Recenter map"
         >
-          <Crosshair className="h-3.5 w-3.5" aria-hidden />
+          <Crosshair className="h-4 w-4" aria-hidden />
           Recenter
         </Button>
         <div
@@ -190,12 +190,13 @@ export function DeliveryTrackingMap({
         href={mapsUrl}
         target="_blank"
         rel="noreferrer"
-        className="inline-flex items-center gap-1 text-xs text-[var(--brand-mid)] underline"
+        className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--brand-mid)] sm:w-auto sm:justify-start sm:border-0 sm:bg-transparent sm:px-0 sm:underline"
         data-testid="delivery-tracking-map-open"
+        aria-label="Open in maps"
       >
-        <MapPin className="h-3 w-3" aria-hidden />
+        <MapPin className="h-4 w-4" aria-hidden />
         Open in maps
-        <ExternalLink className="h-3 w-3" aria-hidden />
+        <ExternalLink className="h-4 w-4" aria-hidden />
         <span className="sr-only">({mapModeLabel})</span>
       </a>
 

@@ -911,6 +911,35 @@ export function restaurantReportsNavAllowed(
   return RESTAURANT_REPORTS_ANY_OF.some((p) => can(p))
 }
 
+/** Ops order calendar on /app/dashboard — not for finance- or desk-focused roles. */
+export function shouldShowDashboardCalendar(
+  profile: WorkspacePersonaProfile,
+  tenantType: 'SUPPLIER' | 'RESTAURANT' | null | undefined,
+  can: PermissionCheck
+): boolean {
+  if (tenantType === 'RESTAURANT') {
+    if (profile.restaurantDashboardMode) {
+      return getRestaurantDashboardLayout(profile.restaurantDashboardMode, can, profile.readOnly)
+        .showCalendar
+    }
+    return true
+  }
+  if (tenantType === 'SUPPLIER') {
+    if (profile.commandCenterMode === 'finance' || profile.id === 'supplier_accountant') {
+      return false
+    }
+    if (
+      profile.commandCenterMode === 'sales' ||
+      profile.commandCenterMode === 'catalog' ||
+      profile.id === 'supplier_driver'
+    ) {
+      return false
+    }
+    return true
+  }
+  return true
+}
+
 /** Puts the role's primary nav link at the top of the sidebar (first thing visible). */
 export function reorderNavSectionsForPrimaryFocus<T extends { href: string }>(
   sections: Array<{ label: string; items: T[] }>,

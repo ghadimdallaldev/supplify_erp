@@ -6,7 +6,7 @@ import { Button } from '../ui/button'
 import { Skeleton } from '../ui/skeleton'
 import { useEffect, useState } from 'react'
 import { useGetOrderTrackingQuery } from '../../services/api'
-import { DeliveryTrackingMap } from '../maps/DeliveryTrackingMap'
+import { LazyDeliveryTrackingMap } from '../maps/LazyDeliveryTrackingMap'
 import { getGpsStatusLabel, getLiveDeliveryStatusLine } from '../../lib/deliveryTrackingLabels'
 import {
   canShowRestaurantReceiveCta,
@@ -73,8 +73,8 @@ export function RestaurantOrderTrackingPanel({ orderId, orderStatus }: Props) {
   return (
     <Card data-testid="restaurant-order-tracking-panel">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Navigation className="h-4 w-4 text-[var(--brand-mid)]" aria-hidden />
+        <CardTitle className="text-lg font-bold flex items-center gap-2">
+          <Navigation className="h-5 w-5 text-[var(--brand-mid)]" aria-hidden />
           Delivery tracking
         </CardTitle>
         {data?.delivery?.label && <CardDescription>{data.delivery.label}</CardDescription>}
@@ -96,7 +96,10 @@ export function RestaurantOrderTrackingPanel({ orderId, orderStatus }: Props) {
           )}
         </div>
 
-        <p className="text-sm text-[var(--text-muted)]" data-testid="restaurant-tracking-message">
+        <p
+          className="text-base text-[var(--text-muted)] leading-relaxed"
+          data-testid="restaurant-tracking-message"
+        >
           {message}
         </p>
 
@@ -110,14 +113,14 @@ export function RestaurantOrderTrackingPanel({ orderId, orderStatus }: Props) {
         ) : null}
 
         {showMap && (
-          <DeliveryTrackingMap
+          <LazyDeliveryTrackingMap
             latitude={loc?.latitude}
             longitude={loc?.longitude}
             showDestinationPin={false}
             live={Boolean(data.tracking?.hasLocation && !data.tracking?.isStale)}
             gpsStale={Boolean(data.tracking?.isStale)}
             recordedAt={loc?.recordedAt ?? null}
-            heightClassName="h-64"
+            heightClassName="h-52 sm:h-64"
             liveStatusLine={liveStatusLine}
             beforeFooter={
               <DeliveryTrackingEtaSection
@@ -131,7 +134,11 @@ export function RestaurantOrderTrackingPanel({ orderId, orderStatus }: Props) {
         )}
 
         {showReceive && (
-          <Button className="w-full sm:w-auto" asChild data-testid="restaurant-receive-order-cta">
+          <Button
+            className="min-h-[48px] w-full text-base font-semibold sm:w-auto"
+            asChild
+            data-testid="restaurant-receive-order-cta"
+          >
             <Link to={`/app/receiving?order=${orderId}`}>
               <Package className="h-4 w-4 mr-2" aria-hidden />
               Receive order

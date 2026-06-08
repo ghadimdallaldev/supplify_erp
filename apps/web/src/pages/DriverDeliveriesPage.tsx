@@ -8,6 +8,7 @@ import { EmptyState } from '../components/ui/empty-state'
 import { DriverDeliveriesHeader } from '../components/driver/DriverDeliveriesHeader'
 import { DriverDeliveryCard } from '../components/driver/DriverDeliveryCard'
 import { DriverRoutePanel } from '../components/driver/DriverRoutePanel'
+import { DriverStickyActionBar } from '../components/driver/DriverStickyActionBar'
 import {
   useBuildDriverRouteFromAssignmentsMutation,
   useGetDriverActiveRouteQuery,
@@ -21,9 +22,11 @@ import toast from 'react-hot-toast'
 import { useDriverLocationTracking } from '../hooks/useDriverLocationTracking'
 import { isTrackableDeliveryStatus } from '../lib/driverGpsTracking'
 import {
+  getDriverActionsForStatus,
   isActiveDriverDeliveryStatus,
   isDoneDriverDeliveryStatus,
   isTerminalDriverDeliveryStatus,
+  routeStopIsComplete,
 } from '../lib/driverDeliveryUi'
 
 export function DriverDeliveriesPage() {
@@ -83,7 +86,9 @@ export function DriverDeliveriesPage() {
     return routeDone + standaloneDone
   }, [activeRoute, completedOrders])
 
-  const nextStandaloneOrderId = activeOrders[0]?.orderId
+  const nextStandaloneOrder = activeOrders[0] ?? null
+  const nextStandaloneOrderId = nextStandaloneOrder?.orderId
+  const nextRouteStop = activeRoute?.stops.find((stop) => !routeStopIsComplete(stop.status)) ?? null
 
   const trackableDeliveries = orders
     .filter((o) => isTrackableDeliveryStatus(o.deliveryStatus))
@@ -199,6 +204,46 @@ export function DriverDeliveriesPage() {
   const hasWork =
     Boolean(activeRoute?.stops.length) || activeOrders.length > 0 || completedOrders.length > 0
 
+  let stickyAction: {
+    primaryLabel: string
+    primarySuccess?: boolean
+    onPrimary: () => void
+    onProblem?: () => void
+  } | null = null
+
+  if (nextRouteStop) {
+    if (nextRouteStop.status === 'PLANNED') {
+      stickyAction = {
+        primaryLabel: "I'm on the way",
+        onPrimary: () =>
+          handleRouteStopStatus(nextRouteStop.id, nextRouteStop.orderId, 'OUT_FOR_DELIVERY'),
+        onProblem: () => handleRouteStopStatus(nextRouteStop.id, nextRouteStop.orderId, 'FAILED'),
+      }
+    } else if (nextRouteStop.status === 'OUT_FOR_DELIVERY') {
+      stickyAction = {
+        primaryLabel: 'Delivered',
+        primarySuccess: true,
+        onPrimary: () =>
+          handleRouteStopStatus(nextRouteStop.id, nextRouteStop.orderId, 'DELIVERED'),
+        onProblem: () => handleRouteStopStatus(nextRouteStop.id, nextRouteStop.orderId, 'FAILED'),
+      }
+    }
+  } else if (nextStandaloneOrder) {
+    const actions = getDriverActionsForStatus(nextStandaloneOrder.deliveryStatus)
+    const primary = actions[0]
+    const problem = actions.find((a) => a.value === 'failed')
+    if (primary) {
+      stickyAction = {
+        primaryLabel: primary.label,
+        primarySuccess: primary.value === 'delivered',
+        onPrimary: () => handleStatus(nextStandaloneOrder.orderId, primary.value),
+        onProblem: problem
+          ? () => handleStatus(nextStandaloneOrder.orderId, problem.value)
+          : undefined,
+      }
+    }
+  }
+
   return (
     <RequirePermission permission="DRIVER_DELIVERIES_VIEW" title="my deliveries">
       <div
@@ -210,17 +255,21 @@ export function DriverDeliveriesPage() {
           doneCount={doneCount}
           trackingActive={trackingActive}
           trackableCount={trackableCount}
+          permissionDenied={permissionDenied}
+          gpsError={gpsError}
           isLoading={isLoading || routeLoading}
           onRefresh={handleRefresh}
         />
 
         {(gpsError || permissionDenied) && (
           <p
-            className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+            className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-base text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
             data-testid="driver-gps-error"
             role="alert"
           >
-            {gpsError || 'Location permission denied. Enable GPS to share live tracking.'}
+            {permissionDenied
+              ? 'Location permission needed. Turn on location in your phone settings so restaurants can see your progress.'
+              : 'Location not updating. Check your signal or try refreshing.'}
           </p>
         )}
 
@@ -242,8 +291,8 @@ export function DriverDeliveriesPage() {
         {!isLoading && !isError && !hasWork && (
           <div data-testid="driver-deliveries-empty">
             <EmptyState
-              title="No deliveries assigned"
-              description="When dispatch assigns orders to you, they will appear here."
+              title="No deliveries today"
+              description="When dispatch assigns orders to you, they will show up here with Open Maps and one-tap actions."
               icon={<Package className="h-6 w-6" aria-hidden />}
             />
           </div>
@@ -354,6 +403,16 @@ export function DriverDeliveriesPage() {
                 ))
               : null}
           </section>
+        ) : null}
+
+        {stickyAction && !isLoading && !isError ? (
+          <DriverStickyActionBar
+            primaryLabel={stickyAction.primaryLabel}
+            primarySuccess={stickyAction.primarySuccess}
+            onPrimary={stickyAction.onPrimary}
+            onProblem={stickyAction.onProblem}
+            disabled={updating}
+          />
         ) : null}
       </div>
     </RequirePermission>
