@@ -5,7 +5,7 @@ export const DELIVERY_STATUS_LABELS: Record<string, string> = {
   out_for_delivery: 'Out for delivery',
   delivered: 'Delivered',
   failed: 'Failed',
-  rescheduled: 'Rescheduled',
+  rescheduled: 'Moved to tomorrow',
 }
 
 export function formatDeliveryStatus(status: string): string {
