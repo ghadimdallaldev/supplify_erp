@@ -19,6 +19,7 @@ import {
   useReassignDriverOnOrderMutation,
   useUpdateOrderDeliveryStatusMutation,
   useSubmitOrderProofOfDeliveryMutation,
+  useRolloverAssignmentToTomorrowMutation,
 } from '../../services/api'
 import { usePermissions } from '../../hooks/usePermissions'
 import { DispatchOrderRow } from './DispatchOrderRow'
@@ -70,6 +71,7 @@ export function DriverDispatchBoard({
   const [updateDeliveryStatus, { isLoading: updatingStatus }] =
     useUpdateOrderDeliveryStatusMutation()
   const [submitPod, { isLoading: submittingPod }] = useSubmitOrderProofOfDeliveryMutation()
+  const [rolloverAssignment, { isLoading: rollingOver }] = useRolloverAssignmentToTomorrowMutation()
 
   const driverLabel = (d: { full_name?: string; fullName?: string }) =>
     d.full_name ?? d.fullName ?? 'Driver'
@@ -105,11 +107,23 @@ export function DriverDispatchBoard({
     }
   }
 
+  const moveToTomorrow = async (order: DispatchOrderCard) => {
+    const assignmentId = order.assignment?.id
+    if (!assignmentId) return
+    try {
+      await rolloverAssignment({ assignmentId }).unwrap()
+      toast.success('Moved to tomorrow')
+    } catch (e: unknown) {
+      const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
+      toast.error(msg || 'Could not move to tomorrow')
+    }
+  }
+
   const advanceStatus = async (order: DispatchOrderCard, next: string) => {
     try {
       await updateDeliveryStatus({
         orderId: order.id,
-        status: next as 'picked_up' | 'out_for_delivery' | 'delivered' | 'rescheduled',
+        status: next as 'picked_up' | 'out_for_delivery' | 'delivered' | 'rescheduled' | 'assigned',
       }).unwrap()
       if (next === 'delivered') {
         setPodOrder(order)
@@ -351,10 +365,10 @@ export function DriverDispatchBoard({
                       <Button
                         size="sm"
                         variant="ghost"
-                        disabled={updatingStatus}
-                        onClick={() => advanceStatus(order, 'rescheduled')}
+                        disabled={updatingStatus || rollingOver}
+                        onClick={() => moveToTomorrow(order)}
                       >
-                        Reschedule
+                        Move to tomorrow
                       </Button>
                     </div>
                   )}
@@ -420,10 +434,10 @@ export function DriverDispatchBoard({
                         <Button
                           size="sm"
                           variant="ghost"
-                          disabled={updatingStatus}
-                          onClick={() => advanceStatus(order, 'rescheduled')}
+                          disabled={updatingStatus || rollingOver}
+                          onClick={() => moveToTomorrow(order)}
                         >
-                          Reschedule
+                          Move to tomorrow
                         </Button>
                       </>
                     )}

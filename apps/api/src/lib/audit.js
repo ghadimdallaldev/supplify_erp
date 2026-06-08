@@ -103,3 +103,37 @@ export async function auditTenantMutation(req, actionType, details = {}) {
     },
   })
 }
+
+/** System/cron audit entries without an HTTP request context. */
+export async function writeSystemAuditLog(opts) {
+  try {
+    await query(
+      `
+      INSERT INTO audit_logs (
+        action_type, actor_user_id, actor_admin_role, tenant_type, tenant_id, target_id, payload_json, request_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `,
+      [
+        opts.action_type,
+        opts.actor_user_id ?? null,
+        opts.actor_admin_role ?? null,
+        opts.tenant_type ?? null,
+        opts.tenant_id ?? null,
+        opts.target_id ?? null,
+        JSON.stringify(opts.payload_json || {}),
+        opts.request_id ?? 'system',
+      ]
+    )
+  } catch (err) {
+    if (err.code === '42P01') {
+      logger.warn('audit_logs table missing, skipping system audit', {
+        action_type: opts.action_type,
+      })
+    } else {
+      logger.error('writeSystemAuditLog failed', {
+        error: err.message,
+        action_type: opts.action_type,
+      })
+    }
+  }
+}

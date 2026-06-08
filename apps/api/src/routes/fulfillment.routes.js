@@ -34,6 +34,8 @@ import {
   isGpsTrackingEnabled,
 } from '../services/driver-location.service.js'
 import { buildTrackingPayload, buildDriverLastSeenAlias } from '../lib/delivery-tracking-payload.js'
+import { rolloverAssignmentToNextDay } from '../services/delivery-rollover.service.js'
+import { invalidateUserAuthCaches } from '../lib/access-cache.js'
 
 const router = express.Router()
 
@@ -431,6 +433,8 @@ function mapDispatchOrder(row) {
           },
           assigned_at: row.assigned_at,
           delivered_at: row.delivered_at,
+          scheduled_delivery_date: row.scheduled_delivery_date ?? null,
+          rolled_over_at: row.rolled_over_at ?? null,
         }
       : null,
     has_pod: row.has_pod === true,
@@ -475,6 +479,8 @@ router.get('/dispatch', async (req, res) => {
         da.status AS assignment_status,
         da.assigned_at,
         da.delivered_at,
+        da.scheduled_delivery_date,
+        da.rolled_over_at,
         d.id AS driver_id,
         d.full_name AS driver_name,
         d.phone AS driver_phone,
@@ -620,6 +626,73 @@ router.get('/dispatch', async (req, res) => {
     })
   }
 })
+
+router.post(
+  '/assignments/:assignmentId/rollover-to-tomorrow',
+  requirePermission('FULFILLMENT_MANAGE'),
+  async (req, res) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
+      }
+
+      const { rows } = await query(
+        `SELECT id, supplier_id, order_id FROM driver_assignments WHERE id = $1`,
+        [req.params.assignmentId]
+      )
+      if (!rows.length || rows[0].supplier_id !== supplierId) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Assignment not found' },
+          requestId: req.requestId,
+        })
+      }
+
+      const outcome = await rolloverAssignmentToNextDay({
+        assignmentId: req.params.assignmentId,
+        actorUserId: req.userData?.id ?? null,
+        force: true,
+        notifyRestaurant: req.body?.notify_restaurant === true,
+      })
+
+      if (!outcome.ok) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: `Cannot move to tomorrow (${outcome.reason ?? 'unknown'})`,
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      await invalidateUserAuthCaches({ tenantId: supplierId, tenantType: 'SUPPLIER' })
+
+      res.json({
+        ok: true,
+        data: outcome,
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Manual delivery rollover error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to move delivery to tomorrow' },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
 
 router.get('/exceptions', async (req, res) => {
   try {

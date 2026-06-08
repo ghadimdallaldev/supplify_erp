@@ -830,6 +830,17 @@ export const api = createApi({
       }),
       invalidatesTags: ['Fulfillment', 'Order'],
     }),
+    rolloverAssignmentToTomorrow: builder.mutation<
+      { ok: boolean; data: Record<string, unknown> },
+      { assignmentId: string; notify_restaurant?: boolean }
+    >({
+      query: ({ assignmentId, notify_restaurant }) => ({
+        url: `/api/fulfillment/assignments/${assignmentId}/rollover-to-tomorrow`,
+        method: 'POST',
+        body: notify_restaurant ? { notify_restaurant: true } : {},
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
     sendDriverLocation: builder.mutation<
       {
         trackingEnabled: boolean
@@ -3907,6 +3918,7 @@ export const {
   useAssignDriverToOrderMutation,
   useReassignDriverOnOrderMutation,
   useUpdateOrderDeliveryStatusMutation,
+  useRolloverAssignmentToTomorrowMutation,
   useSendDriverLocationMutation,
   useGetOrderTrackingQuery,
   useSubmitOrderProofOfDeliveryMutation,
