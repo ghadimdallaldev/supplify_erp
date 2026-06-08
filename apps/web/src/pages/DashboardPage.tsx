@@ -35,7 +35,11 @@ import { useImpersonation } from '../hooks/useImpersonation'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { featureEnabled } from '../lib/planLimits'
 import { canUseFinanceInvoices, canUseGlobalReports } from '../lib/planFeatureGates'
-import { getRestaurantDashboardLayout, type DashboardKpiKey } from '../lib/workspaceRoleProfile'
+import {
+  getRestaurantDashboardLayout,
+  shouldShowDashboardCalendar,
+  type DashboardKpiKey,
+} from '../lib/workspaceRoleProfile'
 import { formatPlanDisplayName } from '../lib/planComparison'
 import { formatCurrency } from '../utils/format'
 /** Vertical rhythm between dashboard sections (KPIs, cards row, calendar). */
@@ -289,6 +293,8 @@ export function DashboardPage() {
 
   const isRestaurant = isEffectiveRestaurant
   const isSupplier = isEffectiveSupplier
+  const tenantType = isRestaurant ? 'RESTAURANT' : isSupplier ? 'SUPPLIER' : null
+  const showDashboardCalendar = shouldShowDashboardCalendar(persona, tenantType, can)
   const restaurantLayout =
     isRestaurant && persona.restaurantDashboardMode
       ? getRestaurantDashboardLayout(persona.restaurantDashboardMode, can, persona.readOnly)
@@ -1122,9 +1128,11 @@ export function DashboardPage() {
                         <button
                           disabled={
                             isAdding ||
-                            (isRestaurant &&
-                              restaurantLayout &&
-                              !restaurantLayout.allowReorderActions)
+                            Boolean(
+                              isRestaurant &&
+                                restaurantLayout &&
+                                !restaurantLayout.allowReorderActions
+                            )
                           }
                           onClick={handleAdd}
                           style={{
@@ -1283,7 +1291,7 @@ export function DashboardPage() {
       ) : null}
 
       {/* Calendar row */}
-      {showRestaurantSection('showCalendar') && (
+      {showDashboardCalendar && (
         <div
           style={{
             marginTop: DASHBOARD_CALENDAR_EXTRA_GAP,

@@ -17,9 +17,11 @@ export function getGpsStatusLabel(tracking?: DeliveryTrackingInfo | null): strin
     case 'none':
       return 'No GPS yet'
     case 'stale':
-      return tracking?.lastUpdatedLabel ? `GPS stale · ${tracking.lastUpdatedLabel}` : 'GPS stale'
+      return tracking?.lastUpdatedLabel
+        ? `Location not updating · ${tracking.lastUpdatedLabel}`
+        : 'Location not updating'
     case 'live':
-      return tracking?.lastUpdatedLabel ? `Live · ${tracking.lastUpdatedLabel}` : 'Live'
+      return tracking?.lastUpdatedLabel ? `Live now · ${tracking.lastUpdatedLabel}` : 'Live now'
     default:
       return 'No GPS yet'
   }
@@ -38,7 +40,7 @@ export function getLiveDeliveryStatusLine(status: string | null | undefined): st
   const normalized = String(status || '')
     .toLowerCase()
     .trim()
-  if (normalized === 'picked_up') return 'Picked up · Live now'
+  if (normalized === 'picked_up') return 'Picked up order · Live now'
   if (normalized === 'out_for_delivery') return 'On the way · Live now'
   return null
 }

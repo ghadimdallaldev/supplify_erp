@@ -6,7 +6,7 @@ import { useGetOrderTrackingQuery } from '../../services/api'
 import { formatDeliveryStatus } from '../../lib/deliveryStatusLabels'
 import { formatOrderRef } from './fulfillmentDispatchUtils'
 import { getGpsStatusLabel, getLiveDeliveryStatusLine } from '../../lib/deliveryTrackingLabels'
-import { DeliveryTrackingMap } from '../maps/DeliveryTrackingMap'
+import { LazyDeliveryTrackingMap } from '../maps/LazyDeliveryTrackingMap'
 import {
   DeliveryTrackingEtaSection,
   getDestinationLabelText,
@@ -45,7 +45,10 @@ export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg" data-testid="delivery-tracking-drawer">
+      <DialogContent
+        className="max-h-[92dvh] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto sm:w-full"
+        data-testid="delivery-tracking-drawer"
+      >
         <DialogHeader>
           <DialogTitle>Delivery tracking</DialogTitle>
           <DialogDescription>
@@ -106,7 +109,7 @@ export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
               ) : null}
             </div>
 
-            <DeliveryTrackingMap
+            <LazyDeliveryTrackingMap
               latitude={data.tracking?.latestLocation?.latitude ?? data.latestLocation?.latitude}
               longitude={data.tracking?.latestLocation?.longitude ?? data.latestLocation?.longitude}
               destinationLatitude={data.destination?.latitude}
