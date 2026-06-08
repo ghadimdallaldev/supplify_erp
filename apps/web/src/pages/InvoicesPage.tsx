@@ -38,6 +38,7 @@ import { Textarea } from '../components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { usePermissions } from '../hooks/usePermissions'
+import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
 import { formatCurrency, formatPrice } from '../utils/format'
@@ -85,6 +86,14 @@ export function InvoicesPage() {
   const { canAny } = usePermissions()
   const canRecordPayments = canAny('INVOICES_MANAGE', 'INVOICES_EDIT', 'PAYMENTS_MANAGE')
   const { isEffectiveRestaurant: isRestaurant } = useImpersonation()
+  const { persona } = useWorkspaceRole()
+  const invoicesTitle = isRestaurant
+    ? (persona.pageCopy?.invoices?.title ?? 'Invoice Dashboard')
+    : 'Invoice Dashboard'
+  const invoicesDescription = isRestaurant
+    ? (persona.pageCopy?.invoices?.description ??
+      'Manage billing, payments, and financial analytics')
+    : 'Manage billing, payments, and financial analytics'
 
   // Fetch invoices from database
   const {
@@ -302,8 +311,8 @@ export function InvoicesPage() {
     <RequirePermission permission="INVOICES_VIEW" title="invoices">
       <div className="space-y-6">
         <PageHeader
-          title="Invoice Dashboard"
-          description="Manage billing, payments, and financial analytics"
+          title={invoicesTitle}
+          description={invoicesDescription}
           actions={
             <Button variant="outline" onClick={() => refetch()}>
               <Download className="h-4 w-4 mr-2" />

@@ -14,6 +14,7 @@ import {
   inviteFormEmailMismatchMessage,
   inviteSessionEmailMismatch,
   invitationAcceptErrorMessage,
+  isInvitationSessionExpiredError,
   finishInviteAcceptNavigation,
 } from '../lib/invite-session'
 import { InviteEmailMismatchCard } from '../components/invite/InviteEmailMismatchCard'
@@ -30,7 +31,11 @@ export function InviteAcceptPage() {
   const type = normalizeInviteTypeParam(searchParams.get('type'))
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
-  const { data: sessionUser, isLoading: sessionLoading } = useGetInviteSessionQuery()
+  const {
+    data: sessionUser,
+    isLoading: sessionLoading,
+    refetch: refetchInviteSession,
+  } = useGetInviteSessionQuery(undefined, { refetchOnMountOrArgChange: true })
 
   const { data, isLoading, isError } = useValidateInviteQuery(
     { token, type: type || 'sb' },
@@ -45,6 +50,7 @@ export function InviteAcceptPage() {
   const [acceptedLegal, setAcceptedLegal] = useState<Set<LegalDocumentSlug>>(new Set())
   const [electronicSigned, setElectronicSigned] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sessionExpired, setSessionExpired] = useState(false)
 
   const legalComplete = isLegalAcceptanceComplete('invite', null, acceptedLegal, electronicSigned)
   const legalPayload = legalComplete ? buildLegalAcceptancePayload(acceptedLegal) : undefined
@@ -125,12 +131,21 @@ export function InviteAcceptPage() {
       return
     }
     try {
-      const result = await accept({ token, type, legalAcceptance: legalPayload }).unwrap()
+      const session = await refetchInviteSession().unwrap()
+      const result = await accept({
+        token,
+        type,
+        email: session?.email,
+        legalAcceptance: legalPayload,
+      }).unwrap()
       dispatch(api.util.resetApiState())
       const { refetchAppSession } = await import('../lib/refetchAppSession')
       await refetchAppSession(dispatch)
       finishInviteAcceptNavigation(result, navigate, searchParams)
     } catch (err) {
+      if (isInvitationSessionExpiredError(err)) {
+        setSessionExpired(true)
+      }
       setError(
         invitationAcceptErrorMessage(
           err,
@@ -186,7 +201,7 @@ export function InviteAcceptPage() {
   const emailMismatch =
     sessionUser && inviteSessionEmailMismatch(invite.invited_email, sessionUser.email)
 
-  if (sessionUser) {
+  if (sessionUser && !sessionExpired) {
     return (
       <PageShell>
         <Card>

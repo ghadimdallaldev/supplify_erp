@@ -405,9 +405,20 @@ router.get(
   requirePermission('SETTINGS_VIEW'),
   async (req, res) => {
     try {
-      const { rows: suppliers } = await query('SELECT * FROM supplier WHERE contact_email = $1', [
-        req.userData.email,
-      ])
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Supplier not found',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      const { rows: suppliers } = await query('SELECT * FROM supplier WHERE id = $1', [supplierId])
 
       if (suppliers.length === 0) {
         return res.status(404).json({

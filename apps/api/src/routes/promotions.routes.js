@@ -19,6 +19,7 @@ import {
   loadDealDetailForRestaurant,
   recordDealInteraction,
   getDealAnalytics,
+  getSupplierDealsAnalyticsSummary,
   enrichPromotionRow,
   enrichPromotionRows,
   getEligibleProductsForDeal,
@@ -891,6 +892,17 @@ const listQuerySchema = z.object({
   status: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
+})
+
+router.get('/analytics/summary', async (req, res, next) => {
+  try {
+    const supplierId = await getSupplierId(req)
+    const days = req.query.days ? Number(req.query.days) : 30
+    const summary = await getSupplierDealsAnalyticsSummary(supplierId, { days })
+    res.json({ ok: true, data: { summary }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
 })
 
 router.get('/', async (req, res, next) => {

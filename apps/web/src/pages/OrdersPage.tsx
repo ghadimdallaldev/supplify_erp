@@ -50,6 +50,7 @@ const ordersFilterControlClass =
 import { Link } from 'react-router-dom'
 import { usePermissions } from '../hooks/usePermissions'
 import { useImpersonation } from '../hooks/useImpersonation'
+import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
 import { DeclineOrderDialog } from '../components/orders/DeclineOrderDialog'
@@ -84,6 +85,13 @@ export function OrdersPage() {
   >([])
   const { can } = usePermissions()
   const { isEffectiveSupplier: isSupplier } = useImpersonation()
+  const { persona } = useWorkspaceRole()
+  const ordersTitle = isSupplier
+    ? 'Orders Inbox'
+    : (persona.pageCopy?.orders?.title ?? 'Orders Inbox')
+  const ordersDescription = isSupplier
+    ? 'Manage inbound orders from restaurants'
+    : (persona.pageCopy?.orders?.description ?? 'Track your orders and their status')
   const canManageOrders = can('ORDERS_MANAGE')
   const canEditOrders = can('ORDERS_EDIT') || canManageOrders
   const canCreateOrders = can('ORDERS_CREATE') || canManageOrders
@@ -374,12 +382,8 @@ export function OrdersPage() {
     <RequirePermission permission="ORDERS_VIEW" title="orders">
       <div className="space-y-6" data-testid="orders-page">
         <PageHeader
-          title="Orders Inbox"
-          description={
-            isSupplier
-              ? 'Manage inbound orders from restaurants'
-              : 'Track your orders and their status'
-          }
+          title={ordersTitle}
+          description={ordersDescription}
           actions={
             <>
               {isSupplier && canCreateOrders && (

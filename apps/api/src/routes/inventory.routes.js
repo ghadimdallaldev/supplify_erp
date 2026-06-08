@@ -1,5 +1,11 @@
 import express from 'express'
-import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  requirePermission,
+  getSupplierIdForRequest,
+} from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
@@ -36,10 +42,19 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
 
     const queryParams = []
 
-    // For suppliers, only show their own products
+    // For suppliers, only show their active workspace products
     if (req.userData.role === 'SUPPLIER') {
-      inventoryQuery += ` WHERE s.contact_email = $1`
-      queryParams.push(req.userData.email)
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
+        return res.json({
+          ok: true,
+          data: { inventory: [] },
+          error: null,
+          requestId: req.requestId,
+        })
+      }
+      inventoryQuery += ` WHERE p.supplier_id = $1`
+      queryParams.push(supplierId)
     }
 
     inventoryQuery += ` ORDER BY p.name`
@@ -124,23 +139,15 @@ const inventorySettingsSchema = z.object({
   backorderEtaDays: z.number().int().min(0).optional(),
 })
 
-// Helper: Check if user owns the product
-async function checkProductOwnership(productId, userEmail) {
-  const { rows } = await query(
-    `
-    SELECT p.*, s.contact_email 
-    FROM product p 
-    JOIN supplier s ON s.id = p.supplier_id 
-    WHERE p.id = $1
-  `,
-    [productId]
-  )
+// Helper: Check if supplier workspace owns the product
+async function checkProductOwnership(productId, supplierId) {
+  const { rows } = await query(`SELECT p.* FROM product p WHERE p.id = $1`, [productId])
 
   if (rows.length === 0) {
     throw new NotFoundError('Product not found')
   }
 
-  if (rows[0].contact_email !== userEmail) {
+  if (supplierId && rows[0].supplier_id !== supplierId) {
     throw new ValidationError('You can only manage inventory for your own products')
   }
 
@@ -223,7 +230,8 @@ router.patch(
 
       // Verify product ownership for suppliers
       if (req.userData.role === 'SUPPLIER') {
-        await checkProductOwnership(productId, req.userData.email)
+        const supplierId = await getSupplierIdForRequest(req)
+        await checkProductOwnership(productId, supplierId)
       }
 
       // Update or insert inventory
@@ -293,7 +301,8 @@ router.post(
 
       // Verify product ownership for suppliers
       if (req.userData.role === 'SUPPLIER') {
-        await checkProductOwnership(productId, req.userData.email)
+        const supplierId = await getSupplierIdForRequest(req)
+        await checkProductOwnership(productId, supplierId)
       }
 
       // Start transaction
@@ -490,7 +499,8 @@ router.patch(
 
       // Verify product ownership for suppliers
       if (req.userData.role === 'SUPPLIER') {
-        await checkProductOwnership(productId, req.userData.email)
+        const supplierId = await getSupplierIdForRequest(req)
+        await checkProductOwnership(productId, supplierId)
       }
 
       const { rows } = await query(
@@ -583,10 +593,19 @@ router.get('/alerts', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (re
 
     const queryParams = []
 
-    // For suppliers, only show their own products
+    // For suppliers, only show their active workspace products
     if (req.userData.role === 'SUPPLIER') {
-      alertsQuery += ` AND s.contact_email = $1`
-      queryParams.push(req.userData.email)
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
+        return res.json({
+          ok: true,
+          data: { alerts: [] },
+          error: null,
+          requestId: req.requestId,
+        })
+      }
+      alertsQuery += ` AND p.supplier_id = $1`
+      queryParams.push(supplierId)
     }
 
     alertsQuery += ` ORDER BY ia.created_at DESC LIMIT 50`
@@ -624,12 +643,12 @@ router.patch(
 
       // Verify ownership for suppliers
       if (req.userData.role === 'SUPPLIER') {
+        const supplierId = await getSupplierIdForRequest(req)
         const { rows: alerts } = await query(
           `
-        SELECT ia.*, s.contact_email
+        SELECT ia.*, p.supplier_id
         FROM inventory_alert ia
         JOIN product p ON p.id = ia.product_id
-        JOIN supplier s ON s.id = p.supplier_id
         WHERE ia.id = $1
       `,
           [alertId]
@@ -639,7 +658,7 @@ router.patch(
           throw new NotFoundError('Alert not found')
         }
 
-        if (alerts[0].contact_email !== req.userData.email) {
+        if (!supplierId || alerts[0].supplier_id !== supplierId) {
           return res.status(403).json({
             ok: false,
             data: null,

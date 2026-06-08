@@ -39,6 +39,17 @@ import {
 import { featureEnabled, getOrderUsageBadge, isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { countActiveDisputes } from '../lib/disputeHelpers'
 import { canUseGlobalReports, canUseSupplierDeals } from '../lib/planFeatureGates'
+import {
+  reorderNavSectionsForPrimaryFocus,
+  restaurantAnalyticsNavAllowed,
+  restaurantOverviewNavAllowed,
+  restaurantReportsNavAllowed,
+  RESTAURANT_DISPUTES_ANY_OF,
+  RESTAURANT_REPORTS_ANY_OF,
+  supplierAnalyticsNavAllowed,
+  supplierOverviewNavAllowed,
+  SUPPLIER_ANALYTICS_ANY_OF,
+} from '../lib/workspaceRoleProfile'
 import { formatPlanDisplayName } from '../lib/planComparison'
 
 type NavItem = {
@@ -83,7 +94,7 @@ export function Sidebar({
   const location = useLocation()
   const { user } = useAppSelector((state) => state.auth)
   const { can, canAny } = usePermissions()
-  const { isDriverRole } = useWorkspaceRole()
+  const { isDriverRole, persona } = useWorkspaceRole()
   const {
     isImpersonating,
     isEffectiveRestaurant,
@@ -121,7 +132,7 @@ export function Sidebar({
     skipPollingIfUnfocused: true,
   })
   const { data: supplierDisputesData } = useGetIncomingDisputesQuery(undefined, {
-    skip: !disputesEnabled || !isSupplier || !user || isDriverRole,
+    skip: !disputesEnabled || !isSupplier || !user || isDriverRole || !can('FULFILLMENT_VIEW'),
     pollingInterval: 30_000,
     skipPollingIfUnfocused: true,
   })
@@ -198,13 +209,13 @@ export function Sidebar({
         permission: 'CATALOG_VIEW',
         testId: 'nav-suppliers',
       },
-      ...(reportsEnabled
+      ...(reportsEnabled && restaurantReportsNavAllowed(persona, can)
         ? [
             {
               name: 'Reports',
               href: '/app/reports',
               icon: BarChart3,
-              permission: 'ORDERS_VIEW',
+              anyOf: [...RESTAURANT_REPORTS_ANY_OF],
               testId: 'nav-reports',
             },
           ]
@@ -215,7 +226,7 @@ export function Sidebar({
               name: 'Disputes',
               href: '/app/disputes',
               icon: Scale,
-              permission: 'ORDERS_VIEW',
+              anyOf: [...RESTAURANT_DISPUTES_ANY_OF],
               badge: 'disputes' as const,
               testId: 'nav-disputes',
             },
@@ -272,22 +283,38 @@ export function Sidebar({
       },
     ].filter((item) => navItemAllowed(item, can, canAny))
 
+    const overviewItems: NavItem[] = []
+    if (persona.analyticsNav && restaurantAnalyticsNavAllowed(persona, can)) {
+      overviewItems.push({
+        name: persona.analyticsNav.label,
+        href: persona.analyticsNav.href,
+        icon: LayoutDashboard,
+        anyOf: ['ORDERS_VIEW', 'INVOICES_VIEW'],
+        testId: 'nav-dashboard',
+      })
+    }
+    if (restaurantOverviewNavAllowed(persona, can)) {
+      overviewItems.push({
+        name: persona.overviewNav!.label,
+        href: persona.overviewNav!.href,
+        icon: persona.id === 'restaurant_foh' ? CalendarDays : PackageCheck,
+        anyOf: ['RESERVATIONS_VIEW', 'RECEIVING_VIEW'],
+        testId: 'nav-role-home',
+      })
+    }
+
     sections = [
-      {
-        label: 'OVERVIEW',
-        items: [
-          {
-            name: 'Dashboard',
-            href: '/app/dashboard',
-            icon: LayoutDashboard,
-            permission: 'ORDERS_VIEW',
-            testId: 'nav-dashboard',
-          },
-        ].filter((item) => navItemAllowed(item, can, canAny)),
-      },
+      ...(overviewItems.length
+        ? [
+            {
+              label: 'OVERVIEW',
+              items: overviewItems.filter((item) => navItemAllowed(item, can, canAny)),
+            },
+          ]
+        : []),
       { label: 'OPERATIONS', items: ops },
       ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
-      { label: 'ACCOUNT', items: acct },
+      ...(acct.length ? [{ label: 'ACCOUNT', items: acct }] : []),
     ]
   } else if (hasAdminNavAccess && !isImpersonating) {
     sections = [
@@ -381,7 +408,7 @@ export function Sidebar({
                 name: 'Disputes',
                 href: '/app/disputes',
                 icon: Scale,
-                permission: 'ORDERS_VIEW',
+                permission: 'FULFILLMENT_VIEW',
                 badge: 'disputes' as const,
                 testId: 'nav-disputes',
               },
@@ -389,13 +416,13 @@ export function Sidebar({
           : []),
       ].filter((item) => navItemAllowed(item, can, canAny))
       const intel: NavItem[] = [
-        ...(reportsEnabled
+        ...(reportsEnabled && persona.showGlobalReports
           ? [
               {
                 name: 'Reports',
                 href: '/app/reports',
                 icon: BarChart3,
-                permission: 'ORDERS_VIEW',
+                anyOf: [...SUPPLIER_ANALYTICS_ANY_OF],
                 testId: 'nav-reports',
               },
             ]
@@ -427,32 +454,45 @@ export function Sidebar({
         },
       ].filter((item) => navItemAllowed(item, can, canAny))
 
+      const supplierOverview: NavItem[] = []
+      if (persona.overviewNav && supplierOverviewNavAllowed(persona, can, canAny)) {
+        supplierOverview.push({
+          name: persona.overviewNav.label,
+          href: persona.overviewNav.href,
+          icon: Radar,
+          anyOf:
+            persona.overviewNav.gate === 'promotions'
+              ? ['PROMOTIONS_VIEW']
+              : [
+                  'ORDERS_MANAGE',
+                  'INVOICES_VIEW',
+                  'CATALOG_EDIT',
+                  'FULFILLMENT_VIEW',
+                  'PROMOTIONS_MANAGE',
+                  'PROMOTIONS_VIEW',
+                ],
+          testId: 'nav-command-center',
+        })
+      }
+      if (persona.analyticsNav && supplierAnalyticsNavAllowed(persona, can)) {
+        supplierOverview.push({
+          name: persona.analyticsNav.label,
+          href: persona.analyticsNav.href,
+          icon: LayoutDashboard,
+          anyOf: [...SUPPLIER_ANALYTICS_ANY_OF],
+          testId: 'nav-dashboard',
+        })
+      }
+
       sections = [
-        {
-          label: 'OVERVIEW',
-          items: [
-            {
-              name: 'Command Center',
-              href: '/app/command-center',
-              icon: Radar,
-              anyOf: [
-                'ORDERS_MANAGE',
-                'INVOICES_VIEW',
-                'CATALOG_EDIT',
-                'FULFILLMENT_VIEW',
-                'PROMOTIONS_MANAGE',
-              ],
-              testId: 'nav-command-center',
-            },
-            {
-              name: 'Analytics',
-              href: '/app/dashboard',
-              icon: LayoutDashboard,
-              permission: 'ORDERS_VIEW',
-              testId: 'nav-dashboard',
-            },
-          ].filter((item) => navItemAllowed(item, can, canAny)),
-        },
+        ...(supplierOverview.length
+          ? [
+              {
+                label: 'OVERVIEW',
+                items: supplierOverview.filter((item) => navItemAllowed(item, can, canAny)),
+              },
+            ]
+          : []),
         { label: 'OPERATIONS', items: ops },
         ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
         {
@@ -470,6 +510,15 @@ export function Sidebar({
       ]
     }
   }
+
+  sections = sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => navItemAllowed(item, can, canAny)),
+    }))
+    .filter((section) => section.items.length > 0)
+
+  sections = reorderNavSectionsForPrimaryFocus(sections, persona.primaryNavHref)
 
   const initials = (user?.displayName || user?.email || 'U')
     .split(/[\s@]/)

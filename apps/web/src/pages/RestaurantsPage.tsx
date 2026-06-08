@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useGetOrdersQuery, useGetRestaurantsQuery, useGetSupplierMeQuery } from '../services/api'
+import { useGetOrdersQuery, useGetRestaurantsQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -53,10 +53,8 @@ export function RestaurantsPage() {
   const [sortBy, setSortBy] = useState<'name' | 'orders' | 'revenue' | 'recent'>('name')
   const [filterBy, setFilterBy] = useState<'all' | 'active' | 'new'>('all')
   const isSupplier = user?.role === 'SUPPLIER'
-
-  // Get supplier info to filter orders
-  const { data: supplierData } = useGetSupplierMeQuery(undefined, { skip: !isSupplier })
-  const supplierId = supplierData?.supplier?.id
+  const supplierId =
+    user?.workspace?.tenantType === 'SUPPLIER' ? user.workspace.tenantId : undefined
 
   // Get orders to find restaurants (filter by supplier if supplier)
   const { data: ordersData } = useGetOrdersQuery(
@@ -77,77 +75,60 @@ export function RestaurantsPage() {
     offset: 0,
   })
 
-  // Supplier view: Show restaurants that purchased from this supplier
+  // Supplier view: API returns restaurants that ordered from or follow this supplier
   const restaurantsWithOrders = useMemo(() => {
-    if (!isSupplier || !ordersData?.orders || !restaurantsData?.restaurants || !supplierId)
-      return []
+    if (!isSupplier || !restaurantsData?.restaurants || !supplierId) return []
 
-    // Filter orders to only include those with items from this supplier
-    const supplierOrders = ordersData.orders.filter((order) => {
-      return order.items?.some((item: any) => item.supplier_id === supplierId)
-    })
-
-    // Get unique restaurant IDs from supplier orders
-    const restaurantIds = new Set(
-      supplierOrders.filter((order) => order.restaurant_id).map((order) => order.restaurant_id)
+    const supplierOrders = (ordersData?.orders || []).filter((order) =>
+      order.items?.some((item: any) => item.supplier_id === supplierId)
     )
 
-    // Get restaurant details and order statistics
-    return Array.from(restaurantIds)
-      .map((restaurantId) => {
-        const restaurant = restaurantsData.restaurants.find((r) => r.id === restaurantId)
-        if (!restaurant) return null
+    return restaurantsData.restaurants.map((restaurant) => {
+      const restaurantOrders = supplierOrders.filter(
+        (order) => order.restaurant_id === restaurant.id
+      )
 
-        // Filter restaurant orders to only include orders with items from this supplier
-        const restaurantOrders = supplierOrders.filter(
-          (order) => order.restaurant_id === restaurantId
-        )
-
-        const totalOrders = restaurantOrders.length
-        const totalSpent = restaurantOrders.reduce((sum, order) => {
-          // Only sum items from this supplier
-          const supplierItemsTotal =
-            order.items
-              ?.filter((item: any) => item.supplier_id === supplierId)
-              .reduce((itemSum: number, item: any) => itemSum + (item.line_total || 0), 0) || 0
-          return sum + supplierItemsTotal
-        }, 0)
-
-        const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0
-
-        const latestOrder = restaurantOrders.sort(
-          (a, b) =>
-            new Date(b.placed_at || b.created_at).getTime() -
-            new Date(a.placed_at || a.created_at).getTime()
-        )[0]
-
-        // Get most purchased products from this supplier
-        const productCount = new Map()
-        restaurantOrders.forEach((order) => {
+      const totalOrders = restaurantOrders.length
+      const totalSpent = restaurantOrders.reduce((sum, order) => {
+        const supplierItemsTotal =
           order.items
             ?.filter((item: any) => item.supplier_id === supplierId)
-            .forEach((item: any) => {
-              productCount.set(
-                item.product_id,
-                (productCount.get(item.product_id) || 0) + item.quantity
-              )
-            })
-        })
+            .reduce((itemSum: number, item: any) => itemSum + (item.line_total || 0), 0) || 0
+        return sum + supplierItemsTotal
+      }, 0)
 
-        const mostPurchasedProduct = Array.from(productCount.entries()).sort(
-          (a, b) => b[1] - a[1]
-        )[0]
+      const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0
 
-        return {
-          ...restaurant,
-          totalOrders,
-          totalSpent,
-          averageOrderValue,
-          latestOrder,
-          mostPurchasedProduct,
-        }
+      const latestOrder = restaurantOrders.sort(
+        (a, b) =>
+          new Date(b.placed_at || b.created_at).getTime() -
+          new Date(a.placed_at || a.created_at).getTime()
+      )[0]
+
+      const productCount = new Map()
+      restaurantOrders.forEach((order) => {
+        order.items
+          ?.filter((item: any) => item.supplier_id === supplierId)
+          .forEach((item: any) => {
+            productCount.set(
+              item.product_id,
+              (productCount.get(item.product_id) || 0) + item.quantity
+            )
+          })
       })
-      .filter(Boolean)
+
+      const mostPurchasedProduct = Array.from(productCount.entries()).sort((a, b) => b[1] - a[1])[0]
+
+      return {
+        ...restaurant,
+        totalOrders,
+        totalSpent,
+        averageOrderValue,
+        latestOrder,
+        mostPurchasedProduct,
+        isFollowerOnly: totalOrders === 0,
+      }
+    })
   }, [ordersData, restaurantsData, supplierId, isSupplier])
 
   // Filter and sort restaurants
@@ -339,7 +320,9 @@ export function RestaurantsPage() {
       <div className={pageHeaderRowClass}>
         <div className="min-w-0">
           <h1 className="text-[21px] font-black text-[var(--text)]">My Restaurants</h1>
-          <p className="text-[var(--text-muted)] mt-2">Restaurants that purchase from you</p>
+          <p className="text-[var(--text-muted)] mt-2">
+            Restaurants that follow you or purchase from you
+          </p>
         </div>
         {isSupplier && (
           <div className="flex flex-wrap gap-2 shrink-0">
@@ -493,7 +476,7 @@ export function RestaurantsPage() {
               <p className="text-[var(--text-muted)] mb-4">
                 {search || cityFilter || filterBy !== 'all'
                   ? 'Try adjusting your search or filters'
-                  : 'No restaurants have purchased from you yet'}
+                  : 'No restaurants follow you or have purchased from you yet'}
               </p>
               {(search || cityFilter || filterBy !== 'all') && (
                 <Button
@@ -539,6 +522,12 @@ export function RestaurantsPage() {
                       <Badge className="bg-[var(--brand)] text-white flex items-center gap-1">
                         <Sparkles className="h-3 w-3 shrink-0" />
                         New
+                      </Badge>
+                    )}
+                    {restaurant.isFollowerOnly && (
+                      <Badge variant="outline" className="flex items-center gap-1">
+                        <Users className="h-3 w-3 shrink-0" />
+                        Following
                       </Badge>
                     )}
                   </CardStatusBadges>
@@ -736,6 +725,12 @@ export function RestaurantsPage() {
                                 <Badge className="bg-[var(--brand)] text-white">
                                   <Sparkles className="h-3 w-3 mr-1" />
                                   New
+                                </Badge>
+                              )}
+                              {restaurant.isFollowerOnly && (
+                                <Badge variant="outline">
+                                  <Users className="h-3 w-3 mr-1" />
+                                  Following
                                 </Badge>
                               )}
                             </>

@@ -332,6 +332,44 @@ export async function assignOrgUserRole({
   }
 }
 
+/**
+ * Backfill org membership for branch staff invited before org access was granted on accept.
+ */
+export async function ensureOrgAccessForBranchStaff(userId, supplierId) {
+  if (!userId || !supplierId) return false
+
+  const { rows: branchRows } = await query(
+    `SELECT organization_id FROM supplier WHERE id = $1 AND organization_id IS NOT NULL`,
+    [supplierId]
+  )
+  const organizationId = branchRows[0]?.organization_id
+  if (!organizationId) return false
+
+  const { rows: orgMembership } = await query(
+    `SELECT 1 FROM org_user_roles WHERE user_id = $1 AND organization_id = $2`,
+    [userId, organizationId]
+  )
+  if (orgMembership.length > 0) return false
+
+  const { rows: tenantMembership } = await query(
+    `SELECT 1 FROM tenant_user_roles WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = 'SUPPLIER'`,
+    [userId, supplierId]
+  )
+  if (!tenantMembership.length) return false
+
+  await assignOrgUserRole({
+    userId,
+    organizationId,
+    roleName: 'Regional Manager',
+  })
+  await grantOrgBranchAccess({
+    userId,
+    supplierId,
+    organizationId,
+  })
+  return true
+}
+
 export async function grantOrgBranchAccess({
   userId,
   supplierId,

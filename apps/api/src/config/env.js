@@ -155,28 +155,15 @@ export const config = {
       : `http://localhost:${process.env.PORT || 4000}`),
   REDIS_URL: resolveRedisUrl(),
   E2E_SECRET: process.env.E2E_SECRET || '',
-  TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || '',
-  TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || '',
-  TWILIO_WHATSAPP_FROM: process.env.TWILIO_WHATSAPP_FROM || '',
   EMAIL_ENABLED: envBool(process.env.EMAIL_ENABLED, true),
   EMAIL_LOG_ONLY: envBool(process.env.EMAIL_LOG_ONLY, false),
-  EMAIL_PROVIDER:
-    process.env.EMAIL_PROVIDER ||
-    (process.env.SENDGRID_API_KEY ? 'sendgrid' : process.env.SMTP_HOST ? 'smtp' : ''),
-  EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || process.env.SENDGRID_FROM_NAME || 'Supplify',
+  EMAIL_PROVIDER: process.env.EMAIL_PROVIDER || (process.env.SMTP_HOST ? 'smtp' : ''),
+  EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || 'Supplify',
   EMAIL_FROM_ADDRESS:
-    process.env.EMAIL_FROM_ADDRESS ||
-    process.env.EMAIL_FROM ||
-    process.env.SENDGRID_FROM_EMAIL ||
-    process.env.SMTP_FROM ||
-    '',
+    process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_FROM || process.env.SMTP_FROM || '',
   EMAIL_REPLY_TO: process.env.EMAIL_REPLY_TO || '',
   EMAIL_TEST_TO: process.env.EMAIL_TEST_TO || '',
-  EMAIL_FROM: process.env.EMAIL_FROM || process.env.SENDGRID_FROM_EMAIL || '',
-  EMAIL_API_KEY: process.env.EMAIL_API_KEY || process.env.SENDGRID_API_KEY || '',
-  SENDGRID_API_KEY: process.env.SENDGRID_API_KEY || '',
-  SENDGRID_FROM_EMAIL: process.env.SENDGRID_FROM_EMAIL || '',
-  SENDGRID_FROM_NAME: process.env.SENDGRID_FROM_NAME || 'Supplify',
+  EMAIL_FROM: process.env.EMAIL_FROM || '',
   SMTP_FROM:
     process.env.SMTP_FROM ||
     process.env.EMAIL_FROM_ADDRESS ||

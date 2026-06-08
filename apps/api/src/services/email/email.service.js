@@ -20,15 +20,13 @@ export function logEmailBootMode() {
 function resolveActiveProvider() {
   if (!config.EMAIL_ENABLED) return 'disabled'
   if (config.EMAIL_LOG_ONLY) return 'log_only'
-  if (config.EMAIL_PROVIDER === 'sendgrid' || config.SENDGRID_API_KEY) return 'sendgrid'
   if (config.SMTP_HOST) return 'smtp'
   return 'none'
 }
 
 function resolveFromHeader() {
-  const email =
-    config.EMAIL_FROM_ADDRESS || config.EMAIL_FROM || config.SENDGRID_FROM_EMAIL || config.SMTP_FROM
-  const name = config.EMAIL_FROM_NAME || config.SENDGRID_FROM_NAME || 'Supplify'
+  const email = config.EMAIL_FROM_ADDRESS || config.EMAIL_FROM || config.SMTP_FROM
+  const name = config.EMAIL_FROM_NAME || 'Supplify'
   if (email && name) return `"${name}" <${email}>`
   return email || undefined
 }

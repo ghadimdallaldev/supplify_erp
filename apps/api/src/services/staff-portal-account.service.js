@@ -99,6 +99,7 @@ export async function createStaffPortalAccount(staffId, restaurantId, { invitedB
     lastName,
     password: tempPassword,
     realmRoleName: STAFF_PORTAL_KEYCLOAK_ROLE,
+    reuseExisting: true,
   })
 
   if (!created) {

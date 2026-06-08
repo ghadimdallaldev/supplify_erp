@@ -27,11 +27,17 @@ import { Input } from '../components/ui/input'
 import { toast } from 'react-hot-toast'
 import { copyToClipboard } from '../utils/clipboard'
 import { RequirePermission } from '../components/RequirePermission'
+import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { PageHeader } from '../components/ui/page-header'
 import { EmptyState } from '../components/ui/empty-state'
 import { Skeleton } from '../components/ui/skeleton'
 
 export function ReservationsPage() {
+  const { persona } = useWorkspaceRole()
+  const reservationsTitle = persona.pageCopy?.reservations?.title ?? 'Reservations cockpit'
+  const reservationsDescription =
+    persona.pageCopy?.reservations?.description ??
+    'Track bookings, optimise capacity, and wow every guest from one unified view.'
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [range, setRange] = useState<'day' | 'week' | 'month'>('week')
   const [branchId, setBranchId] = useState('')
@@ -140,8 +146,8 @@ export function ReservationsPage() {
     <RequirePermission permission="RESERVATIONS_VIEW" title="reservations">
       <div className="page-stack overflow-x-hidden">
         <PageHeader
-          title="Reservations cockpit"
-          description="Track bookings, optimise capacity, and wow every guest from one unified view."
+          title={reservationsTitle}
+          description={reservationsDescription}
           actions={
             <div className="action-bar w-full sm:w-auto">
               <div className="flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 shadow-sm sm:w-auto">

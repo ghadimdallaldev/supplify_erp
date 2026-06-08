@@ -28,8 +28,12 @@ import { assertChatAttachmentUrl } from '../lib/sanitize-upload.js'
 const router = express.Router()
 
 // Validation schemas
-const createConversationSchema = z.object({
+const createConversationRestaurantSchema = z.object({
   supplierId: z.string().uuid(),
+})
+
+const createConversationSupplierSchema = z.object({
+  restaurantId: z.string().uuid(),
 })
 
 const sendMessageSchema = z.object({
@@ -363,39 +367,50 @@ router.post(
   requireRole(['SUPPLIER', 'RESTAURANT']),
   async (req, res) => {
     try {
-      const { supplierId } = createConversationSchema.parse(req.body)
-
-      let resolvedSupplierId = supplierId
-      let resolvedRestaurantId
-
-      // Verify that the user has permission to create this conversation
       if (req.userData.role === 'SUPPLIER') {
-        const tenantSupplierId = await getSupplierIdForRequest(req)
-        if (!tenantSupplierId || tenantSupplierId !== supplierId) {
+        const { restaurantId } = createConversationSupplierSchema.parse(req.body)
+        const supplierId = await getSupplierIdForRequest(req)
+        if (!supplierId) {
           return res.status(403).json({
             ok: false,
             data: null,
             error: {
               name: 'FORBIDDEN',
-              message: 'You can only create conversations as yourself',
+              message: 'Supplier not found',
             },
             requestId: req.requestId,
           })
         }
 
-        // For suppliers, they need to specify which restaurant to talk to
-        // But this endpoint is typically called by restaurants to talk to suppliers
-        // So we don't need to handle supplier creating conversations here
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'NOT_SUPPORTED',
-            message: 'Suppliers cannot create conversations this way',
-          },
+        const { rows: restaurants } = await query('SELECT id FROM restaurant WHERE id = $1', [
+          restaurantId,
+        ])
+
+        if (restaurants.length === 0) {
+          return res.status(404).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'NOT_FOUND',
+              message: 'Restaurant not found',
+            },
+            requestId: req.requestId,
+          })
+        }
+
+        const conversation = await getOrCreateConversation(supplierId, restaurantId)
+
+        res.status(201).json({
+          ok: true,
+          data: { conversation },
+          error: null,
           requestId: req.requestId,
         })
-      } else if (req.userData.role === 'RESTAURANT') {
+        return
+      }
+
+      if (req.userData.role === 'RESTAURANT') {
+        const { supplierId } = createConversationRestaurantSchema.parse(req.body)
         const restaurantId = await getRestaurantIdForRequest(req)
         if (!restaurantId) {
           return res.status(403).json({
@@ -425,10 +440,7 @@ router.post(
           })
         }
 
-        const resolvedRestaurantId = restaurantId
-        const resolvedSupplierId = supplierId
-
-        const conversation = await getOrCreateConversation(resolvedSupplierId, resolvedRestaurantId)
+        const conversation = await getOrCreateConversation(supplierId, restaurantId)
 
         res.status(201).json({
           ok: true,
@@ -439,7 +451,6 @@ router.post(
         return
       }
 
-      // If we get here, the role is not supported
       res.status(403).json({
         ok: false,
         data: null,

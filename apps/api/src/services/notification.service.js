@@ -3,7 +3,6 @@ import { getCache, setCache, deleteCache } from '../lib/cache.js'
 import { singleflight } from '../lib/singleflight.js'
 import { mapWithConcurrency } from '../lib/concurrency.js'
 import { logger } from '../lib/logger.js'
-import { buildWhatsAppUrl } from '../lib/whatsapp.js'
 import { getEntitlements, isFeatureEnabled } from '../lib/subscription.js'
 import { sendWhatsAppMessage as sendWhatsAppMessageService } from './whatsapp.service.js'
 import { sendWebPushToUser, isPushConfigured } from './push.service.js'
@@ -15,7 +14,7 @@ import {
 } from './email/template-resolver.js'
 
 /**
- * Notification Service — email via email.service (SMTP/SendGrid); WhatsApp via Twilio.
+ * Notification Service — email via email.service (SMTP); WhatsApp server send pending Meta Cloud API.
  */
 
 const emailService = {
@@ -602,9 +601,6 @@ export async function sendNotification({
     if (channels.whatsapp && contact?.phone) {
       const waResult = await sendWhatsAppMessageService({ to: contact.phone, message })
       results.sms = waResult.sent
-      // Store deep link in metadata for in-app display
-      const whatsappUrl = buildWhatsAppUrl(contact.phone, message)
-      if (whatsappUrl) metadataPayload.whatsappUrl = whatsappUrl
     }
 
     if (Object.keys(metadataPayload).length) {
@@ -820,13 +816,6 @@ export async function getUserNotifications(
   })
 }
 
-export async function sendWhatsAppMessage(phone, message) {
-  if (!phone) {
-    throw new Error('WhatsApp phone is required')
-  }
-  return buildWhatsAppUrl(phone, message)
-}
-
 function formatReservationTime(scheduledAt) {
   if (!scheduledAt) return 'your scheduled time'
   return new Date(scheduledAt).toLocaleString()
@@ -878,10 +867,11 @@ export async function notifyGuestReservationConfirmation(reservation, restaurant
   }
 
   if (customerPhone) {
-    const guestWhatsAppUrl = buildWhatsAppUrl(customerPhone, message)
-    if (guestWhatsAppUrl) {
-      results.whatsapp = true
-      results.whatsappUrl = guestWhatsAppUrl
+    try {
+      const waResult = await sendWhatsAppMessageService({ to: customerPhone, message })
+      results.whatsapp = Boolean(waResult.sent)
+    } catch (error) {
+      logger.error('Guest reservation WhatsApp failed', { error: error.message })
     }
   }
 

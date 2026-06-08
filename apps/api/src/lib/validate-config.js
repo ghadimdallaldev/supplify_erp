@@ -50,17 +50,9 @@ function validateSharedProductionRules(issues) {
     )
   }
   const emailConfigured =
-    !config.EMAIL_ENABLED ||
-    config.EMAIL_LOG_ONLY ||
-    Boolean(config.SENDGRID_API_KEY || config.EMAIL_API_KEY) ||
-    Boolean(config.SMTP_HOST && config.SMTP_PASS)
+    !config.EMAIL_ENABLED || config.EMAIL_LOG_ONLY || Boolean(config.SMTP_HOST && config.SMTP_PASS)
   if (config.EMAIL_ENABLED && !emailConfigured && !config.EMAIL_LOG_ONLY) {
-    issues.push(
-      'EMAIL_ENABLED=true requires SMTP_HOST+SMTP_PASS, SENDGRID_API_KEY, or EMAIL_LOG_ONLY=true'
-    )
-  }
-  if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-    logger.warn('TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not set — WhatsApp notifications disabled')
+    issues.push('EMAIL_ENABLED=true requires SMTP_HOST+SMTP_PASS or EMAIL_LOG_ONLY=true')
   }
 }
 

@@ -388,6 +388,7 @@ async function acceptRestaurantInvitationCore({
       lastName,
       password,
       realmRoleName: keycloakRealmRoleForWorkspace('RESTAURANT'),
+      resetPasswordOnExisting: true,
     })
     keycloakSub = kcUserId
   }

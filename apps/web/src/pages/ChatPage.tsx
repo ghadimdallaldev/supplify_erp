@@ -123,9 +123,11 @@ export function ChatPage() {
     navigate(`/app/chat?conversation=${id}`, { replace: true })
   }
 
-  const handleStartConversation = async (supplierId: string) => {
+  const handleStartConversation = async (participantId: string) => {
+    const isSupplier = user?.role === 'SUPPLIER'
     const existingConv = conversations.find(
-      (conv: { supplier_id?: string }) => conv.supplier_id === supplierId
+      (conv: { supplier_id?: string; restaurant_id?: string }) =>
+        isSupplier ? conv.restaurant_id === participantId : conv.supplier_id === participantId
     )
     if (existingConv) {
       selectConversation(existingConv.id)
@@ -133,7 +135,9 @@ export function ChatPage() {
     }
 
     try {
-      const result = await createConversation({ supplierId }).unwrap()
+      const result = await createConversation(
+        isSupplier ? { restaurantId: participantId } : { supplierId: participantId }
+      ).unwrap()
       selectConversation(result.conversation.id)
       toast.success('Conversation started')
     } catch (error: unknown) {
@@ -192,6 +196,34 @@ export function ChatPage() {
     const supplierId = searchParams.get('supplier')
     const conversationId = searchParams.get('conversation')
     const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+    const restaurantId = searchParams.get('restaurant')
+
+    if (restaurantId && !conversationId && user?.role === 'SUPPLIER' && !isCreatingConversation) {
+      if (!uuidRe.test(restaurantId)) {
+        toast.error('This restaurant link is invalid. Open chat from the restaurant profile.')
+        navigate('/app/chat', { replace: true })
+        return
+      }
+      const existingConv = conversations.find(
+        (conv: { restaurant_id?: string }) => conv.restaurant_id === restaurantId
+      )
+      if (existingConv) {
+        selectConversation(existingConv.id)
+      } else if (conversationsData && !conversationsLoading) {
+        createConversation({ restaurantId })
+          .unwrap()
+          .then((result) => {
+            selectConversation(result.conversation.id)
+            toast.success('Conversation created')
+          })
+          .catch((error: { data?: { error?: { message?: string }; message?: string } }) => {
+            const msg =
+              error?.data?.message || error?.data?.error?.message || 'Failed to create conversation'
+            toast.error(typeof msg === 'string' ? msg : 'Failed to create conversation')
+          })
+      }
+    }
 
     if (supplierId && !conversationId && user?.role === 'RESTAURANT' && !isCreatingConversation) {
       if (!uuidRe.test(supplierId)) {
@@ -418,7 +450,8 @@ export function ChatPage() {
 
   const showListOnMobile = !mobileShowThread || !selectedConversation
   const showThreadOnMobile = mobileShowThread && selectedConversation
-  const canStartConversation = user?.role === 'RESTAURANT' && canSendMessages
+  const canStartConversation =
+    (user?.role === 'RESTAURANT' || user?.role === 'SUPPLIER') && canSendMessages
   const hasConversations = conversations.length > 0
 
   const newMessageAction = canStartConversation ? (
@@ -447,6 +480,7 @@ export function ChatPage() {
               onListFilterChange={setListFilter}
               userRole={user?.role}
               formatConversationDate={formatConversationDate}
+              onNewMessage={canStartConversation ? () => setShowNewConversation(true) : undefined}
             />
           </div>
         ) : (
@@ -464,6 +498,7 @@ export function ChatPage() {
                 onListFilterChange={setListFilter}
                 userRole={user?.role}
                 formatConversationDate={formatConversationDate}
+                onNewMessage={canStartConversation ? () => setShowNewConversation(true) : undefined}
                 className="h-full"
               />
             </div>
@@ -549,7 +584,7 @@ export function ChatPage() {
                   <p className="text-sm font-medium">Select a conversation</p>
                   <p className="text-xs max-w-xs">
                     {user?.role === 'SUPPLIER'
-                      ? 'Restaurants message you first. Pick one from the list.'
+                      ? 'Pick a restaurant from the list or start a new message.'
                       : 'Choose someone from the list to view messages.'}
                   </p>
                 </div>
@@ -561,7 +596,8 @@ export function ChatPage() {
         <NewConversationDialog
           open={showNewConversation}
           onOpenChange={setShowNewConversation}
-          onSelectSupplier={handleStartConversation}
+          userRole={user?.role}
+          onSelectParticipant={handleStartConversation}
           isCreating={isCreatingConversation}
         />
       </div>

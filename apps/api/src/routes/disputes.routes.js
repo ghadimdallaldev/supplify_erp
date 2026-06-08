@@ -80,11 +80,23 @@ const rejectSchema = z.object({
   resolutionNotes: z.string().min(1),
 })
 
+function isSupplierDisputeActor(req) {
+  return req.userData?.role === 'SUPPLIER' || req.tenantContext?.tenantType === 'SUPPLIER'
+}
+
+/** Restaurants use ORDERS_VIEW; suppliers need fulfillment access (not promotions-only roles). */
+function requireDisputeReadAccess(req, res, next) {
+  const middleware = requirePermission(
+    isSupplierDisputeActor(req) ? 'FULFILLMENT_VIEW' : 'ORDERS_VIEW'
+  )
+  return middleware(req, res, next)
+}
+
 // Supplier: list incoming (before /:id)
 router.get(
   '/incoming',
   requireRole(['SUPPLIER', 'ADMIN']),
-  requirePermission('ORDERS_VIEW'),
+  requirePermission('FULFILLMENT_VIEW'),
   async (req, res, next) => {
     try {
       const supplierId = await requireSupplierId(req)
@@ -152,7 +164,7 @@ router.get(
 router.get(
   '/:id',
   requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']),
-  requirePermission('ORDERS_VIEW'),
+  requireDisputeReadAccess,
   async (req, res, next) => {
     try {
       let scope
@@ -210,7 +222,7 @@ router.post(
 router.post(
   '/:id/review',
   requireRole(['SUPPLIER', 'ADMIN']),
-  requirePermission('ORDERS_MANAGE'),
+  requirePermission('FULFILLMENT_MANAGE'),
   async (req, res, next) => {
     try {
       const supplierId = await requireSupplierId(req)
@@ -225,7 +237,7 @@ router.post(
 router.post(
   '/:id/resolve',
   requireRole(['SUPPLIER', 'ADMIN']),
-  requirePermission('ORDERS_MANAGE'),
+  requirePermission('FULFILLMENT_MANAGE'),
   async (req, res, next) => {
     try {
       const body = resolveSchema.parse(req.body)
@@ -241,7 +253,7 @@ router.post(
 router.post(
   '/:id/reject',
   requireRole(['SUPPLIER', 'ADMIN']),
-  requirePermission('ORDERS_MANAGE'),
+  requirePermission('FULFILLMENT_MANAGE'),
   async (req, res, next) => {
     try {
       const body = rejectSchema.parse(req.body)
