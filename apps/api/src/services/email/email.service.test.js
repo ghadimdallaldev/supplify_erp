@@ -23,7 +23,6 @@ const mockConfig = {
   EMAIL_FROM_NAME: 'Supplify',
   EMAIL_FROM_ADDRESS: 'noreply@test.local',
   EMAIL_REPLY_TO: '',
-  SENDGRID_API_KEY: '',
   SMTP_HOST: 'smtp.test.local',
 }
 

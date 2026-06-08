@@ -1,13 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const sgSend = vi.fn()
-vi.mock('@sendgrid/mail', () => ({
-  default: {
-    setApiKey: vi.fn(),
-    send: sgSend,
-  },
-}))
-
 const smtpSendMail = vi.fn().mockResolvedValue({ messageId: 'smtp-1' })
 vi.mock('nodemailer', () => ({
   default: {
@@ -21,13 +13,9 @@ const mockConfig = {
   NODE_ENV: 'test',
   EMAIL_ENABLED: true,
   EMAIL_LOG_ONLY: false,
-  EMAIL_PROVIDER: '',
-  SENDGRID_API_KEY: '',
-  EMAIL_API_KEY: '',
+  EMAIL_PROVIDER: 'smtp',
   EMAIL_FROM_ADDRESS: '',
   EMAIL_FROM_NAME: 'Supplify',
-  SENDGRID_FROM_EMAIL: '',
-  SENDGRID_FROM_NAME: 'Supplify',
   SMTP_HOST: '',
   SMTP_FROM: 'noreply@test.local',
   SMTP_PORT: 587,
@@ -48,36 +36,37 @@ vi.mock('../lib/logger.js', () => ({
 describe('mailer.service', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
-    mockConfig.SENDGRID_API_KEY = ''
-    mockConfig.SENDGRID_FROM_EMAIL = ''
     mockConfig.SMTP_HOST = ''
     vi.resetModules()
     const mod = await import('./mailer.service.js')
     mod.__resetMailerForTests?.()
   })
 
-  it('isEmailConfigured is false when no providers set', async () => {
+  it('isEmailConfigured is false when no SMTP host set', async () => {
     const { isEmailConfigured } = await import('./mailer.service.js')
     expect(isEmailConfigured()).toBe(false)
   })
 
-  it('sendMail uses SendGrid when SENDGRID_API_KEY is set', async () => {
-    mockConfig.SENDGRID_API_KEY = 'SG.test'
-    mockConfig.SENDGRID_FROM_EMAIL = 'noreply@supplify.com'
+  it('isEmailConfigured is true when SMTP host is set', async () => {
+    mockConfig.SMTP_HOST = 'smtp.test.local'
     vi.resetModules()
-    sgSend.mockResolvedValue([{ statusCode: 202, headers: { 'x-message-id': 'sg-1' } }])
-
-    const { sendMail, isEmailConfigured } = await import('./mailer.service.js')
+    const { isEmailConfigured } = await import('./mailer.service.js')
     expect(isEmailConfigured()).toBe(true)
+  })
 
+  it('sendMail uses SMTP when SMTP_HOST is set', async () => {
+    mockConfig.SMTP_HOST = 'smtp.test.local'
+    vi.resetModules()
+
+    const { sendMail } = await import('./mailer.service.js')
     const result = await sendMail({
       to: 'user@example.com',
       subject: 'Test',
       text: 'Hello',
     })
 
-    expect(sgSend).toHaveBeenCalled()
-    expect(result.provider).toBe('sendgrid')
+    expect(smtpSendMail).toHaveBeenCalled()
+    expect(result.provider).toBe('smtp')
   })
 
   it('sendMail previews when no provider configured', async () => {
@@ -90,7 +79,6 @@ describe('mailer.service', () => {
     })
     expect(result.provider).toBe('none')
     expect(result.accepted).toContain('user@example.com')
-    expect(sgSend).not.toHaveBeenCalled()
     expect(smtpSendMail).not.toHaveBeenCalled()
   })
 })

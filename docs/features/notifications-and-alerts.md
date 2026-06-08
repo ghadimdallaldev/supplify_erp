@@ -13,13 +13,13 @@ Team members receive the same in-app (and email/push when enabled) alerts as the
 
 ## Channels
 
-| Channel  | When                                                                                                           |
-| -------- | -------------------------------------------------------------------------------------------------------------- |
-| In-app   | `notification_log` + header bell; foreground toast + optional browser banner via `useNotificationAlerts`       |
-| Realtime | Socket.IO `notification_new` and `entitlements_refresh` on the app socket                                      |
-| Email    | Plan tier + `email_enabled` + per-category `notify_*` toggles; HTML templates (see below)                      |
-| WhatsApp | Tier + toggle; often a `wa.me` link in metadata — [twilio-integration.md](../operations/twilio-integration.md) |
-| Web Push | Opt-in `push_enabled` + VAPID keys (see below)                                                                 |
+| Channel  | When                                                                                                     |
+| -------- | -------------------------------------------------------------------------------------------------------- |
+| In-app   | `notification_log` + header bell; foreground toast + optional browser banner via `useNotificationAlerts` |
+| Realtime | Socket.IO `notification_new` and `entitlements_refresh` on the app socket                                |
+| Email    | Plan tier + `email_enabled` + per-category `notify_*` toggles; HTML templates (see below)                |
+| WhatsApp | Tier + toggle; server send via Meta Cloud API (planned)                                                  |
+| Web Push | Opt-in `push_enabled` + VAPID keys (see below)                                                           |
 
 ## Order events
 
@@ -55,7 +55,7 @@ Business flow → notification.service (prefs/tier/in-app/push/WhatsApp)
                     ↓ email channel
               email.service (templates, dedup, EMAIL_* gates)
                     ↓
-              mailer.service (SendGrid API or Nodemailer SMTP)
+              mailer.service (Nodemailer SMTP)
 ```
 
 Direct sends (guest waitlist, team invites, staff portal) call `email.service` without tenant notification prefs where appropriate.
@@ -66,9 +66,9 @@ Direct sends (guest waitlist, team invites, staff portal) call `email.service` w
 | ---------------------------------------- | ------------------------------ |
 | `EMAIL_ENABLED`                          | Master switch (default `true`) |
 | `EMAIL_LOG_ONLY`                         | Log payload, no network send   |
-| `EMAIL_PROVIDER`                         | `smtp` or `sendgrid`           |
+| `EMAIL_PROVIDER`                         | `smtp`                         |
 | `EMAIL_FROM_NAME` / `EMAIL_FROM_ADDRESS` | From header                    |
-| `SMTP_*` / `SENDGRID_API_KEY`            | Transport                      |
+| `SMTP_*`                                 | Transport                      |
 
 Full list: [environment-variables.md](../operations/environment-variables.md), `apps/api/.env.example`.
 

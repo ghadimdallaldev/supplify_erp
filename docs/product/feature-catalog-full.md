@@ -353,7 +353,7 @@ Also available via API (not always separate pages):
 | Service                       | Description                                                                                                      |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | **File storage**              | S3/MinIO presigned uploads; product images; attachments; storage quota metering                                  |
-| **Notifications**             | In-app log, email (SendGrid/SMTP), WhatsApp (Twilio), Web Push (VAPID); user preferences                         |
+| **Notifications**             | In-app log, email (SMTP), WhatsApp (Meta Cloud API planned), Web Push (VAPID); user preferences                  |
 | **Web Push (PWA)**            | `usePushNotifications`, service worker `static/sw.js`, `/api/push/*` (opt-in `push_enabled`)                     |
 | **Realtime**                  | Socket.IO for chat + layout events (cookie JWT auth; `getAppSocket()`; optional Redis adapter for multi-replica) |
 | **Audit logging**             | Admin actions, impersonation, plan changes                                                                       |
@@ -520,8 +520,8 @@ Overrides: admin can set per-tenant limit overrides; API returns `LIMIT_EXCEEDED
 | Channel  | Technology                                                                                                           |
 | -------- | -------------------------------------------------------------------------------------------------------------------- |
 | In-app   | `notification_log` + header bell; toast/sound via `useNotificationAlerts`; **team-wide** `notifyTenantUsers`         |
-| Email    | Twilio SendGrid API (preferred) or SMTP                                                                              |
-| WhatsApp | Twilio Programmable Messaging (+ wa.me link in metadata fallback)                                                    |
+| Email    | SMTP (Resend recommended)                                                                                            |
+| WhatsApp | Meta Cloud API server send (planned)                                                                                 |
 | Push     | Web Push via VAPID (`web-push`); `GET /api/push/vapid-public-key`, subscribe/unsubscribe; service worker at `/sw.js` |
 
 ### Notification categories (preference keys)
@@ -555,21 +555,20 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled/declined), 
 
 ## 15. Integrations & infrastructure
 
-| Integration                 | Use                                                                                                                                                                             |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Keycloak**                | OIDC login, roles, self-registration, SSO logout (`post.logout.redirect.uris` on `supplify-api` / `supplify-web`; seeded in `realm-export.json`, applied by `keycloak-init.sh`) |
-| **PostgreSQL**              | Primary database (~65 migrations)                                                                                                                                               |
-| **Redis**                   | Order calendar cache                                                                                                                                                            |
-| **S3 / MinIO**              | Object storage for uploads                                                                                                                                                      |
-| **Twilio**                  | WhatsApp outbound                                                                                                                                                               |
-| **SendGrid (Twilio Email)** | Transactional email (preferred over SMTP when configured)                                                                                                                       |
-| **Web Push (VAPID)**        | Browser push notifications (`VAPID_*` env on API)                                                                                                                               |
-| **Socket.IO**               | Realtime chat + layout notifications                                                                                                                                            |
-| **Docker Compose**          | Local full stack (Postgres, Redis, Keycloak, MinIO, nginx)                                                                                                                      |
-| **AWS CDK** (`infra/`)      | Cloud deployment (dev/staging/prod)                                                                                                                                             |
-| **Local CI**                | `pnpm lint`, `pnpm test:ci`, `pnpm build` before deploy                                                                                                                         |
-| **Playwright**              | E2E tests (`tests/e2e`)                                                                                                                                                         |
-| **Semantic release**        | Versioning (root config)                                                                                                                                                        |
+| Integration            | Use                                                                                                                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Keycloak**           | OIDC login, roles, self-registration, SSO logout (`post.logout.redirect.uris` on `supplify-api` / `supplify-web`; seeded in `realm-export.json`, applied by `keycloak-init.sh`) |
+| **PostgreSQL**         | Primary database (~65 migrations)                                                                                                                                               |
+| **Redis**              | Order calendar cache                                                                                                                                                            |
+| **S3 / MinIO**         | Object storage for uploads                                                                                                                                                      |
+| **Resend (SMTP)**      | Transactional email                                                                                                                                                             |
+| **Web Push (VAPID)**   | Browser push notifications (`VAPID_*` env on API)                                                                                                                               |
+| **Socket.IO**          | Realtime chat + layout notifications                                                                                                                                            |
+| **Docker Compose**     | Local full stack (Postgres, Redis, Keycloak, MinIO, nginx)                                                                                                                      |
+| **AWS CDK** (`infra/`) | Cloud deployment (dev/staging/prod)                                                                                                                                             |
+| **Local CI**           | `pnpm lint`, `pnpm test:ci`, `pnpm build` before deploy                                                                                                                         |
+| **Playwright**         | E2E tests (`tests/e2e`)                                                                                                                                                         |
+| **Semantic release**   | Versioning (root config)                                                                                                                                                        |
 
 ---
 
@@ -599,7 +598,7 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled/declined), 
 | Tenant audit log (detail)  | `docs/features/tenant-audit-log.md`                                                                    |
 | Tenant roles (detail)      | `docs/features/tenant-roles.md`                                                                        |
 | Security audit notes       | `docs/security/security-audit-report.md`                                                               |
-| Twilio setup guide         | `docs/integrations/TWILIO.md`                                                                          |
+| Email operations           | `docs/operations/email-system.md`                                                                      |
 
 ---
 
@@ -720,7 +719,7 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled/declined), 
 | [regression-checklist.md](../qa/regression-checklist.md)         | QA smoke tests                          |
 | [admin_endpoints.md](../blueprint/admin/admin_endpoints.md)      | Admin API reference                     |
 | [admin-feature-flags.md](../admin/admin-feature-flags.md)        | Feature toggle API                      |
-| [TWILIO.md](../integrations/TWILIO.md)                           | Messaging integration                   |
+| [email-system.md](../operations/email-system.md)                 | Transactional email (SMTP)              |
 | [SECURITY_AUDIT_REPORT.md](../security/SECURITY_AUDIT_REPORT.md) | Security posture                        |
 
 ---

@@ -186,8 +186,8 @@ Tests: `subscriptions.routes.test.js`, `feature-flags.test.js`, `subscription.te
 | Feature              | Web route                        | API prefix           | Notes                                                                       |
 | -------------------- | -------------------------------- | -------------------- | --------------------------------------------------------------------------- |
 | In-app notifications | Header bell + toasts             | `/api/notifications` | Team-wide via `notifyTenantUsers`; `useNotificationAlerts` in Layout        |
-| Email                | Settings → Notifications         | —                    | SendGrid (preferred) or SMTP                                                |
-| WhatsApp             | Settings → Notifications         | —                    | Twilio / `wa.me` link in metadata                                           |
+| Email                | Settings → Notifications         | —                    | SMTP (Resend / Mailpit)                                                     |
+| WhatsApp             | Settings → Notifications         | —                    | Meta Cloud API server send (planned)                                        |
 | Web Push (PWA)       | Settings (restaurant onboarding) | `/api/push`          | VAPID keys on API; `usePushNotifications` + `/sw.js`; opt-in `push_enabled` |
 
 See [notifications-summary.md](./notifications-summary.md) and [notifications-and-alerts.md](../features/notifications-and-alerts.md).

@@ -2,12 +2,12 @@
 
 ## Delivery channels
 
-| Channel      | Implementation                                                                | Notes                                                                                                                                      |
-| ------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Email**    | Twilio SendGrid API (preferred) or [nodemailer](https://nodemailer.com/) SMTP | `SENDGRID_API_KEY` or `SMTP_*` on the API                                                                                                  |
-| **WhatsApp** | Twilio Programmable Messaging (+ `wa.me` fallback in metadata)                | Outbound when configured; in-app “Open in WhatsApp” when link present                                                                      |
-| **In-app**   | `notification_log` table                                                      | Bell icon; **toast + sound** via `useNotificationAlerts` (~10s); **Socket.IO `notification_new`** for sub-second delivery when tab is open |
-| **Push**     | Web Push (VAPID) via `web-push`                                               | Opt-in (`push_enabled`); requires `VAPID_*` env — see [notifications-and-alerts.md](../features/notifications-and-alerts.md)               |
+| Channel      | Implementation                                                  | Notes                                                                                                                                      |
+| ------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Email**    | [nodemailer](https://nodemailer.com/) SMTP (Resend recommended) | `SMTP_*` on the API                                                                                                                        |
+| **WhatsApp** | Meta Cloud API server send (planned)                            | Server send pending Phase 2; no deep-link fallback                                                                                         |
+| **In-app**   | `notification_log` table                                        | Bell icon; **toast + sound** via `useNotificationAlerts` (~10s); **Socket.IO `notification_new`** for sub-second delivery when tab is open |
+| **Push**     | Web Push (VAPID) via `web-push`                                 | Opt-in (`push_enabled`); requires `VAPID_*` env — see [notifications-and-alerts.md](../features/notifications-and-alerts.md)               |
 
 ### SMTP environment variables
 
@@ -24,16 +24,12 @@ If SMTP is not configured, emails are logged only (safe for local dev).
 
 ### WhatsApp behavior
 
-When **WhatsApp** is enabled in preferences and a phone number exists:
-
-1. The API builds `https://wa.me/{digits}?text={encoded message}`
-2. The link is stored in `notification_log.metadata.whatsappUrl`
-3. The in-app notification shows **Open in WhatsApp**
+When **WhatsApp** is enabled in preferences and a phone number exists, the API calls `whatsapp.service.js` for server-side delivery (Meta Cloud API — planned).
 
 Guest reservation confirmations:
 
 - **Email** → sent to `customer_email` when provided
-- **Phone** → returns a `wa.me` link for staff to message the guest (one tap from notifications)
+- **Phone** → server-side WhatsApp when Meta API is configured
 
 ---
 

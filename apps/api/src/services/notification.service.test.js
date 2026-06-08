@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   sendNotification,
   notifyGuestReservationConfirmation,
-  sendWhatsAppMessage,
   listTenantUserIds,
   notifyTenantUsers,
   getUserNotifications,
@@ -110,8 +109,9 @@ describe('Notification Service', () => {
       expect(result).toBeNull()
     })
 
-    it('stores WhatsApp deep link in metadata when whatsapp is enabled', async () => {
+    it('calls WhatsApp service when whatsapp channel is enabled', async () => {
       const { getEntitlements } = await import('../lib/subscription.js')
+      const { sendWhatsAppMessage } = await import('./whatsapp.service.js')
       getEntitlements.mockResolvedValue({ features: { notifications: 'email_and_whatsapp' } })
 
       queryMock
@@ -124,8 +124,6 @@ describe('Notification Service', () => {
         .mockResolvedValueOnce({
           rows: [{ id: 'notif-1', title: 'Low stock', message: 'Restock soon' }],
         })
-        .mockResolvedValueOnce({ rowCount: 1 })
-        .mockResolvedValueOnce({ rowCount: 1 })
 
       await sendNotification({
         userId: 'user-1',
@@ -136,12 +134,10 @@ describe('Notification Service', () => {
         message: 'Restock soon',
       })
 
-      const metadataUpdate = queryMock.mock.calls.find((call) =>
-        String(call[0]).includes('UPDATE notification_log SET metadata')
-      )
-      expect(metadataUpdate).toBeTruthy()
-      const payload = JSON.parse(metadataUpdate[1][0])
-      expect(payload.whatsappUrl).toContain('https://wa.me/96176911906')
+      expect(sendWhatsAppMessage).toHaveBeenCalledWith({
+        to: '+96176911906',
+        message: 'Restock soon',
+      })
     })
 
     it('does NOT send email when tenant is on Free plan', async () => {
@@ -259,7 +255,8 @@ describe('Notification Service', () => {
       expect(result.email).toBe(true)
     })
 
-    it('returns wa.me link for guest phone', async () => {
+    it('attempts server-side WhatsApp for guest phone', async () => {
+      const { sendWhatsAppMessage } = await import('./whatsapp.service.js')
       const result = await notifyGuestReservationConfirmation(
         {
           customer_name: 'Sam',
@@ -271,8 +268,8 @@ describe('Notification Service', () => {
         'Golden Fork'
       )
 
-      expect(result.whatsapp).toBe(true)
-      expect(result.whatsappUrl).toContain('https://wa.me/96176911906')
+      expect(sendWhatsAppMessage).toHaveBeenCalled()
+      expect(result.whatsapp).toBe(false)
     })
   })
 
@@ -408,13 +405,6 @@ describe('Notification Service', () => {
       expect(mapSpy).toHaveBeenCalledWith(['user-a', 'user-b'], 5, expect.any(Function))
       expect(sent.length).toBe(2)
       mapSpy.mockRestore()
-    })
-  })
-
-  describe('sendWhatsAppMessage', () => {
-    it('returns a wa.me URL instead of sending server-side', async () => {
-      const url = await sendWhatsAppMessage('+96176911906', 'Hello')
-      expect(url).toBe('https://wa.me/96176911906?text=Hello')
     })
   })
 

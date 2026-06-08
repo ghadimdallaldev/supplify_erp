@@ -9,7 +9,8 @@ const mockConfig = vi.hoisted(() => ({
   DATABASE_URL: 'postgresql://user:strongpass@db.example.com:5432/supplify',
   DATABASE_SSL: true,
   WEB_ORIGINS: ['https://app.example.com'],
-  SENDGRID_API_KEY: 'sg-test',
+  SMTP_HOST: 'smtp.example.com',
+  SMTP_PASS: 'smtp-secret',
   PAYMENTS_MODE: 'live',
   STORAGE_DRIVER: 's3',
   STORAGE_ACCESS_KEY_ID: 'access-key-prod',
@@ -112,8 +113,8 @@ describe('validateProductionConfig dev (Railway)', () => {
       NODE_ENV: 'production',
       KEYCLOAK_CLIENT_SECRET: 'changeme',
       SESSION_SECRET: 'short',
-      SENDGRID_API_KEY: '',
       SMTP_HOST: '',
+      SMTP_PASS: '',
     })
     const { validateProductionConfig } = await import('./validate-config.js')
     expect(() => validateProductionConfig()).not.toThrow()

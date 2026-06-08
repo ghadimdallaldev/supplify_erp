@@ -132,7 +132,7 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 - **Multi-branch support**
 - Warehouse pick & pack
 - Add-on toggles
-- Email + WhatsApp (wa.me) + in-app notifications
+- Email + WhatsApp + in-app notifications
 - API key access
 - 24-hour priority support
 - Logo & color customization

@@ -51,13 +51,12 @@ See [../operations/STORAGE_UPLOADS.md](../operations/STORAGE_UPLOADS.md) for whe
 
 | `EMAIL_ENABLED` | API | all | `true`/`false` | Master switch (default `true`) |
 | `EMAIL_LOG_ONLY` | API | dev | `true`/`false` | Log only, no network send (Railway dev default) |
-| `EMAIL_PROVIDER` | API | optional | `smtp`/`sendgrid` | Transport selection |
+| `EMAIL_PROVIDER` | API | optional | `smtp` | Transport selection |
 | `EMAIL_FROM_NAME` | API | all | `Supplify` | From display name |
-| `EMAIL_FROM_ADDRESS` | API | preprod, prod | `noreply@…` | From email (falls back to `SENDGRID_FROM_EMAIL` / `SMTP_FROM`) |
+| `EMAIL_FROM_ADDRESS` | API | preprod, prod | `noreply@…` | From email (falls back to `SMTP_FROM`) |
 | `EMAIL_REPLY_TO` | API | optional | email | Optional reply-to header |
 | `EMAIL_TEST_TO` | API | dev | email | Default recipient for `pnpm email:test` |
-| `SENDGRID_API_KEY` | API | preprod, prod | key | SendGrid API (legacy); or use SMTP |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | API | preprod, prod | — | Primary transport (Resend recommended); `SMTP_PASS` only in Railway secrets |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | API | preprod, prod | — | Email transport (Resend recommended); `SMTP_PASS` only in Railway secrets |
 | `MAILPIT_SMTP_PORT` / `MAILPIT_UI_PORT` | Docker local | dev | `1025` / `8025` | Mailpit fake SMTP in root `docker-compose.yml`; UI at http://localhost:8025 |
 
 See [../features/email-system.md](../features/email-system.md) for templates, dedup, and coverage matrix.

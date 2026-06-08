@@ -1,5 +1,4 @@
 import nodemailer from 'nodemailer'
-import sgMail from '@sendgrid/mail'
 import { config } from '../config/env.js'
 import { logger } from '../lib/logger.js'
 
@@ -32,33 +31,24 @@ function getSmtpTransporter() {
   return transporter
 }
 
-export function isSendGridConfigured() {
-  const provider = (config.EMAIL_PROVIDER || '').toLowerCase()
-  if (provider === 'smtp') return false
-  return Boolean(config.SENDGRID_API_KEY || config.EMAIL_API_KEY)
-}
-
 export function isSmtpConfigured() {
-  const provider = (config.EMAIL_PROVIDER || '').toLowerCase()
-  if (provider === 'sendgrid') return false
   return Boolean(config.SMTP_HOST)
 }
 
 export function isEmailConfigured() {
   if (!config.EMAIL_ENABLED) return false
   if (config.EMAIL_LOG_ONLY) return true
-  return isSendGridConfigured() || isSmtpConfigured()
+  return isSmtpConfigured()
 }
 
 function resolveFromAddress() {
   const email =
     config.EMAIL_FROM_ADDRESS ||
     config.EMAIL_FROM ||
-    config.SENDGRID_FROM_EMAIL ||
     config.SMTP_FROM ||
     config.SMTP_USER ||
     'noreply@supplify.local'
-  const name = config.EMAIL_FROM_NAME || config.SENDGRID_FROM_NAME || 'Supplify'
+  const name = config.EMAIL_FROM_NAME || 'Supplify'
   return { email, name }
 }
 
@@ -82,19 +72,6 @@ function buildPayload({ to, subject, text, html, cc, bcc, attachments, replyTo, 
   }
 }
 
-async function sendViaSendGrid(payload) {
-  const apiKey = config.SENDGRID_API_KEY || config.EMAIL_API_KEY
-  sgMail.setApiKey(apiKey)
-  const from = formatFrom(payload.from)
-  const msg = { ...payload, from }
-  const [response] = await sgMail.send(msg)
-  logger.info('Email sent via Twilio SendGrid', {
-    statusCode: response?.statusCode,
-    subject: payload.subject,
-  })
-  return { messageId: response?.headers?.['x-message-id'], provider: 'sendgrid' }
-}
-
 async function sendViaSmtp(payload) {
   const fromAddr = formatFrom(payload.from)
   const from =
@@ -112,7 +89,7 @@ async function sendViaSmtp(payload) {
 }
 
 /**
- * Send transactional email. Prefers SendGrid when configured, otherwise SMTP (nodemailer).
+ * Send transactional email via SMTP (nodemailer).
  */
 export async function sendMail({ to, subject, text, html, cc, bcc, attachments, replyTo, from }) {
   if (!to) {
@@ -120,10 +97,6 @@ export async function sendMail({ to, subject, text, html, cc, bcc, attachments, 
   }
 
   const basePayload = buildPayload({ to, subject, text, html, cc, bcc, attachments, replyTo, from })
-
-  if (isSendGridConfigured()) {
-    return sendViaSendGrid(basePayload)
-  }
 
   const transport = getSmtpTransporter()
   if (transport) {

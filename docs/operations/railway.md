@@ -144,7 +144,7 @@ Non-secret email settings load from `deploy/railway/<env>/api.env` on deploy (`E
 | development    | `EMAIL_LOG_ONLY=true` (safe log-only)                      |
 | preprod / prod | `EMAIL_LOG_ONLY=false` — requires `SMTP_PASS` in dashboard |
 
-API startup validates: when `EMAIL_ENABLED=true` and `EMAIL_LOG_ONLY=false`, you must configure `SMTP_HOST`+`SMTP_PASS` or `SENDGRID_API_KEY`. Test with `pnpm --filter @supplify/api email:test`. See [../features/email-system.md](../features/email-system.md).
+API startup validates: when `EMAIL_ENABLED=true` and `EMAIL_LOG_ONLY=false`, you must configure `SMTP_HOST`+`SMTP_PASS`. Test with `pnpm --filter @supplify/api email:test`. See [email-system.md](./email-system.md).
 
 ## 3. Web service
 

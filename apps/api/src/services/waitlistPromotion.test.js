@@ -41,8 +41,8 @@ vi.mock('./email/email.service.js', () => ({
   sendTemplateEmail: vi.fn().mockResolvedValue({ sent: true }),
 }))
 
-vi.mock('../lib/whatsapp.js', () => ({
-  buildWhatsAppUrl: vi.fn(() => 'https://wa.me/example'),
+vi.mock('./whatsapp.service.js', () => ({
+  sendWhatsAppMessage: vi.fn().mockResolvedValue({ sent: false, reason: 'NOT_CONFIGURED' }),
 }))
 
 vi.mock('../config/env.js', () => ({
