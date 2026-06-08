@@ -243,8 +243,10 @@ export async function getPermissionsForUser(userId, tenantId, tenantType) {
       const branchPerms = hasNamedAssignment ? named : mergeUniquePermissions(named, legacy)
 
       if ((tenantType === 'SUPPLIER' || tenantType === 'RESTAURANT') && hasOrgRole) {
+        // Org membership gates multi-branch scope; an explicit tenant role defines workspace access.
+        // Do not union org role permissions onto invited staff (e.g. Catalog Manager + Regional Manager org).
         const permissions = hasNamedAssignment
-          ? mergeUniquePermissions(orgPerms, named)
+          ? named
           : mergeUniquePermissions(orgPerms, branchPerms)
         await setCache(cacheKey, permissions, PERMISSION_CACHE_TTL_SECONDS)
         return permissions

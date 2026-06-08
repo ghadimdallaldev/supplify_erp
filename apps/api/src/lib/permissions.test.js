@@ -85,11 +85,12 @@ describe('permissions resolution', () => {
     expect(perms).toEqual(['ORDERS_VIEW'])
   })
 
-  it('merges restaurant org and branch permissions when user has org role', async () => {
+  it('uses tenant role only when user has org role and tenant_user_roles assignment', async () => {
     const { getRestaurantOrgRolePermissions } = await import('./restaurant-org.js')
     vi.mocked(getRestaurantOrgRolePermissions).mockResolvedValueOnce([
       'ORDERS_VIEW',
       'RESERVATIONS_VIEW',
+      'FULFILLMENT_VIEW',
     ])
     queryMock.mockImplementation((sql) => {
       if (sql.includes('organization_id FROM restaurant')) {
@@ -99,7 +100,13 @@ describe('permissions resolution', () => {
         return Promise.resolve({ rows: [{ '?column?': 1 }] })
       }
       if (sql.includes('tenant_role_permissions')) {
-        return Promise.resolve({ rows: [{ permission: 'SETTINGS_VIEW' }] })
+        return Promise.resolve({
+          rows: [
+            { permission: 'CATALOG_VIEW' },
+            { permission: 'CATALOG_EDIT' },
+            { permission: 'ORDERS_VIEW' },
+          ],
+        })
       }
       if (sql.includes('FROM user_role ur')) {
         return Promise.resolve({ rows: [] })
@@ -111,9 +118,9 @@ describe('permissions resolution', () => {
     })
 
     const perms = await getPermissionsForUser('u1', 'rest-1', 'RESTAURANT')
-    expect(perms).toContain('ORDERS_VIEW')
-    expect(perms).toContain('RESERVATIONS_VIEW')
-    expect(perms).toContain('SETTINGS_VIEW')
+    expect(perms).toEqual(['CATALOG_VIEW', 'CATALOG_EDIT', 'ORDERS_VIEW'])
+    expect(perms).not.toContain('FULFILLMENT_VIEW')
+    expect(perms).not.toContain('RESERVATIONS_VIEW')
   })
 
   it('uses cache when present', async () => {
@@ -134,7 +141,51 @@ describe('permissions resolution', () => {
     expect(hasPermission(['ORDERS_VIEW'], 'ORDERS_MANAGE')).toBe(false)
   })
 
-  it('merges org and branch permissions for supplier users', async () => {
+  it('does not expand supplier tenant role with org Regional Manager permissions', async () => {
+    getOrgRolePermissionsMock.mockResolvedValue([
+      'FULFILLMENT_VIEW',
+      'SETTINGS_VIEW',
+      'CHAT_VIEW',
+      'INVOICES_VIEW',
+    ])
+    queryMock.mockImplementation((sql) => {
+      if (sql.includes('organization_id FROM supplier')) {
+        return Promise.resolve({ rows: [{ organization_id: 'org-1' }] })
+      }
+      if (sql.includes('org_user_roles')) {
+        return Promise.resolve({ rows: [{ '?column?': 1 }] })
+      }
+      if (sql.includes('tenant_role_permissions')) {
+        return Promise.resolve({
+          rows: [
+            { permission: 'CATALOG_VIEW' },
+            { permission: 'CATALOG_EDIT' },
+            { permission: 'CATALOG_MANAGE' },
+            { permission: 'INVENTORY_VIEW' },
+            { permission: 'INVENTORY_EDIT' },
+            { permission: 'ORDERS_VIEW' },
+          ],
+        })
+      }
+      if (sql.includes('FROM user_role ur')) {
+        return Promise.resolve({ rows: [] })
+      }
+      if (sql.includes('FROM tenant_user_roles WHERE')) {
+        return Promise.resolve({ rows: [{ '?column?': 1 }] })
+      }
+      return Promise.resolve({ rows: [] })
+    })
+
+    const perms = await getPermissionsForUser('u1', 'supplier-1', 'SUPPLIER')
+    expect(perms).toContain('CATALOG_VIEW')
+    expect(perms).toContain('ORDERS_VIEW')
+    expect(perms).not.toContain('FULFILLMENT_VIEW')
+    expect(perms).not.toContain('SETTINGS_VIEW')
+    expect(perms).not.toContain('CHAT_VIEW')
+    expect(perms).not.toContain('INVOICES_VIEW')
+  })
+
+  it('merges org and branch permissions for supplier users without tenant assignment', async () => {
     getOrgRolePermissionsMock.mockResolvedValue(['ORDERS_VIEW', 'CATALOG_VIEW'])
     queryMock.mockImplementation((sql) => {
       if (sql.includes('organization_id FROM supplier')) {

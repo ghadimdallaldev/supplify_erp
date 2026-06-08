@@ -82,13 +82,66 @@ async function getCachedRealmRole(token, roleName) {
   return entry
 }
 
+export function normalizeKeycloakEmail(email) {
+  return (email || '').trim().toLowerCase()
+}
+
+/** Derive a stable, unique Keycloak username from an email (avoids collisions on local-part only). */
+export function keycloakUsernameFromEmail(email) {
+  const normalized = normalizeKeycloakEmail(email)
+  const safe = normalized
+    .replace(/@/g, '_at_')
+    .replace(/\./g, '_')
+    .replace(/[^a-z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+  return (safe || 'user').slice(0, 255)
+}
+
 export async function findKeycloakUserByEmail(token, email) {
-  const q = encodeURIComponent(email)
-  const url = `${base()}/admin/realms/${config.KEYCLOAK_REALM}/users?email=${q}&exact=true`
-  const { data: users } = await keycloakAdminHttp.get(url, {
-    headers: { Authorization: `Bearer ${token}` },
+  const normalized = normalizeKeycloakEmail(email)
+  if (!normalized) return null
+
+  const headers = { Authorization: `Bearer ${token}` }
+  const exactUrl = `${base()}/admin/realms/${config.KEYCLOAK_REALM}/users?email=${encodeURIComponent(normalized)}&exact=true`
+  const { data: exactUsers } = await keycloakAdminHttp.get(exactUrl, { headers })
+  const exactMatch = (exactUsers || []).find(
+    (user) => normalizeKeycloakEmail(user.email) === normalized
+  )
+  if (exactMatch) return exactMatch
+
+  const searchUrl = `${base()}/admin/realms/${config.KEYCLOAK_REALM}/users?search=${encodeURIComponent(normalized)}&max=25`
+  const { data: searchUsers } = await keycloakAdminHttp.get(searchUrl, { headers })
+  return (
+    (searchUsers || []).find((user) => normalizeKeycloakEmail(user.email) === normalized) || null
+  )
+}
+
+async function ensureRealmRoleForUser(adminToken, userId, realmRoleName) {
+  if (!realmRoleName) return
+  try {
+    await assignKeycloakRealmRole(adminToken, userId, realmRoleName)
+  } catch (error) {
+    logger.warn('Keycloak realm role assignment skipped', {
+      userId,
+      realmRoleName,
+      error: error.message,
+    })
+  }
+}
+
+async function resolveExistingKeycloakInviteUser(adminToken, email, username) {
+  const byEmail = await findKeycloakUserByEmail(adminToken, email)
+  if (byEmail?.id) return byEmail
+
+  const usernameUrl = `${base()}/admin/realms/${config.KEYCLOAK_REALM}/users?username=${encodeURIComponent(username)}&exact=true`
+  const { data: byUsername } = await keycloakAdminHttp.get(usernameUrl, {
+    headers: { Authorization: `Bearer ${adminToken}` },
   })
-  return users[0] || null
+  const usernameMatch = (byUsername || []).find(
+    (user) => normalizeKeycloakEmail(user.email) === normalizeKeycloakEmail(email)
+  )
+  return usernameMatch || null
 }
 
 export async function assignKeycloakRealmRole(token, userId, roleName) {
@@ -118,21 +171,42 @@ export async function createKeycloakUserWithPassword({
   lastName,
   password,
   realmRoleName = 'SUPPLIER',
+  reuseExisting = false,
+  resetPasswordOnExisting = false,
 }) {
   const adminToken = await getKeycloakAdminToken()
-  const existing = await findKeycloakUserByEmail(adminToken, email)
-  if (existing?.id) {
-    return { userId: existing.id, created: false }
+  const normalizedEmail = normalizeKeycloakEmail(email)
+  const username = keycloakUsernameFromEmail(normalizedEmail)
+
+  const useExistingUser = async (existing) => {
+    if (resetPasswordOnExisting && password) {
+      await resetKeycloakUserPassword(adminToken, existing.id, password, false)
+      await ensureRealmRoleForUser(adminToken, existing.id, realmRoleName)
+      return { userId: existing.id, created: false, passwordUpdated: true }
+    }
+    if (reuseExisting) {
+      await ensureRealmRoleForUser(adminToken, existing.id, realmRoleName)
+      return { userId: existing.id, created: false }
+    }
+    const err = new Error(
+      'An account with this email already exists. Sign in to accept this invitation.'
+    )
+    err.code = 'account_exists'
+    throw err
   }
 
-  const username = email.split('@')[0] || email
+  const existing = await findKeycloakUserByEmail(adminToken, normalizedEmail)
+  if (existing?.id) {
+    return useExistingUser(existing)
+  }
+
   const url = `${base()}/admin/realms/${config.KEYCLOAK_REALM}/users`
   try {
     const res = await keycloakAdminHttp.post(
       url,
       {
         username,
-        email,
+        email: normalizedEmail,
         firstName: firstName || '',
         lastName: lastName || '',
         enabled: true,
@@ -148,21 +222,24 @@ export async function createKeycloakUserWithPassword({
       }
     )
     if (res.status === 409) {
-      const again = await findKeycloakUserByEmail(adminToken, email)
-      if (again?.id) return { userId: again.id, created: false }
-      throw new Error('Keycloak user already exists')
+      const again = await resolveExistingKeycloakInviteUser(adminToken, normalizedEmail, username)
+      if (again?.id) return useExistingUser(again)
+
+      const err = new Error(
+        'An account with this email already exists. Sign in to accept this invitation.'
+      )
+      err.code = 'account_exists'
+      throw err
     }
     const location = res.headers.location
     const userId = location ? location.split('/').pop() : null
     if (!userId) throw new Error('No Keycloak user id in response')
 
-    if (realmRoleName) {
-      await assignKeycloakRealmRole(adminToken, userId, realmRoleName)
-    }
+    await ensureRealmRoleForUser(adminToken, userId, realmRoleName)
 
     return { userId, created: true }
   } catch (error) {
-    if (error.message?.includes('Keycloak user already exists')) throw error
+    if (error.code === 'account_exists') throw error
     const status = error.response?.status
     const text = error.response?.data ? JSON.stringify(error.response.data) : error.message
     throw new Error(`Create Keycloak user failed: ${status || 'error'} ${text}`)

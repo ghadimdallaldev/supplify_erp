@@ -51,7 +51,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     data: supplierOrgData,
     isLoading: supplierOrgLoading,
     isError: supplierOrgError,
-  } = useGetOrgBranchesQuery(undefined, { skip: !isSupplier || isDriverRole })
+  } = useGetOrgBranchesQuery(undefined, {
+    skip: !isSupplier || isDriverRole || !multiBranchFeature,
+  })
 
   const {
     data: restaurantOrgData,

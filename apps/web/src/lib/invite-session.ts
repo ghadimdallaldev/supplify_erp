@@ -28,16 +28,52 @@ export function inviteFormEmailMismatchMessage(invitedEmail: string): string {
   return `This invitation was sent to ${invitedEmail}. You must sign up with that exact email address.`
 }
 
+function extractInvitationAcceptApiError(err: unknown) {
+  const envelope = err as {
+    data?: {
+      message?: string
+      name?: string
+      error?: { message?: string; name?: string }
+    }
+  }
+  return envelope?.data?.error ?? envelope?.data
+}
+
 export function invitationAcceptErrorMessage(err: unknown, fallback: string): string {
-  const payload = (err as { data?: { message?: string; name?: string } })?.data
-  if (payload?.message) return payload.message
+  const payload = extractInvitationAcceptApiError(err)
+  if (payload?.message) {
+    if (
+      payload.name === 'VALIDATION_ERROR' &&
+      payload.message.toLowerCase().includes('password is required')
+    ) {
+      return 'Your session expired or you are not signed in. Sign in with the invited email, or create an account below.'
+    }
+    return payload.message
+  }
   if (payload?.name === 'INVITATION_EMAIL_MISMATCH') {
     return 'Email must match the address this invitation was created for.'
+  }
+  if (payload?.name === 'INVITATION_ACCOUNT_EXISTS') {
+    return (
+      payload.message ||
+      'An account with this email already exists. Sign in with that email to accept the invitation.'
+    )
+  }
+  if (payload?.message?.toLowerCase().includes('keycloak user already exists')) {
+    return 'An account with this email already exists. Sign in with that email to accept the invitation.'
   }
   if (payload?.name === 'KEYCLOAK_NOT_CONFIGURED') {
     return 'Account signup is not configured on the server (Keycloak admin). Ask your administrator or set KEYCLOAK_ADMIN_PASSWORD in the API environment.'
   }
   return fallback
+}
+
+export function isInvitationSessionExpiredError(err: unknown): boolean {
+  const payload = extractInvitationAcceptApiError(err)
+  return (
+    payload?.name === 'VALIDATION_ERROR' &&
+    Boolean(payload.message?.toLowerCase().includes('password is required'))
+  )
 }
 
 export type InviteSessionUser = Pick<User, 'email' | 'displayName'>

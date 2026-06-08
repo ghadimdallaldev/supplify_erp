@@ -38,6 +38,19 @@ vi.mock('./access-cache.js', () => ({
   invalidateUserAuthCaches: (...args) => invalidateUserAuthCaches(...args),
 }))
 
+vi.mock('./supplier-org.js', () => ({
+  assignOrgUserRole: vi.fn().mockResolvedValue(undefined),
+  invalidateOrgPermissionCaches: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('./permissions.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    invalidateUserPermissionCache: vi.fn().mockResolvedValue(undefined),
+  }
+})
+
 import { acceptBranchInvitation } from './branch-invitations.js'
 import { acceptRestaurantMemberInvitation } from './restaurant-invitations.js'
 

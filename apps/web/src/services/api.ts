@@ -312,6 +312,7 @@ export const api = createApi({
       void
     >({
       query: () => '/auth/session',
+      keepUnusedDataFor: 0,
     }),
     logout: builder.mutation<{ message?: string; keycloakLogoutUrl?: string }, void>({
       query: () => ({
@@ -894,6 +895,7 @@ export const api = createApi({
       invalidatesTags: (_result, _error, id) => [
         { type: 'Supplier', id },
         { type: 'Supplier', id: 'LIST' },
+        'Restaurant',
         'Subscription',
       ],
     }),
@@ -905,6 +907,7 @@ export const api = createApi({
       invalidatesTags: (_result, _error, id) => [
         { type: 'Supplier', id },
         { type: 'Supplier', id: 'LIST' },
+        'Restaurant',
         'Subscription',
       ],
     }),
@@ -1210,7 +1213,7 @@ export const api = createApi({
       query: ({ conversationId }) => `/api/chat/conversations/${conversationId}/messages`,
       providesTags: ['Chat'],
     }),
-    createConversation: builder.mutation<any, { supplierId: string }>({
+    createConversation: builder.mutation<any, { supplierId?: string; restaurantId?: string }>({
       query: (body) => ({
         url: '/api/chat/conversations',
         method: 'POST',
@@ -2665,6 +2668,16 @@ export const api = createApi({
       query: (id) => `/api/promotions/${id}/analytics`,
       providesTags: (_r, _e, id) => [{ type: 'Promotions', id }],
     }),
+    getPromotionsAnalyticsSummary: builder.query<
+      { summary: Record<string, unknown> },
+      { days?: number } | void
+    >({
+      query: (params) => ({
+        url: '/api/promotions/analytics/summary',
+        params: params?.days ? { days: params.days } : undefined,
+      }),
+      providesTags: ['Promotions'],
+    }),
     getPromotionPricing: builder.query<{ pricing: Array<Record<string, unknown>> }, void>({
       query: () => '/api/promotions/pricing',
     }),
@@ -4108,6 +4121,7 @@ export const {
   usePausePromotionMutation,
   useDeletePromotionMutation,
   useGetPromotionAnalyticsQuery,
+  useGetPromotionsAnalyticsSummaryQuery,
   useGetPromotionPricingQuery,
   useGetAdminPromotionPricingQuery,
   useGetDealDetailQuery,

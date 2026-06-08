@@ -21,6 +21,7 @@ import {
   grantOrgBranchAccess,
   revokeOrgBranchAccess,
   userHasOrgBranchAccess,
+  ensureOrgAccessForBranchStaff,
 } from '../lib/supplier-org.js'
 import { createActiveTenantToken, getActiveTenantCookieName } from '../lib/tenant-switch.js'
 import { config } from '../config/env.js'
@@ -43,7 +44,16 @@ async function requireSupplierOrgContext(req, res, next) {
     })
   }
 
-  const membership = await getUserOrgMembership(req.userData.id)
+  let membership = await getUserOrgMembership(req.userData.id)
+  if (!membership && req.userData.role === 'SUPPLIER') {
+    const supplierId = await getSupplierIdForRequest(req)
+    if (supplierId) {
+      const repaired = await ensureOrgAccessForBranchStaff(req.userData.id, supplierId)
+      if (repaired) {
+        membership = await getUserOrgMembership(req.userData.id)
+      }
+    }
+  }
   if (!membership && req.userData.role !== 'ADMIN') {
     return res.status(403).json({
       ok: false,

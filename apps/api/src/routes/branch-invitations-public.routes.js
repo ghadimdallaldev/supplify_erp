@@ -124,6 +124,7 @@ function invitationAcceptErrorName(error) {
   if (error.code === 'expired') return 'INVITATION_EXPIRED'
   if (error instanceof WorkspaceMembershipError) return 'WORKSPACE_MEMBERSHIP_CONFLICT'
   if (error.code === 'email_mismatch') return 'INVITATION_EMAIL_MISMATCH'
+  if (error.code === 'account_exists') return 'INVITATION_ACCOUNT_EXISTS'
   if (error.code === 'already_used') return 'INVITATION_ALREADY_USED'
   if (isKeycloakSetupError(error)) return 'KEYCLOAK_NOT_CONFIGURED'
   return 'INVITATION_INVALID'
