@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { RestaurantOrderTrackingPanel } from './RestaurantOrderTrackingPanel'
 
@@ -34,7 +34,7 @@ vi.mock('../../services/api', () => ({
 }))
 
 describe('RestaurantOrderTrackingPanel', () => {
-  it('renders live tracking with positive ETA', () => {
+  it('renders live tracking with positive ETA', async () => {
     render(
       <MemoryRouter>
         <RestaurantOrderTrackingPanel orderId="order-1" orderStatus="SHIPPED" />
@@ -42,7 +42,7 @@ describe('RestaurantOrderTrackingPanel', () => {
     )
     expect(screen.getByTestId('restaurant-order-tracking-panel')).toBeInTheDocument()
     expect(screen.getByTestId('restaurant-tracking-message')).toHaveTextContent(/on the way/i)
-    expect(screen.getByTestId('delivery-tracking-map')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('delivery-tracking-map')).toBeInTheDocument())
     expect(screen.getByTestId('restaurant-tracking-eta-primary')).toHaveTextContent(
       /Arriving in about 12–18 minutes/i
     )
@@ -52,5 +52,6 @@ describe('RestaurantOrderTrackingPanel', () => {
     expect(screen.getByTestId('delivery-tracking-map-status')).toHaveTextContent(
       /On the way · Live now/i
     )
+    expect(screen.getByTestId('restaurant-gps-status')).toHaveTextContent(/Live now/i)
   })
 })

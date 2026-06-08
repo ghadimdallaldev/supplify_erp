@@ -1,10 +1,10 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { ArrowDown, ArrowUp, Loader2, Star, XCircle } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, Loader2, Star, XCircle } from 'lucide-react'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
-import { formatDeliveryStatus } from '../../lib/deliveryStatusLabels'
-import type { DeliveryRouteDetail } from '../../types'
+import type { DeliveryRouteDetail, DeliveryRouteStop } from '../../types'
 import {
   useCancelFulfillmentRouteMutation,
   useReorderFulfillmentRouteStopsMutation,
@@ -15,6 +15,12 @@ import {
 import { usePermissions } from '../../hooks/usePermissions'
 import { formatOrderRef } from './fulfillmentDispatchUtils'
 import { getGpsStatusLabel } from '../../lib/deliveryTrackingLabels'
+import {
+  formatFulfillmentRouteStatus,
+  formatFulfillmentStopStatus,
+  getFulfillmentStopPrimaryAction,
+  getStopEtaLabel,
+} from '../../lib/fulfillmentRouteLabels'
 
 type Props = {
   route: DeliveryRouteDetail
@@ -22,9 +28,296 @@ type Props = {
   onViewTracking?: (orderId: string) => void
 }
 
+const mobileActionClass = 'min-h-[44px] w-full text-sm font-semibold'
+
+function RouteStopCard({
+  stop,
+  index,
+  route,
+  editable,
+  nextStopId,
+  expanded,
+  onToggleDetails,
+  onSetNext,
+  onMoveStop,
+  onSetStatus,
+  onViewTracking,
+  reordering,
+  settingNext,
+  updatingStop,
+}: {
+  stop: DeliveryRouteStop
+  index: number
+  route: DeliveryRouteDetail
+  editable: boolean
+  nextStopId?: string
+  expanded: boolean
+  onToggleDetails: () => void
+  onSetNext: (orderId: string) => void
+  onMoveStop: (index: number, direction: -1 | 1) => void
+  onSetStatus: (stopId: string, status: 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED') => void
+  onViewTracking?: (orderId: string) => void
+  reordering: boolean
+  settingNext: boolean
+  updatingStop: boolean
+}) {
+  const badge = formatFulfillmentStopStatus(stop, route.status)
+  const etaLabel = getStopEtaLabel(stop)
+  const gpsLabel = stop.tracking ? getGpsStatusLabel(stop.tracking) : null
+  const primaryAction = editable ? getFulfillmentStopPrimaryAction(stop) : null
+  const orderRef = stop.orderNumber ?? formatOrderRef(stop.orderId)
+  const isNext = stop.id === nextStopId && stop.status !== 'DELIVERED' && stop.status !== 'FAILED'
+  const hasSecondaryDetails = Boolean(
+    stop.deliveryArea || stop.addressLine || stop.itemCount > 0 || stop.totalAmount > 0
+  )
+  const showSecondaryActions = editable && !['DELIVERED', 'FAILED'].includes(stop.status)
+
+  const secondaryActionRow = editable ? (
+    <div className="flex flex-wrap gap-1">
+      {!['DELIVERED', 'FAILED'].includes(stop.status) && stop.id !== nextStopId ? (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={settingNext}
+          onClick={() => onSetNext(stop.orderId)}
+          title="Set as next"
+        >
+          <Star className="h-3 w-3" />
+        </Button>
+      ) : null}
+      {!['DELIVERED', 'FAILED'].includes(stop.status) ? (
+        <>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={index === 0 || reordering}
+            onClick={() => onMoveStop(index, -1)}
+            aria-label="Move up"
+          >
+            <ArrowUp className="h-3 w-3" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={index === route.stops.length - 1 || reordering}
+            onClick={() => onMoveStop(index, 1)}
+            aria-label="Move down"
+          >
+            <ArrowDown className="h-3 w-3" />
+          </Button>
+        </>
+      ) : null}
+      {stop.status === 'PLANNED' && (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={updatingStop}
+          onClick={() => onSetStatus(stop.id, 'OUT_FOR_DELIVERY')}
+        >
+          Out
+        </Button>
+      )}
+      {['PLANNED', 'OUT_FOR_DELIVERY'].includes(stop.status) && (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={updatingStop}
+          onClick={() => onSetStatus(stop.id, 'DELIVERED')}
+        >
+          Delivered
+        </Button>
+      )}
+      {stop.status !== 'DELIVERED' && stop.status !== 'FAILED' && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-[var(--red)]"
+          disabled={updatingStop}
+          onClick={() => onSetStatus(stop.id, 'FAILED')}
+        >
+          Problem
+        </Button>
+      )}
+    </div>
+  ) : null
+
+  return (
+    <li
+      data-testid={`fulfillment-route-stop-${stop.id}`}
+      className={`rounded-xl border border-[var(--app-border)] p-4 sm:flex sm:flex-row sm:justify-between sm:gap-3 sm:p-3 ${
+        isNext
+          ? 'ring-1 ring-[var(--brand-mid)]/30 bg-[var(--brand-ultra)]/30'
+          : 'bg-[var(--surface)]'
+      }`}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start gap-3">
+          <div
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold sm:h-8 sm:w-8 sm:text-xs ${
+              stop.status === 'DELIVERED'
+                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200'
+                : isNext
+                  ? 'bg-[var(--brand-mid)] text-white'
+                  : 'bg-[var(--brand-ultra)] text-[var(--text-muted)]'
+            }`}
+          >
+            {stop.sequenceNumber}
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            {isNext ? (
+              <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--brand-mid)]">
+                Next stop
+              </p>
+            ) : null}
+            <p className="font-semibold leading-snug">{stop.restaurantName}</p>
+            <p className="text-sm text-[var(--text-muted)]">
+              <Link
+                to={`/app/orders/${stop.orderId}`}
+                className="text-[var(--brand-mid)] hover:underline"
+              >
+                {orderRef}
+              </Link>
+            </p>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Badge variant={badge.variant}>{badge.label}</Badge>
+            </div>
+            {etaLabel ? (
+              <p className="text-sm font-medium text-[var(--text)]" data-testid="stop-eta">
+                {etaLabel}
+              </p>
+            ) : null}
+            {gpsLabel ? (
+              <p className="text-xs text-[var(--text-muted)]" data-testid="stop-gps">
+                {gpsLabel}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        {hasSecondaryDetails ? (
+          <div className="mt-3 sm:mt-2">
+            <button
+              type="button"
+              className="inline-flex min-h-[44px] items-center gap-1 text-sm font-medium text-[var(--brand-mid)] sm:min-h-0 sm:text-xs"
+              onClick={onToggleDetails}
+              aria-expanded={expanded}
+              data-testid={`stop-details-toggle-${stop.id}`}
+            >
+              {expanded ? 'Hide details' : 'Show details'}
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
+                aria-hidden
+              />
+            </button>
+            {expanded ? (
+              <div
+                className="mt-2 space-y-1 text-sm text-[var(--text-muted)]"
+                data-testid={`stop-details-${stop.id}`}
+              >
+                {stop.deliveryArea ? <p>{stop.deliveryArea}</p> : null}
+                {stop.addressLine ? <p>{stop.addressLine}</p> : null}
+                {stop.itemCount > 0 || stop.totalAmount > 0 ? (
+                  <p>
+                    {stop.itemCount > 0 ? `${stop.itemCount} items` : null}
+                    {stop.itemCount > 0 && stop.totalAmount > 0 ? ' · ' : null}
+                    {stop.totalAmount > 0 ? `$${stop.totalAmount.toFixed(2)}` : null}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {onViewTracking ? (
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="mt-2 h-auto min-h-[44px] p-0 text-sm sm:min-h-0 sm:text-xs"
+            onClick={() => onViewTracking(stop.orderId)}
+          >
+            View tracking
+          </Button>
+        ) : null}
+      </div>
+
+      {editable ? (
+        <>
+          <div className="mt-3 space-y-2 sm:hidden">
+            {primaryAction ? (
+              <Button
+                size="lg"
+                className={mobileActionClass}
+                disabled={updatingStop}
+                data-testid={`stop-primary-action-${stop.id}`}
+                onClick={() => onSetStatus(stop.id, primaryAction.status)}
+              >
+                {primaryAction.label}
+              </Button>
+            ) : null}
+            {showSecondaryActions && stop.status !== 'DELIVERED' && stop.status !== 'FAILED' ? (
+              <Button
+                size="lg"
+                variant="outline"
+                className={`${mobileActionClass} border-red-200 text-red-700`}
+                disabled={updatingStop}
+                onClick={() => onSetStatus(stop.id, 'FAILED')}
+              >
+                Problem
+              </Button>
+            ) : null}
+            {expanded && showSecondaryActions ? (
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                {stop.id !== nextStopId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-[44px] text-xs"
+                    disabled={settingNext}
+                    onClick={() => onSetNext(stop.orderId)}
+                  >
+                    <Star className="mr-1 h-4 w-4" aria-hidden />
+                    Next
+                  </Button>
+                ) : (
+                  <span />
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-[44px] text-xs"
+                  disabled={index === 0 || reordering}
+                  onClick={() => onMoveStop(index, -1)}
+                  aria-label="Move up"
+                >
+                  <ArrowUp className="mr-1 h-4 w-4" aria-hidden />
+                  Up
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-[44px] text-xs"
+                  disabled={index === route.stops.length - 1 || reordering}
+                  onClick={() => onMoveStop(index, 1)}
+                  aria-label="Move down"
+                >
+                  <ArrowDown className="mr-1 h-4 w-4" aria-hidden />
+                  Down
+                </Button>
+              </div>
+            ) : null}
+          </div>
+          <div className="hidden shrink-0 sm:block">{secondaryActionRow}</div>
+        </>
+      ) : null}
+    </li>
+  )
+}
+
 export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: Props) {
   const { can } = usePermissions()
   const canManage = can('FULFILLMENT_MANAGE')
+  const [expandedStops, setExpandedStops] = useState<Record<string, boolean>>({})
 
   const [reorderStops, { isLoading: reordering }] = useReorderFulfillmentRouteStopsMutation()
   const [setNextStop, { isLoading: settingNext }] = useSetNextFulfillmentRouteStopMutation()
@@ -84,17 +377,6 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
   const editable = canManage && ['PLANNED', 'IN_PROGRESS'].includes(route.status)
   const nextStopId = route.stops.find((s) => !['DELIVERED', 'FAILED'].includes(s.status))?.id
 
-  const stopBadge = (stop: (typeof route.stops)[0]) => {
-    if (stop.id === nextStopId && stop.status !== 'DELIVERED' && stop.status !== 'FAILED') {
-      return { label: 'Next delivery', variant: 'default' as const }
-    }
-    if (stop.status === 'DELIVERED') return { label: 'Completed', variant: 'secondary' as const }
-    if (stop.status === 'FAILED') return { label: 'Failed', variant: 'destructive' as const }
-    if (stop.status === 'OUT_FOR_DELIVERY')
-      return { label: 'On the way', variant: 'outline' as const }
-    return { label: 'Waiting', variant: 'outline' as const }
-  }
-
   const handleSetNext = async (orderId: string) => {
     try {
       await setNextStop({ routeId: route.id, orderId }).unwrap()
@@ -104,14 +386,18 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
     }
   }
 
+  const toggleStopDetails = (stopId: string) => {
+    setExpandedStops((prev) => ({ ...prev, [stopId]: !prev[stopId] }))
+  }
+
   return (
     <div
       data-testid="fulfillment-route-detail"
-      className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4 space-y-4"
+      className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4 space-y-4"
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h3 className="font-semibold text-lg">{route.routeLabel}</h3>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-semibold text-lg leading-snug">{route.routeLabel}</h3>
           <p className="text-sm text-[var(--text-muted)]">
             {route.routeNumber} · {route.driverName}
             {route.area ? ` · ${route.area}` : ''}
@@ -121,9 +407,11 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
             {route.completedStops} delivered · {route.failedStops} failed
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Badge>{route.status}</Badge>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <Badge variant={route.status === 'IN_PROGRESS' ? 'default' : 'secondary'}>
+            {formatFulfillmentRouteStatus(route.status)}
+          </Badge>
+          <Button variant="ghost" size="sm" className="min-h-[44px] sm:min-h-0" onClick={onClose}>
             Close
           </Button>
         </div>
@@ -131,7 +419,12 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
 
       {canManage && route.status === 'PLANNED' && (
         <div className="space-y-2">
-          <Button size="sm" onClick={startRoute} disabled={updatingRoute}>
+          <Button
+            size="lg"
+            className="min-h-[44px] w-full sm:min-h-0 sm:w-auto"
+            onClick={startRoute}
+            disabled={updatingRoute}
+          >
             Activate ready orders
           </Button>
           <p className="text-xs text-[var(--text-muted)]">
@@ -141,125 +434,36 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
         </div>
       )}
 
-      <ol className="space-y-3">
-        {route.stops.map((stop, index) => {
-          const badge = stopBadge(stop)
-          return (
-            <li
-              key={stop.id}
-              className="rounded-lg border border-[var(--app-border)] p-3 flex flex-col gap-2 sm:flex-row sm:justify-between"
-            >
-              <div className="min-w-0">
-                <p className="text-xs text-[var(--text-muted)]">Stop {stop.sequenceNumber}</p>
-                <p className="font-medium">{stop.restaurantName}</p>
-                <p className="text-xs text-[var(--text-muted)]">
-                  <Link
-                    to={`/app/orders/${stop.orderId}`}
-                    className="text-[var(--brand-mid)] hover:underline"
-                  >
-                    {formatOrderRef(stop.orderId)}
-                  </Link>
-                  {stop.deliveryArea ? ` · ${stop.deliveryArea}` : ''}
-                </p>
-                {stop.addressLine && (
-                  <p className="text-xs text-[var(--text-muted)] mt-1">{stop.addressLine}</p>
-                )}
-                <div className="flex flex-wrap items-center gap-2 mt-2">
-                  <Badge variant={badge.variant}>{badge.label}</Badge>
-                  <Badge variant="outline">{formatDeliveryStatus(stop.status)}</Badge>
-                  {stop.tracking && (
-                    <span className="text-[10px] text-[var(--text-muted)]">
-                      {getGpsStatusLabel(stop.tracking)}
-                    </span>
-                  )}
-                </div>
-                {onViewTracking && (
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    className="h-auto p-0 mt-1 text-xs"
-                    onClick={() => onViewTracking(stop.orderId)}
-                  >
-                    View tracking
-                  </Button>
-                )}
-              </div>
-              {editable && (
-                <div className="flex flex-wrap gap-1 shrink-0">
-                  {!['DELIVERED', 'FAILED'].includes(stop.status) && stop.id !== nextStopId ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={settingNext}
-                      onClick={() => handleSetNext(stop.orderId)}
-                      title="Set as next"
-                    >
-                      <Star className="h-3 w-3" />
-                    </Button>
-                  ) : null}
-                  {!['DELIVERED', 'FAILED'].includes(stop.status) ? (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={index === 0 || reordering}
-                        onClick={() => moveStop(index, -1)}
-                        aria-label="Move up"
-                      >
-                        <ArrowUp className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={index === route.stops.length - 1 || reordering}
-                        onClick={() => moveStop(index, 1)}
-                        aria-label="Move down"
-                      >
-                        <ArrowDown className="h-3 w-3" />
-                      </Button>
-                    </>
-                  ) : null}
-                  {stop.status === 'PLANNED' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={updatingStop}
-                      onClick={() => setStopStatus(stop.id, 'OUT_FOR_DELIVERY')}
-                    >
-                      Out
-                    </Button>
-                  )}
-                  {['PLANNED', 'OUT_FOR_DELIVERY'].includes(stop.status) && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={updatingStop}
-                      onClick={() => setStopStatus(stop.id, 'DELIVERED')}
-                    >
-                      Delivered
-                    </Button>
-                  )}
-                  {stop.status !== 'DELIVERED' && stop.status !== 'FAILED' && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-[var(--red)]"
-                      disabled={updatingStop}
-                      onClick={() => setStopStatus(stop.id, 'FAILED')}
-                    >
-                      Failed
-                    </Button>
-                  )}
-                </div>
-              )}
-            </li>
-          )
-        })}
+      <ol className="space-y-3" data-testid="fulfillment-route-stops">
+        {route.stops.map((stop, index) => (
+          <RouteStopCard
+            key={stop.id}
+            stop={stop}
+            index={index}
+            route={route}
+            editable={editable}
+            nextStopId={nextStopId}
+            expanded={Boolean(expandedStops[stop.id])}
+            onToggleDetails={() => toggleStopDetails(stop.id)}
+            onSetNext={handleSetNext}
+            onMoveStop={moveStop}
+            onSetStatus={setStopStatus}
+            onViewTracking={onViewTracking}
+            reordering={reordering}
+            settingNext={settingNext}
+            updatingStop={updatingStop}
+          />
+        ))}
       </ol>
 
       {canManage && route.status !== 'CANCELLED' && route.status !== 'COMPLETED' && (
-        <Button variant="destructive" size="sm" onClick={handleCancel} disabled={cancelling}>
+        <Button
+          variant="destructive"
+          size="lg"
+          className="min-h-[44px] w-full sm:min-h-0 sm:w-auto"
+          onClick={handleCancel}
+          disabled={cancelling}
+        >
           {cancelling ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (

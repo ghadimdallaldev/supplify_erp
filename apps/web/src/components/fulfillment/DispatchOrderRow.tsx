@@ -154,13 +154,13 @@ export function DispatchOrderRow({
             <Button
               type="button"
               variant="outline"
-              size="sm"
-              className="whitespace-nowrap"
+              size="lg"
+              className="min-h-[44px] w-full whitespace-nowrap sm:h-9 sm:w-auto"
               data-testid={`dispatch-view-tracking-${order.id}`}
               onClick={() => onViewTracking(order.id)}
             >
-              <Navigation className="h-3.5 w-3.5 mr-1" aria-hidden />
-              View tracking
+              <Navigation className="h-4 w-4 mr-1.5" aria-hidden />
+              Track delivery
             </Button>
           )}
           <Button variant="outline" size="sm" className="whitespace-nowrap" asChild>

@@ -7,10 +7,11 @@ import {
 } from './driverDeliveryUi'
 
 describe('driverDeliveryUi', () => {
-  it('marks assigned as active with start delivery as primary action', () => {
+  it('marks assigned as active with on-the-way as primary action', () => {
     expect(isActiveDriverDeliveryStatus('assigned')).toBe(true)
     expect(getDriverStatusTone('assigned')).toBe('neutral')
     expect(getDriverActionsForStatus('assigned')[0]?.value).toBe('out_for_delivery')
+    expect(getDriverActionsForStatus('assigned')[0]?.label).toBe("I'm on the way")
   })
 
   it('prioritizes delivered for out_for_delivery', () => {

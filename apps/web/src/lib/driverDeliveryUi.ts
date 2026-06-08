@@ -49,10 +49,25 @@ export type DriverAction = {
 }
 
 const ACTION_META: Record<DriverAction['value'], Omit<DriverAction, 'value'>> = {
-  out_for_delivery: { label: 'Start delivery', variant: 'primary' },
-  delivered: { label: 'Mark delivered', variant: 'success' },
-  failed: { label: 'Failed', variant: 'danger' },
+  out_for_delivery: { label: "I'm on the way", variant: 'primary' },
+  delivered: { label: 'Delivered', variant: 'success' },
+  failed: { label: 'Problem', variant: 'danger' },
   rescheduled: { label: 'Reschedule', variant: 'outline' },
+}
+
+/** Driver GPS banner for the deliveries header (plain language). */
+export function getDriverGpsBannerLabel(input: {
+  trackableCount: number
+  trackingActive: boolean
+  permissionDenied: boolean
+  gpsError?: string | null
+}): string | null {
+  const { trackableCount, trackingActive, permissionDenied, gpsError } = input
+  if (trackableCount === 0) return null
+  if (permissionDenied) return 'Location permission needed'
+  if (trackingActive) return 'Location active'
+  if (gpsError) return 'Location not updating'
+  return 'Location permission needed'
 }
 
 export function getDriverActionsForStatus(deliveryStatus: string): DriverAction[] {

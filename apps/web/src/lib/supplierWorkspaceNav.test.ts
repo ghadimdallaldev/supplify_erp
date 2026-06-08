@@ -6,6 +6,7 @@ import {
   resolveWorkspacePersona,
   restaurantAnalyticsNavAllowed,
   restaurantReportsNavAllowed,
+  shouldShowDashboardCalendar,
 } from './workspaceRoleProfile'
 
 function perms(...keys: string[]) {
@@ -119,6 +120,25 @@ describe('resolveWorkspacePersona', () => {
     expect(layout.showSpendTrend).toBe(true)
     expect(layout.showReorderAlerts).toBe(false)
     expect(layout.showCalendar).toBe(false)
+  })
+
+  it('hides order calendar on finance dashboards for both tenant accountants', () => {
+    const restaurantAccountant = resolveWorkspacePersona({
+      tenantType: 'RESTAURANT',
+      roleName: 'Accountant',
+      can: perms('INVOICES_VIEW', 'INVOICES_MANAGE', 'ORDERS_VIEW'),
+    })
+    const supplierAccountant = resolveWorkspacePersona({
+      tenantType: 'SUPPLIER',
+      roleName: 'Accountant',
+      can: perms('INVOICES_VIEW', 'INVOICES_MANAGE', 'ORDERS_VIEW'),
+    })
+    expect(
+      shouldShowDashboardCalendar(restaurantAccountant, 'RESTAURANT', perms('ORDERS_VIEW'))
+    ).toBe(false)
+    expect(shouldShowDashboardCalendar(supplierAccountant, 'SUPPLIER', perms('ORDERS_VIEW'))).toBe(
+      false
+    )
   })
 
   it('receiving staff has no analytics nav access', () => {

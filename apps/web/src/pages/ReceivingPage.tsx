@@ -331,6 +331,14 @@ export function ReceivingPage() {
             <CardContent className="space-y-4 p-4 md:p-5">
               <PageHeader title={receivingTitle} description={receivingDescription} />
 
+              <div
+                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+                data-testid="receiving-delivered-hint"
+              >
+                <strong>Delivered does not mean received.</strong> Confirm quantities on site even
+                when the supplier marks an order as delivered.
+              </div>
+
               <Tabs defaultValue="pending" className="space-y-4">
                 <TabsList className="tabs-scroll h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
                   <TabsTrigger value="pending" className="flex items-center gap-2">

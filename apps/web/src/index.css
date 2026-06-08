@@ -121,6 +121,10 @@
     padding-right: env(safe-area-inset-right);
   }
 
+  .driver-sticky-action-bar {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
   /* Branded text selection */
   ::selection {
     background: var(--brand-pale);

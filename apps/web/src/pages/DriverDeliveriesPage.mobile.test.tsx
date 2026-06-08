@@ -78,7 +78,10 @@ describe('DriverDeliveriesPage mobile', () => {
     expect(screen.getByTestId('driver-deliveries-page')).toBeInTheDocument()
     expect(screen.getByTestId('driver-delivery-order-1')).toBeInTheDocument()
     expect(screen.getByTestId('driver-deliveries-header')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /start delivery/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /navigate/i })).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('button', { name: /i'm on the way/i }).length
+    ).toBeGreaterThanOrEqual(1)
+    expect(screen.getByRole('link', { name: /open maps/i })).toBeInTheDocument()
+    expect(screen.getByTestId('driver-sticky-action-bar')).toBeInTheDocument()
   })
 })
