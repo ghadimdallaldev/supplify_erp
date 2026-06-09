@@ -5,6 +5,7 @@ import { useAppDispatch } from '../hooks/redux'
 import { setUser, clearUser, setLoading } from '../features/auth/authSlice'
 import { refetchAppSession, hasStaleRegistrationState } from '../lib/refetchAppSession'
 import { needsLegalReacceptance } from '../lib/legalReacceptanceGate'
+import { applyAdminPreferences, clearAdminPreferences } from '../lib/adminPreferences'
 import type { ReactNode } from 'react'
 
 interface AuthGuardProps {
@@ -55,6 +56,16 @@ export function AuthGuard({ children }: AuthGuardProps) {
       void refetchAppSession(dispatch)
     }
   }, [staleRegistrationState, dispatch])
+
+  useEffect(() => {
+    if (data?.role === 'ADMIN' && data.adminPreferences) {
+      applyAdminPreferences(data.adminPreferences)
+      return
+    }
+    if (data && data.role !== 'ADMIN') {
+      clearAdminPreferences()
+    }
+  }, [data?.role, data?.adminPreferences])
 
   useEffect(() => {
     if (isLoading) {

@@ -39,6 +39,32 @@ export interface User {
   adminPermissions?: string[]
   /** Current legal pack acceptance status (login re-acceptance gate) */
   legalStatus?: LegalAcceptanceStatus
+  /** Platform admin UI preferences */
+  adminPreferences?: AdminUserPreferences
+}
+
+export type AdminLandingTab =
+  | 'overview'
+  | 'activity'
+  | 'tenants'
+  | 'users'
+  | 'subscriptions'
+  | 'plans'
+  | 'finance'
+  | 'usage'
+  | 'features'
+  | 'deals'
+  | 'limits'
+  | 'operations'
+  | 'health'
+  | 'audit'
+
+export type AdminThemePreference = 'light' | 'dark' | 'system'
+
+export interface AdminUserPreferences {
+  defaultLandingTab: AdminLandingTab
+  compactMode: boolean
+  themePreference: AdminThemePreference
 }
 
 export interface UserWithDetails extends User {
