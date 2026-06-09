@@ -54,6 +54,35 @@ export interface PlanTierDisabledFeature {
   source: PlanTierFeatureSource
 }
 
+const SUPPLIER_ONLY_PLAN_FEATURES = new Set([
+  'fulfillment',
+  'fulfillment_tools',
+  'driver_management',
+  'warehouses',
+  'multi_warehouse',
+  'promotions',
+])
+
+const RESTAURANT_ONLY_PLAN_FEATURES = new Set([
+  'smart_reorder',
+  'receiving_quality',
+  'waste_tracking',
+  'waitlist_auto_promo',
+  'supplier_reviews',
+  'supplier_deals',
+  'supplier_deals_redeem',
+])
+
+/** Plan-tier banner only lists features relevant to the tenant type. */
+export function isPlanTierBannerFeatureApplicable(
+  featureKey: string,
+  tenantType: Entitlements['tenantType']
+): boolean {
+  if (tenantType === 'RESTAURANT' && SUPPLIER_ONLY_PLAN_FEATURES.has(featureKey)) return false
+  if (tenantType === 'SUPPLIER' && RESTAURANT_ONLY_PLAN_FEATURES.has(featureKey)) return false
+  return true
+}
+
 /**
  * Features that are off because of the subscription plan tier (plan JSON or product default),
  * not because of an admin override or global kill-switch.
@@ -70,6 +99,7 @@ export function getPlanTierDisabledFeatures(entitlements: Entitlements): PlanTie
 
   for (const key of keys) {
     if (isRemovedFeatureKey(key)) continue
+    if (!isPlanTierBannerFeatureApplicable(key, entitlements.tenantType)) continue
     const src = sources[key]
     if (src !== 'plan' && src !== 'default') continue
     // Keys never on the plan JSON are N/A for this tier, not "missing from subscription".
