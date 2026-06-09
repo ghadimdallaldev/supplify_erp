@@ -21,8 +21,14 @@
         "http://localhost:4000/auth/callback",
         "http://localhost:5173/auth/callback",
         "http://localhost:8180/auth/callback",
+        "https://app-dev.supplifyerp.com/auth/callback",
+        "https://app-dev.supplifyerp.com/*",
+        "https://api-dev.supplifyerp.com/auth/callback",
+        "https://api-dev.supplifyerp.com/*",
         "https://supplify-api-dev-development.up.railway.app/auth/callback",
-        "https://supplify-web-dev-development.up.railway.app/auth/callback"
+        "https://supplify-api-dev-development.up.railway.app/*",
+        "https://supplify-web-dev-development.up.railway.app/auth/callback",
+        "https://supplify-web-dev-development.up.railway.app/*"
       ],
       "webOrigins": ["+"],
       "protocol": "openid-connect",
@@ -30,7 +36,7 @@
         "access.token.lifespan": "3600",
         "access.token.lifespan.for.implicit.flow": "3600",
         "client.secret.creation.time": "1700000000",
-        "post.logout.redirect.uris": "http://localhost:5173/login##http://localhost:5173/*##http://localhost:4000/login##http://localhost:4000/*##http://localhost/login##http://localhost/*##http://localhost:8180/login##https://supplify-web-dev-development.up.railway.app/login##https://supplify-web-dev-development.up.railway.app/*##https://supplify-api-dev-development.up.railway.app/auth/register?continue=1##https://supplify-api-dev-development.up.railway.app/auth/register##https://supplify-api-dev-development.up.railway.app/*"
+        "post.logout.redirect.uris": "http://localhost:5173/login##http://localhost:5173/*##http://localhost:4000/login##http://localhost:4000/*##http://localhost/login##http://localhost/*##http://localhost:8180/login##https://app-dev.supplifyerp.com/login##https://app-dev.supplifyerp.com/*##https://api-dev.supplifyerp.com/auth/register?continue=1##https://api-dev.supplifyerp.com/auth/register##https://api-dev.supplifyerp.com/*##https://supplify-web-dev-development.up.railway.app/login##https://supplify-web-dev-development.up.railway.app/*##https://supplify-api-dev-development.up.railway.app/auth/register?continue=1##https://supplify-api-dev-development.up.railway.app/auth/register##https://supplify-api-dev-development.up.railway.app/*"
       },
       "defaultClientScopes": ["web-origins", "profile", "roles", "email"],
       "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
@@ -44,14 +50,20 @@
         "http://localhost:4000/auth/callback",
         "http://localhost:5173/auth/callback",
         "http://localhost:8180/auth/callback",
+        "https://app-dev.supplifyerp.com/auth/callback",
+        "https://app-dev.supplifyerp.com/*",
+        "https://api-dev.supplifyerp.com/auth/callback",
+        "https://api-dev.supplifyerp.com/*",
         "https://supplify-api-dev-development.up.railway.app/auth/callback",
-        "https://supplify-web-dev-development.up.railway.app/auth/callback"
+        "https://supplify-api-dev-development.up.railway.app/*",
+        "https://supplify-web-dev-development.up.railway.app/auth/callback",
+        "https://supplify-web-dev-development.up.railway.app/*"
       ],
       "webOrigins": ["+"],
       "protocol": "openid-connect",
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:5173/login##http://localhost:5173/*##http://localhost:4000/login##http://localhost:4000/*##http://localhost/login##http://localhost/*##http://localhost:8180/login##https://supplify-web-dev-development.up.railway.app/login##https://supplify-web-dev-development.up.railway.app/*##https://supplify-api-dev-development.up.railway.app/*"
+        "post.logout.redirect.uris": "http://localhost:5173/login##http://localhost:5173/*##http://localhost:4000/login##http://localhost:4000/*##http://localhost/login##http://localhost/*##http://localhost:8180/login##https://app-dev.supplifyerp.com/login##https://app-dev.supplifyerp.com/*##https://api-dev.supplifyerp.com/*##https://supplify-web-dev-development.up.railway.app/login##https://supplify-web-dev-development.up.railway.app/*##https://supplify-api-dev-development.up.railway.app/*"
       },
       "defaultClientScopes": ["web-origins", "profile", "roles", "email"],
       "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
