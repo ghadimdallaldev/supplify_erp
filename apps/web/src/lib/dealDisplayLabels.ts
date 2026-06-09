@@ -51,6 +51,13 @@ export const CTA_TYPE_HELPER_TEXT: Record<string, string> = {
 export const COUPON_FIELD_HELPER =
   'Coupon codes are attached to this deal. They are not standalone vouchers.'
 
+/** When the discount/coupon itself is valid — separate from boost feed visibility. */
+export const DEAL_SCHEDULE_SECTION_HELPER =
+  'Controls when restaurants can redeem this discount or coupon. This is separate from your boost package, which only controls how long the deal is promoted in restaurant feeds.'
+
+export const DEAL_SCHEDULE_ENDS_HELPER =
+  'Leave blank to keep the offer open for the full boost period (or until you pause it). Set an end date only if you want the discount to stop before or after boosted visibility ends.'
+
 export const COUPON_LINKED_HELPER = 'This code is linked to this supplier deal.'
 
 export const COUPON_COPIED_TOAST = "Coupon copied. We'll apply it at checkout when eligible."

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   COUPON_COPIED_TOAST,
   COUPON_FIELD_HELPER,
+  DEAL_SCHEDULE_ENDS_HELPER,
+  DEAL_SCHEDULE_SECTION_HELPER,
   CTA_TYPE_HELPER_TEXT,
   DEAL_TYPE_HELPER_TEXT,
   DEAL_TYPE_LABELS,
@@ -34,6 +36,13 @@ describe('dealDisplayLabels', () => {
 
   it('falls back for unknown deal types', () => {
     expect(formatDealTypeLabel('custom_type')).toBe('Custom Type')
+  })
+
+  it('explains deal schedule vs boost visibility', () => {
+    expect(DEAL_SCHEDULE_SECTION_HELPER).toContain('boost package')
+    expect(DEAL_SCHEDULE_SECTION_HELPER).toContain('redeem')
+    expect(DEAL_SCHEDULE_ENDS_HELPER).toContain('Leave blank')
+    expect(DEAL_SCHEDULE_ENDS_HELPER).toContain('boost')
   })
 
   it('provides deal type helper text for create form', () => {

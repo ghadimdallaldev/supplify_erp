@@ -29,6 +29,13 @@ import {
   recordLoginLegalReacceptances,
 } from '../lib/legal-acceptance.js'
 import { randomBytes } from 'crypto'
+import { z } from 'zod'
+import {
+  getAdminUserPreferences,
+  upsertAdminUserPreferences,
+  ADMIN_LANDING_TABS,
+  ADMIN_THEME_PREFERENCES,
+} from '../lib/admin-user-preferences.js'
 
 const legalAcceptanceSchema = {
   packVersion: (v) => typeof v === 'string' && v.length > 0 && v.length <= 32,
@@ -385,6 +392,11 @@ router.get('/me', requireAuth, async (req, res) => {
       tenantType: tenant?.tenantType ?? workspace?.tenantType ?? null,
     })
 
+    let adminPreferences = null
+    if (user.role === 'ADMIN') {
+      adminPreferences = await getAdminUserPreferences(user.id)
+    }
+
     const meMs = Number(process.hrtime.bigint() - meT0) / 1e6
     if (meMs >= 400) {
       logger.info({
@@ -412,6 +424,7 @@ router.get('/me', requireAuth, async (req, res) => {
         adminRoles,
         adminPermissions,
         legalStatus,
+        adminPreferences,
         ...additionalData,
       },
       error: null,
@@ -670,6 +683,90 @@ router.post('/logout', requireAuth, async (req, res) => {
         keycloakLogoutUrl: keycloakLogoutUrl || undefined,
       },
       error: null,
+      requestId: req.requestId,
+    })
+  }
+})
+
+const adminPreferencesPatchSchema = z
+  .object({
+    defaultLandingTab: z
+      .string()
+      .refine((value) => ADMIN_LANDING_TABS.includes(value), { message: 'Invalid landing tab' })
+      .optional(),
+    compactMode: z.boolean().optional(),
+    themePreference: z
+      .string()
+      .refine((value) => ADMIN_THEME_PREFERENCES.includes(value), { message: 'Invalid theme' })
+      .optional(),
+  })
+  .refine((data) => Object.values(data).some((value) => value !== undefined), {
+    message: 'No fields to update',
+  })
+
+router.get('/admin-preferences', requireAuth, async (req, res) => {
+  try {
+    if (req.userData.role !== 'ADMIN') {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Admin access required' },
+        requestId: req.requestId,
+      })
+    }
+
+    const preferences = await getAdminUserPreferences(req.userData.id)
+    res.json({
+      ok: true,
+      data: { preferences },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Get admin preferences error', { error: error.message })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get admin preferences' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.patch('/admin-preferences', requireAuth, async (req, res) => {
+  try {
+    if (req.userData.role !== 'ADMIN') {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Admin access required' },
+        requestId: req.requestId,
+      })
+    }
+
+    const updateData = adminPreferencesPatchSchema.parse(req.body)
+    const preferences = await upsertAdminUserPreferences(req.userData.id, updateData)
+
+    res.json({
+      ok: true,
+      data: { preferences },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.errors[0]?.message || 'Invalid input' },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Update admin preferences error', { error: error.message })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to update admin preferences' },
       requestId: req.requestId,
     })
   }

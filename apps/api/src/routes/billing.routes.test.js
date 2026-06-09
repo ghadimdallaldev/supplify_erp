@@ -8,30 +8,41 @@ const setAutoRenew = vi.fn()
 const listBillingGateways = vi.fn()
 const checkoutSubscription = vi.fn()
 
+const rbacState = vi.hoisted(() => ({
+  userData: { id: 'user-1', role: 'RESTAURANT', email: 'r@test.com' },
+  tenantContext: {
+    tenantId: 'rest-1',
+    tenantType: 'RESTAURANT',
+    permissions: ['SUBSCRIPTIONS_VIEW', 'SUBSCRIPTIONS_MANAGE', 'SETTINGS_MANAGE'],
+  },
+  requestTenant: {
+    tenantId: 'rest-1',
+    tenantType: 'RESTAURANT',
+  },
+}))
+
 vi.mock('../lib/rbac.js', () => ({
   requireAuth: (req, res, next) => {
-    req.userData = { id: 'user-1', role: 'RESTAURANT', email: 'r@test.com' }
+    req.userData = { ...rbacState.userData }
     next()
   },
   resolveTenantContext: (req, res, next) => {
-    req.tenantContext = {
-      tenantId: 'rest-1',
-      tenantType: 'RESTAURANT',
-      permissions: ['SUBSCRIPTIONS_VIEW', 'SUBSCRIPTIONS_MANAGE', 'SETTINGS_MANAGE'],
-    }
+    req.tenantContext = { ...rbacState.tenantContext }
     next()
   },
   requireRole: () => (req, res, next) => next(),
   requirePermission: () => (req, res, next) => next(),
   requireAnyPermission: () => (req, res, next) => next(),
-  getRequestTenant: vi.fn().mockResolvedValue({
-    tenantId: 'rest-1',
-    tenantType: 'RESTAURANT',
-  }),
+  getRequestTenant: vi.fn(async () => rbacState.requestTenant),
 }))
 
 vi.mock('../lib/billing/billing-service.js', () => ({
   getBillingStatus,
+  buildPlatformAdminBillingStatus: vi.fn((gateways) => ({
+    subscription: null,
+    access: { isLocked: false, pendingActivation: false },
+    gateways,
+  })),
   listPaymentMethods,
   addPaymentMethod: vi.fn(),
   removePaymentMethod: vi.fn(),
@@ -65,6 +76,16 @@ describe('billing.routes', () => {
   let app
 
   beforeEach(async () => {
+    rbacState.userData = { id: 'user-1', role: 'RESTAURANT', email: 'r@test.com' }
+    rbacState.tenantContext = {
+      tenantId: 'rest-1',
+      tenantType: 'RESTAURANT',
+      permissions: ['SUBSCRIPTIONS_VIEW', 'SUBSCRIPTIONS_MANAGE', 'SETTINGS_MANAGE'],
+    }
+    rbacState.requestTenant = {
+      tenantId: 'rest-1',
+      tenantType: 'RESTAURANT',
+    }
     getEffectiveTenant.mockReturnValue(null)
     getBillingStatus.mockReset()
     listPaymentMethods.mockReset()
@@ -96,6 +117,19 @@ describe('billing.routes', () => {
     expect(res.body.ok).toBe(true)
     expect(res.body.data.access.pendingActivation).toBe(true)
     expect(res.body.data.gateways).toEqual(['stub', 'manual'])
+  })
+
+  it('GET /status for platform admin without tenant returns unlocked shell', async () => {
+    rbacState.userData = { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' }
+    rbacState.tenantContext = {}
+    rbacState.requestTenant = null
+
+    const res = await request(app).get('/api/billing/status').expect(200)
+
+    expect(res.body.ok).toBe(true)
+    expect(res.body.data.subscription).toBeNull()
+    expect(res.body.data.access.isLocked).toBe(false)
+    expect(getBillingStatus).not.toHaveBeenCalled()
   })
 
   it('GET /payment-methods returns methods list', async () => {

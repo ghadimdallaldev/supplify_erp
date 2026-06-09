@@ -6,6 +6,7 @@ import {
   restaurantSupplierMutationGuard,
   ordersRouterMutationGuard,
   chatSendGuard,
+  notificationsMutationGuard,
   resolveAdminDashboardPermission,
   adminDashboardPermissionGuard,
 } from './route-permissions.js'
@@ -334,5 +335,33 @@ describe('role matrix write restrictions', () => {
     const perms = rolePerms('Owner', 'RESTAURANT')
     expect(hasPermission(perms, P.SETTINGS_MANAGE)).toBe(true)
     expect(hasPermission(perms, P.STAFF_MANAGE)).toBe(true)
+  })
+})
+
+describe('notificationsMutationGuard', () => {
+  beforeEach(() => {
+    next.mockReset()
+  })
+
+  it('allows platform admin to PATCH preferences without tenant permissions', () => {
+    const req = {
+      ...mockReq('PATCH', '/preferences'),
+      userData: { role: 'ADMIN' },
+      tenantContext: null,
+    }
+    notificationsMutationGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('requires settings permission for tenant users', () => {
+    const req = {
+      ...mockReq('PATCH', '/preferences'),
+      userData: { role: 'RESTAURANT' },
+      tenantContext: { permissions: ['SETTINGS_VIEW'] },
+    }
+    const r = mockResWithPerms(['SETTINGS_VIEW'])
+    notificationsMutationGuard(req, r, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(r.status).toHaveBeenCalledWith(403)
   })
 })

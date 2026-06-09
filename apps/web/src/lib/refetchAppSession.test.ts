@@ -39,6 +39,7 @@ import {
   hasStaleRegistrationState,
   isBillingPendingActivation,
   refetchAppSession,
+  shouldRefetchTenantBilling,
 } from './refetchAppSession'
 
 describe('refetchAppSession helpers', () => {
@@ -62,7 +63,8 @@ describe('refetchAppSession', () => {
     unwrap.mockResolvedValue(undefined)
   })
 
-  it('force-refetches auth shell endpoints', async () => {
+  it('force-refetches auth shell endpoints for tenant users', async () => {
+    unwrap.mockResolvedValueOnce({ role: 'RESTAURANT' })
     const dispatch = vi.fn((action) => action)
 
     await refetchAppSession(dispatch as never)
@@ -72,5 +74,26 @@ describe('refetchAppSession', () => {
     expect(initiate).toHaveBeenCalledWith('getRegisterStatus', undefined, { forceRefetch: true })
     expect(initiate).toHaveBeenCalledWith('getBillingStatus', undefined, { forceRefetch: true })
     expect(initiate).toHaveBeenCalledWith('getEntitlements', undefined, { forceRefetch: true })
+  })
+
+  it('skips tenant billing and entitlements for platform admin', async () => {
+    unwrap.mockResolvedValueOnce({ role: 'ADMIN' })
+    const dispatch = vi.fn((action) => action)
+
+    await refetchAppSession(dispatch as never)
+
+    expect(initiate).toHaveBeenCalledTimes(2)
+    expect(initiate).toHaveBeenCalledWith('getMe', undefined, { forceRefetch: true })
+    expect(initiate).toHaveBeenCalledWith('getRegisterStatus', undefined, { forceRefetch: true })
+    expect(initiate).not.toHaveBeenCalledWith('getBillingStatus', undefined, { forceRefetch: true })
+  })
+})
+
+describe('shouldRefetchTenantBilling', () => {
+  it('returns true only for restaurant and supplier roles', () => {
+    expect(shouldRefetchTenantBilling('RESTAURANT')).toBe(true)
+    expect(shouldRefetchTenantBilling('SUPPLIER')).toBe(true)
+    expect(shouldRefetchTenantBilling('ADMIN')).toBe(false)
+    expect(shouldRefetchTenantBilling('STAFF_PORTAL')).toBe(false)
   })
 })

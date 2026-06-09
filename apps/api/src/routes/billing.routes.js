@@ -5,6 +5,7 @@ import { billingAccessGuard } from '../lib/route-permissions.js'
 import { logger } from '../lib/logger.js'
 import {
   getBillingStatus,
+  buildPlatformAdminBillingStatus,
   listPaymentMethods,
   addPaymentMethod,
   removePaymentMethod,
@@ -68,6 +69,14 @@ router.get('/status', async (req, res) => {
         }
       : await getRequestTenant(req)
     if (!tenant) {
+      if (req.userData?.role === 'ADMIN') {
+        return res.json({
+          ok: true,
+          data: buildPlatformAdminBillingStatus(listBillingGateways()),
+          error: null,
+          requestId: req.requestId,
+        })
+      }
       return res.status(404).json({
         ok: false,
         data: null,

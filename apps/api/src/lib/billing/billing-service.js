@@ -138,6 +138,25 @@ export function computeBillingAccessState(subscription) {
   }
 }
 
+/** Platform admins have no tenant subscription; stable unlocked shell for GET /status. */
+export function buildPlatformAdminBillingStatus(gateways = []) {
+  return {
+    subscription: null,
+    access: {
+      ...computeBillingAccessState(null),
+      pendingActivation: false,
+      freeSandboxExpired: false,
+      lockReason: null,
+    },
+    paymentMethods: [],
+    defaultPaymentMethod: null,
+    openInvoices: [],
+    amountDue: 0,
+    gracePeriodDays: GRACE_PERIOD_DAYS,
+    gateways,
+  }
+}
+
 export async function getBillingStatus(tenantId, tenantType) {
   // Subscription (cached), payment methods, and open invoices are all independent — fetch in parallel.
   let subscription, paymentMethods, openInvoices, defaultPaymentMethod

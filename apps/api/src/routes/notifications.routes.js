@@ -45,6 +45,7 @@ const updatePreferencesSchema = z.object({
   notifyLowStock: z.boolean().optional(),
   notifyOutOfStock: z.boolean().optional(),
   notifySystemUpdates: z.boolean().optional(),
+  notifyBilling: z.boolean().optional(),
   notifyPromotions: z.boolean().optional(),
   notifyReservationCreated: z.boolean().optional(),
   notifyReservationWaitlist: z.boolean().optional(),
