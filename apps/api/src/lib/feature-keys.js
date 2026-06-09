@@ -36,6 +36,7 @@ export const SUPPLIER_FEATURE_KEYS = [
   'fulfillment',
   'driver_management',
   'disputes_returns',
+  'finance_invoices',
   'quick_lists',
   'inventory_management',
   'advanced_roles',
