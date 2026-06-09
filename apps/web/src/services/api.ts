@@ -2899,10 +2899,12 @@ export const api = createApi({
     >({
       query: (params) => ({ url: '/api/promotions/admin/deals', params: params || {} }),
       providesTags: ['Promotions'],
+      keepUnusedDataFor: 300,
     }),
     getAdminDealInsights: builder.query<{ insights: Record<string, unknown> }, void>({
       query: () => '/api/promotions/admin/deals/insights',
       providesTags: ['Promotions'],
+      keepUnusedDataFor: 300,
     }),
     getAdminPendingDeals: builder.query<{ deals: Array<Record<string, unknown>> }, void>({
       query: () => '/api/promotions/admin/pending',
@@ -2981,6 +2983,8 @@ export const api = createApi({
         url: '/api/admin-dashboard/limit-keys',
         params: params || {},
       }),
+      providesTags: ['Admin'],
+      keepUnusedDataFor: 300,
     }),
     getAdminLimitOverrides: builder.query<
       {
@@ -3475,6 +3479,7 @@ export const api = createApi({
     getAdminOverview: builder.query<import('../lib/adminOverview').AdminOverview, void>({
       query: () => '/api/admin-dashboard/overview',
       providesTags: ['Admin'],
+      keepUnusedDataFor: 300,
     }),
     getAdminPlatformSettings: builder.query<{ freeSandboxDays: number }, void>({
       query: () => '/api/admin-dashboard/platform-settings',
@@ -3528,6 +3533,7 @@ export const api = createApi({
         params: params ?? {},
       }),
       providesTags: ['Admin'],
+      keepUnusedDataFor: 300,
     }),
     getAdminPlans: builder.query<
       { plans: SubscriptionPlan[] },
@@ -3538,6 +3544,7 @@ export const api = createApi({
         params: params ?? {},
       }),
       providesTags: ['Admin'],
+      keepUnusedDataFor: 300,
     }),
     createAdminPlan: builder.mutation<SubscriptionPlan, any>({
       query: (body) => ({
@@ -3568,6 +3575,7 @@ export const api = createApi({
         params,
       }),
       providesTags: ['Admin'],
+      keepUnusedDataFor: 300,
     }),
     updateAdminSubscription: builder.mutation<
       {
@@ -3663,6 +3671,7 @@ export const api = createApi({
     >({
       query: () => '/api/admin-dashboard/health',
       providesTags: ['Admin'],
+      keepUnusedDataFor: 300,
     }),
     getAdminOperationalSummary: builder.query<{ summary: Record<string, unknown> }, void>({
       query: () => '/api/admin-dashboard/operational-summary',
@@ -3730,6 +3739,7 @@ export const api = createApi({
     >({
       query: () => '/api/admin-dashboard/financial-overview',
       providesTags: ['Admin'],
+      keepUnusedDataFor: 300,
     }),
     getAdminSuppliers: builder.query<
       { suppliers: any[]; total?: number; limit?: number; offset?: number },
@@ -3741,6 +3751,7 @@ export const api = createApi({
         return `/api/admin-dashboard/tenants/suppliers?limit=${limit}&offset=${offset}`
       },
       providesTags: ['Admin'],
+      keepUnusedDataFor: 300,
     }),
     getAdminRestaurants: builder.query<
       { restaurants: any[]; total?: number; limit?: number; offset?: number },
@@ -3752,6 +3763,7 @@ export const api = createApi({
         return `/api/admin-dashboard/tenants/restaurants?limit=${limit}&offset=${offset}`
       },
       providesTags: ['Admin'],
+      keepUnusedDataFor: 300,
     }),
     getAdminUsers: builder.query<
       {
@@ -4227,6 +4239,7 @@ export const {
   useGetAdminAuditLogsQuery,
   useGetAdminActivityQuery,
   useGetAdminHealthQuery,
+  useGetAdminFinancialOverviewQuery,
   useGetAdminOperationalSummaryQuery,
   useGetAdminEmailDeliveryLogsQuery,
   useGetAdminFulfillmentIssuesQuery,

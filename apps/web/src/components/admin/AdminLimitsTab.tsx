@@ -120,8 +120,11 @@ export function AdminLimitsTab() {
   const [selectedTenant, setSelectedTenant] = useState<AdminTenantOption | null>(null)
   const [orgMainOnly, setOrgMainOnly] = useState(false)
 
-  const { data: suppliersData, isLoading: suppliersLoading } = useGetAdminSuppliersQuery()
-  const { data: restaurantsData, isLoading: restaurantsLoading } = useGetAdminRestaurantsQuery()
+  const tenantListArgs = { limit: 100, offset: 0 }
+  const { data: suppliersData, isLoading: suppliersLoading } =
+    useGetAdminSuppliersQuery(tenantListArgs)
+  const { data: restaurantsData, isLoading: restaurantsLoading } =
+    useGetAdminRestaurantsQuery(tenantListArgs)
 
   const tenants = useMemo(() => {
     const suppliers = (suppliersData?.suppliers ?? []).map((r: Record<string, unknown>) =>

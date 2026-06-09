@@ -18,7 +18,7 @@ export function resolvePlanLimitFromCatalog(
   return null
 }
 
-export function formatPlanLimitDisplayValue(limit: number | null): string {
+export function formatPlanLimitDisplayValue(limit: number | null | undefined): string {
   if (limit === -1) return 'Unlimited'
   if (limit == null) return '—'
   return String(limit)
