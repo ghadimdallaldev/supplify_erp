@@ -1,5 +1,5 @@
-import { Link, useNavigate } from 'react-router-dom'
-import { useEffect, lazy, Suspense } from 'react'
+import { Link, Navigate } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
 import {
   useGetDashboardStatsQuery,
   useGetOrdersQuery,
@@ -250,7 +250,6 @@ function SectionCard({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function DashboardPage() {
-  const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
   const {
     isImpersonating,
@@ -263,25 +262,6 @@ export function DashboardPage() {
   const { isDriverRole, persona } = useWorkspaceRole()
   const { can } = usePermissions()
   const isAdminNotImpersonating = isPlatformAdmin && !isImpersonating
-
-  useEffect(() => {
-    if (isAdminNotImpersonating) {
-      navigate('/app/admin', { replace: true })
-    }
-  }, [isAdminNotImpersonating, navigate])
-
-  useEffect(() => {
-    if (isDriverRole && !isAdminNotImpersonating) {
-      navigate('/app/driver-deliveries', { replace: true })
-    }
-  }, [isDriverRole, isAdminNotImpersonating, navigate])
-
-  useEffect(() => {
-    if (!persona.dashboard && !isAdminNotImpersonating && !isDriverRole) {
-      navigate(persona.homePath, { replace: true })
-    }
-  }, [persona.dashboard, persona.homePath, isAdminNotImpersonating, isDriverRole, navigate])
-
   const skipDashboardData = isAdminNotImpersonating || isDriverRole
   const {
     data: stats,
@@ -358,6 +338,18 @@ export function DashboardPage() {
     day: 'numeric',
     year: 'numeric',
   })
+
+  if (isAdminNotImpersonating) {
+    return <Navigate to="/app/admin" replace />
+  }
+
+  if (isDriverRole) {
+    return <Navigate to="/app/driver-deliveries" replace />
+  }
+
+  if (!persona.dashboard) {
+    return <Navigate to={persona.homePath} replace />
+  }
 
   // ── Loading ──────────────────────────────────────────────────────────────
   if (isLoading) {

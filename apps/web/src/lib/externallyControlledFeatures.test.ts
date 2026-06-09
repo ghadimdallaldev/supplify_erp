@@ -120,4 +120,25 @@ describe('getPlanTierDisabledFeatures', () => {
     })
     expect(getPlanTierDisabledFeatures(e).map((x) => x.key)).not.toContain('quick_lists')
   })
+
+  it('restaurant Gold does not list supplier-only fulfillment_tools', () => {
+    const e = entitlements({
+      plan: { name: 'Gold', code: 'gold' },
+      features: { fulfillment_tools: false },
+      planFeatures: { fulfillment_tools: false },
+      featureSources: { fulfillment_tools: 'plan' },
+    })
+    expect(getPlanTierDisabledFeatures(e).map((x) => x.key)).not.toContain('fulfillment_tools')
+  })
+
+  it('supplier Silver still lists fulfillment_tools when disabled on plan', () => {
+    const e = entitlements({
+      tenantType: 'SUPPLIER',
+      plan: { name: 'Silver', code: 'silver' },
+      features: { fulfillment_tools: false },
+      planFeatures: { fulfillment_tools: false },
+      featureSources: { fulfillment_tools: 'plan' },
+    })
+    expect(getPlanTierDisabledFeatures(e).map((x) => x.key)).toContain('fulfillment_tools')
+  })
 })

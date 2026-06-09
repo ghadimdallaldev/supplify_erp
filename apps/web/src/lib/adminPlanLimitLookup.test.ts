@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolvePlanLimitFromCatalog } from './adminPlanLimitLookup'
+import { formatPlanLimitDisplayValue, resolvePlanLimitFromCatalog } from './adminPlanLimitLookup'
 import type { SubscriptionPlan } from '../types'
 
 const catalog: SubscriptionPlan[] = [
@@ -33,6 +33,10 @@ describe('adminPlanLimitLookup', () => {
       10
     )
     expect(resolvePlanLimitFromCatalog(catalog, 'RESTAURANT', 'gold', 'orders_per_day')).toBe(100)
+  })
+
+  it('formats undefined limit as em dash', () => {
+    expect(formatPlanLimitDisplayValue(undefined)).toBe('—')
   })
 
   it('returns null when plan or key missing', () => {

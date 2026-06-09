@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { lazy, Suspense, useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardHeader, CardContent, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -15,7 +15,6 @@ import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
-  api,
   useGetAdminOverviewQuery,
   useGetAdminConversionStatsQuery,
   useGetAdminPlansQuery,
@@ -23,6 +22,7 @@ import {
   useGetAdminAuditLogsQuery,
   useGetAdminActivityQuery,
   useGetAdminHealthQuery,
+  useGetAdminFinancialOverviewQuery,
   useGetAdminPlatformSettingsQuery,
   useUpdateAdminPlanMutation,
   useUpdateAdminSubscriptionMutation,
@@ -86,9 +86,6 @@ import {
   formatPlanLimitDisplayValue,
 } from '../lib/adminPlanLimitLookup'
 import { formatCurrency } from '../utils/format'
-import { AdminFeatureFlagsPanel } from '../components/admin/AdminFeatureFlagsPanel'
-import { AdminDealsPanel } from '../components/admin/AdminDealsPanel'
-import { AdminLimitsTab } from '../components/admin/AdminLimitsTab'
 import { AdminOverviewExtras } from '../components/admin/AdminOverviewExtras'
 import { AdminPortalNav } from '../components/admin/AdminPortalNav'
 import { AdminPlatformSettingsPanel } from '../components/admin/AdminPlatformSettingsPanel'
@@ -98,8 +95,6 @@ import { AdminOperationsSnapshot } from '../components/admin/AdminOperationsSnap
 import { AdminTenantUsageTable } from '../components/admin/AdminTenantUsageTable'
 import { AdminKpiCard } from '../components/admin/AdminKpiCard'
 import { AdminSectionHeader } from '../components/admin/adminUi'
-import { AdminUsersTab } from '../components/admin/AdminUsersTab'
-import { AdminOperationsPanel } from '../components/admin/AdminOperationsPanel'
 import { AdminTenantDiagnosticsDrawer } from '../components/admin/AdminTenantDiagnosticsDrawer'
 import type { AdminTenantType } from '../lib/adminTenantSearch'
 import {
@@ -108,6 +103,47 @@ import {
 } from '../components/admin/AdminResetPasswordDialog'
 import { usePermissions } from '../hooks/usePermissions'
 import { useAppSelector } from '../hooks/redux'
+
+const AdminDealsPanel = lazy(() =>
+  import('../components/admin/AdminDealsPanel').then((m) => ({ default: m.AdminDealsPanel }))
+)
+const AdminLimitsTab = lazy(() =>
+  import('../components/admin/AdminLimitsTab').then((m) => ({ default: m.AdminLimitsTab }))
+)
+const AdminFeatureFlagsPanel = lazy(() =>
+  import('../components/admin/AdminFeatureFlagsPanel').then((m) => ({
+    default: m.AdminFeatureFlagsPanel,
+  }))
+)
+const AdminUsersTab = lazy(() =>
+  import('../components/admin/AdminUsersTab').then((m) => ({ default: m.AdminUsersTab }))
+)
+const AdminOperationsPanel = lazy(() =>
+  import('../components/admin/AdminOperationsPanel').then((m) => ({
+    default: m.AdminOperationsPanel,
+  }))
+)
+
+function dedupeAdminPlans(raw: SubscriptionPlan[] | undefined) {
+  return (
+    raw?.filter(
+      (p, i, arr) =>
+        (p.code || '').toLowerCase() !== 'enterprise' &&
+        arr.findIndex(
+          (x) =>
+            x.code === p.code && (x.tenant_type || 'RESTAURANT') === (p.tenant_type || 'RESTAURANT')
+        ) === i
+    ) ?? []
+  )
+}
+
+function AdminTabLoading() {
+  return (
+    <div className="flex justify-center py-12 text-[var(--text-muted)]">
+      <Loader2 className="h-6 w-6 animate-spin" />
+    </div>
+  )
+}
 
 interface AdminDashboardPageProps {
   initialTab?: string
@@ -208,8 +244,8 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     { days: 30 },
     { skip: selectedTab !== 'overview' }
   )
-  const { data: overviewHealthData } = useGetAdminHealthQuery(undefined, {
-    skip: selectedTab !== 'overview',
+  const { data: healthData, isLoading: healthLoading } = useGetAdminHealthQuery(undefined, {
+    skip: selectedTab !== 'overview' && selectedTab !== 'health',
   })
   const { data: platformSettings } = useGetAdminPlatformSettingsQuery(undefined, {
     skip: selectedTab !== 'plans',
@@ -228,31 +264,34 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
       { skip: !['subscriptions', 'plans', 'usage'].includes(selectedTab) }
     )
 
-  const dedupeAdminPlans = (raw: SubscriptionPlan[] | undefined) =>
-    raw?.filter(
-      (p, i, arr) =>
-        (p.code || '').toLowerCase() !== 'enterprise' &&
-        arr.findIndex(
-          (x) =>
-            x.code === p.code && (x.tenant_type || 'RESTAURANT') === (p.tenant_type || 'RESTAURANT')
-        ) === i
-    ) ?? []
+  const plans = useMemo(() => dedupeAdminPlans(plansData?.plans), [plansData?.plans])
 
-  const plans = dedupeAdminPlans(plansData?.plans)
-
-  const supplierProductLimit = (planCode: string | null | undefined) =>
-    resolvePlanLimitFromCatalog(plans, 'SUPPLIER', planCode, 'supplier_products_skus')
-
-  const restaurantOrdersPerDayLimit = (planCode: string | null | undefined) =>
-    resolvePlanLimitFromCatalog(plans, 'RESTAURANT', planCode, 'orders_per_day')
-  const changePlanPlanOptions = dedupeAdminPlans(changePlanPlansData?.plans).filter(
-    (p) => (p.tenant_type || 'RESTAURANT') === changePlanModal?.tenantType
+  const supplierProductLimit = useCallback(
+    (planCode: string | null | undefined) =>
+      resolvePlanLimitFromCatalog(plans, 'SUPPLIER', planCode, 'supplier_products_skus'),
+    [plans]
   )
-  const subscriptions =
-    subscriptionsData?.subscriptions?.filter(
-      (s, i, arr) =>
-        arr.findIndex((x) => x.tenant_id === s.tenant_id && x.tenant_type === s.tenant_type) === i
-    ) ?? []
+
+  const restaurantOrdersPerDayLimit = useCallback(
+    (planCode: string | null | undefined) =>
+      resolvePlanLimitFromCatalog(plans, 'RESTAURANT', planCode, 'orders_per_day'),
+    [plans]
+  )
+  const changePlanPlanOptions = useMemo(
+    () =>
+      dedupeAdminPlans(changePlanPlansData?.plans).filter(
+        (p) => (p.tenant_type || 'RESTAURANT') === changePlanModal?.tenantType
+      ),
+    [changePlanPlansData?.plans, changePlanModal?.tenantType]
+  )
+  const subscriptions = useMemo(
+    () =>
+      subscriptionsData?.subscriptions?.filter(
+        (s, i, arr) =>
+          arr.findIndex((x) => x.tenant_id === s.tenant_id && x.tenant_type === s.tenant_type) === i
+      ) ?? [],
+    [subscriptionsData?.subscriptions]
+  )
   const [auditActionType, setAuditActionType] = useState('all')
   const [auditDateFrom, setAuditDateFrom] = useState('')
   const [auditDateTo, setAuditDateTo] = useState('')
@@ -294,17 +333,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     { skip: selectedTab !== 'activity' }
   )
 
-  const { data: healthData, isLoading: healthLoading } = (api as any).useGetAdminHealthQuery(
-    undefined,
-    { skip: selectedTab !== 'health' }
-  )
   const {
     data: financeData,
     isLoading: financeLoading,
     isError: financeError,
     error: financeQueryError,
     refetch: refetchFinance,
-  } = (api as any).useGetAdminFinancialOverviewQuery(undefined, { skip: selectedTab !== 'finance' })
+  } = useGetAdminFinancialOverviewQuery(undefined, { skip: selectedTab !== 'finance' })
 
   // Load tenant data
   const {
@@ -710,8 +745,8 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 <AdminExecutiveSummary
                   overview={overview as AdminOverview}
                   recentErrorCount={
-                    Array.isArray(overviewHealthData?.recentApiErrors)
-                      ? overviewHealthData.recentApiErrors.length
+                    Array.isArray(healthData?.recentApiErrors)
+                      ? healthData.recentApiErrors.length
                       : 0
                   }
                 />
@@ -719,8 +754,8 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 <AdminOperationsSnapshot
                   overview={overview as AdminOverview}
                   recentErrorCount={
-                    Array.isArray(overviewHealthData?.recentApiErrors)
-                      ? overviewHealthData.recentApiErrors.length
+                    Array.isArray(healthData?.recentApiErrors)
+                      ? healthData.recentApiErrors.length
                       : 0
                   }
                   onNavigateTab={setSelectedTab}
@@ -1491,10 +1526,14 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
           </TabsContent>
 
           <TabsContent value="operations" className="space-y-5">
-            <AdminOperationsPanel
-              initialSubTab={operationsSubTab}
-              onNavigateDeals={() => setSelectedTab('deals')}
-            />
+            {selectedTab === 'operations' ? (
+              <Suspense fallback={<AdminTabLoading />}>
+                <AdminOperationsPanel
+                  initialSubTab={operationsSubTab}
+                  onNavigateDeals={() => setSelectedTab('deals')}
+                />
+              </Suspense>
+            ) : null}
           </TabsContent>
 
           <TabsContent value="health" className="space-y-5">
@@ -1954,7 +1993,11 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
           </TabsContent>
 
           <TabsContent value="users" className="space-y-6">
-            <AdminUsersTab />
+            {selectedTab === 'users' ? (
+              <Suspense fallback={<AdminTabLoading />}>
+                <AdminUsersTab />
+              </Suspense>
+            ) : null}
           </TabsContent>
 
           <TabsContent value="tenants" className="space-y-4">
@@ -2791,28 +2834,40 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
           </TabsContent>
 
           <TabsContent value="features">
-            <AdminFeatureFlagsPanel
-              restaurants={(restaurantsData?.restaurants ?? []).map(
-                (r: { id: string; name: string }) => ({
-                  id: r.id,
-                  name: r.name,
-                })
-              )}
-              suppliers={(suppliersData?.suppliers ?? []).map(
-                (s: { id: string; name: string }) => ({
-                  id: s.id,
-                  name: s.name,
-                })
-              )}
-            />
+            {selectedTab === 'features' ? (
+              <Suspense fallback={<AdminTabLoading />}>
+                <AdminFeatureFlagsPanel
+                  restaurants={(restaurantsData?.restaurants ?? []).map(
+                    (r: { id: string; name: string }) => ({
+                      id: r.id,
+                      name: r.name,
+                    })
+                  )}
+                  suppliers={(suppliersData?.suppliers ?? []).map(
+                    (s: { id: string; name: string }) => ({
+                      id: s.id,
+                      name: s.name,
+                    })
+                  )}
+                />
+              </Suspense>
+            ) : null}
           </TabsContent>
 
           <TabsContent value="deals">
-            <AdminDealsPanel />
+            {selectedTab === 'deals' ? (
+              <Suspense fallback={<AdminTabLoading />}>
+                <AdminDealsPanel />
+              </Suspense>
+            ) : null}
           </TabsContent>
 
           <TabsContent value="limits">
-            <AdminLimitsTab />
+            {selectedTab === 'limits' ? (
+              <Suspense fallback={<AdminTabLoading />}>
+                <AdminLimitsTab />
+              </Suspense>
+            ) : null}
           </TabsContent>
 
           {/* ─── ACTIVITY FEED ──────────────────────────────────────────── */}
