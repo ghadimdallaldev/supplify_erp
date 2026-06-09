@@ -2,7 +2,7 @@ import dotenv from 'dotenv'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { existsSync } from 'node:fs'
-import { loadRailwayApiEnvDefaults } from './load-railway-env.js'
+import { isRailwayRuntime, loadRailwayApiEnvDefaults } from './load-railway-env.js'
 import { resolveNativeDatabaseUrl } from './resolve-database-url.js'
 import {
   envBool,
@@ -21,7 +21,9 @@ const repoRoot = path.resolve(apiEnvDir, '../..')
 loadRailwayApiEnvDefaults(repoRoot)
 dotenv.config({ path: path.join(apiEnvDir, '.env') })
 const dockerSyncPath = path.join(apiEnvDir, '.env.docker-sync')
-if (existsSync(dockerSyncPath)) {
+// Local Docker port overrides must not stomp Railway CLI / hosted DATABASE_URL (railway run injects
+// postgres.railway.internal; .env.docker-sync would otherwise redirect seeds to localhost).
+if (existsSync(dockerSyncPath) && !isRailwayRuntime()) {
   dotenv.config({ path: dockerSyncPath, override: true })
 }
 

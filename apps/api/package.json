@@ -37,6 +37,8 @@
     "seed:features": "node scripts/seed-feature-demos.js",
     "seed:tier-catalog": "node scripts/seed-tier-catalog.js",
     "seed:tier-matrix": "node scripts/seed-tier-matrix.mjs",
+    "seed:dev-role-users": "node scripts/seed-dev-role-matrix-users.js",
+    "seed:business-demo": "node scripts/seed-business-engineer-demo.js",
     "log:tier-limits": "node scripts/log-tier-limits.mjs",
     "verify:tier-matrix": "node scripts/verify-tier-matrix.mjs",
     "reduce-to-single-tenant": "node scripts/reduce-to-single-tenant.js",
