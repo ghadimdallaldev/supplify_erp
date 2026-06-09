@@ -325,8 +325,8 @@ export const api = createApi({
       query: () => '/api/register/status',
       providesTags: ['RegisterStatus'],
       keepUnusedDataFor: 120,
-      transformResponse: (response: { data?: { needsSetup?: boolean } }) => ({
-        needsSetup: Boolean(response?.data?.needsSetup),
+      transformResponse: (response: { needsSetup?: boolean }) => ({
+        needsSetup: Boolean(response?.needsSetup),
       }),
     }),
     submitLegalReacceptance: builder.mutation<
@@ -338,9 +338,6 @@ export const api = createApi({
         method: 'POST',
         body: { legalAcceptance },
       }),
-      transformResponse: (response: {
-        data?: { legalStatus?: import('../types').LegalAcceptanceStatus }
-      }) => ({ legalStatus: response.data!.legalStatus! }),
       invalidatesTags: ['User'],
     }),
     completeRegistration: builder.mutation<
@@ -357,8 +354,10 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      transformResponse: (response: { data?: { tenantType: string; tenant: unknown } }) =>
-        response.data as { tenantType: string; tenant: unknown },
+      transformResponse: (response: { tenantType?: string; tenant?: unknown }) => ({
+        tenantType: response.tenantType as string,
+        tenant: response.tenant,
+      }),
     }),
 
     // Product endpoints
