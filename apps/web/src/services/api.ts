@@ -67,6 +67,7 @@ import type {
   DeliveryRouteDetail,
   DeliveryTrackingInfo,
   OrderTrackingResponse,
+  AdminUserPreferences,
 } from '../types'
 
 import { getApiBase } from '../lib/env'
@@ -306,6 +307,22 @@ export const api = createApi({
       query: () => '/auth/me',
       providesTags: ['User'],
       keepUnusedDataFor: 120,
+    }),
+    getAdminPreferences: builder.query<{ preferences: AdminUserPreferences }, void>({
+      query: () => '/auth/admin-preferences',
+      providesTags: ['User'],
+      keepUnusedDataFor: 300,
+    }),
+    updateAdminPreferences: builder.mutation<
+      { preferences: AdminUserPreferences },
+      Partial<AdminUserPreferences>
+    >({
+      query: (body) => ({
+        url: '/auth/admin-preferences',
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['User'],
     }),
     getInviteSession: builder.query<
       { id: string; email: string; displayName: string } | null,
@@ -3894,6 +3911,8 @@ export const api = createApi({
 
 export const {
   useGetMeQuery,
+  useGetAdminPreferencesQuery,
+  useUpdateAdminPreferencesMutation,
   useGetInviteSessionQuery,
   useGetRegisterStatusQuery,
   useCompleteRegistrationMutation,

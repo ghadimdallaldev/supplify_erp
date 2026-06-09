@@ -37,6 +37,8 @@ import { Loader2, Plus, BarChart3, Send } from 'lucide-react'
 import { EmptyState } from '../../components/ui/empty-state'
 import {
   COUPON_FIELD_HELPER,
+  DEAL_SCHEDULE_ENDS_HELPER,
+  DEAL_SCHEDULE_SECTION_HELPER,
   SUPPLIER_CTA_TYPES,
   SUPPLIER_DEAL_TYPES,
   SUPPLIER_EMPTY_STATE,
@@ -470,21 +472,30 @@ export function PromotionsPage() {
               </div>
               <div>
                 <Label className="text-base font-semibold">Deal schedule</Label>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {DEAL_SCHEDULE_SECTION_HELPER}
+                </p>
                 <div className="mt-2 space-y-3">
                   <div>
                     <Label>Starts</Label>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      When the discount or coupon becomes redeemable.
+                    </p>
                     <Input
                       type="datetime-local"
                       value={form.startsAt}
                       onChange={(e) => setForm((f) => ({ ...f, startsAt: e.target.value }))}
+                      className="mt-1"
                     />
                   </div>
                   <div>
                     <Label>Ends (optional)</Label>
+                    <p className="text-xs text-[var(--text-muted)]">{DEAL_SCHEDULE_ENDS_HELPER}</p>
                     <Input
                       type="datetime-local"
                       value={form.endsAt}
                       onChange={(e) => setForm((f) => ({ ...f, endsAt: e.target.value }))}
+                      className="mt-1"
                     />
                   </div>
                 </div>

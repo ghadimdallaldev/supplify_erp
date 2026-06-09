@@ -1,8 +1,13 @@
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit'
 import { api } from '../services/api'
 import { perfLog } from './perfLog'
+import type { User } from '../types'
 
 type AppDispatch = ThunkDispatch<unknown, unknown, UnknownAction>
+
+export function shouldRefetchTenantBilling(role?: User['role'] | null): boolean {
+  return role === 'RESTAURANT' || role === 'SUPPLIER'
+}
 
 /**
  * Force-refresh auth, registration, billing, and entitlements after mutations
@@ -10,14 +15,28 @@ type AppDispatch = ThunkDispatch<unknown, unknown, UnknownAction>
  */
 export async function refetchAppSession(dispatch: AppDispatch): Promise<void> {
   const t0 = performance.now()
-  await Promise.all([
-    dispatch(api.endpoints.getMe.initiate(undefined, { forceRefetch: true })).unwrap(),
-    dispatch(api.endpoints.getRegisterStatus.initiate(undefined, { forceRefetch: true })).unwrap(),
-    dispatch(api.endpoints.getBillingStatus.initiate(undefined, { forceRefetch: true })).unwrap(),
-    dispatch(api.endpoints.getEntitlements.initiate(undefined, { forceRefetch: true }))
+  const me = await dispatch(
+    api.endpoints.getMe.initiate(undefined, { forceRefetch: true })
+  ).unwrap()
+
+  const tasks: Promise<unknown>[] = [
+    dispatch(api.endpoints.getRegisterStatus.initiate(undefined, { forceRefetch: true }))
       .unwrap()
       .catch(() => undefined),
-  ])
+  ]
+
+  if (shouldRefetchTenantBilling(me?.role)) {
+    tasks.push(
+      dispatch(api.endpoints.getBillingStatus.initiate(undefined, { forceRefetch: true }))
+        .unwrap()
+        .catch(() => undefined),
+      dispatch(api.endpoints.getEntitlements.initiate(undefined, { forceRefetch: true }))
+        .unwrap()
+        .catch(() => undefined)
+    )
+  }
+
+  await Promise.all(tasks)
   perfLog('session.refetch', { durationMs: Math.round(performance.now() - t0) })
 }
 
