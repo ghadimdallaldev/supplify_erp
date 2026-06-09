@@ -30,6 +30,11 @@ import {
 } from 'lucide-react'
 import { AdminEmptyState, AdminLoadingState, AdminStatusBadge, formatAdminDate } from './adminUi'
 import { cn } from '../../lib/utils'
+import {
+  ADMIN_EMPTY_STATE,
+  ADMIN_BOOST_PACKAGES_EMPTY,
+  formatDealTypeLabel,
+} from '../../lib/dealDisplayLabels'
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: 'All statuses' },
@@ -69,8 +74,7 @@ type SortKey = 'name' | 'supplier' | 'type' | 'status' | 'starts_at' | 'ends_at'
 type DealRow = Record<string, unknown>
 
 function formatDealType(type: unknown): string {
-  const key = String(type || '')
-  return TYPE_OPTIONS.find((t) => t.value === key)?.label || key.replace(/_/g, ' ') || '—'
+  return formatDealTypeLabel(type)
 }
 
 function formatDealValue(deal: DealRow): string | null {
@@ -319,9 +323,10 @@ export function AdminDealsPanel() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-[var(--text)]">Deals & promotions</h2>
+          <h2 className="text-lg font-bold text-[var(--text)]">Deals & Boosts</h2>
           <p className="text-sm text-[var(--text-muted)]">
-            Review supplier deals, activation payment status, and platform-wide deal insights.
+            Review supplier deals (offers and discounts), boost purchases (paid sponsored
+            placement), and platform-wide deal insights.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
@@ -342,13 +347,13 @@ export function AdminDealsPanel() {
             { label: 'Pending approval', value: insights.pending_approval },
             { label: 'Pending payment', value: insights.pending_payment },
             { label: 'Total views', value: insights.total_views },
-            { label: 'Orders from deals', value: insights.orders_from_deals },
+            { label: 'Deal redemptions', value: insights.orders_from_deals },
             {
-              label: 'Revenue (orders w/ deals)',
+              label: 'Boost revenue',
               value: `$${Number(insights.total_revenue || 0).toFixed(0)}`,
             },
             {
-              label: 'Discount given',
+              label: 'Discount amount',
               value: `$${Number(insights.total_discount_given || 0).toFixed(0)}`,
             },
           ].map(({ label, value }) => (
@@ -365,7 +370,7 @@ export function AdminDealsPanel() {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle className="text-base">All supplier deals</CardTitle>
+            <CardTitle className="text-base">All deals</CardTitle>
             {hasActiveFilters && (
               <Button
                 type="button"
@@ -464,11 +469,11 @@ export function AdminDealsPanel() {
             <AdminLoadingState label="Loading deals…" />
           ) : sortedDeals.length === 0 ? (
             <AdminEmptyState
-              title="No deals found"
+              title={ADMIN_EMPTY_STATE.title}
               description={
                 hasActiveFilters
                   ? 'No deals match your filters. Try clearing filters or choosing “All statuses”.'
-                  : 'No supplier deals yet. Deals appear here when suppliers create and submit promotions.'
+                  : ADMIN_EMPTY_STATE.description
               }
               action={
                 hasActiveFilters ? (
@@ -822,8 +827,8 @@ export function AdminDealsPanel() {
           Boost packages & activation
         </h2>
         <p className="text-sm text-[var(--text-muted)]">
-          Configure Facebook-style boost packages suppliers see when promoting deals. Price changes
-          apply to new purchases only — existing boosts keep the amount paid at checkout.
+          Configure boost packages suppliers see when boosting deals for sponsored placement. Price
+          changes apply to new purchases only — existing boosts keep the amount paid at checkout.
         </p>
       </div>
 
@@ -856,8 +861,8 @@ export function AdminDealsPanel() {
         <CardContent>
           {boostPackages.length === 0 ? (
             <AdminEmptyState
-              title="No boost packages configured"
-              description="Run migration 0123 or seed boost_flat / boost_7_day / boost_30_day rows."
+              title={ADMIN_BOOST_PACKAGES_EMPTY.title}
+              description={ADMIN_BOOST_PACKAGES_EMPTY.description}
             />
           ) : (
             <div className="space-y-3">

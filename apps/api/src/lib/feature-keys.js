@@ -23,6 +23,8 @@ export const RESTAURANT_FEATURE_KEYS = [
   'tenant_audit_log',
   'waitlist_auto_promo',
   'supplier_deals',
+  'supplier_deals_redeem',
+  'fulfillment_tools',
 ]
 
 export const SUPPLIER_FEATURE_KEYS = [

@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useGetMeQuery } from '../services/api'
-import type { ReactNode } from 'react'
+import { needsLegalReacceptance } from '../lib/legalReacceptanceGate'
 
 interface StaffPortalGuardProps {
   children: ReactNode
@@ -28,6 +28,10 @@ export function StaffPortalGuard({ children }: StaffPortalGuardProps) {
     if (isLoading) return
     if (error || !me) {
       navigate('/staff/login', { replace: true })
+      return
+    }
+    if (needsLegalReacceptance(me)) {
+      navigate('/legal/reaccept', { replace: true })
       return
     }
     if (me.role !== 'STAFF_PORTAL' && me.accessType !== 'staff_portal' && !me.staffPortal) {

@@ -6,6 +6,7 @@ import { StaffPortalGuard } from './components/StaffPortalGuard'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterCompletePage } from './pages/RegisterCompletePage'
+import { LegalReacceptPage } from './pages/LegalReacceptPage'
 import { InviteAcceptPage } from './pages/InviteAcceptPage'
 import { BranchInviteAcceptPage } from './pages/BranchInviteAcceptPage'
 import { OAuthRedirect } from './components/OAuthRedirect'
@@ -234,6 +235,10 @@ const router = createBrowserRouter([
   {
     path: '/register/complete',
     element: <RegisterCompletePage />,
+  },
+  {
+    path: '/legal/reaccept',
+    element: <LegalReacceptPage />,
   },
   {
     path: '/invite/branch',

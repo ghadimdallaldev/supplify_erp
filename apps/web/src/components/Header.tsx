@@ -40,7 +40,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/app/reports': 'Reports',
   '/app/disputes': 'Disputes',
   '/app/deals': 'Deals',
-  '/app/promotions': 'Promotions',
+  '/app/promotions': 'Deals',
   '/app/driver-deliveries': 'My Deliveries',
   '/app/onboarding': 'Onboarding',
   '/app/org': 'Organization',

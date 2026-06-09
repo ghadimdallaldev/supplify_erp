@@ -2038,7 +2038,25 @@ router.get('/tenants/suppliers', async (req, res) => {
         sub.id as subscription_id,
         COALESCE(pc.product_count, 0)::int as product_count,
         COALESCE(wc.warehouse_count, 0)::int as warehouse_count,
-        COALESCE(rev.total_revenue, 0)::numeric(12,2) as total_revenue
+        COALESCE(rev.total_revenue, 0)::numeric(12,2) as total_revenue,
+        (SELECT COUNT(*)::int
+         FROM promotions p
+         WHERE p.supplier_id = s.id
+           AND p.status = 'active'
+           AND COALESCE(p.payment_status, 'not_required') IN ('not_required', 'paid')
+           AND p.starts_at <= NOW()
+           AND (p.ends_at IS NULL OR p.ends_at > NOW())
+           AND (p.usage_limit IS NULL OR p.usage_count < p.usage_limit)
+        ) AS active_deals_count,
+        (
+          SELECT um.current_value::int
+          FROM usage_meter um
+          WHERE um.tenant_id = s.id
+            AND um.tenant_type = 'SUPPLIER'
+            AND um.meter_type = 'storage_mb'
+            AND um.period_start_date = '2000-01-01'
+          LIMIT 1
+        ) AS storage_mb_used
       FROM supplier s
       LEFT JOIN subscription sub ON sub.tenant_id = s.id AND sub.tenant_type = 'SUPPLIER' AND sub.status IN ('ACTIVE', 'TRIALING')
       LEFT JOIN subscription_plan sp ON sp.id = sub.plan_id
@@ -2098,7 +2116,33 @@ router.get('/tenants/restaurants', async (req, res) => {
         sub.id as subscription_id,
         COALESCE(oc.order_count, 0)::int as order_count,
         COALESCE(oc.total_spent, 0)::numeric(12,2) as total_spent,
-        COALESCE(oc.orders_last_30d, 0)::int as orders_last_30d
+        COALESCE(oc.orders_last_30d, 0)::int as orders_last_30d,
+        (
+          SELECT COUNT(*)::int
+          FROM customer_order co
+          WHERE co.restaurant_id = r.id
+            AND co.status = 'PLACED'
+            AND DATE(co.placed_at) = CURRENT_DATE
+        ) AS orders_today,
+        (
+          SELECT COUNT(*)::int
+          FROM supplier_follow sf
+          WHERE sf.restaurant_id = r.id
+        ) AS connected_suppliers_count,
+        (
+          SELECT COUNT(DISTINCT ri.product_id)::int
+          FROM restaurant_inventory ri
+          WHERE ri.restaurant_id = r.id
+        ) AS inventory_skus_count,
+        (
+          SELECT um.current_value::int
+          FROM usage_meter um
+          WHERE um.tenant_id = r.id
+            AND um.tenant_type = 'RESTAURANT'
+            AND um.meter_type = 'storage_mb'
+            AND um.period_start_date = '2000-01-01'
+          LIMIT 1
+        ) AS storage_mb_used
       FROM restaurant r
       LEFT JOIN subscription sub ON sub.tenant_id = r.id AND sub.tenant_type = 'RESTAURANT' AND sub.status IN ('ACTIVE', 'TRIALING')
       LEFT JOIN subscription_plan sp ON sp.id = sub.plan_id

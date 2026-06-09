@@ -14,11 +14,17 @@ server {
     gzip_min_length 1024;
     gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml+rss application/json application/javascript;
 
-    # Security headers
+    # Security headers (Railway terminates TLS; HSTS tells browsers to stay on HTTPS)
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
+
+    # Browsers request /favicon.ico by default; we ship SVG only
+    location = /favicon.ico {
+        return 301 /favicon.svg;
+    }
 
     # Service worker — must revalidate so updates propagate
     location = /sw.js {

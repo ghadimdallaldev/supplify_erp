@@ -30,7 +30,9 @@ Supplify is a business-to-business software platform that helps restaurants and 
 **User** means any person using Supplify, including owners, admins, staff, drivers, finance users, and platform admins.  
 **Guest** means a person using a public reservation or waitlist page without a registered Supplify account.  
 **Order** means a purchase, supplier-created order, restaurant-created order, replacement order, imported order, or related transaction created or managed through Supplify.  
-**Deal**, **Promotion**, or **Boost** means a supplier offer, discount, visibility package, paid placement, or promotional campaign.  
+**Deal** means a supplier-created offer, discount, visibility-only offer, or coupon-backed offer made available to restaurants through Supplify.  
+**Boost** means an optional paid visibility or sponsored placement campaign associated with a deal.  
+**Coupon code** means an optional code attached to a deal that a restaurant may apply during checkout when eligible.  
 **Subscription** means a Free Trial or paid plan giving a tenant access to features and limits.  
 **Free Trial** means a time-limited evaluation plan that may become read-only after expiry.  
 **Branch** means a business location or child tenant/location under an organization.  
@@ -108,9 +110,9 @@ Restaurants are responsible for availability, capacity, honoring reservations, m
 
 Guests may use public pages without a Supplify account. Reservation and waitlist tokens may expire or be revoked.
 
-## 13. Deals, Promotions, and Boosts
+## 13. Deals and Boosts
 
-Suppliers are responsible for the accuracy and legality of all deals and promotional content. Supplify may require admin approval before a deal becomes visible.
+Suppliers are responsible for the accuracy and legality of all deal and boost content. Supplify may require admin approval before a deal becomes visible.
 
 Boost packages may increase visibility inside Supplify, but Supplify does not guarantee views, clicks, redemptions, orders, revenue, ranking, return on investment, or business outcomes.
 
@@ -224,7 +226,7 @@ Supplify is provided “as is” and “as available.” To the maximum extent a
 
 ## 32. Limitation of Liability
 
-To the maximum extent allowed by law, Supplify will not be liable for lost profits, lost revenue, lost opportunities, loss of goodwill, indirect damages, consequential damages, data loss caused by user error, supplier product issues, delivery failures, restaurant payment disputes, reservation no-shows, promotion performance, or third-party failures.
+To the maximum extent allowed by law, Supplify will not be liable for lost profits, lost revenue, lost opportunities, loss of goodwill, indirect damages, consequential damages, data loss caused by user error, supplier product issues, delivery failures, restaurant payment disputes, reservation no-shows, deal or boost performance, or third-party failures.
 
 Supplify’s total liability for claims related to the platform will not exceed the amount paid by the tenant to Supplify during the three months before the event giving rise to the claim, unless a different limit is required by law.
 

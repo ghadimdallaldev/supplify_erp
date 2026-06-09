@@ -329,6 +329,20 @@ export const api = createApi({
         needsSetup: Boolean(response?.data?.needsSetup),
       }),
     }),
+    submitLegalReacceptance: builder.mutation<
+      { legalStatus: import('../types').LegalAcceptanceStatus },
+      LegalAcceptancePayload
+    >({
+      query: (legalAcceptance) => ({
+        url: '/auth/legal-acceptance',
+        method: 'POST',
+        body: { legalAcceptance },
+      }),
+      transformResponse: (response: {
+        data?: { legalStatus?: import('../types').LegalAcceptanceStatus }
+      }) => ({ legalStatus: response.data!.legalStatus! }),
+      invalidatesTags: ['User'],
+    }),
     completeRegistration: builder.mutation<
       { tenantType: string; tenant: unknown },
       {
@@ -3884,6 +3898,7 @@ export const {
   useGetInviteSessionQuery,
   useGetRegisterStatusQuery,
   useCompleteRegistrationMutation,
+  useSubmitLegalReacceptanceMutation,
   useLogoutMutation,
   useGetProductsQuery,
   useGetProductCategoriesQuery,

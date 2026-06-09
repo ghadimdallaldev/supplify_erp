@@ -48,7 +48,7 @@ export const LIMIT_UPGRADE_COPY: Record<string, { plan: string; value: string }>
   },
   promotions: {
     plan: 'Gold',
-    value: 'Upgrade to Gold for more active promotions on your catalog (up to 25).',
+    value: 'Upgrade to Gold for more active deals on your catalog (up to 25).',
   },
   open_conversations: {
     plan: 'Gold',

@@ -91,10 +91,11 @@ export const RESTAURANT_REPORTS_ANY_OF = ['ORDERS_VIEW', 'INVOICES_VIEW'] as con
 export const RESTAURANT_DISPUTES_ANY_OF = ['ORDERS_MANAGE', 'RECEIVING_MANAGE'] as const
 
 const DEFAULT_PROMOTIONS_COPY = {
-  title: 'Deals & promotions',
-  subtitle: 'View supplier campaigns and performance.',
-  listTitle: 'Campaigns',
-  newButton: 'New promotion',
+  title: 'Deals',
+  subtitle:
+    'Create supplier deals within your plan limits. Boosts are optional paid campaigns for sponsored placement.',
+  listTitle: 'Active deals',
+  newButton: 'Create deal',
   performanceTitle: 'Deals performance (30 days)',
 }
 
@@ -156,10 +157,11 @@ const PROFILES: Record<WorkspacePersonaId, WorkspacePersonaProfile> = {
       },
     },
     promotionsCopy: {
-      title: 'Deals & promotions',
-      subtitle: 'Create campaigns and track performance across your restaurant network.',
-      listTitle: 'Your promotions',
-      newButton: 'New promotion',
+      title: 'Deals',
+      subtitle:
+        'Create supplier deals within your plan limits. Boosts are optional paid campaigns for sponsored placement.',
+      listTitle: 'Your deals',
+      newButton: 'Create deal',
       performanceTitle: 'Deals performance (30 days)',
     },
     readOnly: false,
@@ -185,10 +187,11 @@ const PROFILES: Record<WorkspacePersonaId, WorkspacePersonaProfile> = {
       },
     },
     promotionsCopy: {
-      title: 'Deals & promotions',
-      subtitle: 'Create campaigns and track performance across your restaurant network.',
-      listTitle: 'Your promotions',
-      newButton: 'New promotion',
+      title: 'Deals',
+      subtitle:
+        'Create supplier deals within your plan limits. Boosts are optional paid campaigns for sponsored placement.',
+      listTitle: 'Your deals',
+      newButton: 'Create deal',
       performanceTitle: 'Deals performance (30 days)',
     },
     readOnly: false,
@@ -281,10 +284,11 @@ const PROFILES: Record<WorkspacePersonaId, WorkspacePersonaProfile> = {
     commandCenterMode: 'sales',
     dashboard: null,
     promotionsCopy: {
-      title: 'Deals & promotions',
-      subtitle: 'Run campaigns, follow up on reorder leads, and measure deal ROI.',
-      listTitle: 'Your campaigns',
-      newButton: 'New deal',
+      title: 'Deals',
+      subtitle:
+        'Run deals, follow up on reorder leads, and measure ROI. Boosts add optional sponsored placement.',
+      listTitle: 'Your deals',
+      newButton: 'Create deal',
       performanceTitle: 'All deals performance (30 days)',
     },
     readOnly: false,

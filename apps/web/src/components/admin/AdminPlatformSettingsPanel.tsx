@@ -10,7 +10,11 @@ import {
 import toast from 'react-hot-toast'
 import { Loader2 } from 'lucide-react'
 
-export function AdminPlatformSettingsPanel() {
+export function AdminPlatformSettingsPanel({
+  variant = 'default',
+}: {
+  variant?: 'default' | 'compact'
+}) {
   const { data, isLoading } = useGetAdminPlatformSettingsQuery()
   const [updateSettings, { isLoading: saving }] = useUpdateAdminPlatformSettingsMutation()
   const [days, setDays] = useState('7')
@@ -39,15 +43,23 @@ export function AdminPlatformSettingsPanel() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Free Trial length</CardTitle>
+    <Card
+      className={variant === 'compact' ? 'border-[var(--app-border)]' : undefined}
+      data-testid="admin-platform-settings-panel"
+    >
+      <CardHeader className={variant === 'compact' ? 'px-4 py-3' : undefined}>
+        <CardTitle className={variant === 'compact' ? 'text-base' : undefined}>
+          Free Trial length
+        </CardTitle>
         <CardDescription>
-          Free Trial workspaces auto-lock after this many days unless the tenant upgrades to a paid
-          plan. This is not a forever-free tier.
+          {variant === 'compact'
+            ? 'Applies to new Free Trial activations platform-wide. Workspaces auto-lock after this period unless upgraded.'
+            : 'Free Trial workspaces auto-lock after this many days unless the tenant upgrades to a paid plan. This is not a forever-free tier.'}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4 max-w-sm">
+      <CardContent
+        className={`space-y-4 max-w-sm ${variant === 'compact' ? 'px-4 pb-4 pt-0' : ''}`}
+      >
         {isLoading ? (
           <Loader2 className="h-5 w-5 animate-spin text-[var(--text-muted)]" />
         ) : (

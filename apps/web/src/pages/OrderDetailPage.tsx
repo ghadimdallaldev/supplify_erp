@@ -748,7 +748,7 @@ export function OrderDetailPage() {
                     {promotionDiscount > 0 ? (
                       <div className="flex items-center justify-between text-sm text-[var(--mint)]">
                         <span>
-                          Promotion
+                          Deal discount
                           {promotionInfo?.promotionName || promotionInfo?.promotion_name
                             ? ` (${promotionInfo.promotionName || promotionInfo.promotion_name})`
                             : ''}

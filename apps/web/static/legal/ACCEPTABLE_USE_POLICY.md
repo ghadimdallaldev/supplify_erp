@@ -37,9 +37,9 @@ Suppliers must not list or promote products that are illegal, counterfeit, stole
 
 Products involving special regulation may require proof of authorization, licensing, or compliance.
 
-## 4. Promotional Abuse
+## 4. Misleading Deals and Boosts
 
-Suppliers must not create fake discounts, fake urgency, misleading prices, unavailable deals, false stock, or false performance claims. Supplify may remove or reject any misleading promotion.
+Suppliers must not create fake discounts, fake urgency, misleading prices, unavailable deals, false stock, or false performance claims. Supplify may remove or reject any misleading deal or boost.
 
 ## 5. Messaging Abuse
 
