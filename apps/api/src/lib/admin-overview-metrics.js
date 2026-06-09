@@ -2,6 +2,7 @@ import { query } from './db.js'
 import { logger } from './logger.js'
 import { config } from '../config/env.js'
 import { buildAdminOperationalOverviewCounters } from './admin-operational-metrics.js'
+import { buildTenantLimitOverviewCounts } from './admin-tenant-usage-metrics.js'
 
 const PAID_PLAN_EXCLUDE = `LOWER(sp.code) NOT IN ('free', 'enterprise')`
 
@@ -207,6 +208,7 @@ export async function buildAdminOverviewMetrics() {
   const revenueRow = revenueRows[0] || {}
   const mrr = parseFloat(revenueRow.mrr || 0)
   const orderRow = orderStatsRows[0] || {}
+  const tenantLimitCounts = await buildTenantLimitOverviewCounts(safeOverviewQuery)
 
   const payload = {
     tenantCounts,
@@ -248,6 +250,8 @@ export async function buildAdminOverviewMetrics() {
       overdueInvoices: parseInt(overdueInvoiceStatsRows[0]?.count, 10) || 0,
     },
     operational: await buildAdminOperationalOverviewCounters(),
+    tenantsOverLimit: tenantLimitCounts.tenantsOverLimit,
+    tenantsNearLimit: tenantLimitCounts.tenantsNearLimit,
     activity: {
       ordersLast24h: parseInt(orderRow.today, 10) || 0,
       chatsLast24h: parseInt(chatStatsRows[0]?.count, 10) || 0,

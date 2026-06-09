@@ -47,7 +47,10 @@ export function DealsPerformanceSummary({ title, days = 30 }: Props) {
             value={summary.conversionRate != null ? `${Number(summary.conversionRate)}%` : '—'}
           />
           <Stat label="Coupon uses" value={summary.couponUses} />
-          <Stat label="Discount given" value={formatCurrency(Number(summary.totalDiscount || 0))} />
+          <Stat
+            label="Discount amount"
+            value={formatCurrency(Number(summary.totalDiscount || 0))}
+          />
           <Stat label="Pending approval" value={summary.pendingDeals} />
         </div>
         {topDeals.length > 0 ? (

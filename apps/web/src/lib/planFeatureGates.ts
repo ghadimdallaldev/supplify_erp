@@ -17,3 +17,16 @@ export function canUseFinanceInvoices(entitlements?: Entitlements | null): boole
 export function canUseSupplierDeals(entitlements?: Entitlements | null): boolean {
   return isEntitlementFeatureEnabled(entitlements, 'supplier_deals')
 }
+
+/** Fulfillment hub and logistics routes. */
+export function canUseFulfillment(entitlements?: Entitlements | null): boolean {
+  return (
+    isEntitlementFeatureEnabled(entitlements, 'fulfillment') ||
+    isEntitlementFeatureEnabled(entitlements, 'fulfillment_tools')
+  )
+}
+
+/** Quick lists module. */
+export function canUseQuickLists(entitlements?: Entitlements | null): boolean {
+  return isEntitlementFeatureEnabled(entitlements, 'quick_lists')
+}

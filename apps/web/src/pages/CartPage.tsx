@@ -433,7 +433,7 @@ export function CartPage() {
                 </div>
                 {estimatedPromoDiscount > 0 ? (
                   <div className="flex items-center justify-between text-sm text-[var(--mint)]">
-                    <span>Est. promotion savings</span>
+                    <span>Est. deal savings</span>
                     <span>-${formatPrice(estimatedPromoDiscount)}</span>
                   </div>
                 ) : dealRedeemGate.limit != null ? (
@@ -456,7 +456,12 @@ export function CartPage() {
                 </div>
                 {estimatedPromoDiscount > 0 ? (
                   <p className="text-xs text-[var(--text-muted)]">
-                    Final discount applied at checkout based on eligible supplier promotions.
+                    Final discount applied at checkout based on eligible supplier deals.
+                  </p>
+                ) : null}
+                {couponCode.trim() ? (
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Coupon from deal will be applied at checkout when eligible.
                   </p>
                 ) : null}
               </CardContent>

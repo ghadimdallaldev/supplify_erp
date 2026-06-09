@@ -1,4 +1,14 @@
 // User types
+export type LegalAcceptanceStatus = {
+  needsReacceptance: boolean
+  currentPackVersion: string
+  acceptedPackVersion: string | null
+  requiredDocuments: string[]
+  missingDocuments: string[]
+  variant: 'registration' | 'invite'
+  accountType: 'RESTAURANT' | 'SUPPLIER' | null
+}
+
 export interface User {
   id: string
   email: string
@@ -27,6 +37,8 @@ export interface User {
   adminRoles?: string[]
   /** Admin permission codes for admin nav gating */
   adminPermissions?: string[]
+  /** Current legal pack acceptance status (login re-acceptance gate) */
+  legalStatus?: LegalAcceptanceStatus
 }
 
 export interface UserWithDetails extends User {

@@ -54,8 +54,8 @@ export function DealBoostPackagePicker({
   return (
     <div className="space-y-3">
       <p className="text-xs text-[var(--text-muted)] rounded-md bg-[var(--surface-muted)] px-3 py-2">
-        Your deal will appear higher in restaurant deal feeds during the boost period. Reach labels
-        describe placement priority, not exact impression counts.
+        Your deal will get sponsored placement in restaurant deal feeds during the boost period.
+        Reach labels describe placement priority, not exact impression counts.
       </p>
       <div className="grid gap-3">
         {options.map((opt, index) => {

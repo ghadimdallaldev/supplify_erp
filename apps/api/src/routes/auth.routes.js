@@ -24,7 +24,38 @@ import { getTenantProfileRow } from '../lib/tenant-profile-cache.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
+import {
+  getUserLegalAcceptanceStatus,
+  recordLoginLegalReacceptances,
+} from '../lib/legal-acceptance.js'
 import { randomBytes } from 'crypto'
+
+const legalAcceptanceSchema = {
+  packVersion: (v) => typeof v === 'string' && v.length > 0 && v.length <= 32,
+  acceptedDocuments: (v) => Array.isArray(v) && v.every((s) => typeof s === 'string'),
+  electronicSignatureAttestation: (v) => v === true,
+}
+
+function parseLegalAcceptanceBody(body) {
+  const legalAcceptance = body?.legalAcceptance
+  if (!legalAcceptance || typeof legalAcceptance !== 'object') {
+    throw new ValidationError('Legal acceptance is required')
+  }
+  if (!legalAcceptanceSchema.packVersion(legalAcceptance.packVersion)) {
+    throw new ValidationError('Invalid legal pack version')
+  }
+  if (!legalAcceptanceSchema.acceptedDocuments(legalAcceptance.acceptedDocuments)) {
+    throw new ValidationError('Invalid accepted documents')
+  }
+  if (
+    !legalAcceptanceSchema.electronicSignatureAttestation(
+      legalAcceptance.electronicSignatureAttestation
+    )
+  ) {
+    throw new ValidationError('You must accept the legal agreements to continue')
+  }
+  return legalAcceptance
+}
 
 const router = express.Router()
 
@@ -348,6 +379,12 @@ router.get('/me', requireAuth, async (req, res) => {
       }
     }
 
+    const legalStatus = await getUserLegalAcceptanceStatus({
+      userId: user.id,
+      role: user.role,
+      tenantType: tenant?.tenantType ?? workspace?.tenantType ?? null,
+    })
+
     const meMs = Number(process.hrtime.bigint() - meT0) / 1e6
     if (meMs >= 400) {
       logger.info({
@@ -374,6 +411,7 @@ router.get('/me', requireAuth, async (req, res) => {
         workspace,
         adminRoles,
         adminPermissions,
+        legalStatus,
         ...additionalData,
       },
       error: null,
@@ -388,6 +426,55 @@ router.get('/me', requireAuth, async (req, res) => {
         name: 'INTERNAL_ERROR',
         message: 'Failed to get user info',
       },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/legal-acceptance', requireAuth, async (req, res) => {
+  try {
+    const user = req.userData
+    const legalAcceptance = parseLegalAcceptanceBody(req.body)
+    const tenant = await getRequestTenant(req)
+
+    await recordLoginLegalReacceptances({
+      userId: user.id,
+      tenantId: tenant?.tenantId ?? null,
+      tenantType: tenant?.tenantType ?? null,
+      role: user.role,
+      acceptedDocuments: legalAcceptance.acceptedDocuments,
+      electronicSignatureAttestation: legalAcceptance.electronicSignatureAttestation,
+      packVersion: legalAcceptance.packVersion,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    })
+
+    const legalStatus = await getUserLegalAcceptanceStatus({
+      userId: user.id,
+      role: user.role,
+      tenantType: tenant?.tenantType ?? null,
+    })
+
+    res.json({
+      ok: true,
+      data: { legalStatus },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Legal re-acceptance error', { error: error.message })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to record legal acceptance' },
       requestId: req.requestId,
     })
   }

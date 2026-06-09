@@ -6,7 +6,13 @@ import {
   resolveTenantContext,
   requirePermission,
 } from '../lib/rbac.js'
-import { requireFeature } from '../lib/subscription.js'
+import {
+  requireFeature,
+  checkLimit,
+  buildLimitExceededPayload,
+  getTenantSubscription,
+  getRecommendedPlanNames,
+} from '../lib/subscription.js'
 import { isFeatureEnabledForTenant } from '../lib/feature-flags.js'
 import { query, withTransaction } from '../lib/db.js'
 import { startStage, mark } from '../middlewares/request-timing.js'
@@ -416,6 +422,34 @@ router.post(
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) {
         throw new ValidationError('Restaurant not found')
+      }
+
+      // Enforce restaurant_inventory_skus limit when adding a new tracked SKU
+      const { rows: existingSku } = await query(
+        `SELECT 1 FROM restaurant_inventory WHERE restaurant_id = $1 AND product_id = $2 LIMIT 1`,
+        [restaurantId, productId]
+      )
+      if (existingSku.length === 0) {
+        const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'restaurant_inventory_skus')
+        if (limitCheck.isOverLimit && !limitCheck.isUnlimited) {
+          const [subscription, recommendedPlans] = await Promise.all([
+            getTenantSubscription(restaurantId, 'RESTAURANT'),
+            getRecommendedPlanNames('RESTAURANT'),
+          ])
+          const err = buildLimitExceededPayload(
+            limitCheck,
+            'restaurant_inventory_skus',
+            subscription?.plan_name || subscription?.plan_display_name,
+            recommendedPlans,
+            'Restaurant inventory SKU limit reached for your plan'
+          )
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: err,
+            requestId: req.requestId,
+          })
+        }
       }
 
       await withTransaction(async (client) => {

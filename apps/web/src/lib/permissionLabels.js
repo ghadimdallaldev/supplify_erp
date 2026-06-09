@@ -38,8 +38,8 @@ export const PERMISSION_LABELS = {
   PAYMENTS_MANAGE: 'Process payments',
   FULFILLMENT_VIEW: 'View fulfillment board',
   FULFILLMENT_MANAGE: 'Manage fulfillment',
-  PROMOTIONS_VIEW: 'View promotions',
-  PROMOTIONS_MANAGE: 'Manage promotions',
+  PROMOTIONS_VIEW: 'View deals',
+  PROMOTIONS_MANAGE: 'Manage deals',
   DRIVER_DELIVERIES_VIEW: 'View assigned deliveries',
   DRIVER_DELIVERIES_MANAGE: 'Update delivery status & proof',
   ADMIN_ACCESS: 'Platform admin access',
@@ -69,7 +69,7 @@ export const PERMISSION_DOMAINS = {
   Receiving: ['RECEIVING_VIEW', 'RECEIVING_MANAGE'],
   Payments: ['PAYMENTS_VIEW', 'PAYMENTS_MANAGE'],
   Fulfillment: ['FULFILLMENT_VIEW', 'FULFILLMENT_MANAGE'],
-  Promotions: ['PROMOTIONS_VIEW', 'PROMOTIONS_MANAGE'],
+  Deals: ['PROMOTIONS_VIEW', 'PROMOTIONS_MANAGE'],
   'Driver deliveries': ['DRIVER_DELIVERIES_VIEW', 'DRIVER_DELIVERIES_MANAGE'],
 }
 
@@ -99,7 +99,7 @@ export const SUPPLIER_PERMISSION_DOMAINS = {
   Receiving: PERMISSION_DOMAINS.Receiving,
   Payments: PERMISSION_DOMAINS.Payments,
   Fulfillment: PERMISSION_DOMAINS.Fulfillment,
-  Promotions: PERMISSION_DOMAINS.Promotions,
+  Deals: PERMISSION_DOMAINS.Deals,
   'Driver deliveries': PERMISSION_DOMAINS['Driver deliveries'],
 }
 

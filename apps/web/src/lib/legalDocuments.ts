@@ -1,4 +1,4 @@
-export const LEGAL_PACK_VERSION = '2026-05-28'
+export const LEGAL_PACK_VERSION = '2026-06-09'
 
 export const LEGAL_OPERATOR = {
   companyLegalName: 'Supplify',
@@ -6,7 +6,7 @@ export const LEGAL_OPERATOR = {
   privacyEmail: 'privacy@supplify.com',
   website: 'https://supplify.com',
   effectiveDate: 'May 28, 2026',
-  lastUpdated: 'May 28, 2026',
+  lastUpdated: 'June 9, 2026',
 }
 
 export type LegalDocumentSlug =
@@ -108,7 +108,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentSlug, LegalDocumentMeta> = {
     title: 'Deals & Boost Terms',
     shortTitle: 'Deals & Boosts',
     fileName: 'DEALS_BOOST_TERMS.md',
-    description: 'Terms for promotional deals and paid visibility boosts.',
+    description: 'Terms for supplier deals, optional coupon codes, and paid visibility boosts.',
     category: 'reference',
   },
 }

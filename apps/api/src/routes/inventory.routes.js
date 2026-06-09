@@ -11,8 +11,15 @@ import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 import { notifySupplierLowStock, notifyOutOfStock } from '../services/notification.service.js'
+import { requireFeature } from '../lib/subscription.js'
 
 const router = express.Router()
+
+const inventoryManagementGate = requireFeature(
+  'inventory_management',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
 
 router.use(requireAuth, resolveTenantContext, requirePermission('INVENTORY_VIEW'))
 
@@ -220,6 +227,7 @@ router.get('/product/:productId', requireAuth, async (req, res) => {
 // Update inventory (direct update without adjustment log)
 router.patch(
   '/product/:productId',
+  inventoryManagementGate,
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
   requirePermission('INVENTORY_EDIT'),
@@ -291,6 +299,7 @@ router.patch(
 // Create inventory adjustment (with reason tracking)
 router.post(
   '/product/:productId/adjustment',
+  inventoryManagementGate,
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
   requirePermission('INVENTORY_EDIT'),
@@ -489,6 +498,7 @@ router.get('/product/:productId/adjustments', requireAuth, async (req, res) => {
 // Manage product inventory settings
 router.patch(
   '/product/:productId/settings',
+  inventoryManagementGate,
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
   requirePermission('INVENTORY_EDIT'),
