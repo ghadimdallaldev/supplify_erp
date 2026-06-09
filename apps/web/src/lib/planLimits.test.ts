@@ -165,7 +165,7 @@ describe('deal and promotion limits', () => {
     expect(getSupplierPromotionGate(ent).canCreate).toBe(true)
     const blocked = getSupplierPromotionGate({ ...ent, usage: { promotions: 1 } })
     expect(blocked.canCreate).toBe(false)
-    expect(blocked.message).toContain('promotion')
+    expect(blocked.message).toContain('active deal')
   })
 
   it('getPlanLimitGate labels deal_redemptions_per_day for upgrade messaging', () => {

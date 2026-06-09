@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockQuery = vi.fn()
 vi.mock('./db.js', () => ({ query: (...args) => mockQuery(...args) }))
-vi.mock('./logger.js', () => ({ logger: { error: vi.fn(), debug: vi.fn() } }))
+vi.mock('./logger.js', () => ({ logger: { error: vi.fn(), debug: vi.fn(), warn: vi.fn() } }))
+vi.mock('./cache.js', () => ({
+  getCache: vi.fn().mockResolvedValue(null),
+  setCache: vi.fn().mockResolvedValue(undefined),
+  deleteCache: vi.fn().mockResolvedValue(undefined),
+}))
 
 describe('feature-flags', () => {
   beforeEach(() => {
@@ -86,6 +91,27 @@ describe('feature-flags', () => {
 
       const result = await resolveFeatureEnabled('t1', 'RESTAURANT', 'reports', { reports: true })
       expect(result).toEqual({ enabled: true, source: 'plan' })
+    })
+  })
+
+  describe('shouldResolveFeatureAlias', () => {
+    it('does not alias when primary key is explicitly false', async () => {
+      const { shouldResolveFeatureAlias } = await import('./feature-flags.js')
+      expect(
+        shouldResolveFeatureAlias('driver_management', {
+          driver_management: false,
+          fulfillment_tools: 'manual_orders_invoices',
+        })
+      ).toBe(false)
+      expect(shouldResolveFeatureAlias('fulfillment', { fulfillment: false })).toBe(false)
+    })
+
+    it('aliases when primary key is absent from plan JSON', async () => {
+      const { shouldResolveFeatureAlias } = await import('./feature-flags.js')
+      expect(
+        shouldResolveFeatureAlias('driver_management', { fulfillment_tools: 'warehouse_pick_pack' })
+      ).toBe(true)
+      expect(shouldResolveFeatureAlias('fulfillment', {})).toBe(true)
     })
   })
 })

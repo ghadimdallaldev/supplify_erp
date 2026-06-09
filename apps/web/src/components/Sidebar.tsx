@@ -38,7 +38,13 @@ import {
 } from 'lucide-react'
 import { featureEnabled, getOrderUsageBadge, isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { countActiveDisputes } from '../lib/disputeHelpers'
-import { canUseGlobalReports, canUseSupplierDeals } from '../lib/planFeatureGates'
+import {
+  canUseGlobalReports,
+  canUseSupplierDeals,
+  canUseFinanceInvoices,
+  canUseFulfillment,
+  canUseQuickLists,
+} from '../lib/planFeatureGates'
 import {
   reorderNavSectionsForPrimaryFocus,
   restaurantAnalyticsNavAllowed,
@@ -122,6 +128,9 @@ export function Sidebar({
   const planCode = (entitlementsData?.entitlements?.plan?.code ?? 'free').toLowerCase()
   const reportsEnabled = canUseGlobalReports(entitlementsData?.entitlements)
   const supplierDealsEnabled = canUseSupplierDeals(entitlementsData?.entitlements)
+  const financeInvoicesEnabled = canUseFinanceInvoices(entitlementsData?.entitlements)
+  const fulfillmentEnabled = canUseFulfillment(entitlementsData?.entitlements)
+  const quickListsEnabled = canUseQuickLists(entitlementsData?.entitlements)
   const disputesEnabled = isEntitlementFeatureEnabled(
     entitlementsData?.entitlements,
     'disputes_returns'
@@ -171,13 +180,17 @@ export function Sidebar({
         permission: 'CATALOG_VIEW',
         testId: 'nav-my-prices',
       },
-      {
-        name: 'Ordering Lists',
-        href: '/app/quick-lists',
-        icon: List,
-        permission: 'ORDERS_VIEW',
-        testId: 'nav-quick-lists',
-      },
+      ...(quickListsEnabled
+        ? [
+            {
+              name: 'Ordering Lists',
+              href: '/app/quick-lists',
+              icon: List,
+              permission: 'ORDERS_VIEW',
+              testId: 'nav-quick-lists',
+            },
+          ]
+        : []),
       {
         name: 'Cart',
         href: '/app/cart',
@@ -243,13 +256,17 @@ export function Sidebar({
             },
           ]
         : []),
-      {
-        name: 'Invoices',
-        href: '/app/invoices',
-        icon: FileText,
-        permission: 'INVOICES_VIEW',
-        testId: 'nav-invoices',
-      },
+      ...(financeInvoicesEnabled
+        ? [
+            {
+              name: 'Invoices',
+              href: '/app/invoices',
+              icon: FileText,
+              permission: 'INVOICES_VIEW',
+              testId: 'nav-invoices',
+            },
+          ]
+        : []),
       {
         name: 'Chat',
         href: '/app/chat',
@@ -388,13 +405,17 @@ export function Sidebar({
           permission: 'CATALOG_VIEW',
           testId: 'nav-contract-pricing',
         },
-        {
-          name: 'Fulfillment',
-          href: '/app/fulfillment',
-          icon: Truck,
-          permission: 'FULFILLMENT_VIEW',
-          testId: 'nav-fulfillment',
-        },
+        ...(fulfillmentEnabled
+          ? [
+              {
+                name: 'Fulfillment',
+                href: '/app/fulfillment',
+                icon: Truck,
+                permission: 'FULFILLMENT_VIEW',
+                testId: 'nav-fulfillment',
+              },
+            ]
+          : []),
         {
           name: 'Restaurants',
           href: '/app/restaurants',
@@ -430,7 +451,7 @@ export function Sidebar({
         ...(promotionsEnabled
           ? [
               {
-                name: 'Deals & Promotions',
+                name: 'Deals',
                 href: '/app/promotions',
                 icon: Tag,
                 permission: 'PROMOTIONS_VIEW',
@@ -438,13 +459,17 @@ export function Sidebar({
               },
             ]
           : []),
-        {
-          name: 'Invoices',
-          href: '/app/invoices',
-          icon: FileText,
-          permission: 'INVOICES_VIEW',
-          testId: 'nav-invoices',
-        },
+        ...(financeInvoicesEnabled
+          ? [
+              {
+                name: 'Invoices',
+                href: '/app/invoices',
+                icon: FileText,
+                permission: 'INVOICES_VIEW',
+                testId: 'nav-invoices',
+              },
+            ]
+          : []),
         {
           name: 'Chat',
           href: '/app/chat',

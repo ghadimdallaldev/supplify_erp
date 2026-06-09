@@ -22,7 +22,7 @@ Supplify is a B2B SaaS platform for restaurants and suppliers. It includes resta
 ## Product assumptions reflected in drafts
 
 - Supplify is the software/platform provider, not the seller of goods.
-- Suppliers are responsible for product quality, legality, delivery, invoices, drivers, and promotions.
+- Suppliers are responsible for product quality, legality, delivery, invoices, drivers, deals, and boosts.
 - Restaurants are responsible for ordering, receiving, payment, reservations, guests, and staff access.
 - Boosts increase platform visibility but do not guarantee results.
 - Free Trial is time-limited and may become read-only after expiry.

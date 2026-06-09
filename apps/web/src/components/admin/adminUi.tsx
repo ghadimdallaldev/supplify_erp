@@ -64,6 +64,41 @@ export function AdminLoadingState({ label = 'Loading…' }: { label?: string }) 
   )
 }
 
+export function AdminLoadingSkeleton({ rows = 3 }: { rows?: number }) {
+  return (
+    <div className="space-y-2 py-2" data-testid="admin-loading-skeleton">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="h-10 animate-pulse rounded-md bg-[var(--surface-mid)]" />
+      ))}
+    </div>
+  )
+}
+
+export function AdminErrorState({
+  title = 'Something went wrong',
+  message,
+  onRetry,
+}: {
+  title?: string
+  message?: string
+  onRetry?: () => void
+}) {
+  return (
+    <div
+      className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm"
+      data-testid="admin-error-state"
+    >
+      <p className="font-semibold text-red-900">{title}</p>
+      {message && <p className="mt-1 text-red-800">{message}</p>}
+      {onRetry && (
+        <Button variant="outline" size="sm" className="mt-3" onClick={onRetry}>
+          Retry
+        </Button>
+      )}
+    </div>
+  )
+}
+
 export function AdminRefreshBar({
   lastUpdated,
   onRefresh,

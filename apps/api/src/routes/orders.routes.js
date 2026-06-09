@@ -18,7 +18,6 @@ import {
   getTenantSubscription,
   getRecommendedPlanNames,
   buildLimitExceededPayload,
-  requireFeature,
   isFeatureEnabled,
 } from '../lib/subscription.js'
 import { z } from 'zod'

@@ -65,9 +65,10 @@ describe('planComparison', () => {
 
   it('includes deals and promotions keys for plan comparison (GATE-R19, GATE-S13)', () => {
     expect(RESTAURANT_FEATURE_KEYS).toContain('supplier_deals')
-    expect(LIMIT_KEY_LABELS.deal_redemptions_per_day).toBe('Deal redemptions (today)')
+    expect(LIMIT_KEY_LABELS.deal_redemptions_per_day).toBe('Deal redemptions per day')
+    expect(LIMIT_KEY_LABELS.promotions).toBe('Active deals')
     expect(FEATURE_KEY_LABELS.supplier_deals).toBe('Supplier deals')
-    expect(FEATURE_KEY_LABELS.promotions).toBe('Promotions')
+    expect(FEATURE_KEY_LABELS.promotions).toBe('Deals')
   })
 
   it('comparison feature/limit keys are subset of backend canonical keys', () => {

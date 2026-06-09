@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { getPaidActiveSubscriptionCount } from './adminOverview'
+import {
+  getPaidActiveSubscriptionCount,
+  getTotalTenantCount,
+  getActiveSubscriptionCount,
+  deriveSystemHealth,
+} from './adminOverview'
 import type { AdminOverview } from './adminOverview'
 
 describe('adminOverview', () => {
@@ -30,6 +35,20 @@ describe('adminOverview', () => {
     expect(sample.revenue?.mrr).toBe(198)
   })
 
+  it('computes total tenant count', () => {
+    expect(getTotalTenantCount(sample)).toBe(11)
+  })
+
+  it('computes active subscription count', () => {
+    expect(getActiveSubscriptionCount(sample)).toBe(4)
+  })
+
+  it('derives system health from errors and alerts', () => {
+    expect(deriveSystemHealth(sample, 0)).toBe('healthy')
+    expect(deriveSystemHealth({ alerts: { pastDueSubscriptions: 1 } }, 0)).toBe('critical')
+    expect(deriveSystemHealth({ operational: { emailFailed24h: 6 } }, 0)).toBe('degraded')
+  })
+
   it('prefers paidActiveSubscriptions for Active Subs card', () => {
     expect(getPaidActiveSubscriptionCount(sample)).toBe(2)
     expect(
@@ -38,5 +57,15 @@ describe('adminOverview', () => {
         subscriptionStats: { ACTIVE: 5 },
       })
     ).toBe(2)
+  })
+
+  it('accepts tenantsOverLimit and tenantsNearLimit from overview', () => {
+    const withLimits: AdminOverview = {
+      ...sample,
+      tenantsOverLimit: 3,
+      tenantsNearLimit: 7,
+    }
+    expect(withLimits.tenantsOverLimit).toBe(3)
+    expect(withLimits.tenantsNearLimit).toBe(7)
   })
 })

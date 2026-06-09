@@ -12,6 +12,7 @@ import {
 } from '../components/ui/dialog'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
+import { Textarea } from '../components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   api,
@@ -21,6 +22,8 @@ import {
   useGetAdminSubscriptionsQuery,
   useGetAdminAuditLogsQuery,
   useGetAdminActivityQuery,
+  useGetAdminHealthQuery,
+  useGetAdminPlatformSettingsQuery,
   useUpdateAdminPlanMutation,
   useUpdateAdminSubscriptionMutation,
   useCreateAdminPlanMutation,
@@ -68,15 +71,20 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { notifyAdminPlanSaveError, notifyAdminPlanSaveSuccess } from '../lib/adminPlanSaveFeedback'
-import { getPaidActiveSubscriptionCount } from '../lib/adminOverview'
+import { getPaidActiveSubscriptionCount, type AdminOverview } from '../lib/adminOverview'
+import { getAdminPageHeader } from '../lib/adminPageHeaders'
+import { formatPlanPrice } from '../lib/formatPlanPrice'
 import type { SubscriptionPlan } from '../types'
+import { getPlanSubtitle, getLimitLabel, formatPlanDisplayName } from '../lib/planComparison'
 import {
-  getPlanSubtitle,
-  getFeatureLabel,
-  getLimitLabel,
-  formatPlanFeatureCell,
-  formatPlanDisplayName,
-} from '../lib/planComparison'
+  parsePlanFeaturesJson,
+  parsePlanLimitsJson,
+  stringifyPlanJson,
+} from '../lib/adminPlanJsonParse'
+import {
+  resolvePlanLimitFromCatalog,
+  formatPlanLimitDisplayValue,
+} from '../lib/adminPlanLimitLookup'
 import { formatCurrency } from '../utils/format'
 import { AdminFeatureFlagsPanel } from '../components/admin/AdminFeatureFlagsPanel'
 import { AdminDealsPanel } from '../components/admin/AdminDealsPanel'
@@ -84,6 +92,12 @@ import { AdminLimitsTab } from '../components/admin/AdminLimitsTab'
 import { AdminOverviewExtras } from '../components/admin/AdminOverviewExtras'
 import { AdminPortalNav } from '../components/admin/AdminPortalNav'
 import { AdminPlatformSettingsPanel } from '../components/admin/AdminPlatformSettingsPanel'
+import { AdminPageHeader } from '../components/admin/AdminPageHeader'
+import { AdminExecutiveSummary } from '../components/admin/AdminExecutiveSummary'
+import { AdminOperationsSnapshot } from '../components/admin/AdminOperationsSnapshot'
+import { AdminTenantUsageTable } from '../components/admin/AdminTenantUsageTable'
+import { AdminKpiCard } from '../components/admin/AdminKpiCard'
+import { AdminSectionHeader } from '../components/admin/adminUi'
 import { AdminUsersTab } from '../components/admin/AdminUsersTab'
 import { AdminOperationsPanel } from '../components/admin/AdminOperationsPanel'
 import { AdminTenantDiagnosticsDrawer } from '../components/admin/AdminTenantDiagnosticsDrawer'
@@ -158,7 +172,8 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   } | null>(null)
 
   const shouldLoadAdminPlans =
-    ['plans', 'subscriptions', 'tenants'].includes(selectedTab) || Boolean(changePlanModal?.open)
+    ['plans', 'subscriptions', 'tenants', 'usage'].includes(selectedTab) ||
+    Boolean(changePlanModal?.open)
 
   const {
     data: overview,
@@ -193,6 +208,12 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     { days: 30 },
     { skip: selectedTab !== 'overview' }
   )
+  const { data: overviewHealthData } = useGetAdminHealthQuery(undefined, {
+    skip: selectedTab !== 'overview',
+  })
+  const { data: platformSettings } = useGetAdminPlatformSettingsQuery(undefined, {
+    skip: selectedTab !== 'plans',
+  })
   const { data: plansData, isLoading: plansLoading } = useGetAdminPlansQuery(
     selectedTab === 'plans' && plansTenantFilter ? { tenant_type: plansTenantFilter } : {},
     { skip: !shouldLoadAdminPlans }
@@ -218,6 +239,12 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     ) ?? []
 
   const plans = dedupeAdminPlans(plansData?.plans)
+
+  const supplierProductLimit = (planCode: string | null | undefined) =>
+    resolvePlanLimitFromCatalog(plans, 'SUPPLIER', planCode, 'supplier_products_skus')
+
+  const restaurantOrdersPerDayLimit = (planCode: string | null | undefined) =>
+    resolvePlanLimitFromCatalog(plans, 'RESTAURANT', planCode, 'orders_per_day')
   const changePlanPlanOptions = dedupeAdminPlans(changePlanPlansData?.plans).filter(
     (p) => (p.tenant_type || 'RESTAURANT') === changePlanModal?.tenantType
   )
@@ -397,7 +424,10 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     trialDays: 0,
     displayOrder: 0,
     isActive: true,
+    limitsJson: '{}',
+    featuresJson: '{}',
   })
+  const [editPlanJsonError, setEditPlanJsonError] = useState<string | null>(null)
   const [confirmEnterpriseActivation, setConfirmEnterpriseActivation] = useState(false)
   const [createPlanOpen, setCreatePlanOpen] = useState(false)
   const [createPlanForm, setCreatePlanForm] = useState({
@@ -448,7 +478,10 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
       trialDays: plan.trial_days ?? 0,
       displayOrder: plan.display_order ?? 0,
       isActive: plan.is_active ?? true,
+      limitsJson: stringifyPlanJson(plan.limits as Record<string, unknown>),
+      featuresJson: stringifyPlanJson(plan.features as Record<string, unknown>),
     })
+    setEditPlanJsonError(null)
   }
 
   const handleSaveEditPlan = async () => {
@@ -456,7 +489,25 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     const plan = editPlanModal.plan
     const isEnterprise = (plan.code || '').toLowerCase() === 'enterprise'
     try {
-      const payload: Record<string, unknown> = { ...editPlanForm }
+      let limits: Record<string, unknown>
+      let features: Record<string, unknown>
+      try {
+        limits = parsePlanLimitsJson(editPlanForm.limitsJson)
+        features = parsePlanFeaturesJson(editPlanForm.featuresJson)
+        setEditPlanJsonError(null)
+      } catch (parseErr) {
+        const message = parseErr instanceof Error ? parseErr.message : 'Invalid JSON'
+        setEditPlanJsonError(message)
+        toast.error(message)
+        return
+      }
+      const payload: Record<string, unknown> = {
+        ...editPlanForm,
+        limits,
+        features,
+      }
+      delete payload.limitsJson
+      delete payload.featuresJson
       if (isEnterprise && editPlanForm.isActive) {
         payload.confirmEnterpriseActivation = confirmEnterpriseActivation
       }
@@ -584,14 +635,15 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     <div className="flex min-h-0 flex-1 flex-col" data-testid="admin-dashboard-page">
       <AdminPortalNav />
       <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
-        <div className="mb-5 flex items-center justify-between">
-          <div>
-            <h1 className="text-[21px] font-black text-[var(--text)]">Admin Panel</h1>
-            <p className="text-sm text-[var(--text-muted)] mt-0.5">
-              Platform management · subscriptions · tenants · billing
-            </p>
-          </div>
-        </div>
+        <AdminPageHeader
+          {...getAdminPageHeader(
+            initialTab === 'suppliers'
+              ? 'suppliers'
+              : initialTab === 'restaurants'
+                ? 'restaurants'
+                : 'platform'
+          )}
+        />
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
           <div className="overflow-x-auto mb-1">
@@ -609,7 +661,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   {canAdminTab.finance && <TabsTrigger value="finance">Finance</TabsTrigger>}
                   {canAdminTab.usage && <TabsTrigger value="usage">Usage</TabsTrigger>}
                   {canAdminTab.features && <TabsTrigger value="features">Features</TabsTrigger>}
-                  {canAdminTab.deals && <TabsTrigger value="deals">Deals</TabsTrigger>}
+                  {canAdminTab.deals && <TabsTrigger value="deals">Deals & Boosts</TabsTrigger>}
                   {canAdminTab.limits && <TabsTrigger value="limits">Limits</TabsTrigger>}
                   {canAdminTab.operations && (
                     <TabsTrigger value="operations">Operations</TabsTrigger>
@@ -655,386 +707,80 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
               </Card>
             ) : (
               <>
+                <AdminExecutiveSummary
+                  overview={overview as AdminOverview}
+                  recentErrorCount={
+                    Array.isArray(overviewHealthData?.recentApiErrors)
+                      ? overviewHealthData.recentApiErrors.length
+                      : 0
+                  }
+                />
+
+                <AdminOperationsSnapshot
+                  overview={overview as AdminOverview}
+                  recentErrorCount={
+                    Array.isArray(overviewHealthData?.recentApiErrors)
+                      ? overviewHealthData.recentApiErrors.length
+                      : 0
+                  }
+                  onNavigateTab={setSelectedTab}
+                  onOperationsSubTab={setOperationsSubTab}
+                />
+
                 <AdminOverviewExtras
                   overview={overview}
                   onNavigateTab={setSelectedTab}
                   onRefresh={() => refetchOverview()}
                   refreshing={overviewFetching}
                   lastUpdated={overviewLastUpdated}
+                  canNavigateTab={(tab) => canAdminTab[tab as keyof typeof canAdminTab] ?? false}
                 />
 
-                <AdminPlatformSettingsPanel />
-
-                {/* Alerts banner — only visible if there are issues */}
-                {((overview?.alerts?.pastDueSubscriptions || 0) > 0 ||
-                  (overview?.alerts?.trialsExpiringSoon || 0) > 0) && (
-                  <div className="flex flex-wrap gap-3">
-                    {(overview?.alerts?.pastDueSubscriptions || 0) > 0 && (
-                      <div
-                        className="flex items-center gap-2 rounded-lg px-4 py-2.5"
-                        style={{ background: '#fef2f2', border: '1px solid #fecaca' }}
-                      >
-                        <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
-                        <span className="text-sm font-semibold text-red-700">
-                          {overview.alerts.pastDueSubscriptions} past-due subscription
-                          {overview.alerts.pastDueSubscriptions > 1 ? 's' : ''}
-                        </span>
-                      </div>
-                    )}
-                    {(overview?.alerts?.trialsExpiringSoon || 0) > 0 && (
-                      <div
-                        className="flex items-center gap-2 rounded-lg px-4 py-2.5"
-                        style={{ background: '#fffbeb', border: '1px solid #fde68a' }}
-                      >
-                        <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                        <span className="text-sm font-semibold text-amber-700">
-                          {overview.alerts.trialsExpiringSoon} trial
-                          {overview.alerts.trialsExpiringSoon > 1 ? 's' : ''} expiring in 7 days
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Row 1 — Orders & Activity */}
+                {/* Tenants & Revenue */}
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">
-                    Orders & Activity
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <Card className="p-5">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div
-                          className="rounded-lg p-2"
-                          style={{ background: 'var(--brand-ultra)' }}
-                        >
-                          <ListOrdered className="h-4 w-4" style={{ color: 'var(--brand)' }} />
-                        </div>
-                        <span className="text-sm text-[var(--text-muted)] font-medium">
-                          Orders Today
-                        </span>
-                      </div>
-                      <p className="text-3xl font-black text-[var(--text)]">
-                        {overview?.orders?.today ?? 0}
-                      </p>
-                      <div className="flex gap-3 mt-2 text-xs text-[var(--text-muted)]">
-                        <span>{overview?.orders?.week ?? 0} this week</span>
-                        <span>·</span>
-                        <span>{overview?.orders?.month ?? 0} this month</span>
-                      </div>
-                    </Card>
-
-                    <Card className="p-5">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div
-                          className="rounded-lg p-2"
-                          style={{ background: 'var(--brand-ultra)' }}
-                        >
-                          <ShoppingCart className="h-4 w-4" style={{ color: 'var(--brand)' }} />
-                        </div>
-                        <span className="text-sm text-[var(--text-muted)] font-medium">
-                          Active Carts
-                        </span>
-                      </div>
-                      <p className="text-3xl font-black text-[var(--text)]">
-                        {overview?.activeCarts ?? 0}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)] mt-2">
-                        Draft orders with items
-                      </p>
-                    </Card>
-
-                    <Card className="p-5">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="rounded-lg p-2" style={{ background: 'var(--mint-pale)' }}>
-                          <MessageSquare className="h-4 w-4" style={{ color: 'var(--mint)' }} />
-                        </div>
-                        <span className="text-sm text-[var(--text-muted)] font-medium">
-                          Chats (24h)
-                        </span>
-                      </div>
-                      <p className="text-3xl font-black text-[var(--text)]">
-                        {overview?.chatsLast24h ?? 0}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)] mt-2">Messages sent</p>
-                    </Card>
-
-                    <Card className="p-5">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div
-                          className="rounded-lg p-2"
-                          style={{ background: 'var(--brand-ultra)' }}
-                        >
-                          <Users className="h-4 w-4" style={{ color: 'var(--brand)' }} />
-                        </div>
-                        <span className="text-sm text-[var(--text-muted)] font-medium">
-                          Active Staff
-                        </span>
-                      </div>
-                      <p className="text-3xl font-black text-[var(--text)]">
-                        {overview?.totalActiveStaff ?? 0}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)] mt-2">Across all tenants</p>
-                    </Card>
-                  </div>
-                </div>
-
-                {/* Row 2 — Reservations & Catalog */}
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">
-                    Reservations & Catalog
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <Card className="p-5">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="rounded-lg p-2" style={{ background: 'var(--mint-pale)' }}>
-                          <Calendar className="h-4 w-4" style={{ color: 'var(--mint)' }} />
-                        </div>
-                        <span className="text-sm text-[var(--text-muted)] font-medium">
-                          Reservations Today
-                        </span>
-                      </div>
-                      <p className="text-3xl font-black text-[var(--text)]">
-                        {overview?.reservations?.today ?? 0}
-                      </p>
-                      <div className="flex gap-3 mt-2 text-xs text-[var(--text-muted)]">
-                        <span>{overview?.reservations?.week ?? 0} this week</span>
-                        <span>·</span>
-                        <span>{overview?.reservations?.confirmed ?? 0} confirmed</span>
-                      </div>
-                    </Card>
-
-                    <Card className="p-5">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div
-                          className="rounded-lg p-2"
-                          style={{ background: 'var(--brand-ultra)' }}
-                        >
-                          <Package className="h-4 w-4" style={{ color: 'var(--brand)' }} />
-                        </div>
-                        <span className="text-sm text-[var(--text-muted)] font-medium">
-                          Active Products
-                        </span>
-                      </div>
-                      <p className="text-3xl font-black text-[var(--text)]">
-                        {overview?.totalActiveProducts ?? 0}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)] mt-2">Across all suppliers</p>
-                    </Card>
-
-                    <Card className="p-5">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div
-                          className="rounded-lg p-2"
-                          style={{ background: 'var(--brand-ultra)' }}
-                        >
-                          <ListOrdered className="h-4 w-4" style={{ color: 'var(--brand)' }} />
-                        </div>
-                        <span className="text-sm text-[var(--text-muted)] font-medium">
-                          Quick Lists
-                        </span>
-                      </div>
-                      <p className="text-3xl font-black text-[var(--text)]">
-                        {overview?.totalQuickLists ?? 0}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)] mt-2">Saved ordering lists</p>
-                    </Card>
-
-                    <Card className="p-5">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div
-                          className="rounded-lg p-2"
-                          style={{ background: 'var(--brand-ultra)' }}
-                        >
-                          <Activity className="h-4 w-4" style={{ color: 'var(--brand)' }} />
-                        </div>
-                        <span className="text-sm text-[var(--text-muted)] font-medium">
-                          Orders Total
-                        </span>
-                      </div>
-                      <p className="text-3xl font-black text-[var(--text)]">
-                        {overview?.orders?.total ?? 0}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)] mt-2">All time (non-draft)</p>
-                    </Card>
-                  </div>
-                </div>
-
-                {/* Operational health (links to Operations tab) */}
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">
-                    Operational health
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <Card
-                      className="p-5 cursor-pointer hover:border-[var(--brand-mid)] transition-colors"
-                      onClick={() => {
-                        setOperationsSubTab('email')
-                        setSelectedTab('operations')
-                      }}
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <Mail className="h-4 w-4 text-[var(--brand)]" />
-                        <span className="text-sm text-[var(--text-muted)]">Email failed (24h)</span>
-                      </div>
-                      <p className="text-2xl font-black">
-                        {overview?.operational?.emailFailed24h ?? 0}
-                      </p>
-                    </Card>
-                    <Card
-                      className="p-5 cursor-pointer hover:border-[var(--brand-mid)] transition-colors"
-                      onClick={() => {
-                        setOperationsSubTab('fulfillment')
-                        setSelectedTab('operations')
-                      }}
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <Package className="h-4 w-4 text-[var(--brand)]" />
-                        <span className="text-sm text-[var(--text-muted)]">Fulfillment issues</span>
-                      </div>
-                      <p className="text-2xl font-black">
-                        {overview?.operational?.openFulfillmentIssues ?? 0}
-                      </p>
-                    </Card>
-                    <Card
-                      className="p-5 cursor-pointer hover:border-[var(--brand-mid)] transition-colors"
-                      onClick={() => {
-                        setOperationsSubTab('gps')
-                        setSelectedTab('operations')
-                      }}
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <MapPin className="h-4 w-4 text-[var(--brand)]" />
-                        <span className="text-sm text-[var(--text-muted)]">Stale GPS</span>
-                      </div>
-                      <p className="text-2xl font-black">
-                        {overview?.operational?.staleGpsDeliveries ?? 0}
-                      </p>
-                    </Card>
-                    <Card
-                      className="p-5 cursor-pointer hover:border-[var(--brand-mid)] transition-colors"
-                      onClick={() => {
-                        setOperationsSubTab('inventory')
-                        setSelectedTab('operations')
-                      }}
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <AlertCircle className="h-4 w-4 text-[var(--brand)]" />
-                        <span className="text-sm text-[var(--text-muted)]">Expired lots</span>
-                      </div>
-                      <p className="text-2xl font-black">
-                        {overview?.operational?.expiredInventoryLots ?? 0}
-                      </p>
-                    </Card>
-                  </div>
-                </div>
-
-                {/* Row 3 — Tenants & Revenue */}
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">
-                    Tenants & Revenue
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <Card className="p-5">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div
-                          className="rounded-lg p-2"
-                          style={{ background: 'var(--brand-ultra)' }}
-                        >
-                          <Building2 className="h-4 w-4" style={{ color: 'var(--brand)' }} />
-                        </div>
-                        <span className="text-sm text-[var(--text-muted)] font-medium">
-                          Suppliers
-                        </span>
-                      </div>
-                      <p className="text-3xl font-black text-[var(--text)]">
-                        {overview?.tenants?.totalSuppliers ?? 0}
-                      </p>
-                      {(overview?.tenants?.newSuppliers7d || 0) > 0 && (
-                        <div className="flex items-center gap-1 mt-2">
-                          <ArrowUpRight className="h-3 w-3" style={{ color: 'var(--mint)' }} />
-                          <span className="text-xs font-semibold" style={{ color: 'var(--mint)' }}>
-                            +{overview.tenants.newSuppliers7d} this week
-                          </span>
-                        </div>
-                      )}
-                      {!overview?.tenants?.newSuppliers7d && (
-                        <p className="text-xs text-[var(--text-muted)] mt-2">No new this week</p>
-                      )}
-                    </Card>
-
-                    <Card className="p-5">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="rounded-lg p-2" style={{ background: 'var(--mint-pale)' }}>
-                          <Store className="h-4 w-4" style={{ color: 'var(--mint)' }} />
-                        </div>
-                        <span className="text-sm text-[var(--text-muted)] font-medium">
-                          Restaurants
-                        </span>
-                      </div>
-                      <p className="text-3xl font-black text-[var(--text)]">
-                        {overview?.tenants?.totalRestaurants ?? 0}
-                      </p>
-                      {(overview?.tenants?.newRestaurants7d || 0) > 0 && (
-                        <div className="flex items-center gap-1 mt-2">
-                          <ArrowUpRight className="h-3 w-3" style={{ color: 'var(--mint)' }} />
-                          <span className="text-xs font-semibold" style={{ color: 'var(--mint)' }}>
-                            +{overview.tenants.newRestaurants7d} this week
-                          </span>
-                        </div>
-                      )}
-                      {!overview?.tenants?.newRestaurants7d && (
-                        <p className="text-xs text-[var(--text-muted)] mt-2">No new this week</p>
-                      )}
-                    </Card>
-
-                    <Card className="p-5">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="rounded-lg p-2" style={{ background: 'var(--mint-pale)' }}>
-                          <DollarSign className="h-4 w-4" style={{ color: 'var(--mint)' }} />
-                        </div>
-                        <span className="text-sm text-[var(--text-muted)] font-medium">MRR</span>
-                      </div>
-                      <p className="text-3xl font-black text-[var(--text)]">
-                        {formatCurrency(overview?.revenue?.mrr)}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)] mt-2">
-                        ARR: {formatCurrency(overview?.revenue?.arr)}
-                      </p>
-                    </Card>
-
-                    <Card className="p-5">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div
-                          className="rounded-lg p-2"
-                          style={{ background: 'var(--brand-ultra)' }}
-                        >
-                          <CreditCard className="h-4 w-4" style={{ color: 'var(--brand)' }} />
-                        </div>
-                        <span className="text-sm text-[var(--text-muted)] font-medium">
-                          Active Subs
-                        </span>
-                      </div>
-                      <p className="text-3xl font-black text-[var(--text)]">
-                        {getPaidActiveSubscriptionCount(overview)}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)] mt-2">
-                        Paid plans (excl. Free Trial)
-                        {(overview?.subscriptionStats as any)?.TRIALING
-                          ? ` · ${(overview?.subscriptionStats as any)?.TRIALING} trialing total`
-                          : ''}
-                        {((overview?.subscriptionStats as any)?.PAST_DUE || 0) > 0 && (
-                          <span className="text-red-500 ml-2">
-                            · {(overview?.subscriptionStats as any)?.PAST_DUE} past due
-                          </span>
-                        )}
-                      </p>
-                    </Card>
+                  <AdminSectionHeader title="Tenants & Revenue" />
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    <AdminKpiCard
+                      label="Suppliers"
+                      value={overview?.tenants?.totalSuppliers ?? 0}
+                      description={
+                        (overview?.tenants?.newSuppliers7d || 0) > 0
+                          ? `+${overview?.tenants?.newSuppliers7d} new this week`
+                          : 'No new this week'
+                      }
+                      icon={Building2}
+                      tone="brand"
+                    />
+                    <AdminKpiCard
+                      label="Restaurants"
+                      value={overview?.tenants?.totalRestaurants ?? 0}
+                      description={
+                        (overview?.tenants?.newRestaurants7d || 0) > 0
+                          ? `+${overview?.tenants?.newRestaurants7d} new this week`
+                          : 'No new this week'
+                      }
+                      icon={Store}
+                      tone="success"
+                    />
+                    <AdminKpiCard
+                      label="MRR"
+                      value={formatCurrency(overview?.revenue?.mrr)}
+                      description={`ARR: ${formatCurrency(overview?.revenue?.arr)}`}
+                      icon={DollarSign}
+                      tone="success"
+                    />
+                    <AdminKpiCard
+                      label="Active subs"
+                      value={getPaidActiveSubscriptionCount(overview)}
+                      description="Paid plans (excl. Free Trial)"
+                      icon={CreditCard}
+                      tone="brand"
+                    />
                   </div>
                 </div>
 
                 {/* Subscription breakdown */}
-                <Card className="p-5">
+                <Card className="p-4">
                   <h3 className="text-sm font-semibold text-[var(--text)] mb-4">
                     Subscription Status Breakdown
                   </h3>
@@ -1202,9 +948,17 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             )}
           </TabsContent>
 
-          <TabsContent value="plans" className="space-y-6">
+          <TabsContent value="plans" className="space-y-5">
+            <div>
+              <AdminSectionHeader
+                title="Subscription Defaults"
+                description="Platform-wide subscription settings"
+              />
+              <AdminPlatformSettingsPanel variant="compact" />
+            </div>
+
             <div className="flex flex-wrap justify-between items-center gap-4">
-              <h2 className="text-2xl font-bold text-[var(--text)]">Subscription Plans</h2>
+              <h2 className="text-lg font-bold text-[var(--text)]">Subscription Plans</h2>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-[var(--text-muted)]">Filter:</span>
                 <select
@@ -1335,90 +1089,76 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {plans.map((plan) => (
-                  <Card key={plan.id} className="p-6 hover:shadow-lg transition-shadow">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-xl font-bold text-[var(--text)]">{plan.name}</h3>
-                        <Badge variant="outline">
+                  <Card key={plan.id} className="p-4 transition-shadow hover:shadow-md">
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <h3 className="text-base font-bold text-[var(--text)]">{plan.name}</h3>
+                        <Badge variant="outline" className="text-[10px]">
                           {plan.tenant_type === 'RESTAURANT' ? 'Restaurant' : 'Supplier'}
                         </Badge>
-                        {plan.code && (
-                          <span className="text-xs text-[var(--text-muted)]">{plan.code}</span>
-                        )}
-                        {plan.code && getPlanSubtitle(plan.code) ? (
-                          <span className="text-xs text-[var(--text-muted)]">
-                            · {getPlanSubtitle(plan.code)}
-                          </span>
-                        ) : null}
+                        {plan.code?.toLowerCase() === 'free' &&
+                          platformSettings?.freeSandboxDays != null && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {platformSettings.freeSandboxDays}d trial
+                            </Badge>
+                          )}
                       </div>
-                      <Badge variant={plan.is_active ? 'default' : 'secondary'}>
+                      <Badge
+                        variant={plan.is_active ? 'default' : 'secondary'}
+                        className="text-[10px]"
+                      >
                         {plan.is_active ? 'Active' : 'Inactive'}
                       </Badge>
                     </div>
-                    <div className="mb-4">
-                      <p className="text-[21px] font-black text-[var(--text)]">
-                        ${plan.price_per_month}
-                        <span className="text-sm text-[var(--text-muted)] font-normal">/mo</span>
+                    {plan.code && getPlanSubtitle(plan.code) ? (
+                      <p className="mb-2 text-xs text-[var(--text-muted)]">
+                        {getPlanSubtitle(plan.code)}
                       </p>
-                      {plan.price_per_year && (
-                        <p className="text-sm text-[var(--text-muted)]">
-                          ${plan.price_per_year}/yr
+                    ) : null}
+                    <div className="mb-3">
+                      <p className="text-lg font-bold text-[var(--text)]">
+                        {formatPlanPrice(plan.price_per_month, '/mo')}
+                      </p>
+                      {plan.price_per_year != null && plan.price_per_year > 0 && (
+                        <p className="text-xs text-[var(--text-muted)]">
+                          {formatPlanPrice(plan.price_per_year, '/yr')}
                         </p>
                       )}
                     </div>
                     {plan.description && (
-                      <p className="text-sm text-[var(--text-muted)] mb-4">{plan.description}</p>
+                      <p className="mb-3 line-clamp-2 text-xs text-[var(--text-muted)]">
+                        {plan.description}
+                      </p>
                     )}
-                    <div className="space-y-1.5 mb-4">
-                      <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">
-                        Limits
+                    <div className="mb-3 space-y-1">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                        {plan.limits ? Object.keys(plan.limits).length : 0} limits ·{' '}
+                        {plan.features ? Object.keys(plan.features).length : 0} features
                       </p>
                       {plan.limits && Object.keys(plan.limits).length > 0 ? (
-                        Object.entries(plan.limits).map(([key, value]) => (
-                          <div key={key} className="flex justify-between text-xs">
-                            <span className="text-[var(--text-muted)]">{getLimitLabel(key)}</span>
-                            <span
-                              className={`font-semibold ${value === -1 ? 'text-[var(--mint)]' : 'text-[var(--text)]'}`}
-                            >
-                              {value === -1 ? '∞ unlimited' : String(value)}
-                            </span>
-                          </div>
-                        ))
+                        Object.entries(plan.limits)
+                          .slice(0, 3)
+                          .map(([key, value]) => (
+                            <div key={key} className="flex justify-between text-xs">
+                              <span className="text-[var(--text-muted)]">{getLimitLabel(key)}</span>
+                              <span
+                                className={`font-semibold ${value === -1 ? 'text-[var(--mint)]' : 'text-[var(--text)]'}`}
+                              >
+                                {value === -1 ? '∞ unlimited' : String(value)}
+                              </span>
+                            </div>
+                          ))
                       ) : (
                         <p className="text-xs text-[var(--text-muted)]">No limits defined</p>
                       )}
-                    </div>
-                    <div className="space-y-1.5 mb-4">
-                      <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">
-                        Features
-                      </p>
-                      {plan.features &&
-                      typeof plan.features === 'object' &&
-                      Object.keys(plan.features).length > 0 ? (
-                        Object.entries(plan.features).map(([key, value]) => {
-                          const cell = formatPlanFeatureCell(key, value)
-                          return (
-                            <div key={key} className="flex justify-between items-center text-xs">
-                              <span className="text-[var(--text-muted)]">
-                                {getFeatureLabel(key)}
-                              </span>
-                              {!cell.enabled ? (
-                                <span className="text-[var(--text-muted)]">—</span>
-                              ) : cell.caption ? (
-                                <span className="font-medium text-[var(--brand)] text-right max-w-[120px] truncate">
-                                  {cell.caption}
-                                </span>
-                              ) : (
-                                <CheckCircle2 className="h-3.5 w-3.5 text-[var(--mint)]" />
-                              )}
-                            </div>
-                          )
-                        })
-                      ) : (
-                        <p className="text-xs text-[var(--text-muted)]">No features defined</p>
-                      )}
+                      {(plan.limits && Object.keys(plan.limits).length > 3) ||
+                      (plan.features && Object.keys(plan.features).length > 0) ? (
+                        <p className="text-[10px] text-[var(--text-muted)]">
+                          Edit plan for full details
+                        </p>
+                      ) : null}
                     </div>
                     {plan.updated_at && (
                       <p className="text-xs text-[var(--text-muted)] mb-3">
@@ -1445,11 +1185,11 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
               open={!!editPlanModal?.open}
               onOpenChange={(open) => !open && setEditPlanModal(null)}
             >
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Edit Plan</DialogTitle>
                   <DialogDescription>
-                    Update pricing, trial days, and visibility for this plan.
+                    Update pricing, limits, features, trial days, and visibility for this plan.
                   </DialogDescription>
                 </DialogHeader>
                 {editPlanModal?.plan && (
@@ -1550,6 +1290,39 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       />
                       <Label htmlFor="edit-plan-active">Active</Label>
                     </div>
+                    <div>
+                      <Label>Limits (JSON)</Label>
+                      <Textarea
+                        className="font-mono text-xs min-h-[140px]"
+                        value={editPlanForm.limitsJson}
+                        onChange={(e) =>
+                          setEditPlanForm((s) => ({ ...s, limitsJson: e.target.value }))
+                        }
+                        spellCheck={false}
+                      />
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        Use -1 for unlimited. Numbers stay numbers; booleans are not valid limit
+                        values.
+                      </p>
+                    </div>
+                    <div>
+                      <Label>Features (JSON)</Label>
+                      <Textarea
+                        className="font-mono text-xs min-h-[180px]"
+                        value={editPlanForm.featuresJson}
+                        onChange={(e) =>
+                          setEditPlanForm((s) => ({ ...s, featuresJson: e.target.value }))
+                        }
+                        spellCheck={false}
+                      />
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        true/false, tier strings (e.g. basic_kpis), or omit keys. Empty strings are
+                        rejected.
+                      </p>
+                    </div>
+                    {editPlanJsonError ? (
+                      <p className="text-sm text-[var(--red)]">{editPlanJsonError}</p>
+                    ) : null}
                     {editPlanModal.plan.code === 'enterprise' && editPlanForm.isActive ? (
                       <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
                         <p className="font-semibold">Enterprise activation</p>
@@ -2184,26 +1957,29 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             <AdminUsersTab />
           </TabsContent>
 
-          <TabsContent value="tenants" className="space-y-6">
-            <div className="flex flex-wrap justify-between items-center gap-3">
-              <h2 className="text-2xl font-bold text-[var(--text)]">
-                {initialTab === 'suppliers'
-                  ? 'Supplier Management'
-                  : initialTab === 'restaurants'
-                    ? 'Restaurant Management'
-                    : 'Tenant Management'}
-              </h2>
-              {initialTab !== 'suppliers' && initialTab !== 'restaurants' && (
-                <div className="relative w-full max-w-xs">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-[var(--text-muted)]" />
-                  <Input
-                    className="pl-8 h-9"
-                    placeholder="Search suppliers or restaurants…"
-                    value={tenantSearch}
-                    onChange={(e) => setTenantSearch(e.target.value)}
-                  />
-                </div>
-              )}
+          <TabsContent value="tenants" className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {initialTab !== 'suppliers' && initialTab !== 'restaurants' ? (
+                <AdminSectionHeader
+                  title="Tenant directory"
+                  description="Manage supplier and restaurant accounts"
+                />
+              ) : null}
+              <div className="relative w-full max-w-xs">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-[var(--text-muted)]" />
+                <Input
+                  className="h-8 pl-8 text-sm"
+                  placeholder={
+                    initialTab === 'suppliers'
+                      ? 'Search suppliers…'
+                      : initialTab === 'restaurants'
+                        ? 'Search restaurants…'
+                        : 'Search suppliers or restaurants…'
+                  }
+                  value={tenantSearch}
+                  onChange={(e) => setTenantSearch(e.target.value)}
+                />
+              </div>
             </div>
 
             {(() => {
@@ -2229,12 +2005,89 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 }) ?? []
 
               return (
-                <div className="space-y-6">
+                <div className="space-y-4">
+                  {showSuppliersOnly && (
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                      <AdminKpiCard
+                        label="Suppliers"
+                        value={`${suppliersForUi?.length ?? 0} / ${suppliersTotal}`}
+                        icon={Building2}
+                        tone="brand"
+                      />
+                      <AdminKpiCard
+                        label="Active subs"
+                        value={
+                          suppliersForUi?.filter(
+                            (s: { subscription_status?: string }) =>
+                              s.subscription_status === 'ACTIVE' ||
+                              s.subscription_status === 'TRIALING'
+                          ).length ?? 0
+                        }
+                        icon={CreditCard}
+                        tone="success"
+                      />
+                      <AdminKpiCard
+                        label="Total products"
+                        value={
+                          suppliersForUi?.reduce(
+                            (sum, s) => sum + parseInt(String(s.product_count || 0), 10),
+                            0
+                          ) ?? 0
+                        }
+                        icon={Package}
+                        tone="neutral"
+                      />
+                      <AdminKpiCard
+                        label="Revenue"
+                        value={formatCurrency(
+                          suppliersForUi?.reduce(
+                            (sum, s) => sum + parseFloat(String(s.total_revenue || 0)),
+                            0
+                          )
+                        )}
+                        icon={DollarSign}
+                        tone="neutral"
+                      />
+                    </div>
+                  )}
+                  {showRestaurantsOnly && (
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                      <AdminKpiCard
+                        label="Restaurants"
+                        value={`${restaurantsForUi?.length ?? 0} / ${restaurantsTotal}`}
+                        icon={Users}
+                        tone="brand"
+                      />
+                      <AdminKpiCard
+                        label="Active subs"
+                        value={
+                          restaurantsForUi?.filter(
+                            (r: { subscription_status?: string }) =>
+                              r.subscription_status === 'ACTIVE' ||
+                              r.subscription_status === 'TRIALING'
+                          ).length ?? 0
+                        }
+                        icon={CreditCard}
+                        tone="success"
+                      />
+                      <AdminKpiCard
+                        label="Orders (30d)"
+                        value={
+                          restaurantsForUi?.reduce(
+                            (sum, r) => sum + parseInt(String(r.orders_last_30d || 0), 10),
+                            0
+                          ) ?? 0
+                        }
+                        icon={TrendingUp}
+                        tone="neutral"
+                      />
+                    </div>
+                  )}
                   {/* Suppliers Section - Show if not restaurant-only view */}
                   {!showRestaurantsOnly && (
                     <Card>
-                      <CardHeader>
-                        <h3 className="text-xl font-bold text-[var(--text)]">Suppliers</h3>
+                      <CardHeader className="px-4 py-3">
+                        <h3 className="text-sm font-semibold text-[var(--text)]">Suppliers</h3>
                         <p className="text-sm text-[var(--text-muted)]">
                           Manage supplier tenants and subscriptions
                           {suppliersTotal > 0
@@ -2657,124 +2510,104 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             })()}
           </TabsContent>
 
-          <TabsContent value="usage" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-[var(--text)]">
-                {initialTab === 'suppliers'
+          <TabsContent value="usage" className="space-y-4">
+            <AdminSectionHeader
+              title={
+                initialTab === 'suppliers'
                   ? 'Supplier Usage & Quotas'
                   : initialTab === 'restaurants'
                     ? 'Restaurant Usage & Quotas'
-                    : 'Usage & Quotas'}
-              </h2>
-              <p className="text-sm text-[var(--text-muted)]">
-                Monitor tenant resource usage against plan limits
-              </p>
-            </div>
+                    : 'Usage & Quotas'
+              }
+              description="Monitor tenant resource usage against plan limits"
+            />
 
             {/* Supplier-specific Usage View */}
             {initialTab === 'suppliers' && (
               <>
-                <Card>
-                  <CardHeader>
-                    <h3 className="text-xl font-bold text-[var(--text)]">
-                      Supplier Usage Overview
-                    </h3>
-                    <p className="text-sm text-[var(--text-muted)]">
-                      Product and warehouse usage across all suppliers
-                    </p>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  <AdminKpiCard
+                    label="Total products"
+                    value={
+                      suppliersForUi?.reduce(
+                        (sum, s) => sum + parseInt(String(s.product_count || 0), 10),
+                        0
+                      ) ?? 0
+                    }
+                    icon={Package}
+                    tone="brand"
+                  />
+                  <AdminKpiCard
+                    label="Loaded suppliers"
+                    value={`${suppliersForUi?.length ?? 0} / ${suppliersTotal}`}
+                    description="Paginate below to load more"
+                    icon={Building2}
+                    tone="success"
+                  />
+                  <AdminKpiCard
+                    label="Over limit"
+                    value={
+                      suppliersForUi?.filter((s) => {
+                        const limit = supplierProductLimit(s.plan_code ?? s.plan_name)
+                        if (limit == null || limit === -1) return false
+                        return parseInt(String(s.product_count || 0), 10) > limit
+                      }).length ?? 0
+                    }
+                    icon={AlertCircle}
+                    tone="danger"
+                  />
+                  <AdminKpiCard
+                    label="Total revenue"
+                    value={formatCurrency(
+                      suppliersForUi?.reduce(
+                        (sum, s) => sum + parseFloat(String(s.total_revenue || 0)),
+                        0
+                      )
+                    )}
+                    icon={DollarSign}
+                    tone="neutral"
+                  />
+                </div>
+                <Card className="p-4">
+                  <CardHeader className="px-0 pb-3 pt-0">
+                    <CardTitle className="text-sm font-semibold">Supplier usage table</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-[var(--text-muted)]">Total Products</span>
-                          <Package className="h-4 w-4 text-[var(--brand-mid)]" />
-                        </div>
-                        <p className="text-2xl font-bold text-[var(--text)]">
-                          {suppliersData?.suppliers?.reduce(
-                            (sum, s) => sum + parseInt(s.product_count || 0),
-                            0
-                          ) || 0}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)] mt-1">
-                          Across all suppliers
-                        </p>
-                      </div>
-
-                      <div className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-[var(--text-muted)]">Active Suppliers</span>
-                          <Building2 className="h-4 w-4 text-[var(--mint)]" />
-                        </div>
-                        <p className="text-2xl font-bold text-[var(--text)]">
-                          {suppliersData?.suppliers?.length || 0}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)] mt-1">
-                          With active subscriptions
-                        </p>
-                      </div>
-
-                      <div className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-[var(--text-muted)]">Over Limit</span>
-                          <AlertCircle className="h-4 w-4 text-[var(--red)]" />
-                        </div>
-                        <p className="text-2xl font-bold text-[var(--text)]">
-                          {suppliersData?.suppliers?.filter((s) => {
-                            const limit =
-                              s.plan_name === 'Free'
-                                ? 50
-                                : s.plan_name === 'Silver'
-                                  ? 1000
-                                  : s.plan_name === 'Platinum'
-                                    ? 999999
-                                    : 1000
-                            return parseInt(s.product_count || 0) > limit
-                          }).length || 0}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)] mt-1">
-                          Suppliers over product limit
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <h3 className="text-xl font-bold text-[var(--text)]">Products by Supplier</h3>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {suppliersData?.suppliers?.slice(0, 10).map((supplier: any) => {
-                        const limit =
-                          supplier.plan_name === 'Free'
-                            ? 50
-                            : supplier.plan_name === 'Silver'
-                              ? 1000
-                              : supplier.plan_name === 'Platinum'
-                                ? 999999
-                                : 1000
-                        const productCount = parseInt(supplier.product_count || 0)
-                        const usage = (productCount / limit) * 100
-                        return (
-                          <div key={supplier.id} className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span className="font-medium">{supplier.name}</span>
-                              <span className={productCount > limit ? 'text-[var(--red)]' : ''}>
-                                {productCount} / {limit}
-                              </span>
-                            </div>
-                            <div className="h-2 bg-[var(--app-border-mid)] rounded-full overflow-hidden">
-                              <div
-                                className={`h-full ${productCount > limit ? 'bg-[var(--red)]' : 'bg-[var(--brand-mid)]'}`}
-                                style={{ width: `${Math.min(usage, 100)}%` }}
-                              />
-                            </div>
-                          </div>
+                  <CardContent className="px-0 pb-0 pt-0">
+                    <AdminTenantUsageTable
+                      mode="supplier"
+                      suppliers={suppliersForUi ?? []}
+                      plans={plans}
+                      isLoading={suppliersLoading}
+                      onDiagnostics={(id, name) =>
+                        setTenantDiag({ id, tenantType: 'SUPPLIER', name })
+                      }
+                      onChangePlan={(id, name, tenantType) => {
+                        const sub = subscriptions.find(
+                          (s) => s.tenant_id === id && s.tenant_type === tenantType
                         )
-                      })}
-                    </div>
+                        if (sub) {
+                          setChangePlanModal({
+                            open: true,
+                            subId: sub.id,
+                            tenantType,
+                            tenantName: name,
+                            targetPlanId: sub.plan_id || '',
+                          })
+                        }
+                      }}
+                    />
+                    {!suppliersLoading && (suppliersForUi?.length ?? 0) < suppliersTotal && (
+                      <div className="mt-3 flex justify-center">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSupplierListOffset((o) => o + TENANT_PAGE_SIZE)}
+                        >
+                          Load more suppliers
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </>
@@ -2783,99 +2616,78 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             {/* Restaurant-specific Usage View */}
             {initialTab === 'restaurants' && (
               <>
-                <Card>
-                  <CardHeader>
-                    <h3 className="text-xl font-bold text-[var(--text)]">
-                      Restaurant Usage Overview
-                    </h3>
-                    <p className="text-sm text-[var(--text-muted)]">
-                      Orders and spending across all restaurants
-                    </p>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                  <AdminKpiCard
+                    label="30-day orders"
+                    value={
+                      restaurantsForUi?.reduce(
+                        (sum, r) => sum + parseInt(String(r.orders_last_30d || 0), 10),
+                        0
+                      ) ?? 0
+                    }
+                    icon={TrendingUp}
+                    tone="brand"
+                  />
+                  <AdminKpiCard
+                    label="Loaded restaurants"
+                    value={`${restaurantsForUi?.length ?? 0} / ${restaurantsTotal}`}
+                    description="Paginate below to load more"
+                    icon={Users}
+                    tone="success"
+                  />
+                  <AdminKpiCard
+                    label="Lifetime spend"
+                    value={formatCurrency(
+                      restaurantsForUi?.reduce(
+                        (sum, r) => sum + parseFloat(String(r.total_spent || 0)),
+                        0
+                      )
+                    )}
+                    description="Loaded tenants only (lifetime delivered)"
+                    icon={DollarSign}
+                    tone="neutral"
+                  />
+                </div>
+                <Card className="p-4">
+                  <CardHeader className="px-0 pb-3 pt-0">
+                    <CardTitle className="text-sm font-semibold">Restaurant usage table</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-[var(--text-muted)]">30-Day Orders</span>
-                          <TrendingUp className="h-4 w-4 text-[var(--brand-mid)]" />
-                        </div>
-                        <p className="text-2xl font-bold text-[var(--text)]">
-                          {restaurantsData?.restaurants?.reduce(
-                            (sum, r) => sum + parseInt(r.orders_last_30d || 0),
-                            0
-                          ) || 0}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)] mt-1">
-                          Total orders last 30 days
-                        </p>
-                      </div>
-
-                      <div className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-[var(--text-muted)]">
-                            Active Restaurants
-                          </span>
-                          <Users className="h-4 w-4 text-[var(--mint)]" />
-                        </div>
-                        <p className="text-2xl font-bold text-[var(--text)]">
-                          {restaurantsData?.restaurants?.length || 0}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)] mt-1">
-                          With active subscriptions
-                        </p>
-                      </div>
-
-                      <div className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-[var(--text-muted)]">
-                            Total Spent (30d)
-                          </span>
-                          <DollarSign className="h-4 w-4 text-[var(--mint)]" />
-                        </div>
-                        <p className="text-2xl font-bold text-[var(--text)]">
-                          {formatCurrency(
-                            restaurantsData?.restaurants?.reduce(
-                              (sum, r) => sum + parseFloat(r.total_spent || 0),
-                              0
-                            )
-                          )}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)] mt-1">
-                          Across all restaurants
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <h3 className="text-xl font-bold text-[var(--text)]">Orders by Restaurant</h3>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {restaurantsData?.restaurants?.slice(0, 10).map((restaurant: any) => {
-                        const dailyLimit =
-                          restaurant.plan_name === 'Free'
-                            ? 10
-                            : restaurant.plan_name === 'Silver'
-                              ? 100
-                              : restaurant.plan_name === 'Gold'
-                                ? 500
-                                : -1
-                        return (
-                          <div key={restaurant.id} className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span className="font-medium">{restaurant.name}</span>
-                              <span>{restaurant.orders_last_30d || 0} orders</span>
-                            </div>
-                            <div className="text-xs text-[var(--text-muted)]">
-                              Daily limit: {dailyLimit === -1 ? 'Unlimited' : `${dailyLimit}/day`}
-                            </div>
-                          </div>
+                  <CardContent className="px-0 pb-0 pt-0">
+                    <AdminTenantUsageTable
+                      mode="restaurant"
+                      restaurants={restaurantsForUi ?? []}
+                      plans={plans}
+                      isLoading={restaurantsLoading}
+                      onDiagnostics={(id, name) =>
+                        setTenantDiag({ id, tenantType: 'RESTAURANT', name })
+                      }
+                      onChangePlan={(id, name, tenantType) => {
+                        const sub = subscriptions.find(
+                          (s) => s.tenant_id === id && s.tenant_type === tenantType
                         )
-                      })}
-                    </div>
+                        if (sub) {
+                          setChangePlanModal({
+                            open: true,
+                            subId: sub.id,
+                            tenantType,
+                            tenantName: name,
+                            targetPlanId: sub.plan_id || '',
+                          })
+                        }
+                      }}
+                    />
+                    {!restaurantsLoading && (restaurantsForUi?.length ?? 0) < restaurantsTotal && (
+                      <div className="mt-3 flex justify-center">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setRestaurantListOffset((o) => o + TENANT_PAGE_SIZE)}
+                        >
+                          Load more restaurants
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </>
@@ -2937,14 +2749,8 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         </div>
                         <p className="text-2xl font-bold text-[var(--text)]">
                           {suppliersData?.suppliers?.filter((s) => {
-                            const limit =
-                              s.plan_name === 'Free'
-                                ? 50
-                                : s.plan_name === 'Silver'
-                                  ? 1000
-                                  : s.plan_name === 'Platinum'
-                                    ? 999999
-                                    : 1000
+                            const limit = supplierProductLimit(s.plan_code ?? s.plan_name) ?? 1000
+                            if (limit === -1) return false
                             return parseInt(s.product_count || 0) > limit
                           }).length ?? 0}
                         </p>
@@ -3031,7 +2837,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   <option value="order_placed">Order placed</option>
                   <option value="order_confirmed">Order acknowledged</option>
                   <option value="order_completed">Order completed</option>
-                  <option value="deal_activity">Promotion / deal</option>
+                  <option value="deal_activity">Deal activity</option>
                   <option value="cart_updated">Cart updated</option>
                   <option value="new_tenant">New registration</option>
                   <option value="plan_changed">Plan changed</option>
@@ -3081,7 +2887,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 <p className="text-sm font-medium">No matching activity</p>
                 <p className="text-xs mt-1 max-w-md mx-auto">
                   {activityType !== 'all'
-                    ? 'Try “All events” or another filter. The feed includes orders, registrations, plan changes, promotions, reservations, and admin subscription actions when present in the database.'
+                    ? 'Try “All events” or another filter. The feed includes orders, registrations, plan changes, deals, boosts, reservations, and admin subscription actions when present in the database.'
                     : 'No platform events found yet. Create tenants, place orders, or change subscriptions to populate this feed.'}
                 </p>
               </div>

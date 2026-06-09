@@ -19,6 +19,8 @@ Restaurant & F&B supplier marketplace monorepo (`apps/api`, `apps/web`).
 | Admin console                 | [admin/admin-operations-console.md](./admin/admin-operations-console.md)                                          |
 | Run tests / QA                | [qa/testing-guide.md](./qa/testing-guide.md) · [qa/regression-checklist.md](./qa/regression-checklist.md)         |
 | Release workflow              | [operations/branching.md](./operations/branching.md)                                                              |
+| **Pre-deploy (June 2026)**    | [releases/2026-06-09-pre-deploy-checklist.md](./releases/2026-06-09-pre-deploy-checklist.md)                      |
+| UI copy & legal gates         | [ui/README.md](./ui/README.md)                                                                                    |
 | Historical audits             | [archive/audits/](./archive/audits/)                                                                              |
 
 ## Folder map
@@ -33,6 +35,8 @@ docs/
   security/                 RBAC index, security audits
   admin/                    Admin guide, flags, operations console
   qa/                       Testing guide, regression checklist
+  ui/                       UI copy maps, legal re-acceptance, admin UX notes
+  releases/                 Pre-deploy checklists per coordinated release
   guides/                   Setup, handbook, migrations, seeding
   api/                      API route index
   diagrams/                 Canonical Mermaid diagrams

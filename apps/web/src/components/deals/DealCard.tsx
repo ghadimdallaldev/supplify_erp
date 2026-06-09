@@ -28,16 +28,23 @@ import { LIMIT_UPGRADE_COPY } from '../../lib/upgradeCopy'
 import { openBrowseUpgrade } from '../../lib/openBrowseUpgrade'
 import { cn } from '../../lib/utils'
 import { cardActionBtnClass, cardShellClass } from '../ui/card-layout'
+import {
+  COUPON_COPIED_TOAST,
+  COUPON_LINKED_HELPER,
+  formatDealTypeLabel,
+  getCtaLabel,
+} from '../../lib/dealDisplayLabels'
 
 export type DealRecord = Record<string, unknown>
 
 function formatDiscount(deal: DealRecord) {
   const type = String(deal.type || '')
   const val = deal.discount_value
-  if (val == null) return String(type).replace(/_/g, ' ')
-  if (type === 'percentage_discount') return `${val}% off`
-  if (type === 'fixed_discount') return `${formatPrice(Number(val))} off`
-  return String(type).replace(/_/g, ' ')
+  if (val == null) return formatDealTypeLabel(type)
+  if (type === 'percentage_discount' || type === 'percentage_off') return `${val}% off`
+  if (type === 'fixed_discount' || type === 'fixed_off') return `${formatPrice(Number(val))} off`
+  if (type === 'free_shipping') return 'Free shipping'
+  return formatDealTypeLabel(type)
 }
 
 function formatValidUntil(deal: DealRecord) {
@@ -50,16 +57,7 @@ function formatValidUntil(deal: DealRecord) {
 }
 
 function ctaLabel(deal: DealRecord) {
-  switch (deal.cta_type) {
-    case 'use_coupon':
-      return 'Use coupon'
-    case 'message_supplier':
-      return 'Message supplier'
-    case 'view_products':
-      return 'View products'
-    default:
-      return 'Order now'
-  }
+  return getCtaLabel(deal.cta_type, 'restaurant')
 }
 
 function CtaIcon({ cta }: { cta: string }) {
@@ -172,7 +170,7 @@ export function DealCard({
       try {
         const result = await redeemCoupon(dealId).unwrap()
         await navigator.clipboard.writeText(result.couponCode)
-        toast.success(`Coupon copied: ${result.couponCode}`)
+        toast.success(COUPON_COPIED_TOAST)
         navigate(
           `/app/cart?coupon=${encodeURIComponent(result.couponCode)}&supplierId=${supplierId}`
         )
@@ -241,13 +239,16 @@ export function DealCard({
             </p>
           ) : null}
           {deal.coupon_code ? (
-            <p className="text-xs font-mono bg-[var(--app-muted)] px-2 py-1 rounded inline-block">
-              {canRedeem ? (
-                <>Code: {String(deal.coupon_code)}</>
-              ) : (
-                <>Apply limit reached — upgrade for more redemptions</>
-              )}
-            </p>
+            <div className="space-y-1">
+              <p className="text-xs font-mono bg-[var(--app-muted)] px-2 py-1 rounded inline-block">
+                {canRedeem ? (
+                  <>Code: {String(deal.coupon_code)}</>
+                ) : (
+                  <>Apply limit reached — upgrade for more redemptions</>
+                )}
+              </p>
+              <p className="text-xs text-[var(--text-muted)]">{COUPON_LINKED_HELPER}</p>
+            </div>
           ) : null}
           {deal.description ? (
             <p className="text-[var(--text-muted)] line-clamp-2">{String(deal.description)}</p>

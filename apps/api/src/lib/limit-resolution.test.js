@@ -197,6 +197,8 @@ describe('limit-resolution', () => {
     expect(SUPPLIER_LIMIT_KEYS).toContain('promotions')
     expect(isLimitKeyApplicable('RESTAURANT', 'promotions')).toBe(false)
     expect(isLimitKeyApplicable('SUPPLIER', 'promotions')).toBe(true)
+    expect(isLimitKeyApplicable('SUPPLIER', 'restaurant_inventory_skus')).toBe(false)
+    expect(isLimitKeyApplicable('RESTAURANT', 'restaurant_inventory_skus')).toBe(true)
   })
 
   it('formatPlanLimitDisplay treats missing keys as n/a not unlimited', () => {

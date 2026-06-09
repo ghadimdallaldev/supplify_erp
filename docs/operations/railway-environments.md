@@ -129,8 +129,9 @@ Set at **build time** (Docker `ARG` or Railway). See `apps/web/.env.<env>.exampl
 4. Deploy API: Root Directory **empty**, config `/apps/api/railway.json`, Dockerfile `apps/api/Dockerfile`, health check `/health`.
 5. Deploy Web: Root Directory **empty**, config `/apps/web/railway.json`, Dockerfile `apps/web/Dockerfile`, build args from `apps/web/.env.<env>.example`.
 6. Commit defaults live in `deploy/railway/<environment>/` (API + web load on deploy). Paste secrets from `deploy/railway/<environment>/secrets.env.example` into each service’s Railway Raw Editor once (`DATABASE_URL`, `REDIS_URL`, session keys, Keycloak secret).
-7. On API startup (`RUN_MIGRATIONS_ON_START=true` in `deploy/railway/<env>/api.env`), the server runs the **full** migration pipeline: SQL files, runtime schema checks, tenant role backfill, and supplier org backfill (same as `pnpm db:migrate`). No manual steps after redeploy. Check API logs for `Running full startup migrations` / `Full startup migrations completed`.
+7. On API startup (`RUN_MIGRATIONS_ON_START=true` in `deploy/railway/<env>/api.env`), the server runs the **full** migration pipeline: SQL files, runtime schema checks, tenant role backfill, and supplier org backfill (same as `pnpm db:migrate`). No manual steps after redeploy. Check API logs for `Running full startup migrations` / `Full startup migrations completed`. **June 2026 release:** confirm **`0144`** and **`0145`** apply (plan catalog audit); see [../releases/2026-06-09-pre-deploy-checklist.md](../releases/2026-06-09-pre-deploy-checklist.md).
 8. Verify `GET /health` and `GET /ready` on API (`redis.connected` should be `true` when Redis is wired); open web app and sign in via Keycloak. Confirm `CRONS_ENABLED=true` in `deploy/railway/<env>/api.env` (loaded on deploy) so the operational reminders job runs daily (default `CRON_OPERATIONAL_REMINDERS_INTERVAL_MS=86400000`). For email, confirm API boot logs show `Email service initialized` with the expected provider; preprod/prod require `SMTP_PASS` in dashboard secrets when `EMAIL_LOG_ONLY=false`.
+9. **Legal pack `2026-06-09`:** deploy **Web and API together** (`LEGAL_PACK_VERSION` must match). After deploy, existing users with stale acceptances are redirected to **`/legal/reaccept`** on first app login — expected one-time UX; see [../ui/LEGAL_PACK_REACCEPTANCE.md](../ui/LEGAL_PACK_REACCEPTANCE.md).
 
 ## I. Redis (cache + Socket.IO)
 
@@ -271,7 +272,8 @@ API blocks `PAYMENTS_MODE=mock` when `APP_ENV=prod` or `preprod`.
 - [ ] `REDIS_URL` set on API (Redis plugin per environment); `/health` shows `redis.connected: true`
 - [ ] `GET /health` returns `{ status, service, env }` without secrets
 - [ ] Frontend build with prod `VITE_*` vars
-- [ ] Migrations applied (`pnpm db:migrate`); incl. **0133–0135** for restaurant operations features
+- [ ] Migrations applied (`pnpm db:migrate`); incl. **0133–0135** for restaurant operations; **`0144`**, **`0145`** for plan catalog audit (June 2026)
+- [ ] Web + API legal pack version aligned (`2026-06-09`); re-acceptance smoke tested on one stale user
 - [ ] `CRONS_ENABLED=true` on API (operational reminders job; default 24 h interval)
 - [ ] Admin created securely
 - [ ] Backups and rollback plan documented
@@ -293,4 +295,4 @@ API blocks `PAYMENTS_MODE=mock` when `APP_ENV=prod` or `preprod`.
 - `STORAGE_DRIVER=local` on prod (validation fails)
 - Committing `.env` files with real secrets
 
-See also: [railway.md](./railway.md) (single-env overview), [env-matrix.md](./env-matrix.md), [../operations/cron-jobs.md](../operations/cron-jobs.md) (in-process scheduled jobs and env vars).
+See also: [railway.md](./railway.md) (single-env overview), [env-matrix.md](./env-matrix.md), [../operations/cron-jobs.md](../operations/cron-jobs.md) (in-process scheduled jobs and env vars), [../releases/2026-06-09-pre-deploy-checklist.md](../releases/2026-06-09-pre-deploy-checklist.md) (June 2026 coordinated release).

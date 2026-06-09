@@ -1609,7 +1609,8 @@ export function requireFeature(featureKey, getTenantId, getTenantType) {
         featureKey,
         subscription?.features
       )
-      if (!featureResult.enabled && FEATURE_ALIASES[featureKey]) {
+      const { shouldResolveFeatureAlias } = await import('./feature-flags.js')
+      if (!featureResult.enabled && shouldResolveFeatureAlias(featureKey, subscription?.features)) {
         featureResult = await resolveFeatureEnabled(
           billingTenantId,
           tenantType,

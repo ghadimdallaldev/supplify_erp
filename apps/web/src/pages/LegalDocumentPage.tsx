@@ -136,7 +136,7 @@ export function LegalHubPage() {
     { key: 'core', label: 'Platform agreements' },
     { key: 'role', label: 'Organization-specific' },
     { key: 'product', label: 'Product terms' },
-    { key: 'reference', label: 'Billing & promotions' },
+    { key: 'reference', label: 'Billing & deals' },
   ] as const
 
   return (

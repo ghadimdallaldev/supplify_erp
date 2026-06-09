@@ -524,6 +524,63 @@ describe('Admin Dashboard Routes', () => {
       expect(res.body.data.validationWarnings[0]).toMatch(/silver/)
     })
 
+    it('persists -1 unlimited branches on PATCH', async () => {
+      const updatedLimits = { ...goldPlan.limits, branches: -1 }
+      query.mockImplementation(async (sql) => {
+        if (
+          typeof sql === 'string' &&
+          sql.includes('WHERE id = $1') &&
+          sql.includes('subscription_plan')
+        ) {
+          return { rows: [goldPlan] }
+        }
+        if (typeof sql === 'string' && sql.includes('id != $2')) {
+          return { rows: [{ code: 'silver', limits: { orders_per_day: 20, branches: 1 } }] }
+        }
+        if (typeof sql === 'string' && sql.includes('UPDATE subscription_plan')) {
+          return { rows: [{ ...goldPlan, limits: updatedLimits }] }
+        }
+        return { rows: [] }
+      })
+
+      const res = await request(app)
+        .patch(`/api/admin-dashboard/plans/${planId}`)
+        .send({ limits: updatedLimits })
+        .expect(200)
+
+      expect(res.body.data.plan.limits.branches).toBe(-1)
+    })
+
+    it('persists tier string and boolean features on PATCH', async () => {
+      const updatedFeatures = {
+        reports: 'usage_cost_dashboards',
+        finance_invoices: 'expense_analytics',
+        fulfillment_tools: false,
+      }
+      query.mockImplementation(async (sql) => {
+        if (
+          typeof sql === 'string' &&
+          sql.includes('WHERE id = $1') &&
+          sql.includes('subscription_plan')
+        ) {
+          return { rows: [goldPlan] }
+        }
+        if (typeof sql === 'string' && sql.includes('UPDATE subscription_plan')) {
+          return { rows: [{ ...goldPlan, features: updatedFeatures }] }
+        }
+        return { rows: [] }
+      })
+
+      const res = await request(app)
+        .patch(`/api/admin-dashboard/plans/${planId}`)
+        .send({ features: updatedFeatures })
+        .expect(200)
+
+      expect(res.body.data.plan.features.reports).toBe('usage_cost_dashboards')
+      expect(res.body.data.plan.features.finance_invoices).toBe('expense_analytics')
+      expect(res.body.data.plan.features.fulfillment_tools).toBe(false)
+    })
+
     it('blocks activating enterprise without confirm flag', async () => {
       query.mockResolvedValueOnce({
         rows: [{ ...goldPlan, code: 'enterprise', is_active: false }],
@@ -771,7 +828,16 @@ describe('Admin Dashboard Routes', () => {
       query
         .mockResolvedValueOnce({ rows: [{ total: 120 }] })
         .mockResolvedValueOnce({
-          rows: [{ id: 's1', name: 'Supplier One', product_count: 3, warehouse_count: 1 }],
+          rows: [
+            {
+              id: 's1',
+              name: 'Supplier One',
+              product_count: 3,
+              warehouse_count: 1,
+              active_deals_count: 2,
+              storage_mb_used: 120,
+            },
+          ],
         })
         .mockResolvedValue({ rows: [{ code: 'gold' }] })
 
@@ -781,9 +847,42 @@ describe('Admin Dashboard Routes', () => {
 
       expect(res.body.ok).toBe(true)
       expect(res.body.data.suppliers).toHaveLength(1)
+      expect(res.body.data.suppliers[0].active_deals_count).toBe(2)
+      expect(res.body.data.suppliers[0].storage_mb_used).toBe(120)
       expect(res.body.data.total).toBe(120)
       expect(res.body.data.limit).toBe(50)
       expect(res.body.data.offset).toBe(0)
+    })
+  })
+
+  describe('GET /tenants/restaurants', () => {
+    it('returns restaurant usage fields when present', async () => {
+      query
+        .mockResolvedValueOnce({ rows: [{ total: 40 }] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'r1',
+              name: 'Cafe One',
+              orders_last_30d: 51,
+              orders_today: 2,
+              connected_suppliers_count: 6,
+              inventory_skus_count: 240,
+              storage_mb_used: null,
+            },
+          ],
+        })
+        .mockResolvedValue({ rows: [{ code: 'silver' }] })
+
+      const res = await request(app)
+        .get('/api/admin-dashboard/tenants/restaurants?limit=50&offset=0')
+        .expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.restaurants[0].orders_today).toBe(2)
+      expect(res.body.data.restaurants[0].connected_suppliers_count).toBe(6)
+      expect(res.body.data.restaurants[0].inventory_skus_count).toBe(240)
+      expect(res.body.data.restaurants[0].storage_mb_used).toBeNull()
     })
   })
 

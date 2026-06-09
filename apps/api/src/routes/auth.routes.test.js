@@ -357,17 +357,18 @@ describe('Auth Routes', () => {
   })
 
   describe('GET /auth/me', () => {
-    it('should return current user data', async () => {
-      // Mock database query for restaurant lookup
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'restaurant-1',
-            name: 'Test Restaurant',
-            contact_email: 'test@example.com',
-          },
-        ],
-      })
+    it('should return current user data with legal status', async () => {
+      db.query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'restaurant-1',
+              name: 'Test Restaurant',
+              contact_email: 'test@example.com',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] })
 
       const response = await request(app).get('/auth/me').expect(200)
 
@@ -379,6 +380,10 @@ describe('Auth Routes', () => {
       expect(response.body.data.tenantRoles).toContain('RESTAURANT_OWNER')
       expect(response.body.data.tenantPermissions).toContain('SETTINGS_VIEW')
       expect(response.body.data.workspace?.tenantName).toBe('Test Restaurant')
+      expect(response.body.data.legalStatus).toMatchObject({
+        needsReacceptance: true,
+        currentPackVersion: expect.any(String),
+      })
     })
   })
 

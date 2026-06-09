@@ -21,6 +21,8 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | Path                                                                            | Persona                                               |
 | ------------------------------------------------------------------------------- | ----------------------------------------------------- |
 | `/login`                                                                        | Public                                                |
+| `/legal/reaccept`                                                               | Authenticated users with stale legal pack             |
+| `/legal/:slug`                                                                  | Public / authenticated — read-only legal documents    |
 | `/register/complete`                                                            | Pending / needs setup                                 |
 | `/reserve`, `/reserve/:slug`, `/reserve/confirmation`, `/reserve/manage/:token` | Guest                                                 |
 | `/reserve/waitlist/:token/accept`, `/reserve/waitlist/:token/decline`           | Guest (waitlist table offer)                          |
@@ -52,17 +54,17 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 ## 0.1 Wipe and rebuild the database
 
-| ID       | Steps                                                                                                                                                          | Expected                                                                                                                                                                                         | Pass? |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----- |
-| SETUP-01 | Stop all running services (`Ctrl+C` in each terminal or `pnpm run dev` teardown)                                                                               | No API or web process running on ports 3001/5173                                                                                                                                                 | pass  |
-| SETUP-02 | Drop and recreate the database: run your project's DB reset script (e.g. `pnpm run db:reset` or `psql -c "DROP DATABASE supplify; CREATE DATABASE supplify;"`) | Clean empty database; no tables                                                                                                                                                                  | pass  |
-| SETUP-03 | Run all migrations: `pnpm run db:migrate`                                                                                                                      | All migrations apply (incl. `0104_user_workspace_membership`); no errors                                                                                                                         | pass  |
-| SETUP-04 | Seed the subscription plan catalog: `pnpm run seed:tier-catalog`                                                                                               | Free, Silver, Gold, Platinum plans for RESTAURANT and SUPPLIER in `subscription_plan` table; confirm with `SELECT code, tenant_type FROM subscription_plan ORDER BY tenant_type, display_order;` | pass  |
-| SETUP-05 | Verify plan catalog (post `0117`): `pnpm run log:tier-limits` or query `subscription_plan` for `code = 'silver'`                                               | Silver restaurant: 1 branch, 20 orders/day, 5 suppliers, 250 SKUs, no `promotions` limit key; Silver supplier: 1 warehouse, `promotions` 3; `advanced_roles` false on Silver                     | pass  |
-| SETUP-06 | Start the API: `pnpm --filter @supplify/api dev`                                                                                                               | API listening; migrations logged; no crash on startup                                                                                                                                            | pass  |
-| SETUP-07 | Start the web: `pnpm --filter @supplify/web dev`                                                                                                               | Dev server running at `http://localhost:5173` (or configured port)                                                                                                                               | pass  |
-| SETUP-08 | Health check: `GET /api/health`                                                                                                                                | `{ status: "ok" }`                                                                                                                                                                               | pass  |
-| SETUP-09 | Navigate to `/login` in browser                                                                                                                                | Login page loads; no errors in console                                                                                                                                                           | pass  |
+| ID       | Steps                                                                                                                                                          | Expected                                                                                                                                                                                                  | Pass? |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| SETUP-01 | Stop all running services (`Ctrl+C` in each terminal or `pnpm run dev` teardown)                                                                               | No API or web process running on ports 3001/5173                                                                                                                                                          | pass  |
+| SETUP-02 | Drop and recreate the database: run your project's DB reset script (e.g. `pnpm run db:reset` or `psql -c "DROP DATABASE supplify; CREATE DATABASE supplify;"`) | Clean empty database; no tables                                                                                                                                                                           | pass  |
+| SETUP-03 | Run all migrations: `pnpm run db:migrate`                                                                                                                      | All migrations apply (incl. `0104_user_workspace_membership`, **`0144`**, **`0145`**); no errors                                                                                                          | pass  |
+| SETUP-04 | Seed the subscription plan catalog: `pnpm run seed:tier-catalog`                                                                                               | Free, Silver, Gold, Platinum plans for RESTAURANT and SUPPLIER in `subscription_plan` table; confirm with `SELECT code, tenant_type FROM subscription_plan ORDER BY tenant_type, display_order;`          | pass  |
+| SETUP-05 | Verify plan catalog (post `0117` + `0145`): `pnpm run log:tier-limits` or query `subscription_plan` for `code = 'silver'`                                      | Silver restaurant: 1 branch, 20 orders/day, 5 suppliers, 250 SKUs, no `promotions` limit key; Silver supplier: 1 warehouse, `promotions` 3; Free **`chats_per_day: 3`**; `advanced_roles` false on Silver | pass  |
+| SETUP-06 | Start the API: `pnpm --filter @supplify/api dev`                                                                                                               | API listening; migrations logged; no crash on startup                                                                                                                                                     | pass  |
+| SETUP-07 | Start the web: `pnpm --filter @supplify/web dev`                                                                                                               | Dev server running at `http://localhost:5173` (or configured port)                                                                                                                                        | pass  |
+| SETUP-08 | Health check: `GET /api/health`                                                                                                                                | `{ status: "ok" }`                                                                                                                                                                                        | pass  |
+| SETUP-09 | Navigate to `/login` in browser                                                                                                                                | Login page loads; no errors in console                                                                                                                                                                    | pass  |
 
 ## 0.2 Seed the platform admin account
 
@@ -295,7 +297,21 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | AUTH-09 | Finish registration as **Supplier**                          | Same; supplier settings reachable when unlocked            |       |
 | AUTH-10 | User with `needsSetup` from `/api/register/status`           | Forced to `/register/complete` until done                  |       |
 
-## 4.3 Account activation lock (new tenants)
+## 4.3 Legal re-acceptance (pack `2026-06-09`)
+
+> Requires a user whose `legal_acceptance.document_version` ≠ `2026-06-09` (seed or manual DB row). See [../ui/LEGAL_PACK_REACCEPTANCE.md](../ui/LEGAL_PACK_REACCEPTANCE.md).
+
+| ID     | Steps                                                             | Expected                                                                    | Pass? |
+| ------ | ----------------------------------------------------------------- | --------------------------------------------------------------------------- | ----- |
+| LEG-01 | Log in as user on stale legal pack → navigate to `/app/dashboard` | Redirect to `/legal/reaccept` before app shell                              |       |
+| LEG-02 | `/legal/reaccept` page                                            | Lists required documents for tenant type; accept-all checkbox required      |       |
+| LEG-03 | Submit acceptance with current pack `2026-06-09`                  | Redirect to `/app`; `GET /auth/me` → `legalStatus.needsReacceptance: false` |       |
+| LEG-04 | Staff portal user on stale pack → `/staff/dashboard`              | Redirect to `/legal/reaccept` first                                         |       |
+| LEG-05 | `PENDING` user during registration                                | `/register/complete`, **not** `/legal/reaccept`                             |       |
+| LEG-06 | POST `/auth/legal-acceptance` with wrong `packVersion`            | 400 validation error                                                        |       |
+| LEG-07 | Read-only `/legal/terms_and_conditions` while logged out          | Document loads; no re-accept gate on public legal routes                    |       |
+
+## 4.4 Account activation lock (new tenants)
 
 | ID     | Steps                                                 | Expected                                                                  | Pass? |
 | ------ | ----------------------------------------------------- | ------------------------------------------------------------------------- | ----- |
@@ -305,7 +321,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | BIL-04 | Paid checkout (stub card) for Silver/Gold             | Unlock; full app access                                                   |       |
 | BIL-05 | Admin → Subscriptions → **Activate** on locked tenant | Unlocked without payment                                                  |       |
 
-## 4.4 Billing, subscriptions & overdue
+## 4.5 Billing, subscriptions & overdue
 
 | ID     | Steps                                                 | Expected                                              | Pass? |
 | ------ | ----------------------------------------------------- | ----------------------------------------------------- | ----- |
@@ -317,7 +333,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | BIL-11 | Toggle auto-renew in billing UI                       | Persists; reflected on reload                         |       |
 | BIL-12 | Free plan tenant                                      | No payment required; upgrade prompts where applicable |       |
 
-## 4.5 Plan limits & upgrade UX
+## 4.6 Plan limits & upgrade UX
 
 | ID      | Steps                                          | Expected                                                  | Pass? |
 | ------- | ---------------------------------------------- | --------------------------------------------------------- | ----- |
@@ -333,7 +349,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | PLN-07  | Gold/Platinum → custom branding in settings    | Logo/colors upload (Gold); white-label if Platinum        |       |
 | PLN-08  | Header **Plans** button                        | Upgrade/browse modal; plan comparison table               |       |
 
-## 4.6 Free Trial expiry (read-only lock)
+## 4.7 Free Trial expiry (read-only lock)
 
 > **Spec:** [free-trial-expiry.md](../features/free-trial-expiry.md) · **Audit:** [FREE_TRIAL_BEHAVIOR_AUDIT.md](./FREE_TRIAL_BEHAVIOR_AUDIT.md)  
 > **Accounts:** Free restaurant or supplier (`restaurant-free@…` / `supplier-free@…`) or any tenant on plan `free`.  
@@ -362,7 +378,7 @@ WHERE id = '<subscription_id>';
 | BIL-FT-11 | Re-expire tenant; Admin → **Activate** / unlock on `free_sandbox_expired` | Unlock + trial extended (job should not re-lock immediately)                                     |       |
 | BIL-FT-12 | `POST …/extend-free-trial` with `{ "days": 5 }` (API or admin action)     | **200**; expiry ≈ now + 5 days                                                                   |       |
 
-## 4.7 Shell UI (Layout, Header, Sidebar)
+## 4.8 Shell UI (Layout, Header, Sidebar)
 
 | ID     | Steps                                     | Expected                                             | Pass? |
 | ------ | ----------------------------------------- | ---------------------------------------------------- | ----- |
@@ -381,7 +397,7 @@ WHERE id = '<subscription_id>';
 | UX-08  | Plan badge in sidebar footer              | Shows plan name for non-free paid tiers              |       |
 | UX-09  | Mobile/narrow viewport                    | Sidebar/layout usable; tabs wrap (supplier settings) |       |
 
-## 4.8 Notifications preferences
+## 4.9 Notifications preferences
 
 | ID     | Steps                                                   | Expected                                          | Pass? |
 | ------ | ------------------------------------------------------- | ------------------------------------------------- | ----- |
@@ -391,7 +407,7 @@ WHERE id = '<subscription_id>';
 | UX-12a | Same event as UX-12 (foreground tab)                    | Toast ~10s + short sound; optional browser banner |       |
 | UX-12b | Log in as **second team user** (not contact_email only) | Same event visible in bell + toast for that user  |       |
 
-## 4.9 Realtime & impersonation
+## 4.10 Realtime & impersonation
 
 Ref: [features/admin-impersonation.md](../features/admin-impersonation.md) · [IMPERSONATION_AUDIT.md](../IMPERSONATION_AUDIT.md)
 
@@ -409,7 +425,7 @@ Ref: [features/admin-impersonation.md](../features/admin-impersonation.md) · [I
 | ADM-IMP-10 | Audit log                                           | `IMPERSONATION_START` / `IMPERSONATION_END` entries      |       |
 | ADM-IMP-11 | Plan change while logged in (admin or billing)      | `entitlements_refresh` toast or refetch updates UI       |       |
 
-## 4.10 WebSocket connectivity
+## 4.11 WebSocket connectivity
 
 | ID    | Steps                                                                                        | Expected                                                                                     | Pass? |
 | ----- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----- |
@@ -623,7 +639,9 @@ Prereq: supplier assigned driver; active assignment; API `GPS_ALLOW_RESTAURANT_L
 | RST-68 | Socket reconnect                       | Brief API restart: client shows Reconnecting then Live; messages still flow |       |
 | RST-69 | Mobile chat layout                     | List full-width; open thread with back; composer usable with keyboard       |       |
 
-## 6.14 Deals & promotions (`/app/deals`) — requires `supplier_deals` feature
+## 6.14 Deals (`/app/deals`) — requires `supplier_deals` feature
+
+> **UI:** page title **Available deals**; card CTA **Order with deal**. See [../ui/DEALS_BOOSTS_WORDING_CLEANUP.md](../ui/DEALS_BOOSTS_WORDING_CLEANUP.md).
 
 | ID     | Steps                                                      | Expected                                                                          | Pass? |
 | ------ | ---------------------------------------------------------- | --------------------------------------------------------------------------------- | ----- |
@@ -813,7 +831,9 @@ Prereq: migration `0137_driver_location_tracking.sql`; API env `GPS_TRACKING_ENA
 | RBAC-S6 | Settings → **Team & roles** tab (Gold+, `advanced_roles`)            | `TeamRolesPanel` + branch invite panel   |       |
 | RBAC-S7 | Invite email already on another supplier account                     | Blocked at invite or accept              |       |
 
-## 7.11 Deals & promotions (`/app/promotions`) — requires `promotions` feature
+## 7.11 Deals (`/app/promotions`) — requires `promotions` feature
+
+> **UI label:** sidebar and page title show **Deals** (route unchanged). See [../ui/DEALS_BOOSTS_WORDING_CLEANUP.md](../ui/DEALS_BOOSTS_WORDING_CLEANUP.md).
 
 | ID     | Steps                                        | Expected                                           | Pass? |
 | ------ | -------------------------------------------- | -------------------------------------------------- | ----- |
@@ -824,6 +844,8 @@ Prereq: migration `0137_driver_location_tracking.sql`; API env `GPS_TRACKING_ENA
 | SUP-56 | **Boost** active deal                        | Boost dialog; pricing tier; campaign active        |       |
 | SUP-57 | Deal analytics                               | Views, clicks, orders, messages, coupon uses shown |       |
 | SUP-58 | Pause / resume deal                          | Status toggles correctly                           |       |
+| SUP-59 | Sidebar nav label                            | **Deals** (not “Promotions”)                       |       |
+| SUP-60 | Settings → Subscription usage                | Limit labeled **Active deals**                     |       |
 
 ---
 
@@ -909,14 +931,14 @@ Prereq: migration `0137_driver_location_tracking.sql`; API env `GPS_TRACKING_ENA
 | ADM-33 | After any flag change, check logged-in tenant receives `entitlements_refresh` | WebSocket event delivered; UI updates                                             |       |
 | ADM-34 | Audit log records every flag change                                           | Action logged under admin actor                                                   |       |
 
-### Deals tab — approvals & boost pricing
+### Deals & Boosts tab — approvals & boost pricing
 
-| ID     | Steps                              | Expected                                     | Pass? |
-| ------ | ---------------------------------- | -------------------------------------------- | ----- |
-| ADM-35 | Open **Deals** tab on `/app/admin` | Pending deals list + pricing tiers load      |       |
-| ADM-36 | Approve pending deal               | Deal status → active; visible to restaurants |       |
-| ADM-37 | Reject pending deal                | Deal returns to draft                        |       |
-| ADM-38 | Edit boost pricing tier amount     | Saves via PATCH; suppliers see updated price |       |
+| ID     | Steps                                       | Expected                                     | Pass? |
+| ------ | ------------------------------------------- | -------------------------------------------- | ----- |
+| ADM-35 | Open **Deals & Boosts** tab on `/app/admin` | Pending deals list + pricing tiers load      |       |
+| ADM-36 | Approve pending deal                        | Deal status → active; visible to restaurants |       |
+| ADM-37 | Reject pending deal                         | Deal returns to draft                        |       |
+| ADM-38 | Edit boost pricing tier amount              | Saves via PATCH; suppliers see updated price |       |
 
 ### Health tab
 
@@ -1028,14 +1050,16 @@ Prereq: migration `0137_driver_location_tracking.sql`; API env `GPS_TRACKING_ENA
 
 # Part 11 — Automated tests (CI parity)
 
-| ID    | Command                                                                                               | Expected                                                 | Pass? |
-| ----- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ----- |
-| CI-01 | `pnpm test:api`                                                                                       | 131 files / ~770 API tests pass                          |       |
-| CI-02 | `pnpm test:web`                                                                                       | 59 files / ~202 web tests pass                           |       |
-| CI-03 | `pnpm test:ci` (root)                                                                                 | Both packages green                                      |       |
-| CI-04 | `pnpm run e2e:playwright` (if configured)                                                             | E2E suite pass                                           |       |
-| CI-05 | Deals/promotions unit + API gates (see `docs/features/deals-and-promotions.md` § Tests)               | Vitest + `tests/api/promotions-deals-gates.spec.ts` pass |       |
-| CI-06 | Realtime/socket subset: `socket.test.js`, `useChatRealtime.test.ts`, `useNotificationAlerts.test.tsx` | Pass                                                     |       |
+| ID    | Command                                                                                                       | Expected                                                 | Pass? |
+| ----- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ----- |
+| CI-01 | `pnpm test:api`                                                                                               | 131 files / ~770 API tests pass                          |       |
+| CI-02 | `pnpm test:web`                                                                                               | 59 files / ~202 web tests pass                           |       |
+| CI-03 | `pnpm test:ci` (root)                                                                                         | Both packages green                                      |       |
+| CI-04 | `pnpm run e2e:playwright` (if configured)                                                                     | E2E suite pass                                           |       |
+| CI-05 | Deals/promotions unit + API gates (see `docs/features/deals-and-promotions.md` § Tests)                       | Vitest + `tests/api/promotions-deals-gates.spec.ts` pass |       |
+| CI-06 | Realtime/socket subset: `socket.test.js`, `useChatRealtime.test.ts`, `useNotificationAlerts.test.tsx`         | Pass                                                     |       |
+| CI-07 | Legal re-acceptance: `legal-acceptance.test.js`, `legalReacceptanceGate.test.ts`, `dealDisplayLabels.test.ts` | Pass                                                     |       |
+| CI-08 | Plan audit (post `0145`): `planLimits.test.ts`, `planComparison.test.ts`, `npm run test:billing`              | Pass; Free `chats_per_day` = 3                           |       |
 
 ---
 

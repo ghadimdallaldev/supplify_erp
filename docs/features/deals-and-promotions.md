@@ -4,15 +4,19 @@
 
 Suppliers create **deals** (stored in `promotions`) — percentage/fixed discounts, buy-X-get-Y, free shipping, coupons, and CTAs. Restaurants discover deals from followed suppliers plus **sponsored** deals from boosted suppliers they do not follow.
 
-**Promotions** (paid boost layer) are separate: suppliers pay to run a `deal_promotions` campaign that surfaces deals to non-followers with analytics (views, clicks, orders, messages, coupon uses).
+**Boosts** (paid visibility layer, stored in `deal_promotions`) are separate: suppliers pay to run a boost campaign that surfaces deals to non-followers with analytics (views, clicks, orders, messages, coupon uses).
+
+> **UI labels (June 2026):** User-facing copy uses **Deals** and **Boosts**; internal API/DB names remain `promotions`, `deal_promotions`, etc. See [../ui/DEALS_BOOSTS_WORDING_CLEANUP.md](../ui/DEALS_BOOSTS_WORDING_CLEANUP.md).
 
 ## Terminology
 
-| Term                  | Meaning                                                     |
-| --------------------- | ----------------------------------------------------------- |
-| **Deal**              | Supplier-created offer (`promotions` row)                   |
-| **Promotion / Boost** | Paid visibility campaign (`deal_promotions` row)            |
-| **Sponsored**         | Deal with an active boost campaign visible to non-followers |
+| Term                | Meaning                                                     |
+| ------------------- | ----------------------------------------------------------- |
+| **Deal**            | Supplier-created offer (`promotions` row)                   |
+| **Boost**           | Paid visibility campaign (`deal_promotions` row)            |
+| **Coupon code**     | Optional code on a deal (`promotions.coupon_code`)          |
+| **Deal redemption** | Checkout usage (`promotion_usages` / `usage_count`)         |
+| **Sponsored**       | Deal with an active boost campaign visible to non-followers |
 
 ## Plan limits (not boost pricing)
 
@@ -90,7 +94,7 @@ Deal **boost** checkout uses separate `promotion_pricing_config` — not counted
 | GET    | `/api/promotions/admin/pricing`      | All boost + activation pricing rows (incl. inactive) |
 | PATCH  | `/api/promotions/admin/pricing/:key` | Update boost package fields                          |
 
-Admin UI: **Admin → Deals** tab (`AdminDealsPanel`).
+Admin UI: **Admin → Deals & Boosts** tab (`AdminDealsPanel`).
 
 See **[DEALS_BOOST_PUBLISHING_FLOW.md](../DEALS_BOOST_PUBLISHING_FLOW.md)** for the full submit → approve → publish flow.
 
@@ -139,11 +143,17 @@ Supplier list responses include `boost_status`: `active` (days remaining, ends a
 
 ## Frontend
 
-| Role       | Page / component                                                                     |
-| ---------- | ------------------------------------------------------------------------------------ |
-| Supplier   | `/app/promotions` — Deals & Promotions (create, boost, analytics, targeting pickers) |
-| Restaurant | `/app/deals` — discovery feed with CTAs (`DealCard`)                                 |
-| Admin      | `/app/admin` → Deals tab — approvals + pricing                                       |
+| Role       | Route / nav label                     | Component / notes                                                                   |
+| ---------- | ------------------------------------- | ----------------------------------------------------------------------------------- |
+| Supplier   | `/app/promotions` — **Deals**         | Create, boost, analytics, targeting pickers (`PromotionsPage`, `dealDisplayLabels`) |
+| Restaurant | `/app/deals` — **Deals**              | Discovery feed with CTAs (`DealsPage`, `DealCard`)                                  |
+| Admin      | `/app/admin` — **Deals & Boosts** tab | Approvals + boost pricing (`AdminDealsPanel`)                                       |
+
+Label maps: [`apps/web/src/lib/dealDisplayLabels.ts`](../../apps/web/src/lib/dealDisplayLabels.ts).
+
+### Legal (deals/boost copy in agreements)
+
+Legal pack **`2026-06-09`** aligns static terms with Deals/Boosts/Coupon terminology. Existing users re-accept on login via `/legal/reaccept`. See [../ui/LEGAL_PACK_REACCEPTANCE.md](../ui/LEGAL_PACK_REACCEPTANCE.md).
 
 ## Tests
 
@@ -166,10 +176,13 @@ Automated coverage maps to `docs/qa/regression-checklist.md` IDs below.
 
 ### Web unit (Vitest)
 
-| File                                   | Covers                                                                  |
-| -------------------------------------- | ----------------------------------------------------------------------- |
-| `apps/web/src/lib/planLimits.test.ts`  | `deal_redemptions_per_day`, supplier `promotions` caps (PLN upgrade UX) |
-| `apps/web/src/lib/upgradeCopy.test.ts` | Upgrade copy for deals/promotions limits                                |
+| File                                             | Covers                                                                  |
+| ------------------------------------------------ | ----------------------------------------------------------------------- |
+| `apps/web/src/lib/planLimits.test.ts`            | `deal_redemptions_per_day`, supplier `promotions` caps (PLN upgrade UX) |
+| `apps/web/src/lib/upgradeCopy.test.ts`           | Upgrade copy for active deals / redemptions limits                      |
+| `apps/web/src/lib/dealDisplayLabels.test.ts`     | User-facing deal/boost/coupon label maps                                |
+| `apps/web/src/lib/legalReacceptanceGate.test.ts` | Legal re-accept redirect when pack stale                                |
+| `apps/api/src/lib/legal-acceptance.test.js`      | `legalStatus`, `login_refresh` acceptance recording                     |
 
 ### Playwright API / E2E
 

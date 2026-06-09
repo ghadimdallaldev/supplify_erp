@@ -62,9 +62,13 @@ describe('admin-overview-metrics', () => {
         .mockResolvedValueOnce({ rows: [{ count: 0 }] })
         .mockResolvedValueOnce({ rows: [{ count: 0 }] })
         .mockResolvedValueOnce({ rows: [{ count: 0 }] })
+        .mockResolvedValueOnce({ rows: [{ count: 2 }] })
+        .mockResolvedValueOnce({ rows: [{ count: 5 }] })
 
       const data = await buildAdminOverviewMetrics()
 
+      expect(data.tenantsOverLimit).toBe(2)
+      expect(data.tenantsNearLimit).toBe(5)
       expect(data.orders).toEqual({ today: 3, week: 8, month: 12, total: 50 })
       expect(data.activeCarts).toBe(4)
       expect(data.chatsLast24h).toBe(10)

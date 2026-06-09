@@ -61,7 +61,7 @@ describe('AdminOverviewExtras', () => {
     expect(screen.getByText('Needs your attention')).toBeInTheDocument()
     expect(screen.getByText('Recent activity')).toBeInTheDocument()
     expect(screen.getByText('Quick actions')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Subscriptions/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Review subscriptions/i })).toBeInTheDocument()
     expect(screen.getByText(/Updated 03:42 PM/i)).toBeInTheDocument()
   })
 
@@ -76,6 +76,18 @@ describe('AdminOverviewExtras', () => {
       />
     )
     expect(screen.getByText(/6 failed emails in 24h/i)).toBeInTheDocument()
+  })
+
+  it('shows healthy empty state when no issues', () => {
+    render(<AdminOverviewExtras overview={{ alerts: {} }} onNavigateTab={vi.fn()} />)
+    expect(
+      screen.getByText(/All clear. No critical platform issues right now/i)
+    ).toBeInTheDocument()
+  })
+
+  it('shows recent activity empty state', () => {
+    render(<AdminOverviewExtras overview={{ alerts: {} }} onNavigateTab={vi.fn()} />)
+    expect(screen.getByText(/No recent platform activity yet/i)).toBeInTheDocument()
   })
 
   it('tolerates non-array pending deals payload', () => {

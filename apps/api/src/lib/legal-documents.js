@@ -1,6 +1,6 @@
 /** @typedef {'RESTAURANT' | 'SUPPLIER'} TenantType */
 
-export const LEGAL_PACK_VERSION = '2026-05-28'
+export const LEGAL_PACK_VERSION = '2026-06-09'
 
 /** Slugs stored in legal_acceptance.document_slug */
 export const LEGAL_DOCUMENT_SLUGS = {

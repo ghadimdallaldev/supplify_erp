@@ -252,28 +252,28 @@ Also available via API (not always separate pages):
 
 ### 6.1 Navigation & operations
 
-| Feature                                 | Web route                    | API                                                                                                                                                    |
-| --------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Dashboard                               | `/app/dashboard`             | Stats                                                                                                                                                  |
-| Products catalog management             | `/app/products`              | `/api/products` POST/PATCH                                                                                                                             |
-| Product images / files                  | Products                     | `/api/files/presign`, attach                                                                                                                           |
-| Prices & price lists                    | —                            | `/api/prices`                                                                                                                                          |
-| Supplier inventory & stock              | `/app/inventory`             | `/api/inventory`                                                                                                                                       |
-| Stock adjustments & alerts              | Inventory                    | adjustments, `/alerts`                                                                                                                                 |
-| Warehouses & fulfillment                | Settings → Warehouses        | `/api/warehouses`, `/api/warehouses/routing/*`, `/api/suppliers/me/fulfillment`, `/api/orders/:id/warehouses` (flags: `warehouses`, `multi_warehouse`) |
-| Supplier org & branches                 | `/app/org`                   | `/api/org`, `/api/org/branches`, `/api/org/context/switch` (flag: `multi_branch`)                                                                      |
-| Branch manager invitations              | `/app/org`, `/invite/branch` | `/api/org/invitations`, `/api/public/invitations/branch` (flag: `multi_branch`; link-only, no email)                                                   |
-| Orders (incoming)                       | `/app/orders`                | `/api/orders` (auto warehouse assignment on create when multi-warehouse)                                                                               |
-| Fulfillment board                       | `/app/fulfillment`           | `/api/fulfillment/board`                                                                                                                               |
-| Fulfillment waves / routes / exceptions | Fulfillment                  | `/api/fulfillment/*`                                                                                                                                   |
-| Restaurants (customers)                 | `/app/restaurants`           | `/api/restaurants`                                                                                                                                     |
-| Restaurant-specific pricing tiers       | —                            | `/api/restaurant-pricing`                                                                                                                              |
-| Invoices                                | `/app/invoices`              | `/api/invoices`                                                                                                                                        |
-| Chat                                    | `/app/chat`                  | `/api/chat`                                                                                                                                            |
-| Promotions management (plan)            | `/app/promotions`            | `/api/promotions` (supplier CRUD, restaurant eligibility)                                                                                              |
-| Reports & analytics (plan)              | `/app/reports`               | `/api/reports/supplier/*`                                                                                                                              |
-| Tenant audit log (plan)                 | Settings → Activity          | `/api/audit` (labeled filter dropdowns)                                                                                                                |
-| Supplier profile & settings             | `/app/supplier-settings`     | `/api/suppliers`                                                                                                                                       |
+| Feature                                      | Web route                    | API                                                                                                                                                    |
+| -------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Dashboard                                    | `/app/dashboard`             | Stats                                                                                                                                                  |
+| Products catalog management                  | `/app/products`              | `/api/products` POST/PATCH                                                                                                                             |
+| Product images / files                       | Products                     | `/api/files/presign`, attach                                                                                                                           |
+| Prices & price lists                         | —                            | `/api/prices`                                                                                                                                          |
+| Supplier inventory & stock                   | `/app/inventory`             | `/api/inventory`                                                                                                                                       |
+| Stock adjustments & alerts                   | Inventory                    | adjustments, `/alerts`                                                                                                                                 |
+| Warehouses & fulfillment                     | Settings → Warehouses        | `/api/warehouses`, `/api/warehouses/routing/*`, `/api/suppliers/me/fulfillment`, `/api/orders/:id/warehouses` (flags: `warehouses`, `multi_warehouse`) |
+| Supplier org & branches                      | `/app/org`                   | `/api/org`, `/api/org/branches`, `/api/org/context/switch` (flag: `multi_branch`)                                                                      |
+| Branch manager invitations                   | `/app/org`, `/invite/branch` | `/api/org/invitations`, `/api/public/invitations/branch` (flag: `multi_branch`; link-only, no email)                                                   |
+| Orders (incoming)                            | `/app/orders`                | `/api/orders` (auto warehouse assignment on create when multi-warehouse)                                                                               |
+| Fulfillment board                            | `/app/fulfillment`           | `/api/fulfillment/board`                                                                                                                               |
+| Fulfillment waves / routes / exceptions      | Fulfillment                  | `/api/fulfillment/*`                                                                                                                                   |
+| Restaurants (customers)                      | `/app/restaurants`           | `/api/restaurants`                                                                                                                                     |
+| Restaurant-specific pricing tiers            | —                            | `/api/restaurant-pricing`                                                                                                                              |
+| Invoices                                     | `/app/invoices`              | `/api/invoices`                                                                                                                                        |
+| Chat                                         | `/app/chat`                  | `/api/chat`                                                                                                                                            |
+| Promotions management (plan) — UI: **Deals** | `/app/promotions`            | `/api/promotions` (supplier CRUD, restaurant eligibility)                                                                                              |
+| Reports & analytics (plan)                   | `/app/reports`               | `/api/reports/supplier/*`                                                                                                                              |
+| Tenant audit log (plan)                      | Settings → Activity          | `/api/audit` (labeled filter dropdowns)                                                                                                                |
+| Supplier profile & settings                  | `/app/supplier-settings`     | `/api/suppliers`                                                                                                                                       |
 
 ### 6.2 Supplier settings hub tabs
 
@@ -318,7 +318,7 @@ Also available via API (not always separate pages):
 | **Finance**           | GMV, outstanding, revenue by plan                                                     |
 | **Usage**             | Per-tenant usage meters & quota overrides                                             |
 | **Features**          | Global + per-tenant feature flag overrides                                            |
-| **Deals**             | Approve/reject pending supplier deals; insights; payment activation                   |
+| **Deals & Boosts**    | Approve/reject pending supplier deals; insights; boost pricing                        |
 | **Limit overrides**   | Per-tenant plan limit overrides                                                       |
 | **Platform settings** | Free Trial length (**3–7** days, default 7)                                           |
 | **Health**            | DB pool, recent errors, system health                                                 |
@@ -453,32 +453,32 @@ Canonical keys in `apps/api/src/lib/feature-keys.js`:
 
 ### Supplier plan features
 
-| Key                                                       | Display name                  |
-| --------------------------------------------------------- | ----------------------------- |
-| `chat`                                                    | Chat                          |
-| `order_calendar`                                          | Order calendar                |
-| `reports`                                                 | Reports & analytics           |
-| `multi_branch`                                            | Multi-branch org accounts     |
-| `warehouses`                                              | Warehouses                    |
-| `multi_warehouse`                                         | Multi-warehouse fulfillment   |
-| `fulfillment_tools`                                       | Fulfillment tools             |
-| `disputes_returns`                                        | Disputes & returns            |
-| `quick_lists`                                             | Quick lists                   |
-| `inventory_management`                                    | Inventory management          |
-| `advanced_roles`                                          | Named tenant roles            |
-| `notifications`                                           | Notifications                 |
-| `api_integrations`                                        | API integrations              |
-| `support_sla`                                             | Support SLA                   |
-| `custom_branding`                                         | Custom branding               |
-| `feature_flags_access`                                    | Feature flag admin            |
-| `promotions`                                              | Promotions & deals (supplier) |
-| `disputes_returns`                                        | Disputes & returns            |
-| `order_amendments`                                        | Order amendments              |
-| `order_calendar`                                          | Order calendar                |
-| `push_notifications`                                      | Web push                      |
-| `tenant_audit_log`                                        | Activity log                  |
-| `warehouses` / `multi_warehouse`                          | Warehouse fulfillment         |
-| `fulfillment` / `fulfillment_tools` / `driver_management` | Logistics                     |
+| Key                                                       | Display name                                          |
+| --------------------------------------------------------- | ----------------------------------------------------- |
+| `chat`                                                    | Chat                                                  |
+| `order_calendar`                                          | Order calendar                                        |
+| `reports`                                                 | Reports & analytics                                   |
+| `multi_branch`                                            | Multi-branch org accounts                             |
+| `warehouses`                                              | Warehouses                                            |
+| `multi_warehouse`                                         | Multi-warehouse fulfillment                           |
+| `fulfillment_tools`                                       | Fulfillment tools                                     |
+| `disputes_returns`                                        | Disputes & returns                                    |
+| `quick_lists`                                             | Quick lists                                           |
+| `inventory_management`                                    | Inventory management                                  |
+| `advanced_roles`                                          | Named tenant roles                                    |
+| `notifications`                                           | Notifications                                         |
+| `api_integrations`                                        | API integrations                                      |
+| `support_sla`                                             | Support SLA                                           |
+| `custom_branding`                                         | Custom branding                                       |
+| `feature_flags_access`                                    | Feature flag admin                                    |
+| `promotions`                                              | Deals (supplier plan feature; internal key unchanged) |
+| `disputes_returns`                                        | Disputes & returns                                    |
+| `order_amendments`                                        | Order amendments                                      |
+| `order_calendar`                                          | Order calendar                                        |
+| `push_notifications`                                      | Web push                                              |
+| `tenant_audit_log`                                        | Activity log                                          |
+| `warehouses` / `multi_warehouse`                          | Warehouse fulfillment                                 |
+| `fulfillment` / `fulfillment_tools` / `driver_management` | Logistics                                             |
 
 **Admin overrides:** global defaults + per-tenant overrides via Admin → Features tab.
 
@@ -604,54 +604,55 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled/declined), 
 
 ## 17. Web route index
 
-| Route                       | Page / purpose                      |
-| --------------------------- | ----------------------------------- |
-| `/login`                    | Login                               |
-| `/register/complete`        | Post-signup tenant setup            |
-| `/`                         | Dashboard (auth)                    |
-| `/app`                      | Dashboard                           |
-| `/app/dashboard`            | Dashboard                           |
-| `/app/activate`             | Billing activation                  |
-| `/app/products`             | Products                            |
-| `/app/products/:id`         | Product detail                      |
-| `/app/orders`               | Orders                              |
-| `/app/orders/:id`           | Order detail                        |
-| `/app/cart`                 | Cart                                |
-| `/app/quick-lists`          | Quick lists                         |
-| `/app/restaurant-inventory` | Restaurant inventory                |
-| `/app/onboarding`           | Restaurant onboarding (legacy path) |
-| `/app/receiving`            | Receiving                           |
-| `/app/reservations`         | Reservations                        |
-| `/app/staff`                | Staff HR                            |
-| `/app/suppliers`            | Suppliers                           |
-| `/app/suppliers/:id`        | Supplier detail                     |
-| `/app/restaurants`          | Restaurants (supplier view)         |
-| `/app/restaurants/:id`      | Restaurant detail                   |
-| `/app/settings`             | Settings (role-specific)            |
-| `/app/chat`                 | Chat                                |
-| `/app/fulfillment`          | Fulfillment                         |
-| `/app/inventory`            | Supplier inventory                  |
-| `/app/invoices`             | Invoices                            |
-| `/app/supplier-settings`    | Supplier settings                   |
-| `/app/admin`                | Admin dashboard                     |
-| `/app/admin/suppliers`      | Admin → suppliers                   |
-| `/app/admin/restaurants`    | Admin → restaurants                 |
-| `/app/reports`              | Reports & analytics (plan)          |
-| `/app/disputes`             | Disputes & returns (plan)           |
-| `/app/promotions`           | Supplier promotions management      |
-| `/app/deals`                | Restaurant active supplier deals    |
-| `/app/disputes`             | Disputes list (plan)                |
-| `/app/disputes/:id`         | Dispute detail                      |
-| `/app/reports`              | Reports & analytics (plan)          |
-| `/app/org`                  | Supplier org / branches             |
-| `/app/org/branches/:id`     | Branch detail                       |
-| `/invite`, `/invite/branch` | Team / branch invitations           |
-| `/reserve`                  | Public booking                      |
-| `/reserve/:idOrSlug`        | Public booking by restaurant        |
-| `/reserve/confirmation`     | Booking confirmed                   |
-| `/reserve/manage/:token`    | Manage booking                      |
-| `/staff`                    | Staff login                         |
-| `/staff/dashboard`          | Staff portal                        |
+| Route                       | Page / purpose                                    |
+| --------------------------- | ------------------------------------------------- |
+| `/login`                    | Login                                             |
+| `/register/complete`        | Post-signup tenant setup                          |
+| `/`                         | Dashboard (auth)                                  |
+| `/app`                      | Dashboard                                         |
+| `/app/dashboard`            | Dashboard                                         |
+| `/app/activate`             | Billing activation                                |
+| `/app/products`             | Products                                          |
+| `/app/products/:id`         | Product detail                                    |
+| `/app/orders`               | Orders                                            |
+| `/app/orders/:id`           | Order detail                                      |
+| `/app/cart`                 | Cart                                              |
+| `/app/quick-lists`          | Quick lists                                       |
+| `/app/restaurant-inventory` | Restaurant inventory                              |
+| `/app/onboarding`           | Restaurant onboarding (legacy path)               |
+| `/app/receiving`            | Receiving                                         |
+| `/app/reservations`         | Reservations                                      |
+| `/app/staff`                | Staff HR                                          |
+| `/app/suppliers`            | Suppliers                                         |
+| `/app/suppliers/:id`        | Supplier detail                                   |
+| `/app/restaurants`          | Restaurants (supplier view)                       |
+| `/app/restaurants/:id`      | Restaurant detail                                 |
+| `/app/settings`             | Settings (role-specific)                          |
+| `/app/chat`                 | Chat                                              |
+| `/app/fulfillment`          | Fulfillment                                       |
+| `/app/inventory`            | Supplier inventory                                |
+| `/app/invoices`             | Invoices                                          |
+| `/app/supplier-settings`    | Supplier settings                                 |
+| `/app/admin`                | Admin dashboard                                   |
+| `/app/admin/suppliers`      | Admin → suppliers                                 |
+| `/app/admin/restaurants`    | Admin → restaurants                               |
+| `/app/reports`              | Reports & analytics (plan)                        |
+| `/app/disputes`             | Disputes & returns (plan)                         |
+| `/app/promotions`           | Supplier **Deals** management (route unchanged)   |
+| `/legal/reaccept`           | Legal pack re-acceptance gate (stale acceptances) |
+| `/app/deals`                | Restaurant active supplier deals                  |
+| `/app/disputes`             | Disputes list (plan)                              |
+| `/app/disputes/:id`         | Dispute detail                                    |
+| `/app/reports`              | Reports & analytics (plan)                        |
+| `/app/org`                  | Supplier org / branches                           |
+| `/app/org/branches/:id`     | Branch detail                                     |
+| `/invite`, `/invite/branch` | Team / branch invitations                         |
+| `/reserve`                  | Public booking                                    |
+| `/reserve/:idOrSlug`        | Public booking by restaurant                      |
+| `/reserve/confirmation`     | Booking confirmed                                 |
+| `/reserve/manage/:token`    | Manage booking                                    |
+| `/staff`                    | Staff login                                       |
+| `/staff/dashboard`          | Staff portal                                      |
 
 ---
 
@@ -707,20 +708,23 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled/declined), 
 
 ## Related documentation
 
-| Document                                                         | Purpose                                 |
-| ---------------------------------------------------------------- | --------------------------------------- |
-| [waste-tracking.md](../features/waste-tracking.md)               | Restaurant waste & spoilage             |
-| [warehouse-fulfillment.md](../features/warehouse-fulfillment.md) | Warehouses, routing, order assignments  |
-| [deals-and-promotions.md](../features/deals-and-promotions.md)   | Deals lifecycle & admin approval        |
-| [disputes-returns.md](../features/disputes-returns.md)           | Disputes & replacement orders           |
-| [BRANCHING.md](../BRANCHING.md)                                  | dev → preprod → prod release chain      |
-| [supplier-branches.md](../features/supplier-branches.md)         | Supplier org & branch accounts          |
-| [features.md](./features.md)                                     | Shorter catalog + verification commands |
-| [regression-checklist.md](../qa/regression-checklist.md)         | QA smoke tests                          |
-| [admin_endpoints.md](../blueprint/admin/admin_endpoints.md)      | Admin API reference                     |
-| [admin-feature-flags.md](../admin/admin-feature-flags.md)        | Feature toggle API                      |
-| [email-system.md](../operations/email-system.md)                 | Transactional email (SMTP)              |
-| [SECURITY_AUDIT_REPORT.md](../security/SECURITY_AUDIT_REPORT.md) | Security posture                        |
+| Document                                                                             | Purpose                                 |
+| ------------------------------------------------------------------------------------ | --------------------------------------- |
+| [waste-tracking.md](../features/waste-tracking.md)                                   | Restaurant waste & spoilage             |
+| [warehouse-fulfillment.md](../features/warehouse-fulfillment.md)                     | Warehouses, routing, order assignments  |
+| [deals-and-promotions.md](../features/deals-and-promotions.md)                       | Deals lifecycle & admin approval        |
+| [DEALS_BOOSTS_WORDING_CLEANUP.md](../ui/DEALS_BOOSTS_WORDING_CLEANUP.md)             | UI label map (Deals vs Boosts)          |
+| [LEGAL_PACK_REACCEPTANCE.md](../ui/LEGAL_PACK_REACCEPTANCE.md)                       | Legal pack login gate                   |
+| [2026-06-09-pre-deploy-checklist.md](../releases/2026-06-09-pre-deploy-checklist.md) | Coordinated release checklist           |
+| [disputes-returns.md](../features/disputes-returns.md)                               | Disputes & replacement orders           |
+| [BRANCHING.md](../BRANCHING.md)                                                      | dev → preprod → prod release chain      |
+| [supplier-branches.md](../features/supplier-branches.md)                             | Supplier org & branch accounts          |
+| [features.md](./features.md)                                                         | Shorter catalog + verification commands |
+| [regression-checklist.md](../qa/regression-checklist.md)                             | QA smoke tests                          |
+| [admin_endpoints.md](../blueprint/admin/admin_endpoints.md)                          | Admin API reference                     |
+| [admin-feature-flags.md](../admin/admin-feature-flags.md)                            | Feature toggle API                      |
+| [email-system.md](../operations/email-system.md)                                     | Transactional email (SMTP)              |
+| [SECURITY_AUDIT_REPORT.md](../security/SECURITY_AUDIT_REPORT.md)                     | Security posture                        |
 
 ---
 

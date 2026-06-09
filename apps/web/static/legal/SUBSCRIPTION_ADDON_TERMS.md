@@ -33,7 +33,7 @@ Supplify may lock or restrict accounts for expired trials, overdue payments, can
 
 ## 7. Plan Limits
 
-Plan limits may include users, branches, warehouses, orders per day, SKUs, storage, chats, quick lists, supplier deals, active promotions, reservations, and other meters. Supplify may block actions when limits are reached.
+Plan limits may include users, branches, warehouses, orders per day, SKUs, storage, chats, quick lists, supplier deals, active deals, deal redemptions per day, reservations, and other meters. Supplify may block actions when limits are reached.
 
 ## 8. Add-ons
 

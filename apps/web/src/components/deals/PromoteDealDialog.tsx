@@ -70,12 +70,12 @@ export function PromoteDealDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Megaphone className="h-5 w-5" />
-            Boost visibility
+            Boost this deal
           </DialogTitle>
         </DialogHeader>
 
         <p className="text-sm text-[var(--text-muted)]">
-          Choose a boost package to show this deal higher in restaurant deal feeds — including
+          Choose a boost package for sponsored placement in restaurant deal feeds — including
           restaurants that do not follow you yet.
         </p>
 

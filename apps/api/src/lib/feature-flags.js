@@ -171,6 +171,18 @@ export const FEATURE_ALIASES = {
   driver_management: 'fulfillment_tools',
 }
 
+/**
+ * Follow feature alias only when the primary key is absent from plan JSON.
+ * Explicit `false` on the primary key must not be overridden by alias target.
+ * @param {string} featureKey
+ * @param {Record<string, unknown>|null|undefined} planFeatures
+ */
+export function shouldResolveFeatureAlias(featureKey, planFeatures) {
+  if (!FEATURE_ALIASES[featureKey]) return false
+  if (!planFeatures || typeof planFeatures !== 'object') return true
+  return !Object.prototype.hasOwnProperty.call(planFeatures, featureKey)
+}
+
 export async function isFeatureEnabledForTenant(tenantId, tenantType, featureKey) {
   try {
     const { getTenantSubscription } = await import('./subscription.js')
@@ -183,7 +195,7 @@ export async function isFeatureEnabledForTenant(tenantId, tenantType, featureKey
       featureKey,
       subscription?.features
     )
-    if (!result.enabled && FEATURE_ALIASES[featureKey]) {
+    if (!result.enabled && shouldResolveFeatureAlias(featureKey, subscription?.features)) {
       result = await resolveFeatureEnabled(
         billingTenantId,
         tenantType,

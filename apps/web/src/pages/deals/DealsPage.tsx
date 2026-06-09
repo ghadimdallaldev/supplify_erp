@@ -10,6 +10,7 @@ import { getDealRedeemGate } from '../../lib/planLimits'
 import { LIMIT_UPGRADE_COPY } from '../../lib/upgradeCopy'
 import { Loader2, Sparkles, Store } from 'lucide-react'
 import { useAppSelector } from '../../hooks/redux'
+import { RESTAURANT_EMPTY_STATE } from '../../lib/dealDisplayLabels'
 import { RequirePermission } from '../../components/RequirePermission'
 
 const SORT_OPTIONS = [
@@ -171,10 +172,10 @@ function MotionDealsHeader() {
     <div>
       <h1 className="text-[21px] font-black text-[var(--text)] flex items-center gap-2">
         <Sparkles className="h-5 w-5 text-[var(--brand)]" />
-        Deals & promotions
+        Available deals
       </h1>
       <p className="text-xs text-[var(--text-muted)] mt-1">
-        Deals from suppliers you follow, plus sponsored offers from new suppliers
+        Supplier deals from suppliers you follow, plus sponsored placement from new suppliers
       </p>
     </div>
   )
@@ -197,7 +198,7 @@ function DealsEmptyState({
     return (
       <EmptyState
         title={supplierName ? `No deals from ${supplierName}` : 'No deals for this supplier'}
-        description="They may not have active promotions right now. Browse your full feed or pick another supplier."
+        description="They may not have active deals right now. Browse your full feed or pick another supplier."
         icon={<Store className="h-6 w-6" aria-hidden />}
         action={
           <Button type="button" variant="outline" size="sm" onClick={onClearSupplier}>
@@ -212,7 +213,7 @@ function DealsEmptyState({
     return (
       <EmptyState
         title="No deals expiring in the next 7 days"
-        description="Turn off “Expiring within 7 days” to see everything in your feed, or check back as promotions go live."
+        description="Turn off “Expiring within 7 days” to see everything in your feed, or check back as new deals go live."
         icon={<Sparkles className="h-6 w-6" aria-hidden />}
         action={
           <Button type="button" variant="outline" size="sm" onClick={onClearExpiringSoon}>
@@ -225,8 +226,8 @@ function DealsEmptyState({
 
   return (
     <EmptyState
-      title="No deals in your feed yet"
-      description="Follow suppliers you order from to unlock their promotions. Sponsored offers from new suppliers will show up here when available."
+      title={RESTAURANT_EMPTY_STATE.title}
+      description={RESTAURANT_EMPTY_STATE.description}
       icon={<Sparkles className="h-6 w-6" aria-hidden />}
       action={
         <Button

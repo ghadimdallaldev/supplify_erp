@@ -67,7 +67,7 @@ function resolveRequesterRole(req) {
 
 router.use(requireAuth, resolveTenantContext, requirePermission('ORDERS_VIEW'))
 
-const amendmentsCreateGate = requireFeature(
+const amendmentsGate = requireFeature(
   'order_amendments',
   (req) => req.tenantContext?.tenantId,
   (req) => req.tenantContext?.tenantType
@@ -106,164 +106,174 @@ router.get('/', async (req, res, next) => {
   }
 })
 
-router.post(
-  '/',
-  requirePermission('ORDERS_MANAGE'),
-  amendmentsCreateGate,
-  async (req, res, next) => {
-    try {
-      const orderId = req.params.orderId
-      const order = await assertOrderAccess(req, orderId)
-      if (!canAmendOrderStatus(order.status)) {
-        throw new ValidationError('Order cannot be amended in its current status')
-      }
-      const body = createSchema.parse(req.body)
-      const requestedByRole = resolveRequesterRole(req)
+router.post('/', requirePermission('ORDERS_MANAGE'), amendmentsGate, async (req, res, next) => {
+  try {
+    const orderId = req.params.orderId
+    const order = await assertOrderAccess(req, orderId)
+    if (!canAmendOrderStatus(order.status)) {
+      throw new ValidationError('Order cannot be amended in its current status')
+    }
+    const body = createSchema.parse(req.body)
+    const requestedByRole = resolveRequesterRole(req)
 
-      const amendment = await withTransaction(async (client) => {
-        await assertNoPendingAmendment(orderId, client)
-        const { rows } = await client.query(
-          `
+    const amendment = await withTransaction(async (client) => {
+      await assertNoPendingAmendment(orderId, client)
+      const { rows } = await client.query(
+        `
         INSERT INTO order_amendments (
           order_id, requested_by_role, requested_by, change_type, description
         ) VALUES ($1, $2, $3, $4, $5)
         RETURNING *
         `,
-          [orderId, requestedByRole, req.userData.id, body.changeType, body.description]
-        )
-        const created = rows[0]
-        for (const item of body.items || []) {
-          await client.query(
-            `
+        [orderId, requestedByRole, req.userData.id, body.changeType, body.description]
+      )
+      const created = rows[0]
+      for (const item of body.items || []) {
+        await client.query(
+          `
           INSERT INTO order_amendment_items (
             amendment_id, order_item_id, original_product_id, substitute_product_id,
             original_quantity, requested_quantity, unit_price, notes
           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
           `,
-            [
-              created.id,
-              item.orderItemId ?? null,
-              item.originalProductId ?? null,
-              item.substituteProductId ?? null,
-              item.originalQuantity ?? null,
-              item.requestedQuantity ?? null,
-              item.unitPrice ?? null,
-              item.notes ?? null,
-            ]
-          )
-        }
-        return created
-      })
+          [
+            created.id,
+            item.orderItemId ?? null,
+            item.originalProductId ?? null,
+            item.substituteProductId ?? null,
+            item.originalQuantity ?? null,
+            item.requestedQuantity ?? null,
+            item.unitPrice ?? null,
+            item.notes ?? null,
+          ]
+        )
+      }
+      return created
+    })
 
-      await notifyAmendmentParty(order, amendment, 'created')
+    await notifyAmendmentParty(order, amendment, 'created')
+
+    const tenant = req.tenantContext
+    await writeAuditLog(req, {
+      action_type: 'order.amendment_created',
+      tenant_type: tenant?.tenantType,
+      tenant_id: tenant?.tenantId,
+      target_id: orderId,
+      payload_json: {
+        resource_type: 'order_amendment',
+        resource_id: amendment.id,
+        change_type: body.changeType,
+      },
+    })
+
+    res.status(201).json({ ok: true, data: { amendment }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post(
+  '/:amendmentId/accept',
+  requirePermission('ORDERS_MANAGE'),
+  amendmentsGate,
+  async (req, res, next) => {
+    try {
+      const { orderId, amendmentId } = req.params
+      const order = await assertOrderAccess(req, orderId)
+      const { responseNotes } = req.body || {}
+      const { amendment, newTotal } = await acceptAmendment(
+        amendmentId,
+        orderId,
+        req.userData.id,
+        responseNotes
+      )
+
+      await notifyAmendmentParty(order, amendment, 'accepted')
 
       const tenant = req.tenantContext
       await writeAuditLog(req, {
-        action_type: 'order.amendment_created',
+        action_type: 'order.amendment_accepted',
         tenant_type: tenant?.tenantType,
         tenant_id: tenant?.tenantId,
         target_id: orderId,
         payload_json: {
           resource_type: 'order_amendment',
-          resource_id: amendment.id,
-          change_type: body.changeType,
+          resource_id: amendmentId,
+          new_total: newTotal,
         },
       })
 
-      res.status(201).json({ ok: true, data: { amendment }, error: null, requestId: req.requestId })
+      res.json({
+        ok: true,
+        data: { amendment, orderTotal: newTotal },
+        error: null,
+        requestId: req.requestId,
+      })
     } catch (err) {
       next(err)
     }
   }
 )
 
-router.post('/:amendmentId/accept', requirePermission('ORDERS_MANAGE'), async (req, res, next) => {
-  try {
-    const { orderId, amendmentId } = req.params
-    const order = await assertOrderAccess(req, orderId)
-    const { responseNotes } = req.body || {}
-    const { amendment, newTotal } = await acceptAmendment(
-      amendmentId,
-      orderId,
-      req.userData.id,
-      responseNotes
-    )
+router.post(
+  '/:amendmentId/reject',
+  requirePermission('ORDERS_MANAGE'),
+  amendmentsGate,
+  async (req, res, next) => {
+    try {
+      const { orderId, amendmentId } = req.params
+      const order = await assertOrderAccess(req, orderId)
+      const notes = req.body?.responseNotes || req.body?.notes
+      if (!notes) throw new ValidationError('responseNotes are required')
 
-    await notifyAmendmentParty(order, amendment, 'accepted')
-
-    const tenant = req.tenantContext
-    await writeAuditLog(req, {
-      action_type: 'order.amendment_accepted',
-      tenant_type: tenant?.tenantType,
-      tenant_id: tenant?.tenantId,
-      target_id: orderId,
-      payload_json: {
-        resource_type: 'order_amendment',
-        resource_id: amendmentId,
-        new_total: newTotal,
-      },
-    })
-
-    res.json({
-      ok: true,
-      data: { amendment, orderTotal: newTotal },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (err) {
-    next(err)
-  }
-})
-
-router.post('/:amendmentId/reject', requirePermission('ORDERS_MANAGE'), async (req, res, next) => {
-  try {
-    const { orderId, amendmentId } = req.params
-    const order = await assertOrderAccess(req, orderId)
-    const notes = req.body?.responseNotes || req.body?.notes
-    if (!notes) throw new ValidationError('responseNotes are required')
-
-    const { rows } = await query(
-      `
+      const { rows } = await query(
+        `
       UPDATE order_amendments
       SET status = 'rejected', responded_by = $1, response_notes = $2, responded_at = NOW(), updated_at = NOW()
       WHERE id = $3 AND order_id = $4 AND status = 'pending'
       RETURNING *
       `,
-      [req.userData.id, notes, amendmentId, orderId]
-    )
-    if (!rows.length) throw new NotFoundError('Pending amendment not found')
-    if (rows[0].requested_by === req.userData.id) {
-      throw new ValidationError('You cannot reject your own amendment request')
+        [req.userData.id, notes, amendmentId, orderId]
+      )
+      if (!rows.length) throw new NotFoundError('Pending amendment not found')
+      if (rows[0].requested_by === req.userData.id) {
+        throw new ValidationError('You cannot reject your own amendment request')
+      }
+
+      await notifyAmendmentParty(order, rows[0], 'rejected')
+      res.json({ ok: true, data: { amendment: rows[0] }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
     }
-
-    await notifyAmendmentParty(order, rows[0], 'rejected')
-    res.json({ ok: true, data: { amendment: rows[0] }, error: null, requestId: req.requestId })
-  } catch (err) {
-    next(err)
   }
-})
+)
 
-router.post('/:amendmentId/cancel', requirePermission('ORDERS_MANAGE'), async (req, res, next) => {
-  try {
-    const { orderId, amendmentId } = req.params
-    await assertOrderAccess(req, orderId)
+router.post(
+  '/:amendmentId/cancel',
+  requirePermission('ORDERS_MANAGE'),
+  amendmentsGate,
+  async (req, res, next) => {
+    try {
+      const { orderId, amendmentId } = req.params
+      await assertOrderAccess(req, orderId)
 
-    const { rows } = await query(
-      `
+      const { rows } = await query(
+        `
       UPDATE order_amendments
       SET status = 'cancelled', updated_at = NOW()
       WHERE id = $1 AND order_id = $2 AND status = 'pending' AND requested_by = $3
       RETURNING *
       `,
-      [amendmentId, orderId, req.userData.id]
-    )
-    if (!rows.length) {
-      throw new NotFoundError('Pending amendment not found or not owned by requester')
+        [amendmentId, orderId, req.userData.id]
+      )
+      if (!rows.length) {
+        throw new NotFoundError('Pending amendment not found or not owned by requester')
+      }
+      res.json({ ok: true, data: { amendment: rows[0] }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
     }
-    res.json({ ok: true, data: { amendment: rows[0] }, error: null, requestId: req.requestId })
-  } catch (err) {
-    next(err)
   }
-})
+)
 
 export { router as orderAmendmentsRouter }
