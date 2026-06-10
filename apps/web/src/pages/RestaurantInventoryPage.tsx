@@ -386,9 +386,6 @@ export function RestaurantInventoryPage() {
     )
   }
 
-  const filterSelectClass =
-    'h-10 w-full rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]'
-
   return (
     <RequirePermission permission="INVENTORY_VIEW" title="inventory">
       <div className="page-stack p-4 sm:p-6">
@@ -1146,16 +1143,13 @@ export function RestaurantInventoryPage() {
                   >
                     Source
                   </label>
-                  <select
-                    id="history-source-filter"
-                    value={historySource}
-                    onChange={(e) => setHistorySource(e.target.value)}
-                    className={`${filterSelectClass} sm:w-48`}
-                  >
-                    <option value="ALL">All</option>
-                    <option value="Order">Order</option>
-                    <option value="Manual">Manual</option>
-                  </select>
+                  <Select value={historySource} onValueChange={setHistorySource}>
+                    <SelectTrigger id="history-source-filter" className="sm:w-48">
+                      <option value="ALL">All</option>
+                      <option value="Order">Order</option>
+                      <option value="Manual">Manual</option>
+                    </SelectTrigger>
+                  </Select>
                 </div>
                 {isLoadingHistory ? (
                   <div className="text-center py-12">Loading history...</div>

@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
+import { Select, SelectTrigger } from '../components/ui/select'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
@@ -728,23 +729,23 @@ function ReceivingDialog({
                           </div>
                           <div>
                             <Label htmlFor={`quality_${item.id}`}>Quality Status</Label>
-                            <select
-                              id={`quality_${item.id}`}
-                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            <Select
                               value={String(formData[`quality_${item.id}`] ?? 'ACCEPTED')}
-                              onChange={(e) =>
+                              onValueChange={(value) =>
                                 setFormData({
                                   ...formData,
-                                  [`quality_${item.id}`]: e.target.value,
+                                  [`quality_${item.id}`]: value,
                                 })
                               }
                             >
-                              <option value="ACCEPTED">Accepted</option>
-                              <option value="DAMAGED">Damaged</option>
-                              <option value="EXPIRED">Expired</option>
-                              <option value="WRONG_ITEM">Wrong Item</option>
-                              <option value="SHORT">Short</option>
-                            </select>
+                              <SelectTrigger id={`quality_${item.id}`}>
+                                <option value="ACCEPTED">Accepted</option>
+                                <option value="DAMAGED">Damaged</option>
+                                <option value="EXPIRED">Expired</option>
+                                <option value="WRONG_ITEM">Wrong Item</option>
+                                <option value="SHORT">Short</option>
+                              </SelectTrigger>
+                            </Select>
                           </div>
                           <div>
                             <Label htmlFor={`notes_${item.id}`}>Notes (Optional)</Label>

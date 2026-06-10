@@ -50,6 +50,7 @@ import { formatPrice } from '../utils/format'
 import { usePermissions } from '../hooks/usePermissions'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
+import { Select, SelectTrigger } from '../components/ui/select'
 import { StaffPortalAccessPanel } from '../components/StaffPortalAccessPanel'
 import { getApiErrorMessage } from '../lib/apiError'
 import { AlertCircle } from 'lucide-react'
@@ -669,21 +670,19 @@ export function StaffPage() {
                         </div>
                         <div>
                           <Label htmlFor="shiftStaff">Assign to (optional)</Label>
-                          <select
-                            id="shiftStaff"
+                          <Select
                             value={shiftForm.staffId}
-                            onChange={(event) =>
-                              handleShiftInputChange('staffId', event.target.value)
-                            }
-                            className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
+                            onValueChange={(value) => handleShiftInputChange('staffId', value)}
                           >
-                            <option value="">Unassigned</option>
-                            {staffMembers.map((member) => (
-                              <option key={member.id} value={member.id}>
-                                {member.displayName} · {member.role}
-                              </option>
-                            ))}
-                          </select>
+                            <SelectTrigger id="shiftStaff" className="mt-1 w-full">
+                              <option value="">Unassigned</option>
+                              {staffMembers.map((member) => (
+                                <option key={member.id} value={member.id}>
+                                  {member.displayName} · {member.role}
+                                </option>
+                              ))}
+                            </SelectTrigger>
+                          </Select>
                         </div>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">
@@ -808,20 +807,18 @@ export function StaffPage() {
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div>
                           <Label htmlFor="wageType">Wage type</Label>
-                          <select
-                            id="wageType"
+                          <Select
                             value={staffForm.wageType}
-                            onChange={(event) =>
-                              handleStaffInputChange('wageType', event.target.value)
-                            }
-                            className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
+                            onValueChange={(value) => handleStaffInputChange('wageType', value)}
                           >
-                            {wageTypeOptions.map((option) => (
-                              <option key={option} value={option}>
-                                {option.charAt(0) + option.slice(1).toLowerCase()}
-                              </option>
-                            ))}
-                          </select>
+                            <SelectTrigger id="wageType" className="mt-1 w-full">
+                              {wageTypeOptions.map((option) => (
+                                <option key={option} value={option}>
+                                  {option.charAt(0) + option.slice(1).toLowerCase()}
+                                </option>
+                              ))}
+                            </SelectTrigger>
+                          </Select>
                         </div>
                         <div>
                           <Label htmlFor="wageRate">Base rate</Label>
@@ -1228,57 +1225,55 @@ export function StaffPage() {
               <CardContent className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <Label htmlFor="swapShift">Shift</Label>
-                  <select
-                    id="swapShift"
+                  <Select
                     value={swapForm.shiftId}
-                    onChange={(event) =>
-                      setSwapForm((prev) => ({ ...prev, shiftId: event.target.value }))
-                    }
-                    className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
+                    onValueChange={(value) => setSwapForm((prev) => ({ ...prev, shiftId: value }))}
                   >
-                    <option value="">Select shift</option>
-                    {shifts.map((shift) => (
-                      <option key={shift.id} value={shift.id}>
-                        {format(new Date(shift.startsAt), 'EEE, MMM d · p')} — {shift.role}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="swapShift" className="mt-1 w-full">
+                      <option value="">Select shift</option>
+                      {shifts.map((shift) => (
+                        <option key={shift.id} value={shift.id}>
+                          {format(new Date(shift.startsAt), 'EEE, MMM d · p')} — {shift.role}
+                        </option>
+                      ))}
+                    </SelectTrigger>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="swapRequester">Requested by</Label>
-                  <select
-                    id="swapRequester"
+                  <Select
                     value={swapForm.requestedBy}
-                    onChange={(event) =>
-                      setSwapForm((prev) => ({ ...prev, requestedBy: event.target.value }))
+                    onValueChange={(value) =>
+                      setSwapForm((prev) => ({ ...prev, requestedBy: value }))
                     }
-                    className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                   >
-                    <option value="">Choose staff</option>
-                    {staffMembers.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.displayName}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="swapRequester" className="mt-1 w-full">
+                      <option value="">Choose staff</option>
+                      {staffMembers.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.displayName}
+                        </option>
+                      ))}
+                    </SelectTrigger>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="swapCover">Proposed cover</Label>
-                  <select
-                    id="swapCover"
+                  <Select
                     value={swapForm.proposedCoverId}
-                    onChange={(event) =>
-                      setSwapForm((prev) => ({ ...prev, proposedCoverId: event.target.value }))
+                    onValueChange={(value) =>
+                      setSwapForm((prev) => ({ ...prev, proposedCoverId: value }))
                     }
-                    className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                   >
-                    <option value="">Open to team</option>
-                    {staffMembers.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.displayName}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="swapCover" className="mt-1 w-full">
+                      <option value="">Open to team</option>
+                      {staffMembers.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.displayName}
+                        </option>
+                      ))}
+                    </SelectTrigger>
+                  </Select>
                 </div>
                 <div className="sm:col-span-2">
                   <Label htmlFor="swapReason">Reason</Label>
@@ -1388,38 +1383,34 @@ export function StaffPage() {
               <CardContent className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <Label htmlFor="ptoStaff">Staff</Label>
-                  <select
-                    id="ptoStaff"
+                  <Select
                     value={ptoForm.staffId}
-                    onChange={(event) =>
-                      setPtoForm((prev) => ({ ...prev, staffId: event.target.value }))
-                    }
-                    className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
+                    onValueChange={(value) => setPtoForm((prev) => ({ ...prev, staffId: value }))}
                   >
-                    <option value="">Select staff</option>
-                    {staffMembers.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.displayName}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="ptoStaff" className="mt-1 w-full">
+                      <option value="">Select staff</option>
+                      {staffMembers.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.displayName}
+                        </option>
+                      ))}
+                    </SelectTrigger>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="ptoType">Type</Label>
-                  <select
-                    id="ptoType"
+                  <Select
                     value={ptoForm.type}
-                    onChange={(event) =>
-                      setPtoForm((prev) => ({ ...prev, type: event.target.value }))
-                    }
-                    className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
+                    onValueChange={(value) => setPtoForm((prev) => ({ ...prev, type: value }))}
                   >
-                    <option value="VACATION">Vacation</option>
-                    <option value="SICK">Sick</option>
-                    <option value="PERSONAL">Personal</option>
-                    <option value="UNPAID">Unpaid</option>
-                    <option value="OTHER">Other</option>
-                  </select>
+                    <SelectTrigger id="ptoType" className="mt-1 w-full">
+                      <option value="VACATION">Vacation</option>
+                      <option value="SICK">Sick</option>
+                      <option value="PERSONAL">Personal</option>
+                      <option value="UNPAID">Unpaid</option>
+                      <option value="OTHER">Other</option>
+                    </SelectTrigger>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="ptoStart">Start date</Label>
@@ -1485,40 +1476,40 @@ export function StaffPage() {
                 <div className="grid gap-3 sm:grid-cols-4">
                   <div>
                     <Label htmlFor="availabilityStaff">Staff</Label>
-                    <select
-                      id="availabilityStaff"
+                    <Select
                       value={availabilityForm.staffId}
-                      onChange={(event) =>
-                        setAvailabilityForm((prev) => ({ ...prev, staffId: event.target.value }))
+                      onValueChange={(value) =>
+                        setAvailabilityForm((prev) => ({ ...prev, staffId: value }))
                       }
-                      className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                     >
-                      <option value="">Select staff</option>
-                      {staffMembers.map((member) => (
-                        <option key={member.id} value={member.id}>
-                          {member.displayName}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger id="availabilityStaff" className="mt-1 w-full">
+                        <option value="">Select staff</option>
+                        {staffMembers.map((member) => (
+                          <option key={member.id} value={member.id}>
+                            {member.displayName}
+                          </option>
+                        ))}
+                      </SelectTrigger>
+                    </Select>
                   </div>
                   <div>
                     <Label htmlFor="availabilityDay">Weekday</Label>
-                    <select
-                      id="availabilityDay"
+                    <Select
                       value={availabilityForm.weekday}
-                      onChange={(event) =>
-                        setAvailabilityForm((prev) => ({ ...prev, weekday: event.target.value }))
+                      onValueChange={(value) =>
+                        setAvailabilityForm((prev) => ({ ...prev, weekday: value }))
                       }
-                      className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                     >
-                      <option value="0">Sunday</option>
-                      <option value="1">Monday</option>
-                      <option value="2">Tuesday</option>
-                      <option value="3">Wednesday</option>
-                      <option value="4">Thursday</option>
-                      <option value="5">Friday</option>
-                      <option value="6">Saturday</option>
-                    </select>
+                      <SelectTrigger id="availabilityDay" className="mt-1 w-full">
+                        <option value="0">Sunday</option>
+                        <option value="1">Monday</option>
+                        <option value="2">Tuesday</option>
+                        <option value="3">Wednesday</option>
+                        <option value="4">Thursday</option>
+                        <option value="5">Friday</option>
+                        <option value="6">Saturday</option>
+                      </SelectTrigger>
+                    </Select>
                   </div>
                   <div>
                     <Label htmlFor="availabilityStart">Start</Label>
@@ -1736,21 +1727,21 @@ export function StaffPage() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="docStaff">Staff</Label>
-                    <select
-                      id="docStaff"
+                    <Select
                       value={documentForm.staffId}
-                      onChange={(event) =>
-                        setDocumentForm((prev) => ({ ...prev, staffId: event.target.value }))
+                      onValueChange={(value) =>
+                        setDocumentForm((prev) => ({ ...prev, staffId: value }))
                       }
-                      className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                     >
-                      <option value="">Select staff</option>
-                      {staffMembers.map((member) => (
-                        <option key={member.id} value={member.id}>
-                          {member.displayName}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger id="docStaff" className="mt-1 w-full">
+                        <option value="">Select staff</option>
+                        {staffMembers.map((member) => (
+                          <option key={member.id} value={member.id}>
+                            {member.displayName}
+                          </option>
+                        ))}
+                      </SelectTrigger>
+                    </Select>
                   </div>
                   <div>
                     <Label htmlFor="docType">Type</Label>
@@ -1853,21 +1844,21 @@ export function StaffPage() {
                     <div className="mt-3 space-y-2 text-sm">
                       <div>
                         <Label htmlFor="incidentStaff">Staff</Label>
-                        <select
-                          id="incidentStaff"
+                        <Select
                           value={incidentForm.staffId}
-                          onChange={(event) =>
-                            setIncidentForm((prev) => ({ ...prev, staffId: event.target.value }))
+                          onValueChange={(value) =>
+                            setIncidentForm((prev) => ({ ...prev, staffId: value }))
                           }
-                          className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                         >
-                          <option value="">Unassigned</option>
-                          {staffMembers.map((member) => (
-                            <option key={member.id} value={member.id}>
-                              {member.displayName}
-                            </option>
-                          ))}
-                        </select>
+                          <SelectTrigger id="incidentStaff" className="mt-1 w-full">
+                            <option value="">Unassigned</option>
+                            {staffMembers.map((member) => (
+                              <option key={member.id} value={member.id}>
+                                {member.displayName}
+                              </option>
+                            ))}
+                          </SelectTrigger>
+                        </Select>
                       </div>
                       <div>
                         <Label htmlFor="incidentCategory">Category</Label>
@@ -1881,19 +1872,19 @@ export function StaffPage() {
                       </div>
                       <div>
                         <Label htmlFor="incidentSeverity">Severity</Label>
-                        <select
-                          id="incidentSeverity"
+                        <Select
                           value={incidentForm.severity}
-                          onChange={(event) =>
-                            setIncidentForm((prev) => ({ ...prev, severity: event.target.value }))
+                          onValueChange={(value) =>
+                            setIncidentForm((prev) => ({ ...prev, severity: value }))
                           }
-                          className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                         >
-                          <option value="LOW">Low</option>
-                          <option value="MEDIUM">Medium</option>
-                          <option value="HIGH">High</option>
-                          <option value="CRITICAL">Critical</option>
-                        </select>
+                          <SelectTrigger id="incidentSeverity" className="mt-1 w-full">
+                            <option value="LOW">Low</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="HIGH">High</option>
+                            <option value="CRITICAL">Critical</option>
+                          </SelectTrigger>
+                        </Select>
                       </div>
                       <div>
                         <Label htmlFor="incidentDate">Occurred at</Label>
@@ -1964,42 +1955,42 @@ export function StaffPage() {
                     <div className="mt-3 space-y-2 text-sm">
                       <div>
                         <Label htmlFor="performanceStaff">Staff</Label>
-                        <select
-                          id="performanceStaff"
+                        <Select
                           value={performanceNoteForm.staffId}
-                          onChange={(event) =>
+                          onValueChange={(value) =>
                             setPerformanceNoteForm((prev) => ({
                               ...prev,
-                              staffId: event.target.value,
+                              staffId: value,
                             }))
                           }
-                          className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                         >
-                          <option value="">Select staff</option>
-                          {staffMembers.map((member) => (
-                            <option key={member.id} value={member.id}>
-                              {member.displayName}
-                            </option>
-                          ))}
-                        </select>
+                          <SelectTrigger id="performanceStaff" className="mt-1 w-full">
+                            <option value="">Select staff</option>
+                            {staffMembers.map((member) => (
+                              <option key={member.id} value={member.id}>
+                                {member.displayName}
+                              </option>
+                            ))}
+                          </SelectTrigger>
+                        </Select>
                       </div>
                       <div>
                         <Label htmlFor="performanceType">Type</Label>
-                        <select
-                          id="performanceType"
+                        <Select
                           value={performanceNoteForm.noteType}
-                          onChange={(event) =>
+                          onValueChange={(value) =>
                             setPerformanceNoteForm((prev) => ({
                               ...prev,
-                              noteType: event.target.value,
+                              noteType: value,
                             }))
                           }
-                          className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                         >
-                          <option value="KUDOS">Kudos</option>
-                          <option value="COACHING">Coaching</option>
-                          <option value="GENERAL">General</option>
-                        </select>
+                          <SelectTrigger id="performanceType" className="mt-1 w-full">
+                            <option value="KUDOS">Kudos</option>
+                            <option value="COACHING">Coaching</option>
+                            <option value="GENERAL">General</option>
+                          </SelectTrigger>
+                        </Select>
                       </div>
                       <div>
                         <Label htmlFor="performanceBody">Note</Label>

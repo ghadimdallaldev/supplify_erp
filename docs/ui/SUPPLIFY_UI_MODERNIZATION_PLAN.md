@@ -1003,6 +1003,8 @@ The following user-facing labels are already implemented correctly in `dealDispl
 
 ### Phase 5 — Tables and Forms Polish
 
+> **Status: ✅ Completed (with one deliberate deviation)** — All ~66 remaining native `<select>` elements across ~30 files (admin panels, fulfillment, disputes, org modals, Staff, Orders, Products, Inventory, Contract Pricing, Reports, Reservations, onboarding, etc.) were replaced with the shared `Select`/`SelectTrigger`. `BranchSwitcher` left untouched per the preserve list. `TableSkeleton` (rows × columns) added to `ui/skeleton.tsx`. `DataTableShell` created at `ui/data-table-shell.tsx` for future tables, but NOT retrofitted onto Orders/Products/Inventory: their filter/table areas were already standardized in Phases 1–4, so restructuring them again was judged churn without visual gain. Retrofit on request.
+
 **Scope:** Cross-cutting table and form improvements.
 
 **Tasks:**

@@ -3,6 +3,7 @@ import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Label } from '../ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
+import { Select, SelectTrigger } from '../ui/select'
 import {
   useGetAdminOperationalSummaryQuery,
   useGetAdminEmailDeliveryLogsQuery,
@@ -234,20 +235,21 @@ export function AdminOperationsPanel({
           <div className="flex flex-wrap gap-2 items-end">
             <div>
               <Label className="text-xs">Status</Label>
-              <select
-                className="mt-1 block rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
+              <Select
                 value={emailStatus}
-                onChange={(e) => {
-                  setEmailStatus(e.target.value)
+                onValueChange={(value) => {
+                  setEmailStatus(value)
                   setEmailOffset(0)
                 }}
               >
-                {EMAIL_STATUS_OPTIONS.map((s) => (
-                  <option key={s || 'all'} value={s}>
-                    {s || 'All'}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="mt-1 block w-auto">
+                  {EMAIL_STATUS_OPTIONS.map((s) => (
+                    <option key={s || 'all'} value={s}>
+                      {s || 'All'}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
           </div>
           {emailLoading ? (

@@ -3,6 +3,7 @@ import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
+import { Select, SelectTrigger } from '../ui/select'
 import toast from 'react-hot-toast'
 import { Loader2, Minus, Plus } from 'lucide-react'
 import { PageHeader } from '../ui/page-header'
@@ -44,8 +45,6 @@ const SUPPLIER_ADDON_OPTIONS = [
 ]
 
 const RESTAURANT_ADDON_OPTIONS = [{ key: 'restaurant_extra_branch', label: 'Extra branch' }]
-const ADMIN_SELECT_CLASS =
-  'mt-1.5 h-10 w-full rounded-lg border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30'
 
 export function AdminLimitsTab() {
   const [tenantType, setTenantType] = useState<AdminTenantType>('RESTAURANT')
@@ -388,17 +387,15 @@ export function AdminLimitsTab() {
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 items-end">
                 <div>
                   <Label>Add-on type</Label>
-                  <select
-                    className={ADMIN_SELECT_CLASS}
-                    value={addonKey}
-                    onChange={(e) => setAddonKey(e.target.value)}
-                  >
-                    {addonOptions.map((o) => (
-                      <option key={o.key} value={o.key}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                  <Select value={addonKey} onValueChange={(value) => setAddonKey(value)}>
+                    <SelectTrigger className="mt-1.5 w-full">
+                      {addonOptions.map((o) => (
+                        <option key={o.key} value={o.key}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </SelectTrigger>
+                  </Select>
                 </div>
                 <div>
                   <Label>Quantity</Label>
@@ -479,37 +476,35 @@ export function AdminLimitsTab() {
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <Label>Plan</Label>
-              <select
-                className={ADMIN_SELECT_CLASS}
+              <Select
                 value={planId}
-                onChange={(e) => {
-                  setPlanId(e.target.value)
+                onValueChange={(value) => {
+                  setPlanId(value)
                   setPlanLimitKey('')
                 }}
               >
-                <option value="">Select plan tier</option>
-                {plans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {formatPlanCodeLabel(p.code)} ({p.name})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="mt-1.5 w-full">
+                  <option value="">Select plan tier</option>
+                  {plans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {formatPlanCodeLabel(p.code)} ({p.name})
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
             <div>
               <Label>Limit</Label>
-              <select
-                className={ADMIN_SELECT_CLASS}
-                value={planLimitKey}
-                onChange={(e) => setPlanLimitKey(e.target.value)}
-                disabled={!planId}
-              >
-                <option value="">Select limit</option>
-                {limitKeys.map((k) => (
-                  <option key={k} value={k}>
-                    {formatLimitKeyLabel(k)}
-                  </option>
-                ))}
-              </select>
+              <Select value={planLimitKey} onValueChange={(value) => setPlanLimitKey(value)}>
+                <SelectTrigger className="mt-1.5 w-full" disabled={!planId}>
+                  <option value="">Select limit</option>
+                  {limitKeys.map((k) => (
+                    <option key={k} value={k}>
+                      {formatLimitKeyLabel(k)}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
             {planLimitKey && (
               <div className="md:col-span-2 rounded-md bg-[var(--app-bg-subtle)]/80 px-3 py-2 text-sm">
@@ -576,18 +571,16 @@ export function AdminLimitsTab() {
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <Label>Limit</Label>
-                <select
-                  className={ADMIN_SELECT_CLASS}
-                  value={tenantLimitKey}
-                  onChange={(e) => setTenantLimitKey(e.target.value)}
-                >
-                  <option value="">Select limit</option>
-                  {limitKeys.map((k) => (
-                    <option key={k} value={k}>
-                      {formatLimitKeyLabel(k)}
-                    </option>
-                  ))}
-                </select>
+                <Select value={tenantLimitKey} onValueChange={(value) => setTenantLimitKey(value)}>
+                  <SelectTrigger className="mt-1.5 w-full">
+                    <option value="">Select limit</option>
+                    {limitKeys.map((k) => (
+                      <option key={k} value={k}>
+                        {formatLimitKeyLabel(k)}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
               </div>
               <div>
                 <Label>Override value</Label>

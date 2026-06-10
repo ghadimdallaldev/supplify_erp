@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
+import { Select, SelectTrigger } from '../ui/select'
 import { Textarea } from '../ui/textarea'
 import {
   Dialog,
@@ -157,16 +158,14 @@ export function RestaurantWastePanel({
         <div className="flex flex-wrap gap-2 items-center">
           <div>
             <Label className="text-xs text-[var(--text-muted)]">Period</Label>
-            <select
-              className="mt-1 block h-9 rounded-md border px-3 text-sm"
-              value={period}
-              onChange={(e) => setPeriod(Number(e.target.value))}
-            >
-              <option value={7}>Last 7 days</option>
-              <option value={14}>Last 14 days</option>
-              <option value={30}>Last 30 days</option>
-              <option value={90}>Last 90 days</option>
-            </select>
+            <Select value={String(period)} onValueChange={(value) => setPeriod(Number(value))}>
+              <SelectTrigger className="mt-1 block">
+                <option value={7}>Last 7 days</option>
+                <option value={14}>Last 14 days</option>
+                <option value={30}>Last 30 days</option>
+                <option value={90}>Last 90 days</option>
+              </SelectTrigger>
+            </Select>
           </div>
           <Button className="mt-5" onClick={() => setShowLogDialog(true)}>
             Log waste
@@ -332,52 +331,55 @@ export function RestaurantWastePanel({
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Product</Label>
-              <select
-                className="w-full h-10 rounded-md border px-3 text-sm"
+              <Select
                 value={selectedProductId}
-                onChange={(e) => {
-                  setSelectedProductId(e.target.value)
-                  const item = inventory.find((i) => i.product_id === e.target.value)
+                onValueChange={(value) => {
+                  setSelectedProductId(value)
+                  const item = inventory.find((i) => i.product_id === value)
                   const hint = item?.last_unit_cost ?? item?.unit_cost
                   if (hint != null && Number(hint) > 0) setUnitCost(String(hint))
                 }}
               >
-                <option value="">Select product…</option>
-                {inventory.map((item) => (
-                  <option key={item.product_id} value={item.product_id}>
-                    {item.product_name} ({item.quantity} {item.product_unit} on hand)
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <option value="">Select product…</option>
+                  {inventory.map((item) => (
+                    <option key={item.product_id} value={item.product_id}>
+                      {item.product_name} ({item.quantity} {item.product_unit} on hand)
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Type</Label>
-                <select
-                  className="w-full h-10 rounded-md border px-3 text-sm"
+                <Select
                   value={adjustmentType}
-                  onChange={(e) => setAdjustmentType(e.target.value as 'WASTAGE' | 'SPOILAGE')}
+                  onValueChange={(value) => setAdjustmentType(value as 'WASTAGE' | 'SPOILAGE')}
                 >
-                  <option value="WASTAGE">Prep wastage</option>
-                  <option value="SPOILAGE">Spoilage (bad stock)</option>
-                </select>
+                  <SelectTrigger>
+                    <option value="WASTAGE">Prep wastage</option>
+                    <option value="SPOILAGE">Spoilage (bad stock)</option>
+                  </SelectTrigger>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Category</Label>
-                <select
-                  className="w-full h-10 rounded-md border px-3 text-sm"
+                <Select
                   value={wasteCategory}
-                  onChange={(e) =>
-                    setWasteCategory(e.target.value as (typeof WASTE_CATEGORIES)[number]['value'])
+                  onValueChange={(value) =>
+                    setWasteCategory(value as (typeof WASTE_CATEGORIES)[number]['value'])
                   }
                 >
-                  {WASTE_CATEGORIES.map((c) => (
-                    <option key={c.value} value={c.value}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    {WASTE_CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
               </div>
             </div>
 

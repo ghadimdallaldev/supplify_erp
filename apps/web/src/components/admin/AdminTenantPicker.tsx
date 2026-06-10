@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Button } from '../ui/button'
+import { Select, SelectTrigger } from '../ui/select'
 import { ChevronDown, Search, X } from 'lucide-react'
 import {
   filterAdminTenants,
@@ -64,18 +65,19 @@ export function AdminTenantPicker({
         {showTypeFilter && (
           <div>
             <Label>Tenant type</Label>
-            <select
-              className="mt-1 h-10 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 text-sm"
+            <Select
               value={tenantType}
-              onChange={(e) => {
-                onTenantTypeChange(e.target.value as AdminTenantType)
+              onValueChange={(value) => {
+                onTenantTypeChange(value as AdminTenantType)
                 onSelect(null)
                 setQuery('')
               }}
             >
-              <option value="RESTAURANT">Restaurant</option>
-              <option value="SUPPLIER">Supplier</option>
-            </select>
+              <SelectTrigger className="mt-1 w-full">
+                <option value="RESTAURANT">Restaurant</option>
+                <option value="SUPPLIER">Supplier</option>
+              </SelectTrigger>
+            </Select>
           </div>
         )}
         <div className={showTypeFilter ? 'md:col-span-2' : 'md:col-span-3'}>

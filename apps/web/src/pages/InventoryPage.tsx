@@ -25,6 +25,7 @@ import { PageHeader } from '../components/ui/page-header'
 import { EmptyState } from '../components/ui/empty-state'
 import { StatusBadge } from '../components/ui/status-badge'
 import { Skeleton } from '../components/ui/skeleton'
+import { Select, SelectTrigger } from '../components/ui/select'
 
 const ADJUSTMENT_TYPES = [
   { value: 'IN', label: 'Add Stock' },
@@ -513,22 +514,23 @@ export function InventoryPage() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Adjustment Type *</label>
-                <select
-                  className="w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
+                <Select
                   value={adjustmentForm.adjustmentType}
-                  onChange={(e) =>
+                  onValueChange={(value) =>
                     setAdjustmentForm((f) => ({
                       ...f,
-                      adjustmentType: e.target.value as 'IN' | 'OUT',
+                      adjustmentType: value as 'IN' | 'OUT',
                     }))
                   }
                 >
-                  {ADJUSTMENT_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    {ADJUSTMENT_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Quantity *</label>

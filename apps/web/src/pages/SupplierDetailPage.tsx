@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
+import { Select, SelectTrigger } from '../components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -524,19 +525,20 @@ export function SupplierDetailPage() {
             </div>
             <div>
               <Label>Rating</Label>
-              <select
-                className="w-full h-10 border rounded-md px-3"
-                value={reviewForm.overallRating}
-                onChange={(e) =>
-                  setReviewForm((f) => ({ ...f, overallRating: Number(e.target.value) }))
+              <Select
+                value={String(reviewForm.overallRating)}
+                onValueChange={(value) =>
+                  setReviewForm((f) => ({ ...f, overallRating: Number(value) }))
                 }
               >
-                {[5, 4, 3, 2, 1].map((n) => (
-                  <option key={n} value={n}>
-                    {n} stars
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  {[5, 4, 3, 2, 1].map((n) => (
+                    <option key={n} value={n}>
+                      {n} stars
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
             <div>
               <Label>Comment</Label>

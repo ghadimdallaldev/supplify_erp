@@ -3,6 +3,7 @@ import { Label } from '../ui/label'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
+import { Select, SelectTrigger } from '../ui/select'
 import {
   useGetProductsQuery,
   useGetProductCategoriesQuery,
@@ -76,11 +77,10 @@ export function DealTargetingPickers({ value, onChange }: Props) {
       </p>
       <div>
         <Label>Applies to</Label>
-        <select
-          className="mt-1 w-full h-10 border rounded-md px-3 text-sm"
+        <Select
           value={value.appliesTo}
-          onChange={(e) => {
-            const appliesTo = e.target.value as AppliesTo
+          onValueChange={(v) => {
+            const appliesTo = v as AppliesTo
             onChange({
               appliesTo,
               productIds: appliesTo === 'specific_products' ? value.productIds : [],
@@ -88,10 +88,12 @@ export function DealTargetingPickers({ value, onChange }: Props) {
             })
           }}
         >
-          <option value="all">All products</option>
-          <option value="specific_products">Specific products</option>
-          <option value="specific_categories">Specific categories</option>
-        </select>
+          <SelectTrigger className="mt-1">
+            <option value="all">All products</option>
+            <option value="specific_products">Specific products</option>
+            <option value="specific_categories">Specific categories</option>
+          </SelectTrigger>
+        </Select>
       </div>
 
       {value.appliesTo === 'specific_products' ? (

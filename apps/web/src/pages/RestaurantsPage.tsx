@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
+import { Select, SelectTrigger } from '../components/ui/select'
 import { useNavigate } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
 import {
@@ -441,16 +442,14 @@ export function RestaurantsPage() {
           <div className="flex-1" />
           <div className="flex items-center gap-2">
             <ArrowUpDown className="h-4 w-4 text-[var(--text-muted)]" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="px-3 py-1 text-sm border border-[var(--app-border-mid)] rounded-md bg-white"
-            >
-              <option value="name">Sort by Name</option>
-              <option value="orders">Sort by Orders</option>
-              <option value="revenue">Sort by Revenue</option>
-              <option value="recent">Sort by Recent</option>
-            </select>
+            <Select value={sortBy} onValueChange={(value) => setSortBy(value as any)}>
+              <SelectTrigger className="w-auto">
+                <option value="name">Sort by Name</option>
+                <option value="orders">Sort by Orders</option>
+                <option value="revenue">Sort by Revenue</option>
+                <option value="recent">Sort by Recent</option>
+              </SelectTrigger>
+            </Select>
           </div>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
+import { Select, SelectTrigger } from '../ui/select'
 import type { DispatchOrderCard } from '../../types'
 import { useCreateFulfillmentRouteMutation, useGetDriversQuery } from '../../services/api'
 import { formatOrderRef } from './fulfillmentDispatchUtils'
@@ -93,23 +94,23 @@ export function CreateRouteDialog({ open, onClose, selectedOrders }: Props) {
                 Could not load drivers. Try again.
               </p>
             ) : (
-              <select
-                id="route-driver"
-                data-testid="create-route-driver"
-                className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
-                value={driverId}
-                onChange={(e) => setDriverId(e.target.value)}
-                disabled={drivers.length === 0}
-              >
-                <option value="">
-                  {drivers.length === 0 ? 'No active drivers' : 'Select driver…'}
-                </option>
-                {drivers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.fullName ?? (d as { full_name?: string }).full_name}
+              <Select value={driverId} onValueChange={setDriverId}>
+                <SelectTrigger
+                  id="route-driver"
+                  data-testid="create-route-driver"
+                  className="mt-1"
+                  disabled={drivers.length === 0}
+                >
+                  <option value="">
+                    {drivers.length === 0 ? 'No active drivers' : 'Select driver…'}
                   </option>
-                ))}
-              </select>
+                  {drivers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.fullName ?? (d as { full_name?: string }).full_name}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             )}
           </div>
           <div>

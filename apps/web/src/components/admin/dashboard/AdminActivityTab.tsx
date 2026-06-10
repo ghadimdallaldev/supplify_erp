@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { Card } from '../../ui/card'
 import { Button } from '../../ui/button'
+import { Select, SelectTrigger } from '../../ui/select'
 import { useGetAdminActivityQuery } from '../../../services/api'
 import { formatCurrency } from '../../../utils/format'
 
@@ -49,31 +50,32 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            className="rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
+          <Select
             value={activityType}
-            onChange={(e) => {
-              setActivityType(e.target.value)
+            onValueChange={(value) => {
+              setActivityType(value)
               setActivityOffset(0)
             }}
           >
-            <option value="all">All events</option>
-            <option value="order_placed">Order placed</option>
-            <option value="order_confirmed">Order acknowledged</option>
-            <option value="order_completed">Order completed</option>
-            <option value="deal_activity">Deal activity</option>
-            <option value="cart_updated">Cart updated</option>
-            <option value="new_tenant">New registration</option>
-            <option value="plan_changed">Plan changed</option>
-            <option value="subscription_status">Subscription status</option>
-            <option value="staff_added">Staff added</option>
-            <option value="reservation">Reservation</option>
-            <option value="invoice_issued">Invoice issued</option>
-            <option value="payment_received">Payment received</option>
-            <option value="quick_list">Quick list</option>
-            <option value="receiving">Receiving</option>
-            <option value="chat_started">Chat started</option>
-          </select>
+            <SelectTrigger className="w-auto">
+              <option value="all">All events</option>
+              <option value="order_placed">Order placed</option>
+              <option value="order_confirmed">Order acknowledged</option>
+              <option value="order_completed">Order completed</option>
+              <option value="deal_activity">Deal activity</option>
+              <option value="cart_updated">Cart updated</option>
+              <option value="new_tenant">New registration</option>
+              <option value="plan_changed">Plan changed</option>
+              <option value="subscription_status">Subscription status</option>
+              <option value="staff_added">Staff added</option>
+              <option value="reservation">Reservation</option>
+              <option value="invoice_issued">Invoice issued</option>
+              <option value="payment_received">Payment received</option>
+              <option value="quick_list">Quick list</option>
+              <option value="receiving">Receiving</option>
+              <option value="chat_started">Chat started</option>
+            </SelectTrigger>
+          </Select>
           <Button variant="outline" size="sm" onClick={() => refetchActivity()}>
             <RefreshCw className="h-4 w-4" />
           </Button>

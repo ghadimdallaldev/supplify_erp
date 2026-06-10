@@ -24,6 +24,7 @@ import { ReservationAssignmentsSummary } from '../components/reservations/Reserv
 import { CalendarDays, Loader2, Link2, Copy, Star, Users, Sparkles } from 'lucide-react'
 import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
+import { Select, SelectTrigger } from '../components/ui/select'
 import { toast } from 'react-hot-toast'
 import { copyToClipboard } from '../utils/clipboard'
 import { RequirePermission } from '../components/RequirePermission'
@@ -169,19 +170,16 @@ export function ReservationsPage() {
                 </Button>
               </div>
               {branches.length > 1 ? (
-                <select
-                  className="h-10 min-w-[140px] rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 text-sm shadow-sm"
-                  value={branchId}
-                  onChange={(event) => setBranchId(event.target.value)}
-                  aria-label="Branch"
-                >
-                  <option value="">All branches</option>
-                  {branches.map((branch: { id: string; name: string }) => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
+                <Select value={branchId} onValueChange={setBranchId}>
+                  <SelectTrigger className="min-w-[140px] shadow-sm" aria-label="Branch">
+                    <option value="">All branches</option>
+                    {branches.map((branch: { id: string; name: string }) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
               ) : null}
               <ReservationCreateDrawer
                 tables={tables}

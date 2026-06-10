@@ -11,6 +11,7 @@ import {
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
+import { Select, SelectTrigger } from '../ui/select'
 import { Textarea } from '../ui/textarea'
 import { useCreateDisputeMutation, useGetOrderQuery } from '../../services/api'
 import {
@@ -167,33 +168,32 @@ export function OpenDisputeDialog({
 
             <div>
               <Label>Supplier</Label>
-              <select
-                className="w-full h-10 rounded-md border border-[var(--app-border)] px-3 text-sm"
-                value={supplierId}
-                onChange={(e) => setSupplierId(e.target.value)}
-              >
-                <option value="">Select supplier</option>
-                {supplierOptions.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+              <Select value={supplierId} onValueChange={setSupplierId}>
+                <SelectTrigger>
+                  <option value="">Select supplier</option>
+                  {supplierOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
 
             <div>
               <Label>Type</Label>
-              <select
-                className="w-full h-10 rounded-md border px-3 text-sm"
+              <Select
                 value={type}
-                onChange={(e) => setType(e.target.value as (typeof DISPUTE_TYPES)[number])}
+                onValueChange={(value) => setType(value as (typeof DISPUTE_TYPES)[number])}
               >
-                {DISPUTE_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t.replace(/_/g, ' ')}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  {DISPUTE_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
 
             {lineItems.length > 0 && (

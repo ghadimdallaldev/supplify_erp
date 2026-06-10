@@ -21,6 +21,7 @@ import { Badge } from '../components/ui/badge'
 import { PageHeader } from '../components/ui/page-header'
 import { EmptyState } from '../components/ui/empty-state'
 import { Skeleton } from '../components/ui/skeleton'
+import { Select, SelectTrigger } from '../components/ui/select'
 import { Label } from '../components/ui/label'
 import { Package, Search, Plus, Upload, Download, TrendingUp, TrendingDown } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
@@ -442,9 +443,6 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
     )
   }
 
-  const filterSelectClass =
-    'h-10 w-full rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]'
-
   return (
     <RequirePermission anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']} title="products">
       <div className="space-y-6" data-testid="products-page">
@@ -508,19 +506,16 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                   <Label htmlFor="product-supplier-filter" className="sr-only">
                     Supplier
                   </Label>
-                  <select
-                    id="product-supplier-filter"
-                    value={supplierFilter}
-                    onChange={(e) => setSupplierFilter(e.target.value)}
-                    className={filterSelectClass}
-                  >
-                    <option value="">All Suppliers</option>
-                    {uniqueSuppliers.map((supplier) => (
-                      <option key={supplier.id} value={supplier.id}>
-                        {supplier.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+                    <SelectTrigger id="product-supplier-filter">
+                      <option value="">All Suppliers</option>
+                      {uniqueSuppliers.map((supplier) => (
+                        <option key={supplier.id} value={supplier.id}>
+                          {supplier.name}
+                        </option>
+                      ))}
+                    </SelectTrigger>
+                  </Select>
                 </div>
               )}
               <div
@@ -529,22 +524,22 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 <Label htmlFor="product-category-filter" className="sr-only">
                   Category
                 </Label>
-                <select
-                  id="product-category-filter"
+                <Select
                   value={categoryId}
-                  onChange={(e) => {
-                    setCategoryId(e.target.value)
+                  onValueChange={(value) => {
+                    setCategoryId(value)
                     setCategory('')
                   }}
-                  className={filterSelectClass}
                 >
-                  <option value="">All Categories</option>
-                  {categoriesData?.categories?.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="product-category-filter">
+                    <option value="">All Categories</option>
+                    {categoriesData?.categories?.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
               </div>
               {!isSupplier && (
                 <div className="min-w-0 sm:col-span-2 xl:col-span-4">
@@ -1001,47 +996,47 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="category_id">Category *</Label>
-                  <select
-                    id="category_id"
-                    className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] w-full"
+                  <Select
                     value={productForm.category_id}
-                    onChange={(e) =>
-                      setProductForm({ ...productForm, category_id: e.target.value, category: '' })
+                    onValueChange={(value) =>
+                      setProductForm({ ...productForm, category_id: value, category: '' })
                     }
                   >
-                    <option value="">Select category</option>
-                    {categoriesData?.categories?.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="category_id">
+                      <option value="">Select category</option>
+                      {categoriesData?.categories?.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </SelectTrigger>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="unit">Unit *</Label>
-                  <select
-                    id="unit"
-                    className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] w-full"
+                  <Select
                     value={productForm.unit}
-                    onChange={(e) => setProductForm({ ...productForm, unit: e.target.value })}
+                    onValueChange={(value) => setProductForm({ ...productForm, unit: value })}
                   >
-                    <option value="">Select unit</option>
-                    <option value="kg">Kilogram (kg)</option>
-                    <option value="g">Gram (g)</option>
-                    <option value="lb">Pound (lb)</option>
-                    <option value="oz">Ounce (oz)</option>
-                    <option value="liter">Liter (L)</option>
-                    <option value="ml">Milliliter (ml)</option>
-                    <option value="pack">Pack</option>
-                    <option value="bottle">Bottle</option>
-                    <option value="box">Box</option>
-                    <option value="carton">Carton</option>
-                    <option value="bag">Bag</option>
-                    <option value="piece">Piece</option>
-                    <option value="can">Can</option>
-                    <option value="jar">Jar</option>
-                    <option value="unit">Unit</option>
-                  </select>
+                    <SelectTrigger id="unit">
+                      <option value="">Select unit</option>
+                      <option value="kg">Kilogram (kg)</option>
+                      <option value="g">Gram (g)</option>
+                      <option value="lb">Pound (lb)</option>
+                      <option value="oz">Ounce (oz)</option>
+                      <option value="liter">Liter (L)</option>
+                      <option value="ml">Milliliter (ml)</option>
+                      <option value="pack">Pack</option>
+                      <option value="bottle">Bottle</option>
+                      <option value="box">Box</option>
+                      <option value="carton">Carton</option>
+                      <option value="bag">Bag</option>
+                      <option value="piece">Piece</option>
+                      <option value="can">Can</option>
+                      <option value="jar">Jar</option>
+                      <option value="unit">Unit</option>
+                    </SelectTrigger>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="price">Price (USD) *</Label>
@@ -1068,19 +1063,19 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               </div>
               <div className="space-y-2">
                 <Label htmlFor="warehouse">Warehouse (Optional)</Label>
-                <select
-                  id="warehouse"
-                  className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] w-full"
+                <Select
                   value={productForm.warehouse_id}
-                  onChange={(e) => setProductForm({ ...productForm, warehouse_id: e.target.value })}
+                  onValueChange={(value) => setProductForm({ ...productForm, warehouse_id: value })}
                 >
-                  <option value="">Select a warehouse (optional)</option>
-                  {warehousesData?.warehouses?.map((warehouse: any) => (
-                    <option key={warehouse.id} value={warehouse.id}>
-                      {warehouse.name} {warehouse.code ? `(${warehouse.code})` : ''}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="warehouse">
+                    <option value="">Select a warehouse (optional)</option>
+                    {warehousesData?.warehouses?.map((warehouse: any) => (
+                      <option key={warehouse.id} value={warehouse.id}>
+                        {warehouse.name} {warehouse.code ? `(${warehouse.code})` : ''}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
               </div>
 
               {/* Tags Input */}
@@ -1410,19 +1405,16 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
 
               <div>
                 <Label htmlFor="reason">Reason</Label>
-                <select
-                  id="reason"
-                  className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
-                  value={adjustmentReason}
-                  onChange={(e) => setAdjustmentReason(e.target.value)}
-                >
-                  <option value="">Select a reason</option>
-                  <option value="STOCK_TAKE">Stock Take / Count</option>
-                  <option value="DAMAGE">Damage / Spoilage</option>
-                  <option value="RETURN">Return</option>
-                  <option value="ADJUSTMENT">Manual Adjustment</option>
-                  <option value="OTHER">Other</option>
-                </select>
+                <Select value={adjustmentReason} onValueChange={setAdjustmentReason}>
+                  <SelectTrigger id="reason">
+                    <option value="">Select a reason</option>
+                    <option value="STOCK_TAKE">Stock Take / Count</option>
+                    <option value="DAMAGE">Damage / Spoilage</option>
+                    <option value="RETURN">Return</option>
+                    <option value="ADJUSTMENT">Manual Adjustment</option>
+                    <option value="OTHER">Other</option>
+                  </SelectTrigger>
+                </Select>
               </div>
 
               <div>

@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
 import { Label } from '../../components/ui/label'
 import { Input } from '../../components/ui/input'
+import { Select, SelectTrigger } from '../../components/ui/select'
 import {
   useGetRestaurantReportQuery,
   useGetSupplierReportQuery,
@@ -348,31 +349,27 @@ export function ReportsPage() {
             </div>
             <div>
               <Label>Granularity</Label>
-              <select
-                className="w-full h-10 rounded-md border border-[var(--app-border)] px-3 text-sm"
-                value={granularity}
-                onChange={(e) => setGranularity(e.target.value)}
-              >
-                <option value="day">Day</option>
-                <option value="week">Week</option>
-                <option value="month">Month</option>
-              </select>
+              <Select value={granularity} onValueChange={setGranularity}>
+                <SelectTrigger>
+                  <option value="day">Day</option>
+                  <option value="week">Week</option>
+                  <option value="month">Month</option>
+                </SelectTrigger>
+              </Select>
             </div>
             {isRestaurant && branches.length > 0 ? (
               <div>
                 <Label>Branch</Label>
-                <select
-                  className="w-full h-10 rounded-md border border-[var(--app-border)] px-3 text-sm"
-                  value={branchId}
-                  onChange={(e) => setBranchId(e.target.value)}
-                >
-                  <option value="">All branches</option>
-                  {branches.map((b: { id: string; name: string }) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
+                <Select value={branchId} onValueChange={setBranchId}>
+                  <SelectTrigger>
+                    <option value="">All branches</option>
+                    {branches.map((b: { id: string; name: string }) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
               </div>
             ) : null}
           </CardContent>

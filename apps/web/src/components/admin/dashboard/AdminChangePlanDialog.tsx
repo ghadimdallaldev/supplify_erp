@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '../../ui/dialog'
 import { Label } from '../../ui/label'
+import { Select, SelectTrigger } from '../../ui/select'
 import {
   useGetAdminPlansQuery,
   usePreviewSubscriptionPlanChangeMutation,
@@ -145,19 +146,18 @@ function AdminChangePlanDialogContent({
         <div className="space-y-4 py-4">
           <div>
             <Label>Target plan</Label>
-            <select
-              className="w-full rounded-md border border-[var(--app-border-mid)] bg-[var(--app-surface)] px-3 py-2 mt-1 text-[var(--text-primary)]"
-              value={targetPlanId}
-              disabled={changePlanPlansLoading}
-              onChange={(e) => setTargetPlanId(e.target.value)}
-            >
-              <option value="">{changePlanPlansLoading ? 'Loading plans…' : 'Select plan'}</option>
-              {changePlanPlanOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.code})
+            <Select value={targetPlanId} onValueChange={(value) => setTargetPlanId(value)}>
+              <SelectTrigger className="w-full mt-1" disabled={changePlanPlansLoading}>
+                <option value="">
+                  {changePlanPlansLoading ? 'Loading plans…' : 'Select plan'}
                 </option>
-              ))}
-            </select>
+                {changePlanPlanOptions.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.code})
+                  </option>
+                ))}
+              </SelectTrigger>
+            </Select>
             {!changePlanPlansLoading && changePlanPlanOptions.length === 0 && (
               <p className="mt-1 text-sm text-amber-600">
                 No plans found for {modal.tenantType.toLowerCase()} tenants. Create one on the Plans

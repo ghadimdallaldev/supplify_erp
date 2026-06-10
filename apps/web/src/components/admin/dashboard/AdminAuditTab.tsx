@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, Loader2, RefreshCw, Search, Shield } from 'luci
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
 import { Input } from '../../ui/input'
+import { Select, SelectTrigger } from '../../ui/select'
 import { useGetAdminAuditLogsQuery } from '../../../services/api'
 
 const AUDIT_PAGE_SIZE = 20
@@ -50,21 +51,22 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
             }}
           />
         </div>
-        <select
-          className="rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm min-w-[160px]"
+        <Select
           value={auditActionType}
-          onChange={(e) => {
-            setAuditActionType(e.target.value)
+          onValueChange={(value) => {
+            setAuditActionType(value)
             setAuditOffset(0)
           }}
         >
-          <option value="all">All action types</option>
-          {auditLogsData?.actionTypes?.map((t: string) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="w-auto min-w-[160px]">
+            <option value="all">All action types</option>
+            {auditLogsData?.actionTypes?.map((t: string) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </SelectTrigger>
+        </Select>
         <div className="flex items-center gap-2">
           <Input
             type="date"

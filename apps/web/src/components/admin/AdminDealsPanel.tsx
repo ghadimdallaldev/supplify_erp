@@ -604,19 +604,20 @@ export function AdminDealsPanel() {
                 <div className="flex flex-wrap items-center gap-2">
                   <label className="flex items-center gap-1.5">
                     <span>Per page</span>
-                    <select
-                      className="h-8 rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-2 text-xs"
-                      value={pageSize}
-                      onChange={(e) =>
-                        setPageSize(Number(e.target.value) as (typeof DEAL_PAGE_SIZES)[number])
+                    <Select
+                      value={String(pageSize)}
+                      onValueChange={(value) =>
+                        setPageSize(Number(value) as (typeof DEAL_PAGE_SIZES)[number])
                       }
                     >
-                      {DEAL_PAGE_SIZES.map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-auto text-xs">
+                        {DEAL_PAGE_SIZES.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </SelectTrigger>
+                    </Select>
                   </label>
                   <div className="flex items-center gap-1">
                     <Button

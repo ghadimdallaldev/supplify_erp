@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Copy, Check } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
+import { Select, SelectTrigger } from '../ui/select'
 import {
   useCreateRestaurantOrgBranchMutation,
   useCreateRestaurantBranchInvitationMutation,
@@ -187,17 +188,15 @@ export function RestaurantAddBranchModal({ open, onClose }: Props) {
                 </label>
                 <label className="block text-sm">
                   <span className="text-[var(--text-muted)]">Role</span>
-                  <select
-                    className="mt-1 w-full rounded-md border border-[var(--app-border)] px-3 py-2 text-sm"
-                    value={roleId}
-                    onChange={(e) => setRoleId(e.target.value)}
-                  >
-                    {(rolesData?.roles ?? []).map((role) => (
-                      <option key={role.id} value={role.id}>
-                        {role.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Select value={roleId} onValueChange={setRoleId}>
+                    <SelectTrigger className="mt-1">
+                      {(rolesData?.roles ?? []).map((role) => (
+                        <option key={role.id} value={role.id}>
+                          {role.name}
+                        </option>
+                      ))}
+                    </SelectTrigger>
+                  </Select>
                 </label>
                 <Button
                   type="button"
@@ -211,9 +210,16 @@ export function RestaurantAddBranchModal({ open, onClose }: Props) {
             ) : (
               <div className="space-y-3">
                 <div className="rounded-md border border-[var(--app-border)] p-3 space-y-2">
-                  <p className="text-xs text-[var(--text-muted)]">Invite link (expires in 7 days)</p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Invite link (expires in 7 days)
+                  </p>
                   <p className="text-sm break-all font-mono">{inviteUrl}</p>
-                  <Button type="button" variant="outline" size="sm" onClick={() => handleCopy().catch(() => {})}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCopy().catch(() => {})}
+                  >
                     {copied ? (
                       <>
                         <Check className="h-4 w-4 mr-1" /> Copied!
@@ -229,7 +235,12 @@ export function RestaurantAddBranchModal({ open, onClose }: Props) {
                   <Button type="button" className="flex-1" onClick={onClose}>
                     Done
                   </Button>
-                  <Button type="button" variant="outline" className="flex-1" onClick={resetInviteForm}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={resetInviteForm}
+                  >
                     Invite Another Person
                   </Button>
                 </div>

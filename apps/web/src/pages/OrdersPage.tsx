@@ -19,6 +19,7 @@ import { RequirePermission } from '../components/RequirePermission'
 import { EmptyState } from '../components/ui/empty-state'
 import { StatusBadge } from '../components/ui/status-badge'
 import { Input } from '../components/ui/input'
+import { Select, SelectTrigger } from '../components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   Dialog,
@@ -41,7 +42,6 @@ import {
   Plus,
   AlertCircle,
   Scale,
-  ChevronDown,
 } from 'lucide-react'
 
 /** Shared height/padding so filter controls align and text does not touch borders. */
@@ -426,16 +426,15 @@ export function OrdersPage() {
                 />
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3 shrink-0">
-                <div className="relative w-full sm:w-[12.5rem]">
-                  <select
-                    value={status}
-                    onChange={(e) => {
-                      setStatus(e.target.value)
-                      if (e.target.value) setActiveTab('all')
-                    }}
-                    className={`${ordersFilterControlClass} appearance-none pl-3.5 pr-10`}
-                    aria-label="Filter by order status"
-                  >
+                <Select
+                  className="w-full sm:w-[12.5rem]"
+                  value={status}
+                  onValueChange={(value) => {
+                    setStatus(value)
+                    if (value) setActiveTab('all')
+                  }}
+                >
+                  <SelectTrigger className="shadow-sm" aria-label="Filter by order status">
                     <option value="">All Statuses</option>
                     <option value="PLACED">Placed</option>
                     <option value="ACKNOWLEDGED">Acknowledged</option>
@@ -447,12 +446,8 @@ export function OrdersPage() {
                     <option value="INVOICED">Invoiced</option>
                     <option value="COMPLETED">Completed</option>
                     <option value="CANCELLED">Cancelled</option>
-                  </select>
-                  <ChevronDown
-                    className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
-                    aria-hidden
-                  />
-                </div>
+                  </SelectTrigger>
+                </Select>
                 <Button
                   type="button"
                   variant="outline"
@@ -833,23 +828,20 @@ export function OrdersPage() {
                 {/* Restaurant Selection */}
                 <div className="space-y-2">
                   <Label htmlFor="restaurant">Restaurant *</Label>
-                  <select
-                    id="restaurant"
-                    className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
-                    value={selectedRestaurant}
-                    onChange={(e) => setSelectedRestaurant(e.target.value)}
-                  >
-                    <option value="">
-                      {(restaurantsData?.restaurants?.length ?? 0) === 0
-                        ? 'No eligible restaurants yet'
-                        : 'Select a restaurant'}
-                    </option>
-                    {restaurantsData?.restaurants?.map((restaurant: any) => (
-                      <option key={restaurant.id} value={restaurant.id}>
-                        {restaurant.name}
+                  <Select value={selectedRestaurant} onValueChange={setSelectedRestaurant}>
+                    <SelectTrigger id="restaurant">
+                      <option value="">
+                        {(restaurantsData?.restaurants?.length ?? 0) === 0
+                          ? 'No eligible restaurants yet'
+                          : 'Select a restaurant'}
                       </option>
-                    ))}
-                  </select>
+                      {restaurantsData?.restaurants?.map((restaurant: any) => (
+                        <option key={restaurant.id} value={restaurant.id}>
+                          {restaurant.name}
+                        </option>
+                      ))}
+                    </SelectTrigger>
+                  </Select>
                   {(restaurantsData?.restaurants?.length ?? 0) === 0 && (
                     <p className="text-xs text-[var(--text-muted)]">
                       Restaurants appear here after they follow your supplier profile or place their

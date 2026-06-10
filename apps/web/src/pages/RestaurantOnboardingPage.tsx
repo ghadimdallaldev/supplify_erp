@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
+import { Select, SelectTrigger } from '../components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   Dialog,
@@ -638,19 +639,19 @@ export function RestaurantOnboardingPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="businessType">Business Type *</Label>
-                  <select
-                    id="businessType"
-                    className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
+                  <Select
                     value={profileForm.business_type}
-                    onChange={(e) =>
-                      setProfileForm({ ...profileForm, business_type: e.target.value })
+                    onValueChange={(value) =>
+                      setProfileForm({ ...profileForm, business_type: value })
                     }
                   >
-                    <option value="restaurant">Restaurant</option>
-                    <option value="cafe">Café</option>
-                    <option value="hotel">Hotel</option>
-                    <option value="catering">Catering</option>
-                  </select>
+                    <SelectTrigger id="businessType">
+                      <option value="restaurant">Restaurant</option>
+                      <option value="cafe">Café</option>
+                      <option value="hotel">Hotel</option>
+                      <option value="catering">Catering</option>
+                    </SelectTrigger>
+                  </Select>
                 </div>
               </div>
 
