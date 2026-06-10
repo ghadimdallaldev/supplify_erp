@@ -44,7 +44,7 @@ export function useWorkspaceRole() {
         can,
         isDriver: isDriverRole,
       }),
-    [tenantType, roleName, can, isDriverRole, user?.tenantPermissions]
+    [tenantType, roleName, can, isDriverRole]
   )
 
   return { roleName, isDriverRole, isReadOnlyViewer, persona, tenantType }

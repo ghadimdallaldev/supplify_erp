@@ -434,6 +434,8 @@ export interface OrderFilters {
   to?: string
   limit?: number
   offset?: number
+  warehouseId?: string
+  warehouse_id?: string
 }
 
 export interface OrdersResponse {
@@ -513,6 +515,11 @@ export interface Supplier {
   contact_email: string
   phone?: string
   address_json?: Address
+  logo_url?: string
+  brand_primary?: string
+  brand_accent?: string
+  brand_display_name?: string
+  public_catalog_enabled?: boolean
   created_at: string
   updated_at: string
 }
@@ -560,6 +567,10 @@ export interface Restaurant {
   contact_email: string
   phone?: string
   address_json?: Address
+  logo_url?: string
+  brand_primary?: string
+  brand_accent?: string
+  brand_display_name?: string
   created_at: string
   updated_at: string
 }
@@ -742,6 +753,7 @@ export interface CartItem {
   product: Product
   quantity: number
   notes?: string
+  quotedUnitPrice?: number
 }
 
 export interface CartGroup {
@@ -790,6 +802,24 @@ export interface ReorderSuggestion {
 
 export interface ReorderSuggestionsResponse {
   suggestions: ReorderSuggestion[]
+}
+
+export interface ReorderAssistanceItem {
+  id: string
+  productId?: string | null
+  productName: string
+  productUnit?: string
+  supplierId?: string
+  supplierName?: string
+  cadenceId?: string
+  reasonCode: string
+  reasonLabel: string
+  urgency: string
+  suggestedQty?: number | null
+  currentQty?: number
+  expiryDate?: string
+  scopeType: 'product' | 'cadence' | 'supplier_product'
+  scopeId: string
 }
 
 // Reservations types
@@ -1344,6 +1374,140 @@ export interface PublicRestaurant {
   name: string
   contact_email?: string | null
   created_at?: string
+}
+
+export interface PublicSupplier {
+  id: string
+  slug: string
+  name: string
+  logoUrl?: string | null
+  brandDisplayName?: string | null
+  brandPrimary?: string | null
+  brandAccent?: string | null
+  minimumOrderAmount?: number | null
+  paymentTerms?: string | null
+  publicCatalogEnabled?: boolean
+  productCount?: number
+}
+
+export interface PublicSupplierProduct {
+  id: string
+  name: string
+  sku: string
+  category?: string | null
+  unit?: string | null
+  imageUrl?: string | null
+  description?: string | null
+  inStock?: boolean
+  currentPrice?: number | null
+  currency?: string
+  pricingSource?: string | null
+}
+
+export interface PublicSupplierProductsResponse {
+  products: PublicSupplierProduct[]
+  categories: string[]
+  pagination: { page: number; limit: number; total: number }
+}
+
+export interface QuoteRequestSummary {
+  id: string
+  restaurantId: string
+  status: 'open' | 'closed' | 'cancelled'
+  note?: string | null
+  neededBy?: string | null
+  createdAt: string
+  updatedAt?: string
+  itemCount?: number
+  supplierCount?: number
+  responseCount?: number
+}
+
+export interface QuoteRequestItem {
+  id: string
+  productId: string
+  productName: string
+  productSku: string
+  productUnit?: string
+  productImageUrl?: string | null
+  productSupplierId?: string
+  quantity: number
+  unit?: string | null
+  notes?: string | null
+}
+
+export interface QuoteResponseItem {
+  id?: string
+  quoteRequestItemId: string
+  isAvailable: boolean
+  unitPrice?: number | null
+  currency?: string
+  quantity?: number | null
+  deliveryDate?: string | null
+  note?: string | null
+  substituteProductId?: string | null
+  substituteProductName?: string | null
+  substituteProductSku?: string | null
+}
+
+export interface QuoteRequestSupplierEntry {
+  id: string
+  supplierId: string
+  supplierName: string
+  supplierSlug?: string
+  status: 'pending' | 'responded' | 'declined'
+  response?: {
+    id: string
+    note?: string | null
+    submittedAt?: string
+    items: QuoteResponseItem[]
+  } | null
+}
+
+export interface QuoteRequestDetail {
+  quoteRequest: QuoteRequestSummary
+  items: QuoteRequestItem[]
+  suppliers: QuoteRequestSupplierEntry[]
+}
+
+export interface SupplierQuoteInboxEntry {
+  id: string
+  quoteRequestId: string
+  status: 'pending' | 'responded' | 'declined'
+  quoteRequestStatus: string
+  note?: string | null
+  neededBy?: string | null
+  createdAt: string
+  restaurantName: string
+  itemCount: number
+}
+
+export interface SupplierQuoteRequestDetail {
+  id: string
+  quoteRequestId: string
+  status: string
+  restaurantId: string
+  restaurantName: string
+  quoteRequestNote?: string | null
+  neededBy?: string | null
+  items: QuoteRequestItem[]
+  response?: {
+    id: string
+    note?: string | null
+    submittedAt?: string
+    items: QuoteResponseItem[]
+  } | null
+}
+
+export interface QuoteCartPayload {
+  supplierId: string
+  items: Array<{
+    productId: string
+    quantity: number
+    quotedUnitPrice?: number | null
+    product: Product
+  }>
+  disclaimer: string
 }
 
 export interface PublicAvailabilitySlot {

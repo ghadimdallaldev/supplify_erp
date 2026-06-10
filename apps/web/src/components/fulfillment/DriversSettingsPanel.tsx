@@ -6,6 +6,7 @@ import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
+import { Select, SelectTrigger } from '../ui/select'
 import { Textarea } from '../ui/textarea'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
 import type { DriverRecord } from '../../types'
@@ -220,20 +221,19 @@ export function DriversSettingsPanel() {
             </div>
             <div>
               <Label htmlFor="link_user">Link to app user (Driver role)</Label>
-              <select
-                id="link_user"
-                data-testid="driver-link-user-select"
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+              <Select
                 value={form.user_id}
-                onChange={(e) => setForm({ ...form, user_id: e.target.value })}
+                onValueChange={(value) => setForm({ ...form, user_id: value })}
               >
-                <option value="">— No login (dispatch-only profile) —</option>
-                {linkableUsers.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.display_name || u.email} ({u.role_name || 'no role'})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="link_user" data-testid="driver-link-user-select">
+                  <option value="">— No login (dispatch-only profile) —</option>
+                  {linkableUsers.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.display_name || u.email} ({u.role_name || 'no role'})
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
               <p className="text-xs text-[var(--text-muted)] mt-1">
                 Invite team members with the Driver role under Settings → Team, then link them here.
               </p>
@@ -248,18 +248,18 @@ export function DriversSettingsPanel() {
             </div>
             <div>
               <Label htmlFor="vehicle_type">Vehicle type</Label>
-              <select
-                id="vehicle_type"
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+              <Select
                 value={form.vehicle_type}
-                onChange={(e) => setForm({ ...form, vehicle_type: e.target.value })}
+                onValueChange={(value) => setForm({ ...form, vehicle_type: value })}
               >
-                {VEHICLE_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="vehicle_type">
+                  {VEHICLE_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
             <div>
               <Label htmlFor="vehicle_plate">Plate</Label>
@@ -272,19 +272,19 @@ export function DriversSettingsPanel() {
             {warehouses.length > 0 && (
               <div>
                 <Label htmlFor="warehouse_id">Home warehouse</Label>
-                <select
-                  id="warehouse_id"
-                  className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+                <Select
                   value={form.warehouse_id}
-                  onChange={(e) => setForm({ ...form, warehouse_id: e.target.value })}
+                  onValueChange={(value) => setForm({ ...form, warehouse_id: value })}
                 >
-                  <option value="">— None —</option>
-                  {warehouses.map((w: { id: string; name: string }) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="warehouse_id">
+                    <option value="">— None —</option>
+                    {warehouses.map((w: { id: string; name: string }) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
               </div>
             )}
             <div>

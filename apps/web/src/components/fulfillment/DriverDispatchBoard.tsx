@@ -4,10 +4,10 @@ import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Label } from '../ui/label'
+import { Select, SelectTrigger } from '../ui/select'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { Skeleton } from '../ui/skeleton'
-import { formatPrice } from '../../utils/format'
 import { CheckCircle, AlertTriangle, Loader2, Route } from 'lucide-react'
 import { CreateRouteDialog } from './CreateRouteDialog'
 import { canSelectOrderForRoute } from './fulfillmentDispatchUtils'
@@ -488,20 +488,17 @@ export function DriverDispatchBoard({
                 <DialogTitle>Assign driver</DialogTitle>
               </DialogHeader>
               <Label htmlFor="assign-driver-select">Driver</Label>
-              <select
-                id="assign-driver-select"
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
-                value={selectedDriverId}
-                onChange={(e) => setSelectedDriverId(e.target.value)}
-              >
-                <option value="">Select driver…</option>
-                {drivers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {driverLabel(d)}
-                    {d.vehicleType ? ` (${d.vehicleType})` : ''}
-                  </option>
-                ))}
-              </select>
+              <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+                <SelectTrigger id="assign-driver-select">
+                  <option value="">Select driver…</option>
+                  {drivers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {driverLabel(d)}
+                      {d.vehicleType ? ` (${d.vehicleType})` : ''}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setAssignOrder(null)}>
                   Cancel
@@ -520,19 +517,16 @@ export function DriverDispatchBoard({
                 <DialogTitle>Reassign driver</DialogTitle>
               </DialogHeader>
               <Label htmlFor="reassign-driver-select">New driver</Label>
-              <select
-                id="reassign-driver-select"
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
-                value={selectedDriverId}
-                onChange={(e) => setSelectedDriverId(e.target.value)}
-              >
-                <option value="">Select driver…</option>
-                {drivers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {driverLabel(d)}
-                  </option>
-                ))}
-              </select>
+              <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+                <SelectTrigger id="reassign-driver-select">
+                  <option value="">Select driver…</option>
+                  {drivers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {driverLabel(d)}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setReassignOrder(null)}>
                   Cancel

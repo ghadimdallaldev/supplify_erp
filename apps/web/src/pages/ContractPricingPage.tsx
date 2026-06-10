@@ -4,6 +4,7 @@ import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
+import { Select, SelectTrigger } from '../components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -197,33 +198,27 @@ export function ContractPricingPage() {
             </div>
             <div className="w-full sm:max-w-none lg:min-w-[180px]">
               <Label htmlFor="restaurant">Restaurant</Label>
-              <select
-                id="restaurant"
-                className="mt-1 w-full rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 text-sm"
-                value={restaurantFilter}
-                onChange={(e) => setRestaurantFilter(e.target.value)}
-              >
-                <option value="">All restaurants</option>
-                {restaurants.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
+              <Select value={restaurantFilter} onValueChange={setRestaurantFilter}>
+                <SelectTrigger id="restaurant" className="mt-1">
+                  <option value="">All restaurants</option>
+                  {restaurants.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
             <div className="w-full sm:max-w-none lg:min-w-[140px]">
               <Label htmlFor="status">Status</Label>
-              <select
-                id="status"
-                className="mt-1 w-full rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 text-sm"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="all">All</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="expired">Expired</option>
-              </select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger id="status" className="mt-1">
+                  <option value="all">All</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="expired">Expired</option>
+                </SelectTrigger>
+              </Select>
             </div>
           </CardContent>
         </Card>
@@ -391,35 +386,35 @@ export function ContractPricingPage() {
             <div className="space-y-4 py-2">
               <div>
                 <Label>Restaurant</Label>
-                <select
-                  className="mt-1 w-full rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 text-sm"
+                <Select
                   value={form.restaurantId}
-                  disabled={!!editingId}
-                  onChange={(e) => setForm({ ...form, restaurantId: e.target.value })}
+                  onValueChange={(value) => setForm({ ...form, restaurantId: value })}
                 >
-                  <option value="">Select restaurant</option>
-                  {restaurants.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="mt-1" disabled={!!editingId}>
+                    <option value="">Select restaurant</option>
+                    {restaurants.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
               </div>
               <div>
                 <Label>Product</Label>
-                <select
-                  className="mt-1 w-full rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 text-sm"
+                <Select
                   value={form.productId}
-                  disabled={!!editingId}
-                  onChange={(e) => setForm({ ...form, productId: e.target.value })}
+                  onValueChange={(value) => setForm({ ...form, productId: value })}
                 >
-                  <option value="">Select product</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.sku})
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="mt-1" disabled={!!editingId}>
+                    <option value="">Select product</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.sku})
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
               </div>
               <div>
                 <Label>Contract price</Label>
@@ -474,22 +469,23 @@ export function ContractPricingPage() {
               </div>
               <div>
                 <Label>Agreement type</Label>
-                <select
-                  className="mt-1 w-full rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 text-sm"
+                <Select
                   value={form.agreementType}
-                  onChange={(e) =>
+                  onValueChange={(value) =>
                     setForm({
                       ...form,
-                      agreementType: e.target.value as FormState['agreementType'],
+                      agreementType: value as FormState['agreementType'],
                     })
                   }
                 >
-                  {AGREEMENT_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="mt-1">
+                    {AGREEMENT_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
               </div>
               <div>
                 <Label>Notes</Label>

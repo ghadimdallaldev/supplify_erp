@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Copy, Check } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
+import { Select, SelectTrigger } from '../ui/select'
 import {
   useCreateRestaurantMemberInvitationMutation,
   useGetRestaurantMemberInviteRolesQuery,
@@ -136,22 +137,23 @@ export function RestaurantMemberInviteModal({ open, onClose }: Props) {
               </label>
               <label className="block text-sm">
                 <span className="text-[var(--text-muted)]">Role</span>
-                <select
-                  className="mt-1 w-full rounded-md border border-[var(--app-border)] px-3 py-2 text-sm"
+                <Select
                   value={roleId}
-                  onChange={(e) => {
-                    const id = e.target.value
+                  onValueChange={(value) => {
+                    const id = value
                     setRoleId(id)
                     const role = roles.find((r) => r.id === id)
                     setSelectedRoleName(role?.name ?? '')
                   }}
                 >
-                  {roles.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="mt-1">
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
                 {selectedRoleName && ROLE_HELP[selectedRoleName] && (
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
                     {ROLE_HELP[selectedRoleName]}

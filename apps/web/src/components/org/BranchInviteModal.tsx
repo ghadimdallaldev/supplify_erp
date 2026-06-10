@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Copy, Check } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
+import { Select, SelectTrigger } from '../ui/select'
 import { useCreateBranchInvitationMutation, useGetBranchInviteRolesQuery } from '../../services/api'
 
 type Props = {
@@ -92,17 +93,15 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
             </label>
             <label className="block text-sm">
               <span className="text-[var(--text-muted)]">Role</span>
-              <select
-                className="mt-1 w-full rounded-md border border-[var(--app-border)] px-3 py-2 text-sm"
-                value={roleId}
-                onChange={(e) => setRoleId(e.target.value)}
-              >
-                {(rolesData?.roles ?? []).map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.name}
-                  </option>
-                ))}
-              </select>
+              <Select value={roleId} onValueChange={setRoleId}>
+                <SelectTrigger className="mt-1">
+                  {(rolesData?.roles ?? []).map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </label>
             {selectedRoleName === 'Driver' && (
               <p className="text-xs text-[var(--text-muted)] rounded-md border border-[var(--app-border)] p-2">

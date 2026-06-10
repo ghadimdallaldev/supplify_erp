@@ -10,6 +10,22 @@ import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../lib/safe-update.js'
 import { deliveredOrderStatusInSql } from '../lib/order-statuses.js'
 import { invalidateTenantProfileCache } from '../lib/tenant-profile-cache.js'
+import { getTenantBranding, updateTenantBranding } from '../services/branding.service.js'
+
+const brandingUpdateSchema = z.object({
+  brandPrimary: z.string().optional().nullable(),
+  brandAccent: z.string().optional().nullable(),
+  brandDisplayName: z.string().max(120).optional().nullable(),
+})
+
+const customBrandingGate = requireFeature(
+  'custom_branding',
+  async (req) => {
+    const { getRestaurantIdForRequest } = await import('../lib/rbac.js')
+    return getRestaurantIdForRequest(req)
+  },
+  () => 'RESTAURANT'
+)
 
 const router = express.Router()
 
@@ -264,6 +280,44 @@ router.get('/me', requireAuth, requireRole(['RESTAURANT']), async (req, res) => 
     })
   }
 })
+
+router.get(
+  '/me/branding',
+  requireAuth,
+  requireRole(['RESTAURANT']),
+  customBrandingGate,
+  async (req, res, next) => {
+    try {
+      const { getRestaurantIdForRequest } = await import('../lib/rbac.js')
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new NotFoundError('Restaurant not found')
+      const branding = await getTenantBranding(restaurantId, 'RESTAURANT')
+      res.json({ ok: true, data: { branding }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.patch(
+  '/me/branding',
+  requireAuth,
+  requireRole(['RESTAURANT']),
+  customBrandingGate,
+  async (req, res, next) => {
+    try {
+      const { getRestaurantIdForRequest } = await import('../lib/rbac.js')
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new NotFoundError('Restaurant not found')
+      const body = brandingUpdateSchema.parse(req.body)
+      const branding = await updateTenantBranding(restaurantId, 'RESTAURANT', body)
+      invalidateTenantProfileCache(restaurantId, 'RESTAURANT')
+      res.json({ ok: true, data: { branding }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 
 // Delivery destination coordinates (ETA readiness)
 router.get('/me/delivery-locations', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {

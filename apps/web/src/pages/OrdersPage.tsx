@@ -15,10 +15,12 @@ import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Skeleton } from '../components/ui/skeleton'
 import { PageHeader } from '../components/ui/page-header'
+import { DataTableShell } from '../components/ui/data-table-shell'
 import { RequirePermission } from '../components/RequirePermission'
 import { EmptyState } from '../components/ui/empty-state'
 import { StatusBadge } from '../components/ui/status-badge'
 import { Input } from '../components/ui/input'
+import { Select, SelectTrigger } from '../components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   Dialog,
@@ -41,7 +43,6 @@ import {
   Plus,
   AlertCircle,
   Scale,
-  ChevronDown,
 } from 'lucide-react'
 
 /** Shared height/padding so filter controls align and text does not touch borders. */
@@ -404,74 +405,72 @@ export function OrdersPage() {
           }
         />
 
-        {/* Filters and Search */}
-        <Card>
-          <CardContent className="p-5 sm:p-6">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-4">
-              <div className="relative min-w-0 flex-1">
-                <Search
-                  className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
-                  aria-hidden
-                />
-                <Input
-                  placeholder={
-                    isSupplier
-                      ? 'Search by order ID or restaurant…'
-                      : 'Search by order ID, restaurant, or supplier…'
-                  }
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className={`${ordersFilterControlClass} pl-11 pr-4`}
-                  aria-label="Search orders"
-                />
-              </div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3 shrink-0">
-                <div className="relative w-full sm:w-[12.5rem]">
-                  <select
-                    value={status}
-                    onChange={(e) => {
-                      setStatus(e.target.value)
-                      if (e.target.value) setActiveTab('all')
-                    }}
-                    className={`${ordersFilterControlClass} appearance-none pl-3.5 pr-10`}
-                    aria-label="Filter by order status"
-                  >
-                    <option value="">All Statuses</option>
-                    <option value="PLACED">Placed</option>
-                    <option value="ACKNOWLEDGED">Acknowledged</option>
-                    <option value="PROCESSING">Processing</option>
-                    <option value="SHIPPED">Shipped</option>
-                    <option value="DELIVERED">Delivered</option>
-                    <option value="RECEIVED_PARTIAL">Received (Partial)</option>
-                    <option value="RECEIVED_FULL">Received (Full)</option>
-                    <option value="INVOICED">Invoiced</option>
-                    <option value="COMPLETED">Completed</option>
-                    <option value="CANCELLED">Cancelled</option>
-                  </select>
-                  <ChevronDown
-                    className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
-                    aria-hidden
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-10 shrink-0 gap-2 px-4 whitespace-nowrap"
-                  onClick={() => setMoreFiltersOpen(true)}
-                  aria-expanded={moreFiltersOpen}
-                >
-                  <Filter className="h-4 w-4" />
-                  More Filters
-                  {hasAdvancedFilters ? (
-                    <Badge variant="secondary" className="ml-0.5 px-2 py-0 text-xs font-medium">
-                      On
-                    </Badge>
-                  ) : null}
-                </Button>
-              </div>
+        <DataTableShell
+          data-testid="orders-table-shell"
+          search={
+            <div className="relative min-w-0">
+              <Search
+                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
+                aria-hidden
+              />
+              <Input
+                placeholder={
+                  isSupplier
+                    ? 'Search by order ID or restaurant…'
+                    : 'Search by order ID, restaurant, or supplier…'
+                }
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className={`${ordersFilterControlClass} pl-11 pr-4`}
+                aria-label="Search orders"
+              />
             </div>
+          }
+          filters={
+            <>
+              <Select
+                className="w-full sm:w-[12.5rem]"
+                value={status}
+                onValueChange={(value) => {
+                  setStatus(value)
+                  if (value) setActiveTab('all')
+                }}
+              >
+                <SelectTrigger className="shadow-sm" aria-label="Filter by order status">
+                  <option value="">All Statuses</option>
+                  <option value="PLACED">Placed</option>
+                  <option value="ACKNOWLEDGED">Acknowledged</option>
+                  <option value="PROCESSING">Processing</option>
+                  <option value="SHIPPED">Shipped</option>
+                  <option value="DELIVERED">Delivered</option>
+                  <option value="RECEIVED_PARTIAL">Received (Partial)</option>
+                  <option value="RECEIVED_FULL">Received (Full)</option>
+                  <option value="INVOICED">Invoiced</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="CANCELLED">Cancelled</option>
+                </SelectTrigger>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 shrink-0 gap-2 px-4 whitespace-nowrap"
+                onClick={() => setMoreFiltersOpen(true)}
+                aria-expanded={moreFiltersOpen}
+              >
+                <Filter className="h-4 w-4" />
+                More Filters
+                {hasAdvancedFilters ? (
+                  <Badge variant="secondary" className="ml-0.5 px-2 py-0 text-xs font-medium">
+                    On
+                  </Badge>
+                ) : null}
+              </Button>
+            </>
+          }
+        >
+          <div className="p-4 sm:p-5">
             {(debouncedSearch || status || hasAdvancedFilters) && (
-              <div className="mt-4 border-t border-[var(--app-border)] pt-4">
+              <div className="mb-4 border-b border-[var(--app-border)] pb-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="mr-1 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                     Active filters
@@ -508,314 +507,319 @@ export function OrdersPage() {
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
 
-        <Dialog open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>More filters</DialogTitle>
-              <DialogDescription>
-                Narrow orders by placed date. Search and status filters apply from the toolbar.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="orders-date-from">Placed from</Label>
-                <Input
-                  id="orders-date-from"
-                  type="date"
-                  className="mt-1"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="orders-date-to">Placed to</Label>
-                <Input
-                  id="orders-date-to"
-                  type="date"
-                  className="mt-1"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                />
-              </div>
-            </div>
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button type="button" variant="outline" onClick={clearAllFilters}>
-                Clear all
-              </Button>
-              <Button type="button" onClick={() => setMoreFiltersOpen(false)}>
-                Apply
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            <Dialog open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>More filters</DialogTitle>
+                  <DialogDescription>
+                    Narrow orders by placed date. Search and status filters apply from the toolbar.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor="orders-date-from">Placed from</Label>
+                    <Input
+                      id="orders-date-from"
+                      type="date"
+                      className="mt-1"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="orders-date-to">Placed to</Label>
+                    <Input
+                      id="orders-date-to"
+                      type="date"
+                      className="mt-1"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button type="button" variant="outline" onClick={clearAllFilters}>
+                    Clear all
+                  </Button>
+                  <Button type="button" onClick={() => setMoreFiltersOpen(false)}>
+                    Apply
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
-        {/* Order Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="h-auto w-full flex-wrap justify-start gap-1 p-1.5">
-            <TabsTrigger value="all" className="px-3 py-2">
-              All Orders
-            </TabsTrigger>
-            <TabsTrigger value="new" className="px-3 py-2">
-              New (Needs Action)
-            </TabsTrigger>
-            <TabsTrigger value="processing" className="px-3 py-2">
-              Processing
-            </TabsTrigger>
-            <TabsTrigger value="shipped" className="px-3 py-2">
-              Shipped
-            </TabsTrigger>
-            <TabsTrigger value="completed" className="px-3 py-2">
-              Completed
-            </TabsTrigger>
-          </TabsList>
+            {/* Order Tabs */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+              <TabsList className="h-auto w-full flex-wrap justify-start gap-1 p-1.5">
+                <TabsTrigger value="all" className="px-3 py-2">
+                  All Orders
+                </TabsTrigger>
+                <TabsTrigger value="new" className="px-3 py-2">
+                  New (Needs Action)
+                </TabsTrigger>
+                <TabsTrigger value="processing" className="px-3 py-2">
+                  Processing
+                </TabsTrigger>
+                <TabsTrigger value="shipped" className="px-3 py-2">
+                  Shipped
+                </TabsTrigger>
+                <TabsTrigger value="completed" className="px-3 py-2">
+                  Completed
+                </TabsTrigger>
+              </TabsList>
 
-          <TabsContent value={activeTab} className="space-y-4">
-            <div className="space-y-4">
-              {filteredOrders?.map((order: any) => (
-                <Card
-                  key={order.id}
-                  className="hover:shadow-md transition-shadow"
-                  data-testid={`order-row-${order.id}`}
-                >
-                  <CardHeader className="pb-4">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
-                          <CardTitle className="text-lg">
-                            Order #{order.id.slice(-8).toUpperCase()}
-                          </CardTitle>
-                          <span className="inline-flex items-center gap-1">
-                            <span className="text-[var(--text-muted)]" aria-hidden>
-                              {getStatusIcon(order.status)}
-                            </span>
-                            <StatusBadge
-                              status={order.status}
-                              label={getOrderStatusLabel(
-                                order,
-                                isSupplier ? 'SUPPLIER' : 'RESTAURANT'
+              <TabsContent value={activeTab} className="space-y-4">
+                <div className="space-y-4">
+                  {filteredOrders?.map((order: any) => (
+                    <Card
+                      key={order.id}
+                      className="hover:shadow-md transition-shadow"
+                      data-testid={`order-row-${order.id}`}
+                    >
+                      <CardHeader className="pb-4">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                              <CardTitle className="text-lg">
+                                Order #{order.id.slice(-8).toUpperCase()}
+                              </CardTitle>
+                              <span className="inline-flex items-center gap-1">
+                                <span className="text-[var(--text-muted)]" aria-hidden>
+                                  {getStatusIcon(order.status)}
+                                </span>
+                                <StatusBadge
+                                  status={order.status}
+                                  label={getOrderStatusLabel(
+                                    order,
+                                    isSupplier ? 'SUPPLIER' : 'RESTAURANT'
+                                  )}
+                                />
+                                {isDisputeReplacementOrder(order) && (
+                                  <Badge variant="secondary">Replacement</Badge>
+                                )}
+                                {disputesEnabled &&
+                                  getActiveDisputeForOrder(allDisputes, order.id) && (
+                                    <Badge
+                                      variant="outline"
+                                      className="border-amber-400 text-amber-800 bg-amber-50"
+                                    >
+                                      <Scale className="h-3 w-3 mr-1" aria-hidden />
+                                      Dispute open
+                                    </Badge>
+                                  )}
+                                {!isSupplier &&
+                                  order.status === 'CANCELLED' &&
+                                  order.cancelled_by === 'SUPPLIER' &&
+                                  order.cancel_reason && (
+                                    <p className="text-xs text-red-700 mt-1 max-w-md">
+                                      {order.cancel_reason}
+                                    </p>
+                                  )}
+                              </span>
+                              {order.status === 'PLACED' && isSupplier && (
+                                <Badge variant="destructive">Action Required</Badge>
                               )}
-                            />
-                            {isDisputeReplacementOrder(order) && (
-                              <Badge variant="secondary">Replacement</Badge>
-                            )}
-                            {disputesEnabled && getActiveDisputeForOrder(allDisputes, order.id) && (
-                              <Badge
-                                variant="outline"
-                                className="border-amber-400 text-amber-800 bg-amber-50"
-                              >
-                                <Scale className="h-3 w-3 mr-1" aria-hidden />
-                                Dispute open
-                              </Badge>
-                            )}
-                            {!isSupplier &&
-                              order.status === 'CANCELLED' &&
-                              order.cancelled_by === 'SUPPLIER' &&
-                              order.cancel_reason && (
-                                <p className="text-xs text-red-700 mt-1 max-w-md">
-                                  {order.cancel_reason}
-                                </p>
+                            </div>
+                            <div className="text-sm text-[var(--text-muted)] space-y-1">
+                              <div>Restaurant: {order.restaurant_name}</div>
+                              <div>
+                                Placed:{' '}
+                                {new Date(order.placed_at || order.created_at).toLocaleString()}
+                              </div>
+                              {!isSupplier && order.status === 'DELIVERED' && (
+                                <div className="mt-2 p-2 rounded bg-[var(--brand-ultra)] text-[var(--brand-mid)] border border-[var(--app-border)] text-xs">
+                                  Supplier marked this order as delivered. Please{' '}
+                                  <Link
+                                    to={`/app/receiving?order=${order.id}`}
+                                    className="underline"
+                                  >
+                                    receive this order
+                                  </Link>{' '}
+                                  to update inventory and generate an invoice.
+                                </div>
                               )}
-                          </span>
-                          {order.status === 'PLACED' && isSupplier && (
-                            <Badge variant="destructive">Action Required</Badge>
-                          )}
-                        </div>
-                        <div className="text-sm text-[var(--text-muted)] space-y-1">
-                          <div>Restaurant: {order.restaurant_name}</div>
-                          <div>
-                            Placed: {new Date(order.placed_at || order.created_at).toLocaleString()}
+                              {isSupplier && order.status === 'DELIVERED' && (
+                                <div className="mt-2 p-2 rounded bg-[var(--amber-pale)] text-[var(--amber)] border border-[var(--amber-mid)]/35 text-xs">
+                                  Awaiting restaurant receiving. You’ll see the invoice after they
+                                  receive.
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          {!isSupplier && order.status === 'DELIVERED' && (
-                            <div className="mt-2 p-2 rounded bg-[var(--brand-ultra)] text-[var(--brand-mid)] border border-[var(--app-border)] text-xs">
-                              Supplier marked this order as delivered. Please{' '}
-                              <Link to={`/app/receiving?order=${order.id}`} className="underline">
-                                receive this order
-                              </Link>{' '}
-                              to update inventory and generate an invoice.
+                          <div className="text-left sm:text-right shrink-0">
+                            <div className="text-xl sm:text-2xl font-bold text-[var(--brand-mid)]">
+                              {`$${formatPrice(order.total_amount)}`}
                             </div>
-                          )}
-                          {isSupplier && order.status === 'DELIVERED' && (
-                            <div className="mt-2 p-2 rounded bg-[var(--amber-pale)] text-[var(--amber)] border border-[var(--amber-mid)]/35 text-xs">
-                              Awaiting restaurant receiving. You’ll see the invoice after they
-                              receive.
+                            <div className="text-sm text-[var(--text-muted)]">
+                              {order.items?.length || 0} items
                             </div>
-                          )}
+                          </div>
                         </div>
-                      </div>
-                      <div className="text-left sm:text-right shrink-0">
-                        <div className="text-xl sm:text-2xl font-bold text-[var(--brand-mid)]">
-                          {`$${formatPrice(order.total_amount)}`}
-                        </div>
-                        <div className="text-sm text-[var(--text-muted)]">
-                          {order.items?.length || 0} items
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                      {/* Order Items Preview */}
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm text-[var(--text-muted)] mb-2">Items:</div>
-                        <div className="flex flex-wrap gap-2">
-                          {order.items?.slice(0, 3).map((item: any, idx: number) => (
-                            <Badge key={idx} variant="outline" className="text-xs">
-                              {item.product_name} × {item.quantity}
-                            </Badge>
-                          ))}
-                          {order.items && order.items.length > 3 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{order.items.length - 3} more
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                          {/* Order Items Preview */}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm text-[var(--text-muted)] mb-2">Items:</div>
+                            <div className="flex flex-wrap gap-2">
+                              {order.items?.slice(0, 3).map((item: any, idx: number) => (
+                                <Badge key={idx} variant="outline" className="text-xs">
+                                  {item.product_name} × {item.quantity}
+                                </Badge>
+                              ))}
+                              {order.items && order.items.length > 3 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{order.items.length - 3} more
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
 
-                      {/* Action Buttons */}
-                      <div className="flex flex-wrap gap-2 w-full lg:w-auto lg:justify-end">
-                        {isSupplier && canEditOrders && order.status === 'PLACED' && (
-                          <>
-                            <Button
-                              size="sm"
-                              onClick={() => handleStatusUpdate(order.id, 'ACKNOWLEDGED')}
-                              data-testid={`order-${order.id}-acknowledge`}
-                            >
-                              Acknowledge
-                            </Button>
-                            {canDeclineOrder && (
+                          {/* Action Buttons */}
+                          <div className="flex flex-wrap gap-2 w-full lg:w-auto lg:justify-end">
+                            {isSupplier && canEditOrders && order.status === 'PLACED' && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleStatusUpdate(order.id, 'ACKNOWLEDGED')}
+                                  data-testid={`order-${order.id}-acknowledge`}
+                                >
+                                  Acknowledge
+                                </Button>
+                                {canDeclineOrder && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setDeclineOrderId(order.id)
+                                      setDeclineOrderLabel(order.restaurant_name)
+                                    }}
+                                    data-testid={`order-${order.id}-decline`}
+                                  >
+                                    Decline
+                                  </Button>
+                                )}
+                              </>
+                            )}
+                            {isSupplier && canEditOrders && order.status === 'ACKNOWLEDGED' && (
                               <Button
                                 size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setDeclineOrderId(order.id)
-                                  setDeclineOrderLabel(order.restaurant_name)
-                                }}
-                                data-testid={`order-${order.id}-decline`}
+                                onClick={() => handleStatusUpdate(order.id, 'PROCESSING')}
+                                data-testid={`order-${order.id}-start-processing`}
                               >
-                                Decline
+                                Start Processing
                               </Button>
                             )}
-                          </>
-                        )}
-                        {isSupplier && canEditOrders && order.status === 'ACKNOWLEDGED' && (
-                          <Button
-                            size="sm"
-                            onClick={() => handleStatusUpdate(order.id, 'PROCESSING')}
-                            data-testid={`order-${order.id}-start-processing`}
-                          >
-                            Start Processing
-                          </Button>
-                        )}
-                        {isSupplier && canEditOrders && order.status === 'PROCESSING' && (
-                          <Button
-                            size="sm"
-                            onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}
-                            data-testid={`order-${order.id}-ship`}
-                          >
-                            Mark as Shipped
-                          </Button>
-                        )}
-                        {isSupplier &&
-                          canEditOrders &&
-                          order.status === 'SHIPPED' &&
-                          updatingOrderId !== order.id && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleStatusUpdate(order.id, 'DELIVERED')}
-                              disabled={false}
-                              data-testid={`order-${order.id}-deliver`}
-                            >
-                              Mark Delivered
-                            </Button>
-                          )}
-                        {isSupplier &&
-                          (updatingOrderId === order.id || order.status === 'DELIVERED') && (
-                            <Button
-                              size="sm"
-                              variant={order.status === 'DELIVERED' ? 'outline' : 'default'}
-                              disabled
-                              className="cursor-not-allowed opacity-75"
-                            >
-                              {updatingOrderId === order.id ? (
-                                <>Updating...</>
-                              ) : (
-                                <>
-                                  <CheckCircle className="h-4 w-4 mr-1" />
-                                  Delivered
-                                </>
+                            {isSupplier && canEditOrders && order.status === 'PROCESSING' && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}
+                                data-testid={`order-${order.id}-ship`}
+                              >
+                                Mark as Shipped
+                              </Button>
+                            )}
+                            {isSupplier &&
+                              canEditOrders &&
+                              order.status === 'SHIPPED' &&
+                              updatingOrderId !== order.id && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleStatusUpdate(order.id, 'DELIVERED')}
+                                  disabled={false}
+                                  data-testid={`order-${order.id}-deliver`}
+                                >
+                                  Mark Delivered
+                                </Button>
                               )}
+                            {isSupplier &&
+                              (updatingOrderId === order.id || order.status === 'DELIVERED') && (
+                                <Button
+                                  size="sm"
+                                  variant={order.status === 'DELIVERED' ? 'outline' : 'default'}
+                                  disabled
+                                  className="cursor-not-allowed opacity-75"
+                                >
+                                  {updatingOrderId === order.id ? (
+                                    <>Updating...</>
+                                  ) : (
+                                    <>
+                                      <CheckCircle className="h-4 w-4 mr-1" />
+                                      Delivered
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                            {!isSupplier && order.status === 'PLACED' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleSendReminder(order.id)}
+                              >
+                                <AlertCircle className="h-4 w-4 mr-1" />
+                                {order.reminder_count > 0
+                                  ? `Remind (${order.reminder_count})`
+                                  : 'Send Reminder'}
+                              </Button>
+                            )}
+                            <Button variant="outline" size="sm" asChild>
+                              <Link to={`/app/orders/${order.id}`}>
+                                <FileText className="h-4 w-4 mr-1" />
+                                View Details
+                              </Link>
                             </Button>
-                          )}
-                        {!isSupplier && order.status === 'PLACED' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSendReminder(order.id)}
-                          >
-                            <AlertCircle className="h-4 w-4 mr-1" />
-                            {order.reminder_count > 0
-                              ? `Remind (${order.reminder_count})`
-                              : 'Send Reminder'}
-                          </Button>
-                        )}
-                        <Button variant="outline" size="sm" asChild>
-                          <Link to={`/app/orders/${order.id}`}>
-                            <FileText className="h-4 w-4 mr-1" />
-                            View Details
+                            {isSupplier && (
+                              <Button variant="outline" size="sm" asChild>
+                                <Link to={`/app/orders/${order.id}?tab=packing`}>
+                                  <Package className="h-4 w-4 mr-1" />
+                                  Packing Slip
+                                </Link>
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {(!filteredOrders || filteredOrders.length === 0) && (
+                  <EmptyState
+                    title={
+                      debouncedSearch || status || hasAdvancedFilters || activeTab !== 'all'
+                        ? 'No orders match your filters'
+                        : 'No orders yet'
+                    }
+                    description={
+                      debouncedSearch || status || hasAdvancedFilters || activeTab !== 'all'
+                        ? 'Try adjusting search, status, or date filters.'
+                        : !isSupplier
+                          ? 'Create your first order to get started.'
+                          : 'Orders from restaurants will appear here.'
+                    }
+                    icon={<ShoppingCart className="h-10 w-10" aria-hidden />}
+                    action={
+                      !isSupplier &&
+                      canCreateOrders &&
+                      !debouncedSearch &&
+                      !status &&
+                      !hasAdvancedFilters &&
+                      activeTab === 'all' ? (
+                        <Button asChild>
+                          <Link to="/app/cart">
+                            <Plus className="h-4 w-4 mr-2" />
+                            Create first order
                           </Link>
                         </Button>
-                        {isSupplier && (
-                          <Button variant="outline" size="sm" asChild>
-                            <Link to={`/app/orders/${order.id}?tab=packing`}>
-                              <Package className="h-4 w-4 mr-1" />
-                              Packing Slip
-                            </Link>
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {(!filteredOrders || filteredOrders.length === 0) && (
-              <EmptyState
-                title={
-                  debouncedSearch || status || hasAdvancedFilters || activeTab !== 'all'
-                    ? 'No orders match your filters'
-                    : 'No orders yet'
-                }
-                description={
-                  debouncedSearch || status || hasAdvancedFilters || activeTab !== 'all'
-                    ? 'Try adjusting search, status, or date filters.'
-                    : !isSupplier
-                      ? 'Create your first order to get started.'
-                      : 'Orders from restaurants will appear here.'
-                }
-                icon={<ShoppingCart className="h-10 w-10" aria-hidden />}
-                action={
-                  !isSupplier &&
-                  canCreateOrders &&
-                  !debouncedSearch &&
-                  !status &&
-                  !hasAdvancedFilters &&
-                  activeTab === 'all' ? (
-                    <Button asChild>
-                      <Link to="/app/cart">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create first order
-                      </Link>
-                    </Button>
-                  ) : undefined
-                }
-              />
-            )}
-          </TabsContent>
-        </Tabs>
+                      ) : undefined
+                    }
+                  />
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+        </DataTableShell>
 
         {/* Manual Order Creation Dialog */}
         {isSupplier && (
@@ -833,23 +837,20 @@ export function OrdersPage() {
                 {/* Restaurant Selection */}
                 <div className="space-y-2">
                   <Label htmlFor="restaurant">Restaurant *</Label>
-                  <select
-                    id="restaurant"
-                    className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
-                    value={selectedRestaurant}
-                    onChange={(e) => setSelectedRestaurant(e.target.value)}
-                  >
-                    <option value="">
-                      {(restaurantsData?.restaurants?.length ?? 0) === 0
-                        ? 'No eligible restaurants yet'
-                        : 'Select a restaurant'}
-                    </option>
-                    {restaurantsData?.restaurants?.map((restaurant: any) => (
-                      <option key={restaurant.id} value={restaurant.id}>
-                        {restaurant.name}
+                  <Select value={selectedRestaurant} onValueChange={setSelectedRestaurant}>
+                    <SelectTrigger id="restaurant">
+                      <option value="">
+                        {(restaurantsData?.restaurants?.length ?? 0) === 0
+                          ? 'No eligible restaurants yet'
+                          : 'Select a restaurant'}
                       </option>
-                    ))}
-                  </select>
+                      {restaurantsData?.restaurants?.map((restaurant: any) => (
+                        <option key={restaurant.id} value={restaurant.id}>
+                          {restaurant.name}
+                        </option>
+                      ))}
+                    </SelectTrigger>
+                  </Select>
                   {(restaurantsData?.restaurants?.length ?? 0) === 0 && (
                     <p className="text-xs text-[var(--text-muted)]">
                       Restaurants appear here after they follow your supplier profile or place their

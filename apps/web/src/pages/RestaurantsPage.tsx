@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
+import { Select, SelectTrigger } from '../components/ui/select'
+import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { useNavigate } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
 import {
@@ -11,27 +13,18 @@ import {
   Mail,
   Phone,
   MapPin,
-  FileText,
   Search,
-  Pin,
   BarChart3,
   ShoppingCart,
   TrendingUp,
   DollarSign,
   Grid3x3,
   List,
-  Filter,
-  Calendar,
-  Award,
-  MessageCircle,
   Users,
-  Store,
   Clock,
   Sparkles,
   ArrowUpDown,
-  Package,
 } from 'lucide-react'
-import toast from 'react-hot-toast'
 import { formatCurrency, formatPrice } from '../utils/format'
 import {
   CardActionGrid,
@@ -224,11 +217,7 @@ export function RestaurantsPage() {
   // If user is not a supplier, show all restaurants
   if (!isSupplier) {
     if (isLoading) {
-      return (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
-        </div>
-      )
+      return <DetailPageSkeleton />
     }
 
     if (error) {
@@ -299,11 +288,7 @@ export function RestaurantsPage() {
   }
 
   if (isLoading || (isSupplier && !supplierId)) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
-      </div>
-    )
+    return <DetailPageSkeleton />
   }
 
   if (error) {
@@ -450,16 +435,14 @@ export function RestaurantsPage() {
           <div className="flex-1" />
           <div className="flex items-center gap-2">
             <ArrowUpDown className="h-4 w-4 text-[var(--text-muted)]" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="px-3 py-1 text-sm border border-[var(--app-border-mid)] rounded-md bg-white"
-            >
-              <option value="name">Sort by Name</option>
-              <option value="orders">Sort by Orders</option>
-              <option value="revenue">Sort by Revenue</option>
-              <option value="recent">Sort by Recent</option>
-            </select>
+            <Select value={sortBy} onValueChange={(value) => setSortBy(value as any)}>
+              <SelectTrigger className="w-auto">
+                <option value="name">Sort by Name</option>
+                <option value="orders">Sort by Orders</option>
+                <option value="revenue">Sort by Revenue</option>
+                <option value="recent">Sort by Recent</option>
+              </SelectTrigger>
+            </Select>
           </div>
         </div>
       </div>

@@ -1071,14 +1071,18 @@ router.post(
   requireRole(['RESTAURANT', 'ADMIN']),
   async (req, res) => {
     try {
-      const result = await executeScheduledOrders()
+      const { runManualCronJob, CRON_JOBS } = await import('../lib/cron-runner.js')
+      const { result } = await runManualCronJob(CRON_JOBS.SCHEDULED_ORDERS, () =>
+        executeScheduledOrders()
+      )
+      const jobResult = result ?? { executed: 0, errors: 0 }
 
       res.json({
         ok: true,
         data: {
-          executed: result.executed,
-          errors: result.errors,
-          message: `Executed ${result.executed} scheduled orders, ${result.errors} errors`,
+          executed: jobResult.executed,
+          errors: jobResult.errors,
+          message: `Executed ${jobResult.executed} scheduled orders, ${jobResult.errors} errors`,
         },
         error: null,
         requestId: req.requestId,

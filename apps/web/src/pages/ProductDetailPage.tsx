@@ -1,8 +1,9 @@
 import { useParams } from 'react-router-dom'
 import { useGetProductQuery } from '../services/api'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
+import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { Package, ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useCartActions } from '../hooks/useCartActions'
@@ -30,11 +31,7 @@ export function ProductDetailPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
-      </div>
-    )
+    return <DetailPageSkeleton />
   }
 
   if (error || !data) {

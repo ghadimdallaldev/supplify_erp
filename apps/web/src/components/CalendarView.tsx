@@ -26,7 +26,6 @@ import { useGetEntitlementsQuery } from '../services/api'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { useAppDispatch } from '../hooks/redux'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
-import { openPayOverdueModal } from '../features/billing/billingSlice'
 import { FEATURE_KEY_LABELS } from '../lib/planComparison'
 import type { OrdersCalendarEvent } from '../types'
 

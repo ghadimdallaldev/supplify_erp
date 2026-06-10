@@ -2,12 +2,14 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { createFulfillmentException } from '../lib/fulfillment-exceptions.js'
 
+const BATCH_LIMIT = 200
+
 export async function runFulfillmentExceptionChecks() {
   const overdue = await checkOverdueDeliveries()
   const noPod = await checkMissingPod()
   const unassigned = await checkUnassignedOverdue()
   logger.info('Fulfillment exception checks complete', { overdue, noPod, unassigned })
-  return { overdue, noPod, unassigned }
+  return { overdue, noPod, unassigned, scanned: overdue + noPod + unassigned }
 }
 
 async function checkOverdueDeliveries() {
@@ -16,11 +18,13 @@ async function checkOverdueDeliveries() {
      FROM driver_assignments da
      LEFT JOIN order_warehouse_assignment owa ON owa.id = da.warehouse_assignment_id
      WHERE da.status = 'out_for_delivery'
-       AND da.updated_at < now() - interval '4 hours'`
+       AND da.updated_at < now() - interval '4 hours'
+     LIMIT $1`,
+    [BATCH_LIMIT]
   )
   let created = 0
   for (const row of rows) {
-    await createFulfillmentException(null, {
+    const inserted = await createFulfillmentException(null, {
       supplierId: row.supplier_id,
       orderId: row.order_id,
       driverAssignmentId: row.id,
@@ -28,7 +32,7 @@ async function checkOverdueDeliveries() {
       type: 'overdue',
       description: 'Order has been out for delivery for more than 4 hours',
     })
-    created++
+    if (inserted) created++
   }
   return created
 }
@@ -44,11 +48,13 @@ async function checkMissingPod() {
        AND NOT EXISTS (
          SELECT 1 FROM proof_of_delivery pod WHERE pod.order_id = da.order_id
        )
-     GROUP BY da.id, da.order_id, da.supplier_id, owa.warehouse_id`
+     GROUP BY da.id, da.order_id, da.supplier_id, owa.warehouse_id
+     LIMIT $1`,
+    [BATCH_LIMIT]
   )
   let created = 0
   for (const row of rows) {
-    await createFulfillmentException(null, {
+    const inserted = await createFulfillmentException(null, {
       supplierId: row.supplier_id,
       orderId: row.order_id,
       driverAssignmentId: row.id,
@@ -56,7 +62,7 @@ async function checkMissingPod() {
       type: 'no_pod',
       description: 'Delivered more than 2 hours ago with no proof of delivery',
     })
-    created++
+    if (inserted) created++
   }
   return created
 }
@@ -73,18 +79,20 @@ async function checkUnassignedOverdue() {
          SELECT 1 FROM driver_assignments da
          WHERE da.order_id = o.id
            AND da.status IN ('assigned', 'picked_up', 'out_for_delivery', 'delivered')
-       )`
+       )
+     LIMIT $1`,
+    [BATCH_LIMIT]
   )
   let created = 0
   for (const row of rows) {
-    await createFulfillmentException(null, {
+    const inserted = await createFulfillmentException(null, {
       supplierId: row.supplier_id,
       orderId: row.order_id,
       warehouseId: row.warehouse_id,
       type: 'unassigned_overdue',
       description: 'Order pending driver assignment for more than 24 hours',
     })
-    created++
+    if (inserted) created++
   }
   return created
 }

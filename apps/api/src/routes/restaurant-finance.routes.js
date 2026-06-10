@@ -129,6 +129,55 @@ router.get(
   }
 )
 
+router.get(
+  '/invoices/export.csv',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVOICES_VIEW'),
+  async (req, res, next) => {
+    try {
+      const { status, supplier } = req.query
+      const restaurantId = await requireRestaurantId(req)
+
+      let sql = `
+        SELECT
+          i.invoice_number,
+          i.invoice_date,
+          i.due_date,
+          i.status,
+          i.total_amount,
+          s.name AS supplier_name
+        FROM invoice i
+        JOIN supplier s ON s.id = i.supplier_id
+        WHERE i.restaurant_id = $1
+      `
+      const params = [restaurantId]
+      if (status) {
+        params.push(status)
+        sql += ` AND i.status = $${params.length}`
+      }
+      if (supplier) {
+        params.push(supplier)
+        sql += ` AND i.supplier_id = $${params.length}`
+      }
+      sql += ` ORDER BY i.invoice_date ASC`
+
+      const { rows } = await query(sql, params)
+      const header = 'Invoice Number,Invoice Date,Due Date,Status,Total,Supplier\n'
+      const lines = rows.map(
+        (r) =>
+          `"${r.invoice_number}","${r.invoice_date}","${r.due_date}","${r.status}",${r.total_amount},"${String(r.supplier_name || '').replace(/"/g, '""')}"`
+      )
+      const csv = header + lines.join('\n')
+      const date = new Date().toISOString().slice(0, 10)
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+      res.setHeader('Content-Disposition', `attachment; filename="invoices-${date}.csv"`)
+      res.send(csv)
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
 // Get comprehensive invoice analytics for restaurant (place BEFORE dynamic :id routes)
 router.get(
   '/invoices/analytics',

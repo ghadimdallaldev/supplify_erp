@@ -8,6 +8,7 @@ import { UpgradeModal } from './UpgradeModal'
 import { PaymentModal } from './billing/PaymentModal'
 import { BillingOverdueBanner } from './billing/BillingOverdueBanner'
 import { BranchProvider } from '../contexts/BranchContext'
+import { TenantBrandingProvider } from './TenantBrandingProvider'
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
 import {
   refreshBlockedCount,
@@ -28,12 +29,15 @@ import {
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { useCartActions } from '../hooks/useCartActions'
 import { formatPlanBlockNudgeMessage, getLimitLabel } from '../lib/planComparison'
-import { isAtEntitlementLimit, shouldShowEntitlementLimit } from '../lib/planLimits'
+import { isAtEntitlementLimit, shouldShowEntitlementLimit, featureEnabled } from '../lib/planLimits'
 import { getAppSocket, releaseAppSocket } from '../lib/appSocket'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { shouldLoadBillingStatus, shouldRedirectToActivate } from '../lib/billingActivationRedirect'
 import { LimitExceededBanner } from './LimitExceededBanner'
 import { OfflineBanner } from './OfflineBanner'
+import { RestaurantMobileNav } from './RestaurantMobileNav'
+import { InfoBanner } from './ui/info-banner'
+import { NewDealsBanner } from './deals/NewDealsBanner'
 import { useNotificationAlerts } from '../hooks/useNotificationAlerts'
 
 export function Layout() {
@@ -75,7 +79,8 @@ export function Layout() {
       rehydrateCart()
     }
   }, [user?.email, rehydrateCart])
-  const { isImpersonating, isPlatformAdmin, shouldLoadTenantEntitlements } = useImpersonation()
+  const { isImpersonating, isPlatformAdmin, shouldLoadTenantEntitlements, isEffectiveRestaurant } =
+    useImpersonation()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: !shouldLoadTenantEntitlements,
     refetchOnFocus: false,
@@ -203,7 +208,7 @@ export function Layout() {
       return { key, pct, current, limit }
     })
     .filter(({ pct }) => pct >= 80 && pct < 100)
-    .slice(0, 3)
+    .sort((a, b) => b.pct - a.pct)
 
   const atLimitEntries = Object.entries(limits)
     .filter(([key, limit]) => shouldShowEntitlementLimit(key) && limit != null && limit !== -1)
@@ -213,7 +218,6 @@ export function Layout() {
       limit: limit as number,
     }))
     .filter(({ current, limit }) => isAtEntitlementLimit(current, limit))
-    .slice(0, 3)
 
   const recentBlockLimitKeys = recentBlockedSummary.limitKeys.map((x) => x.key)
   const recentBlockFeatureKeys = recentBlockedSummary.featureKeys.map((x) => x.key)
@@ -223,198 +227,245 @@ export function Layout() {
       ? "You've hit your plan limits several times this week. Check usage in settings and upgrade for more room."
       : null)
 
+  const showTenantBanners = !isPlatformAdmin || isImpersonating
+  const primaryNearLimit = nearLimitKeys[0]
+  const showNearLimitBanner = showTenantBanners && atLimitEntries.length === 0 && primaryNearLimit
+  const showTierDisabledBanner =
+    showTenantBanners &&
+    atLimitEntries.length === 0 &&
+    !showNearLimitBanner &&
+    planTierDisabledFeatures.length > 0 &&
+    e
+  const showPlanBlockNudge =
+    showTenantBanners &&
+    atLimitEntries.length === 0 &&
+    !showNearLimitBanner &&
+    planTierDisabledFeatures.length === 0 &&
+    blockedCountLast7d >= 3 &&
+    planBlockNudgeMessage
+
   const isAdminPortalRoute =
     isPlatformAdmin && !isImpersonating && location.pathname.startsWith('/app/admin')
 
   return (
-    <BranchProvider>
-      <div className="min-h-screen min-h-[100dvh]" style={{ background: 'var(--bg)' }}>
-        <ImpersonationBanner />
-        <OfflineBanner />
-        <UpgradeModal />
-        <PaymentModal />
-        <div className="flex">
-          {mobileNavOpen && !isAdminPortalRoute && (
-            <button
-              type="button"
-              className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
-              aria-label="Close navigation menu"
-              onClick={() => setMobileNavOpen(false)}
-            />
-          )}
-          {!isAdminPortalRoute && (
-            <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
-          )}
-          <div className="flex min-w-0 flex-1 flex-col">
-            <Header onOpenMobileNav={() => setMobileNavOpen(true)} />
-            {(!isPlatformAdmin || isImpersonating) && <BillingOverdueBanner />}
-            {(!isPlatformAdmin || isImpersonating) &&
-              externallyDisabledFeatures.length > 0 &&
-              e && (
-                <div className="mx-3 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 sm:mx-6">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex gap-2">
-                      <Lock className="h-4 w-4 shrink-0 text-amber-800 mt-0.5" aria-hidden />
-                      <div>
-                        <p className="font-medium text-amber-950">
-                          Some features are not available on your account
-                        </p>
-                        <p className="mt-1 text-amber-900/90">
-                          This is set by your organization or platform administrators, not by your
-                          subscription plan alone. Restricted capabilities include:{' '}
-                          <span className="font-medium">
-                            {externallyDisabledFeatures.map((x) => x.label).join(', ')}
-                          </span>
-                          .
-                        </p>
-                      </div>
-                    </div>
+    <TenantBrandingProvider>
+      <BranchProvider>
+        <div className="min-h-screen min-h-[100dvh]" style={{ background: 'var(--bg)' }}>
+          <ImpersonationBanner />
+          <OfflineBanner />
+          <UpgradeModal />
+          <PaymentModal />
+          <div className="flex">
+            {mobileNavOpen && !isAdminPortalRoute && (
+              <button
+                type="button"
+                className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
+                aria-label="Close navigation menu"
+                onClick={() => setMobileNavOpen(false)}
+              />
+            )}
+            {!isAdminPortalRoute && (
+              <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
+            )}
+            <div className="flex min-w-0 flex-1 flex-col">
+              <Header onOpenMobileNav={() => setMobileNavOpen(true)} />
+              {showTenantBanners &&
+                isEffectiveRestaurant &&
+                featureEnabled(e?.features?.supplier_deals) && <NewDealsBanner />}
+              {showTenantBanners && <BillingOverdueBanner />}
+              {showTenantBanners && externallyDisabledFeatures.length > 0 && e && (
+                <InfoBanner
+                  tone="amber"
+                  icon={Lock}
+                  title="Some features are not available on your account"
+                  description={
+                    <>
+                      This is set by your organization or platform administrators, not by your
+                      subscription plan alone. Restricted capabilities include:{' '}
+                      <span className="font-medium">
+                        {externallyDisabledFeatures.map((x) => x.label).join(', ')}
+                      </span>
+                      .
+                    </>
+                  }
+                  action={
                     <button
                       type="button"
-                      className="shrink-0 self-start font-medium text-amber-950 underline hover:no-underline sm:ml-4"
+                      className="font-medium text-amber-950 underline hover:no-underline"
                       onClick={() => navigate(settingsFeaturesTabPath(e.tenantType))}
                     >
                       View in Settings
                     </button>
-                  </div>
-                </div>
+                  }
+                />
               )}
-            {(!isPlatformAdmin || isImpersonating) && planTierDisabledFeatures.length > 0 && e && (
-              <div className="mx-3 mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 sm:mx-6">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex gap-2">
-                    <Layers className="h-4 w-4 shrink-0 text-slate-600 mt-0.5" aria-hidden />
-                    <div>
-                      <p className="font-medium text-slate-900">
-                        Some features are limited by your plan tier
-                      </p>
-                      <p className="mt-1 text-slate-700">
-                        Your current subscription does not include:{' '}
-                        <span className="font-medium text-slate-900">
-                          {planTierDisabledFeatures.map((x) => x.label).join(', ')}
-                        </span>
-                        . Upgrade to a higher tier to unlock them.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="shrink-0 self-start font-medium text-slate-900 underline hover:no-underline sm:ml-4"
-                    onClick={() =>
-                      openBrowseUpgrade(dispatch, {
-                        currentPlan: e?.plan?.name,
-                        upgradeUrl: settingsFeaturesTabPath(e.tenantType),
-                      })
-                    }
-                  >
-                    Compare plans
-                  </button>
-                </div>
-              </div>
-            )}
-            {(!isPlatformAdmin || isImpersonating) && atLimitEntries.length > 0 && (
-              <div className="mx-3 mt-4 space-y-2 sm:mx-6">
-                {atLimitEntries.map(({ key, current, limit }) => (
+              {showTenantBanners && atLimitEntries.length === 1 && (
+                <div className="mx-3 mt-4 sm:mx-6">
                   <LimitExceededBanner
-                    key={key}
-                    limitKey={key}
-                    currentUsage={current}
-                    limitValue={limit}
+                    limitKey={atLimitEntries[0].key}
+                    currentUsage={atLimitEntries[0].current}
+                    limitValue={atLimitEntries[0].limit}
                     currentPlan={e?.plan?.name ?? null}
                     upgradeUrl={e ? settingsFeaturesTabPath(e.tenantType) : undefined}
                   />
-                ))}
-              </div>
-            )}
-            {(!isPlatformAdmin || isImpersonating) && nearLimitKeys.length > 0 && (
-              <div className="mx-3 mt-4 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 sm:mx-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                <span className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  Usage near limit: {nearLimitKeys
-                    .map(({ key }) => getLimitLabel(key))
-                    .join(', ')}.{' '}
-                  <button
-                    type="button"
-                    className="font-medium underline hover:no-underline"
-                    onClick={() =>
-                      navigate(
-                        e ? settingsFeaturesTabPath(e.tenantType) : '/app/settings?tab=subscription'
-                      )
-                    }
-                  >
-                    View usage
-                  </button>
-                </span>
-                <button
-                  type="button"
-                  className="font-medium underline hover:no-underline shrink-0"
-                  onClick={() => {
-                    const first = nearLimitKeys[0]
-                    if (first) {
-                      recordConversionEvent({
-                        eventType: 'OPEN_UPGRADE',
-                        metadata: { source: 'near_limit', limitKey: first.key },
-                      }).catch(() => {})
-                      dispatch(
-                        showMonetizationBlock({
-                          type: 'limit',
-                          payload: {
-                            limitKey: first.key,
-                            limitValue: first.limit,
-                            currentUsage: first.current,
-                            currentPlan: e?.plan?.name ?? null,
-                            recommendedPlans: [],
-                            upgradeUrl: e
+                </div>
+              )}
+              {showTenantBanners && atLimitEntries.length > 1 && (
+                <InfoBanner
+                  tone="amber"
+                  icon={AlertTriangle}
+                  title={`${atLimitEntries.length} limits reached`}
+                  description={
+                    <>
+                      {atLimitEntries
+                        .slice(0, 3)
+                        .map(({ key }) => getLimitLabel(key))
+                        .join(', ')}
+                      {atLimitEntries.length > 3 ? ' and more' : ''}. Review usage in settings.
+                    </>
+                  }
+                  action={
+                    <button
+                      type="button"
+                      className="font-medium text-amber-950 underline hover:no-underline"
+                      onClick={() =>
+                        navigate(
+                          e
+                            ? settingsFeaturesTabPath(e.tenantType)
+                            : '/app/settings?tab=subscription'
+                        )
+                      }
+                    >
+                      View usage
+                    </button>
+                  }
+                />
+              )}
+              {showNearLimitBanner && primaryNearLimit && (
+                <InfoBanner
+                  tone="amber"
+                  icon={AlertTriangle}
+                  title={`Usage near limit: ${getLimitLabel(primaryNearLimit.key)}`}
+                  description={`${primaryNearLimit.current} / ${primaryNearLimit.limit} used.`}
+                  action={
+                    <div className="flex flex-col gap-1 sm:items-end">
+                      <button
+                        type="button"
+                        className="font-medium text-amber-950 underline hover:no-underline"
+                        onClick={() =>
+                          navigate(
+                            e
                               ? settingsFeaturesTabPath(e.tenantType)
-                              : '/app/settings?tab=subscription',
-                          },
+                              : '/app/settings?tab=subscription'
+                          )
+                        }
+                      >
+                        View usage
+                      </button>
+                      <button
+                        type="button"
+                        className="font-medium text-amber-950 underline hover:no-underline"
+                        onClick={() => {
+                          recordConversionEvent({
+                            eventType: 'OPEN_UPGRADE',
+                            metadata: { source: 'near_limit', limitKey: primaryNearLimit.key },
+                          }).catch(() => {})
+                          dispatch(
+                            showMonetizationBlock({
+                              type: 'limit',
+                              payload: {
+                                limitKey: primaryNearLimit.key,
+                                limitValue: primaryNearLimit.limit,
+                                currentUsage: primaryNearLimit.current,
+                                currentPlan: e?.plan?.name ?? null,
+                                recommendedPlans: [],
+                                upgradeUrl: e
+                                  ? settingsFeaturesTabPath(e.tenantType)
+                                  : '/app/settings?tab=subscription',
+                              },
+                            })
+                          )
+                        }}
+                      >
+                        Upgrade
+                      </button>
+                    </div>
+                  }
+                />
+              )}
+              {showTierDisabledBanner && (
+                <InfoBanner
+                  tone="slate"
+                  icon={Layers}
+                  title="Some features are limited by your plan tier"
+                  description={
+                    <>
+                      Your current subscription does not include:{' '}
+                      <span className="font-medium text-slate-900">
+                        {planTierDisabledFeatures.map((x) => x.label).join(', ')}
+                      </span>
+                      . Upgrade to a higher tier to unlock them.
+                    </>
+                  }
+                  action={
+                    <button
+                      type="button"
+                      className="font-medium text-slate-900 underline hover:no-underline"
+                      onClick={() =>
+                        openBrowseUpgrade(dispatch, {
+                          currentPlan: e?.plan?.name,
+                          upgradeUrl: settingsFeaturesTabPath(e.tenantType),
                         })
-                      )
-                    }
-                  }}
-                >
-                  Upgrade
-                </button>
-              </div>
-            )}
-            {(!isPlatformAdmin || isImpersonating) &&
-              blockedCountLast7d >= 3 &&
-              planBlockNudgeMessage && (
-                <div className="mx-3 mt-4 flex flex-col gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--bg)] px-4 py-2 text-sm text-[var(--text-mid)] sm:mx-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                  <span>{planBlockNudgeMessage}</span>
-                  <button
-                    type="button"
-                    className="font-medium underline hover:no-underline shrink-0"
-                    onClick={() => {
-                      recordConversionEvent({ eventType: 'VIEW_PLANS' }).catch(() => {})
-                      openBrowseUpgrade(dispatch, {
-                        currentPlan: e?.plan?.name,
-                        upgradeUrl: settingsFeaturesTabPath(e.tenantType),
-                      })
-                    }}
-                  >
-                    View plans
-                  </button>
-                </div>
+                      }
+                    >
+                      Compare plans
+                    </button>
+                  }
+                />
               )}
-            <main
-              className={
-                isAdminPortalRoute ? 'flex min-h-0 flex-1 flex-col' : 'flex-1 p-3 sm:p-4 md:p-6'
-              }
-            >
-              {isAdminPortalRoute ? (
-                <div className="flex min-h-[calc(100dvh-3.5rem)] min-w-0 flex-1 flex-col bg-[var(--surface)]">
-                  <Outlet />
-                </div>
-              ) : (
-                <div className="min-h-[calc(100vh-5rem)] rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm sm:rounded-2xl sm:p-4 md:p-6">
-                  <Outlet />
-                </div>
+              {showPlanBlockNudge && planBlockNudgeMessage && (
+                <InfoBanner
+                  tone="neutral"
+                  title={planBlockNudgeMessage}
+                  action={
+                    <button
+                      type="button"
+                      className="font-medium text-[var(--text)] underline hover:no-underline"
+                      onClick={() => {
+                        recordConversionEvent({ eventType: 'VIEW_PLANS' }).catch(() => {})
+                        openBrowseUpgrade(dispatch, {
+                          currentPlan: e?.plan?.name,
+                          upgradeUrl: settingsFeaturesTabPath(e.tenantType),
+                        })
+                      }}
+                    >
+                      View plans
+                    </button>
+                  }
+                />
               )}
-            </main>
+              <main
+                className={
+                  isAdminPortalRoute
+                    ? 'flex min-h-0 flex-1 flex-col'
+                    : 'flex-1 p-3 pb-20 sm:p-4 md:p-6 lg:pb-6'
+                }
+              >
+                {isAdminPortalRoute ? (
+                  <div className="flex min-h-[calc(100dvh-3.5rem)] min-w-0 flex-1 flex-col bg-[var(--surface)]">
+                    <Outlet />
+                  </div>
+                ) : (
+                  <div className="min-h-[calc(100vh-5rem)] rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm sm:rounded-2xl sm:p-4 md:p-6">
+                    <Outlet />
+                  </div>
+                )}
+              </main>
+            </div>
           </div>
+          {!isAdminPortalRoute && <RestaurantMobileNav />}
         </div>
-      </div>
-    </BranchProvider>
+      </BranchProvider>
+    </TenantBrandingProvider>
   )
 }

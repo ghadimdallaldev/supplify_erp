@@ -2,10 +2,11 @@ import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
-import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
+import { Select, SelectTrigger } from '../components/ui/select'
+import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   Dialog,
@@ -27,7 +28,6 @@ import {
   Trash2,
   Package,
   ShoppingCart,
-  TrendingUp,
   Globe,
   Save,
   Loader2,
@@ -36,7 +36,6 @@ import {
   Clock,
   Calendar,
   CheckCircle2,
-  XCircle,
   AlertCircle,
   Bell,
   MessageCircle,
@@ -47,6 +46,7 @@ import { useAppSelector } from '../hooks/redux'
 import { formatCurrency } from '../utils/format'
 import { SubscriptionInfo } from '../components/SubscriptionInfo'
 import { LogoUpload } from '../components/LogoUpload'
+import { BrandingSettingsSection } from '../components/settings/BrandingSettingsSection'
 import {
   useGetRestaurantMeQuery,
   useUpdateRestaurantMutation,
@@ -62,9 +62,9 @@ import {
   useCreateBranchMutation,
   useDeleteBranchMutation,
   useDeactivateRestaurantOrgBranchMutation,
-  useSwitchRestaurantOrgBranchContextMutation,
   useGetRestaurantTeamQuery,
   useDeleteRestaurantTeamMemberMutation,
+  useGetMyReviewsQuery,
 } from '../services/api'
 import { RestaurantDeliveryLocationCard } from '../components/restaurant/RestaurantDeliveryLocationCard'
 import { TeamRolesPanel } from '../components/TeamRolesPanel'
@@ -86,7 +86,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import { isTenantOwner } from '../lib/tenantRoles'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { normalizeAddress } from '../lib/address'
-import { useGetMyReviewsQuery } from '../services/api'
+import { SupportContactCard } from '../components/support/SupportContactCard'
 import { Star } from 'lucide-react'
 
 const DEFAULT_NOTIFICATION_PREFS = {
@@ -102,6 +102,7 @@ const DEFAULT_NOTIFICATION_PREFS = {
   notifyStaffPto: true,
   notifyStaffSwap: true,
   notifyScheduledOrder: true,
+  notifyReorderCadence: true,
 }
 
 interface PreferenceField {
@@ -151,6 +152,12 @@ const CATEGORY_FIELDS: PreferenceField[] = [
     label: 'Low stock alerts',
     description: 'Inventory thresholds reached',
     icon: AlertCircle,
+  },
+  {
+    key: 'notifyReorderCadence',
+    label: 'Reorder reminders',
+    description: 'Suggested reorders based on your ordering patterns',
+    icon: Clock,
   },
   {
     key: 'notifyReservationCreated',
@@ -354,10 +361,9 @@ export function RestaurantOnboardingPage() {
   const { data: branchesData, refetch: refetchBranches } = useGetBranchesQuery(undefined, {
     skip: !user?.id || Boolean(restaurantOrgBranches?.organizationId),
   })
-  const [createBranch, { isLoading: isCreatingBranch }] = useCreateBranchMutation()
+  const [createBranch] = useCreateBranchMutation()
   const [deleteBranch] = useDeleteBranchMutation()
   const [deactivateOrgBranch] = useDeactivateRestaurantOrgBranchMutation()
-  const [switchRestaurantBranch] = useSwitchRestaurantOrgBranchContextMutation()
   const useRestaurantOrg = Boolean(restaurantOrgBranches?.organizationId)
   const branches = useRestaurantOrg
     ? (restaurantOrgBranches?.branches ?? [])
@@ -398,6 +404,7 @@ export function RestaurantOnboardingPage() {
         notifyStaffPto: prefs.notifyStaffPto ?? previous.notifyStaffPto,
         notifyStaffSwap: prefs.notifyStaffSwap ?? previous.notifyStaffSwap,
         notifyScheduledOrder: prefs.notifyScheduledOrder ?? previous.notifyScheduledOrder,
+        notifyReorderCadence: prefs.notifyReorderCadence ?? previous.notifyReorderCadence,
       }))
     }
   }, [notificationPrefsData])
@@ -456,11 +463,7 @@ export function RestaurantOnboardingPage() {
   }
 
   if (isLoadingRestaurant) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
-      </div>
-    )
+    return <DetailPageSkeleton rows={6} />
   }
 
   return (
@@ -623,6 +626,13 @@ export function RestaurantOnboardingPage() {
             </CardContent>
           </Card>
 
+          {brandingAllowed && (
+            <BrandingSettingsSection
+              tenantType="RESTAURANT"
+              canEdit={can('SETTINGS_EDIT') || can('SETTINGS_MANAGE')}
+            />
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Business Profile</CardTitle>
@@ -643,19 +653,19 @@ export function RestaurantOnboardingPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="businessType">Business Type *</Label>
-                  <select
-                    id="businessType"
-                    className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
+                  <Select
                     value={profileForm.business_type}
-                    onChange={(e) =>
-                      setProfileForm({ ...profileForm, business_type: e.target.value })
+                    onValueChange={(value) =>
+                      setProfileForm({ ...profileForm, business_type: value })
                     }
                   >
-                    <option value="restaurant">Restaurant</option>
-                    <option value="cafe">Café</option>
-                    <option value="hotel">Hotel</option>
-                    <option value="catering">Catering</option>
-                  </select>
+                    <SelectTrigger id="businessType">
+                      <option value="restaurant">Restaurant</option>
+                      <option value="cafe">Café</option>
+                      <option value="hotel">Hotel</option>
+                      <option value="catering">Catering</option>
+                    </SelectTrigger>
+                  </Select>
                 </div>
               </div>
 
@@ -957,8 +967,9 @@ export function RestaurantOnboardingPage() {
         </TabsContent>
 
         {/* Subscription Tab */}
-        <TabsContent value="subscription">
+        <TabsContent value="subscription" className="space-y-4">
           <SubscriptionInfo />
+          <SupportContactCard />
         </TabsContent>
 
         {/* Notifications Tab */}

@@ -16,7 +16,7 @@ import { patchRequestLogTenant } from '../lib/request-log-context.js'
 import { invalidateTenantProfileCache } from '../lib/tenant-profile-cache.js'
 
 const log = createModuleLogger('suppliers.routes')
-import { ValidationError } from '../middlewares/errorHandler.js'
+import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { createPendingActivationSubscription } from '../lib/billing/subscription-activation.js'
 import { ensureTenantSystemRoles } from '../lib/tenant-roles.js'
 import { restaurantSupplierMutationGuard } from '../lib/route-permissions.js'
@@ -28,6 +28,19 @@ import {
   getSupplierRatingSummariesBatch,
   getRecentReviewsForSuppliersBatch,
 } from '../services/reviews.service.js'
+import { getTenantBranding, updateTenantBranding } from '../services/branding.service.js'
+import {
+  listFeaturedPackages,
+  purchaseAndActivateFeaturedPlacement,
+  listPlacementsForSupplier,
+  listAllActivePlacementsForAdmin,
+} from '../services/featured-supplier-placement.service.js'
+
+const brandingUpdateSchema = z.object({
+  brandPrimary: z.string().optional().nullable(),
+  brandAccent: z.string().optional().nullable(),
+  brandDisplayName: z.string().max(120).optional().nullable(),
+})
 
 const router = express.Router()
 
@@ -73,7 +86,9 @@ const supplierCreateSchema = z.object({
     .optional(),
 })
 
-const supplierUpdateSchema = supplierCreateSchema.partial()
+const supplierUpdateSchema = supplierCreateSchema.partial().extend({
+  publicCatalogEnabled: z.boolean().optional(),
+})
 
 const supplierListSchema = z.object({
   q: z.string().optional(),
@@ -181,10 +196,27 @@ router.get('/', optionalAuth, async (req, res) => {
       sql += `, false as is_followed`
     }
 
+    sql += `,
+        EXISTS (
+          SELECT 1 FROM supplier_featured_placements fp
+          WHERE fp.supplier_id = s.id
+            AND fp.status = 'active'
+            AND fp.starts_at <= NOW()
+            AND fp.ends_at > NOW()
+        ) as is_featured`
+
     sql += `
       FROM supplier s
       ${whereClause}
-      ORDER BY s.created_at DESC
+      ORDER BY (
+        EXISTS (
+          SELECT 1 FROM supplier_featured_placements fp
+          WHERE fp.supplier_id = s.id
+            AND fp.status = 'active'
+            AND fp.starts_at <= NOW()
+            AND fp.ends_at > NOW()
+        )
+      ) DESC, s.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `
 
@@ -449,6 +481,126 @@ router.get(
         },
         requestId: req.requestId,
       })
+    }
+  }
+)
+
+router.get(
+  '/me/branding',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER']),
+  requirePermission('SETTINGS_VIEW'),
+  requireFeature(
+    'custom_branding',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) throw new NotFoundError('Supplier not found')
+      const branding = await getTenantBranding(supplierId, 'SUPPLIER')
+      res.json({ ok: true, data: { branding }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.patch(
+  '/me/branding',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER']),
+  requirePermission('SETTINGS_EDIT'),
+  requireFeature(
+    'custom_branding',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) throw new NotFoundError('Supplier not found')
+      const body = brandingUpdateSchema.parse(req.body)
+      const branding = await updateTenantBranding(supplierId, 'SUPPLIER', body)
+      invalidateTenantProfileCache(supplierId, 'SUPPLIER')
+      res.json({ ok: true, data: { branding }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/featured-placement/packages',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER', 'ADMIN']),
+  async (req, res, next) => {
+    try {
+      const packages = await listFeaturedPackages()
+      res.json({ ok: true, data: { packages }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/featured-placement/mine',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER']),
+  requirePermission('SETTINGS_VIEW'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) throw new NotFoundError('Supplier not found')
+      const placements = await listPlacementsForSupplier(supplierId)
+      res.json({ ok: true, data: { placements }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/featured-placement/purchase',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER']),
+  requirePermission('SETTINGS_EDIT'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) throw new NotFoundError('Supplier not found')
+      const pricingKey = req.body?.pricingKey
+      if (!pricingKey) throw new ValidationError('pricingKey is required')
+      const placement = await purchaseAndActivateFeaturedPlacement({
+        supplierId,
+        pricingKey,
+        createdBy: req.userData.id,
+        waivePayment: process.env.NODE_ENV !== 'production',
+      })
+      res.status(201).json({ ok: true, data: { placement }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/featured-placement/admin/active',
+  requireAuth,
+  requireRole(['ADMIN']),
+  async (req, res, next) => {
+    try {
+      const placements = await listAllActivePlacementsForAdmin()
+      res.json({ ok: true, data: { placements }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
     }
   }
 )
@@ -847,6 +999,7 @@ router.patch(
           contactEmail: 'contact_email',
           phone: 'phone',
           address: 'address_json',
+          publicCatalogEnabled: 'public_catalog_enabled',
         },
         {
           valueTransform: (dbField, value) =>

@@ -1,6 +1,7 @@
 import { config } from '../../config/env.js'
 import { logger } from '../../lib/logger.js'
 import { sendMail, isEmailConfigured as isTransportConfigured } from '../mailer.service.js'
+import { query } from '../../lib/db.js'
 import { claimEmailDelivery, finalizeEmailDelivery } from './email-delivery-log.js'
 import { renderTemplate } from './templates/registry.js'
 
@@ -42,6 +43,18 @@ function redactRecipient(email) {
   return domain ? `${local?.slice(0, 2) || ''}***@${domain}` : '[redacted]'
 }
 
+async function persistRetryPayload(logId, payload) {
+  if (!logId || !payload) return
+  try {
+    await query(`UPDATE email_delivery_log SET retry_payload = $1::jsonb WHERE id = $2`, [
+      JSON.stringify(payload),
+      logId,
+    ])
+  } catch (error) {
+    logger.warn('Failed to persist email retry_payload', { logId, error: error.message })
+  }
+}
+
 /**
  * Low-level send with env gates, logging, optional idempotency.
  */
@@ -60,6 +73,7 @@ export async function sendEmail({
   entityId = null,
   skipDedup = false,
   throwOnError = false,
+  retryPayload = null,
 }) {
   logEmailBootMode()
 
@@ -106,6 +120,18 @@ export async function sendEmail({
     attachments,
     replyTo: replyTo || config.EMAIL_REPLY_TO || undefined,
     from: resolveFromHeader(),
+  }
+
+  const storedRetryPayload = retryPayload || {
+    to: recipients,
+    subject,
+    html,
+    text: text || null,
+    tenantId,
+    entityId,
+  }
+  if (logId) {
+    await persistRetryPayload(logId, storedRetryPayload)
   }
 
   if (config.EMAIL_LOG_ONLY) {
@@ -202,6 +228,14 @@ export async function sendTemplateEmail({
     entityId,
     skipDedup,
     throwOnError,
+    retryPayload: {
+      template,
+      data,
+      to,
+      subject: subject || rendered.subject,
+      tenantId,
+      entityId,
+    },
   })
 }
 

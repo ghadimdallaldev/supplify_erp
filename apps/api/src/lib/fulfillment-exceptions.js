@@ -18,7 +18,7 @@ export async function createFulfillmentException(
      LIMIT 1`,
     [orderId, type]
   )
-  if (existing.length) return existing[0]
+  if (existing.length) return null
 
   const { rows } = await q(
     `INSERT INTO fulfillment_exceptions (

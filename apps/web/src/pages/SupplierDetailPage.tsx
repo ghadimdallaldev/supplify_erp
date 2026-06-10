@@ -15,9 +15,11 @@ import {
 } from '../services/api'
 import { featureEnabled } from '../lib/planLimits'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
+import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
+import { Select, SelectTrigger } from '../components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -42,9 +44,8 @@ import {
   Clock,
   Globe,
   FileText,
-  Award,
-  CheckCircle,
   Star,
+  FileQuestion,
 } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { Link } from 'react-router-dom'
@@ -63,7 +64,7 @@ export function SupplierDetailPage() {
   )
 
   const { data, isLoading, error, refetch } = useGetSupplierQuery(id!)
-  const { data: restaurantsData } = useGetRestaurantsQuery()
+  useGetRestaurantsQuery()
   const [createConversation, { isLoading: isCreatingConversation }] =
     useCreateConversationMutation()
   const [followSupplier, { isLoading: isFollowing }] = useFollowSupplierMutation()
@@ -77,7 +78,7 @@ export function SupplierDetailPage() {
   })
 
   // Fetch supplier statistics (for restaurants viewing suppliers)
-  const { data: statsData, isLoading: isLoadingStats } = useGetSupplierStatisticsQuery(id!, {
+  const { data: statsData } = useGetSupplierStatisticsQuery(id!, {
     skip: !isRestaurant || !id,
   })
   const { data: reviewsData } = useGetSupplierReviewsQuery(
@@ -97,11 +98,7 @@ export function SupplierDetailPage() {
   const ratingSummary = ratingSummaryData?.summary as Record<string, unknown> | undefined
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
-      </div>
-    )
+    return <DetailPageSkeleton />
   }
 
   if (error || !data?.supplier) {
@@ -221,6 +218,23 @@ export function SupplierDetailPage() {
               >
                 <MessageSquare className="h-4 w-4 mr-2" />
                 {isCreatingConversation ? 'Opening...' : 'Message'}
+              </Button>
+              <Button variant="outline" className="whitespace-normal" asChild>
+                <Link
+                  to="/app/quote-requests/new"
+                  state={{
+                    prefill: {
+                      supplierIds: [supplier.id],
+                      items: (productsData?.products ?? []).slice(0, 5).map((p) => ({
+                        productId: p.id,
+                        quantity: 1,
+                      })),
+                    },
+                  }}
+                >
+                  <FileQuestion className="h-4 w-4 mr-2" />
+                  Request best price
+                </Link>
               </Button>
             </>
           )}
@@ -526,19 +540,20 @@ export function SupplierDetailPage() {
             </div>
             <div>
               <Label>Rating</Label>
-              <select
-                className="w-full h-10 border rounded-md px-3"
-                value={reviewForm.overallRating}
-                onChange={(e) =>
-                  setReviewForm((f) => ({ ...f, overallRating: Number(e.target.value) }))
+              <Select
+                value={String(reviewForm.overallRating)}
+                onValueChange={(value) =>
+                  setReviewForm((f) => ({ ...f, overallRating: Number(value) }))
                 }
               >
-                {[5, 4, 3, 2, 1].map((n) => (
-                  <option key={n} value={n}>
-                    {n} stars
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  {[5, 4, 3, 2, 1].map((n) => (
+                    <option key={n} value={n}>
+                      {n} stars
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
             <div>
               <Label>Comment</Label>

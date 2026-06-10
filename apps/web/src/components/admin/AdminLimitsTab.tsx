@@ -3,6 +3,7 @@ import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
+import { Select, SelectTrigger } from '../ui/select'
 import toast from 'react-hot-toast'
 import { Loader2, Minus, Plus } from 'lucide-react'
 import { PageHeader } from '../ui/page-header'
@@ -34,12 +35,9 @@ import {
   type AdminTenantType,
 } from '../../lib/adminTenantSearch'
 import { AdminTenantPicker } from './AdminTenantPicker'
-import {
-  AdminEmptyState,
-  AdminLoadingState,
-  AdminStatusBadge,
-  formatAdminDateTime,
-} from './adminUi'
+import { AdminEmptyState, AdminLoadingState, AdminStatusBadge } from './adminUi'
+import { LocationMetricCard, type LocationMetric } from './limits/LocationMetricCard'
+import { OverridesTable } from './limits/OverridesTable'
 
 const SUPPLIER_ADDON_OPTIONS = [
   { key: 'supplier_extra_branch', label: 'Extra branch' },
@@ -47,73 +45,6 @@ const SUPPLIER_ADDON_OPTIONS = [
 ]
 
 const RESTAURANT_ADDON_OPTIONS = [{ key: 'restaurant_extra_branch', label: 'Extra branch' }]
-const ADMIN_SELECT_CLASS =
-  'mt-1.5 h-10 w-full rounded-lg border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30'
-
-type LocationMetric = {
-  included?: number | null
-  addonQuantity?: number
-  effective?: number | null
-  current?: number
-  overIncludedLimit?: boolean
-  overEffectiveLimit?: boolean
-  atEnterpriseThreshold?: boolean
-}
-
-function LocationMetricCard({
-  title,
-  metric,
-  showEnterprise,
-}: {
-  title: string
-  metric?: LocationMetric
-  showEnterprise?: boolean
-}) {
-  if (!metric) return null
-  return (
-    <div className="rounded-lg border border-[var(--border)] p-4 space-y-2">
-      <p className="font-medium text-[var(--text)]">{title}</p>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
-        <div>
-          <dt className="text-[var(--text-muted)]">Included</dt>
-          <dd className="font-medium">{formatLimitValue(metric.included)}</dd>
-        </div>
-        <div>
-          <dt className="text-[var(--text-muted)]">Add-ons</dt>
-          <dd className="font-medium">{metric.addonQuantity ?? 0}</dd>
-        </div>
-        <div>
-          <dt className="text-[var(--text-muted)]">Effective</dt>
-          <dd className="font-medium">{formatLimitValue(metric.effective)}</dd>
-        </div>
-        <div>
-          <dt className="text-[var(--text-muted)]">In use</dt>
-          <dd className="font-medium">{metric.current ?? 0}</dd>
-        </div>
-      </dl>
-      <p className="text-xs text-[var(--text-muted)]">
-        Usage: {metric.current ?? 0} / {formatLimitValue(metric.included)} included
-        {(metric.addonQuantity ?? 0) > 0 ? `, +${metric.addonQuantity} add-on` : ''}
-        {metric.effective != null ? ` → effective ${metric.effective}` : ''}
-      </p>
-      {metric.overIncludedLimit && !metric.overEffectiveLimit && (
-        <span className="inline-flex text-xs font-semibold rounded-md border px-2 py-0.5 bg-amber-50 text-amber-800 border-amber-200">
-          Over included limit (within effective cap)
-        </span>
-      )}
-      {metric.overEffectiveLimit && (
-        <span className="inline-flex text-xs font-semibold rounded-md border px-2 py-0.5 bg-red-50 text-red-800 border-red-200">
-          Over effective limit
-        </span>
-      )}
-      {showEnterprise && metric.atEnterpriseThreshold && (
-        <span className="inline-flex text-xs font-semibold rounded-md border px-2 py-0.5 bg-red-50 text-red-800 border-red-200">
-          At Enterprise threshold (6+ branches)
-        </span>
-      )}
-    </div>
-  )
-}
 
 export function AdminLimitsTab() {
   const [tenantType, setTenantType] = useState<AdminTenantType>('RESTAURANT')
@@ -456,17 +387,15 @@ export function AdminLimitsTab() {
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 items-end">
                 <div>
                   <Label>Add-on type</Label>
-                  <select
-                    className={ADMIN_SELECT_CLASS}
-                    value={addonKey}
-                    onChange={(e) => setAddonKey(e.target.value)}
-                  >
-                    {addonOptions.map((o) => (
-                      <option key={o.key} value={o.key}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                  <Select value={addonKey} onValueChange={(value) => setAddonKey(value)}>
+                    <SelectTrigger className="mt-1.5 w-full">
+                      {addonOptions.map((o) => (
+                        <option key={o.key} value={o.key}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </SelectTrigger>
+                  </Select>
                 </div>
                 <div>
                   <Label>Quantity</Label>
@@ -547,37 +476,35 @@ export function AdminLimitsTab() {
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <Label>Plan</Label>
-              <select
-                className={ADMIN_SELECT_CLASS}
+              <Select
                 value={planId}
-                onChange={(e) => {
-                  setPlanId(e.target.value)
+                onValueChange={(value) => {
+                  setPlanId(value)
                   setPlanLimitKey('')
                 }}
               >
-                <option value="">Select plan tier</option>
-                {plans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {formatPlanCodeLabel(p.code)} ({p.name})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="mt-1.5 w-full">
+                  <option value="">Select plan tier</option>
+                  {plans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {formatPlanCodeLabel(p.code)} ({p.name})
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
             <div>
               <Label>Limit</Label>
-              <select
-                className={ADMIN_SELECT_CLASS}
-                value={planLimitKey}
-                onChange={(e) => setPlanLimitKey(e.target.value)}
-                disabled={!planId}
-              >
-                <option value="">Select limit</option>
-                {limitKeys.map((k) => (
-                  <option key={k} value={k}>
-                    {formatLimitKeyLabel(k)}
-                  </option>
-                ))}
-              </select>
+              <Select value={planLimitKey} onValueChange={(value) => setPlanLimitKey(value)}>
+                <SelectTrigger className="mt-1.5 w-full" disabled={!planId}>
+                  <option value="">Select limit</option>
+                  {limitKeys.map((k) => (
+                    <option key={k} value={k}>
+                      {formatLimitKeyLabel(k)}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
             {planLimitKey && (
               <div className="md:col-span-2 rounded-md bg-[var(--app-bg-subtle)]/80 px-3 py-2 text-sm">
@@ -644,18 +571,16 @@ export function AdminLimitsTab() {
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <Label>Limit</Label>
-                <select
-                  className={ADMIN_SELECT_CLASS}
-                  value={tenantLimitKey}
-                  onChange={(e) => setTenantLimitKey(e.target.value)}
-                >
-                  <option value="">Select limit</option>
-                  {limitKeys.map((k) => (
-                    <option key={k} value={k}>
-                      {formatLimitKeyLabel(k)}
-                    </option>
-                  ))}
-                </select>
+                <Select value={tenantLimitKey} onValueChange={(value) => setTenantLimitKey(value)}>
+                  <SelectTrigger className="mt-1.5 w-full">
+                    <option value="">Select limit</option>
+                    {limitKeys.map((k) => (
+                      <option key={k} value={k}>
+                        {formatLimitKeyLabel(k)}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
               </div>
               <div>
                 <Label>Override value</Label>
@@ -787,68 +712,5 @@ export function AdminLimitsTab() {
         </CardContent>
       </Card>
     </div>
-  )
-}
-
-function OverridesTable({
-  rows,
-  kind,
-  tenantName,
-  onDisable,
-}: {
-  rows: Array<Record<string, unknown>>
-  kind: 'tenant' | 'plan'
-  tenantName?: string
-  onDisable: (id: string) => void
-}) {
-  return (
-    <TableScroll aria-label={`${kind} limit overrides`}>
-      <table className="w-full min-w-[760px] text-sm">
-        <thead>
-          <tr className="border-b bg-[var(--app-bg-subtle)]/50 text-left text-xs text-[var(--text-muted)]">
-            {kind === 'plan' && <th className="px-3 py-2">Plan</th>}
-            <th className="px-3 py-2">Limit</th>
-            <th className="px-3 py-2">Value</th>
-            {kind === 'tenant' && <th className="px-3 py-2">Tenant</th>}
-            <th className="px-3 py-2">Reason</th>
-            <th className="px-3 py-2">Updated</th>
-            <th className="px-3 py-2">Status</th>
-            <th className="px-3 py-2 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {rows.map((row) => (
-            <tr key={String(row.id)} className="hover:bg-[var(--brand-ultra)]/30">
-              {kind === 'plan' && (
-                <td className="px-3 py-2 font-medium">
-                  {formatPlanCodeLabel(String(row.plan_code || ''))}
-                </td>
-              )}
-              <td className="px-3 py-2">{formatLimitKeyLabel(String(row.limit_type))}</td>
-              <td className="px-3 py-2">{String(row.override_value)}</td>
-              {kind === 'tenant' && (
-                <td className="px-3 py-2 text-[var(--text-muted)]">{tenantName ?? '—'}</td>
-              )}
-              <td className="px-3 py-2 text-[var(--text-muted)] max-w-[12rem] truncate">
-                {String(row.reason || '—')}
-              </td>
-              <td className="px-3 py-2 text-[var(--text-muted)] text-xs">
-                {formatAdminDateTime(row.updated_at || row.created_at)}
-              </td>
-              <td className="px-3 py-2">
-                <AdminStatusBadge status={row.is_active === false ? 'inactive' : 'active'} />
-              </td>
-              <td className="px-3 py-2 text-right">
-                {row.is_active !== false && (
-                  <Button size="sm" variant="outline" onClick={() => onDisable(String(row.id))}>
-                    Disable
-                  </Button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </TableScroll>
   )
 }

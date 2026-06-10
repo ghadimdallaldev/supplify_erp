@@ -21,6 +21,7 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Textarea } from '../../components/ui/textarea'
+import { Select, SelectTrigger } from '../../components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -393,16 +394,14 @@ export function DisputeDetailPage() {
             <div className="space-y-3">
               <div>
                 <Label>Resolution</Label>
-                <select
-                  className="w-full h-10 rounded-md border px-3 text-sm"
-                  value={resolutionType}
-                  onChange={(e) => setResolutionType(e.target.value)}
-                >
-                  <option value="credit_note">Credit note</option>
-                  <option value="replacement">Replacement</option>
-                  <option value="refund">Refund</option>
-                  <option value="no_action">No action</option>
-                </select>
+                <Select value={resolutionType} onValueChange={setResolutionType}>
+                  <SelectTrigger>
+                    <option value="credit_note">Credit note</option>
+                    <option value="replacement">Replacement</option>
+                    <option value="refund">Refund</option>
+                    <option value="no_action">No action</option>
+                  </SelectTrigger>
+                </Select>
               </div>
               {resolutionType === 'credit_note' && (
                 <div>

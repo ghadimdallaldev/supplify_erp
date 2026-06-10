@@ -16,6 +16,8 @@ export type ReminderDraft = {
   body: string
   status: string
   autoSent?: boolean
+  chatUrl?: string | null
+  chatPrefill?: string
 }
 
 type Props = {
@@ -55,6 +57,11 @@ export function ReorderReminderReviewDialog({ draft, open, onClose }: Props) {
           </div>
         </div>
         <DialogFooter>
+          {draft.chatUrl ? (
+            <Button variant="default" asChild>
+              <a href={draft.chatUrl}>Open in chat</a>
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             data-testid="reminder-draft-copy"

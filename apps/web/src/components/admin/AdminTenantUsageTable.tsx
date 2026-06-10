@@ -15,6 +15,7 @@ import { UsageStatusBadge } from './UsageStatusBadge'
 import { AdminEmptyState, AdminLoadingSkeleton } from './adminUi'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
+import { Select, SelectTrigger } from '../ui/select'
 
 type SupplierRow = {
   id: string
@@ -255,29 +256,28 @@ export function AdminTenantUsageTable({
           onChange={(e) => setSearch(e.target.value)}
           className="h-8 max-w-xs text-sm"
         />
-        <select
-          className="h-8 rounded-md border border-[var(--app-border-mid)] px-2 text-sm"
-          value={planFilter}
-          onChange={(e) => setPlanFilter(e.target.value)}
-        >
-          <option value="all">All plans</option>
-          {planOptions.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-        <select
-          className="h-8 rounded-md border border-[var(--app-border-mid)] px-2 text-sm"
+        <Select value={planFilter} onValueChange={(value) => setPlanFilter(value)}>
+          <SelectTrigger className="w-auto">
+            <option value="all">All plans</option>
+            {planOptions.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </SelectTrigger>
+        </Select>
+        <Select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as UsageStatus | 'all')}
+          onValueChange={(value) => setStatusFilter(value as UsageStatus | 'all')}
         >
-          <option value="all">All statuses</option>
-          <option value="healthy">Healthy</option>
-          <option value="near_limit">Near limit</option>
-          <option value="over_limit">Over limit</option>
-          <option value="unlimited">Unlimited</option>
-        </select>
+          <SelectTrigger className="w-auto">
+            <option value="all">All statuses</option>
+            <option value="healthy">Healthy</option>
+            <option value="near_limit">Near limit</option>
+            <option value="over_limit">Over limit</option>
+            <option value="unlimited">Unlimited</option>
+          </SelectTrigger>
+        </Select>
       </div>
 
       {filtered.length === 0 ? (

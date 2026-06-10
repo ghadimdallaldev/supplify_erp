@@ -43,6 +43,7 @@ import type {
   AttachFileRequest,
   Attachment,
   ReorderSuggestionsResponse,
+  ReorderAssistanceItem,
   SubscriptionPlan,
   Subscription,
   Entitlements,
@@ -53,6 +54,13 @@ import type {
   BillingPaymentMethod,
   UsageMeter,
   PublicRestaurant,
+  PublicSupplier,
+  PublicSupplierProductsResponse,
+  QuoteRequestSummary,
+  QuoteRequestDetail,
+  SupplierQuoteInboxEntry,
+  SupplierQuoteRequestDetail,
+  QuoteCartPayload,
   PublicAvailabilityResponse,
   PublicReservationSummary,
   StaffPortalSession,
@@ -61,11 +69,9 @@ import type {
   StaffShiftSwap,
   StaffTimeEntry,
   PublicReservationDetails,
-  DriverRecord,
   DispatchOrderCard,
   DeliveryRouteSummary,
   DeliveryRouteDetail,
-  DeliveryTrackingInfo,
   OrderTrackingResponse,
   AdminUserPreferences,
 } from '../types'
@@ -283,6 +289,7 @@ export const api = createApi({
     'Disputes',
     'Promotions',
     'ContractPricing',
+    'QuoteRequest',
     'Audit',
     'TenantRoles',
     'Amendments',
@@ -1007,6 +1014,33 @@ export const api = createApi({
       providesTags: ['Restaurant'],
       keepUnusedDataFor: 300,
     }),
+    getTenantBranding: builder.query<
+      { branding: Record<string, unknown> },
+      { tenantType: 'RESTAURANT' | 'SUPPLIER' }
+    >({
+      query: ({ tenantType }) =>
+        tenantType === 'RESTAURANT' ? '/api/restaurants/me/branding' : '/api/suppliers/me/branding',
+      providesTags: ['Restaurant', 'Supplier'],
+    }),
+    updateTenantBranding: builder.mutation<
+      { branding: Record<string, unknown> },
+      {
+        tenantType: 'RESTAURANT' | 'SUPPLIER'
+        brandPrimary?: string | null
+        brandAccent?: string | null
+        brandDisplayName?: string | null
+      }
+    >({
+      query: ({ tenantType, ...body }) => ({
+        url:
+          tenantType === 'RESTAURANT'
+            ? '/api/restaurants/me/branding'
+            : '/api/suppliers/me/branding',
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Restaurant', 'Supplier'],
+    }),
     updateRestaurant: builder.mutation<Restaurant, { id: string; data: Partial<Restaurant> }>({
       query: ({ id, data }) => ({
         url: `/api/restaurants/${id}`,
@@ -1250,6 +1284,45 @@ export const api = createApi({
       query: () => '/api/chat/conversations',
       providesTags: ['Chat'],
     }),
+    startSupportChat: builder.mutation<
+      { conversation: { id: string }; created: boolean },
+      { initialMessage?: string; category?: string; pageUrl?: string }
+    >({
+      query: (body) => ({
+        url: '/api/chat/support/start',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Chat'],
+    }),
+    getSupportConversations: builder.query<{ conversations: unknown[] }, void>({
+      query: () => '/api/chat/support/conversations',
+      providesTags: ['Chat'],
+    }),
+    getAdminSupportConversations: builder.query<{ conversations: unknown[] }, void>({
+      query: () => '/api/chat/admin/conversations',
+      providesTags: ['Chat'],
+    }),
+    getFeaturedPlacementPackages: builder.query<{ packages: unknown[] }, void>({
+      query: () => '/api/suppliers/featured-placement/packages',
+      providesTags: ['Supplier'],
+    }),
+    getMyFeaturedPlacements: builder.query<{ placements: unknown[] }, void>({
+      query: () => '/api/suppliers/featured-placement/mine',
+      providesTags: ['Supplier'],
+    }),
+    purchaseFeaturedPlacement: builder.mutation<{ placement: unknown }, { pricingKey: string }>({
+      query: (body) => ({
+        url: '/api/suppliers/featured-placement/purchase',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Supplier'],
+    }),
+    getAdminFeaturedPlacements: builder.query<{ placements: unknown[] }, void>({
+      query: () => '/api/suppliers/featured-placement/admin/active',
+      providesTags: ['Admin'],
+    }),
     getMessages: builder.query<any, { conversationId: string }>({
       query: ({ conversationId }) => `/api/chat/conversations/${conversationId}/messages`,
       providesTags: ['Chat'],
@@ -1463,6 +1536,29 @@ export const api = createApi({
       query: () => '/api/restaurant-inventory/reorder-reminders',
       providesTags: ['RestaurantInventory'],
     }),
+    getReorderAssistance: builder.query<
+      { suggestions: ReorderAssistanceItem[]; total: number },
+      void
+    >({
+      query: () => '/api/restaurant-inventory/reorder-assistance',
+      providesTags: ['RestaurantInventory'],
+    }),
+    suppressReorderSuggestion: builder.mutation<
+      unknown,
+      {
+        scopeType: 'product' | 'cadence' | 'supplier_product'
+        scopeId: string
+        action: 'snooze' | 'not_needed'
+        snoozeDays?: number
+      }
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-inventory/reorder-assistance/suppress',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['RestaurantInventory'],
+    }),
     // Receiving endpoints
     getPendingOrdersForReceiving: builder.query<any, void>({
       query: () => '/api/receiving/pending-orders',
@@ -1660,13 +1756,33 @@ export const api = createApi({
       },
       providesTags: ['SupplierOps'],
     }),
+    getSupplierReorderAssistance: builder.query<any, { graceDays?: number } | void>({
+      query: (arg) => {
+        const params = new URLSearchParams()
+        if (arg?.graceDays) params.set('grace_days', String(arg.graceDays))
+        const qs = params.toString()
+        return `/api/supplier/reorder-assistance${qs ? `?${qs}` : ''}`
+      },
+      providesTags: ['SupplierOps'],
+    }),
     createReorderReminderDraft: builder.mutation<
-      { draft: { id: string; subject: string; body: string; status: string; autoSent: boolean } },
-      string
+      {
+        draft: {
+          id: string
+          subject: string
+          body: string
+          status: string
+          autoSent: boolean
+          chatUrl?: string | null
+          chatPrefill?: string
+        }
+      },
+      { restaurantId: string; openChat?: boolean }
     >({
-      query: (restaurantId) => ({
+      query: ({ restaurantId, openChat }) => ({
         url: `/api/supplier/reorder-intelligence/${restaurantId}/reminder-draft`,
         method: 'POST',
+        body: openChat ? { openChat: true } : undefined,
       }),
       invalidatesTags: ['SupplierOps'],
     }),
@@ -2324,6 +2440,110 @@ export const api = createApi({
         credentials: 'omit',
       }),
     }),
+    getPublicSupplier: builder.query<PublicSupplier, string>({
+      query: (idOrSlug) => ({
+        url: `/api/public/suppliers/${encodeURIComponent(idOrSlug)}`,
+        credentials: 'omit',
+      }),
+    }),
+    getPublicSupplierProducts: builder.query<
+      PublicSupplierProductsResponse,
+      { idOrSlug: string; page?: number; limit?: number; q?: string; category?: string }
+    >({
+      query: ({ idOrSlug, page, limit, q, category }) => ({
+        url: `/api/public/suppliers/${encodeURIComponent(idOrSlug)}/products`,
+        params: { page, limit, q, category },
+        credentials: 'omit',
+      }),
+    }),
+    getPublicSupplierPricedProducts: builder.query<
+      PublicSupplierProductsResponse,
+      { idOrSlug: string; page?: number; limit?: number; q?: string; category?: string }
+    >({
+      query: ({ idOrSlug, page, limit, q, category }) => ({
+        url: `/api/public/suppliers/${encodeURIComponent(idOrSlug)}/products/priced`,
+        params: { page, limit, q, category },
+      }),
+    }),
+
+    getQuoteRequests: builder.query<
+      {
+        quoteRequests: QuoteRequestSummary[]
+        pagination: { page: number; limit: number; total: number }
+      },
+      { page?: number; limit?: number; status?: string }
+    >({
+      query: (params) => ({ url: '/api/quote-requests', params }),
+      providesTags: ['QuoteRequest'],
+    }),
+    getQuoteRequestDetail: builder.query<QuoteRequestDetail, string>({
+      query: (id) => `/api/quote-requests/${id}`,
+      providesTags: (_r, _e, id) => [{ type: 'QuoteRequest', id }],
+    }),
+    getQuoteRequestCompare: builder.query<QuoteRequestDetail, string>({
+      query: (id) => `/api/quote-requests/${id}/compare`,
+      providesTags: (_r, _e, id) => [{ type: 'QuoteRequest', id }],
+    }),
+    createQuoteRequest: builder.mutation<
+      { quoteRequest: QuoteRequestSummary; itemCount: number; supplierCount: number },
+      {
+        items: Array<{ productId: string; quantity: number; unit?: string; notes?: string }>
+        supplierIds: string[]
+        note?: string
+        neededBy?: string
+      }
+    >({
+      query: (body) => ({ url: '/api/quote-requests', method: 'POST', body }),
+      invalidatesTags: ['QuoteRequest'],
+    }),
+    convertQuoteResponseToCart: builder.mutation<
+      QuoteCartPayload,
+      { quoteRequestId: string; supplierRowId: string }
+    >({
+      query: ({ quoteRequestId, supplierRowId }) => ({
+        url: `/api/quote-requests/${quoteRequestId}/suppliers/${supplierRowId}/to-cart`,
+        method: 'POST',
+      }),
+    }),
+    getSupplierQuoteInbox: builder.query<
+      {
+        inbox: SupplierQuoteInboxEntry[]
+        pagination: { page: number; limit: number; total: number }
+      },
+      { page?: number; limit?: number; status?: string }
+    >({
+      query: (params) => ({ url: '/api/quote-requests/supplier/inbox', params }),
+      providesTags: ['QuoteRequest'],
+    }),
+    getSupplierQuoteRequestDetail: builder.query<SupplierQuoteRequestDetail, string>({
+      query: (quoteRequestSupplierId) =>
+        `/api/quote-requests/supplier/inbox/${quoteRequestSupplierId}`,
+      providesTags: (_r, _e, id) => [{ type: 'QuoteRequest', id }],
+    }),
+    submitSupplierQuoteResponse: builder.mutation<
+      SupplierQuoteRequestDetail,
+      {
+        quoteRequestSupplierId: string
+        note?: string
+        items: Array<{
+          quoteRequestItemId: string
+          isAvailable?: boolean
+          unitPrice?: number | null
+          currency?: string
+          quantity?: number | null
+          deliveryDate?: string | null
+          note?: string | null
+          substituteProductId?: string | null
+        }>
+      }
+    >({
+      query: ({ quoteRequestSupplierId, ...body }) => ({
+        url: `/api/quote-requests/supplier/inbox/${quoteRequestSupplierId}/respond`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['QuoteRequest'],
+    }),
     getPublicReservationAvailability: builder.query<
       PublicAvailabilityResponse,
       { restaurantId: string; partySize: number; date: string; manageToken?: string }
@@ -2678,6 +2898,21 @@ export const api = createApi({
     >({
       query: (params) => ({ url: '/api/promotions/active', params: params || {} }),
       providesTags: ['Promotions'],
+    }),
+    getNewDealsBanner: builder.query<
+      { deals: Array<Record<string, unknown>>; summary: Record<string, unknown> | null },
+      void
+    >({
+      query: () => '/api/promotions/new-deals-banner',
+      providesTags: ['Promotions'],
+      keepUnusedDataFor: 300,
+    }),
+    dismissDealBanner: builder.mutation<{ dismissed: boolean }, string>({
+      query: (dealId) => ({
+        url: `/api/promotions/${dealId}/dismiss-banner`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Promotions'],
     }),
     createPromotion: builder.mutation<
       { promotion: Record<string, unknown> },
@@ -3978,6 +4213,8 @@ export const {
   useUpdateSupplierMutation,
   useUploadSupplierLogoMutation,
   useGetRestaurantMeQuery,
+  useGetTenantBrandingQuery,
+  useUpdateTenantBrandingMutation,
   useUpdateRestaurantMutation,
   useGetRestaurantDeliveryLocationsQuery,
   useUpdateRestaurantDeliveryLocationMutation,
@@ -4005,6 +4242,13 @@ export const {
   useGeneratePresignedUrlMutation,
   useAttachFileToProductMutation,
   useGetConversationsQuery,
+  useStartSupportChatMutation,
+  useGetSupportConversationsQuery,
+  useGetAdminSupportConversationsQuery,
+  useGetFeaturedPlacementPackagesQuery,
+  useGetMyFeaturedPlacementsQuery,
+  usePurchaseFeaturedPlacementMutation,
+  useGetAdminFeaturedPlacementsQuery,
   useGetMessagesQuery,
   useCreateConversationMutation,
   useSendMessageMutation,
@@ -4034,6 +4278,8 @@ export const {
   useUpdateExpiryLotMutation,
   useDeleteExpiryLotMutation,
   useGetReorderRemindersQuery,
+  useGetReorderAssistanceQuery,
+  useSuppressReorderSuggestionMutation,
   useGetOrderFulfillmentIssuesQuery,
   useReportOrderShortageMutation,
   useSuggestOrderSubstitutionIssueMutation,
@@ -4056,6 +4302,7 @@ export const {
   useGetSupplierReceivablesQuery,
   useGetSupplierCommandCenterQuery,
   useGetSupplierReorderIntelligenceQuery,
+  useGetSupplierReorderAssistanceQuery,
   useCreateReorderReminderDraftMutation,
   useGetSupplierDeliveryBoardQuery,
   usePreviewProductImportMutation,
@@ -4115,6 +4362,17 @@ export const {
   useMarkNotificationReadMutation,
   useMarkAllNotificationsReadMutation,
   useGetPublicRestaurantQuery,
+  useGetPublicSupplierQuery,
+  useGetPublicSupplierProductsQuery,
+  useGetPublicSupplierPricedProductsQuery,
+  useGetQuoteRequestsQuery,
+  useGetQuoteRequestDetailQuery,
+  useGetQuoteRequestCompareQuery,
+  useCreateQuoteRequestMutation,
+  useConvertQuoteResponseToCartMutation,
+  useGetSupplierQuoteInboxQuery,
+  useGetSupplierQuoteRequestDetailQuery,
+  useSubmitSupplierQuoteResponseMutation,
   useGetPublicReservationAvailabilityQuery,
   useLazyGetPublicReservationAvailabilityQuery,
   useCreatePublicReservationMutation,
@@ -4166,6 +4424,8 @@ export const {
   useApplyCreditNoteMutation,
   useGetPromotionsQuery,
   useGetActivePromotionsQuery,
+  useGetNewDealsBannerQuery,
+  useDismissDealBannerMutation,
   useGetContractPricingQuery,
   useGetMyContractPricingQuery,
   useCreateContractPricingMutation,

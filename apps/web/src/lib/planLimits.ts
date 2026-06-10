@@ -77,10 +77,6 @@ export type BranchAddGate = {
   planCode?: string | null
 }
 
-function planCodeLower(entitlements: Entitlements | null | undefined): string {
-  return (entitlements?.plan?.code ?? entitlements?.plan?.name ?? '').toLowerCase()
-}
-
 function canBuyBranchAddons(entitlements: Entitlements | null | undefined): boolean {
   if (!multiBranchEnabled(entitlements)) return false
   const limit = limitNumber(entitlements?.limits?.branches)
@@ -440,7 +436,6 @@ export function formatOrderPlaceGateMessage(gate: OrderPlaceGate): string {
 
   if (gate.reason === 'would_exceed' && gate.limit != null) {
     const remaining = gate.remaining ?? 0
-    const orderWord = gate.ordersRequested === 1 ? 'order' : 'orders'
     const supplierNote =
       gate.ordersRequested > 1
         ? ` This cart creates ${gate.ordersRequested} orders (one per supplier).`
