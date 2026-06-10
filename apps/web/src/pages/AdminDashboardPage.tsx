@@ -13,6 +13,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import { useAppSelector } from '../hooks/redux'
 import type { AdminTenantType } from '../lib/adminTenantSearch'
 import {
+  AdminTabScrollRow,
   type AdminCanTabMap,
   type AdminTabKey,
   useAdminChangePlanDialog,
@@ -131,7 +132,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
         />
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-          <div className="mb-1 overflow-x-auto">
+          <AdminTabScrollRow className="mb-1">
             <TabsList className="min-w-max justify-start">
               {initialTab !== 'suppliers' && initialTab !== 'restaurants' && (
                 <>
@@ -164,7 +165,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 </>
               )}
             </TabsList>
-          </div>
+          </AdminTabScrollRow>
 
           <TabsContent value="overview" className="w-full space-y-5">
             <AdminTabMount tab="overview" selectedTab={selectedTab}>

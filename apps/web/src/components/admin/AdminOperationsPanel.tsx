@@ -18,7 +18,7 @@ import {
 } from '../../lib/adminTenantSearch'
 import {
   AdminEmptyState,
-  AdminLoadingState,
+  AdminLoadingSkeleton,
   AdminRefreshBar,
   AdminStatusBadge,
   formatAdminDateTime,
@@ -152,7 +152,7 @@ export function AdminOperationsPanel({
 
         <TabsContent value="summary" className="space-y-4 mt-4">
           {summaryLoading ? (
-            <AdminLoadingState label="Loading operational summary…" />
+            <AdminLoadingSkeleton rows={6} />
           ) : (
             <>
               {warnings.length > 0 ? (
@@ -251,7 +251,7 @@ export function AdminOperationsPanel({
             </div>
           </div>
           {emailLoading ? (
-            <AdminLoadingState label="Loading email logs…" />
+            <AdminLoadingSkeleton rows={6} />
           ) : !emailLogsData?.logs?.length ? (
             <AdminEmptyState
               title="No email logs"
@@ -313,7 +313,7 @@ export function AdminOperationsPanel({
 
         <TabsContent value="inventory" className="mt-4">
           {summaryLoading ? (
-            <AdminLoadingState />
+            <AdminLoadingSkeleton rows={4} />
           ) : (
             <div className="grid md:grid-cols-2 gap-4">
               <Card className="p-4">
@@ -348,7 +348,7 @@ export function AdminOperationsPanel({
 
         <TabsContent value="fulfillment" className="mt-4">
           {issuesLoading ? (
-            <AdminLoadingState />
+            <AdminLoadingSkeleton rows={5} />
           ) : !issuesData?.issues?.length ? (
             <AdminEmptyState
               title="No open fulfillment issues"
@@ -386,7 +386,7 @@ export function AdminOperationsPanel({
 
         <TabsContent value="gps" className="mt-4 space-y-4">
           {summaryLoading ? (
-            <AdminLoadingState />
+            <AdminLoadingSkeleton rows={2} />
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
               <MetricCard label="Active" value={summary?.gpsDeliveries?.active ?? 0} />
@@ -397,7 +397,7 @@ export function AdminOperationsPanel({
             </div>
           )}
           {deliveriesLoading ? (
-            <AdminLoadingState label="Loading active deliveries…" />
+            <AdminLoadingSkeleton rows={4} />
           ) : !deliveriesData?.deliveries?.length ? (
             <p className="text-sm text-[var(--text-muted)]">No in-progress deliveries right now.</p>
           ) : (

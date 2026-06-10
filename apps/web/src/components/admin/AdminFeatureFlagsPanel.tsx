@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
+import { StatusBadge } from '../ui/status-badge'
 import { Loader2, Flag } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
@@ -67,8 +68,7 @@ export function AdminFeatureFlagsPanel({ restaurants, suppliers }: AdminFeatureF
   )
 
   const effectiveFeatures = useMemo(
-    () =>
-      (tenantData?.effectiveFeatures ?? []).filter((f) => !isRemovedFeatureKey(f.featureKey)),
+    () => (tenantData?.effectiveFeatures ?? []).filter((f) => !isRemovedFeatureKey(f.featureKey)),
     [tenantData?.effectiveFeatures]
   )
 
@@ -245,9 +245,10 @@ export function AdminFeatureFlagsPanel({ restaurants, suppliers }: AdminFeatureF
                         {feature.featureName}
                       </td>
                       <td className="py-3 pr-4">
-                        <Badge variant={feature.enabled ? 'default' : 'secondary'}>
-                          {feature.enabled ? 'On' : 'Off'}
-                        </Badge>
+                        <StatusBadge
+                          status={feature.enabled ? 'ACTIVE' : 'INACTIVE'}
+                          label={feature.enabled ? 'On' : 'Off'}
+                        />
                       </td>
                       <td className="py-3 pr-4 text-[var(--text-muted)]">
                         {sourceBadge(feature.source)}

@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { Card } from '../../ui/card'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
+import { StatusBadge } from '../../ui/status-badge'
+import { Select, SelectTrigger } from '../../ui/select'
 import {
   Dialog,
   DialogContent,
@@ -188,19 +190,18 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
         <h2 className="text-lg font-bold text-[var(--text)]">Subscription Plans</h2>
         <div className="flex items-center gap-2">
           <span className="text-sm text-[var(--text-muted)]">Filter:</span>
-          <select
-            className="rounded-md border border-[var(--app-border-mid)] px-3 py-1.5 text-sm"
+          <Select
             value={plansTenantFilter ?? ''}
-            onChange={(e) =>
-              setPlansTenantFilter(
-                e.target.value === '' ? undefined : (e.target.value as 'RESTAURANT' | 'SUPPLIER')
-              )
+            onValueChange={(value) =>
+              setPlansTenantFilter(value === '' ? undefined : (value as 'RESTAURANT' | 'SUPPLIER'))
             }
           >
-            <option value="">All</option>
-            <option value="RESTAURANT">Restaurant</option>
-            <option value="SUPPLIER">Supplier</option>
-          </select>
+            <SelectTrigger className="h-9 w-36">
+              <option value="">All</option>
+              <option value="RESTAURANT">Restaurant</option>
+              <option value="SUPPLIER">Supplier</option>
+            </SelectTrigger>
+          </Select>
           <Dialog open={createPlanOpen} onOpenChange={setCreatePlanOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -234,19 +235,20 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                 </div>
                 <div>
                   <Label>Tenant type</Label>
-                  <select
-                    className="w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2"
+                  <Select
                     value={createPlanForm.tenantType}
-                    onChange={(e) =>
+                    onValueChange={(value) =>
                       setCreatePlanForm((s) => ({
                         ...s,
-                        tenantType: e.target.value as 'RESTAURANT' | 'SUPPLIER',
+                        tenantType: value as 'RESTAURANT' | 'SUPPLIER',
                       }))
                     }
                   >
-                    <option value="RESTAURANT">Restaurant</option>
-                    <option value="SUPPLIER">Supplier</option>
-                  </select>
+                    <SelectTrigger>
+                      <option value="RESTAURANT">Restaurant</option>
+                      <option value="SUPPLIER">Supplier</option>
+                    </SelectTrigger>
+                  </Select>
                 </div>
                 <div>
                   <Label>Description</Label>
@@ -324,9 +326,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                       </Badge>
                     )}
                 </div>
-                <Badge variant={plan.is_active ? 'default' : 'secondary'} className="text-[10px]">
-                  {plan.is_active ? 'Active' : 'Inactive'}
-                </Badge>
+                <StatusBadge status={plan.is_active ? 'ACTIVE' : 'INACTIVE'} />
               </div>
               {plan.code && getPlanSubtitle(plan.code) ? (
                 <p className="mb-2 text-xs text-[var(--text-muted)]">

@@ -17,6 +17,7 @@ import {
 import { Card, CardContent, CardHeader } from '../../ui/card'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
+import { StatusBadge } from '../../ui/status-badge'
 import { Input } from '../../ui/input'
 import {
   useGetAdminSuppliersQuery,
@@ -368,13 +369,7 @@ export function AdminTenantsTab({
                             </Badge>
                           </td>
                           <td className="py-3 px-4">
-                            <Badge
-                              variant={
-                                supplier.subscription_status === 'ACTIVE' ? 'default' : 'secondary'
-                              }
-                            >
-                              {supplier.subscription_status || 'NONE'}
-                            </Badge>
+                            <StatusBadge status={supplier.subscription_status || 'NONE'} />
                           </td>
                           <td className="py-3 px-4 text-[var(--text-muted)]">
                             {supplier.product_count || 0}
@@ -555,15 +550,7 @@ export function AdminTenantsTab({
                             </Badge>
                           </td>
                           <td className="py-3 px-4">
-                            <Badge
-                              variant={
-                                restaurant.subscription_status === 'ACTIVE'
-                                  ? 'default'
-                                  : 'secondary'
-                              }
-                            >
-                              {restaurant.subscription_status || 'NONE'}
-                            </Badge>
+                            <StatusBadge status={restaurant.subscription_status || 'NONE'} />
                           </td>
                           <td className="py-3 px-4 text-[var(--text-muted)]">
                             {restaurant.orders_last_30d || 0}

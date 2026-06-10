@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
+import { StatusBadge } from '../../ui/status-badge'
 import {
   useGetAdminSubscriptionsQuery,
   useUnlockAdminSubscriptionMutation,
@@ -81,19 +82,7 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
                     </Badge>
                   </td>
                   <td className="py-3 px-4">
-                    <Badge
-                      variant={
-                        sub.status === 'ACTIVE'
-                          ? 'default'
-                          : sub.status === 'TRIALING'
-                            ? 'secondary'
-                            : sub.status === 'CANCELLED'
-                              ? 'destructive'
-                              : 'secondary'
-                      }
-                    >
-                      {sub.status}
-                    </Badge>
+                    <StatusBadge status={sub.status} />
                   </td>
                   <td className="py-3 px-4">
                     <Badge variant="outline">{sub.tenant_type}</Badge>

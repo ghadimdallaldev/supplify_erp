@@ -924,6 +924,8 @@ The following user-facing labels are already implemented correctly in `dealDispl
 
 ### Phase 1 — Shared UI System + Quick Wins
 
+> **Status: ✅ Completed**
+
 **Scope:** Foundational changes that unblock all other phases. No layout or page-level restructuring.
 
 **Tasks:**
@@ -942,6 +944,8 @@ The following user-facing labels are already implemented correctly in `dealDispl
 ---
 
 ### Phase 2 — Admin Refinements
+
+> **Status: ✅ Completed** — Status badges replaced in Subscriptions/Tenants/Plans/Feature flags; `AdminTabScrollRow` fade indicator added to the dashboard tab bar; `AdminPlansTab` native selects replaced with `Select`; `AdminOperationsPanel` sub-tabs now use `AdminLoadingSkeleton` instead of spinners.
 
 **Scope:** Polish admin-specific areas that still have rough edges.
 

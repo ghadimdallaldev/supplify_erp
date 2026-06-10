@@ -4,6 +4,7 @@
  */
 export {
   AdminTabLoading,
+  AdminTabScrollRow,
   dedupeAdminPlans,
   ADMIN_TENANT_PAGE_SIZE,
   type AdminTabKey,
