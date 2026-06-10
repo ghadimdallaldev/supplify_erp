@@ -24,6 +24,17 @@ CREATE INDEX IF NOT EXISTS idx_featured_placements_active
 CREATE INDEX IF NOT EXISTS idx_featured_placements_supplier
   ON supplier_featured_placements (supplier_id, created_at DESC);
 
+-- 0123 only allowed boost|activation; featured supplier packages need featured_listing.
+ALTER TABLE promotion_pricing_config
+  DROP CONSTRAINT IF EXISTS promotion_pricing_config_package_type_check;
+
+ALTER TABLE promotion_pricing_config
+  ADD CONSTRAINT promotion_pricing_config_package_type_check
+  CHECK (package_type IN ('boost', 'activation', 'featured_listing'));
+
+COMMENT ON COLUMN promotion_pricing_config.package_type IS
+  'boost = deal visibility; activation = post-approval deal fee; featured_listing = supplier discovery placement';
+
 INSERT INTO promotion_pricing_config (pricing_key, display_name, billing_type, amount, duration_days, description, package_type)
 VALUES (
   'featured_supplier_7_day',
