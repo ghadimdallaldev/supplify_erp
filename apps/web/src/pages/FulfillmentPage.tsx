@@ -13,16 +13,21 @@ import { FulfillmentRoutesTab } from '../components/fulfillment/FulfillmentRoute
 import { FulfillmentTrackingTab } from '../components/fulfillment/FulfillmentTrackingTab'
 import { FulfillmentExceptionsTab } from '../components/fulfillment/FulfillmentExceptionsTab'
 import { RequirePermission } from '../components/RequirePermission'
+import { usePermissions } from '../hooks/usePermissions'
 import { PageHeader } from '../components/ui/page-header'
 import { Label } from '../components/ui/label'
 import { Select, SelectTrigger } from '../components/ui/select'
 
 export function FulfillmentPage() {
+  const { can } = usePermissions()
+  const canViewWarehouses = can('WAREHOUSES_VIEW')
   const [activeTab, setActiveTab] = useState('dispatch')
   const [selectedWarehouseId, setSelectedWarehouseId] = useState('')
 
   const { entitlements } = useEntitlements()
-  const { data: warehousesData } = useGetWarehousesQuery()
+  const { data: warehousesData } = useGetWarehousesQuery(undefined, {
+    skip: !canViewWarehouses,
+  })
   const { data: fulfillmentData } = useGetSupplierFulfillmentQuery()
 
   const warehouses = warehousesData?.warehouses ?? []

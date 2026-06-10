@@ -19,6 +19,7 @@ import {
   useCreateInventoryAdjustmentMutation,
 } from '../services/api'
 import { RequirePermission } from '../components/RequirePermission'
+import { usePermissions } from '../hooks/usePermissions'
 import { formatNumber } from '../utils/format'
 import { KpiCard } from '../components/ui/kpi-card'
 import { PageHeader } from '../components/ui/page-header'
@@ -34,6 +35,9 @@ const ADJUSTMENT_TYPES = [
 ]
 
 export function InventoryPage() {
+  const { can } = usePermissions()
+  const canViewInventory = can('INVENTORY_VIEW')
+  const canViewWarehouses = can('WAREHOUSES_VIEW')
   const [showAdjustment, setShowAdjustment] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
@@ -45,8 +49,15 @@ export function InventoryPage() {
     notes: '',
   })
 
-  const { data, error, isLoading, refetch } = useGetInventoryListQuery()
-  const { data: warehousesData, isLoading: isLoadingWarehouses } = useGetWarehousesQuery()
+  const { data, error, isLoading, refetch } = useGetInventoryListQuery(undefined, {
+    skip: !canViewInventory,
+  })
+  const { data: warehousesData, isLoading: isLoadingWarehouses } = useGetWarehousesQuery(
+    undefined,
+    {
+      skip: !canViewWarehouses,
+    }
+  )
   const [createAdjustment, { isLoading: isAdjusting }] = useCreateInventoryAdjustmentMutation()
 
   const inventory = data?.inventory || []

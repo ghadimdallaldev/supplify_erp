@@ -53,6 +53,7 @@ import { ContractPriceDisplay } from '../components/ContractPriceDisplay'
 import { canUseSupplierDeals } from '../lib/planFeatureGates'
 import { PermissionGate } from '../components/PermissionGate'
 import { RequirePermission } from '../components/RequirePermission'
+import { usePermissions } from '../hooks/usePermissions'
 
 export function ProductsPage() {
   const [search, setSearch] = useState('')
@@ -91,6 +92,7 @@ export function ProductsPage() {
   const { addItem } = useCartActions()
   const { user } = useAppSelector((state) => state.auth)
   const { isEffectiveSupplier, isEffectiveRestaurant } = useImpersonation()
+  const { can } = usePermissions()
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation()
   const [generatePresignedUrl, { isLoading: isUploadingImage }] = useGeneratePresignedUrlMutation()
   const [createInventoryAdjustment, { isLoading: isAdjustingInventory }] =
@@ -126,7 +128,7 @@ export function ProductsPage() {
 
   // Fetch warehouses only for suppliers (warehouse selection in product creation)
   const { data: warehousesData } = useGetWarehousesQuery(undefined, {
-    skip: !isSupplier, // Skip if not a supplier
+    skip: !isSupplier || !can('WAREHOUSES_VIEW'),
   })
 
   // Fetch all suppliers for restaurants (for filter dropdown)

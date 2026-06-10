@@ -18,11 +18,13 @@ export async function getNewDealsBanner(restaurantId) {
     SELECT
       p.id,
       p.name,
-      p.discount_type,
+      p.type AS discount_type,
       p.discount_value,
       p.starts_at,
       p.ends_at,
       p.supplier_id,
+      p.target_restaurant_types,
+      p.target_areas,
       s.name AS supplier_name,
       EXISTS (
         SELECT 1 FROM supplier_follow sf
