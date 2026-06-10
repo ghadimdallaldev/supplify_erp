@@ -983,6 +983,8 @@ The following user-facing labels are already implemented correctly in `dealDispl
 
 ### Phase 4 — Restaurant Operational Pages
 
+> **Status: ✅ Completed** — CartPage uses `PageHeader` + `EmptyState` and lighter card chrome (no `CardHeader`); hydration skeleton skipped because cart rehydration is a synchronous localStorage dispatch (no real loading window — a skeleton would be fake UI). DealsPage got skeleton deal cards and `Select` for sort/supplier. QuickListsPage got a loading skeleton and `Select` for schedule frequency. RestaurantInventoryPage stock badges use `StatusBadge` (tone map extended with IN_STOCK/LOW_STOCK/OUT_OF_STOCK). ReceivingPage verified to render the restyled `FeatureLockedCard`.
+
 **Scope:** Restaurant-specific pages.
 
 **Tasks:**

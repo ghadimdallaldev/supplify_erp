@@ -62,6 +62,8 @@ import {
 import { LimitExceededBanner } from '../components/LimitExceededBanner'
 import { EmptyState } from '../components/ui/empty-state'
 import { PageHeader } from '../components/ui/page-header'
+import { Select, SelectTrigger } from '../components/ui/select'
+import { Skeleton } from '../components/ui/skeleton'
 import { formatDaysOfWeekLabel, parseDaysOfWeek } from '../utils/parseDaysOfWeek'
 import { cn } from '../lib/utils'
 
@@ -546,8 +548,26 @@ export function QuickListsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
+      <div className="space-y-5" data-testid="quick-lists-loading">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-44" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="space-y-3 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <Skeleton className="h-5 w-36" />
+                <Skeleton className="h-6 w-14" />
+              </div>
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-9 w-full" />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
@@ -1104,11 +1124,10 @@ export function QuickListsPage() {
             <div className="space-y-4">
               <div>
                 <Label>Frequency</Label>
-                <select
-                  className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] mt-2"
+                <Select
                   value={scheduleFrequency}
-                  onChange={(e) => {
-                    const newFrequency = e.target.value as any
+                  onValueChange={(value) => {
+                    const newFrequency = value as any
                     setScheduleFrequency(newFrequency)
 
                     // Adjust days based on new frequency
@@ -1125,12 +1144,14 @@ export function QuickListsPage() {
                     }
                   }}
                 >
-                  <option value="DAILY">Daily</option>
-                  <option value="WEEKLY">Once per week</option>
-                  <option value="WEEKLY_3X">Three times per week</option>
-                  <option value="BIWEEKLY">Biweekly (Every 2 weeks)</option>
-                  <option value="MONTHLY">Monthly</option>
-                </select>
+                  <SelectTrigger className="mt-2">
+                    <option value="DAILY">Daily</option>
+                    <option value="WEEKLY">Once per week</option>
+                    <option value="WEEKLY_3X">Three times per week</option>
+                    <option value="BIWEEKLY">Biweekly (Every 2 weeks)</option>
+                    <option value="MONTHLY">Monthly</option>
+                  </SelectTrigger>
+                </Select>
               </div>
 
               {(scheduleFrequency === 'WEEKLY' ||

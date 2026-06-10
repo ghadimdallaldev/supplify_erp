@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
+import { StatusBadge } from '../components/ui/status-badge'
 import { Input } from '../components/ui/input'
 import {
   Dialog,
@@ -353,19 +354,6 @@ export function RestaurantInventoryPage() {
     historySource === 'ALL'
       ? history
       : history.filter((m: any) => getMovementSource(m) === historySource)
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'IN_STOCK':
-        return 'default'
-      case 'LOW_STOCK':
-        return 'secondary'
-      case 'OUT_OF_STOCK':
-        return 'destructive'
-      default:
-        return 'secondary'
-    }
-  }
 
   const summaryCardClass = (active: boolean) =>
     `cursor-pointer transition-all hover:shadow-md ${active ? 'ring-2 ring-[var(--brand-mid)] ring-offset-2' : ''}`
@@ -838,9 +826,7 @@ export function RestaurantInventoryPage() {
                                   {item.supplier_name ? ` · ${item.supplier_name}` : ''}
                                 </p>
                               </div>
-                              <Badge variant={getStatusColor(status)} className="shrink-0">
-                                {status.replace('_', ' ')}
-                              </Badge>
+                              <StatusBadge status={status} className="shrink-0" />
                             </div>
 
                             <div className="mt-3 flex items-end justify-between gap-3">
@@ -1011,9 +997,7 @@ export function RestaurantInventoryPage() {
                                   )}
                                 </td>
                                 <td className="px-4 py-4">
-                                  <Badge variant={getStatusColor(status)}>
-                                    {status.replace('_', ' ')}
-                                  </Badge>
+                                  <StatusBadge status={status} />
                                 </td>
                                 <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
                                   {new Date(item.updated_at).toLocaleDateString()}

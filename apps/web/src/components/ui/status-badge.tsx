@@ -49,6 +49,9 @@ const STATUS_TONE_MAP: Record<string, StatusTone> = {
   INACTIVE: 'muted',
   draft: 'neutral',
   DRAFT: 'neutral',
+  IN_STOCK: 'success',
+  LOW_STOCK: 'warning',
+  OUT_OF_STOCK: 'danger',
 }
 
 const TONE_CLASSES: Record<StatusTone, string> = {
