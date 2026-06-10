@@ -27,6 +27,7 @@ import { RequirePermission } from '../components/RequirePermission'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
+import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { Input } from '../components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
@@ -260,11 +261,7 @@ export function OrderDetailPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
-      </div>
-    )
+    return <DetailPageSkeleton rows={6} />
   }
 
   if (error || !data) {

@@ -22,6 +22,10 @@ import {
   createReorderReminderDraft,
 } from '../services/supplier-reorder-intelligence.service.js'
 import {
+  getSupplierReorderAssistance,
+  createSupplierFollowUpDraft,
+} from '../services/supplier-reorder-assistance.service.js'
+import {
   getSupplierReceivables,
   exportSupplierStatementCsv,
 } from '../services/supplier-receivables.service.js'
@@ -98,8 +102,31 @@ router.get('/command-center', commandCenterGate, async (req, res, next) => {
   }
 })
 
+const smartReorderGate = requireFeature(
+  'smart_reorder',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+router.get(
+  '/reorder-assistance',
+  smartReorderGate,
+  requireAnyPermission('ORDERS_MANAGE', 'PROMOTIONS_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const graceDays = req.query.grace_days ? parseInt(req.query.grace_days, 10) : undefined
+      const data = await getSupplierReorderAssistance(supplierId, { graceDays })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
 router.get(
   '/reorder-intelligence',
+  smartReorderGate,
   requireAnyPermission('ORDERS_MANAGE', 'PROMOTIONS_MANAGE'),
   async (req, res, next) => {
     try {
@@ -115,14 +142,17 @@ router.get(
 
 router.post(
   '/reorder-intelligence/:restaurantId/reminder-draft',
+  smartReorderGate,
   requireAnyPermission('ORDERS_MANAGE', 'PROMOTIONS_MANAGE'),
   async (req, res, next) => {
     try {
       const supplierId = await resolveSupplier(req)
-      const draft = await createReorderReminderDraft(
+      const openChat = req.body?.openChat === true
+      const draft = await createSupplierFollowUpDraft(
         supplierId,
         req.params.restaurantId,
-        req.userData.id
+        req.userData.id,
+        { openChat }
       )
       if (!draft) {
         throw new ValidationError('Restaurant is not currently due for reorder')
@@ -552,6 +582,7 @@ router.post(
 
 router.get(
   '/reorder-cadence/at-risk',
+  smartReorderGate,
   requireAnyPermission('ORDERS_MANAGE', 'PROMOTIONS_MANAGE'),
   async (req, res, next) => {
     try {

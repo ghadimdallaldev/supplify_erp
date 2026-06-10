@@ -24,8 +24,176 @@ import {
 import { z } from 'zod'
 import { notifyMessageReceived } from '../services/notification.service.js'
 import { assertChatAttachmentUrl } from '../lib/sanitize-upload.js'
+import {
+  getOrCreateSupportConversation,
+  listSupportConversationsForTenant,
+  listAdminSupportConversations,
+} from '../services/support-chat.service.js'
 
 const router = express.Router()
+
+const supportStartSchema = z.object({
+  initialMessage: z.string().min(1).max(4000).optional(),
+  category: z.string().max(100).optional(),
+  pageUrl: z.string().max(500).optional(),
+})
+
+/** Tenant support chat — before B2B chat feature gate */
+router.post(
+  '/support/start',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER', 'RESTAURANT']),
+  requireFeature(
+    'chat',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  requirePermission('CHAT_SEND'),
+  async (req, res, next) => {
+    try {
+      const tenant = await getRequestTenant(req)
+      if (!tenant?.tenantId) throw new ValidationError('Tenant not found')
+      const body = supportStartSchema.parse(req.body || {})
+      const result = await getOrCreateSupportConversation({
+        tenantId: tenant.tenantId,
+        tenantType: tenant.tenantType,
+        userId: req.userData.id,
+        context: {
+          category: body.category,
+          pageUrl: body.pageUrl,
+          role: req.userData.role,
+        },
+        initialMessage: body.initialMessage || 'Hello, I need help with Supplify support.',
+      })
+      res.status(result.created ? 201 : 200).json({
+        ok: true,
+        data: result,
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/support/conversations',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER', 'RESTAURANT']),
+  requireFeature(
+    'chat',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  requirePermission('CHAT_VIEW'),
+  async (req, res, next) => {
+    try {
+      const tenant = await getRequestTenant(req)
+      if (!tenant?.tenantId) throw new ValidationError('Tenant not found')
+      const conversations = await listSupportConversationsForTenant(
+        tenant.tenantId,
+        tenant.tenantType
+      )
+      res.json({ ok: true, data: { conversations }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get('/admin/conversations', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+  try {
+    const conversations = await listAdminSupportConversations()
+    res.json({ ok: true, data: { conversations }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post(
+  '/conversations/:conversationId/admin-join',
+  requireAuth,
+  requireRole(['ADMIN']),
+  async (req, res, next) => {
+    try {
+      const conversationId = req.params.conversationId
+      const { rows: conversations } = await query(`SELECT * FROM conversation WHERE id = $1`, [
+        conversationId,
+      ])
+      if (!conversations[0]) throw new NotFoundError('Conversation not found')
+
+      const { rows: existing } = await query(
+        `SELECT 1 FROM conversation_participant WHERE conversation_id = $1 AND user_id = $2 AND role = 'ADMIN'`,
+        [conversationId, req.userData.id]
+      )
+      if (existing.length > 0) {
+        return res.json({
+          ok: true,
+          data: { message: 'Admin already in conversation' },
+          error: null,
+          requestId: req.requestId,
+        })
+      }
+
+      await query(
+        `
+        INSERT INTO conversation_participant (
+          conversation_id, participant_type, participant_id, user_id, role, joined_at
+        ) VALUES ($1, 'ADMIN', $2, $2, 'ADMIN', now())
+        `,
+        [conversationId, req.userData.id]
+      )
+
+      await query(
+        `
+        INSERT INTO message (conversation_id, sender_type, sender_id, content, message_type, is_admin_message)
+        VALUES ($1, 'ADMIN', $2, 'Supplify support joined the conversation', 'SYSTEM', true)
+        `,
+        [conversationId, req.userData.id]
+      )
+
+      res.json({
+        ok: true,
+        data: { message: 'Admin joined conversation successfully' },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/admin/start-conversation',
+  requireAuth,
+  requireRole(['ADMIN']),
+  async (req, res, next) => {
+    try {
+      const { tenant_id, tenant_type, initial_message } = req.body
+      if (!tenant_id || !tenant_type)
+        throw new ValidationError('tenant_id and tenant_type required')
+      const result = await getOrCreateSupportConversation({
+        tenantId: tenant_id,
+        tenantType: tenant_type,
+        userId: req.userData.id,
+        context: { startedBy: 'admin' },
+        initialMessage: initial_message || 'Hello, this is Supplify Support. How can we help you?',
+      })
+      res.status(201).json({
+        ok: true,
+        data: result,
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 
 // Validation schemas
 const createConversationRestaurantSchema = z.object({
@@ -171,10 +339,15 @@ const chatFeatureGate = requireFeature(
   (req) => req.tenantContext?.tenantType
 )
 
+function chatFeatureGateUnlessAdmin(req, res, next) {
+  if (req.userData?.role === 'ADMIN') return next()
+  return chatFeatureGate(req, res, next)
+}
+
 router.use(
   requireAuth,
   resolveTenantContext,
-  chatFeatureGate,
+  chatFeatureGateUnlessAdmin,
   requirePermission('CHAT_VIEW'),
   chatSendGuard
 )
@@ -204,6 +377,7 @@ router.get('/conversations', async (req, res) => {
         LEFT JOIN supplier s ON s.id = c.supplier_id
         LEFT JOIN restaurant r ON r.id = c.restaurant_id
         WHERE c.supplier_id = $1
+          AND COALESCE(c.is_admin_conversation, false) = false
           AND (cp.id IS NULL OR cp.is_archived = false)
         ORDER BY COALESCE(cp.is_pinned, false) DESC, c.last_message_at DESC NULLS LAST
         LIMIT 200
@@ -227,6 +401,7 @@ router.get('/conversations', async (req, res) => {
         LEFT JOIN supplier s ON s.id = c.supplier_id
         LEFT JOIN restaurant r ON r.id = c.restaurant_id
         WHERE c.restaurant_id = $1
+          AND COALESCE(c.is_admin_conversation, false) = false
           AND (cp.id IS NULL OR cp.is_archived = false)
         ORDER BY COALESCE(cp.is_pinned, false) DESC, c.last_message_at DESC NULLS LAST
         LIMIT 200
@@ -596,7 +771,7 @@ router.get('/conversations/:conversationId/messages', requireAuth, async (req, r
 router.post(
   '/conversations/:conversationId/messages',
   requireAuth,
-  requireRole(['SUPPLIER', 'RESTAURANT']),
+  requireRole(['SUPPLIER', 'RESTAURANT', 'ADMIN']),
   requirePermission('CHAT_SEND'),
   async (req, res) => {
     try {
@@ -673,7 +848,8 @@ router.post(
         })
       }
 
-      const senderId = tenantId
+      const senderType = req.userData.role === 'ADMIN' ? 'ADMIN' : req.userData.role
+      const senderId = req.userData.role === 'ADMIN' ? req.userData.id : tenantId
       if (!senderId) {
         return res.status(403).json({
           ok: false,
@@ -735,7 +911,7 @@ router.post(
       `,
           [
             conversationId,
-            req.userData.role,
+            senderType,
             senderId,
             messageData.content,
             messageData.messageType,
@@ -821,7 +997,7 @@ router.post(
               conversationId,
               messageId: message.id,
               senderId: senderId,
-              senderType: req.userData.role,
+              senderType,
               content: messageData.content,
               timestamp: new Date().toISOString(),
             })
@@ -1077,248 +1253,6 @@ router.get('/quick-replies', requireAuth, requireRole(['SUPPLIER']), async (req,
 })
 
 // Create quick reply template
-// ========================================
-// ADMIN CHAT PARTICIPATION
-// ========================================
-
-/**
- * POST /api/chat/conversations/:conversationId/admin-join
- * Admin joins a conversation to help resolve issues
- */
-router.post(
-  '/conversations/:conversationId/admin-join',
-  requireAuth,
-  requireRole(['ADMIN']),
-  async (req, res) => {
-    try {
-      const conversationId = req.params.conversationId
-
-      // Verify conversation exists
-      const { rows: conversations } = await query(
-        `
-      SELECT * FROM conversation WHERE id = $1
-    `,
-        [conversationId]
-      )
-
-      if (conversations.length === 0) {
-        return res.status(404).json({
-          ok: false,
-          data: null,
-          error: { name: 'NOT_FOUND', message: 'Conversation not found' },
-          requestId: req.requestId,
-        })
-      }
-
-      // Check if admin already in conversation
-      const { rows: existing } = await query(
-        `
-      SELECT * FROM conversation_participant 
-      WHERE conversation_id = $1 AND user_id = $2 AND role = 'ADMIN'
-    `,
-        [conversationId, req.userData.id]
-      )
-
-      if (existing.length > 0) {
-        return res.json({
-          ok: true,
-          data: { message: 'Admin already in conversation' },
-          error: null,
-          requestId: req.requestId,
-        })
-      }
-
-      // Add admin as participant
-      await query(
-        `
-      INSERT INTO conversation_participant (conversation_id, user_id, role, joined_at)
-      VALUES ($1, $2, 'ADMIN', now())
-    `,
-        [conversationId, req.userData.id]
-      )
-
-      // Send system message
-      await query(
-        `
-      INSERT INTO message (conversation_id, sender_id, content, message_type, is_admin_message)
-      VALUES ($1, $2, 'Admin joined the conversation', 'SYSTEM', true)
-    `,
-        [conversationId, req.userData.id]
-      )
-
-      // Log audit
-      await query(
-        `
-      INSERT INTO admin_audit_log (action_type, target_entity_type, target_entity_id, action_description, admin_user_id)
-      VALUES ('ADMIN_JOINED_CHAT', 'CONVERSATION', $1, 'Admin joined chat conversation', $2)
-    `,
-        [conversationId, req.userData.id]
-      )
-
-      res.json({
-        ok: true,
-        data: { message: 'Admin joined conversation successfully' },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Admin join conversation error:', error)
-      res.status(500).json({
-        ok: false,
-        data: null,
-        error: { name: 'INTERNAL_ERROR', message: 'Failed to join conversation' },
-        requestId: req.requestId,
-      })
-    }
-  }
-)
-
-/**
- * POST /api/chat/admin/start-conversation
- * Admin starts a conversation with a tenant
- */
-router.post('/admin/start-conversation', requireAuth, requireRole(['ADMIN']), async (req, res) => {
-  try {
-    const { tenant_id, tenant_type, initial_message } = req.body
-
-    // Get tenant details
-    const tenantTable = tenant_type === 'RESTAURANT' ? 'restaurant' : 'supplier'
-    const { rows: tenants } = await query(
-      `
-      SELECT id, name, contact_email FROM ${tenantTable} WHERE id = $1
-    `,
-      [tenant_id]
-    )
-
-    if (tenants.length === 0) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: { name: 'NOT_FOUND', message: 'Tenant not found' },
-        requestId: req.requestId,
-      })
-    }
-
-    // Create conversation
-    const conversationData =
-      tenant_type === 'RESTAURANT'
-        ? { restaurant_id: tenant_id, supplier_id: null }
-        : { supplier_id: tenant_id, restaurant_id: null }
-
-    const { rows: newConversations } = await query(
-      `
-      INSERT INTO conversation (supplier_id, restaurant_id, is_admin_conversation)
-      VALUES ($1, $2, true)
-      RETURNING *
-    `,
-      [conversationData.supplier_id, conversationData.restaurant_id]
-    )
-
-    const conversation = newConversations[0]
-
-    // Add admin as participant
-    await query(
-      `
-      INSERT INTO conversation_participant (conversation_id, user_id, role, joined_at)
-      VALUES ($1, $2, 'ADMIN', now())
-    `,
-      [conversation.id, req.userData.id]
-    )
-
-    // Send initial message
-    const { rows: messages } = await query(
-      `
-      INSERT INTO message (conversation_id, sender_id, content, message_type, is_admin_message)
-      VALUES ($1, $2, $3, 'TEXT', true)
-      RETURNING *
-    `,
-      [
-        conversation.id,
-        req.userData.id,
-        initial_message || 'Hello, this is Supplify Admin. How can we help you?',
-      ]
-    )
-
-    // Log audit
-    await query(
-      `
-      INSERT INTO admin_audit_log (action_type, target_entity_type, target_entity_id, action_description, admin_user_id)
-      VALUES ('ADMIN_STARTED_CHAT', $1, $2, 'Admin started chat conversation with tenant', $3)
-    `,
-      [tenant_type, tenant_id, req.userData.id]
-    )
-
-    res.status(201).json({
-      ok: true,
-      data: { conversation, initial_message: messages[0] },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Admin start conversation error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to start conversation' },
-      requestId: req.requestId,
-    })
-  }
-})
-
-/**
- * GET /api/chat/admin/conversations
- * Admin view of all conversations
- */
-router.get('/admin/conversations', requireAuth, requireRole(['ADMIN']), async (req, res) => {
-  try {
-    const { status, tenant_type } = req.query
-
-    let whereClause = '1=1'
-    const params = []
-
-    if (status) {
-      whereClause += ` AND c.status = $${params.length + 1}`
-      params.push(status)
-    }
-
-    const { rows: conversations } = await query(
-      `
-      SELECT 
-        c.*,
-        CASE WHEN c.restaurant_id IS NOT NULL THEN r.name ELSE s.name END as tenant_name,
-        CASE WHEN c.restaurant_id IS NOT NULL THEN r.contact_email ELSE s.contact_email END as tenant_email,
-        COUNT(DISTINCT CASE WHEN cp.role = 'ADMIN' THEN cp.user_id END) as admin_count,
-        MAX(m.created_at) as last_message_at
-      FROM conversation c
-      LEFT JOIN restaurant r ON c.restaurant_id = r.id
-      LEFT JOIN supplier s ON c.supplier_id = s.id
-      LEFT JOIN conversation_participant cp ON cp.conversation_id = c.id
-      LEFT JOIN message m ON m.conversation_id = c.id
-      WHERE ${whereClause}
-      GROUP BY c.id, r.name, s.name, r.contact_email, s.contact_email
-      ORDER BY last_message_at DESC NULLS LAST
-      LIMIT 100
-    `,
-      params
-    )
-
-    res.json({
-      ok: true,
-      data: { conversations },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Admin get conversations error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to get conversations' },
-      requestId: req.requestId,
-    })
-  }
-})
-
 router.post('/quick-replies', requireAuth, requireRole(['SUPPLIER']), async (req, res) => {
   try {
     const templateData = quickReplySchema.parse(req.body)

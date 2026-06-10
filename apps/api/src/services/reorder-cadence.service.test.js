@@ -36,6 +36,7 @@ describe('reorder-cadence missed detection', () => {
         }
       }
       if (s.includes('reorder_cadence_reminder_log')) return { rows: [] }
+      if (s.includes('customer_order') && s.includes('NOT EXISTS')) return { rows: [] }
       if (s.includes('customer_order')) return { rows: [] }
       return { rows: [] }
     })

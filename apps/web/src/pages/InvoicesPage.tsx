@@ -66,6 +66,7 @@ export function InvoicesPage() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [paymentMode, setPaymentMode] = useState<'full' | 'partial' | 'credit'>('full')
   const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null)
+  const [exportingCsv, setExportingCsv] = useState(false)
 
   // Payment form state
   const [paymentAmount, setPaymentAmount] = useState<number>(0)
@@ -259,6 +260,49 @@ export function InvoicesPage() {
     }
   }
 
+  const handleExportCsv = async () => {
+    setExportingCsv(true)
+    try {
+      if (isRestaurant) {
+        const params = new URLSearchParams()
+        if (statusFilter !== 'ALL') params.set('status', statusFilter)
+        if (supplierFilter !== 'ALL') params.set('supplier', supplierFilter)
+        const qs = params.toString()
+        const res = await fetch(
+          apiUrl(`/api/restaurant-finance/invoices/export.csv${qs ? `?${qs}` : ''}`),
+          { credentials: 'include' }
+        )
+        if (!res.ok) throw new Error('Export failed')
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `invoices-${new Date().toISOString().slice(0, 10)}.csv`
+        a.click()
+        URL.revokeObjectURL(url)
+        toast.success('Invoices exported')
+      } else {
+        const header = 'Invoice Number,Date,Due Date,Status,Total,Restaurant\n'
+        const lines = (invoicesData?.invoices ?? []).map(
+          (inv: any) =>
+            `"${inv.invoice_number || inv.id}","${inv.invoice_date || ''}","${inv.due_date || ''}","${inv.status}",${inv.total_amount},"${String(inv.restaurant_name || '').replace(/"/g, '""')}"`
+        )
+        const blob = new Blob([header + lines.join('\n')], { type: 'text/csv' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `invoices-${new Date().toISOString().slice(0, 10)}.csv`
+        a.click()
+        URL.revokeObjectURL(url)
+        toast.success('Invoices exported')
+      }
+    } catch {
+      toast.error('Could not export invoices')
+    } finally {
+      setExportingCsv(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -274,9 +318,13 @@ export function InvoicesPage() {
           title={invoicesTitle}
           description={invoicesDescription}
           actions={
-            <Button variant="outline" onClick={() => refetch()}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
+            <Button variant="outline" onClick={handleExportCsv} disabled={exportingCsv}>
+              {exportingCsv ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Export CSV
             </Button>
           }
         />

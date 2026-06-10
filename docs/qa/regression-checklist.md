@@ -26,8 +26,10 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | `/register/complete`                                                            | Pending / needs setup                                 |
 | `/reserve`, `/reserve/:slug`, `/reserve/confirmation`, `/reserve/manage/:token` | Guest                                                 |
 | `/reserve/waitlist/:token/accept`, `/reserve/waitlist/:token/decline`           | Guest (waitlist table offer)                          |
+| `/supplier/:slug`                                                               | Public mini-store (guest + restaurant when logged in) |
 | `/staff`, `/staff/login`, `/staff/dashboard`                                    | Staff portal (operational staff; not `/app`)          |
-| `/app/dashboard`, `/`                                                           | Restaurant / Supplier / Admin (impersonating)         |
+| `/app/quote-requests`, `/app/quote-requests/new`, `/app/quote-requests/:id`     | Restaurant — RFQ / compare offers                     |
+| `/app/quote-requests/supplier`                                                  | Supplier — quote inbox                                |
 | `/app/activate`                                                                 | Locked tenant billing activation                      |
 | `/app/orders`, `/app/orders/:id`                                                | Restaurant & Supplier                                 |
 | `/app/products`, `/app/products/:id`                                            | Both (supplier edits catalog)                         |
@@ -1077,6 +1079,24 @@ Prereq: migration `0137_driver_location_tracking.sql`; API env `GPS_TRACKING_ENA
 | NFR-08 | WebSocket      | 10-minute idle, then send chat message     | Socket reconnects; message delivers    |       |
 | NFR-09 | Migration      | Run `db:migrate` on empty DB               | All 90+ migrations apply without error |       |
 | NFR-10 | Concurrency    | Two users submit orders simultaneously     | Both orders created; no duplicates     |       |
+
+---
+
+## Quote requests & supplier mini-store (2026-06-11)
+
+Spec: [QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](../product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md)
+
+| ID     | Step                                             | Expected                                              | Pass? |
+| ------ | ------------------------------------------------ | ----------------------------------------------------- | ----- |
+| QRF-01 | Restaurant → Products → **Request best price**   | Create page opens                                     |       |
+| QRF-02 | Select products + suppliers → submit             | Quote request created; suppliers notified             |       |
+| QRF-03 | Supplier → **Quote inbox** → respond per line    | Response saved; restaurant notified                   |       |
+| QRF-04 | Restaurant → Quote requests → **Compare offers** | Side-by-side table                                    |       |
+| QRF-05 | **Add to cart** from winning response            | Cart populated; checkout still resolves server prices |       |
+| QRF-06 | Supplier settings → copy/preview catalog link    | URL `/supplier/:slug` works                           |       |
+| QRF-07 | Guest opens mini-store                           | Products visible; **no prices**                       |       |
+| QRF-08 | Logged-in restaurant on mini-store               | Prices + add to cart                                  |       |
+| QRF-09 | Disable public catalog in settings               | `/supplier/:slug` returns not found                   |       |
 
 ---
 

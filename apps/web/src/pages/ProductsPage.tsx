@@ -19,11 +19,21 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
 import { PageHeader } from '../components/ui/page-header'
+import { DataTableShell } from '../components/ui/data-table-shell'
 import { EmptyState } from '../components/ui/empty-state'
 import { Skeleton } from '../components/ui/skeleton'
 import { Select, SelectTrigger } from '../components/ui/select'
 import { Label } from '../components/ui/label'
-import { Package, Search, Plus, Upload, Download, TrendingUp, TrendingDown } from 'lucide-react'
+import {
+  Package,
+  Search,
+  Plus,
+  Upload,
+  Download,
+  TrendingUp,
+  TrendingDown,
+  FileQuestion,
+} from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useCartActions } from '../hooks/useCartActions'
@@ -468,9 +478,17 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 </PermissionGate>
               ) : (
                 <PermissionGate permission="ORDERS_CREATE">
-                  <Button asChild>
-                    <Link to="/app/cart">View Cart</Link>
-                  </Button>
+                  <>
+                    <Button asChild variant="outline">
+                      <Link to="/app/quote-requests/new">
+                        <FileQuestion className="h-4 w-4 mr-2" />
+                        Request best price
+                      </Link>
+                    </Button>
+                    <Button asChild>
+                      <Link to="/app/cart">View Cart</Link>
+                    </Button>
+                  </>
                 </PermissionGate>
               )}
             </div>
@@ -487,20 +505,22 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
           </div>
         )}
 
-        <Card className="shadow-sm">
-          <CardContent className="space-y-4 p-4 pt-6">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-12 xl:items-end">
-              <div className="min-w-0 sm:col-span-2 xl:col-span-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
-                  <Input
-                    placeholder="Search products..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="h-10 pl-10"
-                  />
-                </div>
-              </div>
+        <DataTableShell
+          data-testid="products-table-shell"
+          search={
+            <div className="relative min-w-0">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+              <Input
+                placeholder="Search products..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-10 pl-10"
+                aria-label="Search products"
+              />
+            </div>
+          }
+          filters={
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-12 xl:items-end w-full">
               {!isSupplier && (
                 <div className="min-w-0 xl:col-span-2">
                   <Label htmlFor="product-supplier-filter" className="sr-only">
@@ -585,92 +605,85 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 </div>
               )}
             </div>
-
-            {/* Tags Filter */}
-            {!isSupplier && tagsData?.tags && tagsData.tags.length > 0 && (
-              <div className="flex flex-col gap-2 border-t border-[var(--app-border-mid)] pt-4">
-                <Label className="text-sm font-medium">Filter by tags</Label>
-                <div className="flex flex-wrap gap-2">
-                  {tagsData.tags.map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant={selectedTags.includes(tag) ? 'default' : 'outline'}
-                      className="cursor-pointer hover:bg-[var(--bg)]"
-                      onClick={() => {
-                        setSelectedTags((prev) =>
-                          prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-                        )
-                      }}
-                    >
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
+          }
+        >
+          {!isSupplier && tagsData?.tags && tagsData.tags.length > 0 && (
+            <div className="border-b border-[var(--app-border)] px-4 py-3">
+              <Label className="text-sm font-medium">Filter by tags</Label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {tagsData.tags.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant={selectedTags.includes(tag) ? 'default' : 'outline'}
+                    className="cursor-pointer hover:bg-[var(--bg)]"
+                    onClick={() => {
+                      setSelectedTags((prev) =>
+                        prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+                      )
+                    }}
+                  >
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          {(supplierFilter ||
+            categoryId ||
+            category ||
+            selectedTags.length > 0 ||
+            minPrice ||
+            maxPrice) &&
+            !isSupplier && (
+              <div className="flex flex-wrap items-center gap-2 border-b border-[var(--app-border)] px-4 py-3">
+                <span className="text-sm text-[var(--text-muted)]">Filtered by:</span>
+                {supplierFilter && (
+                  <Badge
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-[var(--app-border-mid)]"
+                    onClick={() => setSupplierFilter('')}
+                  >
+                    Supplier: {supplierFilter} ×
+                  </Badge>
+                )}
+                {(categoryId || category) && (
+                  <Badge
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-[var(--app-border-mid)]"
+                    onClick={() => {
+                      setCategoryId('')
+                      setCategory('')
+                    }}
+                  >
+                    Category:{' '}
+                    {categoriesData?.categories?.find((c) => c.id === categoryId)?.name || category}{' '}
+                    ×
+                  </Badge>
+                )}
+                {selectedTags.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-[var(--app-border-mid)]"
+                    onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
+                  >
+                    Tag: {tag} ×
+                  </Badge>
+                ))}
+                {(minPrice || maxPrice) && (
+                  <Badge
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-[var(--app-border-mid)]"
+                    onClick={() => {
+                      setMinPrice('')
+                      setMaxPrice('')
+                    }}
+                  >
+                    Price: ${minPrice || '0'} - ${maxPrice || '∞'} ×
+                  </Badge>
+                )}
               </div>
             )}
-
-            {/* Filter Summary */}
-            {(supplierFilter ||
-              categoryId ||
-              category ||
-              selectedTags.length > 0 ||
-              minPrice ||
-              maxPrice) &&
-              !isSupplier && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm text-[var(--text-muted)]">Filtered by:</span>
-                  {supplierFilter && (
-                    <Badge
-                      variant="secondary"
-                      className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-                      onClick={() => setSupplierFilter('')}
-                    >
-                      Supplier: {supplierFilter} ×
-                    </Badge>
-                  )}
-                  {(categoryId || category) && (
-                    <Badge
-                      variant="secondary"
-                      className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-                      onClick={() => {
-                        setCategoryId('')
-                        setCategory('')
-                      }}
-                    >
-                      Category:{' '}
-                      {categoriesData?.categories?.find((c) => c.id === categoryId)?.name ||
-                        category}{' '}
-                      ×
-                    </Badge>
-                  )}
-                  {selectedTags.map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant="secondary"
-                      className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-                      onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
-                    >
-                      Tag: {tag} ×
-                    </Badge>
-                  ))}
-                  {(minPrice || maxPrice) && (
-                    <Badge
-                      variant="secondary"
-                      className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-                      onClick={() => {
-                        setMinPrice('')
-                        setMaxPrice('')
-                      }}
-                    >
-                      Price: ${minPrice || '0'} - ${maxPrice || '∞'} ×
-                    </Badge>
-                  )}
-                </div>
-              )}
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden p-0 shadow-sm">
           <div className="divide-y md:hidden">
             {filteredProducts?.map((product) => (
               <div
@@ -941,7 +954,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               </tbody>
             </table>
           </div>
-        </Card>
+        </DataTableShell>
 
         {filteredProducts?.length === 0 && (
           <EmptyState

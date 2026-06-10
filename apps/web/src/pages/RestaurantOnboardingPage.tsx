@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { Select, SelectTrigger } from '../components/ui/select'
+import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   Dialog,
@@ -45,6 +46,7 @@ import { useAppSelector } from '../hooks/redux'
 import { formatCurrency } from '../utils/format'
 import { SubscriptionInfo } from '../components/SubscriptionInfo'
 import { LogoUpload } from '../components/LogoUpload'
+import { BrandingSettingsSection } from '../components/settings/BrandingSettingsSection'
 import {
   useGetRestaurantMeQuery,
   useUpdateRestaurantMutation,
@@ -62,6 +64,7 @@ import {
   useDeactivateRestaurantOrgBranchMutation,
   useGetRestaurantTeamQuery,
   useDeleteRestaurantTeamMemberMutation,
+  useGetMyReviewsQuery,
 } from '../services/api'
 import { RestaurantDeliveryLocationCard } from '../components/restaurant/RestaurantDeliveryLocationCard'
 import { TeamRolesPanel } from '../components/TeamRolesPanel'
@@ -83,7 +86,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import { isTenantOwner } from '../lib/tenantRoles'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { normalizeAddress } from '../lib/address'
-import { useGetMyReviewsQuery } from '../services/api'
+import { SupportContactCard } from '../components/support/SupportContactCard'
 import { Star } from 'lucide-react'
 
 const DEFAULT_NOTIFICATION_PREFS = {
@@ -99,6 +102,7 @@ const DEFAULT_NOTIFICATION_PREFS = {
   notifyStaffPto: true,
   notifyStaffSwap: true,
   notifyScheduledOrder: true,
+  notifyReorderCadence: true,
 }
 
 interface PreferenceField {
@@ -148,6 +152,12 @@ const CATEGORY_FIELDS: PreferenceField[] = [
     label: 'Low stock alerts',
     description: 'Inventory thresholds reached',
     icon: AlertCircle,
+  },
+  {
+    key: 'notifyReorderCadence',
+    label: 'Reorder reminders',
+    description: 'Suggested reorders based on your ordering patterns',
+    icon: Clock,
   },
   {
     key: 'notifyReservationCreated',
@@ -394,6 +404,7 @@ export function RestaurantOnboardingPage() {
         notifyStaffPto: prefs.notifyStaffPto ?? previous.notifyStaffPto,
         notifyStaffSwap: prefs.notifyStaffSwap ?? previous.notifyStaffSwap,
         notifyScheduledOrder: prefs.notifyScheduledOrder ?? previous.notifyScheduledOrder,
+        notifyReorderCadence: prefs.notifyReorderCadence ?? previous.notifyReorderCadence,
       }))
     }
   }, [notificationPrefsData])
@@ -452,11 +463,7 @@ export function RestaurantOnboardingPage() {
   }
 
   if (isLoadingRestaurant) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
-      </div>
-    )
+    return <DetailPageSkeleton rows={6} />
   }
 
   return (
@@ -618,6 +625,13 @@ export function RestaurantOnboardingPage() {
               )}
             </CardContent>
           </Card>
+
+          {brandingAllowed && (
+            <BrandingSettingsSection
+              tenantType="RESTAURANT"
+              canEdit={can('SETTINGS_EDIT') || can('SETTINGS_MANAGE')}
+            />
+          )}
 
           <Card>
             <CardHeader>
@@ -953,8 +967,9 @@ export function RestaurantOnboardingPage() {
         </TabsContent>
 
         {/* Subscription Tab */}
-        <TabsContent value="subscription">
+        <TabsContent value="subscription" className="space-y-4">
           <SubscriptionInfo />
+          <SupportContactCard />
         </TabsContent>
 
         {/* Notifications Tab */}

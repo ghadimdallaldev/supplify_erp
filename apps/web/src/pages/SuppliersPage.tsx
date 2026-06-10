@@ -43,6 +43,7 @@ import {
 } from '../components/ui/card-layout'
 import { EmptyState } from '../components/ui/empty-state'
 import { PageHeader } from '../components/ui/page-header'
+import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { cn } from '../lib/utils'
 
 function SupplierStatCard({
@@ -154,8 +155,11 @@ export function SuppliersPage() {
       })
     }
 
-    // Sort
+    // Sort — featured suppliers stay at top unless explicitly sorting by another field
     suppliers = [...suppliers].sort((a: any, b: any) => {
+      const featuredDiff = Number(b.is_featured) - Number(a.is_featured)
+      if (featuredDiff !== 0) return featuredDiff
+
       switch (sortBy) {
         case 'products':
           return Number(b.product_count || 0) - Number(a.product_count || 0)
@@ -201,11 +205,7 @@ export function SuppliersPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
-      </div>
-    )
+    return <DetailPageSkeleton />
   }
 
   if (error) {
@@ -506,6 +506,11 @@ export function SuppliersPage() {
                               New
                             </Badge>
                           )}
+                          {supplier.is_featured && (
+                            <Badge className="bg-amber-500 text-white flex items-center gap-1 shadow-sm text-[10px] px-1.5 py-0">
+                              Featured
+                            </Badge>
+                          )}
                           {isRestaurant && supplier.is_followed && (
                             <Badge className="bg-[var(--brand)] text-white flex items-center gap-1 shadow-sm text-[10px] px-1.5 py-0">
                               <Heart className="h-3 w-3 fill-current shrink-0" />
@@ -667,6 +672,9 @@ export function SuppliersPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="text-lg font-bold text-[var(--text)]">{supplier.name}</h3>
+                        {supplier.is_featured && (
+                          <Badge className="bg-amber-500 text-white text-xs">Featured</Badge>
+                        )}
                         {isRestaurant && supplier.is_followed && (
                           <Badge className="bg-[var(--brand)] text-white">
                             <Heart className="h-3 w-3 mr-1 fill-current" />

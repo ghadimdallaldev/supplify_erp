@@ -27,6 +27,8 @@ import {
 import { AlertCircle, Mail, Package, MapPin, ListOrdered } from 'lucide-react'
 import { AdminTenantDiagnosticsDrawer } from './AdminTenantDiagnosticsDrawer'
 import { AdminTenantPicker } from './AdminTenantPicker'
+import { AdminSupportChatPanel } from './AdminSupportChatPanel'
+import { AdminFeaturedPlacementsPanel } from './AdminFeaturedPlacementsPanel'
 
 const EMAIL_STATUS_OPTIONS = ['', 'sent', 'failed', 'skipped', 'log_only']
 
@@ -141,6 +143,10 @@ export function AdminOperationsPanel({
           loading={suppliersLoading || restaurantsLoading}
         />
       </Card>
+
+      <AdminSupportChatPanel />
+
+      <AdminFeaturedPlacementsPanel />
 
       <Tabs key={initialSubTab} value={subTab} onValueChange={(v) => setSubTab(v as OpsSubTab)}>
         <TabsList className="flex w-max gap-0 flex-wrap">

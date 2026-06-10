@@ -1,7 +1,6 @@
 # Supplify UI/UX Modernization Plan
 
-> **This is a planning document only. No code has been changed.**
-> Execute phases by telling Claude: "Execute Phase N of the UI Modernization Plan."
+> **Planning document.** Phases 1–7 and follow-up pass are **implemented on `refactoring-dev`** (merged to `dev` 2026-06-11). Remaining work is manual browser QA (Section 19) and optional Dialog→bottom-sheet polish.
 
 **Goal:** Transform Supplify from feeling like a generic CRUD app into a premium, trustworthy operations command center that restaurants and suppliers use with confidence every day.
 
@@ -933,7 +932,7 @@ The following user-facing labels are already implemented correctly in `dealDispl
 1. Fix `DashboardPage.tsx`: Remove `StatusChip`, replace with `StatusBadge`. Remove `syntheticRamp`. Remove or wire period picker. **File:** `apps/web/src/pages/DashboardPage.tsx`
 2. Fix `InventoryPage.tsx` (supplier): Replace spinner with skeleton tiles. Add `PageHeader`. Add `EmptyState`. Replace `Card/CardContent` KPI tiles with `AdminKpiCard` or a shared pattern. **File:** `apps/web/src/pages/InventoryPage.tsx`
 3. Fix `FeatureLockedCard.tsx`: Restyle without Shadcn card chrome. Use design tokens. **File:** `apps/web/src/components/FeatureLockedCard.tsx`
-4. Create `InfoBanner` component. Refactor `Layout.tsx` banners to use it. **File:** `apps/web/src/components/ui/info-banner.tsx`, `apps/web/src/components/Layout.tsx`
+4. Create `InfoBanner` component. Refactor `Layout.tsx` banners to use it. ✅ **File:** `apps/web/src/components/ui/info-banner.tsx`, `apps/web/src/components/Layout.tsx`
 5. Fix command center wording: `'Deals & promotions'` → `'Deals'` in quick actions. **File:** `apps/web/src/pages/SupplierCommandCenterPage.tsx`
 
 **Expected impact:** High — fixes the most visually inconsistent page (Inventory), removes fake data, standardizes banners.  
@@ -1003,7 +1002,7 @@ The following user-facing labels are already implemented correctly in `dealDispl
 
 ### Phase 5 — Tables and Forms Polish
 
-> **Status: ✅ Completed (with one deliberate deviation)** — All ~66 remaining native `<select>` elements across ~30 files (admin panels, fulfillment, disputes, org modals, Staff, Orders, Products, Inventory, Contract Pricing, Reports, Reservations, onboarding, etc.) were replaced with the shared `Select`/`SelectTrigger`. `BranchSwitcher` left untouched per the preserve list. `TableSkeleton` (rows × columns) added to `ui/skeleton.tsx`. `DataTableShell` created at `ui/data-table-shell.tsx` for future tables, but NOT retrofitted onto Orders/Products/Inventory: their filter/table areas were already standardized in Phases 1–4, so restructuring them again was judged churn without visual gain. Retrofit on request.
+> **Status: ✅ Completed** — All ~66 remaining native `<select>` elements across ~30 files replaced with `Select`/`SelectTrigger`. `TableSkeleton` added to `ui/skeleton.tsx`. `DataTableShell` created and retrofitted onto `OrdersPage`, `ProductsPage`, and `InventoryPage` (follow-up pass).
 
 **Scope:** Cross-cutting table and form improvements.
 
@@ -1022,7 +1021,7 @@ The following user-facing labels are already implemented correctly in `dealDispl
 
 ### Phase 6 — Mobile / Responsive Pass
 
-> **Status: ✅ Completed (2 items deferred as product decisions)** — Supplier inventory table hides Warehouse/Reserved below `md` and On Hand below `sm` (Product, Available, Status, Actions always visible). Orders already render as responsive stacked cards, so customer/ID/date stacking was already satisfied. Admin tab bar fade indicators were done in Phase 2 (`AdminTabScrollRow`). Dashboard KPI grid is now 2×2 on mobile (was 1-column). **Deferred:** restaurant bottom nav bar and Dialog→bottom-sheet — both are product/UX decisions that should be explicitly requested (same reasoning as section 12.3).
+> **Status: ✅ Completed** — Supplier inventory table responsive column hiding; Orders responsive cards; Admin tab bar fade indicators (Phase 2); Dashboard KPI 2×2 on mobile. **Restaurant bottom nav** added via `RestaurantMobileNav` (Home, Orders, Cart, Products, Chat) — visible on `lg:hidden` for restaurant users. **Deferred:** Dialog→bottom-sheet on mobile (low priority; dialogs remain usable).
 
 **Scope:** Mobile-first improvements for restaurant staff and drivers.
 
@@ -1042,19 +1041,35 @@ The following user-facing labels are already implemented correctly in `dealDispl
 
 ### Phase 7 — Performance and QA
 
+> **Status: ✅ Completed** — recharts audit: still required for restaurant Spend Trend (`SpendTrendChart`), `ReportsPage`, and `ReservationAnalyticsPanel`; synthetic sparklines were already removed in Phase 1 (custom CSS bars). **Optimization:** `SpendTrendChart` extracted and lazy-loaded so supplier dashboards no longer pull the 321 KB `charts` chunk on initial load. Admin bundle: route-level code splitting confirmed — admin tabs are separate lazy chunks; tenant pages use shared `ui/kpi-card` not `components/admin/*`. Build + typecheck pass. No phase-introduced `// TODO` comments found (2 pre-existing stubs in `RestaurantInventoryPage`). Lighthouse not run in CI — use Section 19 checklist for manual browser QA.
+
 **Scope:** Performance audit + cleanup after all phases.
 
 **Tasks:**
 
-1. Check if recharts is still needed after sparkline removal (DashboardPage).
-2. Verify no admin-specific imports leaked into tenant bundle.
-3. Run full Lighthouse audit on Dashboard, Orders, Admin tabs.
-4. Remove any `// TODO` comments introduced during phases.
-5. Manual QA pass (see Section 19).
+1. Check if recharts is still needed after sparkline removal (DashboardPage). ✅ Still needed; lazy-loaded via `components/dashboard/SpendTrendChart.tsx`.
+2. Verify no admin-specific imports leaked into tenant bundle. ✅ Admin routes lazy-split; `InventoryPage` uses `KpiCard` from `ui/kpi-card`.
+3. Run full Lighthouse audit on Dashboard, Orders, Admin tabs. ⏸ Deferred to manual QA (Section 19).
+4. Remove any `// TODO` comments introduced during phases. ✅ None introduced; pre-existing stubs left intact.
+5. Manual QA pass (see Section 19). ⏸ Checklist ready for human verification.
 
-**Expected impact:** Bundle size reduction (if recharts removed), faster load  
+**Expected impact:** Bundle size reduction (charts chunk deferred for supplier dashboards), faster load  
 **Risk:** Low  
-**Files:** Various
+**Files:** `DashboardPage.tsx`, `components/dashboard/SpendTrendChart.tsx` (new), various (audit only)
+
+**Follow-up pass (completed after initial Phase 7):**
+
+- `InfoBanner` + `Layout.tsx` banner priority/consolidation — max 2–3 contextual banners; at-limit collapsed when >1.
+- `DataTableShell` retrofitted on Orders, Products, Inventory.
+- `RestaurantMobileNav` bottom bar for restaurant mobile.
+- `DetailPageSkeleton` replaces h-32 page spinners on detail/list pages.
+- `SectionHeader` exported from `ui/section-header.tsx`.
+
+**Still manual / optional:**
+
+- Section 19 browser QA checklist.
+- Lighthouse audit (Performance ≥ 85).
+- Dialog→bottom-sheet on mobile.
 
 ---
 
@@ -1194,4 +1209,6 @@ After reviewing this plan, use the following prompt to execute Phase 1:
 
 **Recommended first phase:** Phase 1 — 4 focused tasks, all low-risk, all high-impact.
 
-**What to run next:** The "Recommended First Execution Prompt" in Section 20 above.
+**All 7 phases + follow-up pass complete.** Remaining work is manual browser QA (Section 19) and optional Dialog→bottom-sheet polish.
+
+**What to run next:** Walk through the Section 19 QA checklist in a browser.

@@ -3306,7 +3306,8 @@ router.get('/operational/active-deliveries', async (req, res) => {
 // ========================================
 router.get('/health', async (req, res) => {
   try {
-    let jobFailures = []
+    const { getRecentCronFailures } = await import('../lib/cron-runner.js')
+    let jobFailures = getRecentCronFailures()
     let webhookFailures = []
     let recentErrors = []
     let dbPool = null

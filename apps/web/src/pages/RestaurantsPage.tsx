@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
 import { Select, SelectTrigger } from '../components/ui/select'
+import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { useNavigate } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
 import {
@@ -216,11 +217,7 @@ export function RestaurantsPage() {
   // If user is not a supplier, show all restaurants
   if (!isSupplier) {
     if (isLoading) {
-      return (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
-        </div>
-      )
+      return <DetailPageSkeleton />
     }
 
     if (error) {
@@ -291,11 +288,7 @@ export function RestaurantsPage() {
   }
 
   if (isLoading || (isSupplier && !supplierId)) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
-      </div>
-    )
+    return <DetailPageSkeleton />
   }
 
   if (error) {

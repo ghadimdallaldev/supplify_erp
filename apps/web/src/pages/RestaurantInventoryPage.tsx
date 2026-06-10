@@ -45,6 +45,7 @@ import { formatNumber } from '../utils/format'
 import { featureEnabled } from '../lib/planLimits'
 import { RestaurantWastePanel } from '../components/inventory/RestaurantWastePanel'
 import { ExpiryInventoryTab } from '../components/inventory/ExpiryInventoryTab'
+import { ReorderAssistancePanel } from '../components/inventory/ReorderAssistancePanel'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
 import { EmptyState } from '../components/ui/empty-state'
@@ -97,6 +98,9 @@ export function RestaurantInventoryPage() {
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const wasteTrackingEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.waste_tracking
+  )
+  const smartReorderEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.smart_reorder
   )
 
   const { data, isLoading, error } = useGetRestaurantInventoryQuery()
@@ -409,6 +413,12 @@ export function RestaurantInventoryPage() {
             </>
           }
         />
+
+        {smartReorderEnabled && (
+          <div id="reorder-assistance">
+            <ReorderAssistancePanel />
+          </div>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>

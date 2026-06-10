@@ -42,6 +42,7 @@ import {
 } from '../services/deal-publish.service.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { requireFeature, requireWithinLimit } from '../lib/subscription.js'
+import { getNewDealsBanner, dismissDealBanner } from '../services/deal-banner.service.js'
 
 const adminDealGuards = [
   requireAuth,
@@ -248,6 +249,43 @@ router.get(
         expiringSoon: expiringSoon === 'true',
       })
       res.json({ ok: true, data: { promotions }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/new-deals-banner',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  supplierDealsGate,
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantId(req)
+      const data = await getNewDealsBanner(restaurantId)
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/:id/dismiss-banner',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  supplierDealsGate,
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantId(req)
+      const dealId = req.params.id
+      const { rows } = await query(`SELECT supplier_id FROM promotions WHERE id = $1`, [dealId])
+      if (!rows[0]) throw new NotFoundError('Deal not found')
+      await dismissDealBanner(restaurantId, dealId, rows[0].supplier_id)
+      res.json({ ok: true, data: { dismissed: true }, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)
     }

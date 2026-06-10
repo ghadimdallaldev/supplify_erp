@@ -29,7 +29,6 @@ import {
   Warehouse,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { ResponsiveContainer, BarChart, Bar, Tooltip } from 'recharts'
 import { useState } from 'react'
 import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
@@ -52,6 +51,10 @@ const DASHBOARD_CALENDAR_EXTRA_GAP = 12
 
 const CalendarView = lazy(() =>
   import('../components/CalendarView').then((m) => ({ default: m.CalendarView }))
+)
+
+const SpendTrendChart = lazy(() =>
+  import('../components/dashboard/SpendTrendChart').then((m) => ({ default: m.SpendTrendChart }))
 )
 
 // ─── Tiny helpers ────────────────────────────────────────────────────────────
@@ -810,32 +813,16 @@ export function DashboardPage() {
             action={<span style={{ fontSize: 10, color: 'var(--text-muted)' }}>30 days</span>}
           >
             {spendTrend.length > 0 ? (
-              <div style={{ height: 120 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={spendTrend}
-                    margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
-                    barSize={4}
-                  >
-                    <Bar
-                      dataKey="value"
-                      fill="var(--brand-mid)"
-                      radius={[2, 2, 0, 0]}
-                      opacity={0.75}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        background: 'var(--surface)',
-                        border: '1px solid var(--app-border)',
-                        borderRadius: 6,
-                        fontSize: 11,
-                        color: 'var(--text)',
-                      }}
-                      formatter={(v: any) => [formatCurrency(v), 'Spend']}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <Suspense
+                fallback={
+                  <Skeleton
+                    className="h-[120px] w-full rounded-md"
+                    aria-label="Loading spend trend"
+                  />
+                }
+              >
+                <SpendTrendChart data={spendTrend} />
+              </Suspense>
             ) : (
               <p
                 style={{
@@ -896,9 +883,9 @@ export function DashboardPage() {
                 >
                   View all →
                 </Link>
-              ) : isRestaurant && (reorderSuggestions?.suggestions?.length ?? 0) > 0 ? (
+              ) : isRestaurant && smartReorderEnabled ? (
                 <Link
-                  to="/app/quick-lists"
+                  to="/app/inventory#reorder-assistance"
                   style={{
                     fontSize: 11,
                     color: 'var(--brand)',
@@ -906,7 +893,7 @@ export function DashboardPage() {
                     fontWeight: 600,
                   }}
                 >
-                  Add all →
+                  View all →
                 </Link>
               ) : undefined
             }

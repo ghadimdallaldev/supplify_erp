@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -20,12 +20,13 @@ import {
 } from '../services/api'
 import { RequirePermission } from '../components/RequirePermission'
 import { formatNumber } from '../utils/format'
-import { AdminKpiCard } from '../components/admin/AdminKpiCard'
+import { KpiCard } from '../components/ui/kpi-card'
 import { PageHeader } from '../components/ui/page-header'
 import { EmptyState } from '../components/ui/empty-state'
 import { StatusBadge } from '../components/ui/status-badge'
 import { Skeleton } from '../components/ui/skeleton'
 import { Select, SelectTrigger } from '../components/ui/select'
+import { DataTableShell } from '../components/ui/data-table-shell'
 
 const ADJUSTMENT_TYPES = [
   { value: 'IN', label: 'Add Stock' },
@@ -155,13 +156,8 @@ export function InventoryPage() {
 
         {/* KPI summary */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <AdminKpiCard
-            label="Total Products"
-            value={inventory.length}
-            icon={Package}
-            tone="brand"
-          />
-          <AdminKpiCard
+          <KpiCard label="Total Products" value={inventory.length} icon={Package} tone="brand" />
+          <KpiCard
             label="Reserved"
             value={formatNumber(
               inventory.reduce(
@@ -173,13 +169,13 @@ export function InventoryPage() {
             icon={Warehouse}
             tone="warning"
           />
-          <AdminKpiCard
+          <KpiCard
             label="Low Stock"
             value={inventory.filter((item: any) => item.isLowStock).length}
             icon={AlertTriangle}
             tone="danger"
           />
-          <AdminKpiCard
+          <KpiCard
             label="Available"
             value={formatNumber(
               inventory.reduce(
@@ -203,147 +199,129 @@ export function InventoryPage() {
                 icon={<Package className="h-6 w-6" />}
               />
             ) : (
-              <div
-                style={{
-                  background: 'var(--surface)',
-                  border: '1px solid var(--app-border)',
-                  borderRadius: 12,
-                  overflow: 'hidden',
-                }}
-              >
-                <div
-                  style={{
-                    padding: '12px 16px',
-                    borderBottom: '1px solid var(--app-border)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span className="text-sm font-semibold text-[var(--text)]">
-                    Inventory Overview
-                  </span>
+              <DataTableShell
+                data-testid="inventory-table-shell"
+                actions={
                   <span className="text-xs text-[var(--text-muted)]">
                     {inventory.length} {inventory.length === 1 ? 'product' : 'products'}
                   </span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--app-border)' }}>
-                        <th className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                          Product
-                        </th>
-                        <th className="hidden py-3 px-4 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] md:table-cell">
-                          Warehouse
-                        </th>
-                        <th className="hidden py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] sm:table-cell">
-                          On Hand
-                        </th>
-                        <th className="hidden py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] md:table-cell">
-                          Reserved
-                        </th>
-                        <th className="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                          Available
-                        </th>
-                        <th className="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                          Status
-                        </th>
-                        <th className="py-3 px-4 text-center text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {inventory.map((item: any) => (
-                        <tr
-                          key={item.id}
-                          style={{ borderBottom: '1px solid var(--app-border)' }}
-                          className="transition-colors hover:bg-[var(--brand-ultra)]"
-                        >
-                          <td className="py-3 px-4">
-                            <div>
-                              <p className="text-sm font-medium text-[var(--text)]">
-                                {item.product_name}
-                              </p>
-                              <p className="text-xs text-[var(--text-muted)]">{item.sku}</p>
-                            </div>
-                          </td>
-                          <td className="hidden py-3 px-4 md:table-cell">
-                            {item.warehouse_name ? (
-                              <div className="flex items-center gap-2">
-                                <Warehouse className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
-                                <div>
-                                  <p className="text-sm font-medium text-[var(--text)]">
-                                    {item.warehouse_name}
+                }
+              >
+                <table className="w-full min-w-[640px]">
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--app-border)' }}>
+                      <th className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                        Product
+                      </th>
+                      <th className="hidden py-3 px-4 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] md:table-cell">
+                        Warehouse
+                      </th>
+                      <th className="hidden py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] sm:table-cell">
+                        On Hand
+                      </th>
+                      <th className="hidden py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] md:table-cell">
+                        Reserved
+                      </th>
+                      <th className="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                        Available
+                      </th>
+                      <th className="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                        Status
+                      </th>
+                      <th className="py-3 px-4 text-center text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inventory.map((item: any) => (
+                      <tr
+                        key={item.id}
+                        style={{ borderBottom: '1px solid var(--app-border)' }}
+                        className="transition-colors hover:bg-[var(--brand-ultra)]"
+                      >
+                        <td className="py-3 px-4">
+                          <div>
+                            <p className="text-sm font-medium text-[var(--text)]">
+                              {item.product_name}
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)]">{item.sku}</p>
+                          </div>
+                        </td>
+                        <td className="hidden py-3 px-4 md:table-cell">
+                          {item.warehouse_name ? (
+                            <div className="flex items-center gap-2">
+                              <Warehouse className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                              <div>
+                                <p className="text-sm font-medium text-[var(--text)]">
+                                  {item.warehouse_name}
+                                </p>
+                                {item.warehouse_code && (
+                                  <p className="text-xs text-[var(--text-muted)]">
+                                    {item.warehouse_code}
                                   </p>
-                                  {item.warehouse_code && (
-                                    <p className="text-xs text-[var(--text-muted)]">
-                                      {item.warehouse_code}
-                                    </p>
-                                  )}
-                                </div>
+                                )}
                               </div>
-                            ) : (
-                              <span className="text-sm text-[var(--text-muted)]">—</span>
-                            )}
-                          </td>
-                          <td className="hidden py-3 px-4 text-right sm:table-cell">
-                            <span className="text-sm font-medium text-[var(--text)]">
-                              {formatNumber(
-                                parseFloat(String(item.available_qty || 0)) +
-                                  parseFloat(String(item.reserved_qty || 0)),
-                                { maximumFractionDigits: 2 }
-                              )}
-                            </span>
-                          </td>
-                          <td className="hidden py-3 px-4 text-right md:table-cell">
-                            <span className="text-sm" style={{ color: 'var(--amber)' }}>
-                              {item.reserved_qty || 0}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <span className="text-sm font-medium" style={{ color: 'var(--mint)' }}>
-                              {item.available_qty || 0}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            {item.isLowStock ? (
-                              <StatusBadge status="PENDING" label="Low Stock" />
-                            ) : (
-                              <StatusBadge status="ACTIVE" label="In Stock" />
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center justify-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedProduct(item)
-                                  setShowAdjustment(true)
-                                }}
-                              >
-                                Adjust
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedProduct(item)
-                                  setShowSettings(true)
-                                }}
-                              >
-                                <Settings className="h-4 w-4" />
-                              </Button>
                             </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                          ) : (
+                            <span className="text-sm text-[var(--text-muted)]">â€”</span>
+                          )}
+                        </td>
+                        <td className="hidden py-3 px-4 text-right sm:table-cell">
+                          <span className="text-sm font-medium text-[var(--text)]">
+                            {formatNumber(
+                              parseFloat(String(item.available_qty || 0)) +
+                                parseFloat(String(item.reserved_qty || 0)),
+                              { maximumFractionDigits: 2 }
+                            )}
+                          </span>
+                        </td>
+                        <td className="hidden py-3 px-4 text-right md:table-cell">
+                          <span className="text-sm" style={{ color: 'var(--amber)' }}>
+                            {item.reserved_qty || 0}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className="text-sm font-medium" style={{ color: 'var(--mint)' }}>
+                            {item.available_qty || 0}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          {item.isLowStock ? (
+                            <StatusBadge status="PENDING" label="Low Stock" />
+                          ) : (
+                            <StatusBadge status="ACTIVE" label="In Stock" />
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center justify-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedProduct(item)
+                                setShowAdjustment(true)
+                              }}
+                            >
+                              Adjust
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedProduct(item)
+                                setShowSettings(true)
+                              }}
+                            >
+                              <Settings className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </DataTableShell>
             )}
           </>
         )}
@@ -410,7 +388,7 @@ export function InventoryPage() {
                           )}
                         </CardTitle>
                         <CardDescription>
-                          {warehouse.product_count || 0} products ·{' '}
+                          {warehouse.product_count || 0} products Â·{' '}
                           {warehouse.total_available_qty || 0} total available
                         </CardDescription>
                       </div>

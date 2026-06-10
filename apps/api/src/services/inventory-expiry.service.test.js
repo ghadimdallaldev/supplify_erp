@@ -27,30 +27,25 @@ describe('inventory-expiry notification dedup', () => {
     vi.resetModules()
   })
 
-  it('skips duplicate grouped notifications same day', async () => {
+  it('skips duplicate grouped notifications when dedup claim fails', async () => {
     const queryMock = vi.fn()
     queryMock.mockImplementation(async (sql) => {
       const s = String(sql)
-      if (s.includes('FROM restaurant r')) return { rows: [{ id: 'r1' }] }
-      if (s.includes('inventory_expiry_notification_log') && s.includes('SELECT 1')) {
-        return { rows: [{ '': 1 }] }
-      }
-      if (s.includes('FROM restaurant_inventory_lot')) {
+      if (s.includes('GROUP BY l.restaurant_id')) {
         return {
           rows: [
             {
-              id: 'l1',
               restaurant_id: 'r1',
-              expiry_date: '2026-06-08',
-              item_name: 'Milk',
-              quantity: 1,
-              unit: 'L',
-              is_archived: false,
+              expiring_soon_days: 7,
+              expired_count: 0,
+              expiring_soon_count: 2,
             },
           ],
         }
       }
-      if (s.includes('restaurant_inventory_settings')) return { rows: [{ expiring_soon_days: 7 }] }
+      if (s.includes('inventory_expiry_notification_log') && s.includes('INSERT')) {
+        return { rows: [] }
+      }
       return { rows: [] }
     })
 

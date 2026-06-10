@@ -7,13 +7,16 @@ import { Input } from '../ui/input'
 import { Skeleton } from '../ui/skeleton'
 import { splitRowClass } from '../ui/card-layout'
 import { formatPrice } from '../../utils/format'
-import { useGetOrdersQuery } from '../../services/api'
+import { useGetOrdersQuery, useGetWarehousesQuery } from '../../services/api'
 import { useMemo, useState } from 'react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 
 const PICK_STATUSES = ['SHIPPED', 'ACKNOWLEDGED', 'PROCESSING'] as const
 
 export function FulfillmentPickListsTab() {
   const [search, setSearch] = useState('')
+  const [warehouseFilter, setWarehouseFilter] = useState<string>('ALL')
+  const { data: warehousesData } = useGetWarehousesQuery()
   const {
     data: ordersData,
     isLoading,
@@ -22,6 +25,8 @@ export function FulfillmentPickListsTab() {
   } = useGetOrdersQuery({
     limit: 500,
     offset: 0,
+    warehouseId: warehouseFilter !== 'ALL' ? warehouseFilter : undefined,
+    warehouse_id: warehouseFilter !== 'ALL' ? warehouseFilter : undefined,
   })
 
   const pickOrders = useMemo(() => {
@@ -70,12 +75,29 @@ export function FulfillmentPickListsTab() {
             </CardTitle>
             <CardDescription>Orders ready for warehouse picking</CardDescription>
           </div>
-          <Input
-            placeholder="Search order or restaurant…"
-            className="w-full sm:max-w-xs shrink-0"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {(warehousesData?.warehouses?.length ?? 0) > 0 && (
+              <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="All warehouses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All warehouses</SelectItem>
+                  {(warehousesData?.warehouses ?? []).map((wh: { id: string; name: string }) => (
+                    <SelectItem key={wh.id} value={wh.id}>
+                      {wh.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Input
+              placeholder="Search order or restaurant…"
+              className="w-full sm:max-w-xs shrink-0"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
       </CardHeader>
       <CardContent>

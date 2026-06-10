@@ -6,22 +6,26 @@ Restaurant & F&B supplier marketplace monorepo (`apps/api`, `apps/web`).
 
 ## Quick links
 
-| I want to…                    | Start here                                                                                                        |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Set up locally                | [guides/setup.md](./guides/setup.md) · [guides/developer-handbook.md](./guides/developer-handbook.md)             |
-| Understand the product        | [product/overview.md](./product/overview.md)                                                                      |
-| Plans & limits                | [product/plans-and-limits.md](./product/plans-and-limits.md)                                                      |
-| Feature behavior              | [features/README.md](./features/README.md)                                                                        |
-| Deploy to Railway             | [operations/deployment.md](./operations/deployment.md)                                                            |
-| Env variables                 | [operations/environment-variables.md](./operations/environment-variables.md)                                      |
-| Performance / Railway latency | [operations/railway-performance.md](./operations/railway-performance.md)                                          |
-| RBAC & security               | [security/rbac.md](./security/rbac.md) · [security/security-audit-report.md](./security/security-audit-report.md) |
-| Admin console                 | [admin/admin-operations-console.md](./admin/admin-operations-console.md)                                          |
-| Run tests / QA                | [qa/testing-guide.md](./qa/testing-guide.md) · [qa/regression-checklist.md](./qa/regression-checklist.md)         |
-| Release workflow              | [operations/branching.md](./operations/branching.md)                                                              |
-| **Pre-deploy (June 2026)**    | [releases/2026-06-09-pre-deploy-checklist.md](./releases/2026-06-09-pre-deploy-checklist.md)                      |
-| UI copy & legal gates         | [ui/README.md](./ui/README.md)                                                                                    |
-| Historical audits             | [archive/audits/](./archive/audits/)                                                                              |
+| I want to…                             | Start here                                                                                                                             |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Set up locally                         | [guides/setup.md](./guides/setup.md) · [guides/developer-handbook.md](./guides/developer-handbook.md)                                  |
+| Understand the product                 | [product/overview.md](./product/overview.md)                                                                                           |
+| Plans & limits                         | [product/plans-and-limits.md](./product/plans-and-limits.md)                                                                           |
+| Feature behavior                       | [features/README.md](./features/README.md)                                                                                             |
+| Deploy to Railway                      | [operations/deployment.md](./operations/deployment.md)                                                                                 |
+| Env variables                          | [operations/environment-variables.md](./operations/environment-variables.md)                                                           |
+| Performance / Railway latency          | [operations/railway-performance.md](./operations/railway-performance.md)                                                               |
+| RBAC & security                        | [security/rbac.md](./security/rbac.md) · [security/security-audit-report.md](./security/security-audit-report.md)                      |
+| Admin console                          | [admin/admin-operations-console.md](./admin/admin-operations-console.md)                                                               |
+| Run tests / QA                         | [qa/testing-guide.md](./qa/testing-guide.md) · [qa/regression-checklist.md](./qa/regression-checklist.md)                              |
+| Release workflow                       | [operations/branching.md](./operations/branching.md)                                                                                   |
+| **Pre-deploy (June 2026)**             | [releases/2026-06-09-pre-deploy-checklist.md](./releases/2026-06-09-pre-deploy-checklist.md)                                           |
+| **Refactoring-dev release (Jun 2026)** | [releases/2026-06-11-refactoring-dev-release.md](./releases/2026-06-11-refactoring-dev-release.md)                                     |
+| Quote requests & mini-store            | [product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](./product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md)                                 |
+| Cron & background jobs audit           | [audits/CRON_AND_BACKGROUND_JOBS_AUDIT.md](./audits/CRON_AND_BACKGROUND_JOBS_AUDIT.md)                                                 |
+| Reorder / branding / deals audit       | [audits/REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md](./audits/REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md) |
+| UI copy & legal gates                  | [ui/README.md](./ui/README.md)                                                                                                         |
+| Historical audits                      | [archive/audits/](./archive/audits/)                                                                                                   |
 
 ## Folder map
 

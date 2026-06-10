@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { Badge } from '../components/ui/badge'
+import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   Dialog,
@@ -31,9 +32,16 @@ import {
   DollarSign,
   CheckCircle2,
   Bell,
+  Link2,
+  Copy,
+  ExternalLink,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { LogoUpload } from '../components/LogoUpload'
+import { BrandingSettingsSection } from '../components/settings/BrandingSettingsSection'
+import { WarehouseFulfillmentSettings } from '../components/settings/WarehouseFulfillmentSettings'
+import { SupportContactCard } from '../components/support/SupportContactCard'
+import { FeaturedPlacementPanel } from '../components/supplier/FeaturedPlacementPanel'
 import { BranchAccountsPanel } from '../components/BranchAccountsPanel'
 import { SubscriptionInfo } from '../components/SubscriptionInfo'
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
@@ -187,6 +195,42 @@ export function SupplierSettingsPage() {
   const warehouseGate = getWarehouseAddGate(entitlements, warehouseCount)
   const canAddWarehouse = warehouseGate.canAdd
   const brandingAllowed = canUseCustomBranding(entitlements)
+
+  const catalogLink = useMemo(() => {
+    if (!supplier?.id) return null
+    const base = typeof window !== 'undefined' ? window.location.origin : ''
+    const segment = supplier.slug || supplier.id
+    return `${base}/supplier/${segment}`
+  }, [supplier?.id, supplier?.slug])
+
+  const handleCopyCatalogLink = async () => {
+    if (!catalogLink) return
+    try {
+      await navigator.clipboard.writeText(catalogLink)
+      toast.success('Catalog link copied')
+    } catch {
+      toast.error('Could not copy link')
+    }
+  }
+
+  const handleTogglePublicCatalog = async (enabled: boolean) => {
+    if (!supplier?.id) return
+    try {
+      await updateSupplier({
+        id: supplier.id,
+        data: { publicCatalogEnabled: enabled } as Partial<typeof supplier> & {
+          publicCatalogEnabled?: boolean
+        },
+      }).unwrap()
+      toast.success(enabled ? 'Public catalog enabled' : 'Public catalog disabled')
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'data' in err
+          ? (err as { data?: { error?: { message?: string } } }).data?.error?.message
+          : undefined
+      toast.error(message || 'Failed to update catalog setting')
+    }
+  }
 
   // Profile form state
   const [profileForm, setProfileForm] = useState({
@@ -381,11 +425,7 @@ export function SupplierSettingsPage() {
   }
 
   if (isLoadingSupplier) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
-      </div>
-    )
+    return <DetailPageSkeleton rows={6} />
   }
 
   return (
@@ -536,6 +576,69 @@ export function SupplierSettingsPage() {
                     Loading supplier information...
                   </p>
                 )}
+              </CardContent>
+            </Card>
+
+            {brandingAllowed && (
+              <BrandingSettingsSection
+                tenantType="SUPPLIER"
+                canEdit={can('SETTINGS_EDIT') || can('SETTINGS_MANAGE')}
+              />
+            )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Link2 className="h-5 w-5" />
+                  Supplier catalog link
+                </CardTitle>
+                <CardDescription>
+                  Share this link with restaurants so they can browse your catalog and request
+                  quotes without full onboarding.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Input readOnly value={catalogLink ?? ''} className="font-mono text-sm" />
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCopyCatalogLink}
+                    >
+                      <Copy className="h-4 w-4 mr-1" />
+                      Copy catalog link
+                    </Button>
+                    {catalogLink && (
+                      <Button type="button" variant="outline" size="sm" asChild>
+                        <a href={catalogLink} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-4 w-4 mr-1" />
+                          Preview catalog
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-[var(--app-border)] p-3">
+                  <div>
+                    <p className="text-sm font-medium">Public catalog enabled</p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      When off, the catalog link returns not found.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant={supplier?.public_catalog_enabled !== false ? 'default' : 'outline'}
+                    size="sm"
+                    disabled={isUpdating}
+                    onClick={() =>
+                      handleTogglePublicCatalog(supplier?.public_catalog_enabled === false)
+                    }
+                  >
+                    {supplier?.public_catalog_enabled !== false ? 'Enabled' : 'Disabled'}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -849,6 +952,9 @@ export function SupplierSettingsPage() {
                 </Card>
               ) : (
                 <>
+                  {multiWarehousePlan && (
+                    <WarehouseFulfillmentSettings enabled={multiWarehousePlan} />
+                  )}
                   <Card>
                     <CardHeader>
                       <div className="flex items-center justify-between">
@@ -932,6 +1038,8 @@ export function SupplierSettingsPage() {
 
           <TabsContent value="plan" className="space-y-4">
             <SubscriptionInfo />
+            <FeaturedPlacementPanel />
+            <SupportContactCard />
           </TabsContent>
           <TabsContent value="branches" className="space-y-4">
             <BranchAccountsPanel entityLabel="supplier location" />

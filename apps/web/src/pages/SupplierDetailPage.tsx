@@ -15,6 +15,7 @@ import {
 } from '../services/api'
 import { featureEnabled } from '../lib/planLimits'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
+import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
@@ -44,6 +45,7 @@ import {
   Globe,
   FileText,
   Star,
+  FileQuestion,
 } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { Link } from 'react-router-dom'
@@ -96,11 +98,7 @@ export function SupplierDetailPage() {
   const ratingSummary = ratingSummaryData?.summary as Record<string, unknown> | undefined
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
-      </div>
-    )
+    return <DetailPageSkeleton />
   }
 
   if (error || !data?.supplier) {
@@ -220,6 +218,23 @@ export function SupplierDetailPage() {
               >
                 <MessageSquare className="h-4 w-4 mr-2" />
                 {isCreatingConversation ? 'Opening...' : 'Message'}
+              </Button>
+              <Button variant="outline" className="whitespace-normal" asChild>
+                <Link
+                  to="/app/quote-requests/new"
+                  state={{
+                    prefill: {
+                      supplierIds: [supplier.id],
+                      items: (productsData?.products ?? []).slice(0, 5).map((p) => ({
+                        productId: p.id,
+                        quantity: 1,
+                      })),
+                    },
+                  }}
+                >
+                  <FileQuestion className="h-4 w-4 mr-2" />
+                  Request best price
+                </Link>
               </Button>
             </>
           )}

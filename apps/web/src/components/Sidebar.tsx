@@ -35,6 +35,7 @@ import {
   Tag,
   Percent,
   Radar,
+  FileQuestion,
 } from 'lucide-react'
 import { getOrderUsageBadge, isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { countActiveDisputes } from '../lib/disputeHelpers'
@@ -197,6 +198,13 @@ export function Sidebar({
         icon: ShoppingBag,
         permission: 'ORDERS_CREATE',
         testId: 'nav-cart',
+      },
+      {
+        name: 'Quote requests',
+        href: '/app/quote-requests',
+        icon: FileQuestion,
+        permission: 'ORDERS_CREATE',
+        testId: 'nav-quote-requests',
       },
       {
         name: 'Reservations',
@@ -422,6 +430,13 @@ export function Sidebar({
           icon: Users,
           permission: 'ORDERS_VIEW',
           testId: 'nav-restaurants',
+        },
+        {
+          name: 'Quote inbox',
+          href: '/app/quote-requests/supplier',
+          icon: FileQuestion,
+          permission: 'ORDERS_VIEW',
+          testId: 'nav-supplier-quote-inbox',
         },
         ...(disputesEnabled
           ? [

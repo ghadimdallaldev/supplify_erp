@@ -366,6 +366,17 @@ register(TEMPLATE_REGISTRY, 'notification.generic', (d) =>
     data: d,
   })
 )
+register(TEMPLATE_REGISTRY, 'notification.digest', (d) =>
+  standardTemplate({
+    subject: d.subject || 'Your Supplify digest',
+    title: d.title || 'Your notification digest',
+    message: d.items ? `${d.message || ''}\n\n${d.items}` : d.message,
+    ctaUrl: d.ctaUrl || '/app/notifications',
+    ctaLabel: 'View notifications',
+    tenantName: d.tenantName,
+    data: d,
+  })
+)
 
 export function renderTemplate(templateId, data = {}) {
   const fn = TEMPLATE_REGISTRY[templateId] || TEMPLATE_REGISTRY['notification.generic']
