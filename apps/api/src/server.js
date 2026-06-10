@@ -78,6 +78,11 @@ import { requestTimingMiddleware } from './middlewares/request-timing.js'
 import { disconnectCache, isRedisConnected } from './lib/cache.js'
 import { runFullStartupMigrations } from './lib/startup-migrations.js'
 import {
+  markStartupMigrationsReady,
+  requireStartupMigrationsReady,
+  isStartupMigrationsReady,
+} from './lib/startup-readiness.js'
+import {
   getMemorySnapshot,
   shouldExposeMemoryOnHealth,
   startMemoryMonitor,
@@ -95,11 +100,15 @@ if (config.REDIS_URL && isLikelyPublicRedisUrl(config.REDIS_URL)) {
 
 /** Run after HTTP listen so Railway health checks get a response during slow DB work. */
 async function runStartupSchemaTasks() {
-  if (config.NODE_ENV === 'test') return
+  if (config.NODE_ENV === 'test') {
+    markStartupMigrationsReady()
+    return
+  }
 
   try {
     await runFullStartupMigrations()
     await ensureOrderCancellationColumns()
+    markStartupMigrationsReady()
   } catch (error) {
     logger.error(`Database migration failed after listen — shutting down: ${error.message}`, {
       error: error.message,
@@ -313,13 +322,21 @@ app.get('/health', async (req, res) => {
 app.get('/ready', async (req, res) => {
   try {
     await pool.query('SELECT 1')
+    if (!isStartupMigrationsReady()) {
+      return res.status(503).json({
+        status: 'migrating',
+        service: 'supplify-api',
+        env: config.APP_ENV,
+      })
+    }
     res.json({ status: 'ok', service: 'supplify-api', env: config.APP_ENV })
   } catch {
     res.status(503).json({ status: 'degraded', service: 'supplify-api', env: config.APP_ENV })
   }
 })
 
-// API routes
+// API routes — blocked until startup SQL migrations finish on this instance
+app.use(requireStartupMigrationsReady)
 app.use('/auth', authLimiter)
 app.use('/auth', authRoutes)
 app.use('/api/register', authLimiter)
