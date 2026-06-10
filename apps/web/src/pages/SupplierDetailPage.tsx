@@ -42,8 +42,6 @@ import {
   Clock,
   Globe,
   FileText,
-  Award,
-  CheckCircle,
   Star,
 } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
@@ -63,7 +61,7 @@ export function SupplierDetailPage() {
   )
 
   const { data, isLoading, error, refetch } = useGetSupplierQuery(id!)
-  const { data: restaurantsData } = useGetRestaurantsQuery()
+  useGetRestaurantsQuery()
   const [createConversation, { isLoading: isCreatingConversation }] =
     useCreateConversationMutation()
   const [followSupplier, { isLoading: isFollowing }] = useFollowSupplierMutation()
@@ -77,7 +75,7 @@ export function SupplierDetailPage() {
   })
 
   // Fetch supplier statistics (for restaurants viewing suppliers)
-  const { data: statsData, isLoading: isLoadingStats } = useGetSupplierStatisticsQuery(id!, {
+  const { data: statsData } = useGetSupplierStatisticsQuery(id!, {
     skip: !isRestaurant || !id,
   })
   const { data: reviewsData } = useGetSupplierReviewsQuery(

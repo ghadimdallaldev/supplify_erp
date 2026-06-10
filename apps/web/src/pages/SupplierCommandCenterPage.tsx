@@ -46,7 +46,7 @@ const OPS_QUICK_ACTIONS = [
 ]
 
 const SALES_QUICK_ACTIONS = [
-  { label: 'Deals & promotions', href: '/app/promotions', icon: Tag, testId: 'qa-deals' },
+  { label: 'Deals', href: '/app/promotions', icon: Tag, testId: 'qa-deals' },
   { label: 'Restaurants', href: '/app/restaurants', icon: Users, testId: 'qa-restaurants' },
   { label: 'Reorder leads', href: '#reorder', icon: Users, testId: 'qa-reorder' },
 ]

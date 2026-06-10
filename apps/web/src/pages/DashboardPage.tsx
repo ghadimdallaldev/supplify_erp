@@ -16,6 +16,7 @@ import {
 import { usePermissions } from '../hooks/usePermissions'
 import { Button } from '../components/ui/button'
 import { Skeleton } from '../components/ui/skeleton'
+import { StatusBadge } from '../components/ui/status-badge'
 import {
   Package,
   ShoppingCart,
@@ -34,7 +35,7 @@ import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { featureEnabled } from '../lib/planLimits'
-import { canUseFinanceInvoices, canUseGlobalReports } from '../lib/planFeatureGates'
+import { canUseFinanceInvoices } from '../lib/planFeatureGates'
 import {
   getRestaurantDashboardLayout,
   shouldShowDashboardCalendar,
@@ -76,6 +77,7 @@ function buildOrderSpendTrend(orders: any[], days = SPEND_TREND_DAYS) {
 }
 
 function Sparkline({ data, color }: { data: number[]; color: string }) {
+  if (data.length < 3) return null
   const max = Math.max(...data, 1)
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 26, marginTop: 8 }}>
@@ -92,35 +94,6 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
         />
       ))}
     </div>
-  )
-}
-
-function StatusChip({ status }: { status: string }) {
-  const s = (status || '').toUpperCase()
-  const map: Record<string, [string, string]> = {
-    PLACED: ['var(--brand-pale)', 'var(--brand-mid)'],
-    PENDING: ['var(--amber-pale)', 'var(--amber)'],
-    PROCESSING: ['var(--amber-pale)', 'var(--amber)'],
-    SHIPPED: ['var(--mint-pale)', 'var(--mint)'],
-    COMPLETED: ['var(--mint-pale)', 'var(--mint)'],
-    CANCELLED: ['var(--red-pale)', 'var(--red)'],
-  }
-  const [bg, color] = map[s] || ['var(--brand-pale)', 'var(--brand-mid)']
-  return (
-    <span
-      style={{
-        background: bg,
-        color,
-        fontSize: 10,
-        fontWeight: 700,
-        borderRadius: 6,
-        padding: '2px 7px',
-        letterSpacing: '0.02em',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {s}
-    </span>
   )
 }
 
@@ -295,7 +268,6 @@ export function DashboardPage() {
   const smartReorderEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.smart_reorder
   )
-  const reportsEnabled = canUseGlobalReports(entitlementsData?.entitlements)
   const { data: reorderSuggestions } = useGetReorderSuggestionsQuery(undefined, {
     skip: !isRestaurant || !smartReorderEnabled,
   })
@@ -321,8 +293,6 @@ export function DashboardPage() {
     { period: 30 },
     { skip: !isRestaurant || !financeInvoicesEnabled }
   )
-  const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d')
-
   const planName = formatPlanDisplayName(
     entitlementsData?.entitlements?.plan?.code,
     entitlementsData?.entitlements?.plan?.name
@@ -411,20 +381,10 @@ export function DashboardPage() {
   // ── Derived data ─────────────────────────────────────────────────────────
   const orders = (ordersData?.orders || []).slice(0, 7)
   const orderAmounts = orders.map((o: any) => Number(o.total_amount) || 0)
-  const syntheticRamp = (n: number, peak: number) =>
-    Array.from({ length: 7 }, (_, i) =>
-      Math.round((peak || 100) * (0.3 + (i / 6) * 0.7) * (0.7 + Math.random() * 0.3))
-    ).slice(0, n)
-  const revenueSparkData =
-    orderAmounts.length >= 4
-      ? [...orderAmounts.slice(-7).reverse()]
-      : syntheticRamp(7, (stats?.totalRevenue as number) || 500)
-  const ordersSparkData = syntheticRamp(7, (stats?.totalOrders as number) || 10)
-  const pendingSparkData = syntheticRamp(7, (stats?.pendingOrders as number) || 5)
-  const counterpartSparkData = syntheticRamp(
-    7,
-    ((isSupplier ? stats?.totalRestaurants : stats?.totalSuppliers) as number) || 5
-  )
+  const revenueSparkData = orderAmounts.length >= 3 ? [...orderAmounts.slice(-7)] : []
+  const ordersSparkData: number[] = []
+  const pendingSparkData: number[] = []
+  const counterpartSparkData: number[] = []
 
   const invoiceSpendTrend = Array.isArray(invoiceAnalytics?.points)
     ? invoiceAnalytics.points.map((p: any) => ({
@@ -660,37 +620,6 @@ export function DashboardPage() {
             &nbsp;·&nbsp; {planName}
           </p>
         </div>
-        {/* Period selector — UI only */}
-        <div
-          style={{
-            display: 'flex',
-            background: 'var(--surface)',
-            border: '1px solid var(--app-border)',
-            borderRadius: 8,
-            overflow: 'hidden',
-            flexShrink: 0,
-          }}
-        >
-          {(['7d', '30d', '90d'] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              style={{
-                padding: '5px 12px',
-                fontSize: 12,
-                fontWeight: 600,
-                fontFamily: 'inherit',
-                border: 'none',
-                cursor: 'pointer',
-                background: period === p ? 'var(--brand)' : 'transparent',
-                color: period === p ? '#fff' : 'var(--text-muted)',
-                transition: 'background 0.15s, color 0.15s',
-              }}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* KPI grid — 4 columns */}
@@ -784,7 +713,7 @@ export function DashboardPage() {
                       <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
                         {formatCurrency(o.total_amount)}
                       </span>
-                      <StatusChip status={o.status} />
+                      <StatusBadge status={o.status} />
                     </div>
                   </Link>
                 ))
@@ -1251,7 +1180,7 @@ export function DashboardPage() {
               title="At-risk expected orders"
               action={
                 <Link
-                  to="/app/supplier/command-center"
+                  to="/app/command-center"
                   style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}
                 >
                   Command center →

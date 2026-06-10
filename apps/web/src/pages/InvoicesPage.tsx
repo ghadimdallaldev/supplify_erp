@@ -4,21 +4,17 @@ import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import {
   FileText,
-  DollarSign,
   Clock,
   CheckCircle,
   XCircle,
   Search,
-  Filter,
   Download,
   Loader2,
   TrendingUp,
   TrendingDown,
   Calendar,
   CreditCard,
-  Building2,
   AlertTriangle,
-  Plus,
   ArrowRightLeft,
   Receipt,
 } from 'lucide-react'
@@ -31,7 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog'
-import { Select, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
+import { Select, SelectItem, SelectTrigger } from '../components/ui/select'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
@@ -41,7 +37,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
-import { formatCurrency, formatPrice } from '../utils/format'
+import { formatPrice } from '../utils/format'
 import { splitRowClass } from '../components/ui/card-layout'
 import {
   useGetRestaurantInvoicesQuery,
@@ -143,7 +139,6 @@ export function InvoicesPage() {
 
   const invoices = invoicesData?.invoices || []
   const analytics = analyticsData?.analytics || {}
-  const overdueInvoices = overdueData?.invoices || []
   const creditNotes = creditsData?.creditNotes || []
 
   // Calculate remaining balance for selected invoice

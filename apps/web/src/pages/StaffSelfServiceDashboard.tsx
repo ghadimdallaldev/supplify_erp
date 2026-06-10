@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -44,7 +44,6 @@ const PTO_TYPES = [
 
 function useStaffToken() {
   const [searchParams] = useSearchParams()
-  const location = useLocation()
   const token = searchParams.get('token')
 
   useEffect(() => {
@@ -53,7 +52,7 @@ function useStaffToken() {
     }
   }, [token])
 
-  const storedToken = useMemo(() => localStorage.getItem('staff.portal.token'), [location.key])
+  const storedToken = useMemo(() => localStorage.getItem('staff.portal.token'), [])
 
   return token ?? storedToken ?? ''
 }

@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
-import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
@@ -27,7 +26,6 @@ import {
   Trash2,
   Package,
   ShoppingCart,
-  TrendingUp,
   Globe,
   Save,
   Loader2,
@@ -36,7 +34,6 @@ import {
   Clock,
   Calendar,
   CheckCircle2,
-  XCircle,
   AlertCircle,
   Bell,
   MessageCircle,
@@ -62,7 +59,6 @@ import {
   useCreateBranchMutation,
   useDeleteBranchMutation,
   useDeactivateRestaurantOrgBranchMutation,
-  useSwitchRestaurantOrgBranchContextMutation,
   useGetRestaurantTeamQuery,
   useDeleteRestaurantTeamMemberMutation,
 } from '../services/api'
@@ -354,10 +350,9 @@ export function RestaurantOnboardingPage() {
   const { data: branchesData, refetch: refetchBranches } = useGetBranchesQuery(undefined, {
     skip: !user?.id || Boolean(restaurantOrgBranches?.organizationId),
   })
-  const [createBranch, { isLoading: isCreatingBranch }] = useCreateBranchMutation()
+  const [createBranch] = useCreateBranchMutation()
   const [deleteBranch] = useDeleteBranchMutation()
   const [deactivateOrgBranch] = useDeactivateRestaurantOrgBranchMutation()
-  const [switchRestaurantBranch] = useSwitchRestaurantOrgBranchContextMutation()
   const useRestaurantOrg = Boolean(restaurantOrgBranches?.organizationId)
   const branches = useRestaurantOrg
     ? (restaurantOrgBranches?.branches ?? [])

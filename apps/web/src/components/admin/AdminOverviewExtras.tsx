@@ -13,7 +13,6 @@ import {
   HeartPulse,
   Layers,
   ScrollText,
-  Shield,
   Sliders,
   Tag,
   Users,

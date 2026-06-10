@@ -88,9 +88,18 @@ describe('Subscriptions Routes', () => {
   let app
   let db
 
-  beforeEach(() => {
+  beforeEach(async () => {
     clearAllMocks()
     db = setupMocks()
+    // Drop any unconsumed mockResolvedValueOnce values queued by earlier tests
+    // (e.g. when a route takes the tenantContext fast path and never calls
+    // getRequestTenant), then restore the default tenant.
+    const rbac = await import('../lib/rbac.js')
+    vi.mocked(rbac.getRequestTenant).mockReset().mockResolvedValue({
+      tenantId: 'rest-1',
+      tenantType: 'RESTAURANT',
+      tenantName: 'Test Restaurant',
+    })
     mockGetTenantSubscription.mockReset()
     mockCheckLimit.mockReset()
     mockIsFeatureEnabled.mockReset()

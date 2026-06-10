@@ -44,6 +44,7 @@
     "seed:prodlike-team": "node scripts/pnpm-run.mjs --filter @supplify/api seed:prodlike-team",
     "seed:full": "node scripts/pnpm-run.mjs --filter @supplify/api seed:full",
     "seed:features": "node scripts/pnpm-run.mjs --filter @supplify/api seed:features",
+    "seed:demo-readiness": "node scripts/pnpm-run.mjs --filter @supplify/api seed:demo-readiness",
     "seed:tier-catalog": "node apps/api/scripts/seed-tier-catalog.mjs",
     "seed:tier-matrix": "node apps/api/scripts/seed-tier-matrix.mjs",
     "log:tier-limits": "node apps/api/scripts/log-tier-limits.mjs",

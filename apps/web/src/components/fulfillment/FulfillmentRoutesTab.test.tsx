@@ -16,6 +16,7 @@ vi.mock('../../services/api', () => ({
     isError: false,
     refetch: vi.fn(),
   }),
+  useGetOrderTrackingQuery: () => ({ data: undefined, isLoading: false, isError: false }),
 }))
 
 describe('FulfillmentRoutesTab', () => {

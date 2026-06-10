@@ -61,11 +61,9 @@ import type {
   StaffShiftSwap,
   StaffTimeEntry,
   PublicReservationDetails,
-  DriverRecord,
   DispatchOrderCard,
   DeliveryRouteSummary,
   DeliveryRouteDetail,
-  DeliveryTrackingInfo,
   OrderTrackingResponse,
   AdminUserPreferences,
 } from '../types'

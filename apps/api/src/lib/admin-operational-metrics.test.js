@@ -11,7 +11,7 @@ vi.mock('../config/env.js', () => ({
     EMAIL_PROVIDER: 'smtp',
     SMTP_HOST: 'smtp.example.com',
     SMTP_USER: 'user',
-    EMAIL_API_KEY: '',
+    SMTP_PASS: 'secret',
     GPS_TRACKING_ENABLED: true,
     GPS_ALLOW_RESTAURANT_LIVE_TRACKING: true,
     GPS_RESTAURANT_SHOW_DRIVER_NAME: true,

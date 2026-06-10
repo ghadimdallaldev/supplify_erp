@@ -121,10 +121,6 @@ function clampToISODate(date: Date) {
   return format(date, 'yyyy-MM-dd')
 }
 
-function toIsoDate(dateString: string) {
-  return new Date(dateString)
-}
-
 export function StaffPage() {
   const { canAny } = usePermissions()
   const canWriteStaff = canAny('STAFF_EDIT', 'STAFF_MANAGE', 'STAFF_INVITE')

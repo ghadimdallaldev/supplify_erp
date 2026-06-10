@@ -35,6 +35,7 @@
     "seed:prodlike-team": "node scripts/seed-prodlike-team-backfill.js",
     "seed:full": "node scripts/seed-full.mjs",
     "seed:features": "node scripts/seed-feature-demos.js",
+    "seed:demo-readiness": "node scripts/seed-demo-readiness-extras.js",
     "seed:tier-catalog": "node scripts/seed-tier-catalog.js",
     "seed:tier-matrix": "node scripts/seed-tier-matrix.mjs",
     "seed:dev-role-users": "node scripts/seed-dev-role-matrix-users.js",

@@ -38,13 +38,6 @@ vi.mock('jose', () => ({
   createRemoteJWKSet: vi.fn().mockReturnValue({}),
 }))
 
-vi.mock('./keycloak-config.js', () => ({
-  getKeycloakConfig: vi.fn().mockResolvedValue({
-    issuer: 'http://keycloak.example.com/realms/Supplify',
-    jwks_uri: 'http://keycloak.example.com/realms/Supplify/protocol/openid-connect/certs',
-  }),
-}))
-
 vi.mock('./logger.js', () => ({
   logger: {
     info: vi.fn(),
@@ -90,13 +83,22 @@ describe('Auth Utilities', () => {
   describe('getUserInfo', () => {
     it('should fetch user info from Keycloak', async () => {
       const axios = (await import('axios')).default
-      axios.get.mockResolvedValueOnce({
-        data: {
-          sub: 'user-sub-123',
-          email: 'test@example.com',
-          preferred_username: 'testuser',
-        },
-      })
+      // getKeycloakConfig now lives in auth.js: first GET fetches the
+      // well-known config, second GET hits the userinfo endpoint.
+      axios.get
+        .mockResolvedValueOnce({
+          data: {
+            userinfo_endpoint:
+              'http://keycloak.example.com/realms/Supplify/protocol/openid-connect/userinfo',
+          },
+        })
+        .mockResolvedValueOnce({
+          data: {
+            sub: 'user-sub-123',
+            email: 'test@example.com',
+            preferred_username: 'testuser',
+          },
+        })
 
       const userInfo = await getUserInfo('access-token')
 

@@ -31,7 +31,6 @@ import { Input } from '../components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   ArrowLeft,
-  Calendar,
   DollarSign,
   Package,
   FileText,
@@ -41,7 +40,6 @@ import {
   Download,
   Edit,
   Check,
-  X,
   ClipboardList,
   MapPin,
 } from 'lucide-react'
@@ -103,8 +101,6 @@ export function OrderDetailPage() {
   const canDeclineOrder = can('ORDERS_MANAGE')
   const canOpenDispute = can('ORDERS_CREATE') || can('RECEIVING_MANAGE')
   const [activeTab, setActiveTab] = useState<string>('timeline')
-  const [showPickingNotes, setShowPickingNotes] = useState(false)
-  const [showDeliveryNotes, setShowDeliveryNotes] = useState(false)
   const [showOpenDispute, setShowOpenDispute] = useState(false)
 
   useEffect(() => {
@@ -124,11 +120,9 @@ export function OrderDetailPage() {
     entitlementsData?.entitlements,
     'disputes_returns'
   )
-  const {
-    data: invoicesData,
-    isLoading: isLoadingInvoices,
-    refetch: refetchInvoices,
-  } = useGetOrderInvoicesQuery(id!, { skip: !id })
+  const { data: invoicesData, isLoading: isLoadingInvoices } = useGetOrderInvoicesQuery(id!, {
+    skip: !id,
+  })
   const { data: amendmentsData, refetch: refetchAmendments } = useGetOrderAmendmentsQuery(id!, {
     skip: !id,
   })

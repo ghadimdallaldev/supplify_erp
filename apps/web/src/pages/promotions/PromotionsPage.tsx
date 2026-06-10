@@ -31,6 +31,7 @@ import {
 } from '../../components/deals/DealTargetingPickers'
 import toast from 'react-hot-toast'
 import { RequirePermission } from '../../components/RequirePermission'
+import { FeatureLockedCard } from '../../components/FeatureLockedCard'
 import { DealsPerformanceSummary } from '../../components/promotions/DealsPerformanceSummary'
 import { useWorkspaceRole } from '../../hooks/useWorkspaceRole'
 import { Loader2, Plus, BarChart3, Send } from 'lucide-react'
@@ -98,12 +99,11 @@ export function PromotionsPage() {
     return (
       <div className="space-y-4">
         <h1 className="text-[21px] font-black text-[var(--text)]">Deals</h1>
-        <Card>
-          <CardContent className="py-8 text-sm text-[var(--text-muted)]">
-            Deals are not on your plan. Upgrade to create supplier discounts, coupons, and
-            visibility-based offers.
-          </CardContent>
-        </Card>
+        <FeatureLockedCard
+          featureKey="promotions"
+          featureName="Deals"
+          currentPlan={entitlementsData?.entitlements?.plan?.name ?? null}
+        />
       </div>
     )
   }

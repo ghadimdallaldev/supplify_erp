@@ -28,10 +28,6 @@ vi.mock('./useImpersonation', () => ({
   }),
 }))
 
-vi.mock('./useWorkspaceRole', () => ({
-  useWorkspaceRole: () => ({ roleName: 'Driver', isDriverRole: true, isReadOnlyViewer: false }),
-}))
-
 vi.mock('./usePermissions', () => ({
   usePermissions: () => ({
     can: (key: string) => key === 'DRIVER_DELIVERIES_VIEW' || key === 'DRIVER_DELIVERIES_MANAGE',

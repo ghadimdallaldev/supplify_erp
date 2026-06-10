@@ -58,8 +58,6 @@ function SortableReservationCard({
   tables,
   onStatusChange,
   onAssignTables,
-  boardDate,
-  branchId,
   updating,
 }: {
   reservation: Reservation

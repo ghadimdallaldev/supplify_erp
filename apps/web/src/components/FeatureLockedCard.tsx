@@ -1,5 +1,4 @@
 import { Lock } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { useNavigate } from 'react-router-dom'
 import { getFeatureUpgradeCopy } from '../lib/upgradeCopy'
@@ -30,36 +29,40 @@ export function FeatureLockedCard({
   const valueProp = upgradeCopy?.value
 
   return (
-    <Card className={`border-amber-200 bg-amber-50/50 ${className}`} title={valueProp ?? undefined}>
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-2" title={valueProp ?? undefined}>
-          <Lock className="h-5 w-5 text-amber-600" aria-hidden />
-          <CardTitle className="text-lg">{displayName}</CardTitle>
-        </div>
-        <CardDescription>
-          This feature is not available on your current plan{currentPlan ? ` (${currentPlan})` : ''}
-          .
-          {recommendedPlans.length > 0 && (
-            <> Upgrade to {recommendedPlans.slice(0, 2).join(' or ')} to unlock it.</>
-          )}
-        </CardDescription>
-        {valueProp && (
-          <p className="text-sm text-amber-800 mt-2" role="tooltip">
-            {valueProp}
+    <div
+      className={`rounded-xl border border-amber-200 p-4 ${className}`}
+      style={{ background: 'var(--amber-pale)' }}
+      title={valueProp ?? undefined}
+    >
+      <div className="mb-3 flex items-start gap-2.5">
+        <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold capitalize text-[var(--text)]">{displayName}</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-[var(--text-muted)]">
+            {valueProp ? (
+              valueProp
+            ) : (
+              <>
+                Not available on your current plan
+                {currentPlan ? ` (${currentPlan})` : ''}.
+                {recommendedPlans.length > 0 && (
+                  <> Upgrade to {recommendedPlans.slice(0, 2).join(' or ')} to unlock.</>
+                )}
+              </>
+            )}
           </p>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {children}
-        <Button
-          variant="outline"
-          className="border-amber-300"
-          onClick={() => navigate(upgradeUrl)}
-          title={valueProp ?? `Upgrade to ${planToUnlock} to unlock ${displayName}`}
-        >
-          View plans
-        </Button>
-      </CardContent>
-    </Card>
+        </div>
+      </div>
+      {children && <div className="mb-3">{children}</div>}
+      <Button
+        variant="outline"
+        size="sm"
+        className="border-amber-300 text-amber-900 hover:bg-amber-100 hover:border-amber-400"
+        onClick={() => navigate(upgradeUrl)}
+        title={valueProp ?? `Upgrade to ${planToUnlock} to unlock ${displayName}`}
+      >
+        View plans
+      </Button>
+    </div>
   )
 }

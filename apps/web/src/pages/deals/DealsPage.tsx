@@ -44,7 +44,7 @@ export function DealsPage() {
   )
 
   const { data, isLoading } = useGetActivePromotionsQuery(queryParams)
-  const promotions = data?.promotions || []
+  const promotions = useMemo(() => data?.promotions || [], [data])
 
   const suppliers = useMemo(() => {
     const map = new Map<string, string>()

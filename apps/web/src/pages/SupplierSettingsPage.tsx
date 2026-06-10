@@ -21,42 +21,30 @@ import {
   MapPin,
   FileText,
   Clock,
-  AlertCircle,
-  UserPlus,
-  Upload,
   Package,
   ShoppingCart,
-  TrendingUp,
   Mail,
   Phone,
   Globe,
   Save,
   Loader2,
-  Activity,
-  Users,
   DollarSign,
-  Calendar,
   CheckCircle2,
-  XCircle,
   Bell,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import Papa from 'papaparse'
 import { LogoUpload } from '../components/LogoUpload'
 import { BranchAccountsPanel } from '../components/BranchAccountsPanel'
 import { SubscriptionInfo } from '../components/SubscriptionInfo'
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
 import { formatCurrency } from '../utils/format'
 import {
-  canAddWarehouses,
   getWarehouseAddGate,
   formatWarehouseGateMessage,
   canUseCustomBranding,
   customBrandingUpgradeMessage,
   warehousesFeatureEnabled,
   multiWarehousePlanEnabled,
-  isMultiWarehouseActive,
-  featureEnabled,
   isEntitlementFeatureEnabled,
 } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
@@ -80,10 +68,7 @@ import {
   useGetEntitlementsQuery,
   useGetWarehousesQuery,
   useCreateWarehouseMutation,
-  useSetDefaultWarehouseMutation,
   useGetSupplierFulfillmentQuery,
-  useUpdateSupplierFulfillmentMutation,
-  useSimulateWarehouseRoutingMutation,
 } from '../services/api'
 import { RequirePermission } from '../components/RequirePermission'
 
@@ -96,6 +81,22 @@ const SUPPLIER_NOTIFICATION_DEFAULTS = {
   notifyInvoiceIssued: true,
   notifyLowStock: true,
 } as const
+
+/** Unwired tabs hidden for demo — re-enable when backend exists. */
+const CONTACTS_TAB_ENABLED = false
+const DELIVERY_ZONES_ENABLED = false
+
+const SUPPLIER_SETTINGS_URL_TABS = [
+  'profile',
+  'business',
+  'warehouses',
+  'notifications',
+  'plan',
+  'team',
+  'drivers',
+  'branches',
+  'activity',
+] as const
 
 const SUPPLIER_NOTIFICATION_FIELDS: Array<{
   key: keyof typeof SUPPLIER_NOTIFICATION_DEFAULTS
@@ -160,10 +161,6 @@ export function SupplierSettingsPage() {
   )
 
   const [showAddWarehouse, setShowAddWarehouse] = useState(false)
-  const [showAddZone, setShowAddZone] = useState(false)
-  const [showAddContact, setShowAddContact] = useState(false)
-  const [showBulkUpload, setShowBulkUpload] = useState(false)
-  const [uploadedContacts, setUploadedContacts] = useState<any[]>([])
 
   const [notificationPrefs, setNotificationPrefs] = useState(SUPPLIER_NOTIFICATION_DEFAULTS)
   const {
@@ -184,16 +181,8 @@ export function SupplierSettingsPage() {
   const { data: warehousesData, refetch: refetchWarehouses } = useGetWarehousesQuery(undefined, {
     skip: !warehousesEnabled,
   })
-  const { data: fulfillmentData, refetch: refetchFulfillment } = useGetSupplierFulfillmentQuery(
-    undefined,
-    { skip: !multiWarehousePlan }
-  )
+  useGetSupplierFulfillmentQuery(undefined, { skip: !multiWarehousePlan })
   const [createWarehouse, { isLoading: isCreatingWarehouse }] = useCreateWarehouseMutation()
-  const [setDefaultWarehouse] = useSetDefaultWarehouseMutation()
-  const [updateFulfillment, { isLoading: isUpdatingFulfillment }] =
-    useUpdateSupplierFulfillmentMutation()
-  const fulfillment = fulfillmentData?.fulfillment
-  const multiWarehouseActive = isMultiWarehouseActive(entitlements, fulfillment ?? supplier)
   const warehouseCount = warehousesData?.warehouses?.length ?? 0
   const warehouseGate = getWarehouseAddGate(entitlements, warehouseCount)
   const canAddWarehouse = warehouseGate.canAdd
@@ -249,18 +238,12 @@ export function SupplierSettingsPage() {
 
   useEffect(() => {
     const tab = searchParams.get('tab')
-    if (
-      tab &&
-      [
-        'profile',
-        'contacts',
-        'business',
-        'warehouses',
-        'delivery',
-        'notifications',
-        'plan',
-      ].includes(tab)
-    ) {
+    if (!tab) return
+    if (tab === 'contacts' || tab === 'delivery') {
+      setActiveTab('profile')
+      return
+    }
+    if ((SUPPLIER_SETTINGS_URL_TABS as readonly string[]).includes(tab)) {
       setActiveTab(tab)
     }
   }, [searchParams])
@@ -364,23 +347,6 @@ export function SupplierSettingsPage() {
     isMain: false,
   })
 
-  // Delivery zone form state
-  const [zoneForm, setZoneForm] = useState({
-    name: '',
-    deliveryFee: '',
-    minOrderAmount: '',
-    deliveryTimeDays: '',
-  })
-
-  // Contact form state
-  const [contactForm, setContactForm] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    role: '',
-    isPrimary: false,
-  })
-
   const handleAddWarehouse = async () => {
     if (!canAddWarehouse) {
       toast.error(
@@ -412,96 +378,6 @@ export function SupplierSettingsPage() {
     } catch (err: any) {
       toast.error(err?.data?.error?.message || 'Failed to add warehouse')
     }
-  }
-
-  const handleAddZone = () => {
-    // TODO: Implement API call to add delivery zone
-    console.log('Adding delivery zone:', zoneForm)
-    toast.success('Delivery zone added successfully!')
-    setShowAddZone(false)
-    setZoneForm({
-      name: '',
-      deliveryFee: '',
-      minOrderAmount: '',
-      deliveryTimeDays: '',
-    })
-  }
-
-  const handleAddContact = () => {
-    // TODO: Implement API call to add contact
-    console.log('Adding contact:', contactForm)
-    toast.success('Contact added successfully!')
-    setShowAddContact(false)
-    setContactForm({
-      name: '',
-      email: '',
-      phone: '',
-      role: '',
-      isPrimary: false,
-    })
-  }
-
-  const handleFileUpload = (event: any) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    // Validate file type
-    const validTypes = [
-      'text/csv',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    ]
-    if (!validTypes.includes(file.type)) {
-      toast.error('Please upload a CSV or Excel file')
-      return
-    }
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        try {
-          const contacts = results.data
-            .map((row: any, index) => ({
-              id: index + 1,
-              name: row.Name || row.name || '',
-              email: row.Email || row.email || '',
-              phone: row.Phone || row.phone || '',
-              role: row.Role || row.role || row.Title || row.title || '',
-              isPrimary: row['Is Primary'] === 'true' || row['is_primary'] === 'true' || false,
-            }))
-            .filter((contact) => contact.name && contact.email)
-
-          if (contacts.length === 0) {
-            toast.error('No valid contacts found in the file')
-            return
-          }
-
-          setUploadedContacts(contacts)
-          toast.success(`Imported ${contacts.length} contacts`)
-        } catch (error) {
-          toast.error('Error parsing file')
-          console.error(error)
-        }
-      },
-      error: (error) => {
-        toast.error('Error reading file')
-        console.error(error)
-      },
-    })
-  }
-
-  const handleSaveBulkContacts = () => {
-    if (uploadedContacts.length === 0) {
-      toast.error('No contacts to save')
-      return
-    }
-
-    // TODO: Implement API call to save bulk contacts
-    console.log('Saving contacts:', uploadedContacts)
-    toast.success(`${uploadedContacts.length} contacts uploaded successfully!`)
-    setShowBulkUpload(false)
-    setUploadedContacts([])
   }
 
   if (isLoadingSupplier) {
@@ -588,13 +464,13 @@ export function SupplierSettingsPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="justify-start">
             <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="contacts">Contacts</TabsTrigger>
+            {CONTACTS_TAB_ENABLED && <TabsTrigger value="contacts">Contacts</TabsTrigger>}
             {(can('STAFF_VIEW') || can('SETTINGS_VIEW')) && (
               <TabsTrigger value="team">Team & roles</TabsTrigger>
             )}
             <TabsTrigger value="business">Business</TabsTrigger>
             {can('WAREHOUSES_VIEW') && <TabsTrigger value="warehouses">Warehouses</TabsTrigger>}
-            <TabsTrigger value="delivery">Delivery Zones</TabsTrigger>
+            {DELIVERY_ZONES_ENABLED && <TabsTrigger value="delivery">Delivery Zones</TabsTrigger>}
             <TabsTrigger value="drivers">Drivers</TabsTrigger>
             <TabsTrigger value="branches">Branches</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
@@ -854,110 +730,6 @@ export function SupplierSettingsPage() {
                     </>
                   )}
                 </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="contacts" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Building2 className="h-5 w-5" />
-                      Business Contacts
-                    </CardTitle>
-                    <CardDescription>Manage business contact information</CardDescription>
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload CSV/Excel
-                    </Button>
-                    <Button onClick={() => setShowAddContact(true)}>
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Add Contact
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <h4 className="font-semibold">John Doe</h4>
-                          <Badge variant="secondary">Sales Manager</Badge>
-                          <Badge className="bg-[var(--brand)] text-white">Primary</Badge>
-                        </div>
-                        <div className="flex flex-col gap-2 text-sm text-[var(--text-muted)] sm:flex-row sm:items-center sm:gap-4">
-                          <span className="flex items-center gap-1 min-w-0">
-                            <Mail className="h-3 w-3 shrink-0" />
-                            <span className="truncate">john.doe@freshproduce.com</span>
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Phone className="h-3 w-3 shrink-0" />
-                            +1 (555) 123-4567
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 shrink-0">
-                        <Button variant="outline" size="sm">
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-[var(--red)] hover:text-[var(--red)]"
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <h4 className="font-semibold">Jane Smith</h4>
-                          <Badge variant="secondary">Operations Lead</Badge>
-                        </div>
-                        <div className="flex flex-col gap-2 text-sm text-[var(--text-muted)] sm:flex-row sm:items-center sm:gap-4">
-                          <span className="flex items-center gap-1 min-w-0">
-                            <Mail className="h-3 w-3 shrink-0" />
-                            <span className="truncate">jane.smith@freshproduce.com</span>
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Phone className="h-3 w-3 shrink-0" />
-                            +1 (555) 987-6543
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 shrink-0">
-                        <Button variant="outline" size="sm">
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-[var(--red)] hover:text-[var(--red)]"
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-center py-8 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
-                    <UserPlus className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
-                    <p className="text-[var(--text-muted)]">No additional contacts</p>
-                    <p className="text-sm text-[var(--text-muted)] mt-1">
-                      Add contacts to manage your team
-                    </p>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1315,65 +1087,6 @@ export function SupplierSettingsPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="delivery" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <MapPin className="h-5 w-5" />
-                      Delivery Zones
-                    </CardTitle>
-                    <CardDescription>Manage delivery coverage areas and pricing</CardDescription>
-                  </div>
-                  <Button
-                    onClick={() => setShowAddZone(true)}
-                    className="w-full sm:w-auto shrink-0"
-                  >
-                    <MapPin className="h-4 w-4 mr-2" />
-                    Add Zone
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-semibold mb-2">Downtown Zone</h4>
-                        <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3 sm:gap-4">
-                          <div>
-                            <span className="text-[var(--text-muted)]">Fee:</span>
-                            <span className="ml-2 font-medium">$10.00</span>
-                          </div>
-                          <div>
-                            <span className="text-[var(--text-muted)]">Min Order:</span>
-                            <span className="ml-2 font-medium">$50.00</span>
-                          </div>
-                          <div>
-                            <span className="text-[var(--text-muted)]">Delivery:</span>
-                            <span className="ml-2 font-medium">2 days</span>
-                          </div>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        Edit
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
-                    <MapPin className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
-                    <p className="text-[var(--text-muted)]">No additional delivery zones</p>
-                    <p className="text-sm text-[var(--text-muted)] mt-1">
-                      Add zones to define delivery areas and pricing
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           <TabsContent value="drivers" className="space-y-4">
             <DriversSettingsPanel />
           </TabsContent>
@@ -1488,235 +1201,6 @@ export function SupplierSettingsPage() {
               <Button onClick={handleAddWarehouse} disabled={isCreatingWarehouse}>
                 {isCreatingWarehouse ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Add Warehouse
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Add Delivery Zone Dialog */}
-        <Dialog open={showAddZone} onOpenChange={setShowAddZone}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Delivery Zone</DialogTitle>
-              <DialogDescription>Create a new delivery coverage zone</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="zone-name">Zone Name *</Label>
-                <Input
-                  id="zone-name"
-                  placeholder="Downtown Zone"
-                  value={zoneForm.name}
-                  onChange={(e) => setZoneForm({ ...zoneForm, name: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="delivery-fee">Delivery Fee ($)</Label>
-                  <Input
-                    id="delivery-fee"
-                    type="number"
-                    placeholder="10.00"
-                    value={zoneForm.deliveryFee}
-                    onChange={(e) => setZoneForm({ ...zoneForm, deliveryFee: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="min-order">Min Order Amount ($)</Label>
-                  <Input
-                    id="min-order"
-                    type="number"
-                    placeholder="50.00"
-                    value={zoneForm.minOrderAmount}
-                    onChange={(e) => setZoneForm({ ...zoneForm, minOrderAmount: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="delivery-time">Delivery Time (days)</Label>
-                  <Input
-                    id="delivery-time"
-                    type="number"
-                    placeholder="2"
-                    value={zoneForm.deliveryTimeDays}
-                    onChange={(e) => setZoneForm({ ...zoneForm, deliveryTimeDays: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Coverage Area (Map Integration)</Label>
-                <div className="border-2 border-dashed border-[var(--app-border-mid)] rounded-lg p-8 text-center">
-                  <MapPin className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
-                  <p className="text-sm text-[var(--text-muted)]">
-                    Map picker will be integrated here
-                  </p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">
-                    Draw polygon or select area
-                  </p>
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAddZone(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddZone}>Add Zone</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Add Contact Dialog */}
-        <Dialog open={showAddContact} onOpenChange={setShowAddContact}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Contact</DialogTitle>
-              <DialogDescription>Add a business contact person</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="contact-name">Name *</Label>
-                <Input
-                  id="contact-name"
-                  placeholder="John Doe"
-                  value={contactForm.name}
-                  onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="contact-email">Email *</Label>
-                  <Input
-                    id="contact-email"
-                    type="email"
-                    placeholder="john.doe@example.com"
-                    value={contactForm.email}
-                    onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="contact-phone">Phone *</Label>
-                  <Input
-                    id="contact-phone"
-                    type="tel"
-                    placeholder="+1 (555) 123-4567"
-                    value={contactForm.phone}
-                    onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="contact-role">Role/Title</Label>
-                <Input
-                  id="contact-role"
-                  placeholder="Sales Manager"
-                  value={contactForm.role}
-                  onChange={(e) => setContactForm({ ...contactForm, role: e.target.value })}
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="isPrimary"
-                  checked={contactForm.isPrimary}
-                  onChange={(e) => setContactForm({ ...contactForm, isPrimary: e.target.checked })}
-                  className="rounded"
-                />
-                <Label htmlFor="isPrimary" className="text-sm font-medium">
-                  Set as primary contact
-                </Label>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAddContact(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddContact}>Add Contact</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* CSV Upload Feature */}
-        <Dialog open={showBulkUpload} onOpenChange={setShowBulkUpload}>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Upload Contacts from CSV/Excel</DialogTitle>
-              <DialogDescription>Upload a spreadsheet file to bulk add contacts</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="border-2 border-dashed border-[var(--app-border-mid)] rounded-lg p-8 text-center hover:border-[var(--brand-mid)] cursor-pointer transition-colors">
-                <input
-                  type="file"
-                  accept=".csv,.xlsx,.xls"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  id="csv-upload"
-                />
-                <label htmlFor="csv-upload" className="cursor-pointer">
-                  <Upload className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
-                  <p className="text-sm text-[var(--text-muted)]">Drop your CSV/Excel file here</p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">or click to browse</p>
-                </label>
-              </div>
-              <div className="text-sm text-[var(--text-muted)] bg-[var(--brand-ultra)] p-4 rounded-lg">
-                <p className="font-medium mb-2">Expected columns:</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>Name (required)</li>
-                  <li>Email (required)</li>
-                  <li>Phone</li>
-                  <li>Role or Title</li>
-                  <li>Is Primary (true/false, optional)</li>
-                </ul>
-              </div>
-
-              {uploadedContacts.length > 0 && (
-                <div className="space-y-2">
-                  <p className="font-medium text-sm">
-                    Preview ({uploadedContacts.length} contacts):
-                  </p>
-                  <div className="max-h-48 overflow-y-auto border rounded-lg">
-                    <table className="w-full text-sm">
-                      <thead className="bg-[var(--brand-ultra)]">
-                        <tr>
-                          <th className="px-3 py-2 text-left">Name</th>
-                          <th className="px-3 py-2 text-left">Email</th>
-                          <th className="px-3 py-2 text-left">Phone</th>
-                          <th className="px-3 py-2 text-left">Role</th>
-                          <th className="px-3 py-2 text-center">Primary</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {uploadedContacts.map((contact) => (
-                          <tr key={contact.id} className="border-t">
-                            <td className="px-3 py-2">{contact.name}</td>
-                            <td className="px-3 py-2">{contact.email}</td>
-                            <td className="px-3 py-2">{contact.phone}</td>
-                            <td className="px-3 py-2">{contact.role}</td>
-                            <td className="px-3 py-2 text-center">
-                              {contact.isPrimary ? (
-                                <CheckCircle2 className="h-4 w-4 text-[var(--mint)] mx-auto" />
-                              ) : (
-                                <XCircle className="h-4 w-4 text-[var(--text-muted)] mx-auto" />
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowBulkUpload(false)
-                  setUploadedContacts([])
-                }}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleSaveBulkContacts} disabled={uploadedContacts.length === 0}>
-                Upload {uploadedContacts.length > 0 ? `(${uploadedContacts.length})` : ''}
               </Button>
             </DialogFooter>
           </DialogContent>

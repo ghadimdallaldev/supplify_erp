@@ -1,5 +1,4 @@
-import { Button } from '../ui/button'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { useGetPromotionAnalyticsQuery } from '../../services/api'
 import { formatBoostStatusLabel } from '../../lib/dealDisplayLabels'
 import { Loader2 } from 'lucide-react'

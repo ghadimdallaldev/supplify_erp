@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
-import { Badge } from '../ui/badge'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Textarea } from '../ui/textarea'
@@ -117,7 +116,9 @@ export function RestaurantWastePanel({
       return
     }
     if (selectedItem && qty > Number(selectedItem.quantity)) {
-      toast.error(`Cannot log more than on hand (${selectedItem.quantity} ${selectedItem.product_unit || ''})`)
+      toast.error(
+        `Cannot log more than on hand (${selectedItem.quantity} ${selectedItem.product_unit || ''})`
+      )
       return
     }
 
@@ -281,17 +282,23 @@ export function RestaurantWastePanel({
                     <tr key={String(row.product_id)} className="hover:bg-[var(--brand-ultra)]">
                       <td className="py-3 pr-4">
                         <p className="font-medium">{String(row.product_name)}</p>
-                        <p className="text-xs text-[var(--text-muted)]">{String(row.product_sku)}</p>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          {String(row.product_sku)}
+                        </p>
                       </td>
                       <td className="py-3 pr-4">{String(row.supplier_name || '—')}</td>
                       <td className="py-3 pr-4">
                         {formatNumber(Number(row.total_waste_qty || 0))}{' '}
-                        <span className="text-[var(--text-muted)]">{String(row.product_unit || '')}</span>
+                        <span className="text-[var(--text-muted)]">
+                          {String(row.product_unit || '')}
+                        </span>
                       </td>
                       <td className="py-3 pr-4 font-semibold text-[var(--red)]">
                         {formatCurrency(Number(row.total_waste_cost || 0))}
                       </td>
-                      <td className="py-3 pr-4">{formatNumber(Number(row.waste_incidents || 0))}</td>
+                      <td className="py-3 pr-4">
+                        {formatNumber(Number(row.waste_incidents || 0))}
+                      </td>
                       <td className="py-3 text-right">
                         <Button
                           variant="outline"

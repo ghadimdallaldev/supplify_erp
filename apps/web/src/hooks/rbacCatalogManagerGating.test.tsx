@@ -41,10 +41,6 @@ vi.mock('./useImpersonation', () => ({
   }),
 }))
 
-vi.mock('./useWorkspaceRole', () => ({
-  useWorkspaceRole: () => ({ isDriverRole: false }),
-}))
-
 vi.mock('./useNotificationBadge', () => ({
   useNotificationBadge: () => ({ unreadCount: 0 }),
 }))

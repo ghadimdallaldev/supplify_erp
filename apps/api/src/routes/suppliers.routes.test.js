@@ -56,6 +56,8 @@ vi.mock('../lib/logger.js', async (importOriginal) => {
 vi.mock('../services/reviews.service.js', () => ({
   getSupplierRatingSummary: vi.fn().mockResolvedValue({ avg_overall: 0, review_count: 0 }),
   getRecentReviewsForSupplier: vi.fn().mockResolvedValue([]),
+  getSupplierRatingSummariesBatch: vi.fn().mockResolvedValue(new Map()),
+  getRecentReviewsForSuppliersBatch: vi.fn().mockResolvedValue(new Map()),
 }))
 
 // Import routes after mocks

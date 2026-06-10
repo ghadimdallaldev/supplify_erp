@@ -26,6 +26,7 @@ vi.mock('../lib/rbac.js', () => ({
   resolveTenantContext: (req, res, next) => next(),
   requirePermission: () => (req, res, next) => next(),
   getRequestTenant: vi.fn().mockResolvedValue(null),
+  getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
   checkPermission: vi.fn().mockResolvedValue(true),
   upsertUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com' }),
   setAuthCookies: vi.fn(),
@@ -34,6 +35,7 @@ vi.mock('../lib/rbac.js', () => ({
 }))
 
 vi.mock('../lib/subscription.js', () => ({
+  requireFeature: () => (_req, _res, next) => next(),
   checkLimit: vi
     .fn()
     .mockResolvedValue({ allowed: true, current: 0, limit: 100, isOverLimit: false }),

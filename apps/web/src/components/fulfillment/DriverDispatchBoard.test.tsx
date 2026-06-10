@@ -24,6 +24,7 @@ vi.mock('../../services/api', () => ({
   useUpdateOrderDeliveryStatusMutation: () => [vi.fn(), { isLoading: false }],
   useSubmitOrderProofOfDeliveryMutation: () => [vi.fn(), { isLoading: false }],
   useCreateFulfillmentRouteMutation: () => [vi.fn(), { isLoading: false }],
+  useRolloverAssignmentToTomorrowMutation: () => [vi.fn(), { isLoading: false }],
 }))
 
 const order: DispatchOrderCard = {

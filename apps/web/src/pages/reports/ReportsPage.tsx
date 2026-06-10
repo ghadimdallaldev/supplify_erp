@@ -164,7 +164,7 @@ function ReportPanel({
   const { data, isLoading, isFetching, isError, error, refetch } = isRestaurant
     ? restaurantQuery
     : supplierQuery
-  const rows = data?.data ?? []
+  const rows = useMemo(() => data?.data ?? [], [data])
   const showInitialLoad = isLoading && !data
   const showRefreshing = isFetching && !isLoading && rows.length > 0
 

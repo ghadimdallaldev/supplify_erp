@@ -41,7 +41,7 @@ describe('load-railway-env', () => {
     const loaded = loadRailwayApiEnvDefaults(repoRoot)
     expect(loaded).toContain('api.env')
     expect(process.env.KEYCLOAK_REALM).toBe('Supplify')
-    expect(process.env.WEB_ORIGIN).toBe('https://supplify-web-dev-development.up.railway.app')
+    expect(process.env.WEB_ORIGIN).toBe('https://app-dev.supplifyerp.com')
   })
 
   it('does not override existing env vars', () => {

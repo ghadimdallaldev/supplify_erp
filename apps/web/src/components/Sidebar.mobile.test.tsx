@@ -30,6 +30,10 @@ vi.mock('../hooks/useNotificationBadge', () => ({
   useNotificationBadge: () => ({ unreadCount: 0 }),
 }))
 
+vi.mock('./BranchSwitcher', () => ({
+  BranchSwitcher: () => null,
+}))
+
 vi.mock('../services/api', () => ({
   useGetEntitlementsQuery: () => ({
     data: { entitlements: { plan: { code: 'gold' }, features: {} } },
@@ -44,10 +48,6 @@ vi.mock('../hooks/usePermissions', () => ({
     can: () => true,
     canAny: () => true,
   }),
-}))
-
-vi.mock('../hooks/useWorkspaceRole', () => ({
-  useWorkspaceRole: () => ({ isDriverRole: false }),
 }))
 
 describe('Sidebar mobile', () => {

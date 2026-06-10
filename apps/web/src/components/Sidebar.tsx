@@ -36,7 +36,7 @@ import {
   Percent,
   Radar,
 } from 'lucide-react'
-import { featureEnabled, getOrderUsageBadge, isEntitlementFeatureEnabled } from '../lib/planLimits'
+import { getOrderUsageBadge, isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { countActiveDisputes } from '../lib/disputeHelpers'
 import {
   canUseGlobalReports,

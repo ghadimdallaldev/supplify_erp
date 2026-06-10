@@ -14,16 +14,15 @@ import {
   useGetEntitlementsQuery,
 } from '../services/api'
 import { Link } from 'react-router-dom'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Card, CardContent } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
 import { PageHeader } from '../components/ui/page-header'
 import { EmptyState } from '../components/ui/empty-state'
 import { Label } from '../components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Package, Search, Plus, Upload, Download, TrendingUp, TrendingDown } from 'lucide-react'
-import { useAppDispatch, useAppSelector } from '../hooks/redux'
+import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useCartActions } from '../hooks/useCartActions'
 import { AddToOrderingListButton } from '../components/ordering/AddToOrderingListButton'
@@ -37,7 +36,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog'
-import { formatPrice, formatNumber } from '../utils/format'
+import { formatNumber } from '../utils/format'
 import { ContractPriceDisplay } from '../components/ContractPriceDisplay'
 import { canUseSupplierDeals } from '../lib/planFeatureGates'
 import { PermissionGate } from '../components/PermissionGate'
@@ -77,7 +76,6 @@ export function ProductsPage() {
     warehouse_id: '',
   })
   const [newTag, setNewTag] = useState('')
-  const dispatch = useAppDispatch()
   const { addItem } = useCartActions()
   const { user } = useAppSelector((state) => state.auth)
   const { isEffectiveSupplier, isEffectiveRestaurant } = useImpersonation()
@@ -288,7 +286,7 @@ export function ProductsPage() {
     if (!file) return
 
     if (!file.name.endsWith('.csv')) {
-      toast.error('Please upload a CSV file (Excel preview uses server validation on CSV export)')
+      toast.error('Please upload a .csv file. Using Excel? Save your sheet as CSV first.')
       return
     }
 

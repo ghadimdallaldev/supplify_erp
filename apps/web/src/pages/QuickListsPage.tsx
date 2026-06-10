@@ -34,7 +34,6 @@ import {
   Calendar,
   CheckCircle,
   Pause,
-  Play,
   Eye,
   Filter,
   Zap,
@@ -51,7 +50,6 @@ import {
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import toast from 'react-hot-toast'
-import { useAppDispatch } from '../hooks/redux'
 import { useCartActions } from '../hooks/useCartActions'
 import { useNavigate } from 'react-router-dom'
 import { formatPrice } from '../utils/format'
@@ -136,7 +134,6 @@ export function QuickListsPage() {
   const [scheduleTime, setScheduleTime] = useState('09:00')
   const [autoCreateOrder, setAutoCreateOrder] = useState(true)
 
-  const dispatch = useAppDispatch()
   const { addItem } = useCartActions()
   const navigate = useNavigate()
 
@@ -513,7 +510,7 @@ export function QuickListsPage() {
   }
 
   // Format frequency text
-  const formatFrequency = (freq: string, days?: any) => {
+  const formatFrequency = (freq: string, _days?: any) => {
     switch (freq) {
       case 'DAILY':
         return 'Daily'
