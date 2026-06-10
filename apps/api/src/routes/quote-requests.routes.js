@@ -186,14 +186,25 @@ router.get(
           requestId: req.requestId,
         })
       }
-      const params = listQuerySchema.parse(req.query)
+      const params = listQuerySchema.safeParse(req.query)
+      if (!params.success) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: params.error.flatten().formErrors.join('; '),
+          },
+          requestId: req.requestId,
+        })
+      }
       const restaurantStatus =
-        params.status && ['open', 'closed', 'cancelled'].includes(params.status)
-          ? params.status
+        params.data.status && ['open', 'closed', 'cancelled'].includes(params.data.status)
+          ? params.data.status
           : undefined
       const data = await listRestaurantQuoteRequests(restaurantId, {
-        page: params.page,
-        limit: params.limit,
+        page: params.data.page,
+        limit: params.data.limit,
         status: restaurantStatus,
       })
       res.json({ ok: true, data, error: null, requestId: req.requestId })
