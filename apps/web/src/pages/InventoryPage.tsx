@@ -234,13 +234,13 @@ export function InventoryPage() {
                         <th className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                           Product
                         </th>
-                        <th className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                        <th className="hidden py-3 px-4 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] md:table-cell">
                           Warehouse
                         </th>
-                        <th className="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                        <th className="hidden py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] sm:table-cell">
                           On Hand
                         </th>
-                        <th className="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                        <th className="hidden py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] md:table-cell">
                           Reserved
                         </th>
                         <th className="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
@@ -269,7 +269,7 @@ export function InventoryPage() {
                               <p className="text-xs text-[var(--text-muted)]">{item.sku}</p>
                             </div>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="hidden py-3 px-4 md:table-cell">
                             {item.warehouse_name ? (
                               <div className="flex items-center gap-2">
                                 <Warehouse className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
@@ -288,7 +288,7 @@ export function InventoryPage() {
                               <span className="text-sm text-[var(--text-muted)]">—</span>
                             )}
                           </td>
-                          <td className="py-3 px-4 text-right">
+                          <td className="hidden py-3 px-4 text-right sm:table-cell">
                             <span className="text-sm font-medium text-[var(--text)]">
                               {formatNumber(
                                 parseFloat(String(item.available_qty || 0)) +
@@ -297,7 +297,7 @@ export function InventoryPage() {
                               )}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-right">
+                          <td className="hidden py-3 px-4 text-right md:table-cell">
                             <span className="text-sm" style={{ color: 'var(--amber)' }}>
                               {item.reserved_qty || 0}
                             </span>

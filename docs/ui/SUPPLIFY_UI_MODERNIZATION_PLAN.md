@@ -1022,6 +1022,8 @@ The following user-facing labels are already implemented correctly in `dealDispl
 
 ### Phase 6 — Mobile / Responsive Pass
 
+> **Status: ✅ Completed (2 items deferred as product decisions)** — Supplier inventory table hides Warehouse/Reserved below `md` and On Hand below `sm` (Product, Available, Status, Actions always visible). Orders already render as responsive stacked cards, so customer/ID/date stacking was already satisfied. Admin tab bar fade indicators were done in Phase 2 (`AdminTabScrollRow`). Dashboard KPI grid is now 2×2 on mobile (was 1-column). **Deferred:** restaurant bottom nav bar and Dialog→bottom-sheet — both are product/UX decisions that should be explicitly requested (same reasoning as section 12.3).
+
 **Scope:** Mobile-first improvements for restaurant staff and drivers.
 
 **Tasks:**
