@@ -7,6 +7,7 @@ import { Badge } from '../../components/ui/badge'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Textarea } from '../../components/ui/textarea'
+import { Select, SelectTrigger } from '../../components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -45,9 +46,6 @@ import { EmptyState } from '../../components/ui/empty-state'
 import { formatPrice } from '../../utils/format'
 import toast from 'react-hot-toast'
 import { Loader2, Scale } from 'lucide-react'
-
-const FORM_SELECT_CLASS =
-  'mt-1.5 h-10 w-full rounded-lg border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30'
 
 type DisputeRow = {
   id: string
@@ -299,17 +297,15 @@ export function DisputesPage() {
           <CardContent className="px-4 py-4 sm:px-6 sm:py-6">
             <div className="flex w-full max-w-md flex-col gap-2">
               <Label>Status filter</Label>
-              <select
-                className={FORM_SELECT_CLASS}
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="">All</option>
-                <option value="open">Open</option>
-                <option value="under_review">Under review</option>
-                <option value="resolved">Resolved</option>
-                <option value="rejected">Rejected</option>
-              </select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="mt-1.5">
+                  <option value="">All</option>
+                  <option value="open">Open</option>
+                  <option value="under_review">Under review</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="rejected">Rejected</option>
+                </SelectTrigger>
+              </Select>
             </div>
           </CardContent>
         </Card>
@@ -483,53 +479,56 @@ export function DisputesPage() {
               )}
               <div>
                 <Label>Order</Label>
-                <select
-                  className={FORM_SELECT_CLASS}
+                <Select
                   value={createForm.orderId}
-                  onChange={(e) =>
+                  onValueChange={(value) =>
                     setCreateForm((f) => ({
                       ...f,
-                      orderId: e.target.value,
+                      orderId: value,
                       supplierId: '',
                     }))
                   }
-                  disabled={loadingOrders}
                 >
-                  <option value="">
-                    {loadingOrders
-                      ? 'Loading orders…'
-                      : orderOptions.length === 0
-                        ? 'No eligible delivered orders'
-                        : 'Select an order'}
-                  </option>
-                  {orderOptions.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.label}
+                  <SelectTrigger className="mt-1.5" disabled={loadingOrders}>
+                    <option value="">
+                      {loadingOrders
+                        ? 'Loading orders…'
+                        : orderOptions.length === 0
+                          ? 'No eligible delivered orders'
+                          : 'Select an order'}
                     </option>
-                  ))}
-                </select>
+                    {orderOptions.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
               </div>
               <div>
                 <Label>Supplier</Label>
-                <select
-                  className={FORM_SELECT_CLASS}
+                <Select
                   value={createForm.supplierId}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, supplierId: e.target.value }))}
-                  disabled={!createForm.orderId || loadingSuppliers}
+                  onValueChange={(value) => setCreateForm((f) => ({ ...f, supplierId: value }))}
                 >
-                  <option value="">
-                    {!createForm.orderId
-                      ? 'Select an order first'
-                      : supplierOptions.length === 0
-                        ? 'No suppliers on this order'
-                        : 'Select supplier'}
-                  </option>
-                  {supplierOptions.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
+                  <SelectTrigger
+                    className="mt-1.5"
+                    disabled={!createForm.orderId || loadingSuppliers}
+                  >
+                    <option value="">
+                      {!createForm.orderId
+                        ? 'Select an order first'
+                        : supplierOptions.length === 0
+                          ? 'No suppliers on this order'
+                          : 'Select supplier'}
                     </option>
-                  ))}
-                </select>
+                    {supplierOptions.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
               </div>
               <p className="text-sm text-[var(--text-muted)]">
                 Next you can select specific line items and quantities (e.g. received 1 of 3
@@ -578,16 +577,14 @@ export function DisputesPage() {
             <div className="space-y-3">
               <div>
                 <Label>Resolution</Label>
-                <select
-                  className={FORM_SELECT_CLASS}
-                  value={resolutionType}
-                  onChange={(e) => setResolutionType(e.target.value)}
-                >
-                  <option value="credit_note">Credit note</option>
-                  <option value="replacement">Replacement</option>
-                  <option value="refund">Refund</option>
-                  <option value="no_action">No action</option>
-                </select>
+                <Select value={resolutionType} onValueChange={setResolutionType}>
+                  <SelectTrigger className="mt-1.5">
+                    <option value="credit_note">Credit note</option>
+                    <option value="replacement">Replacement</option>
+                    <option value="refund">Refund</option>
+                    <option value="no_action">No action</option>
+                  </SelectTrigger>
+                </Select>
               </div>
               {resolutionType === 'credit_note' && (
                 <div>

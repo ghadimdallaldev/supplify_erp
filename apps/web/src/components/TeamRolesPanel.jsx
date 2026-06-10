@@ -509,21 +509,22 @@ export function TeamRolesPanel({
           {unlinkedDrivers.length > 0 && (
             <div>
               <Label>Existing driver profile (optional)</Label>
-              <select
-                className="mt-1 w-full rounded-md border border-[var(--app-border)] px-3 py-2 text-sm"
+              <Select
                 value={driverAssign?.driverId ?? ''}
-                onChange={(e) =>
-                  setDriverAssign((prev) => (prev ? { ...prev, driverId: e.target.value } : null))
+                onValueChange={(value) =>
+                  setDriverAssign((prev) => (prev ? { ...prev, driverId: value } : null))
                 }
               >
-                <option value="">Create new profile for this user</option>
-                {unlinkedDrivers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.full_name}
-                    {d.phone ? ` · ${d.phone}` : ''}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="mt-1">
+                  <option value="">Create new profile for this user</option>
+                  {unlinkedDrivers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.full_name}
+                      {d.phone ? ` · ${d.phone}` : ''}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
           )}
           <DialogFooter>

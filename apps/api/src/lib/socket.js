@@ -160,6 +160,7 @@ export async function initializeSocket(server) {
           conversationId,
           content,
           senderId,
+          senderType: socket.data.role,
           messageId,
           timestamp,
         })

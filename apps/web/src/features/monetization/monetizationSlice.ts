@@ -49,11 +49,6 @@ const WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 const IGNORED_FEATURE_KEYS = new Set(['upgrade_prompt'])
 const IGNORED_LIMIT_KEYS = new Set(['scheduled_order_grace_per_day'])
 
-const emptySummary = (): RecentBlockedSummary => ({
-  limitKeys: [],
-  featureKeys: [],
-})
-
 function loadBlockedEvents(): BlockedEvent[] {
   try {
     const raw = localStorage.getItem(BLOCKED_KEY)

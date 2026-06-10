@@ -93,6 +93,7 @@ const DEFAULT_NOTIFICATION_PREFS = {
   notify_inventory_expiring: true,
   notify_reorder_cadence: true,
   notify_billing: true,
+  notify_email_digest: false,
 }
 
 const CATEGORY_PREF_MAP = {
@@ -142,6 +143,8 @@ const CATEGORY_PREF_MAP = {
   billing_payment_failed: 'notify_billing',
   billing_cancelled: 'notify_billing',
   billing_plan_changed: 'notify_billing',
+  quote_request_received: 'notify_order_new',
+  quote_response_received: 'notify_order_new',
   billing_trial_extended: 'notify_billing',
   billing_account_locked: 'notify_billing',
   deal_submitted: 'notify_promotions',
@@ -624,7 +627,9 @@ export async function sendNotification({
                   ? '/app/chat'
                   : referenceType === 'QUICK_LIST'
                     ? '/app/quick-lists'
-                    : '/app/notifications'
+                    : referenceType === 'QUOTE_REQUEST'
+                      ? `/app/quote-requests/${referenceId}`
+                      : '/app/notifications'
       sendWebPushToUser({
         userId,
         title,
@@ -1527,25 +1532,20 @@ export async function notifyDealApproved(deal, { supplierName } = {}) {
       `SELECT restaurant_id FROM supplier_follow WHERE supplier_id = $1`,
       [supplierId]
     )
-    const followerIds = new Set(followers.map((r) => r.restaurant_id))
 
-    const { rows: nonFollowers } = await query(
-      `
-      SELECT id AS restaurant_id
-      FROM restaurant r
-      WHERE r.id IS NOT NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM supplier_follow sf
-          WHERE sf.supplier_id = $1 AND sf.restaurant_id = r.id
-        )
-      `,
-      [supplierId]
+    const { rows: targeted } = await query(
+      `SELECT restaurant_id FROM promotion_restaurant_targets WHERE promotion_id = $1`,
+      [dealId]
     )
 
-    let followerCount = 0
-    let nonFollowerCount = 0
+    const recipientIds = new Set([
+      ...followers.map((r) => r.restaurant_id),
+      ...targeted.map((r) => r.restaurant_id),
+    ])
 
-    for (const { restaurant_id: restaurantId } of followers) {
+    let notifiedCount = 0
+
+    for (const restaurantId of recipientIds) {
       await notifyTenantUsers({
         tenantId: restaurantId,
         tenantType: 'RESTAURANT',
@@ -1555,34 +1555,17 @@ export async function notifyDealApproved(deal, { supplierName } = {}) {
         message: `${dealName} is now available. Open Deals to view and redeem.`,
         referenceId: dealId,
         referenceType: 'DEAL',
-        metadata: { link, dealId, supplierId, audience: 'follower' },
+        metadata: { link, dealId, supplierId, audience: 'eligible' },
       })
-      followerCount += 1
-    }
-
-    for (const { restaurant_id: restaurantId } of nonFollowers) {
-      if (followerIds.has(restaurantId)) continue
-      await notifyTenantUsers({
-        tenantId: restaurantId,
-        tenantType: 'RESTAURANT',
-        notificationType: 'PROMOTION',
-        notificationCategory: 'promotions',
-        title: `New deal on Supplify`,
-        message: `${supplierLabel} published "${dealName}". Open Deals to explore.`,
-        referenceId: dealId,
-        referenceType: 'DEAL',
-        metadata: { link, dealId, supplierId, audience: 'non_follower' },
-      })
-      nonFollowerCount += 1
+      notifiedCount += 1
     }
 
     logger.info('notifyDealApproved completed', {
       dealId,
       supplierId,
-      followerCount,
-      nonFollowerCount,
+      notifiedCount,
     })
-    return { followers: followerCount, nonFollowers: nonFollowerCount }
+    return { followers: notifiedCount, nonFollowers: 0 }
   } catch (err) {
     logger.error('notifyDealApproved failed', { err: err.message, dealId })
     return { followers: 0, nonFollowers: 0, error: err.message }
@@ -1905,6 +1888,111 @@ export async function notifyStaffDocumentUploaded(restaurantId, { title, message
     })
   } catch (err) {
     logger.error('notifyStaffDocumentUploaded failed', { err: err.message })
+    return null
+  }
+}
+
+async function hasRecentQuoteNotification({
+  tenantId,
+  tenantType,
+  notificationCategory,
+  referenceId,
+  referenceType = 'QUOTE_REQUEST',
+  windowMinutes = 60,
+}) {
+  const { rows } = await query(
+    `
+    SELECT 1
+    FROM notification_log nl
+    JOIN app_user au ON au.id = nl.user_id
+    WHERE nl.notification_category = $1
+      AND nl.reference_id = $2
+      AND nl.reference_type = $3
+      AND nl.created_at > now() - ($4 || ' minutes')::interval
+      AND (
+        ($5 = 'RESTAURANT' AND au.restaurant_id = $6)
+        OR ($5 = 'SUPPLIER' AND au.supplier_id = $6)
+      )
+    LIMIT 1
+    `,
+    [notificationCategory, referenceId, referenceType, String(windowMinutes), tenantType, tenantId]
+  )
+  return rows.length > 0
+}
+
+export async function notifyQuoteRequestReceived({
+  supplierId,
+  quoteRequestId,
+  quoteRequestSupplierId,
+  restaurantId,
+}) {
+  try {
+    const alreadySent = await hasRecentQuoteNotification({
+      tenantId: supplierId,
+      tenantType: 'SUPPLIER',
+      notificationCategory: 'quote_request_received',
+      referenceId: quoteRequestSupplierId,
+    })
+    if (alreadySent) return null
+
+    const { rows } = await query(`SELECT name FROM restaurant WHERE id = $1`, [restaurantId])
+    const restaurantName = rows[0]?.name || 'A restaurant'
+
+    return notifyTenantUsers({
+      tenantId: supplierId,
+      tenantType: 'SUPPLIER',
+      notificationType: 'QUOTE_REQUEST',
+      notificationCategory: 'quote_request_received',
+      title: 'New quote request',
+      message: `${restaurantName} requested your best price on selected items.`,
+      referenceId: quoteRequestId,
+      referenceType: 'QUOTE_REQUEST',
+      metadata: {
+        quoteRequestSupplierId,
+        ctaUrl: `/app/quote-requests/supplier/${quoteRequestSupplierId}`,
+      },
+    })
+  } catch (err) {
+    logger.error('notifyQuoteRequestReceived failed', { err: err.message })
+    return null
+  }
+}
+
+export async function notifyQuoteResponseReceived({
+  restaurantId,
+  quoteRequestId,
+  quoteRequestSupplierId,
+  supplierId,
+}) {
+  try {
+    const alreadySent = await hasRecentQuoteNotification({
+      tenantId: restaurantId,
+      tenantType: 'RESTAURANT',
+      notificationCategory: 'quote_response_received',
+      referenceId: quoteRequestSupplierId,
+    })
+    if (alreadySent) return null
+
+    const { rows } = await query(`SELECT name FROM supplier WHERE id = $1`, [supplierId])
+    const supplierName = rows[0]?.name || 'A supplier'
+
+    return notifyTenantUsers({
+      tenantId: restaurantId,
+      tenantType: 'RESTAURANT',
+      notificationType: 'QUOTE_RESPONSE',
+      notificationCategory: 'quote_response_received',
+      title: 'Supplier response received',
+      message: `${supplierName} responded to your quote request.`,
+      referenceId: quoteRequestId,
+      referenceType: 'QUOTE_REQUEST',
+      metadata: {
+        quoteRequestSupplierId,
+        supplierId,
+        ctaUrl: `/app/quote-requests/${quoteRequestId}`,
+      },
+    })
+  } catch (err) {
+    logger.error('notifyQuoteResponseReceived failed', { err: err.message })
     return null
   }
 }

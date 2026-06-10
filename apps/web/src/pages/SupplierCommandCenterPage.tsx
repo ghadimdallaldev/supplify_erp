@@ -29,6 +29,7 @@ import {
   ReorderReminderReviewDialog,
   type ReminderDraft,
 } from '../components/supplier/ReorderReminderReviewDialog'
+import { SupplierFollowUpPanel } from '../components/supplier/SupplierFollowUpPanel'
 import { usePermissions } from '../hooks/usePermissions'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { getCommandCenterLayout } from '../lib/workspaceRoleProfile'
@@ -46,7 +47,7 @@ const OPS_QUICK_ACTIONS = [
 ]
 
 const SALES_QUICK_ACTIONS = [
-  { label: 'Deals & promotions', href: '/app/promotions', icon: Tag, testId: 'qa-deals' },
+  { label: 'Deals', href: '/app/promotions', icon: Tag, testId: 'qa-deals' },
   { label: 'Restaurants', href: '/app/restaurants', icon: Users, testId: 'qa-restaurants' },
   { label: 'Reorder leads', href: '#reorder', icon: Users, testId: 'qa-reorder' },
 ]
@@ -181,7 +182,7 @@ export function SupplierCommandCenterPage() {
 
   const handleDraftReminder = async (restaurantId: string) => {
     try {
-      const result = await createDraft(restaurantId).unwrap()
+      const result = await createDraft({ restaurantId, openChat: false }).unwrap()
       const draft = result.draft ?? result
       if (draft?.autoSent) {
         toast.error('Unexpected: reminder was marked as sent')
@@ -531,6 +532,8 @@ export function SupplierCommandCenterPage() {
             )}
           </div>
         )}
+
+        {layout.showReorder && <SupplierFollowUpPanel className="mb-4" />}
 
         {layout.showReorder && (
           <section

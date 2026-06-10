@@ -244,108 +244,156 @@ export async function createLotFromReceivingLine(
   return rows[0]?.id
 }
 
-async function hasDedupSent(restaurantId, dedupKey, alertKind) {
+async function claimDedup(restaurantId, { alertKind, dedupKey }) {
   const { rows } = await query(
     `
-    SELECT 1 FROM inventory_expiry_notification_log
-    WHERE restaurant_id = $1 AND dedup_key = $2 AND alert_kind = $3
-      AND (snoozed_until IS NULL OR snoozed_until > now())
-    LIMIT 1
+    INSERT INTO inventory_expiry_notification_log (
+      restaurant_id, lot_id, alert_kind, dedup_key
+    ) VALUES ($1, NULL, $2, $3)
+    ON CONFLICT (restaurant_id, dedup_key, alert_kind) DO NOTHING
+    RETURNING id
     `,
-    [restaurantId, dedupKey, alertKind]
+    [restaurantId, alertKind, dedupKey]
   )
   return rows.length > 0
 }
 
-async function recordDedup(restaurantId, { lotId, alertKind, dedupKey, notificationLogId }) {
+async function attachNotificationToDedup(restaurantId, dedupKey, alertKind, notificationLogId) {
+  if (!notificationLogId) return
   await query(
     `
-    INSERT INTO inventory_expiry_notification_log (
-      restaurant_id, lot_id, alert_kind, dedup_key, notification_log_id
-    ) VALUES ($1, $2, $3, $4, $5)
-    ON CONFLICT (restaurant_id, dedup_key, alert_kind) DO NOTHING
+    UPDATE inventory_expiry_notification_log
+    SET notification_log_id = $4
+    WHERE restaurant_id = $1 AND dedup_key = $2 AND alert_kind = $3
     `,
-    [restaurantId, lotId || null, alertKind, dedupKey, notificationLogId || null]
+    [restaurantId, dedupKey, alertKind, notificationLogId]
   )
+}
+
+/**
+ * Batch-fetch expiry lot counts grouped by restaurant (avoids per-restaurant N+1 scans).
+ */
+async function fetchExpiryCountsByRestaurant({ restaurantId = null } = {}) {
+  const params = []
+  let restaurantFilter = ''
+  if (restaurantId) {
+    restaurantFilter = 'AND l.restaurant_id = $1'
+    params.push(restaurantId)
+  }
+
+  const { rows } = await query(
+    `
+    SELECT
+      l.restaurant_id,
+      COALESCE(s.expiring_soon_days, $${params.length + 1})::int AS expiring_soon_days,
+      COUNT(*) FILTER (
+        WHERE l.expiry_date IS NOT NULL
+          AND l.expiry_date < CURRENT_DATE
+      )::int AS expired_count,
+      COUNT(*) FILTER (
+        WHERE l.expiry_date IS NOT NULL
+          AND l.expiry_date >= CURRENT_DATE
+          AND l.expiry_date <= CURRENT_DATE + (COALESCE(s.expiring_soon_days, $${params.length + 1}) || ' days')::interval
+      )::int AS expiring_soon_count
+    FROM restaurant_inventory_lot l
+    LEFT JOIN restaurant_inventory_settings s ON s.restaurant_id = l.restaurant_id
+    WHERE l.is_archived = false
+      ${restaurantFilter}
+    GROUP BY l.restaurant_id, s.expiring_soon_days
+    HAVING
+      COUNT(*) FILTER (WHERE l.expiry_date IS NOT NULL AND l.expiry_date < CURRENT_DATE) > 0
+      OR COUNT(*) FILTER (
+        WHERE l.expiry_date IS NOT NULL
+          AND l.expiry_date >= CURRENT_DATE
+          AND l.expiry_date <= CURRENT_DATE + (COALESCE(s.expiring_soon_days, $${params.length + 1}) || ' days')::interval
+      ) > 0
+    `,
+    [...params, DEFAULT_THRESHOLD]
+  )
+
+  return rows
 }
 
 /**
  * Check all restaurants (or one) and send grouped expiry notifications with dedup.
  */
-export async function runExpiryReminderCheck({ restaurantId = null } = {}) {
-  const restaurantFilter = restaurantId ? 'WHERE r.id = $1' : ''
-  const params = restaurantId ? [restaurantId] : []
-  const { rows: restaurants } = await query(
-    `SELECT r.id FROM restaurant r ${restaurantFilter}`,
-    params
-  )
-
+export async function runExpiryReminderCheck({ restaurantId = null, dryRun = false } = {}) {
+  const countsByRestaurant = await fetchExpiryCountsByRestaurant({ restaurantId })
+  const todayKey = new Date().toISOString().slice(0, 10)
   let notificationsSent = 0
-  for (const { id: rid } of restaurants) {
-    const { lots, expiringSoonDays } = await listExpiryLots(rid)
-    const expiringSoon = lots.filter((l) => l.status === 'expiring_soon')
-    const expired = lots.filter((l) => l.status === 'expired')
+  let restaurantsChecked = countsByRestaurant.length
 
-    const todayKey = new Date().toISOString().slice(0, 10)
+  for (const row of countsByRestaurant) {
+    const rid = row.restaurant_id
+    const expiringSoonDays = row.expiring_soon_days ?? DEFAULT_THRESHOLD
 
-    if (expiringSoon.length > 0) {
+    if (row.expiring_soon_count > 0) {
       const dedupKey = `grouped:expiring:${todayKey}:${expiringSoonDays}`
-      if (!(await hasDedupSent(rid, dedupKey, 'grouped_expiring_soon'))) {
-        const title = 'Items expiring soon'
-        const message =
-          expiringSoon.length === 1
-            ? `1 inventory item is expiring within ${expiringSoonDays} days. Review it before placing your next order.`
-            : `${expiringSoon.length} inventory items are expiring within ${expiringSoonDays} days. Review them before placing your next order.`
-        const sent = await notifyTenantUsers({
-          tenantId: rid,
-          tenantType: 'RESTAURANT',
-          notificationType: 'INVENTORY',
-          notificationCategory: 'inventory_expiring',
-          title,
-          message,
-          referenceType: 'INVENTORY_EXPIRY',
-          metadata: { link: '/app/inventory?tab=expiry', count: expiringSoon.length },
-        })
-        if (sent.length) {
-          await recordDedup(rid, {
-            alertKind: 'grouped_expiring_soon',
-            dedupKey,
-            notificationLogId: sent[0]?.id,
-          })
+      const claimed = await claimDedup(rid, { alertKind: 'grouped_expiring_soon', dedupKey })
+      if (claimed) {
+        if (dryRun || process.env.JOB_DRY_RUN === 'true') {
           notificationsSent += 1
+        } else {
+          const title = 'Items expiring soon'
+          const message =
+            row.expiring_soon_count === 1
+              ? `1 inventory item is expiring within ${expiringSoonDays} days. Review it before placing your next order.`
+              : `${row.expiring_soon_count} inventory items are expiring within ${expiringSoonDays} days. Review them before placing your next order.`
+          const sent = await notifyTenantUsers({
+            tenantId: rid,
+            tenantType: 'RESTAURANT',
+            notificationType: 'INVENTORY',
+            notificationCategory: 'inventory_expiring',
+            title,
+            message,
+            referenceType: 'INVENTORY_EXPIRY',
+            metadata: { link: '/app/inventory?tab=expiry', count: row.expiring_soon_count },
+          })
+          if (sent.length) {
+            await attachNotificationToDedup(rid, dedupKey, 'grouped_expiring_soon', sent[0]?.id)
+            notificationsSent += 1
+          }
         }
       }
     }
 
-    if (expired.length > 0) {
+    if (row.expired_count > 0) {
       const dedupKey = `grouped:expired:${todayKey}`
-      if (!(await hasDedupSent(rid, dedupKey, 'grouped_expired'))) {
-        const title = 'Expired inventory items'
-        const message =
-          expired.length === 1
-            ? '1 inventory item has expired. Review and remove or use it promptly.'
-            : `${expired.length} inventory items have expired. Review them before placing your next order.`
-        const sent = await notifyTenantUsers({
-          tenantId: rid,
-          tenantType: 'RESTAURANT',
-          notificationType: 'INVENTORY',
-          notificationCategory: 'inventory_expired',
-          title,
-          message,
-          referenceType: 'INVENTORY_EXPIRY',
-          metadata: { link: '/app/inventory?tab=expiry&status=expired', count: expired.length },
-        })
-        if (sent.length) {
-          await recordDedup(rid, {
-            alertKind: 'grouped_expired',
-            dedupKey,
-            notificationLogId: sent[0]?.id,
-          })
+      const claimed = await claimDedup(rid, { alertKind: 'grouped_expired', dedupKey })
+      if (claimed) {
+        if (dryRun || process.env.JOB_DRY_RUN === 'true') {
           notificationsSent += 1
+        } else {
+          const title = 'Expired inventory items'
+          const message =
+            row.expired_count === 1
+              ? '1 inventory item has expired. Review and remove or use it promptly.'
+              : `${row.expired_count} inventory items have expired. Review them before placing your next order.`
+          const sent = await notifyTenantUsers({
+            tenantId: rid,
+            tenantType: 'RESTAURANT',
+            notificationType: 'INVENTORY',
+            notificationCategory: 'inventory_expired',
+            title,
+            message,
+            referenceType: 'INVENTORY_EXPIRY',
+            metadata: {
+              link: '/app/inventory?tab=expiry&status=expired',
+              count: row.expired_count,
+            },
+          })
+          if (sent.length) {
+            await attachNotificationToDedup(rid, dedupKey, 'grouped_expired', sent[0]?.id)
+            notificationsSent += 1
+          }
         }
       }
     }
   }
 
-  return { restaurantsChecked: restaurants.length, notificationsSent }
+  return {
+    restaurantsChecked,
+    notificationsSent,
+    dryRun: dryRun || process.env.JOB_DRY_RUN === 'true',
+  }
 }

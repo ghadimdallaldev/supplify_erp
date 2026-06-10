@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../../utils/format'
-import { useAppDispatch, useAppSelector } from '../../hooks/redux'
+import { useAppDispatch } from '../../hooks/redux'
 import { useImpersonation } from '../../hooks/useImpersonation'
 import { getDealRedeemGate } from '../../lib/planLimits'
 import { LIMIT_UPGRADE_COPY } from '../../lib/upgradeCopy'
@@ -102,7 +102,6 @@ export function DealCard({
 }) {
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
-  const { user } = useAppSelector((state) => state.auth)
   const { isEffectiveRestaurant, shouldLoadTenantEntitlements } = useImpersonation()
   const cardRef = useRef<HTMLDivElement>(null)
   const viewTracked = useRef(false)

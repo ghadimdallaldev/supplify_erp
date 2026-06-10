@@ -33,6 +33,10 @@ import {
   listRestaurantReminders,
   recomputeCadencePatterns,
 } from '../services/reorder-cadence.service.js'
+import {
+  getReorderAssistance,
+  suppressReorderSuggestion,
+} from '../services/restaurant-reorder-assistance.service.js'
 
 const router = express.Router()
 
@@ -1122,8 +1126,11 @@ router.post(
     try {
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) throw new ValidationError('Restaurant not found')
-      const result = await runExpiryReminderCheck({ restaurantId })
-      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+      const { runManualCronJob, CRON_JOBS } = await import('../lib/cron-runner.js')
+      const { result } = await runManualCronJob(CRON_JOBS.OPERATIONAL_REMINDERS, () =>
+        runExpiryReminderCheck({ restaurantId })
+      )
+      res.json({ ok: true, data: result ?? {}, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)
     }
@@ -1164,6 +1171,55 @@ router.post(
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) throw new ValidationError('Restaurant not found')
       const result = await recomputeCadencePatterns({ restaurantId })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+const suppressSchema = z.object({
+  scopeType: z.enum(['product', 'cadence', 'supplier_product']),
+  scopeId: z.string().min(1),
+  action: z.enum(['snooze', 'not_needed']),
+  snoozeDays: z.number().int().min(1).max(90).optional(),
+})
+
+router.get(
+  '/reorder-assistance',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requireFeature(
+    'smart_reorder',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const data = await getReorderAssistance(restaurantId)
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/reorder-assistance/suppress',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  requireFeature(
+    'smart_reorder',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const body = suppressSchema.parse(req.body)
+      const result = await suppressReorderSuggestion(restaurantId, body)
       res.json({ ok: true, data: result, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)

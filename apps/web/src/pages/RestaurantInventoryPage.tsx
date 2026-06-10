@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
+import { StatusBadge } from '../components/ui/status-badge'
 import { Input } from '../components/ui/input'
 import {
   Dialog,
@@ -44,6 +45,7 @@ import { formatNumber } from '../utils/format'
 import { featureEnabled } from '../lib/planLimits'
 import { RestaurantWastePanel } from '../components/inventory/RestaurantWastePanel'
 import { ExpiryInventoryTab } from '../components/inventory/ExpiryInventoryTab'
+import { ReorderAssistancePanel } from '../components/inventory/ReorderAssistancePanel'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
 import { EmptyState } from '../components/ui/empty-state'
@@ -96,6 +98,9 @@ export function RestaurantInventoryPage() {
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const wasteTrackingEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.waste_tracking
+  )
+  const smartReorderEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.smart_reorder
   )
 
   const { data, isLoading, error } = useGetRestaurantInventoryQuery()
@@ -354,19 +359,6 @@ export function RestaurantInventoryPage() {
       ? history
       : history.filter((m: any) => getMovementSource(m) === historySource)
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'IN_STOCK':
-        return 'default'
-      case 'LOW_STOCK':
-        return 'secondary'
-      case 'OUT_OF_STOCK':
-        return 'destructive'
-      default:
-        return 'secondary'
-    }
-  }
-
   const summaryCardClass = (active: boolean) =>
     `cursor-pointer transition-all hover:shadow-md ${active ? 'ring-2 ring-[var(--brand-mid)] ring-offset-2' : ''}`
 
@@ -398,9 +390,6 @@ export function RestaurantInventoryPage() {
     )
   }
 
-  const filterSelectClass =
-    'h-10 w-full rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]'
-
   return (
     <RequirePermission permission="INVENTORY_VIEW" title="inventory">
       <div className="page-stack p-4 sm:p-6">
@@ -424,6 +413,12 @@ export function RestaurantInventoryPage() {
             </>
           }
         />
+
+        {smartReorderEnabled && (
+          <div id="reorder-assistance">
+            <ReorderAssistancePanel />
+          </div>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
@@ -838,9 +833,7 @@ export function RestaurantInventoryPage() {
                                   {item.supplier_name ? ` · ${item.supplier_name}` : ''}
                                 </p>
                               </div>
-                              <Badge variant={getStatusColor(status)} className="shrink-0">
-                                {status.replace('_', ' ')}
-                              </Badge>
+                              <StatusBadge status={status} className="shrink-0" />
                             </div>
 
                             <div className="mt-3 flex items-end justify-between gap-3">
@@ -1011,9 +1004,7 @@ export function RestaurantInventoryPage() {
                                   )}
                                 </td>
                                 <td className="px-4 py-4">
-                                  <Badge variant={getStatusColor(status)}>
-                                    {status.replace('_', ' ')}
-                                  </Badge>
+                                  <StatusBadge status={status} />
                                 </td>
                                 <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
                                   {new Date(item.updated_at).toLocaleDateString()}
@@ -1162,16 +1153,13 @@ export function RestaurantInventoryPage() {
                   >
                     Source
                   </label>
-                  <select
-                    id="history-source-filter"
-                    value={historySource}
-                    onChange={(e) => setHistorySource(e.target.value)}
-                    className={`${filterSelectClass} sm:w-48`}
-                  >
-                    <option value="ALL">All</option>
-                    <option value="Order">Order</option>
-                    <option value="Manual">Manual</option>
-                  </select>
+                  <Select value={historySource} onValueChange={setHistorySource}>
+                    <SelectTrigger id="history-source-filter" className="sm:w-48">
+                      <option value="ALL">All</option>
+                      <option value="Order">Order</option>
+                      <option value="Manual">Manual</option>
+                    </SelectTrigger>
+                  </Select>
                 </div>
                 {isLoadingHistory ? (
                   <div className="text-center py-12">Loading history...</div>

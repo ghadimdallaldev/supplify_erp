@@ -27,11 +27,11 @@ import { RequirePermission } from '../components/RequirePermission'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
+import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { Input } from '../components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   ArrowLeft,
-  Calendar,
   DollarSign,
   Package,
   FileText,
@@ -41,7 +41,6 @@ import {
   Download,
   Edit,
   Check,
-  X,
   ClipboardList,
   MapPin,
 } from 'lucide-react'
@@ -103,8 +102,6 @@ export function OrderDetailPage() {
   const canDeclineOrder = can('ORDERS_MANAGE')
   const canOpenDispute = can('ORDERS_CREATE') || can('RECEIVING_MANAGE')
   const [activeTab, setActiveTab] = useState<string>('timeline')
-  const [showPickingNotes, setShowPickingNotes] = useState(false)
-  const [showDeliveryNotes, setShowDeliveryNotes] = useState(false)
   const [showOpenDispute, setShowOpenDispute] = useState(false)
 
   useEffect(() => {
@@ -124,11 +121,9 @@ export function OrderDetailPage() {
     entitlementsData?.entitlements,
     'disputes_returns'
   )
-  const {
-    data: invoicesData,
-    isLoading: isLoadingInvoices,
-    refetch: refetchInvoices,
-  } = useGetOrderInvoicesQuery(id!, { skip: !id })
+  const { data: invoicesData, isLoading: isLoadingInvoices } = useGetOrderInvoicesQuery(id!, {
+    skip: !id,
+  })
   const { data: amendmentsData, refetch: refetchAmendments } = useGetOrderAmendmentsQuery(id!, {
     skip: !id,
   })
@@ -266,11 +261,7 @@ export function OrderDetailPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
-      </div>
-    )
+    return <DetailPageSkeleton rows={6} />
   }
 
   if (error || !data) {

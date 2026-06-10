@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
+import { StatusBadge } from '../ui/status-badge'
+import { Select, SelectTrigger } from '../ui/select'
 import { Loader2, Flag } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
@@ -67,8 +69,7 @@ export function AdminFeatureFlagsPanel({ restaurants, suppliers }: AdminFeatureF
   )
 
   const effectiveFeatures = useMemo(
-    () =>
-      (tenantData?.effectiveFeatures ?? []).filter((f) => !isRemovedFeatureKey(f.featureKey)),
+    () => (tenantData?.effectiveFeatures ?? []).filter((f) => !isRemovedFeatureKey(f.featureKey)),
     [tenantData?.effectiveFeatures]
   )
 
@@ -187,37 +188,36 @@ export function AdminFeatureFlagsPanel({ restaurants, suppliers }: AdminFeatureF
               <label className="mb-1 block text-sm font-medium text-[var(--text-mid)]">
                 Tenant type
               </label>
-              <select
-                className="rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
+              <Select
                 value={tenantType}
-                onChange={(e) => {
-                  setTenantType(e.target.value as TenantType)
+                onValueChange={(value) => {
+                  setTenantType(value as TenantType)
                   setTenantId('')
                 }}
               >
-                <option value="RESTAURANT">Restaurant</option>
-                <option value="SUPPLIER">Supplier</option>
-              </select>
+                <SelectTrigger className="w-auto">
+                  <option value="RESTAURANT">Restaurant</option>
+                  <option value="SUPPLIER">Supplier</option>
+                </SelectTrigger>
+              </Select>
             </div>
             <div className="min-w-[220px] flex-1">
               <label className="mb-1 block text-sm font-medium text-[var(--text-mid)]">
                 Tenant
               </label>
-              <select
-                className="w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
-                value={selectedTenantId}
-                onChange={(e) => setTenantId(e.target.value)}
-              >
-                {tenantOptions.length === 0 ? (
-                  <option value="">No tenants</option>
-                ) : (
-                  tenantOptions.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))
-                )}
-              </select>
+              <Select value={selectedTenantId} onValueChange={(value) => setTenantId(value)}>
+                <SelectTrigger className="w-full">
+                  {tenantOptions.length === 0 ? (
+                    <option value="">No tenants</option>
+                  ) : (
+                    tenantOptions.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))
+                  )}
+                </SelectTrigger>
+              </Select>
             </div>
           </div>
 
@@ -245,9 +245,10 @@ export function AdminFeatureFlagsPanel({ restaurants, suppliers }: AdminFeatureF
                         {feature.featureName}
                       </td>
                       <td className="py-3 pr-4">
-                        <Badge variant={feature.enabled ? 'default' : 'secondary'}>
-                          {feature.enabled ? 'On' : 'Off'}
-                        </Badge>
+                        <StatusBadge
+                          status={feature.enabled ? 'ACTIVE' : 'INACTIVE'}
+                          label={feature.enabled ? 'On' : 'Off'}
+                        />
                       </td>
                       <td className="py-3 pr-4 text-[var(--text-muted)]">
                         {sourceBadge(feature.source)}

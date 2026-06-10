@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
-import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
+import { Select, SelectTrigger } from '../ui/select'
 import {
   useGetAdminOperationalSummaryQuery,
   useGetAdminEmailDeliveryLogsQuery,
@@ -19,14 +19,16 @@ import {
 } from '../../lib/adminTenantSearch'
 import {
   AdminEmptyState,
-  AdminLoadingState,
+  AdminLoadingSkeleton,
   AdminRefreshBar,
   AdminStatusBadge,
   formatAdminDateTime,
 } from './adminUi'
-import { AlertCircle, Mail, Package, MapPin, ListOrdered, RefreshCw } from 'lucide-react'
+import { AlertCircle, Mail, Package, MapPin, ListOrdered } from 'lucide-react'
 import { AdminTenantDiagnosticsDrawer } from './AdminTenantDiagnosticsDrawer'
 import { AdminTenantPicker } from './AdminTenantPicker'
+import { AdminSupportChatPanel } from './AdminSupportChatPanel'
+import { AdminFeaturedPlacementsPanel } from './AdminFeaturedPlacementsPanel'
 
 const EMAIL_STATUS_OPTIONS = ['', 'sent', 'failed', 'skipped', 'log_only']
 
@@ -142,6 +144,10 @@ export function AdminOperationsPanel({
         />
       </Card>
 
+      <AdminSupportChatPanel />
+
+      <AdminFeaturedPlacementsPanel />
+
       <Tabs key={initialSubTab} value={subTab} onValueChange={(v) => setSubTab(v as OpsSubTab)}>
         <TabsList className="flex w-max gap-0 flex-wrap">
           <TabsTrigger value="summary">Summary</TabsTrigger>
@@ -153,7 +159,7 @@ export function AdminOperationsPanel({
 
         <TabsContent value="summary" className="space-y-4 mt-4">
           {summaryLoading ? (
-            <AdminLoadingState label="Loading operational summary…" />
+            <AdminLoadingSkeleton rows={6} />
           ) : (
             <>
               {warnings.length > 0 ? (
@@ -235,24 +241,25 @@ export function AdminOperationsPanel({
           <div className="flex flex-wrap gap-2 items-end">
             <div>
               <Label className="text-xs">Status</Label>
-              <select
-                className="mt-1 block rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
+              <Select
                 value={emailStatus}
-                onChange={(e) => {
-                  setEmailStatus(e.target.value)
+                onValueChange={(value) => {
+                  setEmailStatus(value)
                   setEmailOffset(0)
                 }}
               >
-                {EMAIL_STATUS_OPTIONS.map((s) => (
-                  <option key={s || 'all'} value={s}>
-                    {s || 'All'}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="mt-1 block w-auto">
+                  {EMAIL_STATUS_OPTIONS.map((s) => (
+                    <option key={s || 'all'} value={s}>
+                      {s || 'All'}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
           </div>
           {emailLoading ? (
-            <AdminLoadingState label="Loading email logs…" />
+            <AdminLoadingSkeleton rows={6} />
           ) : !emailLogsData?.logs?.length ? (
             <AdminEmptyState
               title="No email logs"
@@ -314,7 +321,7 @@ export function AdminOperationsPanel({
 
         <TabsContent value="inventory" className="mt-4">
           {summaryLoading ? (
-            <AdminLoadingState />
+            <AdminLoadingSkeleton rows={4} />
           ) : (
             <div className="grid md:grid-cols-2 gap-4">
               <Card className="p-4">
@@ -349,7 +356,7 @@ export function AdminOperationsPanel({
 
         <TabsContent value="fulfillment" className="mt-4">
           {issuesLoading ? (
-            <AdminLoadingState />
+            <AdminLoadingSkeleton rows={5} />
           ) : !issuesData?.issues?.length ? (
             <AdminEmptyState
               title="No open fulfillment issues"
@@ -387,7 +394,7 @@ export function AdminOperationsPanel({
 
         <TabsContent value="gps" className="mt-4 space-y-4">
           {summaryLoading ? (
-            <AdminLoadingState />
+            <AdminLoadingSkeleton rows={2} />
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
               <MetricCard label="Active" value={summary?.gpsDeliveries?.active ?? 0} />
@@ -398,7 +405,7 @@ export function AdminOperationsPanel({
             </div>
           )}
           {deliveriesLoading ? (
-            <AdminLoadingState label="Loading active deliveries…" />
+            <AdminLoadingSkeleton rows={4} />
           ) : !deliveriesData?.deliveries?.length ? (
             <p className="text-sm text-[var(--text-muted)]">No in-progress deliveries right now.</p>
           ) : (

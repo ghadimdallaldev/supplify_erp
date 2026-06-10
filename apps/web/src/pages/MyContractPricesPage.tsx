@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
+import { Select, SelectTrigger } from '../components/ui/select'
 import { useGetMyContractPricingQuery, useGetSuppliersQuery } from '../services/api'
 import { RequirePermission } from '../components/RequirePermission'
 import { ContractPriceDisplay } from '../components/ContractPriceDisplay'
@@ -64,19 +65,16 @@ export function MyContractPricesPage() {
             </div>
             <div className="w-full">
               <Label htmlFor="supplier">Supplier</Label>
-              <select
-                id="supplier"
-                className="mt-1 w-full rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 text-sm"
-                value={supplierFilter}
-                onChange={(e) => setSupplierFilter(e.target.value)}
-              >
-                <option value="">All suppliers</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+              <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+                <SelectTrigger id="supplier" className="mt-1">
+                  <option value="">All suppliers</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
           </CardContent>
         </Card>

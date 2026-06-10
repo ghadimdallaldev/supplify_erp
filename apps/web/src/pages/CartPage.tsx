@@ -6,9 +6,11 @@ import {
   useResolveContractPricesMutation,
 } from '../services/api'
 import { updateItemResolvedPrice } from '../features/cart/cartSlice'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Card, CardContent } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
+import { PageHeader } from '../components/ui/page-header'
+import { EmptyState } from '../components/ui/empty-state'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
@@ -21,7 +23,7 @@ import {
   DialogTitle,
 } from '../components/ui/dialog'
 import { LimitExceededBanner } from '../components/LimitExceededBanner'
-import { pageHeaderRowClass, splitRowClass } from '../components/ui/card-layout'
+import { splitRowClass } from '../components/ui/card-layout'
 import { ShoppingCart, Trash2, Plus, Minus, Save, Calendar, FileText } from 'lucide-react'
 import { useCartActions } from '../hooks/useCartActions'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
@@ -263,18 +265,17 @@ export function CartPage() {
   if (groups.length === 0) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-[21px] font-black text-[var(--text)]">{cartTitle}</h1>
-          <p className="text-[var(--text-muted)] mt-2">Your cart is empty</p>
-        </div>
-
-        <div className="text-center py-12">
-          <ShoppingCart className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-4" />
-          <p className="text-[var(--text-muted)] mb-4">No items in your cart</p>
-          <Button asChild>
-            <a href="/app/products">Browse Products</a>
-          </Button>
-        </div>
+        <PageHeader title={cartTitle} description="Your cart is empty" />
+        <EmptyState
+          title="No items in your cart"
+          description="Browse products from your suppliers to start an order."
+          icon={<ShoppingCart className="h-6 w-6" aria-hidden />}
+          action={
+            <Button asChild>
+              <a href="/app/products">Browse Products</a>
+            </Button>
+          }
+        />
       </div>
     )
   }
@@ -282,30 +283,30 @@ export function CartPage() {
   return (
     <RequirePermission permission="ORDERS_CREATE" title="cart">
       <div className="space-y-6" data-testid="cart-page">
-        <div className={pageHeaderRowClass}>
-          <div className="min-w-0">
-            <h1 className="text-[21px] font-black text-[var(--text)]">{cartTitle}</h1>
-            <p className="text-[var(--text-muted)] mt-2">{cartDescription}</p>
-          </div>
-          <div className="flex flex-wrap gap-2 shrink-0">
-            {drafts.length > 0 && (
-              <Button variant="outline" onClick={() => setShowLoadDraft(true)}>
-                Load Draft
+        <PageHeader
+          title={cartTitle}
+          description={cartDescription}
+          actions={
+            <>
+              {drafts.length > 0 && (
+                <Button variant="outline" onClick={() => setShowLoadDraft(true)}>
+                  Load Draft
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => setShowSaveDraft(true)}
+                disabled={groups.length === 0}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Save Draft
               </Button>
-            )}
-            <Button
-              variant="outline"
-              onClick={() => setShowSaveDraft(true)}
-              disabled={groups.length === 0}
-            >
-              <Save className="h-4 w-4 mr-2" />
-              Save Draft
-            </Button>
-            <Button variant="outline" onClick={() => clearCart()}>
-              Clear Cart
-            </Button>
-          </div>
-        </div>
+              <Button variant="outline" onClick={() => clearCart()}>
+                Clear Cart
+              </Button>
+            </>
+          }
+        />
 
         {!orderGate.canPlace && orderGate.reason === 'at_limit' && orderGate.limit != null && (
           <LimitExceededBanner
@@ -330,18 +331,20 @@ export function CartPage() {
           <div className="lg:col-span-2 space-y-6">
             {groups.map((group) => (
               <Card key={group.supplierId}>
-                <CardHeader>
-                  <CardTitle className={splitRowClass}>
-                    <span className="min-w-0 truncate">{group.supplierName}</span>
-                    <Badge variant="secondary" className="shrink-0">
-                      ${formatPrice(group.subtotal)}
-                    </Badge>
-                  </CardTitle>
-                  <CardDescription>
-                    {group.items.length} item{group.items.length !== 1 ? 's' : ''}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 pt-6">
+                  <div>
+                    <div className={splitRowClass}>
+                      <span className="min-w-0 truncate text-base font-semibold text-[var(--text)]">
+                        {group.supplierName}
+                      </span>
+                      <Badge variant="secondary" className="shrink-0">
+                        ${formatPrice(group.subtotal)}
+                      </Badge>
+                    </div>
+                    <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+                      {group.items.length} item{group.items.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
                   {group.items.map((item) => (
                     <div
                       key={item.productId}
@@ -423,10 +426,8 @@ export function CartPage() {
 
           <div className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Order Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 pt-6">
+                <h3 className="text-base font-semibold text-[var(--text)]">Order Summary</h3>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-[var(--text-muted)]">Subtotal</span>
                   <span>${formatPrice(total)}</span>

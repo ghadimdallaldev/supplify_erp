@@ -14,16 +14,27 @@ import {
   useGetEntitlementsQuery,
 } from '../services/api'
 import { Link } from 'react-router-dom'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Card, CardContent } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
 import { PageHeader } from '../components/ui/page-header'
+import { DataTableShell } from '../components/ui/data-table-shell'
 import { EmptyState } from '../components/ui/empty-state'
+import { Skeleton } from '../components/ui/skeleton'
+import { Select, SelectTrigger } from '../components/ui/select'
 import { Label } from '../components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
-import { Package, Search, Plus, Upload, Download, TrendingUp, TrendingDown } from 'lucide-react'
-import { useAppDispatch, useAppSelector } from '../hooks/redux'
+import {
+  Package,
+  Search,
+  Plus,
+  Upload,
+  Download,
+  TrendingUp,
+  TrendingDown,
+  FileQuestion,
+} from 'lucide-react'
+import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useCartActions } from '../hooks/useCartActions'
 import { AddToOrderingListButton } from '../components/ordering/AddToOrderingListButton'
@@ -37,7 +48,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog'
-import { formatPrice, formatNumber } from '../utils/format'
+import { formatNumber } from '../utils/format'
 import { ContractPriceDisplay } from '../components/ContractPriceDisplay'
 import { canUseSupplierDeals } from '../lib/planFeatureGates'
 import { PermissionGate } from '../components/PermissionGate'
@@ -77,7 +88,6 @@ export function ProductsPage() {
     warehouse_id: '',
   })
   const [newTag, setNewTag] = useState('')
-  const dispatch = useAppDispatch()
   const { addItem } = useCartActions()
   const { user } = useAppSelector((state) => state.auth)
   const { isEffectiveSupplier, isEffectiveRestaurant } = useImpersonation()
@@ -288,7 +298,7 @@ export function ProductsPage() {
     if (!file) return
 
     if (!file.name.endsWith('.csv')) {
-      toast.error('Please upload a CSV file (Excel preview uses server validation on CSV export)')
+      toast.error('Please upload a .csv file. Using Excel? Save your sheet as CSV first.')
       return
     }
 
@@ -403,8 +413,34 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
+      <div className="space-y-6" data-testid="products-page-loading">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <Card className="shadow-sm">
+          <CardContent className="space-y-4 p-4 pt-6">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="overflow-hidden p-0 shadow-sm">
+          <div className="divide-y">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 p-4">
+                <Skeleton className="h-14 w-14 shrink-0 rounded" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-28" />
+                </div>
+                <Skeleton className="h-6 w-16" />
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
     )
   }
@@ -416,9 +452,6 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
       </div>
     )
   }
-
-  const filterSelectClass =
-    'h-10 w-full rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]'
 
   return (
     <RequirePermission anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']} title="products">
@@ -445,9 +478,17 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 </PermissionGate>
               ) : (
                 <PermissionGate permission="ORDERS_CREATE">
-                  <Button asChild>
-                    <Link to="/app/cart">View Cart</Link>
-                  </Button>
+                  <>
+                    <Button asChild variant="outline">
+                      <Link to="/app/quote-requests/new">
+                        <FileQuestion className="h-4 w-4 mr-2" />
+                        Request best price
+                      </Link>
+                    </Button>
+                    <Button asChild>
+                      <Link to="/app/cart">View Cart</Link>
+                    </Button>
+                  </>
                 </PermissionGate>
               )}
             </div>
@@ -464,38 +505,37 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
           </div>
         )}
 
-        <Card className="shadow-sm">
-          <CardContent className="space-y-4 p-4 pt-6">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-12 xl:items-end">
-              <div className="min-w-0 sm:col-span-2 xl:col-span-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
-                  <Input
-                    placeholder="Search products..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="h-10 pl-10"
-                  />
-                </div>
-              </div>
+        <DataTableShell
+          data-testid="products-table-shell"
+          search={
+            <div className="relative min-w-0">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+              <Input
+                placeholder="Search products..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-10 pl-10"
+                aria-label="Search products"
+              />
+            </div>
+          }
+          filters={
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-12 xl:items-end w-full">
               {!isSupplier && (
                 <div className="min-w-0 xl:col-span-2">
                   <Label htmlFor="product-supplier-filter" className="sr-only">
                     Supplier
                   </Label>
-                  <select
-                    id="product-supplier-filter"
-                    value={supplierFilter}
-                    onChange={(e) => setSupplierFilter(e.target.value)}
-                    className={filterSelectClass}
-                  >
-                    <option value="">All Suppliers</option>
-                    {uniqueSuppliers.map((supplier) => (
-                      <option key={supplier.id} value={supplier.id}>
-                        {supplier.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+                    <SelectTrigger id="product-supplier-filter">
+                      <option value="">All Suppliers</option>
+                      {uniqueSuppliers.map((supplier) => (
+                        <option key={supplier.id} value={supplier.id}>
+                          {supplier.name}
+                        </option>
+                      ))}
+                    </SelectTrigger>
+                  </Select>
                 </div>
               )}
               <div
@@ -504,22 +544,22 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 <Label htmlFor="product-category-filter" className="sr-only">
                   Category
                 </Label>
-                <select
-                  id="product-category-filter"
+                <Select
                   value={categoryId}
-                  onChange={(e) => {
-                    setCategoryId(e.target.value)
+                  onValueChange={(value) => {
+                    setCategoryId(value)
                     setCategory('')
                   }}
-                  className={filterSelectClass}
                 >
-                  <option value="">All Categories</option>
-                  {categoriesData?.categories?.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="product-category-filter">
+                    <option value="">All Categories</option>
+                    {categoriesData?.categories?.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
               </div>
               {!isSupplier && (
                 <div className="min-w-0 sm:col-span-2 xl:col-span-4">
@@ -565,92 +605,85 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 </div>
               )}
             </div>
-
-            {/* Tags Filter */}
-            {!isSupplier && tagsData?.tags && tagsData.tags.length > 0 && (
-              <div className="flex flex-col gap-2 border-t border-[var(--app-border-mid)] pt-4">
-                <Label className="text-sm font-medium">Filter by tags</Label>
-                <div className="flex flex-wrap gap-2">
-                  {tagsData.tags.map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant={selectedTags.includes(tag) ? 'default' : 'outline'}
-                      className="cursor-pointer hover:bg-[var(--bg)]"
-                      onClick={() => {
-                        setSelectedTags((prev) =>
-                          prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-                        )
-                      }}
-                    >
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
+          }
+        >
+          {!isSupplier && tagsData?.tags && tagsData.tags.length > 0 && (
+            <div className="border-b border-[var(--app-border)] px-4 py-3">
+              <Label className="text-sm font-medium">Filter by tags</Label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {tagsData.tags.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant={selectedTags.includes(tag) ? 'default' : 'outline'}
+                    className="cursor-pointer hover:bg-[var(--bg)]"
+                    onClick={() => {
+                      setSelectedTags((prev) =>
+                        prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+                      )
+                    }}
+                  >
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          {(supplierFilter ||
+            categoryId ||
+            category ||
+            selectedTags.length > 0 ||
+            minPrice ||
+            maxPrice) &&
+            !isSupplier && (
+              <div className="flex flex-wrap items-center gap-2 border-b border-[var(--app-border)] px-4 py-3">
+                <span className="text-sm text-[var(--text-muted)]">Filtered by:</span>
+                {supplierFilter && (
+                  <Badge
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-[var(--app-border-mid)]"
+                    onClick={() => setSupplierFilter('')}
+                  >
+                    Supplier: {supplierFilter} ×
+                  </Badge>
+                )}
+                {(categoryId || category) && (
+                  <Badge
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-[var(--app-border-mid)]"
+                    onClick={() => {
+                      setCategoryId('')
+                      setCategory('')
+                    }}
+                  >
+                    Category:{' '}
+                    {categoriesData?.categories?.find((c) => c.id === categoryId)?.name || category}{' '}
+                    ×
+                  </Badge>
+                )}
+                {selectedTags.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-[var(--app-border-mid)]"
+                    onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
+                  >
+                    Tag: {tag} ×
+                  </Badge>
+                ))}
+                {(minPrice || maxPrice) && (
+                  <Badge
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-[var(--app-border-mid)]"
+                    onClick={() => {
+                      setMinPrice('')
+                      setMaxPrice('')
+                    }}
+                  >
+                    Price: ${minPrice || '0'} - ${maxPrice || '∞'} ×
+                  </Badge>
+                )}
               </div>
             )}
-
-            {/* Filter Summary */}
-            {(supplierFilter ||
-              categoryId ||
-              category ||
-              selectedTags.length > 0 ||
-              minPrice ||
-              maxPrice) &&
-              !isSupplier && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm text-[var(--text-muted)]">Filtered by:</span>
-                  {supplierFilter && (
-                    <Badge
-                      variant="secondary"
-                      className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-                      onClick={() => setSupplierFilter('')}
-                    >
-                      Supplier: {supplierFilter} ×
-                    </Badge>
-                  )}
-                  {(categoryId || category) && (
-                    <Badge
-                      variant="secondary"
-                      className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-                      onClick={() => {
-                        setCategoryId('')
-                        setCategory('')
-                      }}
-                    >
-                      Category:{' '}
-                      {categoriesData?.categories?.find((c) => c.id === categoryId)?.name ||
-                        category}{' '}
-                      ×
-                    </Badge>
-                  )}
-                  {selectedTags.map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant="secondary"
-                      className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-                      onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
-                    >
-                      Tag: {tag} ×
-                    </Badge>
-                  ))}
-                  {(minPrice || maxPrice) && (
-                    <Badge
-                      variant="secondary"
-                      className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-                      onClick={() => {
-                        setMinPrice('')
-                        setMaxPrice('')
-                      }}
-                    >
-                      Price: ${minPrice || '0'} - ${maxPrice || '∞'} ×
-                    </Badge>
-                  )}
-                </div>
-              )}
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden p-0 shadow-sm">
           <div className="divide-y md:hidden">
             {filteredProducts?.map((product) => (
               <div
@@ -921,7 +954,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               </tbody>
             </table>
           </div>
-        </Card>
+        </DataTableShell>
 
         {filteredProducts?.length === 0 && (
           <EmptyState
@@ -976,47 +1009,47 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="category_id">Category *</Label>
-                  <select
-                    id="category_id"
-                    className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] w-full"
+                  <Select
                     value={productForm.category_id}
-                    onChange={(e) =>
-                      setProductForm({ ...productForm, category_id: e.target.value, category: '' })
+                    onValueChange={(value) =>
+                      setProductForm({ ...productForm, category_id: value, category: '' })
                     }
                   >
-                    <option value="">Select category</option>
-                    {categoriesData?.categories?.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="category_id">
+                      <option value="">Select category</option>
+                      {categoriesData?.categories?.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </SelectTrigger>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="unit">Unit *</Label>
-                  <select
-                    id="unit"
-                    className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] w-full"
+                  <Select
                     value={productForm.unit}
-                    onChange={(e) => setProductForm({ ...productForm, unit: e.target.value })}
+                    onValueChange={(value) => setProductForm({ ...productForm, unit: value })}
                   >
-                    <option value="">Select unit</option>
-                    <option value="kg">Kilogram (kg)</option>
-                    <option value="g">Gram (g)</option>
-                    <option value="lb">Pound (lb)</option>
-                    <option value="oz">Ounce (oz)</option>
-                    <option value="liter">Liter (L)</option>
-                    <option value="ml">Milliliter (ml)</option>
-                    <option value="pack">Pack</option>
-                    <option value="bottle">Bottle</option>
-                    <option value="box">Box</option>
-                    <option value="carton">Carton</option>
-                    <option value="bag">Bag</option>
-                    <option value="piece">Piece</option>
-                    <option value="can">Can</option>
-                    <option value="jar">Jar</option>
-                    <option value="unit">Unit</option>
-                  </select>
+                    <SelectTrigger id="unit">
+                      <option value="">Select unit</option>
+                      <option value="kg">Kilogram (kg)</option>
+                      <option value="g">Gram (g)</option>
+                      <option value="lb">Pound (lb)</option>
+                      <option value="oz">Ounce (oz)</option>
+                      <option value="liter">Liter (L)</option>
+                      <option value="ml">Milliliter (ml)</option>
+                      <option value="pack">Pack</option>
+                      <option value="bottle">Bottle</option>
+                      <option value="box">Box</option>
+                      <option value="carton">Carton</option>
+                      <option value="bag">Bag</option>
+                      <option value="piece">Piece</option>
+                      <option value="can">Can</option>
+                      <option value="jar">Jar</option>
+                      <option value="unit">Unit</option>
+                    </SelectTrigger>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="price">Price (USD) *</Label>
@@ -1043,19 +1076,19 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               </div>
               <div className="space-y-2">
                 <Label htmlFor="warehouse">Warehouse (Optional)</Label>
-                <select
-                  id="warehouse"
-                  className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] w-full"
+                <Select
                   value={productForm.warehouse_id}
-                  onChange={(e) => setProductForm({ ...productForm, warehouse_id: e.target.value })}
+                  onValueChange={(value) => setProductForm({ ...productForm, warehouse_id: value })}
                 >
-                  <option value="">Select a warehouse (optional)</option>
-                  {warehousesData?.warehouses?.map((warehouse: any) => (
-                    <option key={warehouse.id} value={warehouse.id}>
-                      {warehouse.name} {warehouse.code ? `(${warehouse.code})` : ''}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="warehouse">
+                    <option value="">Select a warehouse (optional)</option>
+                    {warehousesData?.warehouses?.map((warehouse: any) => (
+                      <option key={warehouse.id} value={warehouse.id}>
+                        {warehouse.name} {warehouse.code ? `(${warehouse.code})` : ''}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
               </div>
 
               {/* Tags Input */}
@@ -1385,19 +1418,16 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
 
               <div>
                 <Label htmlFor="reason">Reason</Label>
-                <select
-                  id="reason"
-                  className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
-                  value={adjustmentReason}
-                  onChange={(e) => setAdjustmentReason(e.target.value)}
-                >
-                  <option value="">Select a reason</option>
-                  <option value="STOCK_TAKE">Stock Take / Count</option>
-                  <option value="DAMAGE">Damage / Spoilage</option>
-                  <option value="RETURN">Return</option>
-                  <option value="ADJUSTMENT">Manual Adjustment</option>
-                  <option value="OTHER">Other</option>
-                </select>
+                <Select value={adjustmentReason} onValueChange={setAdjustmentReason}>
+                  <SelectTrigger id="reason">
+                    <option value="">Select a reason</option>
+                    <option value="STOCK_TAKE">Stock Take / Count</option>
+                    <option value="DAMAGE">Damage / Spoilage</option>
+                    <option value="RETURN">Return</option>
+                    <option value="ADJUSTMENT">Manual Adjustment</option>
+                    <option value="OTHER">Other</option>
+                  </SelectTrigger>
+                </Select>
               </div>
 
               <div>

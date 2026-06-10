@@ -55,7 +55,7 @@ export function LogoUpload({
     setIsUploading(true)
     try {
       // Get presigned URL
-      const { presignedUrl, publicUrl, fileKey } = await getPresignedUrl({
+      const { presignedUrl, publicUrl } = await getPresignedUrl({
         fileName: file.name,
         fileType: file.type,
         fileSize: file.size,

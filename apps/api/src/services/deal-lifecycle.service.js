@@ -60,6 +60,7 @@ export const EXTENDED_INTERACTION_TYPES = new Set([
   'coupon_used',
   'message',
   'message_supplier',
+  'banner_dismiss',
 ])
 
 export function normalizeDealStatus(status) {

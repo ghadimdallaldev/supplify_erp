@@ -1,24 +1,19 @@
 import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
-import { Badge } from '../components/ui/badge'
+import { StatusBadge } from '../components/ui/status-badge'
 import {
   FileText,
-  DollarSign,
   Clock,
   CheckCircle,
-  XCircle,
   Search,
-  Filter,
   Download,
   Loader2,
   TrendingUp,
   TrendingDown,
   Calendar,
   CreditCard,
-  Building2,
   AlertTriangle,
-  Plus,
   ArrowRightLeft,
   Receipt,
 } from 'lucide-react'
@@ -31,7 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog'
-import { Select, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
+import { Select, SelectItem, SelectTrigger } from '../components/ui/select'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
@@ -41,7 +36,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
-import { formatCurrency, formatPrice } from '../utils/format'
+import { formatPrice } from '../utils/format'
 import { splitRowClass } from '../components/ui/card-layout'
 import {
   useGetRestaurantInvoicesQuery,
@@ -71,6 +66,7 @@ export function InvoicesPage() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [paymentMode, setPaymentMode] = useState<'full' | 'partial' | 'credit'>('full')
   const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null)
+  const [exportingCsv, setExportingCsv] = useState(false)
 
   // Payment form state
   const [paymentAmount, setPaymentAmount] = useState<number>(0)
@@ -143,47 +139,12 @@ export function InvoicesPage() {
 
   const invoices = invoicesData?.invoices || []
   const analytics = analyticsData?.analytics || {}
-  const overdueInvoices = overdueData?.invoices || []
   const creditNotes = creditsData?.creditNotes || []
 
   // Calculate remaining balance for selected invoice
   const remainingBalance = selectedInvoice
     ? parseFloat(selectedInvoice.total_amount || 0) - parseFloat(selectedInvoice.total_paid || 0)
     : 0
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ISSUED':
-        return 'default'
-      case 'PARTIALLY_PAID':
-        return 'secondary'
-      case 'PAID':
-        return 'default'
-      case 'OVERDUE':
-        return 'destructive'
-      case 'VOID':
-        return 'outline'
-      default:
-        return 'secondary'
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'ISSUED':
-        return <FileText className="h-4 w-4" />
-      case 'PARTIALLY_PAID':
-        return <Clock className="h-4 w-4" />
-      case 'PAID':
-        return <CheckCircle className="h-4 w-4" />
-      case 'OVERDUE':
-        return <XCircle className="h-4 w-4" />
-      case 'VOID':
-        return <XCircle className="h-4 w-4" />
-      default:
-        return <FileText className="h-4 w-4" />
-    }
-  }
 
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesSearch =
@@ -299,6 +260,49 @@ export function InvoicesPage() {
     }
   }
 
+  const handleExportCsv = async () => {
+    setExportingCsv(true)
+    try {
+      if (isRestaurant) {
+        const params = new URLSearchParams()
+        if (statusFilter !== 'ALL') params.set('status', statusFilter)
+        if (supplierFilter !== 'ALL') params.set('supplier', supplierFilter)
+        const qs = params.toString()
+        const res = await fetch(
+          apiUrl(`/api/restaurant-finance/invoices/export.csv${qs ? `?${qs}` : ''}`),
+          { credentials: 'include' }
+        )
+        if (!res.ok) throw new Error('Export failed')
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `invoices-${new Date().toISOString().slice(0, 10)}.csv`
+        a.click()
+        URL.revokeObjectURL(url)
+        toast.success('Invoices exported')
+      } else {
+        const header = 'Invoice Number,Date,Due Date,Status,Total,Restaurant\n'
+        const lines = (invoicesData?.invoices ?? []).map(
+          (inv: any) =>
+            `"${inv.invoice_number || inv.id}","${inv.invoice_date || ''}","${inv.due_date || ''}","${inv.status}",${inv.total_amount},"${String(inv.restaurant_name || '').replace(/"/g, '""')}"`
+        )
+        const blob = new Blob([header + lines.join('\n')], { type: 'text/csv' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `invoices-${new Date().toISOString().slice(0, 10)}.csv`
+        a.click()
+        URL.revokeObjectURL(url)
+        toast.success('Invoices exported')
+      }
+    } catch {
+      toast.error('Could not export invoices')
+    } finally {
+      setExportingCsv(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -314,9 +318,13 @@ export function InvoicesPage() {
           title={invoicesTitle}
           description={invoicesDescription}
           actions={
-            <Button variant="outline" onClick={() => refetch()}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
+            <Button variant="outline" onClick={handleExportCsv} disabled={exportingCsv}>
+              {exportingCsv ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Export CSV
             </Button>
           }
         />
@@ -353,7 +361,7 @@ export function InvoicesPage() {
                         </td>
                         <td className="py-2">${formatPrice(Number(cn.amount || 0))}</td>
                         <td className="py-2">
-                          <Badge variant="outline">{String(cn.status || 'available')}</Badge>
+                          <StatusBadge status={String(cn.status || 'available')} />
                         </td>
                         <td className="py-2 text-right">
                           {cn.status !== 'applied' && cn.status !== 'APPLIED' && (
@@ -569,15 +577,12 @@ export function InvoicesPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                           <h3 className="font-semibold">{invoice.invoice_number}</h3>
-                          <Badge variant={getStatusColor(invoice.status)}>
-                            {getStatusIcon(invoice.status)}
-                            <span className="ml-1">{invoice.status}</span>
-                          </Badge>
+                          <StatusBadge status={invoice.status} />
                           {isOverdue && (
-                            <Badge variant="destructive">
-                              <AlertTriangle className="h-3 w-3 mr-1" />
-                              {invoice.days_overdue || 0} days overdue
-                            </Badge>
+                            <StatusBadge
+                              status="OVERDUE"
+                              label={`${invoice.days_overdue || 0} days overdue`}
+                            />
                           )}
                         </div>
                         <p className="text-sm text-[var(--text-muted)] font-medium">
@@ -922,9 +927,7 @@ export function InvoicesPage() {
                                 <p className="text-lg font-semibold text-[var(--mint)]">
                                   {formatPrice(payment.payment_amount)}
                                 </p>
-                                <Badge variant="outline" className="mt-1">
-                                  {payment.status}
-                                </Badge>
+                                <StatusBadge status={String(payment.status)} className="mt-1" />
                               </div>
                             </div>
                           </CardContent>
@@ -988,9 +991,7 @@ export function InvoicesPage() {
                             </div>
                             <div className="flex justify-between">
                               <span className="text-[var(--text-muted)]">Order Status</span>
-                              <Badge variant="outline">
-                                {invoiceDetail.invoice.order_status || 'N/A'}
-                              </Badge>
+                              <StatusBadge status={invoiceDetail.invoice.order_status || 'N/A'} />
                             </div>
                             {invoiceDetail.invoice.order_placed_at && (
                               <div className="flex justify-between">

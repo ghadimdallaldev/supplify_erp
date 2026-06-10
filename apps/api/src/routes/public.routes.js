@@ -33,6 +33,13 @@ import {
   CAPACITY_CONSUMING_STATUSES,
   DEFAULT_DURATION_MINUTES,
 } from '../lib/reservation-availability.js'
+import {
+  getPublicSupplierProfile,
+  listPublicSupplierProducts,
+  listAuthenticatedRestaurantProducts,
+  resolvePublicSupplierByIdOrSlug,
+} from '../services/public-supplier-catalog.service.js'
+import { requireAuth, getRestaurantIdForRequest } from '../lib/rbac.js'
 
 const router = express.Router()
 
@@ -186,6 +193,103 @@ router.get('/restaurants/:idOrSlug', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'PUBLIC_RESTAURANT_ERROR', message: 'Unable to load restaurant' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+const publicSupplierProductsSchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().optional(),
+  q: z.string().optional(),
+  category: z.string().optional(),
+})
+
+router.get('/suppliers/:idOrSlug', async (req, res) => {
+  try {
+    const data = await getPublicSupplierProfile(req.params.idOrSlug)
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (error) {
+    if (error.name === 'NotFoundError') {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'SUPPLIER_NOT_FOUND', message: 'Supplier catalog not found' },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Public supplier fetch failed', { error: error.message })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'PUBLIC_SUPPLIER_ERROR', message: 'Unable to load supplier catalog' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/suppliers/:idOrSlug/products', async (req, res) => {
+  try {
+    const params = publicSupplierProductsSchema.parse(req.query)
+    const supplier = await resolvePublicSupplierByIdOrSlug(req.params.idOrSlug)
+    const data = await listPublicSupplierProducts(supplier.id, params)
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (error) {
+    if (error.name === 'NotFoundError') {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'SUPPLIER_NOT_FOUND', message: 'Supplier catalog not found' },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Public supplier products fetch failed', { error: error.message })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'PUBLIC_SUPPLIER_PRODUCTS_ERROR', message: 'Unable to load products' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/suppliers/:idOrSlug/products/priced', requireAuth, async (req, res) => {
+  try {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Restaurant login required for pricing' },
+        requestId: req.requestId,
+      })
+    }
+    const params = publicSupplierProductsSchema.parse(req.query)
+    const supplier = await resolvePublicSupplierByIdOrSlug(req.params.idOrSlug)
+    const data = await listAuthenticatedRestaurantProducts(supplier.id, restaurantId, params)
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (error) {
+    if (error.name === 'NotFoundError') {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'SUPPLIER_NOT_FOUND', message: 'Supplier catalog not found' },
+        requestId: req.requestId,
+      })
+    }
+    if (error.name === 'ForbiddenError') {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Public supplier priced products fetch failed', { error: error.message })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'PUBLIC_SUPPLIER_PRICED_ERROR', message: 'Unable to load priced products' },
       requestId: req.requestId,
     })
   }

@@ -1,4 +1,4 @@
-import React, { Fragment, useEffect, useMemo, useState } from 'react'
+import React, { Fragment, Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Input } from '../ui/input'
@@ -10,145 +10,30 @@ import {
   useApproveAdminDealMutation,
   useRejectAdminDealMutation,
   usePauseAdminDealMutation,
-  useGetAdminPromotionPricingQuery,
-  useUpdateAdminPromotionPricingMutation,
 } from '../../services/api'
 import toast from 'react-hot-toast'
-import {
-  Loader2,
-  Check,
-  X,
-  DollarSign,
-  Pause,
-  Search,
-  RefreshCw,
-  ChevronUp,
-  ChevronDown,
-  ChevronsUpDown,
-  FilterX,
-  ChevronRight,
-} from 'lucide-react'
+import { Loader2, Check, X, Pause, Search, RefreshCw, FilterX, ChevronRight } from 'lucide-react'
 import { AdminEmptyState, AdminLoadingState, AdminStatusBadge, formatAdminDate } from './adminUi'
 import { cn } from '../../lib/utils'
+import { ADMIN_EMPTY_STATE } from '../../lib/dealDisplayLabels'
 import {
-  ADMIN_EMPTY_STATE,
-  ADMIN_BOOST_PACKAGES_EMPTY,
-  formatDealTypeLabel,
-} from '../../lib/dealDisplayLabels'
+  DEAL_PAGE_SIZES,
+  DEAL_QUICK_STATUS_FILTERS,
+  DEAL_STATUS_OPTIONS,
+  DEAL_TYPE_OPTIONS,
+} from './deals/adminDealsConstants'
+import {
+  compareDeals,
+  DealSortableHeader,
+  formatDealType,
+  formatDealValue,
+  type DealSortKey,
+} from './deals/adminDealsTableUtils'
+import { AdminTabLoading } from './dashboard/adminDashboardShared'
 
-const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: '', label: 'All statuses' },
-  { value: 'pending_review', label: 'Pending review' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'pending_approval', label: 'Pending approval' },
-  { value: 'pending_admin_approval', label: 'Pending admin approval' },
-  { value: 'rejected', label: 'Rejected' },
-  { value: 'approved_pending_payment', label: 'Pending payment' },
-  { value: 'scheduled', label: 'Scheduled' },
-  { value: 'active', label: 'Active' },
-  { value: 'paused', label: 'Paused' },
-  { value: 'expired', label: 'Expired' },
-  { value: 'cancelled', label: 'Cancelled' },
-]
-
-const TYPE_OPTIONS: { value: string; label: string }[] = [
-  { value: '', label: 'All types' },
-  { value: 'percentage_off', label: 'Percentage off' },
-  { value: 'fixed_off', label: 'Fixed discount' },
-  { value: 'bogo', label: 'Buy one get one' },
-  { value: 'bundle', label: 'Bundle' },
-  { value: 'free_shipping', label: 'Free shipping' },
-]
-
-const QUICK_STATUS_FILTERS: { value: string; label: string }[] = [
-  { value: '', label: 'All' },
-  { value: 'active', label: 'Active' },
-  { value: 'pending_review', label: 'Pending review' },
-  { value: 'expired', label: 'Expired' },
-]
-
-const PAGE_SIZES = [10, 25, 50] as const
-
-type SortKey = 'name' | 'supplier' | 'type' | 'status' | 'starts_at' | 'ends_at' | 'created_at'
-
-type DealRow = Record<string, unknown>
-
-function formatDealType(type: unknown): string {
-  return formatDealTypeLabel(type)
-}
-
-function formatDealValue(deal: DealRow): string | null {
-  const type = String(deal.type || '')
-  const raw = deal.discount_value ?? deal.discount_amount ?? deal.value
-  if (raw == null || raw === '') return null
-  const n = Number(raw)
-  if (!Number.isFinite(n)) return String(raw)
-  if (type === 'percentage_off') return `${n}% off`
-  if (type === 'free_shipping') return 'Free shipping'
-  if (type === 'fixed_off') return `$${n.toFixed(2)} off`
-  return String(raw)
-}
-
-function compareDeals(a: DealRow, b: DealRow, key: SortKey, dir: 'asc' | 'desc'): number {
-  const mul = dir === 'asc' ? 1 : -1
-  const str = (v: unknown) => String(v ?? '').toLowerCase()
-  const date = (v: unknown) => {
-    const t = new Date(String(v || '')).getTime()
-    return Number.isNaN(t) ? 0 : t
-  }
-  switch (key) {
-    case 'name':
-      return mul * str(a.name).localeCompare(str(b.name))
-    case 'supplier':
-      return mul * str(a.supplier_name).localeCompare(str(b.supplier_name))
-    case 'type':
-      return mul * str(a.type).localeCompare(str(b.type))
-    case 'status':
-      return mul * str(a.status).localeCompare(str(b.status))
-    case 'starts_at':
-      return mul * (date(a.starts_at) - date(b.starts_at))
-    case 'ends_at':
-      return mul * (date(a.ends_at) - date(b.ends_at))
-    case 'created_at':
-      return mul * (date(a.created_at) - date(b.created_at))
-    default:
-      return 0
-  }
-}
-
-function SortableHeader({
-  label,
-  sortKey,
-  activeKey,
-  direction,
-  onSort,
-  className,
-}: {
-  label: string
-  sortKey: SortKey
-  activeKey: SortKey
-  direction: 'asc' | 'desc'
-  onSort: (key: SortKey) => void
-  className?: string
-}) {
-  const active = activeKey === sortKey
-  const Icon = active ? (direction === 'asc' ? ChevronUp : ChevronDown) : ChevronsUpDown
-  return (
-    <th className={cn('px-3 py-2.5 font-medium', className)}>
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className={cn(
-          'inline-flex items-center gap-1 rounded-md px-1 -mx-1 hover:text-[var(--text)] hover:bg-[var(--app-bg-subtle)] transition-colors',
-          active ? 'text-[var(--text)]' : 'text-[var(--text-muted)]'
-        )}
-      >
-        {label}
-        <Icon className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
-      </button>
-    </th>
-  )
-}
+const LazyAdminDealsBoostSection = lazy(() =>
+  import('./deals/AdminDealsBoostSection').then((m) => ({ default: m.AdminDealsBoostSection }))
+)
 
 export function AdminDealsPanel() {
   const [statusFilter, setStatusFilter] = useState('')
@@ -159,10 +44,10 @@ export function AdminDealsPanel() {
   const [toDate, setToDate] = useState('')
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
-  const [sortKey, setSortKey] = useState<SortKey>('created_at')
+  const [sortKey, setSortKey] = useState<DealSortKey>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZES)[number]>(10)
+  const [pageSize, setPageSize] = useState<(typeof DEAL_PAGE_SIZES)[number]>(10)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -185,31 +70,12 @@ export function AdminDealsPanel() {
     toDate: toDate || undefined,
   })
   const { data: insightsData } = useGetAdminDealInsightsQuery()
-  const { data: pricingData, refetch: refetchPricing } = useGetAdminPromotionPricingQuery()
   const [approveDeal] = useApproveAdminDealMutation()
   const [rejectDeal] = useRejectAdminDealMutation()
   const [pauseDeal] = usePauseAdminDealMutation()
-  const [updatePricing, { isLoading: savingPricing }] = useUpdateAdminPromotionPricingMutation()
-  const [editingKey, setEditingKey] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({
-    amount: '',
-    durationDays: '',
-    displayName: '',
-    description: '',
-    estimatedReachLabel: '',
-    badgeLabel: '',
-    isRecommended: false,
-    isActive: true,
-  })
 
   const deals = data?.deals || []
   const insights = insightsData?.insights
-  const pricing = pricingData?.pricing || []
-  const boostPackages = pricing.filter(
-    (t) =>
-      String(t.package_type || '') === 'boost' || String(t.pricing_key || '').startsWith('boost_')
-  )
-  const activationPricing = pricing.find((t) => String(t.pricing_key) === 'deal_activation')
 
   const hasActiveFilters = Boolean(
     statusFilter || typeFilter || debouncedSearch || fromDate || toDate
@@ -229,7 +95,7 @@ export function AdminDealsPanel() {
     return s === 'pending_approval' || s === 'pending_admin_approval'
   }).length
 
-  const handleSort = (key: SortKey) => {
+  const handleSort = (key: DealSortKey) => {
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     } else {
@@ -279,43 +145,6 @@ export function AdminDealsPanel() {
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
       toast.error(err?.data?.error?.message || 'Failed to pause deal')
-    }
-  }
-
-  const startEditPricing = (tier: Record<string, unknown>) => {
-    const key = String(tier.pricing_key)
-    setEditingKey(key)
-    setEditForm({
-      amount: String(tier.amount ?? ''),
-      durationDays: tier.duration_days != null ? String(tier.duration_days) : '',
-      displayName: String(tier.display_name || ''),
-      description: String(tier.description || ''),
-      estimatedReachLabel: String(tier.estimated_reach_label || ''),
-      badgeLabel: String(tier.badge_label || ''),
-      isRecommended: Boolean(tier.is_recommended),
-      isActive: tier.is_active !== false,
-    })
-  }
-
-  const savePricing = async (key: string) => {
-    try {
-      await updatePricing({
-        key,
-        amount: Number(editForm.amount),
-        durationDays: editForm.durationDays ? Number(editForm.durationDays) : null,
-        displayName: editForm.displayName || undefined,
-        description: editForm.description || null,
-        estimatedReachLabel: editForm.estimatedReachLabel || null,
-        badgeLabel: editForm.badgeLabel || null,
-        isRecommended: editForm.isRecommended,
-        isActive: editForm.isActive,
-      }).unwrap()
-      toast.success('Boost package updated')
-      setEditingKey(null)
-      refetchPricing()
-    } catch (e: unknown) {
-      const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to update pricing')
     }
   }
 
@@ -387,7 +216,7 @@ export function AdminDealsPanel() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
-            {QUICK_STATUS_FILTERS.map(({ value, label }) => (
+            {DEAL_QUICK_STATUS_FILTERS.map(({ value, label }) => (
               <button
                 key={value || 'all'}
                 type="button"
@@ -410,7 +239,7 @@ export function AdminDealsPanel() {
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="h-9" placeholder="All statuses">
                   <SelectContent>
-                    {STATUS_OPTIONS.map((s) => (
+                    {DEAL_STATUS_OPTIONS.map((s) => (
                       <SelectItem key={s.value || 'all'} value={s.value}>
                         {s.label}
                       </SelectItem>
@@ -424,7 +253,7 @@ export function AdminDealsPanel() {
               <Select value={typeFilter} onValueChange={setTypeFilter}>
                 <SelectTrigger className="h-9" placeholder="All types">
                   <SelectContent>
-                    {TYPE_OPTIONS.map((t) => (
+                    {DEAL_TYPE_OPTIONS.map((t) => (
                       <SelectItem key={t.value || 'all'} value={t.value}>
                         {t.label}
                       </SelectItem>
@@ -490,28 +319,28 @@ export function AdminDealsPanel() {
                   <thead>
                     <tr className="border-b bg-[var(--app-bg-subtle)]/80 text-left text-xs">
                       <th className="w-8 px-2 py-2.5" aria-label="Expand row" />
-                      <SortableHeader
+                      <DealSortableHeader
                         label="Deal"
                         sortKey="name"
                         activeKey={sortKey}
                         direction={sortDir}
                         onSort={handleSort}
                       />
-                      <SortableHeader
+                      <DealSortableHeader
                         label="Supplier"
                         sortKey="supplier"
                         activeKey={sortKey}
                         direction={sortDir}
                         onSort={handleSort}
                       />
-                      <SortableHeader
+                      <DealSortableHeader
                         label="Type"
                         sortKey="type"
                         activeKey={sortKey}
                         direction={sortDir}
                         onSort={handleSort}
                       />
-                      <SortableHeader
+                      <DealSortableHeader
                         label="Status"
                         sortKey="status"
                         activeKey={sortKey}
@@ -519,21 +348,21 @@ export function AdminDealsPanel() {
                         onSort={handleSort}
                       />
                       <th className="px-3 py-2.5 font-medium text-[var(--text-muted)]">Payment</th>
-                      <SortableHeader
+                      <DealSortableHeader
                         label="Start"
                         sortKey="starts_at"
                         activeKey={sortKey}
                         direction={sortDir}
                         onSort={handleSort}
                       />
-                      <SortableHeader
+                      <DealSortableHeader
                         label="End"
                         sortKey="ends_at"
                         activeKey={sortKey}
                         direction={sortDir}
                         onSort={handleSort}
                       />
-                      <SortableHeader
+                      <DealSortableHeader
                         label="Created"
                         sortKey="created_at"
                         activeKey={sortKey}
@@ -775,19 +604,20 @@ export function AdminDealsPanel() {
                 <div className="flex flex-wrap items-center gap-2">
                   <label className="flex items-center gap-1.5">
                     <span>Per page</span>
-                    <select
-                      className="h-8 rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-2 text-xs"
-                      value={pageSize}
-                      onChange={(e) =>
-                        setPageSize(Number(e.target.value) as (typeof PAGE_SIZES)[number])
+                    <Select
+                      value={String(pageSize)}
+                      onValueChange={(value) =>
+                        setPageSize(Number(value) as (typeof DEAL_PAGE_SIZES)[number])
                       }
                     >
-                      {PAGE_SIZES.map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-auto text-xs">
+                        {DEAL_PAGE_SIZES.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </SelectTrigger>
+                    </Select>
                   </label>
                   <div className="flex items-center gap-1">
                     <Button
@@ -821,203 +651,9 @@ export function AdminDealsPanel() {
         </CardContent>
       </Card>
 
-      <div>
-        <h2 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
-          <DollarSign className="h-5 w-5" />
-          Boost packages & activation
-        </h2>
-        <p className="text-sm text-[var(--text-muted)]">
-          Configure boost packages suppliers see when boosting deals for sponsored placement. Price
-          changes apply to new purchases only — existing boosts keep the amount paid at checkout.
-        </p>
-      </div>
-
-      {activationPricing ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Deal activation</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm">
-            <p className="font-medium">{String(activationPricing.display_name)}</p>
-            <p className="text-[var(--text-muted)] mt-1">
-              {String(activationPricing.description || '')}
-            </p>
-            <p className="mt-2 tabular-nums font-semibold">
-              ${Number(activationPricing.amount).toFixed(2)}
-              {Number(activationPricing.amount) === 0 ? (
-                <span className="ml-2 text-xs font-normal text-emerald-700">
-                  · {String(activationPricing.badge_label || 'Free after admin approval')}
-                </span>
-              ) : null}
-            </p>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Boost packages</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {boostPackages.length === 0 ? (
-            <AdminEmptyState
-              title={ADMIN_BOOST_PACKAGES_EMPTY.title}
-              description={ADMIN_BOOST_PACKAGES_EMPTY.description}
-            />
-          ) : (
-            <div className="space-y-3">
-              {boostPackages.map((tier) => {
-                const key = String(tier.pricing_key)
-                const isEditing = editingKey === key
-                return (
-                  <div key={key} className="rounded-lg border p-4 space-y-3">
-                    {isEditing ? (
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="text-sm space-y-1">
-                          <span className="text-[var(--text-muted)]">Display name</span>
-                          <Input
-                            value={editForm.displayName}
-                            onChange={(e) =>
-                              setEditForm((f) => ({ ...f, displayName: e.target.value }))
-                            }
-                          />
-                        </label>
-                        <label className="text-sm space-y-1">
-                          <span className="text-[var(--text-muted)]">Price ($)</span>
-                          <Input
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            value={editForm.amount}
-                            onChange={(e) => setEditForm((f) => ({ ...f, amount: e.target.value }))}
-                          />
-                        </label>
-                        <label className="text-sm space-y-1">
-                          <span className="text-[var(--text-muted)]">Duration (days)</span>
-                          <Input
-                            type="number"
-                            min={1}
-                            value={editForm.durationDays}
-                            onChange={(e) =>
-                              setEditForm((f) => ({ ...f, durationDays: e.target.value }))
-                            }
-                          />
-                        </label>
-                        <label className="text-sm space-y-1">
-                          <span className="text-[var(--text-muted)]">Badge label</span>
-                          <Input
-                            value={editForm.badgeLabel}
-                            onChange={(e) =>
-                              setEditForm((f) => ({ ...f, badgeLabel: e.target.value }))
-                            }
-                            placeholder="Most popular"
-                          />
-                        </label>
-                        <label className="text-sm space-y-1 sm:col-span-2">
-                          <span className="text-[var(--text-muted)]">Description</span>
-                          <Input
-                            value={editForm.description}
-                            onChange={(e) =>
-                              setEditForm((f) => ({ ...f, description: e.target.value }))
-                            }
-                          />
-                        </label>
-                        <label className="text-sm space-y-1 sm:col-span-2">
-                          <span className="text-[var(--text-muted)]">Estimated reach label</span>
-                          <Input
-                            value={editForm.estimatedReachLabel}
-                            onChange={(e) =>
-                              setEditForm((f) => ({ ...f, estimatedReachLabel: e.target.value }))
-                            }
-                            placeholder="Higher placement for 7 days"
-                          />
-                        </label>
-                        <label className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={editForm.isRecommended}
-                            onChange={(e) =>
-                              setEditForm((f) => ({ ...f, isRecommended: e.target.checked }))
-                            }
-                          />
-                          Recommended package
-                        </label>
-                        <label className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={editForm.isActive}
-                            onChange={(e) =>
-                              setEditForm((f) => ({ ...f, isActive: e.target.checked }))
-                            }
-                          />
-                          Active (available for purchase)
-                        </label>
-                        <div className="flex gap-2 sm:col-span-2">
-                          <Button
-                            size="sm"
-                            onClick={() => savePricing(key)}
-                            disabled={savingPricing}
-                          >
-                            Save package
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditingKey(null)}>
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-medium">{String(tier.display_name)}</p>
-                            {tier.badge_label ? (
-                              <span className="text-xs rounded-full bg-[var(--surface-muted)] px-2 py-0.5">
-                                {String(tier.badge_label)}
-                              </span>
-                            ) : null}
-                            {tier.is_recommended ? (
-                              <span className="text-xs text-[var(--brand)]">Recommended</span>
-                            ) : null}
-                            {tier.is_active === false ? (
-                              <span className="text-xs text-[var(--red)]">Inactive</span>
-                            ) : null}
-                          </div>
-                          <p className="text-xs text-[var(--text-muted)] mt-1">
-                            {tier.duration_days
-                              ? `${tier.duration_days} day(s)`
-                              : 'No fixed duration'}
-                            {tier.estimated_reach_label
-                              ? ` · ${String(tier.estimated_reach_label)}`
-                              : ''}
-                          </p>
-                          <p className="text-xs text-[var(--text-muted)] mt-1 max-w-xl">
-                            {String(tier.description || '')}
-                          </p>
-                          <p className="text-[10px] text-[var(--text-muted)] mt-2 font-mono">
-                            {key}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold tabular-nums">
-                            ${Number(tier.amount).toFixed(2)}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => startEditPricing(tier)}
-                          >
-                            Edit
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <Suspense fallback={<AdminTabLoading className="py-8" />}>
+        <LazyAdminDealsBoostSection />
+      </Suspense>
     </div>
   )
 }
