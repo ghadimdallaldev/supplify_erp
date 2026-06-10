@@ -20,6 +20,7 @@ import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
 import { PageHeader } from '../components/ui/page-header'
 import { EmptyState } from '../components/ui/empty-state'
+import { Skeleton } from '../components/ui/skeleton'
 import { Label } from '../components/ui/label'
 import { Package, Search, Plus, Upload, Download, TrendingUp, TrendingDown } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
@@ -401,8 +402,34 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
+      <div className="space-y-6" data-testid="products-page-loading">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <Card className="shadow-sm">
+          <CardContent className="space-y-4 p-4 pt-6">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="overflow-hidden p-0 shadow-sm">
+          <div className="divide-y">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 p-4">
+                <Skeleton className="h-14 w-14 shrink-0 rounded" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-28" />
+                </div>
+                <Skeleton className="h-6 w-16" />
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
     )
   }

@@ -15,6 +15,7 @@ import { FulfillmentExceptionsTab } from '../components/fulfillment/FulfillmentE
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
 import { Label } from '../components/ui/label'
+import { Select, SelectTrigger } from '../components/ui/select'
 
 export function FulfillmentPage() {
   const [activeTab, setActiveTab] = useState('dispatch')
@@ -45,19 +46,16 @@ export function FulfillmentPage() {
           <div className="flex max-w-md flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
             <div className="min-w-0 flex-1">
               <Label htmlFor="fulfillment-warehouse">Warehouse filter</Label>
-              <select
-                id="fulfillment-warehouse"
-                className="mt-1.5 flex h-10 w-full rounded-lg border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30"
-                value={selectedWarehouseId}
-                onChange={(e) => setSelectedWarehouseId(e.target.value)}
-              >
-                <option value="">All warehouses</option>
-                {warehouses.map((wh: { id: string; name: string }) => (
-                  <option key={wh.id} value={wh.id}>
-                    {wh.name}
-                  </option>
-                ))}
-              </select>
+              <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>
+                <SelectTrigger id="fulfillment-warehouse" className="mt-1.5">
+                  <option value="">All warehouses</option>
+                  {warehouses.map((wh: { id: string; name: string }) => (
+                    <option key={wh.id} value={wh.id}>
+                      {wh.name}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
           </div>
         )}

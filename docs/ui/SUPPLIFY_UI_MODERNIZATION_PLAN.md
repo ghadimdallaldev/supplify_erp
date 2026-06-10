@@ -964,6 +964,8 @@ The following user-facing labels are already implemented correctly in `dealDispl
 
 ### Phase 3 — Supplier Operational Pages
 
+> **Status: ✅ Completed** — PromotionsPage got `PageHeader`, `Select` components, skeleton deal rows, and `StatusBadge` for deal statuses; FulfillmentPage warehouse filter uses `Select`; InvoicesPage statuses use `StatusBadge` (tone map extended with ISSUED/PARTIALLY_PAID/OVERDUE/VOID); ProductsPage spinner replaced with skeleton filter bar + product rows.
+
 **Scope:** Supplier pages beyond the dashboard and inventory.
 
 **Tasks:**

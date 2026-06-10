@@ -1,12 +1,11 @@
 import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
-import { Badge } from '../components/ui/badge'
+import { StatusBadge } from '../components/ui/status-badge'
 import {
   FileText,
   Clock,
   CheckCircle,
-  XCircle,
   Search,
   Download,
   Loader2,
@@ -145,40 +144,6 @@ export function InvoicesPage() {
   const remainingBalance = selectedInvoice
     ? parseFloat(selectedInvoice.total_amount || 0) - parseFloat(selectedInvoice.total_paid || 0)
     : 0
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ISSUED':
-        return 'default'
-      case 'PARTIALLY_PAID':
-        return 'secondary'
-      case 'PAID':
-        return 'default'
-      case 'OVERDUE':
-        return 'destructive'
-      case 'VOID':
-        return 'outline'
-      default:
-        return 'secondary'
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'ISSUED':
-        return <FileText className="h-4 w-4" />
-      case 'PARTIALLY_PAID':
-        return <Clock className="h-4 w-4" />
-      case 'PAID':
-        return <CheckCircle className="h-4 w-4" />
-      case 'OVERDUE':
-        return <XCircle className="h-4 w-4" />
-      case 'VOID':
-        return <XCircle className="h-4 w-4" />
-      default:
-        return <FileText className="h-4 w-4" />
-    }
-  }
 
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesSearch =
@@ -348,7 +313,7 @@ export function InvoicesPage() {
                         </td>
                         <td className="py-2">${formatPrice(Number(cn.amount || 0))}</td>
                         <td className="py-2">
-                          <Badge variant="outline">{String(cn.status || 'available')}</Badge>
+                          <StatusBadge status={String(cn.status || 'available')} />
                         </td>
                         <td className="py-2 text-right">
                           {cn.status !== 'applied' && cn.status !== 'APPLIED' && (
@@ -564,15 +529,12 @@ export function InvoicesPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                           <h3 className="font-semibold">{invoice.invoice_number}</h3>
-                          <Badge variant={getStatusColor(invoice.status)}>
-                            {getStatusIcon(invoice.status)}
-                            <span className="ml-1">{invoice.status}</span>
-                          </Badge>
+                          <StatusBadge status={invoice.status} />
                           {isOverdue && (
-                            <Badge variant="destructive">
-                              <AlertTriangle className="h-3 w-3 mr-1" />
-                              {invoice.days_overdue || 0} days overdue
-                            </Badge>
+                            <StatusBadge
+                              status="OVERDUE"
+                              label={`${invoice.days_overdue || 0} days overdue`}
+                            />
                           )}
                         </div>
                         <p className="text-sm text-[var(--text-muted)] font-medium">
@@ -917,9 +879,7 @@ export function InvoicesPage() {
                                 <p className="text-lg font-semibold text-[var(--mint)]">
                                   {formatPrice(payment.payment_amount)}
                                 </p>
-                                <Badge variant="outline" className="mt-1">
-                                  {payment.status}
-                                </Badge>
+                                <StatusBadge status={String(payment.status)} className="mt-1" />
                               </div>
                             </div>
                           </CardContent>
@@ -983,9 +943,7 @@ export function InvoicesPage() {
                             </div>
                             <div className="flex justify-between">
                               <span className="text-[var(--text-muted)]">Order Status</span>
-                              <Badge variant="outline">
-                                {invoiceDetail.invoice.order_status || 'N/A'}
-                              </Badge>
+                              <StatusBadge status={invoiceDetail.invoice.order_status || 'N/A'} />
                             </div>
                             {invoiceDetail.invoice.order_placed_at && (
                               <div className="flex justify-between">

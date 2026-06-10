@@ -2,8 +2,12 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
+import { StatusBadge } from '../../components/ui/status-badge'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { PageHeader } from '../../components/ui/page-header'
+import { Select, SelectTrigger } from '../../components/ui/select'
+import { Skeleton } from '../../components/ui/skeleton'
 import {
   Dialog,
   DialogContent,
@@ -34,7 +38,7 @@ import { RequirePermission } from '../../components/RequirePermission'
 import { FeatureLockedCard } from '../../components/FeatureLockedCard'
 import { DealsPerformanceSummary } from '../../components/promotions/DealsPerformanceSummary'
 import { useWorkspaceRole } from '../../hooks/useWorkspaceRole'
-import { Loader2, Plus, BarChart3, Send } from 'lucide-react'
+import { Plus, BarChart3, Send } from 'lucide-react'
 import { EmptyState } from '../../components/ui/empty-state'
 import {
   COUPON_FIELD_HELPER,
@@ -48,9 +52,6 @@ import {
   getCtaHelperText,
   getDealTypeHelperText,
 } from '../../lib/dealDisplayLabels'
-
-const FORM_SELECT_CLASS =
-  'h-10 w-full rounded-lg border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30'
 
 export function PromotionsPage() {
   const { persona } = useWorkspaceRole()
@@ -98,7 +99,7 @@ export function PromotionsPage() {
   if (!promotionsEnabled) {
     return (
       <div className="space-y-4">
-        <h1 className="text-[21px] font-black text-[var(--text)]">Deals</h1>
+        <PageHeader title="Deals" />
         <FeatureLockedCard
           featureKey="promotions"
           featureName="Deals"
@@ -177,18 +178,18 @@ export function PromotionsPage() {
   return (
     <RequirePermission anyOf={['PROMOTIONS_VIEW', 'PROMOTIONS_MANAGE']} title="deals">
       <div className="space-y-6">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-[21px] font-black text-[var(--text)]">{copy.title}</h1>
-            <p className="text-xs text-[var(--text-muted)] mt-1">{copy.subtitle}</p>
-          </div>
-          {!persona.readOnly && (
-            <Button onClick={() => setShowCreate(true)} disabled={!promotionGate.canCreate}>
-              <Plus className="h-4 w-4 mr-2" />
-              {promotionGate.canCreate ? copy.newButton : 'Deal limit reached'}
-            </Button>
-          )}
-        </div>
+        <PageHeader
+          title={copy.title}
+          description={copy.subtitle}
+          actions={
+            !persona.readOnly ? (
+              <Button onClick={() => setShowCreate(true)} disabled={!promotionGate.canCreate}>
+                <Plus className="h-4 w-4 mr-2" />
+                {promotionGate.canCreate ? copy.newButton : 'Deal limit reached'}
+              </Button>
+            ) : undefined
+          }
+        />
 
         <DealsPerformanceSummary title={copy.performanceTitle} />
 
@@ -212,21 +213,18 @@ export function PromotionsPage() {
               <Label htmlFor="promotion-status-filter" className="text-xs text-[var(--text-muted)]">
                 Status filter
               </Label>
-              <select
-                id="promotion-status-filter"
-                className={`mt-1.5 ${FORM_SELECT_CLASS}`}
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="">All</option>
-                <option value="draft">Draft</option>
-                <option value="pending_approval">Pending approval</option>
-                <option value="rejected">Rejected</option>
-                <option value="approved_pending_payment">Awaiting payment</option>
-                <option value="active">Live</option>
-                <option value="paused">Paused</option>
-                <option value="expired">Expired</option>
-              </select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger id="promotion-status-filter" className="mt-1.5">
+                  <option value="">All</option>
+                  <option value="draft">Draft</option>
+                  <option value="pending_approval">Pending approval</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="approved_pending_payment">Awaiting payment</option>
+                  <option value="active">Live</option>
+                  <option value="paused">Paused</option>
+                  <option value="expired">Expired</option>
+                </SelectTrigger>
+              </Select>
             </div>
           </CardHeader>
           <CardContent>
@@ -235,7 +233,22 @@ export function PromotionsPage() {
                 Could not load deals. Refresh the page or check your plan permissions.
               </p>
             ) : isLoading ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex flex-col gap-3 rounded-lg border border-[var(--app-border)] p-4"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-44" />
+                        <Skeleton className="h-3 w-28" />
+                      </div>
+                      <Skeleton className="h-6 w-20" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : promotions.length === 0 ? (
               <EmptyState
                 title={SUPPLIER_EMPTY_STATE.title}
@@ -269,7 +282,10 @@ export function PromotionsPage() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline">{formatDealStatusLabel(p.status)}</Badge>
+                          <StatusBadge
+                            status={String(p.status)}
+                            label={formatDealStatusLabel(p.status)}
+                          />
                           {p.is_promoted ? <Badge variant="secondary">Sponsored</Badge> : null}
                           {p.status === 'rejected' && p.rejection_reason ? (
                             <p className="text-xs text-[var(--red)] w-full">
@@ -285,7 +301,10 @@ export function PromotionsPage() {
                             </p>
                           ) : null}
                           {p.status === 'approved_pending_payment' && (
-                            <Badge variant="secondary">Awaiting boost payment</Badge>
+                            <StatusBadge
+                              status="approved_pending_payment"
+                              label="Awaiting boost payment"
+                            />
                           )}
                           {p.status === 'draft' && (
                             <>
@@ -383,22 +402,23 @@ export function PromotionsPage() {
               </div>
               <div>
                 <Label>Deal type</Label>
-                <select
-                  className="w-full h-10 border rounded-md px-3 text-sm"
+                <Select
                   value={form.type}
-                  onChange={(e) =>
+                  onValueChange={(value) =>
                     setForm((f) => ({
                       ...f,
-                      type: e.target.value as (typeof SUPPLIER_DEAL_TYPES)[number],
+                      type: value as (typeof SUPPLIER_DEAL_TYPES)[number],
                     }))
                   }
                 >
-                  {SUPPLIER_DEAL_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {formatDealTypeLabel(t)}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    {SUPPLIER_DEAL_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {formatDealTypeLabel(t)}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
                 {getDealTypeHelperText(form.type) ? (
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
                     {getDealTypeHelperText(form.type)}
@@ -423,17 +443,18 @@ export function PromotionsPage() {
               </div>
               <div>
                 <Label>CTA type</Label>
-                <select
-                  className="w-full h-10 border rounded-md px-3 text-sm"
+                <Select
                   value={form.ctaType}
-                  onChange={(e) => setForm((f) => ({ ...f, ctaType: e.target.value }))}
+                  onValueChange={(value) => setForm((f) => ({ ...f, ctaType: value }))}
                 >
-                  {SUPPLIER_CTA_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    {SUPPLIER_CTA_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
                 {getCtaHelperText(form.ctaType) ? (
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
                     {getCtaHelperText(form.ctaType)}
