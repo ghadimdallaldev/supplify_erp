@@ -4,48 +4,70 @@ import { logger } from '../lib/logger.js'
 
 let brandingSchemaReadyPromise = null
 
-async function ensureBrandingSchemaReady() {
-  if (!(await brandingColumnsExist('supplier')) || !(await brandingColumnsExist('restaurant'))) {
-    if (!brandingSchemaReadyPromise) {
-      brandingSchemaReadyPromise = import('../lib/ensure-tenant-branding-schema.js')
-        .then((m) => m.ensureTenantBrandingSchema())
-        .catch((err) => {
-          brandingSchemaReadyPromise = null
-          logger.warn('Tenant branding schema ensure failed', { error: err.message })
-          throw err
-        })
-    }
-    await brandingSchemaReadyPromise.catch(() => {
-      /* allow fallback reads when DDL cannot run on this connection */
+async function getBrandingSchemaHelpers() {
+  return import('../lib/ensure-tenant-branding-schema.js')
+}
+
+async function ensureBrandingSchemaReady(table) {
+  const { brandingColumnsExist, columnExists, ensureTenantBrandingSchema } =
+    await getBrandingSchemaHelpers()
+  const needsLogo = !(await columnExists(table, 'logo_url'))
+  const needsBrand = !(await brandingColumnsExist(table))
+  if (!needsLogo && !needsBrand) return
+
+  if (!brandingSchemaReadyPromise) {
+    brandingSchemaReadyPromise = ensureTenantBrandingSchema().catch((err) => {
+      brandingSchemaReadyPromise = null
+      logger.warn('Tenant branding schema ensure failed', { error: err.message })
+      throw err
     })
   }
+  await brandingSchemaReadyPromise.catch(() => {
+    /* allow fallback reads when DDL cannot run on this connection */
+  })
 }
 
 async function brandingColumnsExist(table) {
-  const { brandingColumnsExist: exists } = await import('../lib/ensure-tenant-branding-schema.js')
+  const { brandingColumnsExist: exists } = await getBrandingSchemaHelpers()
   return exists(table)
+}
+
+async function tenantBrandingColumnMap(table) {
+  const { tenantBrandingColumnMap: mapColumns } = await getBrandingSchemaHelpers()
+  return mapColumns(table)
+}
+
+function buildSelectColumns(columns) {
+  const select = []
+  if (columns.logoUrl) select.push('logo_url')
+  if (columns.brandPrimary) select.push('brand_primary')
+  if (columns.brandAccent) select.push('brand_accent')
+  if (columns.brandDisplayName) select.push('brand_display_name')
+  return select
 }
 
 async function loadBrandingRow(tenantId, tenantType) {
   const table = tenantType === 'RESTAURANT' ? 'restaurant' : 'supplier'
-  await ensureBrandingSchemaReady()
+  await ensureBrandingSchemaReady(table)
 
-  if (await brandingColumnsExist(table)) {
-    const { rows } = await query(
-      `SELECT logo_url, brand_primary, brand_accent, brand_display_name FROM ${table} WHERE id = $1`,
-      [tenantId]
-    )
-    return rows[0]
+  const columns = await tenantBrandingColumnMap(table)
+  const selectCols = buildSelectColumns(columns)
+
+  if (selectCols.length === 0) {
+    const { rows } = await query(`SELECT id FROM ${table} WHERE id = $1`, [tenantId])
+    if (!rows[0]) return undefined
+    return {
+      logo_url: null,
+      brand_primary: null,
+      brand_accent: null,
+      brand_display_name: null,
+    }
   }
 
-  const { rows } = await query(`SELECT logo_url FROM ${table} WHERE id = $1`, [tenantId])
-  if (!rows[0]) return undefined
-  return {
-    logo_url: rows[0].logo_url,
-    brand_primary: null,
-    brand_accent: null,
-    brand_display_name: null,
-  }
+  const { rows } = await query(`SELECT ${selectCols.join(', ')} FROM ${table} WHERE id = $1`, [
+    tenantId,
+  ])
+  return rows[0]
 }
 
 /** @internal Test helper */
@@ -140,7 +162,7 @@ export async function getTenantBranding(tenantId, tenantType) {
 
 export async function updateTenantBranding(tenantId, tenantType, payload) {
   const table = tenantType === 'RESTAURANT' ? 'restaurant' : 'supplier'
-  await ensureBrandingSchemaReady()
+  await ensureBrandingSchemaReady(table)
 
   if (!(await brandingColumnsExist(table))) {
     throw new ValidationError(
@@ -175,11 +197,20 @@ export async function updateTenantBranding(tenantId, tenantType, payload) {
 
   sets.push('updated_at = now()')
 
+  const columns = await tenantBrandingColumnMap(table)
+  const returningCols = buildSelectColumns(columns)
+  const returning = returningCols.length > 0 ? ` RETURNING ${returningCols.join(', ')}` : ''
+
   const { rows } = await query(
-    `UPDATE ${table} SET ${sets.join(', ')} WHERE id = $1 RETURNING logo_url, brand_primary, brand_accent, brand_display_name`,
+    `UPDATE ${table} SET ${sets.join(', ')} WHERE id = $1${returning}`,
     params
   )
   if (!rows[0]) throw new NotFoundError('Tenant not found')
+
+  if (returningCols.length === 0) {
+    const row = await loadBrandingRow(tenantId, tenantType)
+    return mapRow(row)
+  }
   return mapRow(rows[0])
 }
 

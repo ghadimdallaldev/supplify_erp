@@ -6,9 +6,18 @@ vi.mock('../lib/db.js', () => ({
 }))
 
 const brandingColumnsExist = vi.fn().mockResolvedValue(true)
+const columnExists = vi.fn().mockResolvedValue(true)
+const tenantBrandingColumnMap = vi.fn().mockResolvedValue({
+  logoUrl: true,
+  brandPrimary: true,
+  brandAccent: true,
+  brandDisplayName: true,
+})
 vi.mock('../lib/ensure-tenant-branding-schema.js', () => ({
   ensureTenantBrandingSchema: vi.fn().mockResolvedValue(undefined),
   brandingColumnsExist: (...args) => brandingColumnsExist(...args),
+  columnExists: (...args) => columnExists(...args),
+  tenantBrandingColumnMap: (...args) => tenantBrandingColumnMap(...args),
 }))
 
 describe('branding.service', () => {
@@ -41,10 +50,17 @@ describe('branding.service', () => {
 describe('getTenantBranding', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    columnExists.mockResolvedValue(true)
   })
 
   it('falls back to logo_url when brand columns are missing', async () => {
     brandingColumnsExist.mockResolvedValue(false)
+    tenantBrandingColumnMap.mockResolvedValue({
+      logoUrl: true,
+      brandPrimary: false,
+      brandAccent: false,
+      brandDisplayName: false,
+    })
     const { query } = await import('../lib/db.js')
     query.mockResolvedValueOnce({
       rows: [{ logo_url: 'https://cdn.example/logo.png' }],
@@ -62,12 +78,50 @@ describe('getTenantBranding', () => {
       'supplier-1',
     ])
   })
+
+  it('omits logo_url from SELECT when only brand columns exist', async () => {
+    brandingColumnsExist.mockResolvedValue(true)
+    tenantBrandingColumnMap.mockResolvedValue({
+      logoUrl: false,
+      brandPrimary: true,
+      brandAccent: true,
+      brandDisplayName: true,
+    })
+    const { query } = await import('../lib/db.js')
+    query.mockResolvedValueOnce({
+      rows: [
+        {
+          brand_primary: '#5b21b6',
+          brand_accent: null,
+          brand_display_name: 'Gulf Chef',
+        },
+      ],
+    })
+
+    const { getTenantBranding, resetBrandingSchemaReadyForTests } = await import(
+      './branding.service.js'
+    )
+    resetBrandingSchemaReadyForTests()
+
+    const branding = await getTenantBranding('supplier-1', 'SUPPLIER')
+    expect(branding.brandDisplayName).toBe('Gulf Chef')
+    expect(branding.logoUrl).toBeNull()
+    const sql = query.mock.calls.find((call) => call[0].includes('SELECT'))?.[0] ?? ''
+    expect(sql).not.toContain('logo_url')
+    expect(sql).toContain('brand_primary')
+  })
 })
 
 describe('updateTenantBranding', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     brandingColumnsExist.mockResolvedValue(true)
+    tenantBrandingColumnMap.mockResolvedValue({
+      logoUrl: true,
+      brandPrimary: true,
+      brandAccent: true,
+      brandDisplayName: true,
+    })
   })
 
   it('only updates fields present in the payload', async () => {
