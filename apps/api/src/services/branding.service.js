@@ -1,41 +1,7 @@
 import { query } from '../lib/db.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
-import { logger } from '../lib/logger.js'
-
-let brandingSchemaReadyPromise = null
-
-async function getBrandingSchemaHelpers() {
-  return import('../lib/ensure-tenant-branding-schema.js')
-}
-
-async function ensureBrandingSchemaReady(table) {
-  const { brandingColumnsExist, columnExists, ensureTenantBrandingSchema } =
-    await getBrandingSchemaHelpers()
-  const needsLogo = !(await columnExists(table, 'logo_url'))
-  const needsBrand = !(await brandingColumnsExist(table))
-  if (!needsLogo && !needsBrand) return
-
-  if (!brandingSchemaReadyPromise) {
-    brandingSchemaReadyPromise = ensureTenantBrandingSchema().catch((err) => {
-      brandingSchemaReadyPromise = null
-      logger.warn('Tenant branding schema ensure failed', { error: err.message })
-      throw err
-    })
-  }
-  await brandingSchemaReadyPromise.catch(() => {
-    /* allow fallback reads when DDL cannot run on this connection */
-  })
-}
-
-async function brandingColumnsExist(table) {
-  const { brandingColumnsExist: exists } = await getBrandingSchemaHelpers()
-  return exists(table)
-}
-
-async function tenantBrandingColumnMap(table) {
-  const { tenantBrandingColumnMap: mapColumns } = await getBrandingSchemaHelpers()
-  return mapColumns(table)
-}
+import { tenantBrandingColumnMap } from '../lib/ensure-tenant-branding-schema.js'
+import { invalidateTenantProfileCache } from '../lib/tenant-profile-cache.js'
 
 function buildSelectColumns(columns) {
   const select = []
@@ -48,8 +14,6 @@ function buildSelectColumns(columns) {
 
 async function loadBrandingRow(tenantId, tenantType) {
   const table = tenantType === 'RESTAURANT' ? 'restaurant' : 'supplier'
-  await ensureBrandingSchemaReady(table)
-
   const columns = await tenantBrandingColumnMap(table)
   const selectCols = buildSelectColumns(columns)
 
@@ -68,11 +32,6 @@ async function loadBrandingRow(tenantId, tenantType) {
     tenantId,
   ])
   return rows[0]
-}
-
-/** @internal Test helper */
-export function resetBrandingSchemaReadyForTests() {
-  brandingSchemaReadyPromise = null
 }
 
 const DEFAULT_BRAND = {
@@ -94,6 +53,25 @@ export function validateHexColor(value, fieldName) {
     throw new ValidationError(`${fieldName} must be a valid hex color (#RRGGBB)`)
   }
   return normalized.toLowerCase()
+}
+
+export function validateLogoUrl(value) {
+  if (value == null || value === '') return null
+  const normalized = String(value).trim()
+  if (!normalized) return null
+  if (normalized.length > 2048) {
+    throw new ValidationError('logoUrl is too long')
+  }
+  let parsed
+  try {
+    parsed = new URL(normalized)
+  } catch {
+    throw new ValidationError('logoUrl must be a valid http or https URL')
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new ValidationError('logoUrl must use http or https')
+  }
+  return normalized
 }
 
 function hexToRgb(hex) {
@@ -162,9 +140,9 @@ export async function getTenantBranding(tenantId, tenantType) {
 
 export async function updateTenantBranding(tenantId, tenantType, payload) {
   const table = tenantType === 'RESTAURANT' ? 'restaurant' : 'supplier'
-  await ensureBrandingSchemaReady(table)
+  const columns = await tenantBrandingColumnMap(table)
 
-  if (!(await brandingColumnsExist(table))) {
+  if (!columns.brandPrimary) {
     throw new ValidationError(
       'Brand colors are not available on this server yet. Retry in a few minutes or contact support.'
     )
@@ -197,7 +175,6 @@ export async function updateTenantBranding(tenantId, tenantType, payload) {
 
   sets.push('updated_at = now()')
 
-  const columns = await tenantBrandingColumnMap(table)
   const returningCols = buildSelectColumns(columns)
   const returning = returningCols.length > 0 ? ` RETURNING ${returningCols.join(', ')}` : ''
 
@@ -212,6 +189,27 @@ export async function updateTenantBranding(tenantId, tenantType, payload) {
     return mapRow(row)
   }
   return mapRow(rows[0])
+}
+
+export async function updateTenantLogo(tenantId, tenantType, logoUrl) {
+  const table = tenantType === 'RESTAURANT' ? 'restaurant' : 'supplier'
+  const columns = await tenantBrandingColumnMap(table)
+
+  if (!columns.logoUrl) {
+    throw new ValidationError(
+      'Logo upload is not available on this server yet. Retry in a few minutes or contact support.'
+    )
+  }
+
+  const validatedUrl = validateLogoUrl(logoUrl)
+  const { rows } = await query(
+    `UPDATE ${table} SET logo_url = $2, updated_at = now() WHERE id = $1 RETURNING *`,
+    [tenantId, validatedUrl]
+  )
+  if (!rows[0]) throw new NotFoundError('Tenant not found')
+
+  await invalidateTenantProfileCache(tenantId, tenantType)
+  return rows[0]
 }
 
 export { DEFAULT_BRAND, derivePalette }

@@ -1,12 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { validateHexColor, derivePalette, DEFAULT_BRAND } from './branding.service.js'
+import {
+  validateHexColor,
+  validateLogoUrl,
+  derivePalette,
+  DEFAULT_BRAND,
+} from './branding.service.js'
 
 vi.mock('../lib/db.js', () => ({
   query: vi.fn(),
 }))
 
-const brandingColumnsExist = vi.fn().mockResolvedValue(true)
-const columnExists = vi.fn().mockResolvedValue(true)
+vi.mock('../lib/tenant-profile-cache.js', () => ({
+  invalidateTenantProfileCache: vi.fn().mockResolvedValue(undefined),
+}))
+
 const tenantBrandingColumnMap = vi.fn().mockResolvedValue({
   logoUrl: true,
   brandPrimary: true,
@@ -15,15 +22,19 @@ const tenantBrandingColumnMap = vi.fn().mockResolvedValue({
 })
 vi.mock('../lib/ensure-tenant-branding-schema.js', () => ({
   ensureTenantBrandingSchema: vi.fn().mockResolvedValue(undefined),
-  brandingColumnsExist: (...args) => brandingColumnsExist(...args),
-  columnExists: (...args) => columnExists(...args),
   tenantBrandingColumnMap: (...args) => tenantBrandingColumnMap(...args),
+  resetBrandingColumnCache: vi.fn(),
 }))
 
 describe('branding.service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    brandingColumnsExist.mockResolvedValue(true)
+    tenantBrandingColumnMap.mockResolvedValue({
+      logoUrl: true,
+      brandPrimary: true,
+      brandAccent: true,
+      brandDisplayName: true,
+    })
   })
 
   it('accepts valid hex colors', () => {
@@ -47,14 +58,31 @@ describe('branding.service', () => {
   })
 })
 
+describe('validateLogoUrl', () => {
+  it('accepts https URLs', () => {
+    expect(validateLogoUrl('https://cdn.example/logo.png')).toBe('https://cdn.example/logo.png')
+  })
+
+  it('returns null for empty values', () => {
+    expect(validateLogoUrl('')).toBeNull()
+    expect(validateLogoUrl(null)).toBeNull()
+  })
+
+  it('rejects non-http(s) URLs', () => {
+    expect(() => validateLogoUrl('javascript:alert(1)')).toThrow(/http or https/)
+  })
+
+  it('rejects invalid URLs', () => {
+    expect(() => validateLogoUrl('not-a-url')).toThrow(/valid http or https/)
+  })
+})
+
 describe('getTenantBranding', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    columnExists.mockResolvedValue(true)
   })
 
   it('falls back to logo_url when brand columns are missing', async () => {
-    brandingColumnsExist.mockResolvedValue(false)
     tenantBrandingColumnMap.mockResolvedValue({
       logoUrl: true,
       brandPrimary: false,
@@ -66,10 +94,7 @@ describe('getTenantBranding', () => {
       rows: [{ logo_url: 'https://cdn.example/logo.png' }],
     })
 
-    const { getTenantBranding, resetBrandingSchemaReadyForTests } = await import(
-      './branding.service.js'
-    )
-    resetBrandingSchemaReadyForTests()
+    const { getTenantBranding } = await import('./branding.service.js')
 
     const branding = await getTenantBranding('supplier-1', 'SUPPLIER')
     expect(branding.logoUrl).toBe('https://cdn.example/logo.png')
@@ -80,7 +105,6 @@ describe('getTenantBranding', () => {
   })
 
   it('omits logo_url from SELECT when only brand columns exist', async () => {
-    brandingColumnsExist.mockResolvedValue(true)
     tenantBrandingColumnMap.mockResolvedValue({
       logoUrl: false,
       brandPrimary: true,
@@ -98,10 +122,7 @@ describe('getTenantBranding', () => {
       ],
     })
 
-    const { getTenantBranding, resetBrandingSchemaReadyForTests } = await import(
-      './branding.service.js'
-    )
-    resetBrandingSchemaReadyForTests()
+    const { getTenantBranding } = await import('./branding.service.js')
 
     const branding = await getTenantBranding('supplier-1', 'SUPPLIER')
     expect(branding.brandDisplayName).toBe('Gulf Chef')
@@ -115,7 +136,6 @@ describe('getTenantBranding', () => {
 describe('updateTenantBranding', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    brandingColumnsExist.mockResolvedValue(true)
     tenantBrandingColumnMap.mockResolvedValue({
       logoUrl: true,
       brandPrimary: true,
@@ -137,10 +157,7 @@ describe('updateTenantBranding', () => {
       ],
     })
 
-    const { updateTenantBranding, resetBrandingSchemaReadyForTests } = await import(
-      './branding.service.js'
-    )
-    resetBrandingSchemaReadyForTests()
+    const { updateTenantBranding } = await import('./branding.service.js')
 
     await updateTenantBranding('supplier-1', 'SUPPLIER', {
       brandDisplayName: 'Gulf Chef',
@@ -154,14 +171,89 @@ describe('updateTenantBranding', () => {
   })
 
   it('rejects updates when brand columns are missing', async () => {
-    brandingColumnsExist.mockResolvedValue(false)
-    const { updateTenantBranding, resetBrandingSchemaReadyForTests } = await import(
-      './branding.service.js'
-    )
-    resetBrandingSchemaReadyForTests()
+    tenantBrandingColumnMap.mockResolvedValue({
+      logoUrl: true,
+      brandPrimary: false,
+      brandAccent: false,
+      brandDisplayName: false,
+    })
+    const { updateTenantBranding } = await import('./branding.service.js')
 
     await expect(
       updateTenantBranding('supplier-1', 'SUPPLIER', { brandPrimary: '#5b21b6' })
     ).rejects.toThrow(/not available/)
+  })
+})
+
+describe('updateTenantLogo', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    tenantBrandingColumnMap.mockResolvedValue({
+      logoUrl: true,
+      brandPrimary: true,
+      brandAccent: true,
+      brandDisplayName: true,
+    })
+  })
+
+  it('updates logo_url and invalidates tenant profile cache', async () => {
+    const { query } = await import('../lib/db.js')
+    const { invalidateTenantProfileCache } = await import('../lib/tenant-profile-cache.js')
+    query.mockResolvedValueOnce({
+      rows: [{ id: 'supplier-1', logo_url: 'https://cdn.example/logo.png' }],
+    })
+
+    const { updateTenantLogo } = await import('./branding.service.js')
+    const row = await updateTenantLogo('supplier-1', 'SUPPLIER', 'https://cdn.example/logo.png')
+
+    expect(row.logo_url).toBe('https://cdn.example/logo.png')
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE supplier SET logo_url = $2'),
+      ['supplier-1', 'https://cdn.example/logo.png']
+    )
+    expect(invalidateTenantProfileCache).toHaveBeenCalledWith('supplier-1', 'SUPPLIER')
+  })
+
+  it('clears logo when given an empty string', async () => {
+    const { query } = await import('../lib/db.js')
+    query.mockResolvedValueOnce({
+      rows: [{ id: 'supplier-1', logo_url: null }],
+    })
+
+    const { updateTenantLogo } = await import('./branding.service.js')
+    const row = await updateTenantLogo('supplier-1', 'SUPPLIER', '')
+
+    expect(row.logo_url).toBeNull()
+    expect(query).toHaveBeenCalledWith(expect.any(String), ['supplier-1', null])
+  })
+
+  it('rejects invalid logo URLs', async () => {
+    const { updateTenantLogo } = await import('./branding.service.js')
+    await expect(updateTenantLogo('supplier-1', 'SUPPLIER', 'not-a-url')).rejects.toThrow(
+      /valid http or https/
+    )
+  })
+
+  it('rejects updates when logo_url column is missing', async () => {
+    tenantBrandingColumnMap.mockResolvedValue({
+      logoUrl: false,
+      brandPrimary: true,
+      brandAccent: true,
+      brandDisplayName: true,
+    })
+    const { updateTenantLogo } = await import('./branding.service.js')
+    await expect(
+      updateTenantLogo('supplier-1', 'SUPPLIER', 'https://cdn.example/logo.png')
+    ).rejects.toThrow(/not available/)
+  })
+
+  it('throws when tenant is not found', async () => {
+    const { query } = await import('../lib/db.js')
+    query.mockResolvedValueOnce({ rows: [] })
+
+    const { updateTenantLogo } = await import('./branding.service.js')
+    await expect(
+      updateTenantLogo('supplier-1', 'SUPPLIER', 'https://cdn.example/logo.png')
+    ).rejects.toThrow(/not found/i)
   })
 })

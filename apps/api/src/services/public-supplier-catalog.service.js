@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js'
+import { columnExists } from '../lib/ensure-tenant-branding-schema.js'
 import { NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
 import { getTenantBranding } from './branding.service.js'
 import {
@@ -9,39 +10,58 @@ import { isFeatureEnabled } from '../lib/subscription.js'
 
 const DEFAULT_PAGE_SIZE = 24
 
+const PUBLIC_SUPPLIER_CORE_FIELDS = `
+  s.id,
+  s.slug,
+  s.name,
+  s.minimum_order_amount,
+  s.payment_terms
+`
+
 export function isUuid(str) {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   return typeof str === 'string' && uuidRegex.test(str)
 }
 
-const PUBLIC_SUPPLIER_FIELDS = `
-  s.id,
-  s.slug,
-  s.name,
-  s.logo_url,
-  s.brand_primary,
-  s.brand_accent,
-  s.brand_display_name,
-  s.public_catalog_enabled,
-  s.minimum_order_amount,
-  s.payment_terms
-`
+async function buildPublicSupplierSelectFields() {
+  const fields = [PUBLIC_SUPPLIER_CORE_FIELDS.trim()]
+  if (await columnExists('supplier', 'public_catalog_enabled')) {
+    fields.push('s.public_catalog_enabled')
+  }
+  return fields.join(',\n  ')
+}
+
+async function publicCatalogEnabledFilter() {
+  if (await columnExists('supplier', 'public_catalog_enabled')) {
+    return 'AND s.public_catalog_enabled = true'
+  }
+  return ''
+}
+
+async function publicCatalogEnabledPredicate(tableAlias = 's') {
+  if (await columnExists('supplier', 'public_catalog_enabled')) {
+    return `${tableAlias}.public_catalog_enabled = true`
+  }
+  return 'TRUE'
+}
 
 export async function resolvePublicSupplierByIdOrSlug(idOrSlug, dbQuery = query) {
+  const selectFields = await buildPublicSupplierSelectFields()
+  const catalogFilter = await publicCatalogEnabledFilter()
   const byId = isUuid(idOrSlug)
   const { rows } = await dbQuery(
     byId
       ? `
-        SELECT ${PUBLIC_SUPPLIER_FIELDS}
+        SELECT ${selectFields}
         FROM supplier s
         WHERE s.id = $1
-          AND s.public_catalog_enabled = true
+          ${catalogFilter}
         `
       : `
-        SELECT ${PUBLIC_SUPPLIER_FIELDS}
+        SELECT ${selectFields}
         FROM supplier s
         WHERE s.slug = $1
-          AND s.public_catalog_enabled = true
+          ${catalogFilter}
         `,
     [idOrSlug]
   )
@@ -62,17 +82,34 @@ export async function getPublicSupplierProfile(idOrSlug, dbQuery = query) {
   const row = await resolvePublicSupplierByIdOrSlug(idOrSlug, dbQuery)
   const brandingAllowed = await canExposeBranding(row.id, dbQuery)
 
+  let logoUrl = null
+  let brandDisplayName = null
+  let brandPrimary = null
+  let brandAccent = null
+
+  try {
+    const branding = await getTenantBranding(row.id, 'SUPPLIER')
+    logoUrl = branding.logoUrl
+    if (brandingAllowed) {
+      brandDisplayName = branding.brandDisplayName
+      brandPrimary = branding.isDefault ? null : branding.brandPrimary
+      brandAccent = branding.brandAccent
+    }
+  } catch {
+    /* branding columns may be missing on older databases */
+  }
+
   return {
     id: row.id,
     slug: row.slug,
     name: row.name,
-    logoUrl: row.logo_url || null,
-    brandDisplayName: brandingAllowed ? row.brand_display_name || null : null,
-    brandPrimary: brandingAllowed ? row.brand_primary || null : null,
-    brandAccent: brandingAllowed ? row.brand_accent || null : null,
+    logoUrl,
+    brandDisplayName,
+    brandPrimary,
+    brandAccent,
     minimumOrderAmount: row.minimum_order_amount != null ? Number(row.minimum_order_amount) : null,
     paymentTerms: row.payment_terms || null,
-    publicCatalogEnabled: row.public_catalog_enabled,
+    publicCatalogEnabled: row.public_catalog_enabled ?? true,
   }
 }
 
@@ -84,7 +121,8 @@ export async function listPublicSupplierProducts(
   const safeLimit = Math.min(Math.max(1, limit), 48)
   const offset = (Math.max(1, page) - 1) * safeLimit
   const params = [supplierId]
-  const where = ['p.supplier_id = $1', 's.public_catalog_enabled = true']
+  const catalogEnabledPredicate = await publicCatalogEnabledPredicate('s')
+  const where = ['p.supplier_id = $1', catalogEnabledPredicate]
   let paramIndex = 2
 
   if (q) {
@@ -143,7 +181,7 @@ export async function listPublicSupplierProducts(
     WHERE p.supplier_id = $1
       AND p.category IS NOT NULL
       AND p.category <> ''
-      AND s.public_catalog_enabled = true
+      AND ${catalogEnabledPredicate}
     ORDER BY p.category ASC
     LIMIT 50
     `,

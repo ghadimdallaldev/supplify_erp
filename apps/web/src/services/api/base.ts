@@ -169,6 +169,7 @@ export const api = createApi({
     'Order',
     'Supplier',
     'Restaurant',
+    'Branding',
     'Price',
     'Inventory',
     'RestaurantInventory',

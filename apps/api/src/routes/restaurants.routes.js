@@ -10,20 +10,19 @@ import {
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
-import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
+import { ValidationError, NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
 import { createPendingActivationSubscription } from '../lib/billing/subscription-activation.js'
 import { ensureTenantSystemRoles } from '../lib/tenant-roles.js'
 import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../lib/safe-update.js'
 import { deliveredOrderStatusInSql } from '../lib/order-statuses.js'
 import { invalidateTenantProfileCache } from '../lib/tenant-profile-cache.js'
-import { getTenantBranding, updateTenantBranding } from '../services/branding.service.js'
-
-const brandingUpdateSchema = z.object({
-  brandPrimary: z.string().optional().nullable(),
-  brandAccent: z.string().optional().nullable(),
-  brandDisplayName: z.string().max(120).optional().nullable(),
-})
+import {
+  getTenantBranding,
+  updateTenantBranding,
+  updateTenantLogo,
+} from '../services/branding.service.js'
+import { brandingUpdateSchema } from './suppliers/suppliers.helpers.js'
 
 const router = express.Router()
 
@@ -587,95 +586,45 @@ router.post('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
 router.post(
   '/:id/logo',
   requireAuth,
+  resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
   requireFeature(
     'custom_branding',
     (req) => req.params.id,
     () => 'RESTAURANT'
   ),
-  async (req, res) => {
+  async (req, res, next) => {
     try {
       const { id } = req.params
       const { logoUrl } = req.body
 
-      if (!logoUrl) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'VALIDATION_ERROR',
-            message: 'logoUrl is required',
-          },
-          requestId: req.requestId,
-        })
+      if (logoUrl == null) {
+        throw new ValidationError('logoUrl is required')
       }
 
-      // Check permissions
-      const { rows: restaurants } = await query('SELECT * FROM restaurant WHERE id = $1', [id])
-
-      if (restaurants.length === 0) {
-        return res.status(404).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'NOT_FOUND',
-            message: 'Restaurant not found',
-          },
-          requestId: req.requestId,
-        })
+      if (req.userData.role === 'RESTAURANT') {
+        const restaurantId = await getRestaurantIdForRequest(req)
+        if (restaurantId !== id) {
+          throw new ForbiddenError('Access denied. You can only update your own logo')
+        }
       }
 
-      const restaurant = restaurants[0]
-
-      // Restaurants can only update their own logo
-      if (req.userData.role === 'RESTAURANT' && restaurant.contact_email !== req.userData.email) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied. You can only update your own logo',
-          },
-          requestId: req.requestId,
-        })
-      }
-
-      // Update logo URL
-      const { rows } = await query(
-        `
-      UPDATE restaurant 
-      SET logo_url = $1, updated_at = now()
-      WHERE id = $2
-      RETURNING *
-    `,
-        [logoUrl, id]
-      )
+      const restaurant = await updateTenantLogo(id, 'RESTAURANT', logoUrl)
 
       logger.info('Restaurant logo updated', {
         restaurantId: id,
-        logoUrl,
+        logoUrl: restaurant.logo_url,
         actor: req.userData.id,
       })
 
-      await invalidateTenantProfileCache(id, 'RESTAURANT')
-
       res.json({
         ok: true,
-        data: { restaurant: rows[0] },
+        data: { restaurant },
         error: null,
         requestId: req.requestId,
       })
-    } catch (error) {
-      logger.error('Update restaurant logo error:', error)
-      res.status(500).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'INTERNAL_ERROR',
-          message: 'Failed to update restaurant logo',
-        },
-        requestId: req.requestId,
-      })
+    } catch (err) {
+      next(err)
     }
   }
 )

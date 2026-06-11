@@ -26,7 +26,6 @@ import {
   getSupplierRatingSummariesBatch,
   getRecentReviewsForSuppliersBatch,
 } from '../../services/reviews.service.js'
-import { getTenantBranding, updateTenantBranding } from '../../services/branding.service.js'
 import {
   listFeaturedPackages,
   purchaseAndActivateFeaturedPlacement,

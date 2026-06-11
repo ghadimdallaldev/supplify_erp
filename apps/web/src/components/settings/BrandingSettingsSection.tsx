@@ -4,8 +4,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
+import { Skeleton } from '../ui/skeleton'
+import { EmptyState } from '../ui/empty-state'
 import toast from 'react-hot-toast'
 import { Palette } from 'lucide-react'
+
+const HEX_RE = /^#([0-9A-Fa-f]{6})$/
+
+function validateHex(value: string, fieldLabel: string): string | null {
+  if (!value.trim()) return null
+  if (!HEX_RE.test(value.trim())) {
+    return `${fieldLabel} must be a valid hex color (#RRGGBB)`
+  }
+  return null
+}
 
 type Props = {
   tenantType: 'RESTAURANT' | 'SUPPLIER'
@@ -13,11 +25,13 @@ type Props = {
 }
 
 export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
-  const { data, isLoading } = useGetTenantBrandingQuery({ tenantType })
+  const { data, isLoading, isError, refetch } = useGetTenantBrandingQuery({ tenantType })
   const [updateBranding, { isLoading: saving }] = useUpdateTenantBrandingMutation()
   const [brandPrimary, setBrandPrimary] = useState('')
   const [brandAccent, setBrandAccent] = useState('')
   const [brandDisplayName, setBrandDisplayName] = useState('')
+  const [primaryError, setPrimaryError] = useState<string | null>(null)
+  const [accentError, setAccentError] = useState<string | null>(null)
 
   useEffect(() => {
     const b = data?.branding
@@ -29,6 +43,12 @@ export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
   }, [data])
 
   const handleSave = async () => {
+    const nextPrimaryError = validateHex(brandPrimary, 'Primary color')
+    const nextAccentError = validateHex(brandAccent, 'Accent color')
+    setPrimaryError(nextPrimaryError)
+    setAccentError(nextAccentError)
+    if (nextPrimaryError || nextAccentError) return
+
     try {
       await updateBranding({
         tenantType,
@@ -42,7 +62,42 @@ export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
     }
   }
 
-  if (isLoading) return null
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="mt-2 h-4 w-full max-w-md" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-9 w-28" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardContent className="py-6">
+          <EmptyState
+            title="Could not load branding settings"
+            description="Try again in a moment."
+            action={
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                Retry
+              </Button>
+            }
+          />
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card>
@@ -57,6 +112,11 @@ export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {!canEdit && (
+          <p className="text-sm text-[var(--text-muted)]">
+            You don&apos;t have permission to edit branding.
+          </p>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor="brand-primary">Primary color</Label>
@@ -66,16 +126,28 @@ export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
                 type="color"
                 value={brandPrimary || '#5b21b6'}
                 disabled={!canEdit}
-                onChange={(e) => setBrandPrimary(e.target.value)}
+                onChange={(e) => {
+                  setBrandPrimary(e.target.value)
+                  setPrimaryError(null)
+                }}
                 className="h-10 w-14 p-1"
               />
               <Input
                 value={brandPrimary}
                 disabled={!canEdit}
                 placeholder="#5b21b6"
-                onChange={(e) => setBrandPrimary(e.target.value)}
+                onChange={(e) => {
+                  setBrandPrimary(e.target.value)
+                  setPrimaryError(null)
+                }}
+                aria-invalid={!!primaryError}
               />
             </div>
+            {primaryError && (
+              <p className="mt-1 text-xs text-red-600" role="alert">
+                {primaryError}
+              </p>
+            )}
           </div>
           <div>
             <Label htmlFor="brand-accent">Accent color</Label>
@@ -85,16 +157,28 @@ export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
                 type="color"
                 value={brandAccent || '#7c3aed'}
                 disabled={!canEdit}
-                onChange={(e) => setBrandAccent(e.target.value)}
+                onChange={(e) => {
+                  setBrandAccent(e.target.value)
+                  setAccentError(null)
+                }}
                 className="h-10 w-14 p-1"
               />
               <Input
                 value={brandAccent}
                 disabled={!canEdit}
                 placeholder="#7c3aed"
-                onChange={(e) => setBrandAccent(e.target.value)}
+                onChange={(e) => {
+                  setBrandAccent(e.target.value)
+                  setAccentError(null)
+                }}
+                aria-invalid={!!accentError}
               />
             </div>
+            {accentError && (
+              <p className="mt-1 text-xs text-red-600" role="alert">
+                {accentError}
+              </p>
+            )}
           </div>
         </div>
         <div>
@@ -105,7 +189,7 @@ export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
             disabled={!canEdit}
             value={brandDisplayName}
             onChange={(e) => setBrandDisplayName(e.target.value)}
-            placeholder="Shown in header when set"
+            placeholder="Shown on your public supplier catalog when set"
           />
         </div>
         {canEdit && (

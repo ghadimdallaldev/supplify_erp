@@ -7,9 +7,7 @@ import { Textarea } from '../../ui/textarea'
 import { Select, SelectTrigger } from '../../ui/select'
 import { Mail, Phone, Globe, Save, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useAppDispatch } from '../../../hooks/redux'
-import { LogoUpload } from '../../LogoUpload'
-import { BrandingSettingsSection } from '../../settings/BrandingSettingsSection'
+import { TenantBrandingPanel } from '../../settings/TenantBrandingPanel'
 import {
   useGetRestaurantMeQuery,
   useUpdateRestaurantMutation,
@@ -18,14 +16,11 @@ import {
   useGetEntitlementsQuery,
 } from '../../../services/api'
 import { RestaurantDeliveryLocationCard } from '../RestaurantDeliveryLocationCard'
-import { canUseCustomBranding, customBrandingUpgradeMessage } from '../../../lib/planLimits'
-import { openBrowseUpgrade } from '../../../lib/openBrowseUpgrade'
 import { usePermissions } from '../../../hooks/usePermissions'
 import { normalizeAddress } from '../../../lib/address'
 import { OnboardingTabLoading } from './onboardingShared'
 
 export function OnboardingProfileTab() {
-  const dispatch = useAppDispatch()
   const { can } = usePermissions()
   const {
     data: restaurantData,
@@ -37,7 +32,6 @@ export function OnboardingProfileTab() {
   const [getPresignedUrl] = useGetPresignedUrlMutation()
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const entitlements = entitlementsData?.entitlements
-  const brandingAllowed = canUseCustomBranding(entitlements)
   const restaurant = restaurantData?.restaurant
 
   const [profileForm, setProfileForm] = useState({
@@ -75,13 +69,14 @@ export function OnboardingProfileTab() {
   const handleLogoUpload = async (logoUrl: string) => {
     if (!restaurant?.id) {
       toast.error('Restaurant information not loaded')
-      return
+      throw new Error('Restaurant information not loaded')
     }
     try {
       await uploadRestaurantLogo({ id: restaurant.id, logoUrl }).unwrap()
       refetchRestaurant()
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to upload logo')
+      throw error
     }
   }
 
@@ -121,64 +116,19 @@ export function OnboardingProfileTab() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Business Logo</CardTitle>
-          <CardDescription>
-            Upload your business logo. This will be displayed in your profile and to suppliers.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!brandingAllowed && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <span>{customBrandingUpgradeMessage(entitlements?.plan?.name)}</span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  openBrowseUpgrade(dispatch, {
-                    currentPlan: entitlements?.plan?.name ?? null,
-                    upgradeUrl: '/app/settings?tab=subscription',
-                  })
-                }
-              >
-                Compare plans
-              </Button>
-            </div>
-          )}
-          {restaurant ? (
-            brandingAllowed ? (
-              <LogoUpload
-                currentLogo={restaurant.logo_url}
-                onUpload={handleLogoUpload}
-                entityId={restaurant.id}
-                entityName={restaurant.name || 'Restaurant'}
-                getPresignedUrl={handleGetPresignedUrl}
-              />
-            ) : restaurant.logo_url ? (
-              <img
-                src={restaurant.logo_url}
-                alt={`${restaurant.name || 'Restaurant'} logo`}
-                className="h-24 w-24 rounded-lg border object-contain bg-white"
-              />
-            ) : (
-              <p className="text-sm text-[var(--text-muted)]">
-                Upgrade to Gold or Platinum to upload your logo.
-              </p>
-            )
-          ) : (
-            <p className="text-sm text-[var(--text-muted)]">Loading restaurant information...</p>
-          )}
-        </CardContent>
-      </Card>
-
-      {brandingAllowed && (
-        <BrandingSettingsSection
-          tenantType="RESTAURANT"
-          canEdit={can('SETTINGS_EDIT') || can('SETTINGS_MANAGE')}
-        />
-      )}
+      <TenantBrandingPanel
+        tenantType="RESTAURANT"
+        entityId={restaurant?.id}
+        entityName={restaurant?.name || 'Restaurant'}
+        currentLogo={restaurant?.logo_url}
+        entitlements={entitlements}
+        canEditBranding={can('SETTINGS_EDIT') || can('SETTINGS_MANAGE')}
+        upgradeTab="subscription"
+        logoTitle="Business Logo"
+        logoDescription="Upload your business logo. This will be displayed in your profile and to suppliers."
+        onLogoUpload={handleLogoUpload}
+        getPresignedUrl={handleGetPresignedUrl}
+      />
 
       <Card>
         <CardHeader>
