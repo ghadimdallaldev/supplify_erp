@@ -16,6 +16,12 @@ export interface Supplier {
   public_catalog_enabled?: boolean
   created_at: string
   updated_at: string
+  /** List enrichment — active store-wide deal badge */
+  has_store_deal?: boolean
+  store_deal_label?: string | null
+  store_deal_id?: string | null
+  store_deal_type?: 'percentage_discount' | 'fixed_discount' | null
+  store_deal_discount_value?: number | null
 }
 
 export interface CreateSupplierRequest {

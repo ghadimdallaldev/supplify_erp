@@ -44,6 +44,7 @@ export const RESTAURANT_FEATURE_KEYS = [
 export const SUPPLIER_FEATURE_KEYS = [
   'order_calendar',
   'reports',
+  'smart_reorder',
   'warehouses',
   'multi_warehouse',
   'fulfillment',

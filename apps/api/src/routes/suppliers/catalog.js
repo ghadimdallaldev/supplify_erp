@@ -26,7 +26,6 @@ import {
   getSupplierRatingSummariesBatch,
   getRecentReviewsForSuppliersBatch,
 } from '../../services/reviews.service.js'
-import { getTenantBranding, updateTenantBranding } from '../../services/branding.service.js'
 import {
   listFeaturedPackages,
   purchaseAndActivateFeaturedPlacement,
@@ -36,6 +35,7 @@ import {
 
 import {
   attachReviewFields,
+  attachStoreDealFields,
   supplierCreateSchema,
   supplierUpdateSchema,
   supplierListSchema,
@@ -173,6 +173,7 @@ router.get('/', optionalAuth, async (req, res) => {
     const { rows } = await query(sql, queryParams)
 
     const suppliersWithReviews = await attachReviewFields(rows)
+    const suppliersWithDeals = await attachStoreDealFields(suppliersWithReviews, { restaurantId })
 
     // Get total count
     // Build count params separately - exclude is_followed param and limit/offset
@@ -209,7 +210,7 @@ router.get('/', optionalAuth, async (req, res) => {
     res.json({
       ok: true,
       data: {
-        suppliers: suppliersWithReviews,
+        suppliers: suppliersWithDeals,
         pagination: {
           total: parseInt(countRows[0].total),
           limit: params.limit,

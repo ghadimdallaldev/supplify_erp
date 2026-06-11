@@ -1,11 +1,8 @@
 import { useEffect, type ReactNode } from 'react'
-import {
-  useGetRestaurantMeQuery,
-  useGetSupplierMeQuery,
-  useGetEntitlementsQuery,
-} from '../services/api'
+import { useGetTenantBrandingQuery, useGetEntitlementsQuery } from '../services/api'
 import { useImpersonation } from '../hooks/useImpersonation'
-import { featureEnabled } from '../lib/planLimits'
+import { canUseCustomBranding } from '../lib/planLimits'
+import type { TenantBranding } from '../services/api/endpoints/restaurants'
 
 const CSS_VARS = [
   '--brand',
@@ -15,22 +12,18 @@ const CSS_VARS = [
   '--brand-ultra',
 ] as const
 
-function applyBrandingVars(
-  branding: {
-    brandPrimary?: string
-    brandMid?: string
-    brandLight?: string
-    brandPale?: string
-    brandUltra?: string
-  } | null
-) {
+function applyBrandingVars(branding: TenantBranding | null) {
   const root = document.documentElement
-  if (!branding || branding.brandPrimary === '#5b21b6') {
+  if (!branding || branding.isDefault) {
     CSS_VARS.forEach((v) => root.style.removeProperty(v))
     return
   }
   if (branding.brandPrimary) root.style.setProperty('--brand', branding.brandPrimary)
-  if (branding.brandMid) root.style.setProperty('--brand-mid', branding.brandMid)
+  if (branding.brandAccent) {
+    root.style.setProperty('--brand-mid', branding.brandAccent)
+  } else if (branding.brandMid) {
+    root.style.setProperty('--brand-mid', branding.brandMid)
+  }
   if (branding.brandLight) root.style.setProperty('--brand-light', branding.brandLight)
   if (branding.brandPale) root.style.setProperty('--brand-pale', branding.brandPale)
   if (branding.brandUltra) root.style.setProperty('--brand-ultra', branding.brandUltra)
@@ -39,39 +32,26 @@ function applyBrandingVars(
 export function TenantBrandingProvider({ children }: { children: ReactNode }) {
   const { isEffectiveRestaurant, isEffectiveSupplier } = useImpersonation()
   const { data: entitlementsData } = useGetEntitlementsQuery()
-  const brandingEnabled = featureEnabled(entitlementsData?.entitlements?.features?.custom_branding)
+  const brandingEnabled = canUseCustomBranding(entitlementsData?.entitlements)
 
-  const { data: restaurantMe } = useGetRestaurantMeQuery(undefined, {
-    skip: !isEffectiveRestaurant || !brandingEnabled,
-  })
-  const { data: supplierMe } = useGetSupplierMeQuery(undefined, {
-    skip: !isEffectiveSupplier || !brandingEnabled,
-  })
+  const tenantType = isEffectiveRestaurant
+    ? ('RESTAURANT' as const)
+    : isEffectiveSupplier
+      ? ('SUPPLIER' as const)
+      : null
+
+  const { data: brandingData } = useGetTenantBrandingQuery(
+    { tenantType: tenantType! },
+    { skip: !brandingEnabled || !tenantType }
+  )
 
   useEffect(() => {
     if (!brandingEnabled) {
       applyBrandingVars(null)
       return
     }
-    const row = isEffectiveRestaurant
-      ? restaurantMe?.restaurant
-      : isEffectiveSupplier
-        ? supplierMe?.supplier
-        : null
-    if (!row) {
-      applyBrandingVars(null)
-      return
-    }
-    const primary = row.brand_primary as string | undefined
-    if (!primary) {
-      applyBrandingVars(null)
-      return
-    }
-    applyBrandingVars({
-      brandPrimary: primary,
-      brandMid: row.brand_accent || undefined,
-    })
-  }, [brandingEnabled, isEffectiveRestaurant, isEffectiveSupplier, restaurantMe, supplierMe])
+    applyBrandingVars(brandingData?.branding ?? null)
+  }, [brandingEnabled, brandingData])
 
   return <>{children}</>
 }

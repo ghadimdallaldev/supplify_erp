@@ -2,7 +2,9 @@ import { Link } from 'react-router-dom'
 import {
   useGetSupplierReorderAssistanceQuery,
   useCreateReorderReminderDraftMutation,
+  useGetEntitlementsQuery,
 } from '../../services/api'
+import { featureEnabled } from '../../lib/planLimits'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
@@ -21,7 +23,13 @@ const URGENCY_STYLES: Record<string, string> = {
 }
 
 export function SupplierFollowUpPanel({ className }: { className?: string }) {
-  const { data, isLoading, isError, refetch } = useGetSupplierReorderAssistanceQuery()
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const smartReorderEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.smart_reorder
+  )
+  const { data, isLoading, isError, refetch } = useGetSupplierReorderAssistanceQuery(undefined, {
+    skip: !smartReorderEnabled,
+  })
   const [createDraft, { isLoading: drafting }] = useCreateReorderReminderDraftMutation()
   const [draft, setDraft] = useState<ReminderDraft | null>(null)
   const [draftOpen, setDraftOpen] = useState(false)
@@ -50,6 +58,10 @@ export function SupplierFollowUpPanel({ className }: { className?: string }) {
     } finally {
       setBusyRestaurantId(null)
     }
+  }
+
+  if (!smartReorderEnabled) {
+    return null
   }
 
   if (isLoading) {

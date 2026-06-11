@@ -1,5 +1,6 @@
 import './endpoints/auth'
 import './endpoints/products'
+import './endpoints/search'
 import './endpoints/orders'
 import './endpoints/suppliers'
 import './endpoints/restaurants'
@@ -31,6 +32,7 @@ import './endpoints/admin'
 import './endpoints/impersonation'
 import '../staffApi'
 import '../reservationsApi'
+import '../consumerApi'
 
 import { api as baseApi } from './base'
 
@@ -52,6 +54,13 @@ export const {
   useGetProductQuery,
   useCreateProductMutation,
   useUpdateProductMutation,
+  useGetProductFavoritesQuery,
+  useFavoriteProductMutation,
+  useUnfavoriteProductMutation,
+  useSearchQuery,
+  useGetSearchHistoryQuery,
+  useUpsertSearchHistoryMutation,
+  useDeleteSearchHistoryMutation,
   useGetOrdersQuery,
   useGetOrderQuery,
   useCreateOrderMutation,

@@ -58,6 +58,21 @@ async function productHasTagsColumn() {
 /** Reset cache for tests so productHasTagsColumn() is re-queried */
 export function __resetProductTagsColumnCache() {
   _productHasTagsColumn = null
+  _productHasSearchVectorColumn = null
+}
+
+let _productHasSearchVectorColumn = null
+async function productHasSearchVectorColumn() {
+  if (_productHasSearchVectorColumn !== null) return _productHasSearchVectorColumn
+  try {
+    const { rows } = await query(
+      `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'product' AND column_name = 'search_vector' LIMIT 1`
+    )
+    _productHasSearchVectorColumn = rows.length > 0
+  } catch {
+    _productHasSearchVectorColumn = false
+  }
+  return _productHasSearchVectorColumn
 }
 
 // Validation schemas
@@ -87,6 +102,11 @@ const productListSchema = z.object({
     .optional(),
   /** When true, include real available_qty in list rows (no filter). Opt-in for performance. */
   includeStock: z
+    .string()
+    .transform((val) => val === 'true')
+    .optional(),
+  /** When true, return only products favorited by the current user (restaurant). */
+  favoritesOnly: z
     .string()
     .transform((val) => val === 'true')
     .optional(),
@@ -196,10 +216,14 @@ router.get('/', async (req, res) => {
     const params = productListSchema.parse(req.query)
     const tenant = await getRequestTenant(req)
     const scopedSupplierId = tenant?.tenantType === 'SUPPLIER' ? tenant.tenantId : null
+    const restaurantId =
+      tenant?.tenantType === 'RESTAURANT' ? await getRestaurantIdForRequest(req) : null
+    const userId = req.userData?.id ?? null
 
     const whereConditions = []
     const queryParams = []
     let paramIndex = 1
+    let orderByClause = 'p.created_at DESC'
 
     if (scopedSupplierId) {
       whereConditions.push(`p.supplier_id = $${paramIndex}`)
@@ -207,11 +231,43 @@ router.get('/', async (req, res) => {
       paramIndex++
     }
 
-    // Text search
+    // Full-text search (fallback to name LIKE when search_vector column absent)
     if (params.q) {
-      whereConditions.push(`LOWER(p.name) LIKE $${paramIndex}`)
-      queryParams.push(`%${params.q.toLowerCase()}%`)
-      paramIndex++
+      const hasSearchVector = await productHasSearchVectorColumn()
+      if (hasSearchVector) {
+        whereConditions.push(`p.search_vector @@ plainto_tsquery('simple', $${paramIndex})`)
+        queryParams.push(params.q)
+        orderByClause = `ts_rank(p.search_vector, plainto_tsquery('simple', $${paramIndex})) DESC, p.created_at DESC`
+        paramIndex++
+      } else {
+        whereConditions.push(`LOWER(p.name) LIKE $${paramIndex}`)
+        queryParams.push(`%${params.q.toLowerCase()}%`)
+        paramIndex++
+      }
+    }
+
+    if (params.favoritesOnly) {
+      if (!restaurantId || !userId) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'favoritesOnly requires a restaurant user context',
+          },
+          requestId: req.requestId,
+        })
+      }
+      whereConditions.push(`
+        EXISTS (
+          SELECT 1 FROM product_favorite pf
+          WHERE pf.product_id = p.id
+            AND pf.restaurant_id = $${paramIndex}
+            AND pf.user_id = $${paramIndex + 1}
+        )
+      `)
+      queryParams.push(restaurantId, userId)
+      paramIndex += 2
     }
 
     // Category filter (support both old category field and new category_id)
@@ -278,6 +334,19 @@ router.get('/', async (req, res) => {
     const availableQtyExpr = needsInventoryJoin
       ? 'COALESCE(inv.total_available, 0) as available_qty'
       : '0::int as available_qty'
+    const favoritedExpr =
+      restaurantId && userId
+        ? `EXISTS (
+        SELECT 1 FROM product_favorite pf
+        WHERE pf.product_id = p.id
+          AND pf.restaurant_id = $${paramIndex}
+          AND pf.user_id = $${paramIndex + 1}
+      ) as is_favorited`
+        : 'false as is_favorited'
+    if (restaurantId && userId) {
+      queryParams.push(restaurantId, userId)
+      paramIndex += 2
+    }
 
     const sql = `
       SELECT 
@@ -286,6 +355,7 @@ router.get('/', async (req, res) => {
         s.slug as supplier_slug,
         s.contact_email as supplier_email,
         ${availableQtyExpr},
+        ${favoritedExpr},
         pr.amount as current_price,
         pr.currency
       FROM product p
@@ -300,7 +370,7 @@ router.get('/', async (req, res) => {
         LIMIT 1
       ) pr ON true
       ${whereClause}
-      ORDER BY p.created_at DESC
+      ORDER BY ${orderByClause}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `
 
@@ -345,11 +415,8 @@ router.get('/', async (req, res) => {
     let { rows } = mainResult
     const { rows: countRows } = countResult
 
-    if (tenant?.tenantType === 'RESTAURANT') {
-      const restaurantId = tenant.tenantId
-      if (restaurantId) {
-        rows = await enrichProductsWithResolvedPricing(rows, restaurantId)
-      }
+    if (tenant?.tenantType === 'RESTAURANT' && restaurantId) {
+      rows = await enrichProductsWithResolvedPricing(rows, restaurantId)
     }
 
     res.json({
@@ -392,6 +459,192 @@ router.get('/', async (req, res) => {
         message: 'Failed to list products',
         details: error.message,
       },
+      requestId: req.requestId,
+    })
+  }
+})
+
+const favoriteProductSchema = z.object({
+  productId: z.string().uuid(),
+})
+
+// List favorited products (restaurant)
+router.get('/favorites', requireRole(['RESTAURANT']), async (req, res) => {
+  try {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    const userId = req.userData?.id
+    if (!restaurantId || !userId) {
+      throw new ValidationError('Restaurant context required')
+    }
+
+    const { rows } = await query(
+      `
+      SELECT
+        p.*,
+        s.name AS supplier_name,
+        s.slug AS supplier_slug,
+        s.contact_email AS supplier_email,
+        pf.created_at AS favorited_at,
+        true AS is_favorited,
+        pr.amount AS current_price,
+        pr.currency
+      FROM product_favorite pf
+      JOIN product p ON p.id = pf.product_id
+      JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN LATERAL (
+        SELECT amount, currency
+        FROM price
+        WHERE price.product_id = p.id
+          AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
+        ORDER BY valid_from DESC
+        LIMIT 1
+      ) pr ON true
+      WHERE pf.restaurant_id = $1 AND pf.user_id = $2
+      ORDER BY pf.created_at DESC
+      `,
+      [restaurantId, userId]
+    )
+
+    const products = await enrichProductsWithResolvedPricing(rows, restaurantId)
+
+    res.json({
+      ok: true,
+      data: { products },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('List product favorites error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to list favorites' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+// Favorite a product (restaurant)
+router.post('/favorites', requireRole(['RESTAURANT']), async (req, res) => {
+  try {
+    const { productId } = favoriteProductSchema.parse(req.body)
+    const restaurantId = await getRestaurantIdForRequest(req)
+    const userId = req.userData?.id
+    if (!restaurantId || !userId) {
+      throw new ValidationError('Restaurant context required')
+    }
+
+    const { rows: products } = await query('SELECT id FROM product WHERE id = $1', [productId])
+    if (products.length === 0) {
+      throw new NotFoundError('Product not found')
+    }
+
+    await query(
+      `
+      INSERT INTO product_favorite (restaurant_id, product_id, user_id)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (restaurant_id, product_id, user_id) DO NOTHING
+      `,
+      [restaurantId, productId, userId]
+    )
+
+    res.status(201).json({
+      ok: true,
+      data: { productId, favorited: true },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Invalid request body',
+          details: error.errors,
+        },
+        requestId: req.requestId,
+      })
+    }
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Favorite product error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to favorite product' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+// Unfavorite a product (restaurant)
+router.delete('/favorites/:productId', requireRole(['RESTAURANT']), async (req, res) => {
+  try {
+    const { productId } = req.params
+    z.string().uuid().parse(productId)
+    const restaurantId = await getRestaurantIdForRequest(req)
+    const userId = req.userData?.id
+    if (!restaurantId || !userId) {
+      throw new ValidationError('Restaurant context required')
+    }
+
+    await query(
+      'DELETE FROM product_favorite WHERE restaurant_id = $1 AND product_id = $2 AND user_id = $3',
+      [restaurantId, productId, userId]
+    )
+
+    res.json({
+      ok: true,
+      data: { productId, favorited: false },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'Invalid product id' },
+        requestId: req.requestId,
+      })
+    }
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Unfavorite product error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to unfavorite product' },
       requestId: req.requestId,
     })
   }

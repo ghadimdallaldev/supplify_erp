@@ -59,6 +59,9 @@ export const config = {
   PUBLIC_FRONTEND_URL:
     process.env.PUBLIC_FRONTEND_URL || primaryWebOrigin || 'http://localhost:5173',
   DATABASE_URL: resolvedDatabaseUrl,
+  /** Direct Postgres URL for DDL/migrations (bypasses poolers that block ALTER TABLE). */
+  DATABASE_MIGRATION_URL:
+    process.env.DATABASE_PRIVATE_URL || process.env.DATABASE_MIGRATION_URL || resolvedDatabaseUrl,
   DATABASE_SSL: process.env.DATABASE_SSL === 'true',
   /** Railway/managed Postgres often use certs outside the public CA bundle; keep false unless you supply a CA. */
   DATABASE_SSL_REJECT_UNAUTHORIZED: envBool(process.env.DATABASE_SSL_REJECT_UNAUTHORIZED, false),
@@ -88,6 +91,11 @@ export const config = {
   COOKIE_DOMAIN: process.env.COOKIE_DOMAIN || '',
   SESSION_SECRET:
     process.env.SESSION_SECRET || (isProductionNode ? '' : 'dev-session-secret-change-me'),
+  /** JWT signing for B2C diner sessions (consumer_auth_token cookie). Separate from Keycloak. */
+  CONSUMER_AUTH_SECRET:
+    process.env.CONSUMER_AUTH_SECRET ||
+    process.env.SESSION_SECRET ||
+    (isProductionNode ? '' : 'dev-consumer-auth-secret'),
   IMPERSONATION_SECRET:
     process.env.IMPERSONATION_SECRET ||
     process.env.SESSION_SECRET ||

@@ -127,5 +127,27 @@ export const productsApi = api.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Product', id }, 'Product'],
     }),
+    getProductFavorites: builder.query<{ products: Product[] }, void>({
+      query: () => '/api/products/favorites',
+      providesTags: ['ProductFavorite'],
+    }),
+    favoriteProduct: builder.mutation<
+      { productId: string; favorited: boolean },
+      { productId: string }
+    >({
+      query: ({ productId }) => ({
+        url: '/api/products/favorites',
+        method: 'POST',
+        body: { productId },
+      }),
+      invalidatesTags: ['Product', 'ProductFavorite'],
+    }),
+    unfavoriteProduct: builder.mutation<{ productId: string; favorited: boolean }, string>({
+      query: (productId) => ({
+        url: `/api/products/favorites/${productId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Product', 'ProductFavorite'],
+    }),
   }),
 })

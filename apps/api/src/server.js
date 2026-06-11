@@ -23,6 +23,7 @@ import { initializeSocket } from './lib/socket.js'
 import { authRoutes } from './routes/auth.routes.js'
 import { registerRoutes } from './routes/register.routes.js'
 import { productsRoutes } from './routes/products.routes.js'
+import { searchRoutes } from './routes/search.routes.js'
 import { pricesRoutes } from './routes/prices.routes.js'
 import { inventoryRoutes } from './routes/inventory.routes.js'
 import { suppliersRoutes } from './routes/suppliers.routes.js'
@@ -61,11 +62,14 @@ import { disputesRoutes } from './routes/disputes.routes.js'
 import { creditNotesRoutes } from './routes/credit-notes.routes.js'
 import { pushRoutes } from './routes/push.routes.js'
 import { reviewsRoutes } from './routes/reviews.routes.js'
+import { consumerReviewsRoutes } from './routes/consumer-reviews.routes.js'
 import { reportsRoutes } from './routes/reports.routes.js'
 import { tenantRolesRoutes } from './routes/tenant-roles.routes.js'
 import branchInvitationsRoutes from './routes/branch-invitations.routes.js'
 import branchInvitationsPublicRoutes from './routes/branch-invitations-public.routes.js'
 import { quoteRequestsRoutes } from './routes/quote-requests.routes.js'
+import { loyaltyRoutes } from './routes/loyalty.routes.js'
+import { consumerRoutes, consumerPublicRoutes } from './routes/consumer/index.js'
 import restaurantOrgRoutes from './routes/restaurant-org.routes.js'
 import restaurantInvitationsRoutes from './routes/restaurant-invitations.routes.js'
 import { registerCronJobs } from './lib/register-cron-jobs.js'
@@ -341,6 +345,7 @@ app.use('/auth', authRoutes)
 app.use('/api/register', authLimiter)
 app.use('/api/register', registerRoutes)
 app.use('/api/products', productsRoutes)
+app.use('/api/search', searchRoutes)
 app.use('/api/prices', pricesRoutes)
 app.use('/api/inventory', inventoryRoutes)
 app.use('/api/suppliers', suppliersRoutes)
@@ -355,6 +360,7 @@ app.use('/api/disputes', disputesRoutes)
 app.use('/api/credit-notes', creditNotesRoutes)
 app.use('/api/push', pushRoutes)
 app.use('/api/reviews', reviewsRoutes)
+app.use('/api/consumer-reviews', consumerReviewsRoutes)
 app.use('/api/reports', reportsRoutes)
 app.use('/api/roles', tenantRolesRoutes)
 app.use('/api/files', filesRoutes)
@@ -365,6 +371,7 @@ app.use('/api/invoices', invoicesRoutes)
 app.use('/api/payments', paymentsRoutes)
 app.use('/api/quick-lists', quickListsRoutes)
 app.use('/api/quote-requests', quoteRequestsRoutes)
+app.use('/api/loyalty', loyaltyRoutes)
 app.use('/api/restaurant-inventory', restaurantInventoryRoutes)
 app.use('/api/restaurant-onboarding', restaurantOnboardingRoutes)
 app.use('/api/receiving', receivingRoutes)
@@ -377,6 +384,8 @@ app.use('/api/subscriptions', subscriptionsRoutes)
 app.use('/api/billing', billingRoutes)
 app.use('/api/public/staff/request-link', staffLinkLimiter)
 app.use('/api/public', publicRoutes)
+app.use('/api/public/consumer/:restaurantSlug', consumerPublicRoutes)
+app.use('/api/consumer', consumerRoutes)
 app.use('/api/admin-dashboard', adminDashboardRoutes)
 if (allowE2eRoutes()) {
   app.use('/api/e2e', e2eRoutes)
