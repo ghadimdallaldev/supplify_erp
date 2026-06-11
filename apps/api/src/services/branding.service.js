@@ -92,30 +92,26 @@ export async function getTenantBranding(tenantId, tenantType) {
 
 export async function updateTenantBranding(tenantId, tenantType, payload) {
   const table = tenantType === 'RESTAURANT' ? 'restaurant' : 'supplier'
-  const brandPrimary = validateHexColor(payload.brandPrimary, 'brandPrimary')
-  const brandAccent = validateHexColor(payload.brandAccent, 'brandAccent')
-  const brandDisplayName =
-    payload.brandDisplayName === undefined
-      ? undefined
-      : payload.brandDisplayName === null || payload.brandDisplayName === ''
-        ? null
-        : String(payload.brandDisplayName).trim().slice(0, 120)
 
   const sets = []
   const params = [tenantId]
   let idx = 2
 
-  if (brandPrimary !== undefined) {
+  if (payload.brandPrimary !== undefined) {
     sets.push(`brand_primary = $${idx++}`)
-    params.push(brandPrimary)
+    params.push(validateHexColor(payload.brandPrimary, 'brandPrimary'))
   }
-  if (brandAccent !== undefined) {
+  if (payload.brandAccent !== undefined) {
     sets.push(`brand_accent = $${idx++}`)
-    params.push(brandAccent)
+    params.push(validateHexColor(payload.brandAccent, 'brandAccent'))
   }
-  if (brandDisplayName !== undefined) {
+  if (payload.brandDisplayName !== undefined) {
     sets.push(`brand_display_name = $${idx++}`)
-    params.push(brandDisplayName)
+    params.push(
+      payload.brandDisplayName === null || payload.brandDisplayName === ''
+        ? null
+        : String(payload.brandDisplayName).trim().slice(0, 120)
+    )
   }
 
   if (sets.length === 0) {
