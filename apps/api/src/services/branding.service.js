@@ -1,18 +1,51 @@
 import { query } from '../lib/db.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
+import { logger } from '../lib/logger.js'
 
 let brandingSchemaReadyPromise = null
 
 async function ensureBrandingSchemaReady() {
-  if (!brandingSchemaReadyPromise) {
-    brandingSchemaReadyPromise = import('../lib/ensure-tenant-branding-schema.js')
-      .then((m) => m.ensureTenantBrandingSchema())
-      .catch((err) => {
-        brandingSchemaReadyPromise = null
-        throw err
-      })
+  if (!(await brandingColumnsExist('supplier')) || !(await brandingColumnsExist('restaurant'))) {
+    if (!brandingSchemaReadyPromise) {
+      brandingSchemaReadyPromise = import('../lib/ensure-tenant-branding-schema.js')
+        .then((m) => m.ensureTenantBrandingSchema())
+        .catch((err) => {
+          brandingSchemaReadyPromise = null
+          logger.warn('Tenant branding schema ensure failed', { error: err.message })
+          throw err
+        })
+    }
+    await brandingSchemaReadyPromise.catch(() => {
+      /* allow fallback reads when DDL cannot run on this connection */
+    })
   }
-  return brandingSchemaReadyPromise
+}
+
+async function brandingColumnsExist(table) {
+  const { brandingColumnsExist: exists } = await import('../lib/ensure-tenant-branding-schema.js')
+  return exists(table)
+}
+
+async function loadBrandingRow(tenantId, tenantType) {
+  const table = tenantType === 'RESTAURANT' ? 'restaurant' : 'supplier'
+  await ensureBrandingSchemaReady()
+
+  if (await brandingColumnsExist(table)) {
+    const { rows } = await query(
+      `SELECT logo_url, brand_primary, brand_accent, brand_display_name FROM ${table} WHERE id = $1`,
+      [tenantId]
+    )
+    return rows[0]
+  }
+
+  const { rows } = await query(`SELECT logo_url FROM ${table} WHERE id = $1`, [tenantId])
+  if (!rows[0]) return undefined
+  return {
+    logo_url: rows[0].logo_url,
+    brand_primary: null,
+    brand_accent: null,
+    brand_display_name: null,
+  }
 }
 
 /** @internal Test helper */
@@ -100,19 +133,20 @@ function mapRow(row) {
 }
 
 export async function getTenantBranding(tenantId, tenantType) {
-  await ensureBrandingSchemaReady()
-  const table = tenantType === 'RESTAURANT' ? 'restaurant' : 'supplier'
-  const { rows } = await query(
-    `SELECT logo_url, brand_primary, brand_accent, brand_display_name FROM ${table} WHERE id = $1`,
-    [tenantId]
-  )
-  if (!rows[0]) throw new NotFoundError('Tenant not found')
-  return mapRow(rows[0])
+  const row = await loadBrandingRow(tenantId, tenantType)
+  if (!row) throw new NotFoundError('Tenant not found')
+  return mapRow(row)
 }
 
 export async function updateTenantBranding(tenantId, tenantType, payload) {
-  await ensureBrandingSchemaReady()
   const table = tenantType === 'RESTAURANT' ? 'restaurant' : 'supplier'
+  await ensureBrandingSchemaReady()
+
+  if (!(await brandingColumnsExist(table))) {
+    throw new ValidationError(
+      'Brand colors are not available on this server yet. Retry in a few minutes or contact support.'
+    )
+  }
 
   const sets = []
   const params = [tenantId]
