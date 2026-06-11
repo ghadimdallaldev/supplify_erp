@@ -8,6 +8,7 @@ import { ZodError } from 'zod'
 import { config } from '../../config/env.js'
 import { deliveredOrderStatusInSql } from '../../lib/order-statuses.js'
 import { parseAdminListPagination } from '../../lib/admin-list-pagination.js'
+import { columnExists } from '../../lib/ensure-tenant-branding-schema.js'
 import {
   createImpersonationToken,
   verifyImpersonationToken,
@@ -260,6 +261,55 @@ router.get('/tenants/restaurants', async (req, res) => {
   }
 })
 
+async function buildSupplierTenantSearchSelectFields() {
+  const [
+    hasSlug,
+    hasOrgId,
+    hasMainBranch,
+    hasContactEmail,
+    hasSalesContactEmail,
+    hasAccountingContactEmail,
+  ] = await Promise.all([
+    columnExists('supplier', 'slug'),
+    columnExists('supplier', 'organization_id'),
+    columnExists('supplier', 'is_main_branch'),
+    columnExists('supplier', 'contact_email'),
+    columnExists('supplier', 'sales_contact_email'),
+    columnExists('supplier', 'accounting_contact_email'),
+  ])
+
+  const emailParts = []
+  if (hasContactEmail) emailParts.push('s.contact_email')
+  if (hasSalesContactEmail) emailParts.push('s.sales_contact_email')
+  if (hasAccountingContactEmail) emailParts.push('s.accounting_contact_email')
+
+  return {
+    slugSelect: hasSlug ? 's.slug,' : 'NULL::text AS slug,',
+    orgIdSelect: hasOrgId ? 's.organization_id,' : 'NULL::uuid AS organization_id,',
+    mainBranchSelect: hasMainBranch ? 's.is_main_branch,' : 'NULL::boolean AS is_main_branch,',
+    contactEmailSelect:
+      emailParts.length > 0
+        ? `COALESCE(${emailParts.join(', ')}) AS contact_email,`
+        : 'NULL::text AS contact_email,',
+  }
+}
+
+async function buildRestaurantTenantSearchSelectFields() {
+  const [hasSlug, hasOrgId, hasMainBranch, hasContactEmail] = await Promise.all([
+    columnExists('restaurant', 'slug'),
+    columnExists('restaurant', 'organization_id'),
+    columnExists('restaurant', 'is_main_branch'),
+    columnExists('restaurant', 'contact_email'),
+  ])
+
+  return {
+    slugSelect: hasSlug ? 'r.slug,' : 'NULL::text AS slug,',
+    orgIdSelect: hasOrgId ? 'r.organization_id,' : 'NULL::uuid AS organization_id,',
+    mainBranchSelect: hasMainBranch ? 'r.is_main_branch,' : 'NULL::boolean AS is_main_branch,',
+    contactEmailSelect: hasContactEmail ? 'r.contact_email,' : 'NULL::text AS contact_email,',
+  }
+}
+
 /**
  * GET /api/admin-dashboard/tenants/search?q=&type=RESTAURANT|SUPPLIER&orgMainOnly=true
  * Lightweight tenant lookup for admin limits / billing tools.
@@ -281,7 +331,6 @@ router.get('/tenants/search', async (req, res) => {
         row.name,
         row.slug,
         row.contact_email,
-        row.sales_contact_email,
         row.plan_code,
         row.plan_name,
         row.subscription_status,
@@ -295,14 +344,16 @@ router.get('/tenants/search', async (req, res) => {
     }
 
     if (!type || type === 'SUPPLIER') {
+      const { slugSelect, orgIdSelect, mainBranchSelect, contactEmailSelect } =
+        await buildSupplierTenantSearchSelectFields()
       const { rows } = await query(`
         SELECT
           s.id,
           s.name,
-          s.slug,
-          s.organization_id,
-          s.is_main_branch,
-          COALESCE(s.contact_email, s.sales_contact_email, s.accounting_contact_email) AS contact_email,
+          ${slugSelect}
+          ${orgIdSelect}
+          ${mainBranchSelect}
+          ${contactEmailSelect}
           sub.status AS subscription_status,
           sub.plan_name,
           (SELECT sp.code FROM subscription_plan sp WHERE sp.id = sub.plan_id LIMIT 1) AS plan_code,
@@ -320,14 +371,16 @@ router.get('/tenants/search', async (req, res) => {
     }
 
     if (!type || type === 'RESTAURANT') {
+      const { slugSelect, orgIdSelect, mainBranchSelect, contactEmailSelect } =
+        await buildRestaurantTenantSearchSelectFields()
       const { rows } = await query(`
         SELECT
           r.id,
           r.name,
-          r.slug,
-          r.organization_id,
-          r.is_main_branch,
-          r.contact_email,
+          ${slugSelect}
+          ${orgIdSelect}
+          ${mainBranchSelect}
+          ${contactEmailSelect}
           sub.status AS subscription_status,
           sub.plan_name,
           (SELECT sp.code FROM subscription_plan sp WHERE sp.id = sub.plan_id LIMIT 1) AS plan_code,

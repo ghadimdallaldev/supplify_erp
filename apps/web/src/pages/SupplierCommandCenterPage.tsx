@@ -4,7 +4,9 @@ import {
   useGetSupplierCommandCenterQuery,
   useCreateReorderReminderDraftMutation,
   useGetSupplierAtRiskOrdersQuery,
+  useGetEntitlementsQuery,
 } from '../services/api'
+import { featureEnabled } from '../lib/planLimits'
 import { Skeleton } from '../components/ui/skeleton'
 import { Button } from '../components/ui/button'
 import {
@@ -171,9 +173,15 @@ export function SupplierCommandCenterPage() {
             : persona.readOnly
               ? 'Read-only snapshot of supplier priorities'
               : "Today's priorities — action items, not just charts"
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const smartReorderEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.smart_reorder
+  )
   const { data, isLoading, isError, error, refetch, isFetching } =
     useGetSupplierCommandCenterQuery()
-  const { data: atRiskData } = useGetSupplierAtRiskOrdersQuery()
+  const { data: atRiskData } = useGetSupplierAtRiskOrdersQuery(undefined, {
+    skip: !smartReorderEnabled || !layout.showAtRisk,
+  })
   const [createDraft, { isLoading: drafting }] = useCreateReorderReminderDraftMutation()
   const [reminderDraft, setReminderDraft] = useState<ReminderDraft | null>(null)
 

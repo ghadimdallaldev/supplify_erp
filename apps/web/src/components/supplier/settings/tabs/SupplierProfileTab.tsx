@@ -6,7 +6,6 @@ import { Label } from '../../../ui/label'
 import { Textarea } from '../../../ui/textarea'
 import {
   Building2,
-  FileText,
   Mail,
   Phone,
   Globe,
@@ -17,12 +16,9 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { LogoUpload } from '../../../LogoUpload'
-import { BrandingSettingsSection } from '../../../settings/BrandingSettingsSection'
-import { useAppSelector, useAppDispatch } from '../../../../hooks/redux'
+import { TenantBrandingPanel } from '../../../settings/TenantBrandingPanel'
+import { useAppSelector } from '../../../../hooks/redux'
 import { usePermissions } from '../../../../hooks/usePermissions'
-import { canUseCustomBranding, customBrandingUpgradeMessage } from '../../../../lib/planLimits'
-import { openBrowseUpgrade } from '../../../../lib/openBrowseUpgrade'
 import { normalizeAddress } from '../../../../lib/address'
 import {
   useGetSupplierMeQuery,
@@ -33,7 +29,6 @@ import {
 } from '../../../../services/api'
 
 export function SupplierProfileTab() {
-  const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
   const { can } = usePermissions()
   const {
@@ -47,7 +42,6 @@ export function SupplierProfileTab() {
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
   const entitlements = entitlementsData?.entitlements
   const supplier = supplierData?.supplier
-  const brandingAllowed = canUseCustomBranding(entitlements)
 
   const [profileForm, setProfileForm] = useState({
     name: '',
@@ -121,13 +115,14 @@ export function SupplierProfileTab() {
   const handleLogoUpload = async (logoUrl: string) => {
     if (!supplier?.id) {
       toast.error('Supplier information not loaded')
-      return
+      throw new Error('Supplier information not loaded')
     }
     try {
       await uploadSupplierLogo({ id: supplier.id, logoUrl }).unwrap()
       refetchSupplier()
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to upload logo')
+      throw error
     }
   }
 
@@ -174,67 +169,19 @@ export function SupplierProfileTab() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Company Logo
-          </CardTitle>
-          <CardDescription>
-            Upload your company logo. This will be displayed in your profile and to restaurants.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!brandingAllowed && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <span>{customBrandingUpgradeMessage(entitlements?.plan?.name)}</span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  openBrowseUpgrade(dispatch, {
-                    currentPlan: entitlements?.plan?.name ?? null,
-                    upgradeUrl: '/app/settings?tab=plan',
-                  })
-                }
-              >
-                Compare plans
-              </Button>
-            </div>
-          )}
-          {supplier ? (
-            brandingAllowed ? (
-              <LogoUpload
-                currentLogo={supplier.logo_url}
-                onUpload={handleLogoUpload}
-                entityId={supplier.id}
-                entityName={supplier.name || 'Supplier'}
-                getPresignedUrl={handleGetPresignedUrl}
-              />
-            ) : supplier.logo_url ? (
-              <img
-                src={supplier.logo_url}
-                alt={`${supplier.name || 'Supplier'} logo`}
-                className="h-24 w-24 rounded-lg border object-contain bg-white"
-              />
-            ) : (
-              <p className="text-sm text-[var(--text-muted)]">
-                Upgrade to Gold or Platinum to upload your logo.
-              </p>
-            )
-          ) : (
-            <p className="text-sm text-[var(--text-muted)]">Loading supplier information...</p>
-          )}
-        </CardContent>
-      </Card>
-
-      {brandingAllowed && (
-        <BrandingSettingsSection
-          tenantType="SUPPLIER"
-          canEdit={can('SETTINGS_EDIT') || can('SETTINGS_MANAGE')}
-        />
-      )}
+      <TenantBrandingPanel
+        tenantType="SUPPLIER"
+        entityId={supplier?.id}
+        entityName={supplier?.name || 'Supplier'}
+        currentLogo={supplier?.logo_url}
+        entitlements={entitlements}
+        canEditBranding={can('SETTINGS_EDIT') || can('SETTINGS_MANAGE')}
+        upgradeTab="plan"
+        logoTitle="Company Logo"
+        logoDescription="Upload your company logo. This will be displayed in your profile and to restaurants."
+        onLogoUpload={handleLogoUpload}
+        getPresignedUrl={handleGetPresignedUrl}
+      />
 
       <Card>
         <CardHeader>

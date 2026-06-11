@@ -52,6 +52,7 @@ import {
 } from '../../services/supplier-inventory.service.js'
 import { ordersRouterMutationGuard } from '../../lib/route-permissions.js'
 import { releaseOrderFromPlannedRoutes } from '../../services/delivery-routes.service.js'
+import { getEffectiveTenant } from '../../lib/impersonation.js'
 
 function elapsedMsSince(startMs) {
   return Math.round(performance.now() - startMs)
@@ -186,6 +187,14 @@ const orderCreateSchema = z.object({
     .min(1),
   promotionId: z.string().uuid().optional(),
   couponCode: z.string().max(64).optional(),
+  loyaltyRedeem: z
+    .array(
+      z.object({
+        supplierId: z.string().uuid(),
+        points: z.number().int().positive(),
+      })
+    )
+    .optional(),
   status: z
     .enum([
       'DRAFT',
@@ -641,6 +650,51 @@ async function handleOrderDelivery(orderId, userData, res, req) {
       requestId: res.locals.requestId,
     })
   }
+}
+
+/**
+ * Enforce tenant-scoped read access for GET order detail (and similar read paths).
+ * Prefers req.tenantContext (set by resolveTenantContext) over a fresh getRequestTenant lookup.
+ * Admin without impersonation may read any order (matches order list behavior).
+ */
+export async function assertOrderReadAccess(req, order, orderId) {
+  if (req.userData?.role === 'ADMIN' && !getEffectiveTenant(req)) {
+    return true
+  }
+
+  const tenant = req.tenantContext
+    ? {
+        tenantId: req.tenantContext.tenantId,
+        tenantType: req.tenantContext.tenantType,
+      }
+    : await getRequestTenant(req)
+
+  if (tenant?.tenantType === 'RESTAURANT') {
+    return order.restaurant_id === tenant.tenantId
+  }
+
+  if (tenant?.tenantType === 'SUPPLIER') {
+    const { rows: supplierItems } = await query(
+      `SELECT 1 FROM order_item WHERE order_id = $1 AND supplier_id = $2 LIMIT 1`,
+      [orderId, tenant.tenantId]
+    )
+    return supplierItems.length > 0
+  }
+
+  if (req.userData?.role === 'RESTAURANT') {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    return Boolean(restaurantId && restaurantId === order.restaurant_id)
+  }
+
+  if (req.userData?.role === 'SUPPLIER') {
+    const { rows: supplierItems } = await query(
+      `SELECT 1 FROM order_item oi JOIN supplier s ON s.id = oi.supplier_id WHERE oi.order_id = $1 AND s.contact_email = $2 LIMIT 1`,
+      [orderId, req.userData.email]
+    )
+    return supplierItems.length > 0
+  }
+
+  return false
 }
 
 export async function loadOrderWarehouseAssignments(orderId) {

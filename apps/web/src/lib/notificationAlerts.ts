@@ -63,8 +63,8 @@ export function unlockNotificationAudio() {
     source.start(0)
 
     if (ctx.state === 'suspended') {
-      void ctx.resume().then((resolved) => {
-        if (resolved.state === 'running') audioUnlocked = true
+      void ctx.resume().then(() => {
+        if (ctx.state === 'running') audioUnlocked = true
       })
       return
     }

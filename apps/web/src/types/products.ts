@@ -18,6 +18,8 @@ export interface Product {
   available_qty?: number
   current_price?: number
   currency?: string
+  is_favorited?: boolean
+  favorited_at?: string
   /** Catalog list price before contract override */
   catalog_price?: number
   pricing_source?: 'DEFAULT_PRICE' | 'CONTRACT_PRICE'
@@ -62,6 +64,7 @@ export interface ProductFilters {
   supplier?: string
   inStock?: boolean
   includeStock?: boolean
+  favoritesOnly?: boolean
   limit?: number
   offset?: number
 }

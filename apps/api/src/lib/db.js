@@ -22,6 +22,69 @@ if (config.DATABASE_STATEMENT_TIMEOUT) {
 }
 export const pool = new Pool(poolConfig)
 
+let migrationPool = null
+
+function buildPoolConfig(connectionString) {
+  const cfg = {
+    connectionString,
+    max: Math.min(config.DATABASE_POOL_MAX, 5),
+    min: 0,
+    idleTimeoutMillis: config.DATABASE_POOL_IDLE_TIMEOUT_MS,
+    connectionTimeoutMillis: 5000,
+    allowExitOnIdle: true,
+    keepAlive: true,
+  }
+  if (config.DATABASE_SSL) {
+    cfg.ssl = { rejectUnauthorized: config.DATABASE_SSL_REJECT_UNAUTHORIZED }
+  }
+  if (config.DATABASE_STATEMENT_TIMEOUT) {
+    cfg.statement_timeout = config.DATABASE_STATEMENT_TIMEOUT
+  }
+  return cfg
+}
+
+/** Pool for DDL and numbered SQL migrations — uses direct URL when configured. */
+function getMigrationPool() {
+  const migrationUrl = config.DATABASE_MIGRATION_URL || config.DATABASE_URL
+  if (migrationUrl === config.DATABASE_URL) {
+    return pool
+  }
+  if (!migrationPool) {
+    migrationPool = new Pool(buildPoolConfig(migrationUrl))
+    migrationPool.on('error', (err) => {
+      logger.error('Migration database pool error', { error: err.message, code: err.code })
+    })
+  }
+  return migrationPool
+}
+
+/** Run schema DDL / migration SQL (not for hot request paths unless repairing drift). */
+export async function migrationQuery(text, params = []) {
+  const start = Date.now()
+  try {
+    const result = await getMigrationPool().query(text, params)
+    const duration = Date.now() - start
+    if (duration > 500) {
+      logger.warn({
+        event: 'db.migration.query.slow',
+        durationMs: duration,
+        rowCount: result.rowCount,
+        query: summarizeQuery(text),
+      })
+    }
+    return result
+  } catch (error) {
+    logger.error({
+      event: 'db.migration.query.failed',
+      error: error.message,
+      code: error.code,
+      durationMs: Date.now() - start,
+      query: summarizeQuery(text),
+    })
+    throw error
+  }
+}
+
 let keepaliveTimer = null
 /** Set when the pool opens a new physical connection (used to flag cold connect on a request). */
 let lastPoolConnectAt = 0
@@ -86,6 +149,10 @@ export function stopPoolKeepalive() {
 export async function closePool() {
   stopPoolKeepalive()
   await pool.end()
+  if (migrationPool) {
+    await migrationPool.end()
+    migrationPool = null
+  }
 }
 
 export function getLastPoolConnectAt() {

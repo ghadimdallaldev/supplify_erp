@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -28,6 +28,10 @@ export function LogoUpload({
   const [preview, setPreview] = useState<string | null>(currentLogo || null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => {
+    setPreview(currentLogo || null)
+  }, [currentLogo])
+
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -51,17 +55,15 @@ export function LogoUpload({
     }
     reader.readAsDataURL(file)
 
-    // Upload to S3
     setIsUploading(true)
+    let fileUrl: string
     try {
-      // Get presigned URL
       const { presignedUrl, publicUrl } = await getPresignedUrl({
         fileName: file.name,
         fileType: file.type,
         fileSize: file.size,
       })
 
-      // Upload to S3
       const uploadResponse = await fetch(presignedUrl, {
         method: 'PUT',
         body: file,
@@ -77,19 +79,26 @@ export function LogoUpload({
       if (!publicUrl) {
         throw new Error('Upload succeeded but no public URL was returned')
       }
-      const fileUrl = publicUrl
-
-      // Save logo URL to database
-      await onUpload(fileUrl)
-
-      toast.success('Logo uploaded successfully!')
-    } catch (error: any) {
+      fileUrl = publicUrl
+    } catch (error: unknown) {
       console.error('Logo upload error:', error)
-      toast.error(error?.message || 'Failed to upload logo')
+      toast.error(error instanceof Error ? error.message : 'Failed to upload logo')
+      setPreview(currentLogo || null)
+      setIsUploading(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      return
+    }
+
+    try {
+      await onUpload(fileUrl)
+      toast.success('Logo uploaded successfully!')
+    } catch (error: unknown) {
+      console.error('Logo save error:', error)
       setPreview(currentLogo || null)
     } finally {
       setIsUploading(false)
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -101,9 +110,10 @@ export function LogoUpload({
       await onUpload('') // Empty string removes the logo
       setPreview(null)
       toast.success('Logo removed successfully!')
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Logo remove error:', error)
-      toast.error(error?.message || 'Failed to remove logo')
+      setPreview(currentLogo || null)
+      throw error
     }
   }
 

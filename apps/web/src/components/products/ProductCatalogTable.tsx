@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Package, Plus, TrendingUp } from 'lucide-react'
+import { Package, Plus, TrendingUp, Heart } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
@@ -7,20 +7,44 @@ import { EmptyState } from '../ui/empty-state'
 import { formatNumber } from '../../utils/format'
 import { ContractPriceDisplay } from '../ContractPriceDisplay'
 import { AddToOrderingListButton } from '../ordering/AddToOrderingListButton'
+import { cn } from '../../lib/utils'
 
 type ProductCatalogTableProps = {
   filteredProducts: any[] | undefined
   isSupplier: boolean
+  isRestaurant?: boolean
   onAddToCart: (product: any) => void
+  onToggleFavorite?: (product: any) => void
   onAdjustStock: (product: any) => void
 }
 
 export function ProductCatalogTable({
   filteredProducts,
   isSupplier,
+  isRestaurant = false,
   onAddToCart,
+  onToggleFavorite,
   onAdjustStock,
 }: ProductCatalogTableProps) {
+  const showFavorite = isRestaurant && onToggleFavorite
+
+  const FavoriteButton = ({ product }: { product: any }) =>
+    showFavorite ? (
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="h-8 w-8 shrink-0 p-0"
+        aria-label={product.is_favorited ? 'Remove from favorites' : 'Add to favorites'}
+        onClick={() => onToggleFavorite?.(product)}
+        data-testid={`product-favorite-${product.id}`}
+      >
+        <Heart
+          className={cn('h-4 w-4', product.is_favorited && 'fill-[var(--red)] text-[var(--red)]')}
+          aria-hidden
+        />
+      </Button>
+    ) : null
   return (
     <>
       <div className="divide-y md:hidden">
@@ -43,7 +67,10 @@ export function ProductCatalogTable({
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="font-medium text-[var(--text)]">{product.name}</p>
+                <div className="flex items-start gap-1">
+                  <p className="font-medium text-[var(--text)]">{product.name}</p>
+                  <FavoriteButton product={product} />
+                </div>
                 <p className="text-sm text-[var(--text-muted)]">{product.sku}</p>
                 <div className="mt-2 flex flex-wrap gap-1">
                   <Badge variant="secondary">
@@ -176,7 +203,10 @@ export function ProductCatalogTable({
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-medium text-[var(--text)] truncate">{product.name}</p>
+                      <div className="flex items-center gap-1">
+                        <p className="font-medium text-[var(--text)] truncate">{product.name}</p>
+                        <FavoriteButton product={product} />
+                      </div>
                       <p className="text-sm text-[var(--text-muted)] truncate">{product.sku}</p>
                     </div>
                   </div>

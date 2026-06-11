@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { query } from './db.js'
+import { query, migrationQuery } from './db.js'
 import { logger } from './logger.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -93,7 +93,7 @@ export async function runAllSqlMigrations() {
     logger.info({ event: 'db.migration.run', file })
     const sql = readMigrationSql(join(migrationsDir, file))
     try {
-      await query(sql)
+      await migrationQuery(sql)
     } catch (error) {
       if (error.code === '42P07') {
         logger.warn({ event: 'db.migration.exists', file })

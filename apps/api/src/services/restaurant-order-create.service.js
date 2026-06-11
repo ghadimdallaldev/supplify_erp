@@ -22,6 +22,7 @@ export async function createRestaurantOrdersInTransaction({
   dailyMeterEnforcement,
   orderData,
   promotionHandlers,
+  loyaltyHandlers,
 }) {
   const txStartedAt = performance.now()
   const timings = {
@@ -143,12 +144,35 @@ export async function createRestaurantOrdersInTransaction({
       timings.promotionMs += elapsedMsSince(phaseStart)
     }
 
+    let loyaltyRedemption = null
+    const redeemRequest = orderData.loyaltyRedeem?.find((entry) => entry.supplierId === supplierId)
+    if (orderStatus === 'PLACED' && redeemRequest?.points && loyaltyHandlers) {
+      phaseStart = performance.now()
+      loyaltyRedemption = await loyaltyHandlers.redeem({
+        client: { query: q },
+        order,
+        supplierId,
+        restaurantId,
+        pointsToRedeem: redeemRequest.points,
+        orderSubtotal: totalAmount,
+      })
+      if (loyaltyRedemption?.discountValue) {
+        totalAmount = Math.max(0, totalAmount - loyaltyRedemption.discountValue)
+        await q(`UPDATE customer_order SET total_amount = $1 WHERE id = $2`, [
+          totalAmount,
+          order.id,
+        ])
+      }
+      timings.promotionMs += elapsedMsSince(phaseStart)
+    }
+
     let finalOrder = {
       ...order,
       total_amount: totalAmount,
       items: orderItems,
       status: orderStatus,
       appliedPromotion,
+      loyaltyRedemption,
     }
 
     if (supplierProfiles.has(supplierId)) {

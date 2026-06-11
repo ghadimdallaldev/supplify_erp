@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ReactNode } from 'react'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, Outlet, useParams } from 'react-router-dom'
 import { ROUTER_FUTURE } from './lib/routerFuture'
+import { ConsumerAuthProvider } from './contexts/ConsumerAuthContext'
 import { AuthGuard } from './components/AuthGuard'
 import { StaffPortalGuard } from './components/StaffPortalGuard'
 import { Layout } from './components/Layout'
@@ -134,6 +135,12 @@ const MyContractPricesPage = lazy(() =>
 const DealsPage = lazy(() =>
   import('./pages/deals/DealsPage').then((m) => ({ default: m.DealsPage }))
 )
+const LoyaltyProgramPage = lazy(() =>
+  import('./pages/loyalty/LoyaltyProgramPage').then((m) => ({ default: m.LoyaltyProgramPage }))
+)
+const ConsumerLoyaltyPage = lazy(() =>
+  import('./pages/loyalty/ConsumerLoyaltyPage').then((m) => ({ default: m.ConsumerLoyaltyPage }))
+)
 const OrgOverviewPage = lazy(() =>
   import('./pages/OrgOverviewPage').then((m) => ({ default: m.OrgOverviewPage }))
 )
@@ -168,6 +175,48 @@ const SupplierQuoteResponsePage = lazy(() =>
     default: m.SupplierQuoteResponsePage,
   }))
 )
+const ConsumerStorefrontPage = lazy(() =>
+  import('./pages/consumer/ConsumerStorefrontPage').then((m) => ({
+    default: m.ConsumerStorefrontPage,
+  }))
+)
+const ConsumerMenuPage = lazy(() =>
+  import('./pages/consumer/ConsumerMenuPage').then((m) => ({ default: m.ConsumerMenuPage }))
+)
+const ConsumerCheckoutPage = lazy(() =>
+  import('./pages/consumer/ConsumerCheckoutPage').then((m) => ({
+    default: m.ConsumerCheckoutPage,
+  }))
+)
+const ConsumerReceiptPage = lazy(() =>
+  import('./pages/consumer/ConsumerReceiptPage').then((m) => ({ default: m.ConsumerReceiptPage }))
+)
+const ConsumerTrackOrderPage = lazy(() =>
+  import('./pages/consumer/ConsumerTrackOrderPage').then((m) => ({
+    default: m.ConsumerTrackOrderPage,
+  }))
+)
+const MenuAdminPage = lazy(() =>
+  import('./pages/consumer/MenuAdminPage').then((m) => ({ default: m.MenuAdminPage }))
+)
+const ConsumerOrdersPage = lazy(() =>
+  import('./pages/consumer/ConsumerOrdersPage').then((m) => ({ default: m.ConsumerOrdersPage }))
+)
+const ConsumerAccountPage = lazy(() =>
+  import('./pages/consumer/ConsumerAccountPage').then((m) => ({ default: m.ConsumerAccountPage }))
+)
+const ConsumerRewardsPage = lazy(() =>
+  import('./pages/consumer/ConsumerRewardsPage').then((m) => ({ default: m.ConsumerRewardsPage }))
+)
+
+function ConsumerRouteLayout() {
+  const { restaurantSlug } = useParams<{ restaurantSlug: string }>()
+  return (
+    <ConsumerAuthProvider restaurantSlug={restaurantSlug ?? ''}>
+      <Outlet />
+    </ConsumerAuthProvider>
+  )
+}
 
 function PageLoader() {
   return <PageLoading />
@@ -245,6 +294,68 @@ const router = createBrowserRouter([
         <PublicSupplierCatalogPage />
       </LazyPage>
     ),
+  },
+  {
+    path: '/order/:restaurantSlug',
+    element: <ConsumerRouteLayout />,
+    children: [
+      {
+        index: true,
+        element: (
+          <LazyPage>
+            <ConsumerStorefrontPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'menu',
+        element: (
+          <LazyPage>
+            <ConsumerMenuPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'checkout',
+        element: (
+          <LazyPage>
+            <ConsumerCheckoutPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'receipt/:receiptToken',
+        element: (
+          <LazyPage>
+            <ConsumerReceiptPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'track',
+        element: (
+          <LazyPage>
+            <ConsumerTrackOrderPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'account',
+        element: (
+          <LazyPage>
+            <ConsumerAccountPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'rewards',
+        element: (
+          <LazyPage>
+            <ConsumerRewardsPage />
+          </LazyPage>
+        ),
+      },
+    ],
   },
   {
     path: '/staff',
@@ -425,6 +536,22 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: 'app/loyalty',
+        element: (
+          <LazyPage>
+            <LoyaltyProgramPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/consumer-loyalty',
+        element: (
+          <LazyPage>
+            <ConsumerLoyaltyPage />
+          </LazyPage>
+        ),
+      },
+      {
         path: 'app/contract-pricing',
         element: (
           <LazyPage>
@@ -493,6 +620,22 @@ const router = createBrowserRouter([
         element: (
           <LazyPage>
             <ReservationsPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/consumer-menu',
+        element: (
+          <LazyPage>
+            <MenuAdminPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/consumer-orders',
+        element: (
+          <LazyPage>
+            <ConsumerOrdersPage />
           </LazyPage>
         ),
       },

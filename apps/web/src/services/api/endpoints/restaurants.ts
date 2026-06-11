@@ -76,6 +76,18 @@ import {
 import { normalizeReportResponse } from '../../../lib/reportResponse'
 import { resolveUpgradeUrl } from '../../../lib/externallyControlledFeatures'
 
+export type TenantBranding = {
+  brandPrimary: string
+  brandMid: string
+  brandLight: string
+  brandPale: string
+  brandUltra: string
+  brandAccent: string | null
+  brandDisplayName: string | null
+  logoUrl: string | null
+  isDefault: boolean
+}
+
 export const restaurantsApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getRestaurants: builder.query<RestaurantsResponse, RestaurantFilters>({
@@ -95,15 +107,19 @@ export const restaurantsApi = api.injectEndpoints({
       keepUnusedDataFor: 300,
     }),
     getTenantBranding: builder.query<
-      { branding: Record<string, unknown> },
+      { branding: TenantBranding },
       { tenantType: 'RESTAURANT' | 'SUPPLIER' }
     >({
       query: ({ tenantType }) =>
         tenantType === 'RESTAURANT' ? '/api/restaurants/me/branding' : '/api/suppliers/me/branding',
-      providesTags: ['Restaurant', 'Supplier'],
+      providesTags: (_result, _error, { tenantType }) => [
+        { type: 'Branding', id: tenantType },
+        'Restaurant',
+        'Supplier',
+      ],
     }),
     updateTenantBranding: builder.mutation<
-      { branding: Record<string, unknown> },
+      { branding: TenantBranding },
       {
         tenantType: 'RESTAURANT' | 'SUPPLIER'
         brandPrimary?: string | null
@@ -119,7 +135,11 @@ export const restaurantsApi = api.injectEndpoints({
         method: 'PATCH',
         body,
       }),
-      invalidatesTags: ['Restaurant', 'Supplier'],
+      invalidatesTags: (_result, _error, { tenantType }) => [
+        { type: 'Branding', id: tenantType },
+        'Restaurant',
+        'Supplier',
+      ],
     }),
     updateRestaurant: builder.mutation<Restaurant, { id: string; data: Partial<Restaurant> }>({
       query: ({ id, data }) => ({
