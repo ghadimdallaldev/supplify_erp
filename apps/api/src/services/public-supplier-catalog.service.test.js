@@ -34,7 +34,9 @@ describe('public-supplier-catalog.service', () => {
     columnExistsMock.mockReset()
     getTenantBrandingMock.mockReset()
     columnExistsMock.mockImplementation((_table, column) =>
-      Promise.resolve(column === 'public_catalog_enabled')
+      Promise.resolve(
+        ['public_catalog_enabled', 'slug', 'minimum_order_amount', 'payment_terms'].includes(column)
+      )
     )
     getTenantBrandingMock.mockResolvedValue({
       logoUrl: 'https://example.com/logo.png',

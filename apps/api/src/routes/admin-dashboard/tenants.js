@@ -8,6 +8,7 @@ import { ZodError } from 'zod'
 import { config } from '../../config/env.js'
 import { deliveredOrderStatusInSql } from '../../lib/order-statuses.js'
 import { parseAdminListPagination } from '../../lib/admin-list-pagination.js'
+import { columnExists } from '../../lib/ensure-tenant-branding-schema.js'
 import {
   createImpersonationToken,
   verifyImpersonationToken,
@@ -294,12 +295,16 @@ router.get('/tenants/search', async (req, res) => {
       return haystack.includes(q)
     }
 
+    const supplierHasSlug = await columnExists('supplier', 'slug')
+    const restaurantHasSlug = await columnExists('restaurant', 'slug')
+
     if (!type || type === 'SUPPLIER') {
+      const slugSelect = supplierHasSlug ? 's.slug,' : 'NULL::text AS slug,'
       const { rows } = await query(`
         SELECT
           s.id,
           s.name,
-          s.slug,
+          ${slugSelect}
           s.organization_id,
           s.is_main_branch,
           COALESCE(s.contact_email, s.sales_contact_email, s.accounting_contact_email) AS contact_email,
@@ -320,11 +325,12 @@ router.get('/tenants/search', async (req, res) => {
     }
 
     if (!type || type === 'RESTAURANT') {
+      const slugSelect = restaurantHasSlug ? 'r.slug,' : 'NULL::text AS slug,'
       const { rows } = await query(`
         SELECT
           r.id,
           r.name,
-          r.slug,
+          ${slugSelect}
           r.organization_id,
           r.is_main_branch,
           r.contact_email,

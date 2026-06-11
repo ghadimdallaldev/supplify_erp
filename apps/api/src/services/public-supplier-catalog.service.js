@@ -10,21 +10,22 @@ import { isFeatureEnabled } from '../lib/subscription.js'
 
 const DEFAULT_PAGE_SIZE = 24
 
-const PUBLIC_SUPPLIER_CORE_FIELDS = `
-  s.id,
-  s.slug,
-  s.name,
-  s.minimum_order_amount,
-  s.payment_terms
-`
-
 export function isUuid(str) {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   return typeof str === 'string' && uuidRegex.test(str)
 }
 
 async function buildPublicSupplierSelectFields() {
-  const fields = [PUBLIC_SUPPLIER_CORE_FIELDS.trim()]
+  const fields = ['s.id', 's.name']
+  if (await columnExists('supplier', 'slug')) {
+    fields.push('s.slug')
+  }
+  if (await columnExists('supplier', 'minimum_order_amount')) {
+    fields.push('s.minimum_order_amount')
+  }
+  if (await columnExists('supplier', 'payment_terms')) {
+    fields.push('s.payment_terms')
+  }
   if (await columnExists('supplier', 'public_catalog_enabled')) {
     fields.push('s.public_catalog_enabled')
   }
@@ -49,6 +50,9 @@ export async function resolvePublicSupplierByIdOrSlug(idOrSlug, dbQuery = query)
   const selectFields = await buildPublicSupplierSelectFields()
   const catalogFilter = await publicCatalogEnabledFilter()
   const byId = isUuid(idOrSlug)
+  if (!byId && !(await columnExists('supplier', 'slug'))) {
+    throw new NotFoundError('Supplier catalog not found')
+  }
   const { rows } = await dbQuery(
     byId
       ? `
