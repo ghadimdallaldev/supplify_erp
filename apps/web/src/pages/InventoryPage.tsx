@@ -28,6 +28,10 @@ import { StatusBadge } from '../components/ui/status-badge'
 import { Skeleton } from '../components/ui/skeleton'
 import { Select, SelectTrigger } from '../components/ui/select'
 import { DataTableShell } from '../components/ui/data-table-shell'
+import {
+  resolveSupplierInventoryStatus,
+  countSupplierLowStockItems,
+} from '../lib/supplierStockStatus'
 
 const ADJUSTMENT_TYPES = [
   { value: 'IN', label: 'Add Stock' },
@@ -62,6 +66,16 @@ export function InventoryPage() {
 
   const inventory = data?.inventory || []
   const warehouses = warehousesData?.warehouses || []
+  const lowStockCount = countSupplierLowStockItems(inventory)
+
+  const renderInventoryStatus = (item: {
+    available_qty?: number | string | null
+    isLowStock?: boolean
+    low_stock_threshold?: number | string | null
+  }) => {
+    const { status, label } = resolveSupplierInventoryStatus(item)
+    return <StatusBadge status={status} label={label} />
+  }
 
   const handleAdjustment = async () => {
     if (!selectedProduct?.product_id) return
@@ -180,12 +194,7 @@ export function InventoryPage() {
             icon={Warehouse}
             tone="warning"
           />
-          <KpiCard
-            label="Low Stock"
-            value={inventory.filter((item: any) => item.isLowStock).length}
-            icon={AlertTriangle}
-            tone="danger"
-          />
+          <KpiCard label="Low Stock" value={lowStockCount} icon={AlertTriangle} tone="danger" />
           <KpiCard
             label="Available"
             value={formatNumber(
@@ -297,13 +306,7 @@ export function InventoryPage() {
                             {item.available_qty || 0}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-right">
-                          {item.isLowStock ? (
-                            <StatusBadge status="PENDING" label="Low Stock" />
-                          ) : (
-                            <StatusBadge status="ACTIVE" label="In Stock" />
-                          )}
-                        </td>
+                        <td className="py-3 px-4 text-right">{renderInventoryStatus(item)}</td>
                         <td className="py-3 px-4">
                           <div className="flex items-center justify-center gap-2">
                             <Button
@@ -468,11 +471,7 @@ export function InventoryPage() {
                                   </span>
                                 </td>
                                 <td className="px-4 py-2 text-center">
-                                  {item.isLowStock ? (
-                                    <StatusBadge status="PENDING" label="Low Stock" />
-                                  ) : (
-                                    <StatusBadge status="ACTIVE" label="In Stock" />
-                                  )}
+                                  {renderInventoryStatus(item)}
                                 </td>
                               </tr>
                             ))}

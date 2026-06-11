@@ -27,7 +27,6 @@ async function filterEligibleSuppliers(restaurantId, supplierIds, dbQuery = quer
     SELECT s.id
     FROM supplier s
     WHERE s.id = ANY($1::uuid[])
-      AND COALESCE(s.account_status, 'ACTIVE') = 'ACTIVE'
       AND NOT EXISTS (
         SELECT 1 FROM supplier_blocklist sb
         WHERE sb.supplier_id = s.id AND sb.restaurant_id = $2

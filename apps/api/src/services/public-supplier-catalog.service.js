@@ -35,14 +35,12 @@ export async function resolvePublicSupplierByIdOrSlug(idOrSlug, dbQuery = query)
         SELECT ${PUBLIC_SUPPLIER_FIELDS}
         FROM supplier s
         WHERE s.id = $1
-          AND COALESCE(s.account_status, 'ACTIVE') = 'ACTIVE'
           AND s.public_catalog_enabled = true
         `
       : `
         SELECT ${PUBLIC_SUPPLIER_FIELDS}
         FROM supplier s
         WHERE s.slug = $1
-          AND COALESCE(s.account_status, 'ACTIVE') = 'ACTIVE'
           AND s.public_catalog_enabled = true
         `,
     [idOrSlug]
@@ -86,11 +84,7 @@ export async function listPublicSupplierProducts(
   const safeLimit = Math.min(Math.max(1, limit), 48)
   const offset = (Math.max(1, page) - 1) * safeLimit
   const params = [supplierId]
-  const where = [
-    'p.supplier_id = $1',
-    "COALESCE(s.account_status, 'ACTIVE') = 'ACTIVE'",
-    's.public_catalog_enabled = true',
-  ]
+  const where = ['p.supplier_id = $1', 's.public_catalog_enabled = true']
   let paramIndex = 2
 
   if (q) {
