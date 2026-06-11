@@ -38,16 +38,38 @@ export function resolveNotificationUrl(notification: NotificationLike): string {
 let audioContext: AudioContext | null = null
 let audioUnlocked = false
 
-/** Call once after a user gesture so notification sounds are allowed by the browser. */
+function getAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null
+  const AudioCtx =
+    window.AudioContext ||
+    (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+  if (!AudioCtx) return null
+  return audioContext ?? new AudioCtx()
+}
+
+/** Call synchronously from a user-gesture handler so notification sounds are allowed. */
 export function unlockNotificationAudio() {
   if (typeof window === 'undefined' || audioUnlocked) return
-  audioUnlocked = true
   try {
-    const ctx = audioContext ?? new AudioContext()
+    const ctx = getAudioContext()
+    if (!ctx) return
     audioContext = ctx
+
+    // Play a silent buffer in the same call stack as the gesture — required by autoplay policy.
+    const buffer = ctx.createBuffer(1, 1, 22050)
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    source.connect(ctx.destination)
+    source.start(0)
+
     if (ctx.state === 'suspended') {
-      void ctx.resume()
+      void ctx.resume().then((resolved) => {
+        if (resolved.state === 'running') audioUnlocked = true
+      })
+      return
     }
+
+    audioUnlocked = true
   } catch {
     // Web Audio unavailable
   }
@@ -57,11 +79,8 @@ export function unlockNotificationAudio() {
 export function playNotificationSound() {
   if (typeof window === 'undefined' || !audioUnlocked) return
   try {
-    const ctx = audioContext ?? new AudioContext()
-    audioContext = ctx
-    if (ctx.state === 'suspended') {
-      void ctx.resume()
-    }
+    const ctx = audioContext
+    if (!ctx || ctx.state !== 'running') return
 
     const playTone = (frequency: number, start: number, duration: number) => {
       const osc = ctx.createOscillator()

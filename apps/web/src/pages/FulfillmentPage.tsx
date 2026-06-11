@@ -7,16 +7,19 @@ import {
 } from '../services/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { isMultiWarehouseActive } from '../lib/planLimits'
-import { FulfillmentDispatchPanel } from '../components/fulfillment/FulfillmentDispatchPanel'
-import { FulfillmentPickListsTab } from '../components/fulfillment/FulfillmentPickListsTab'
-import { FulfillmentRoutesTab } from '../components/fulfillment/FulfillmentRoutesTab'
-import { FulfillmentTrackingTab } from '../components/fulfillment/FulfillmentTrackingTab'
-import { FulfillmentExceptionsTab } from '../components/fulfillment/FulfillmentExceptionsTab'
 import { RequirePermission } from '../components/RequirePermission'
 import { usePermissions } from '../hooks/usePermissions'
 import { PageHeader } from '../components/ui/page-header'
 import { Label } from '../components/ui/label'
 import { Select, SelectTrigger } from '../components/ui/select'
+import { LazyTabMount } from '../components/LazyTabMount'
+import {
+  LazyFulfillmentDispatchPanel,
+  LazyFulfillmentExceptionsTab,
+  LazyFulfillmentPickListsTab,
+  LazyFulfillmentRoutesTab,
+  LazyFulfillmentTrackingTab,
+} from '../components/fulfillment/lazyFulfillmentTabs'
 
 export function FulfillmentPage() {
   const { can } = usePermissions()
@@ -34,6 +37,7 @@ export function FulfillmentPage() {
   const multiWarehouseActive = isMultiWarehouseActive(entitlements, fulfillmentData?.fulfillment)
   const warehouseFilter =
     multiWarehouseActive && selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined
+  const warehouseId = warehouseFilter?.warehouseId
 
   const { data: exceptionsResponse } = useGetFulfillmentExceptionsQuery(warehouseFilter, {
     skip: activeTab !== 'exceptions',
@@ -89,24 +93,34 @@ export function FulfillmentPage() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="dispatch" className="space-y-4 mt-4">
-            <FulfillmentDispatchPanel warehouseId={warehouseFilter?.warehouseId} />
+          <TabsContent value="dispatch" className="mt-4 space-y-4">
+            <LazyTabMount tab="dispatch" selectedTab={activeTab}>
+              <LazyFulfillmentDispatchPanel warehouseId={warehouseId} />
+            </LazyTabMount>
           </TabsContent>
 
-          <TabsContent value="picklists" className="space-y-4 mt-4">
-            <FulfillmentPickListsTab />
+          <TabsContent value="picklists" className="mt-4 space-y-4">
+            <LazyTabMount tab="picklists" selectedTab={activeTab}>
+              <LazyFulfillmentPickListsTab />
+            </LazyTabMount>
           </TabsContent>
 
-          <TabsContent value="routes" className="space-y-4 mt-4">
-            <FulfillmentRoutesTab warehouseId={warehouseFilter?.warehouseId} />
+          <TabsContent value="routes" className="mt-4 space-y-4">
+            <LazyTabMount tab="routes" selectedTab={activeTab}>
+              <LazyFulfillmentRoutesTab warehouseId={warehouseId} />
+            </LazyTabMount>
           </TabsContent>
 
-          <TabsContent value="tracking" className="space-y-4 mt-4">
-            <FulfillmentTrackingTab />
+          <TabsContent value="tracking" className="mt-4 space-y-4">
+            <LazyTabMount tab="tracking" selectedTab={activeTab}>
+              <LazyFulfillmentTrackingTab />
+            </LazyTabMount>
           </TabsContent>
 
-          <TabsContent value="exceptions" className="space-y-4 mt-4">
-            <FulfillmentExceptionsTab warehouseId={warehouseFilter?.warehouseId} />
+          <TabsContent value="exceptions" className="mt-4 space-y-4">
+            <LazyTabMount tab="exceptions" selectedTab={activeTab}>
+              <LazyFulfillmentExceptionsTab warehouseId={warehouseId} />
+            </LazyTabMount>
           </TabsContent>
         </Tabs>
       </div>

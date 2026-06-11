@@ -157,13 +157,16 @@ export function useNotificationAlerts() {
   }, [user?.id, dispatch, navigate, location.pathname])
 
   useEffect(() => {
-    if (typeof document === 'undefined') return
+    if (typeof window === 'undefined') return
     const unlock = () => unlockNotificationAudio()
-    document.addEventListener('pointerdown', unlock, { once: true })
-    document.addEventListener('keydown', unlock, { once: true })
+    const opts: AddEventListenerOptions = { once: true, capture: true }
+    window.addEventListener('click', unlock, opts)
+    window.addEventListener('touchstart', unlock, { ...opts, passive: true })
+    window.addEventListener('keydown', unlock, opts)
     return () => {
-      document.removeEventListener('pointerdown', unlock)
-      document.removeEventListener('keydown', unlock)
+      window.removeEventListener('click', unlock, { capture: true })
+      window.removeEventListener('touchstart', unlock, { capture: true })
+      window.removeEventListener('keydown', unlock, { capture: true })
     }
   }, [])
 

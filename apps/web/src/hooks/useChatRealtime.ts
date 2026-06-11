@@ -83,7 +83,7 @@ export function useChatRealtime({
       }
 
       dispatch(
-        api.util.updateQueryData(
+        (api.util.updateQueryData as any)(
           'getMessages',
           { conversationId: data.conversationId },
           (draft: { messages?: unknown[] }) => {

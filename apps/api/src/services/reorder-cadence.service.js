@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js'
+import { formatYmd } from '../lib/reservation-board-date.js'
 import {
   getDefaultTenantTimezone,
   getRestaurantTimezone,
@@ -219,7 +220,10 @@ export async function getMissedCadencesForToday({ now = new Date() } = {}) {
   return rows.map((cadence) => ({
     ...cadence,
     dayName: DAY_NAMES[cadence.day_of_week],
-    reminderDate: String(cadence.reminder_date).slice(0, 10),
+    reminderDate:
+      typeof cadence.reminder_date === 'string'
+        ? cadence.reminder_date.slice(0, 10)
+        : formatYmd(cadence.reminder_date),
   }))
 }
 
