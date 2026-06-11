@@ -56,6 +56,11 @@ describe('branding.service', () => {
     const palette = derivePalette('invalid')
     expect(palette.brandPrimary).toBe(DEFAULT_BRAND.brandPrimary)
   })
+
+  it('preserves the chosen primary even when contrast on white is low', () => {
+    const palette = derivePalette('#fde047')
+    expect(palette.brandPrimary).toBe('#fde047')
+  })
 })
 
 describe('validateLogoUrl', () => {
@@ -98,7 +103,7 @@ describe('getTenantBranding', () => {
 
     const branding = await getTenantBranding('supplier-1', 'SUPPLIER')
     expect(branding.logoUrl).toBe('https://cdn.example/logo.png')
-    expect(branding.isDefault).toBe(false)
+    expect(branding.isDefault).toBe(true)
     expect(query).toHaveBeenCalledWith(expect.stringContaining('SELECT logo_url FROM supplier'), [
       'supplier-1',
     ])

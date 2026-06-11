@@ -79,22 +79,6 @@ function hexToRgb(hex) {
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
 }
 
-function relativeLuminance({ r, g, b }) {
-  const s = [r, g, b].map((v) => {
-    const c = v / 255
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
-  })
-  return 0.2126 * s[0] + 0.7152 * s[1] + 0.0722 * s[2]
-}
-
-function contrastRatio(hex1, hex2) {
-  const l1 = relativeLuminance(hexToRgb(hex1))
-  const l2 = relativeLuminance(hexToRgb(hex2))
-  const lighter = Math.max(l1, l2)
-  const darker = Math.min(l1, l2)
-  return (lighter + 0.05) / (darker + 0.05)
-}
-
 function derivePalette(primary) {
   if (!primary || !HEX_RE.test(primary)) return { ...DEFAULT_BRAND }
   const { r, g, b } = hexToRgb(primary)
@@ -108,10 +92,8 @@ function derivePalette(primary) {
     .map((v) => v.toString(16).padStart(2, '0'))
     .join('')}`
 
-  const safePrimary = contrastRatio(primary, '#ffffff') >= 3 ? primary : DEFAULT_BRAND.brandPrimary
-
   return {
-    brandPrimary: safePrimary,
+    brandPrimary: primary,
     brandMid: mid,
     brandLight: light,
     brandPale: pale,
@@ -128,7 +110,7 @@ function mapRow(row) {
     brandAccent: row.brand_accent && HEX_RE.test(row.brand_accent) ? row.brand_accent : null,
     brandDisplayName: row.brand_display_name || null,
     logoUrl: row.logo_url || null,
-    isDefault: !primary && !row.logo_url,
+    isDefault: !primary,
   }
 }
 

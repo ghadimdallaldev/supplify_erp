@@ -19,6 +19,9 @@ function validateHex(value: string, fieldLabel: string): string | null {
   return null
 }
 
+const DEFAULT_PRIMARY = '#5b21b6'
+const DEFAULT_ACCENT = '#7c3aed'
+
 type Props = {
   tenantType: 'RESTAURANT' | 'SUPPLIER'
   canEdit?: boolean
@@ -32,15 +35,19 @@ export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
   const [brandDisplayName, setBrandDisplayName] = useState('')
   const [primaryError, setPrimaryError] = useState<string | null>(null)
   const [accentError, setAccentError] = useState<string | null>(null)
+  const [isResetting, setIsResetting] = useState(false)
 
   useEffect(() => {
     const b = data?.branding
     if (b) {
-      setBrandPrimary(b.brandPrimary === '#5b21b6' && b.isDefault ? '' : b.brandPrimary || '')
+      setBrandPrimary(b.isDefault ? '' : b.brandPrimary || '')
       setBrandAccent(b.brandAccent || '')
       setBrandDisplayName(b.brandDisplayName || '')
     }
   }, [data])
+
+  const hasCustomColors =
+    Boolean(data?.branding && !data.branding.isDefault) || Boolean(data?.branding?.brandAccent)
 
   const handleSave = async () => {
     const nextPrimaryError = validateHex(brandPrimary, 'Primary color')
@@ -59,6 +66,26 @@ export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
       toast.success('Branding updated')
     } catch (e: any) {
       toast.error(e?.data?.error?.message || 'Failed to save branding')
+    }
+  }
+
+  const handleResetColors = async () => {
+    setIsResetting(true)
+    try {
+      await updateBranding({
+        tenantType,
+        brandPrimary: null,
+        brandAccent: null,
+      }).unwrap()
+      setBrandPrimary('')
+      setBrandAccent('')
+      setPrimaryError(null)
+      setAccentError(null)
+      toast.success('Brand colors reset to defaults')
+    } catch (e: any) {
+      toast.error(e?.data?.error?.message || 'Failed to reset brand colors')
+    } finally {
+      setIsResetting(false)
     }
   }
 
@@ -124,7 +151,7 @@ export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
               <Input
                 id="brand-primary"
                 type="color"
-                value={brandPrimary || '#5b21b6'}
+                value={brandPrimary || DEFAULT_PRIMARY}
                 disabled={!canEdit}
                 onChange={(e) => {
                   setBrandPrimary(e.target.value)
@@ -135,7 +162,7 @@ export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
               <Input
                 value={brandPrimary}
                 disabled={!canEdit}
-                placeholder="#5b21b6"
+                placeholder={DEFAULT_PRIMARY}
                 onChange={(e) => {
                   setBrandPrimary(e.target.value)
                   setPrimaryError(null)
@@ -155,7 +182,7 @@ export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
               <Input
                 id="brand-accent"
                 type="color"
-                value={brandAccent || '#7c3aed'}
+                value={brandAccent || DEFAULT_ACCENT}
                 disabled={!canEdit}
                 onChange={(e) => {
                   setBrandAccent(e.target.value)
@@ -166,7 +193,7 @@ export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
               <Input
                 value={brandAccent}
                 disabled={!canEdit}
-                placeholder="#7c3aed"
+                placeholder={DEFAULT_ACCENT}
                 onChange={(e) => {
                   setBrandAccent(e.target.value)
                   setAccentError(null)
@@ -193,9 +220,19 @@ export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
           />
         </div>
         {canEdit && (
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : 'Save branding'}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={handleSave} disabled={saving || isResetting}>
+              {saving ? 'Saving…' : 'Save branding'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleResetColors}
+              disabled={saving || isResetting || !hasCustomColors}
+            >
+              {isResetting ? 'Resetting…' : 'Reset to default colors'}
+            </Button>
+          </div>
         )}
       </CardContent>
     </Card>
