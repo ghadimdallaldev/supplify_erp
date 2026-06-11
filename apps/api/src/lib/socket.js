@@ -12,6 +12,36 @@ function userRoom(userId) {
   return `user_${userId}`
 }
 
+function restaurantRoom(restaurantId) {
+  return `restaurant_${restaurantId}`
+}
+
+/**
+ * @param {string} restaurantId
+ * @param {string} event
+ * @param {unknown} payload
+ */
+export function emitToRestaurant(restaurantId, event, payload) {
+  if (!io || !restaurantId) return
+  io.to(restaurantRoom(restaurantId)).emit(event, payload)
+}
+
+/**
+ * Notify kitchen staff of a new guest order.
+ * @param {string} restaurantId
+ * @param {Record<string, unknown>} order
+ */
+export function emitConsumerOrderNew(restaurantId, order) {
+  emitToRestaurant(restaurantId, 'consumer_order_new', {
+    orderId: order.id,
+    orderNumber: order.order_number,
+    status: order.status,
+    fulfillmentType: order.fulfillment_type,
+    totalAmount: order.total_amount,
+    createdAt: order.created_at,
+  })
+}
+
 /**
  * @param {Record<string, unknown>} notification
  * @returns {Record<string, unknown>}
@@ -99,6 +129,9 @@ export async function initializeSocket(server) {
     const userId = socket.data.userId
     if (userId) {
       socket.join(userRoom(userId))
+    }
+    if (socket.data.tenantId && socket.data.role === 'RESTAURANT') {
+      socket.join(restaurantRoom(socket.data.tenantId))
     }
 
     logger.info({

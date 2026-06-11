@@ -15,6 +15,7 @@ import { requireFeature } from '../lib/subscription.js'
 import { notifyLeaveReviewIfEligible } from '../services/reviews.service.js'
 import { notifyInvoiceIssued } from '../services/notification.service.js'
 import { createLotFromReceivingLine } from '../services/inventory-expiry.service.js'
+import { earnLoyaltyOnOrderReceive } from '../services/loyalty.service.js'
 
 const router = express.Router()
 
@@ -649,7 +650,17 @@ router.post(
           )
         }
 
-        return { report, createdInvoice }
+        const earnBaseAmount =
+          totalActualCost > 0 ? totalActualCost : parseFloat(order.total_amount || 0)
+        const loyaltyEarn = await earnLoyaltyOnOrderReceive(client, {
+          supplierId,
+          restaurantId,
+          orderId,
+          receiveAmount: earnBaseAmount,
+          createdBy: req.userData?.id,
+        })
+
+        return { report, createdInvoice, loyaltyEarn }
       })
 
       if (result.createdInvoice) {

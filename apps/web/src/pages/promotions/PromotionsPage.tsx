@@ -53,6 +53,27 @@ import {
   getDealTypeHelperText,
 } from '../../lib/dealDisplayLabels'
 
+const STORE_WIDE_DEAL_PRESETS = [
+  {
+    label: '10% store-wide',
+    name: 'Store-wide 10% off',
+    type: 'percentage_discount' as const,
+    discountValue: '10',
+  },
+  {
+    label: '15% store-wide',
+    name: 'Store-wide 15% off',
+    type: 'percentage_discount' as const,
+    discountValue: '15',
+  },
+  {
+    label: '$25 off store-wide',
+    name: 'Store-wide $25 off',
+    type: 'fixed_discount' as const,
+    discountValue: '25',
+  },
+] as const
+
 export function PromotionsPage() {
   const { persona } = useWorkspaceRole()
   const copy = persona.promotionsCopy
@@ -139,6 +160,16 @@ export function PromotionsPage() {
       return false
     }
     return true
+  }
+
+  const applyStoreWidePreset = (preset: (typeof STORE_WIDE_DEAL_PRESETS)[number]) => {
+    setForm((f) => ({
+      ...f,
+      name: preset.name,
+      type: preset.type,
+      discountValue: preset.discountValue,
+    }))
+    setTargeting({ appliesTo: 'all', productIds: [], categoryIds: [] })
   }
 
   const handleSaveDraft = async () => {
@@ -393,6 +424,26 @@ export function PromotionsPage() {
               <DialogTitle>{copy.newButton}</DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
+              <div>
+                <Label>Store-wide presets</Label>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Quick-start a deal that applies to your entire catalog — shown as an on-sale badge
+                  on your supplier profile.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {STORE_WIDE_DEAL_PRESETS.map((preset) => (
+                    <Button
+                      key={preset.label}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => applyStoreWidePreset(preset)}
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
               <div>
                 <Label>Name</Label>
                 <Input

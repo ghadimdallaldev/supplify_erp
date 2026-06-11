@@ -52,6 +52,7 @@ import {
 } from '../../services/supplier-inventory.service.js'
 import { ordersRouterMutationGuard } from '../../lib/route-permissions.js'
 import { releaseOrderFromPlannedRoutes } from '../../services/delivery-routes.service.js'
+import { redeemLoyaltyAtCheckout } from '../../services/loyalty.service.js'
 
 import {
   orderCreateSchema,
@@ -315,6 +316,24 @@ router.post(
                 }
                 return appliedPromotion
               },
+            },
+            loyaltyHandlers: {
+              redeem: async ({
+                client: txClient,
+                order,
+                supplierId,
+                restaurantId: restId,
+                pointsToRedeem,
+                orderSubtotal,
+              }) =>
+                redeemLoyaltyAtCheckout(txClient, {
+                  supplierId,
+                  restaurantId: restId,
+                  orderId: order.id,
+                  pointsToRedeem,
+                  orderSubtotal,
+                  createdBy: req.userData?.id,
+                }),
             },
           })
 

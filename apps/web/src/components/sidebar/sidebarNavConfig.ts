@@ -21,6 +21,9 @@ import {
   Percent,
   Radar,
   FileQuestion,
+  UtensilsCrossed,
+  ShoppingBasket,
+  Gift,
 } from 'lucide-react'
 import type { WorkspacePersonaProfile } from '../../lib/workspaceRoleProfile'
 import {
@@ -159,13 +162,6 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
         testId: 'nav-quote-requests',
       },
       {
-        name: 'Reservations',
-        href: '/app/reservations',
-        icon: CalendarDays,
-        permission: 'RESERVATIONS_VIEW',
-        testId: 'nav-reservations',
-      },
-      {
         name: 'Receiving',
         href: '/app/receiving',
         icon: PackageCheck,
@@ -238,13 +234,6 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
 
     const acct: SidebarNavItem[] = [
       {
-        name: 'Staff',
-        href: '/app/staff',
-        icon: UserCircle2,
-        permission: 'STAFF_VIEW',
-        testId: 'nav-staff',
-      },
-      {
         name: 'Inventory',
         href: '/app/restaurant-inventory',
         icon: Package2,
@@ -257,6 +246,44 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
         icon: Settings,
         permission: 'SETTINGS_VIEW',
         testId: 'nav-settings',
+      },
+    ].filter((item) => navItemAllowed(item, can, canAny))
+
+    const hospitalityAddOns: SidebarNavItem[] = [
+      {
+        name: 'Reservations',
+        href: '/app/reservations',
+        icon: CalendarDays,
+        permission: 'RESERVATIONS_VIEW',
+        testId: 'nav-reservations',
+      },
+      {
+        name: 'Staff',
+        href: '/app/staff',
+        icon: UserCircle2,
+        permission: 'STAFF_VIEW',
+        testId: 'nav-staff',
+      },
+      {
+        name: 'Guest menu',
+        href: '/app/consumer-menu',
+        icon: UtensilsCrossed,
+        permission: 'CATALOG_VIEW',
+        testId: 'nav-consumer-menu',
+      },
+      {
+        name: 'Guest orders',
+        href: '/app/consumer-orders',
+        icon: ShoppingBasket,
+        permission: 'ORDERS_VIEW',
+        testId: 'nav-consumer-orders',
+      },
+      {
+        name: 'Guest rewards',
+        href: '/app/consumer-loyalty',
+        icon: Gift,
+        permission: 'CATALOG_VIEW',
+        testId: 'nav-consumer-loyalty',
       },
     ].filter((item) => navItemAllowed(item, can, canAny))
 
@@ -292,6 +319,9 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
       { label: 'OPERATIONS', items: ops },
       ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
       ...(acct.length ? [{ label: 'ACCOUNT', items: acct }] : []),
+      ...(hospitalityAddOns.length
+        ? [{ label: 'HOSPITALITY ADD-ONS', items: hospitalityAddOns }]
+        : []),
     ]
   } else if (hasAdminNavAccess && !isImpersonating) {
     sections = [

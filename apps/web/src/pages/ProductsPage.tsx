@@ -11,6 +11,8 @@ import {
   useGetSuppliersQuery,
   useGetActivePromotionsQuery,
   useGetEntitlementsQuery,
+  useFavoriteProductMutation,
+  useUnfavoriteProductMutation,
 } from '../services/api'
 import { Link } from 'react-router-dom'
 import { Button } from '../components/ui/button'
@@ -18,7 +20,7 @@ import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
 import { PageHeader } from '../components/ui/page-header'
 import { DataTableShell } from '../components/ui/data-table-shell'
-import { Search, Plus, Upload, FileQuestion } from 'lucide-react'
+import { Plus, Upload, FileQuestion, Heart } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useCartActions } from '../hooks/useCartActions'
@@ -39,6 +41,8 @@ import {
   ProductActiveFilters,
 } from '../components/products/ProductFilters'
 import { ProductCatalogTable } from '../components/products/ProductCatalogTable'
+import { useDebouncedSearch } from '../hooks/useDebouncedSearch'
+import { SearchHistoryDropdown } from '../components/search/SearchHistoryDropdown'
 import {
   LazyProductFormDialog,
   LazyProductBulkUploadDialog,
@@ -46,7 +50,8 @@ import {
 } from '../components/products/lazyProductDialogs'
 
 export function ProductsPage() {
-  const [search, setSearch] = useState('')
+  const { search, setSearch, debouncedSearch } = useDebouncedSearch()
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [category, setCategory] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
@@ -72,6 +77,8 @@ export function ProductsPage() {
   const { isEffectiveSupplier, isEffectiveRestaurant } = useImpersonation()
   const { can } = usePermissions()
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation()
+  const [favoriteProduct] = useFavoriteProductMutation()
+  const [unfavoriteProduct] = useUnfavoriteProductMutation()
   const [generatePresignedUrl, { isLoading: isUploadingImage }] = useGeneratePresignedUrlMutation()
   const [previewImport] = usePreviewProductImportMutation()
   const [executeImport, { isLoading: importing }] = useExecuteProductImportMutation()
@@ -117,17 +124,27 @@ export function ProductsPage() {
 
   const queryParams = useMemo(
     () => ({
-      q: search || undefined,
+      q: debouncedSearch || undefined,
       category: category || undefined,
       categoryId: categoryId || undefined,
       tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined,
       minPrice: minPrice ? minPrice : undefined,
       maxPrice: maxPrice ? maxPrice : undefined,
       includeStock: true,
+      favoritesOnly: isRestaurant && favoritesOnly ? true : undefined,
       limit: 100,
       offset: 0,
     }),
-    [search, category, categoryId, selectedTags, minPrice, maxPrice]
+    [
+      debouncedSearch,
+      category,
+      categoryId,
+      selectedTags,
+      minPrice,
+      maxPrice,
+      isRestaurant,
+      favoritesOnly,
+    ]
   )
 
   const { data, isLoading, error } = useGetProductsQuery(queryParams)
@@ -143,6 +160,20 @@ export function ProductsPage() {
   const handleAddToCart = (product: any) => {
     addItem({ productId: product.id, product, quantity: 1 })
     toast.success('Added to cart')
+  }
+
+  const handleToggleFavorite = async (product: any) => {
+    try {
+      if (product.is_favorited) {
+        await unfavoriteProduct(product.id).unwrap()
+        toast.success('Removed from favorites')
+      } else {
+        await favoriteProduct({ productId: product.id }).unwrap()
+        toast.success('Added to favorites')
+      }
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to update favorite')
+    }
   }
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -365,32 +396,45 @@ export function ProductsPage() {
         <DataTableShell
           data-testid="products-table-shell"
           search={
-            <div className="relative min-w-0">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
-              <Input
-                placeholder="Search products..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-10 pl-10"
-                aria-label="Search products"
-              />
-            </div>
+            <SearchHistoryDropdown
+              entityType="product"
+              value={search}
+              onChange={setSearch}
+              placeholder="Search products..."
+              aria-label="Search products"
+            />
           }
           filters={
-            <ProductFilterFields
-              isSupplier={isSupplier}
-              supplierFilter={supplierFilter}
-              setSupplierFilter={setSupplierFilter}
-              uniqueSuppliers={uniqueSuppliers}
-              categoryId={categoryId}
-              setCategoryId={setCategoryId}
-              setCategory={setCategory}
-              categoriesData={categoriesData}
-              minPrice={minPrice}
-              maxPrice={maxPrice}
-              setMinPrice={setMinPrice}
-              setMaxPrice={setMaxPrice}
-            />
+            <>
+              {isRestaurant && (
+                <Button
+                  variant={favoritesOnly ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-10"
+                  onClick={() => setFavoritesOnly((prev) => !prev)}
+                >
+                  <Heart
+                    className={`mr-1.5 h-4 w-4 ${favoritesOnly ? 'fill-current' : ''}`}
+                    aria-hidden
+                  />
+                  Favorites
+                </Button>
+              )}
+              <ProductFilterFields
+                isSupplier={isSupplier}
+                supplierFilter={supplierFilter}
+                setSupplierFilter={setSupplierFilter}
+                uniqueSuppliers={uniqueSuppliers}
+                categoryId={categoryId}
+                setCategoryId={setCategoryId}
+                setCategory={setCategory}
+                categoriesData={categoriesData}
+                minPrice={minPrice}
+                maxPrice={maxPrice}
+                setMinPrice={setMinPrice}
+                setMaxPrice={setMaxPrice}
+              />
+            </>
           }
         >
           <ProductTagFilters
@@ -418,7 +462,9 @@ export function ProductsPage() {
           <ProductCatalogTable
             filteredProducts={filteredProducts}
             isSupplier={isSupplier}
+            isRestaurant={isRestaurant}
             onAddToCart={handleAddToCart}
+            onToggleFavorite={handleToggleFavorite}
             onAdjustStock={(product) => {
               setSelectedProductForAdjustment(product)
               setShowInventoryAdjustment(true)

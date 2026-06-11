@@ -265,7 +265,7 @@ Allowed operations:
 
 - Restaurant ordering from Supplier (public catalog)
 - Chat messages between restaurant and supplier
-- Public reviews/ratings (future)
+- Public supplier reviews (`/api/reviews/suppliers/:id`) and consumer restaurant reviews (`/api/consumer-reviews/restaurants/:id`)
 
 Blocked operations:
 

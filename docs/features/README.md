@@ -12,11 +12,14 @@ Per-feature specifications. Naming: lowercase kebab-case.
 | Quick lists & schedules        | See restaurant operations doc                                                                                                                                                                                            |
 | Fulfillment, drivers, GPS      | [drivers-and-gps-tracking.md](./drivers-and-gps-tracking.md)                                                                                                                                                             |
 | Warehouses                     | [warehouse-fulfillment.md](./warehouse-fulfillment.md)                                                                                                                                                                   |
-| Deals & promotions             | [deals-and-promotions.md](./deals-and-promotions.md) · UI labels: [../ui/DEALS_BOOSTS_WORDING_CLEANUP.md](../ui/DEALS_BOOSTS_WORDING_CLEANUP.md)                                                                         |
+| Deals & promotions             | [deals-and-promotions.md](./deals-and-promotions.md) · [store-wide-deal-badges.md](./store-wide-deal-badges.md) · UI labels: [../ui/DEALS_BOOSTS_WORDING_CLEANUP.md](../ui/DEALS_BOOSTS_WORDING_CLEANUP.md)              |
 | Staff portal                   | [staff-portal.md](./staff-portal.md)                                                                                                                                                                                     |
 | Email & notifications          | [notifications-and-alerts.md](./notifications-and-alerts.md)                                                                                                                                                             |
-| Quote requests (RFQ)           | [../product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](../product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md)                                                                                                               |
-| Supplier public mini-store     | [../product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](../product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md) (Feature 4)                                                                                                   |
+| Quote requests (RFQ)           | [quote-requests.md](./quote-requests.md) · product spec: [../product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](../product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md)                                                      |
+| Supplier public mini-store     | [quote-requests.md](./quote-requests.md) § Public mini-store                                                                                                                                                             |
+| Search & discovery             | [search-and-discovery.md](./search-and-discovery.md) · [product-favorites.md](./product-favorites.md)                                                                                                                    |
+| Supplier follow                | [supplier-follow.md](./supplier-follow.md)                                                                                                                                                                               |
+| Supplier operations hub        | [supplier-ops.md](./supplier-ops.md)                                                                                                                                                                                     |
 | Custom branding (Gold+)        | [../audits/REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md](../audits/REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md) § branding                                                                    |
 | Reorder assistance             | [inventory-expiry-and-reorder.md](./inventory-expiry-and-reorder.md) · audit: [../audits/REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md](../audits/REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md) |
 | Featured supplier placement    | [../audits/REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md](../audits/REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md)                                                                               |
@@ -34,8 +37,25 @@ Per-feature specifications. Naming: lowercase kebab-case.
 | Tenant roles              | [tenant-roles.md](./tenant-roles.md)                                                                                                                 |
 | Branches & invitations    | [restaurant-branches.md](./restaurant-branches.md), [supplier-branches.md](./supplier-branches.md), [branch-invitations.md](./branch-invitations.md) |
 
+## Reviews & loyalty
+
+| Topic              | Document                                         |
+| ------------------ | ------------------------------------------------ |
+| Supplier reviews   | [supplier-reviews.md](./supplier-reviews.md)     |
+| Restaurant reviews | [restaurant-reviews.md](./restaurant-reviews.md) |
+| Supplier loyalty   | [supplier-loyalty.md](./supplier-loyalty.md)     |
+| Consumer loyalty   | [consumer-loyalty.md](./consumer-loyalty.md)     |
+
+## Consumer (B2C)
+
+| Topic              | Document                                         |
+| ------------------ | ------------------------------------------------ |
+| Guest ordering     | [consumer-ordering.md](./consumer-ordering.md)   |
+| Consumer loyalty   | [consumer-loyalty.md](./consumer-loyalty.md)     |
+| Restaurant reviews | [restaurant-reviews.md](./restaurant-reviews.md) |
+
 ## Other
 
-Disputes, reservations, reports, reviews, contract pricing, waste tracking — see files in this folder.
+Disputes, reservations, reports, contract pricing, waste tracking — see files in this folder.
 
 Archived operator detail: [../archive/old/fulfillment-logistics.md](../archive/old/fulfillment-logistics.md).

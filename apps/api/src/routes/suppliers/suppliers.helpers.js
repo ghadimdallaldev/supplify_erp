@@ -4,6 +4,7 @@ import {
   getSupplierRatingSummariesBatch,
   getRecentReviewsForSuppliersBatch,
 } from '../../services/reviews.service.js'
+import { getActiveStoreWideDealsBatch } from '../../services/store-deals.service.js'
 
 export const multiWarehouseFeature = requireFeature(
   'multi_warehouse',
@@ -34,6 +35,23 @@ export async function attachReviewFields(suppliers) {
       avg_overall: Number(summary.avg_overall) || 0,
       review_count: summary.review_count ?? 0,
       recent_reviews: reviewsBySupplier.get(s.id) || [],
+    }
+  })
+}
+
+export async function attachStoreDealFields(suppliers, { restaurantId } = {}) {
+  if (!suppliers.length) return suppliers
+  const ids = suppliers.map((s) => s.id)
+  const storeDeals = await getActiveStoreWideDealsBatch(ids, restaurantId)
+  return suppliers.map((s) => {
+    const deal = storeDeals.get(s.id)
+    return {
+      ...s,
+      has_store_deal: Boolean(deal),
+      store_deal_label: deal?.label ?? null,
+      store_deal_id: deal?.id ?? null,
+      store_deal_type: deal?.type ?? null,
+      store_deal_discount_value: deal?.discount_value ?? null,
     }
   })
 }

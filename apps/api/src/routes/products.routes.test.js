@@ -171,6 +171,7 @@ describe('Products Routes', () => {
 
     it('should filter products by search query', async () => {
       db.query
+        .mockResolvedValueOnce({ rows: [] }) // productHasSearchVectorColumn()
         .mockResolvedValueOnce({
           rows: [],
           rowCount: 0,
@@ -181,9 +182,13 @@ describe('Products Routes', () => {
 
       await request(app).get('/api/products?q=test').expect(200)
 
+      const listSql = db.query.mock.calls.find((call) =>
+        String(call[0]).includes('FROM product p')
+      )?.[0]
+      expect(listSql).toMatch(/LIKE|search_vector/)
       expect(db.query).toHaveBeenCalledWith(
-        expect.stringContaining('LIKE'),
-        expect.arrayContaining([expect.stringContaining('%test%')])
+        expect.any(String),
+        expect.arrayContaining([expect.stringMatching(/test|%test%/i)])
       )
     })
 

@@ -60,6 +60,11 @@ vi.mock('../services/reviews.service.js', () => ({
   getRecentReviewsForSuppliersBatch: vi.fn().mockResolvedValue(new Map()),
 }))
 
+vi.mock('../services/store-deals.service.js', () => ({
+  getActiveStoreWideDealsBatch: vi.fn().mockResolvedValue(new Map()),
+  formatStoreDealLabel: vi.fn(),
+}))
+
 // Import routes after mocks
 import { suppliersRoutes } from './suppliers.routes.js'
 
@@ -116,6 +121,51 @@ describe('Suppliers Routes', () => {
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.suppliers).toHaveLength(1)
+    })
+
+    it('includes store-wide deal badges on supplier list', async () => {
+      const { getActiveStoreWideDealsBatch } = await import('../services/store-deals.service.js')
+
+      vi.mocked(getActiveStoreWideDealsBatch).mockResolvedValueOnce(
+        new Map([
+          [
+            'supplier-1',
+            {
+              id: 'deal-1',
+              type: 'percentage_discount',
+              discount_value: 15,
+              label: '15% off',
+            },
+          ],
+        ])
+      )
+
+      db.query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'supplier-1',
+              name: 'Test Supplier',
+              contact_email: 'supplier@example.com',
+              product_count: 5,
+              avg_price: 10.5,
+              is_followed: false,
+              created_at: new Date(),
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ total: '1' }],
+        })
+
+      const response = await request(app).get('/api/suppliers').expect(200)
+
+      expect(response.body.data.suppliers[0]).toMatchObject({
+        has_store_deal: true,
+        store_deal_label: '15% off',
+        store_deal_id: 'deal-1',
+      })
+      expect(getActiveStoreWideDealsBatch).toHaveBeenCalledOnce()
     })
   })
 

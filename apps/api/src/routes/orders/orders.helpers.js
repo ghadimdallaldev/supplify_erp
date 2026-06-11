@@ -187,6 +187,14 @@ const orderCreateSchema = z.object({
     .min(1),
   promotionId: z.string().uuid().optional(),
   couponCode: z.string().max(64).optional(),
+  loyaltyRedeem: z
+    .array(
+      z.object({
+        supplierId: z.string().uuid(),
+        points: z.number().int().positive(),
+      })
+    )
+    .optional(),
   status: z
     .enum([
       'DRAFT',

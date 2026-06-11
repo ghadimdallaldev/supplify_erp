@@ -83,6 +83,24 @@ Deal **boost** checkout uses separate `promotion_pricing_config` — not counted
 | GET    | `/api/promotions/:id/eligible-products` | Products for order CTA                                      |
 | POST   | `/api/promotions/:id/use-coupon`        | Reveal/copy coupon + track usage                            |
 | POST   | `/api/promotions/:id/message`           | Open chat with prefilled deal message                       |
+| GET    | `/api/promotions/new-deals-banner`      | New-deals banner payload (followed suppliers, last 14 days) |
+| POST   | `/api/promotions/:id/dismiss-banner`    | Dismiss banner for one deal (per restaurant)                |
+
+## New-deals banner
+
+Restaurants with `supplier_deals` see a dismissible banner in the app shell when followed suppliers publish new active deals.
+
+**Eligibility** (`deal-banner.service.js`):
+
+- Deal `status = active`, payment ok, within `starts_at` / `ends_at`
+- Started within the last **14 days**
+- Restaurant follows the supplier, is explicitly targeted, or deal has no restaurant targets
+- Matches `target_restaurant_types` / `target_areas` when set
+- Not previously dismissed (`deal_interactions.interaction_type = 'banner_dismiss'`)
+
+**UI:** `NewDealsBanner` in `Layout.tsx` — links to `/app/deals`; dismiss calls `POST /api/promotions/:id/dismiss-banner`.
+
+Migration: `0151_deal_banner_dismiss.sql` — adds `banner_dismiss` to deal interaction types.
 
 ## API — Admin
 
@@ -96,7 +114,7 @@ Deal **boost** checkout uses separate `promotion_pricing_config` — not counted
 
 Admin UI: **Admin → Deals & Boosts** tab (`AdminDealsPanel`).
 
-See **[DEALS_BOOST_PUBLISHING_FLOW.md](../DEALS_BOOST_PUBLISHING_FLOW.md)** for the full submit → approve → publish flow.
+See **[deals-boost-publishing-flow.md](../archive/old/deals-boost-publishing-flow.md)** for the full submit → approve → publish flow.
 
 ## Boost packages (Facebook-style visibility)
 
