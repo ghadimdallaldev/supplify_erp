@@ -27,6 +27,8 @@ After deploy, apply redirect URIs from the matching realm export if URLs change.
 
 `docker-compose.yml` imports `realm-export.json` (realm **Supplify**). Preprod/prod exports are for hosted environments only.
 
+**B2C diner signup** (guest ordering rewards at `/order/:slug/account`) does **not** use Keycloak — no realm or client changes. Diner sessions are API JWT cookies signed with `CONSUMER_AUTH_SECRET` (see [consumer-ordering.md](../../features/consumer-ordering.md)).
+
 ## Railway recovery (no Admin UI)
 
 Use this when `/admin` fails (CSP iframe errors, blank console, or **HTTPS required**) and realm **Supplify** is missing.

@@ -8,8 +8,11 @@ import {
   useGetEntitlementsQuery,
   useGetDisputesQuery,
   useGetIncomingDisputesQuery,
+  useGetMyReviewsQuery,
 } from '../services/api'
-import { isEntitlementFeatureEnabled } from '../lib/planLimits'
+import { isEntitlementFeatureEnabled, featureEnabled } from '../lib/planLimits'
+import { isOrderEligibleForReview } from '../lib/orderReviewEligibility'
+import { SupplierReviewModal } from '../components/reviews/SupplierReviewModal'
 import { isOrderEligibleForDispute } from '../lib/orderDisputeEligibility'
 import { getActiveDisputeForOrder } from '../lib/disputeHelpers'
 import { OrderDisputeBanner } from '../components/disputes/OrderDisputeBanner'
@@ -19,7 +22,7 @@ import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
-import { ArrowLeft, AlertCircle, Check } from 'lucide-react'
+import { ArrowLeft, AlertCircle, Check, Star } from 'lucide-react'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { usePermissions } from '../hooks/usePermissions'
 import toast from 'react-hot-toast'
@@ -54,7 +57,9 @@ export function OrderDetailPage() {
   const [activeTab, setActiveTab] = useState<string>('timeline')
   const [showOpenDispute, setShowOpenDispute] = useState(false)
   const [showDeclineDialog, setShowDeclineDialog] = useState(false)
+  const [showReviewModal, setShowReviewModal] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
+  const reviewFromUrl = searchParams.get('review') === '1'
 
   useEffect(() => {
     if (tabFromUrl && VALID_ORDER_TABS.includes(tabFromUrl as (typeof VALID_ORDER_TABS)[number])) {
@@ -75,8 +80,41 @@ export function OrderDetailPage() {
   const { data: incomingDisputesData } = useGetIncomingDisputesQuery(undefined, {
     skip: !id || !isSupplier || !disputesEnabled,
   })
+  const reviewsWriteEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.supplier_reviews
+  )
+  const { data: myReviewsData, refetch: refetchMyReviews } = useGetMyReviewsQuery(undefined, {
+    skip: isSupplier || !reviewsWriteEnabled,
+  })
   const [updateOrder] = useUpdateOrderMutation()
   const [sendReminder, { isLoading: isSendingReminder }] = useSendOrderReminderMutation()
+
+  const orderForReview = data?.order
+  const primarySupplierForReview = (() => {
+    const items = orderForReview?.items ?? []
+    const first = items.find((item) => item.supplier_id)
+    if (!first?.supplier_id) return null
+    return {
+      id: String(first.supplier_id),
+      name: first.supplier_name ? String(first.supplier_name) : 'Supplier',
+    }
+  })()
+  const existingOrderReview = (myReviewsData?.reviews ?? []).find(
+    (r) => orderForReview && String(r.order_id) === orderForReview.id
+  )
+  const canLeaveReview =
+    !isSupplier &&
+    reviewsWriteEnabled &&
+    Boolean(orderForReview) &&
+    isOrderEligibleForReview(orderForReview?.status) &&
+    Boolean(primarySupplierForReview) &&
+    !existingOrderReview
+
+  useEffect(() => {
+    if (reviewFromUrl && canLeaveReview) {
+      setShowReviewModal(true)
+    }
+  }, [reviewFromUrl, canLeaveReview])
 
   const handleStatusUpdate = async (
     newStatus: string,
@@ -143,6 +181,7 @@ export function OrderDetailPage() {
       (order as Record<string, unknown>).sourceOrderId ??
       ''
   )
+  const primarySupplier = primarySupplierForReview
 
   return (
     <RequirePermission permission="ORDERS_VIEW" title="order details">
@@ -233,6 +272,12 @@ export function OrderDetailPage() {
                   Open dispute
                 </Button>
               )}
+            {canLeaveReview && (
+              <Button size="sm" variant="outline" onClick={() => setShowReviewModal(true)}>
+                <Star className="h-4 w-4 mr-2" />
+                Leave review
+              </Button>
+            )}
             {isSupplier && disputesEnabled && activeDispute && (
               <Button size="sm" variant="outline" asChild>
                 <RouterLink to="/app/disputes">Manage dispute</RouterLink>
@@ -412,6 +457,17 @@ export function OrderDetailPage() {
             onOpenChange={setShowOpenDispute}
             orderId={order.id}
             onCreated={() => refetch()}
+          />
+        )}
+
+        {canLeaveReview && primarySupplier && (
+          <SupplierReviewModal
+            supplierId={primarySupplier.id}
+            supplierName={primarySupplier.name}
+            open={showReviewModal}
+            onOpenChange={setShowReviewModal}
+            initialOrderId={order.id}
+            onSuccess={() => refetchMyReviews()}
           />
         )}
       </div>

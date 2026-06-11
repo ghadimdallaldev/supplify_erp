@@ -52,7 +52,7 @@ import {
 } from '../../services/supplier-inventory.service.js'
 import { ordersRouterMutationGuard } from '../../lib/route-permissions.js'
 import { releaseOrderFromPlannedRoutes } from '../../services/delivery-routes.service.js'
-import { loadOrderWarehouseAssignments } from './orders.helpers.js'
+import { assertOrderReadAccess, loadOrderWarehouseAssignments } from './orders.helpers.js'
 
 const router = express.Router()
 
@@ -89,53 +89,14 @@ router.get('/:id', async (req, res, next) => {
 
     const order = orders[0]
 
-    // Check access permissions (respects impersonation)
-    const tenant = await getRequestTenant(req)
-    if (tenant?.tenantType === 'RESTAURANT') {
-      if (order.restaurant_id !== tenant.tenantId) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: { name: 'FORBIDDEN', message: 'Access denied' },
-          requestId: req.requestId,
-        })
-      }
-    } else if (tenant?.tenantType === 'SUPPLIER') {
-      const { rows: supplierItems } = await query(
-        `SELECT 1 FROM order_item WHERE order_id = $1 AND supplier_id = $2 LIMIT 1`,
-        [id, tenant.tenantId]
-      )
-      if (supplierItems.length === 0) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: { name: 'FORBIDDEN', message: 'Access denied' },
-          requestId: req.requestId,
-        })
-      }
-    } else if (req.userData.role === 'RESTAURANT') {
-      const restaurantId = await getRestaurantIdForRequest(req)
-      if (!restaurantId || restaurantId !== order.restaurant_id) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: { name: 'FORBIDDEN', message: 'Access denied' },
-          requestId: req.requestId,
-        })
-      }
-    } else if (req.userData.role === 'SUPPLIER') {
-      const { rows: supplierItems } = await query(
-        `SELECT 1 FROM order_item oi JOIN supplier s ON s.id = oi.supplier_id WHERE oi.order_id = $1 AND s.contact_email = $2 LIMIT 1`,
-        [id, req.userData.email]
-      )
-      if (supplierItems.length === 0) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: { name: 'FORBIDDEN', message: 'Access denied' },
-          requestId: req.requestId,
-        })
-      }
+    const allowed = await assertOrderReadAccess(req, order, id)
+    if (!allowed) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Access denied' },
+        requestId: req.requestId,
+      })
     }
 
     // Fetch all order detail sub-queries in parallel — none depend on each other.

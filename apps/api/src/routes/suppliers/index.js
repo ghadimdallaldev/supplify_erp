@@ -9,10 +9,11 @@ import relationshipsRouter from './relationships.js'
 const router = express.Router()
 
 router.use(catalogRouter)
+// relationships (/followed, /:id/follow) before profile (/:id) — literal paths must win
+router.use(relationshipsRouter)
 router.use(profileRouter)
 router.use(adminRouter)
 router.use(brandingRouter)
 router.use(manageRouter)
-router.use(relationshipsRouter)
 
 export { router as suppliersRoutes }

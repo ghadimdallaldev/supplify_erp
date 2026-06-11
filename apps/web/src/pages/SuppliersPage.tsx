@@ -12,7 +12,6 @@ import {
   Building2,
   Mail,
   MapPin,
-  Search,
   Star,
   Package,
   Heart,
@@ -27,11 +26,14 @@ import {
   Sparkles,
   Clock,
   X,
+  Tag,
 } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
+import { useDebouncedSearch } from '../hooks/useDebouncedSearch'
+import { SearchHistoryDropdown } from '../components/search/SearchHistoryDropdown'
 import {
   CardActionGrid,
   CardFooterMeta,
@@ -100,19 +102,32 @@ function isSupplierNew(createdAt: string) {
   return daysSince <= 30
 }
 
+function getStoreDealSortScore(supplier: {
+  has_store_deal?: boolean
+  store_deal_type?: string | null
+  store_deal_discount_value?: number | null
+}) {
+  if (!supplier.has_store_deal) return 0
+  const value = Number(supplier.store_deal_discount_value || 0)
+  if (supplier.store_deal_type === 'percentage_discount') return value * 1000
+  return value
+}
+
 export function SuppliersPage() {
   const { user } = useAppSelector((state) => state.auth)
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
+  const { search, setSearch, debouncedSearch } = useDebouncedSearch()
   const [cityFilter, setCityFilter] = useState('')
-  const [sortBy, setSortBy] = useState<'name' | 'products' | 'recent' | 'followed'>('name')
+  const [sortBy, setSortBy] = useState<'name' | 'products' | 'recent' | 'followed' | 'deals'>(
+    'name'
+  )
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [filterBy, setFilterBy] = useState<'all' | 'followed' | 'new'>('all')
+  const [filterBy, setFilterBy] = useState<'all' | 'followed' | 'new' | 'on_sale'>('all')
 
   const isRestaurant = user?.role === 'RESTAURANT'
 
   const { data, isLoading, error, refetch } = useGetSuppliersQuery({
-    q: search || undefined,
+    q: debouncedSearch || undefined,
     city: cityFilter || undefined,
     limit: 50,
     offset: 0,
@@ -133,6 +148,7 @@ export function SuppliersPage() {
         0
       ),
       newSuppliers: suppliers.filter((s: any) => isSupplierNew(s.created_at)).length,
+      onSale: suppliers.filter((s: any) => s.has_store_deal).length,
     }
   }, [data?.suppliers])
 
@@ -153,12 +169,19 @@ export function SuppliersPage() {
         const daysSince = (Date.now() - created.getTime()) / (1000 * 60 * 60 * 24)
         return daysSince <= 30
       })
+    } else if (filterBy === 'on_sale') {
+      suppliers = suppliers.filter((s: any) => s.has_store_deal)
     }
 
-    // Sort — featured suppliers stay at top unless explicitly sorting by another field
+    // Sort — featured suppliers stay at top unless sorting by deals
     suppliers = [...suppliers].sort((a: any, b: any) => {
+      if (sortBy === 'deals') {
+        const dealDiff = getStoreDealSortScore(b) - getStoreDealSortScore(a)
+        if (dealDiff !== 0) return dealDiff
+      }
+
       const featuredDiff = Number(b.is_featured) - Number(a.is_featured)
-      if (featuredDiff !== 0) return featuredDiff
+      if (featuredDiff !== 0 && sortBy !== 'deals') return featuredDiff
 
       switch (sortBy) {
         case 'products':
@@ -169,6 +192,8 @@ export function SuppliersPage() {
           if (a.is_followed && !b.is_followed) return -1
           if (!a.is_followed && b.is_followed) return 1
           return 0
+        case 'deals':
+          return a.name.localeCompare(b.name)
         case 'name':
         default:
           return a.name.localeCompare(b.name)
@@ -298,19 +323,15 @@ export function SuppliersPage() {
           </div>
 
           <div className="flex flex-col gap-3 rounded-xl border border-[var(--app-border-mid)] bg-[var(--surface)] p-3 shadow-sm lg:flex-row lg:items-center lg:p-4">
-            <div className="relative min-w-0 flex-1">
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
-                aria-hidden
-              />
-              <Input
-                placeholder="Search by name, email, or city…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-10 rounded-lg border-[var(--app-border-mid)] pl-10"
-                aria-label="Search suppliers"
-              />
-            </div>
+            <SearchHistoryDropdown
+              entityType="supplier"
+              value={search}
+              onChange={setSearch}
+              placeholder="Search by name, email, or city…"
+              className="min-w-0 flex-1"
+              inputClassName="rounded-lg border-[var(--app-border-mid)]"
+              aria-label="Search suppliers"
+            />
             <Input
               placeholder="City"
               value={cityFilter}
@@ -356,17 +377,35 @@ export function SuppliersPage() {
                 </Badge>
               </Button>
               <Button
+                variant={filterBy === 'on_sale' ? 'default' : 'outline'}
+                size="sm"
+                className="h-10 rounded-lg"
+                onClick={() => setFilterBy('on_sale')}
+              >
+                <Tag className="h-4 w-4 mr-1.5" />
+                On sale now
+                <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
+                  {stats.onSale}
+                </Badge>
+              </Button>
+              <Button
                 variant="outline"
                 size="sm"
                 className="h-10 rounded-lg"
-                onClick={() =>
-                  setSortBy(
-                    sortBy === 'name' ? 'products' : sortBy === 'products' ? 'recent' : 'name'
-                  )
-                }
+                onClick={() => {
+                  const order: (typeof sortBy)[] = ['name', 'products', 'recent', 'deals']
+                  const idx = order.indexOf(sortBy)
+                  setSortBy(order[(idx + 1) % order.length])
+                }}
               >
                 <ArrowUpDown className="h-4 w-4 mr-1.5" />
-                {sortBy === 'name' ? 'Name' : sortBy === 'products' ? 'Products' : 'Recent'}
+                {sortBy === 'name'
+                  ? 'Name'
+                  : sortBy === 'products'
+                    ? 'Products'
+                    : sortBy === 'recent'
+                      ? 'Recent'
+                      : 'Best deals'}
               </Button>
             </div>
           </div>
@@ -509,6 +548,12 @@ export function SuppliersPage() {
                           {supplier.is_featured && (
                             <Badge className="bg-amber-500 text-white flex items-center gap-1 shadow-sm text-[10px] px-1.5 py-0">
                               Featured
+                            </Badge>
+                          )}
+                          {supplier.has_store_deal && supplier.store_deal_label && (
+                            <Badge className="bg-[var(--red)] text-white flex items-center gap-1 shadow-sm text-[10px] px-1.5 py-0">
+                              <Tag className="h-3 w-3 shrink-0" />
+                              {supplier.store_deal_label}
                             </Badge>
                           )}
                           {isRestaurant && supplier.is_followed && (
@@ -674,6 +719,12 @@ export function SuppliersPage() {
                         <h3 className="text-lg font-bold text-[var(--text)]">{supplier.name}</h3>
                         {supplier.is_featured && (
                           <Badge className="bg-amber-500 text-white text-xs">Featured</Badge>
+                        )}
+                        {supplier.has_store_deal && supplier.store_deal_label && (
+                          <Badge className="bg-[var(--red)] text-white text-xs flex items-center gap-1">
+                            <Tag className="h-3 w-3 shrink-0" />
+                            {supplier.store_deal_label}
+                          </Badge>
                         )}
                         {isRestaurant && supplier.is_followed && (
                           <Badge className="bg-[var(--brand)] text-white">

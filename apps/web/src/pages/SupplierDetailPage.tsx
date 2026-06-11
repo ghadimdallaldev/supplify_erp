@@ -10,23 +10,18 @@ import {
   useGetSupplierStatisticsQuery,
   useGetSupplierReviewsQuery,
   useGetSupplierRatingSummaryQuery,
-  useCreateSupplierReviewMutation,
+  useGetMyReviewsQuery,
+  useDeleteReviewMutation,
   useGetEntitlementsQuery,
 } from '../services/api'
 import { featureEnabled } from '../lib/planLimits'
+import { canEditReview } from '../lib/orderReviewEligibility'
+import {
+  SupplierReviewModal,
+  type SupplierReviewEditTarget,
+} from '../components/reviews/SupplierReviewModal'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
-import { Input } from '../components/ui/input'
-import { Label } from '../components/ui/label'
-import { Textarea } from '../components/ui/textarea'
-import { Select, SelectTrigger } from '../components/ui/select'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../components/ui/dialog'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -86,13 +81,17 @@ export function SupplierDetailPage() {
     { skip: !id }
   )
   const { data: ratingSummaryData } = useGetSupplierRatingSummaryQuery(id!, { skip: !id })
-  const [createReview, { isLoading: submittingReview }] = useCreateSupplierReviewMutation()
-  const [showReviewModal, setShowReviewModal] = useState(false)
-  const [reviewForm, setReviewForm] = useState({
-    orderId: '',
-    overallRating: 5,
-    comment: '',
+  const { data: myReviewsData, refetch: refetchMyReviews } = useGetMyReviewsQuery(undefined, {
+    skip: !isRestaurant,
   })
+  const [deleteReview, { isLoading: deletingReview }] = useDeleteReviewMutation()
+  const [showReviewModal, setShowReviewModal] = useState(false)
+  const [editingReview, setEditingReview] = useState<SupplierReviewEditTarget | null>(null)
+
+  const myReviewIds = new Set((myReviewsData?.reviews ?? []).map((r) => String(r.id)))
+  const myReviewsById = new Map(
+    (myReviewsData?.reviews ?? []).map((r) => [String(r.id), r as Record<string, unknown>])
+  )
 
   const stats = statsData || null
   const ratingSummary = ratingSummaryData?.summary as Record<string, unknown> | undefined
@@ -438,7 +437,13 @@ export function SupplierDetailPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Supplier reviews</CardTitle>
               {isRestaurant && reviewsWriteEnabled && (
-                <Button size="sm" onClick={() => setShowReviewModal(true)}>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setEditingReview(null)
+                    setShowReviewModal(true)
+                  }}
+                >
                   Write review
                 </Button>
               )}
@@ -452,22 +457,85 @@ export function SupplierDetailPage() {
               {(reviewsData?.reviews || []).length === 0 ? (
                 <p className="text-sm text-[var(--text-muted)]">No reviews yet.</p>
               ) : (
-                (reviewsData?.reviews || []).map((r: Record<string, unknown>) => (
-                  <div key={String(r.id)} className="rounded-lg border p-3 text-sm">
-                    <div className="flex items-center gap-1 text-amber-600">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`h-3.5 w-3.5 ${i < Number(r.overall_rating || 0) ? 'fill-amber-400' : 'text-amber-200'}`}
-                        />
-                      ))}
+                (reviewsData?.reviews || []).map((r: Record<string, unknown>) => {
+                  const reviewId = String(r.id)
+                  const isOwnReview = myReviewIds.has(reviewId)
+                  const ownReviewMeta = myReviewsById.get(reviewId) as
+                    | Record<string, unknown>
+                    | undefined
+                  const showEdit =
+                    isOwnReview &&
+                    canEditReview(
+                      {
+                        reviewer_user_id: ownReviewMeta?.reviewer_user_id as string | undefined,
+                        created_at: (ownReviewMeta?.created_at ?? r.created_at) as
+                          | string
+                          | undefined,
+                      },
+                      user?.id
+                    )
+
+                  return (
+                    <div key={reviewId} className="rounded-lg border p-3 text-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-1 text-amber-600">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`h-3.5 w-3.5 ${i < Number(r.overall_rating || 0) ? 'fill-amber-400' : 'text-amber-200'}`}
+                            />
+                          ))}
+                        </div>
+                        {isOwnReview && (
+                          <div className="flex gap-1 shrink-0">
+                            {showEdit && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2"
+                                onClick={() => {
+                                  setEditingReview({
+                                    id: reviewId,
+                                    overall_rating: Number(r.overall_rating) || 5,
+                                    comment: r.comment ? String(r.comment) : null,
+                                  })
+                                  setShowReviewModal(true)
+                                }}
+                              >
+                                Edit
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-[var(--red)]"
+                              disabled={deletingReview}
+                              onClick={async () => {
+                                if (!window.confirm('Delete this review?')) return
+                                try {
+                                  await deleteReview(reviewId).unwrap()
+                                  toast.success('Review deleted')
+                                  refetchMyReviews()
+                                } catch (e: unknown) {
+                                  const err = e as { data?: { error?: { message?: string } } }
+                                  toast.error(
+                                    err?.data?.error?.message || 'Failed to delete review'
+                                  )
+                                }
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      {r.comment ? <p className="mt-2">{String(r.comment)}</p> : null}
+                      <p className="text-xs text-[var(--text-muted)] mt-1">
+                        {r.created_at ? new Date(String(r.created_at)).toLocaleDateString() : ''}
+                      </p>
                     </div>
-                    {r.comment ? <p className="mt-2">{String(r.comment)}</p> : null}
-                    <p className="text-xs text-[var(--text-muted)] mt-1">
-                      {r.created_at ? new Date(String(r.created_at)).toLocaleDateString() : ''}
-                    </p>
-                  </div>
-                ))
+                  )
+                })
               )}
             </CardContent>
           </Card>
@@ -525,74 +593,20 @@ export function SupplierDetailPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={showReviewModal} onOpenChange={setShowReviewModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Review {supplier.name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label>Order ID (completed order)</Label>
-              <Input
-                value={reviewForm.orderId}
-                onChange={(e) => setReviewForm((f) => ({ ...f, orderId: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label>Rating</Label>
-              <Select
-                value={String(reviewForm.overallRating)}
-                onValueChange={(value) =>
-                  setReviewForm((f) => ({ ...f, overallRating: Number(value) }))
-                }
-              >
-                <SelectTrigger>
-                  {[5, 4, 3, 2, 1].map((n) => (
-                    <option key={n} value={n}>
-                      {n} stars
-                    </option>
-                  ))}
-                </SelectTrigger>
-              </Select>
-            </div>
-            <div>
-              <Label>Comment</Label>
-              <Textarea
-                value={reviewForm.comment}
-                onChange={(e) => setReviewForm((f) => ({ ...f, comment: e.target.value }))}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              disabled={submittingReview}
-              onClick={async () => {
-                if (!reviewForm.orderId) {
-                  toast.error('Order ID required')
-                  return
-                }
-                try {
-                  await createReview({
-                    supplierId: id!,
-                    body: {
-                      orderId: reviewForm.orderId,
-                      overallRating: reviewForm.overallRating,
-                      comment: reviewForm.comment || null,
-                    },
-                  }).unwrap()
-                  toast.success('Review submitted')
-                  setShowReviewModal(false)
-                } catch (e: unknown) {
-                  const err = e as { data?: { error?: { message?: string } } }
-                  toast.error(err?.data?.error?.message || 'Failed to submit review')
-                }
-              }}
-            >
-              Submit
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SupplierReviewModal
+        supplierId={id!}
+        supplierName={supplier.name}
+        open={showReviewModal}
+        onOpenChange={(open) => {
+          setShowReviewModal(open)
+          if (!open) setEditingReview(null)
+        }}
+        editingReview={editingReview}
+        onSuccess={() => {
+          refetchMyReviews()
+          refetch()
+        }}
+      />
     </div>
   )
 }
