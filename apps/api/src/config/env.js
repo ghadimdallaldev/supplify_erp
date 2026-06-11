@@ -91,6 +91,11 @@ export const config = {
   COOKIE_DOMAIN: process.env.COOKIE_DOMAIN || '',
   SESSION_SECRET:
     process.env.SESSION_SECRET || (isProductionNode ? '' : 'dev-session-secret-change-me'),
+  /** JWT signing for B2C diner sessions (consumer_auth_token cookie). Separate from Keycloak. */
+  CONSUMER_AUTH_SECRET:
+    process.env.CONSUMER_AUTH_SECRET ||
+    process.env.SESSION_SECRET ||
+    (isProductionNode ? '' : 'dev-consumer-auth-secret'),
   IMPERSONATION_SECRET:
     process.env.IMPERSONATION_SECRET ||
     process.env.SESSION_SECRET ||

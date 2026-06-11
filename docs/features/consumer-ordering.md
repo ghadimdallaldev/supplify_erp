@@ -44,6 +44,20 @@ Single linear lifecycle for all fulfillment types:
 
 Migrations: `0161_consumer_ordering.sql`, `0163_consumer_b2c_complete.sql`
 
+## Infrastructure (Keycloak & Docker)
+
+**Diner signup does not use Keycloak.** No new Keycloak clients, realms, or redirect URIs are required.
+
+| Concern        | B2C diners                                        | ERP staff / suppliers                 |
+| -------------- | ------------------------------------------------- | ------------------------------------- |
+| Auth           | API-issued JWT in `consumer_auth_token` cookie    | Keycloak OIDC (`access_token` cookie) |
+| Identity store | `consumer_member` table (per restaurant)          | Keycloak + `app_user`                 |
+| Docker service | None extra — uses existing **api** + **postgres** | **keycloak** unchanged                |
+
+**Docker / env:** set `CONSUMER_AUTH_SECRET` on the API service (optional; falls back to `SESSION_SECRET`). Already wired in root `docker-compose.yml` and `deploy/docker-compose.*.yml`. Run `pnpm db:migrate` so migrations `0161`–`0163` apply.
+
+**Production:** use a dedicated `CONSUMER_AUTH_SECRET` (`openssl rand -hex 32`) so diner session tokens are signed independently of staff sessions. Cookie settings (`COOKIE_SECURE`, `COOKIE_SAME_SITE`, `WEB_ORIGINS`) apply to diner cookies the same as staff cookies.
+
 ## Related
 
 - [consumer-loyalty.md](./consumer-loyalty.md) — earn/redeem for signed-up diners only

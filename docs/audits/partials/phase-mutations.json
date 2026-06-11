@@ -1,0 +1,63 @@
+{
+  "phase": "mutations",
+  "baseUrl": "https://supplify-api-dev-development.up.railway.app",
+  "generatedAt": "2026-06-11T15:26:35.163Z",
+  "results": [
+    {
+      "route": "/api/quick-lists",
+      "method": "POST",
+      "role": "restaurant",
+      "status": 201,
+      "durationMs": 520,
+      "responseBytes": 545,
+      "outcome": "PASS",
+      "shapeOk": null,
+      "skipReason": null,
+      "slow": false,
+      "error": null,
+      "label": "POST quick-list smoke_test_"
+    },
+    {
+      "route": "/api/products",
+      "method": "POST",
+      "role": "supplier",
+      "status": 201,
+      "durationMs": 539,
+      "responseBytes": 463,
+      "outcome": "PASS",
+      "shapeOk": null,
+      "skipReason": null,
+      "slow": false,
+      "error": null,
+      "label": "POST product smoke_test_"
+    },
+    {
+      "route": "POST /api/orders",
+      "method": "POST",
+      "role": "restaurant",
+      "status": null,
+      "durationMs": 0,
+      "responseBytes": 0,
+      "outcome": "SKIP",
+      "shapeOk": null,
+      "skipReason": "SKIPPED_UNSAFE — order create still skipped (commercial side-effect)",
+      "slow": false,
+      "error": null,
+      "label": "POST /api/orders"
+    },
+    {
+      "route": "POST /api/staff/send-invite",
+      "method": "POST",
+      "role": "restaurant",
+      "status": null,
+      "durationMs": 0,
+      "responseBytes": 0,
+      "outcome": "SKIP",
+      "shapeOk": null,
+      "skipReason": "SKIPPED_UNSAFE — staff invite sends email",
+      "slow": false,
+      "error": null,
+      "label": "POST /api/staff/send-invite"
+    }
+  ]
+}

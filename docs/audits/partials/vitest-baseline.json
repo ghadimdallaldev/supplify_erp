@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-06-11T00:00:00.000Z",
+  "suites": {
+    "test:api": {
+      "command": "pnpm test:api",
+      "testFiles": 190,
+      "passed": 187,
+      "failed": 3,
+      "testsPassed": 1081,
+      "testsFailed": 1,
+      "knownFailures": [
+        "src/services/email/email.service.test.js — duplicate event_key does not send twice"
+      ]
+    },
+    "test:rbac": {
+      "command": "pnpm test:rbac",
+      "testFiles": 15,
+      "passed": 15,
+      "failed": 0,
+      "testsPassed": 163,
+      "testsFailed": 0
+    }
+  }
+}

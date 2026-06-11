@@ -1,0 +1,62 @@
+{
+  "generatedAt": "2026-06-11T15:30:00.000Z",
+  "fixes": [
+    {
+      "domain": "public-auth",
+      "file": "apps/api/src/services/public-supplier-catalog.service.js",
+      "issue": "GET /api/public/suppliers/:slug returned 500 on dev when optional supplier columns (slug, minimum_order_amount, payment_terms) were absent or slug lookup used missing column",
+      "fix": "Conditionally include supplier columns via columnExists(); return 404 when slug column missing and lookup is not UUID",
+      "tests": "src/services/public-supplier-catalog.service.test.js — 6/6 pass"
+    },
+    {
+      "domain": "harness",
+      "file": "apps/api/scripts/dev-api-smoke-test.mjs",
+      "issue": "Smoke harness lacked supplier/restaurant/staff RBAC matrix, expiry/quick-lists/command-center coverage, mutation phase, standardized skip reasons, and multi-run JSON output",
+      "fix": "Expanded phased smoke test (~123 routes), SKIP reason taxonomy, optional mutations (smoke_test_ prefix), auth verification at startup, runs[] history in results JSON",
+      "tests": "pnpm smoke:dev-api — 109 pass / 4 fail / 10 skip (2026-06-11 expanded run)"
+    },
+    {
+      "domain": "harness",
+      "file": "apps/api/scripts/lib/auth-token.mjs",
+      "issue": "No programmatic check that SUPPLIFY_*_TOKEN env overrides take precedence over Keycloak grant",
+      "fix": "Exported ROLE_CONFIG, getTokenSource(), verifyTokenOverrides(); env override verified for SUPPLIFY_ADMIN_TOKEN",
+      "tests": "node -e import getTokenSource — env_override + token match true"
+    },
+    {
+      "domain": "routing",
+      "file": "apps/api/src/routes/suppliers/index.js",
+      "issue": "GET /api/suppliers/followed returned 500 on dev — profile /:id route captured literal 'followed' before relationships router",
+      "fix": "Mount relationshipsRouter before profileRouter so /followed and /:id/follow register before /:id",
+      "tests": "src/routes/suppliers.routes.test.js — 2/2 pass"
+    },
+    {
+      "domain": "admin-dashboard",
+      "file": "apps/api/src/routes/admin-dashboard/tenants.js",
+      "issue": "GET /api/admin-dashboard/tenants/search returned 500 when supplier/restaurant slug columns absent on dev schema",
+      "fix": "Use columnExists() to omit slug from SELECT when column missing (NULL::text AS slug fallback)",
+      "tests": "pending redeploy smoke verification"
+    }
+  ],
+  "notFixed": [
+    {
+      "issue": "Railway dev still returns PUBLIC_SUPPLIER_ERROR 500 for public supplier catalog until API redeploy with catalog service fix",
+      "action": "Redeploy API to Railway dev after merge"
+    },
+    {
+      "issue": "Railway dev still returns 500 on GET /api/suppliers/followed and tenants/search until route-order + slug fixes deploy",
+      "action": "Redeploy API to Railway dev after merge"
+    },
+    {
+      "issue": "Staff portal live tests blocked — no SUPPLIFY_STAFF_TOKEN or seeded staff_portal Keycloak user",
+      "action": "Provide SUPPLIFY_STAFF_TOKEN or create staff portal account + E2E_STAFF_EMAIL/PASSWORD"
+    },
+    {
+      "issue": "Cross-tenant negatives partially skipped when only one supplier tenant exists in dev (SKIP_NO_CONTEXT)",
+      "action": "Seed second supplier tenant or run against multi-tenant fixture"
+    },
+    {
+      "issue": "Pre-existing Vitest failure: email.service duplicate event_key test",
+      "action": "Out of scope for route audit"
+    }
+  ]
+}

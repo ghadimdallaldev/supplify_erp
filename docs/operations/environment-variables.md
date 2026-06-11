@@ -5,47 +5,48 @@ Set secrets only in Railway — never commit real values.
 
 ## Backend (API)
 
-| Variable                                                                     | Used by | Required in    | Example                      | Notes                                                     |
-| ---------------------------------------------------------------------------- | ------- | -------------- | ---------------------------- | --------------------------------------------------------- |
-| `APP_ENV`                                                                    | API     | all hosted     | `dev` / `preprod` / `prod`   | Drives safety defaults                                    |
-| `NODE_ENV`                                                                   | API     | all            | `development` / `production` | Node runtime mode                                         |
-| `PORT`                                                                       | API     | all            | `4000`                       | Railway sets automatically                                |
-| `DATABASE_URL`                                                               | API     | all hosted     | `postgresql://...`           | **Unique per environment**                                |
-| `DATABASE_SSL`                                                               | API     | preprod, prod  | `true`                       | Required for Railway Postgres                             |
-| `CORS_ORIGIN`                                                                | API     | preprod, prod  | `https://app.example.com`    | Comma-separated origins                                   |
-| `WEB_ORIGINS`                                                                | API     | optional       | same as CORS                 | Legacy alias; merged with CORS                            |
-| `WEB_ORIGIN`                                                                 | API     | optional       | primary origin               | Staff links, OAuth redirects                              |
-| `PUBLIC_API_URL`                                                             | API     | hosted         | `https://api.example.com`    | Alias of `API_PUBLIC_URL`                                 |
-| `PUBLIC_FRONTEND_URL`                                                        | API     | hosted         | `https://app.example.com`    | Added to CORS allow list                                  |
-| `SESSION_SECRET`                                                             | API     | all hosted     | 64-char hex                  | Session signing; ≥32 chars in prod                        |
-| `IMPERSONATION_SECRET`                                                       | API     | hosted         | 64-char hex                  | Defaults to `SESSION_SECRET`                              |
-| `JWT_SECRET`                                                                 | API     | optional       | —                            | Reserved; auth uses Keycloak + session                    |
-| `JWT_EXPIRES_IN`                                                             | API     | optional       | `1h`                         | Reserved                                                  |
-| `REFRESH_TOKEN_SECRET`                                                       | API     | optional       | —                            | Reserved for future use                                   |
-| `REFRESH_TOKEN_EXPIRES_IN`                                                   | API     | optional       | `7d`                         | Reserved                                                  |
-| `COOKIE_SECURE`                                                              | API     | preprod, prod  | `true`                       | Session cookie                                            |
-| `COOKIE_SAME_SITE`                                                           | API     | all            | `lax` / `none`               | Cross-site if needed                                      |
-| `COOKIE_DOMAIN`                                                              | API     | optional       | `.example.com`               | Optional cookie domain                                    |
-| `AUTH_PROVIDER`                                                              | API     | optional       | `keycloak`                   | Documented; Keycloak is default                           |
-| `KEYCLOAK_URL`                                                               | API     | hosted         | `https://kc.example.com`     | Alias of `KEYCLOAK_BASE_URL`                              |
-| `KEYCLOAK_BASE_URL`                                                          | API     | hosted         | server URL                   | Admin API                                                 |
-| `KEYCLOAK_PUBLIC_URL`                                                        | API     | hosted         | public URL                   | Browser OIDC                                              |
-| `KEYCLOAK_REALM`                                                             | API     | all            | `supplify-dev`               | **Per environment**                                       |
-| `KEYCLOAK_CLIENT_ID`                                                         | API     | all            | `supplify-api`               |                                                           |
-| `KEYCLOAK_CLIENT_SECRET`                                                     | API     | hosted         | secret                       |                                                           |
-| `KEYCLOAK_ADMIN`                                                             | API     | hosted         | `admin`                      | Invite user provisioning                                  |
-| `KEYCLOAK_ADMIN_PASSWORD`                                                    | API     | hosted         | secret                       |                                                           |
-| `STORAGE_DRIVER`                                                             | API     | all            | `local` / `s3`               | prod requires `s3`                                        |
-| `STORAGE_LOCAL_PATH`                                                         | API     | dev            | `uploads`                    | Local disk root                                           |
-| `STORAGE_PUBLIC_URL`                                                         | API     | all            | URL                          | Public object URLs                                        |
-| `STORAGE_ENDPOINT`                                                           | API     | s3             | R2 endpoint                  | S3-compatible                                             |
-| `STORAGE_BUCKET`                                                             | API     | s3             | `supplify-dev`               | Per env bucket                                            |
-| `STORAGE_ACCESS_KEY_ID`                                                      | API     | s3             | key                          |                                                           |
-| `STORAGE_SECRET_ACCESS_KEY`                                                  | API     | s3             | secret                       |                                                           |
-| `STORAGE_REGION`                                                             | API     | s3             | `auto`                       |                                                           |
-| `STORAGE_PUBLIC_READ`                                                        | API     | s3             | `true`/`false`               | `false` for Railway Buckets (use API `/api/files/object`) |
-| `STORAGE_S3_FORCE_PATH_STYLE`                                                | API     | s3             | `true`/`false`               | Auto `false` for Railway endpoints; `true` for MinIO      |
-| Railway `ENDPOINT`, `BUCKET`, `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`, `REGION` | API     | bucket service | —                            | Auto-map to `STORAGE_*` when unset                        |
+| Variable                                                                     | Used by | Required in    | Example                      | Notes                                                                             |
+| ---------------------------------------------------------------------------- | ------- | -------------- | ---------------------------- | --------------------------------------------------------------------------------- |
+| `APP_ENV`                                                                    | API     | all hosted     | `dev` / `preprod` / `prod`   | Drives safety defaults                                                            |
+| `NODE_ENV`                                                                   | API     | all            | `development` / `production` | Node runtime mode                                                                 |
+| `PORT`                                                                       | API     | all            | `4000`                       | Railway sets automatically                                                        |
+| `DATABASE_URL`                                                               | API     | all hosted     | `postgresql://...`           | **Unique per environment**                                                        |
+| `DATABASE_SSL`                                                               | API     | preprod, prod  | `true`                       | Required for Railway Postgres                                                     |
+| `CORS_ORIGIN`                                                                | API     | preprod, prod  | `https://app.example.com`    | Comma-separated origins                                                           |
+| `WEB_ORIGINS`                                                                | API     | optional       | same as CORS                 | Legacy alias; merged with CORS                                                    |
+| `WEB_ORIGIN`                                                                 | API     | optional       | primary origin               | Staff links, OAuth redirects                                                      |
+| `PUBLIC_API_URL`                                                             | API     | hosted         | `https://api.example.com`    | Alias of `API_PUBLIC_URL`                                                         |
+| `PUBLIC_FRONTEND_URL`                                                        | API     | hosted         | `https://app.example.com`    | Added to CORS allow list                                                          |
+| `SESSION_SECRET`                                                             | API     | all hosted     | 64-char hex                  | Session signing; ≥32 chars in prod                                                |
+| `CONSUMER_AUTH_SECRET`                                                       | API     | optional       | 64-char hex                  | B2C diner JWT (`consumer_auth_token`); not Keycloak; defaults to `SESSION_SECRET` |
+| `IMPERSONATION_SECRET`                                                       | API     | hosted         | 64-char hex                  | Defaults to `SESSION_SECRET`                                                      |
+| `JWT_SECRET`                                                                 | API     | optional       | —                            | Reserved; auth uses Keycloak + session                                            |
+| `JWT_EXPIRES_IN`                                                             | API     | optional       | `1h`                         | Reserved                                                                          |
+| `REFRESH_TOKEN_SECRET`                                                       | API     | optional       | —                            | Reserved for future use                                                           |
+| `REFRESH_TOKEN_EXPIRES_IN`                                                   | API     | optional       | `7d`                         | Reserved                                                                          |
+| `COOKIE_SECURE`                                                              | API     | preprod, prod  | `true`                       | Session cookie                                                                    |
+| `COOKIE_SAME_SITE`                                                           | API     | all            | `lax` / `none`               | Cross-site if needed                                                              |
+| `COOKIE_DOMAIN`                                                              | API     | optional       | `.example.com`               | Optional cookie domain                                                            |
+| `AUTH_PROVIDER`                                                              | API     | optional       | `keycloak`                   | Documented; Keycloak is default                                                   |
+| `KEYCLOAK_URL`                                                               | API     | hosted         | `https://kc.example.com`     | Alias of `KEYCLOAK_BASE_URL`                                                      |
+| `KEYCLOAK_BASE_URL`                                                          | API     | hosted         | server URL                   | Admin API                                                                         |
+| `KEYCLOAK_PUBLIC_URL`                                                        | API     | hosted         | public URL                   | Browser OIDC                                                                      |
+| `KEYCLOAK_REALM`                                                             | API     | all            | `supplify-dev`               | **Per environment**                                                               |
+| `KEYCLOAK_CLIENT_ID`                                                         | API     | all            | `supplify-api`               |                                                                                   |
+| `KEYCLOAK_CLIENT_SECRET`                                                     | API     | hosted         | secret                       |                                                                                   |
+| `KEYCLOAK_ADMIN`                                                             | API     | hosted         | `admin`                      | Invite user provisioning                                                          |
+| `KEYCLOAK_ADMIN_PASSWORD`                                                    | API     | hosted         | secret                       |                                                                                   |
+| `STORAGE_DRIVER`                                                             | API     | all            | `local` / `s3`               | prod requires `s3`                                                                |
+| `STORAGE_LOCAL_PATH`                                                         | API     | dev            | `uploads`                    | Local disk root                                                                   |
+| `STORAGE_PUBLIC_URL`                                                         | API     | all            | URL                          | Public object URLs                                                                |
+| `STORAGE_ENDPOINT`                                                           | API     | s3             | R2 endpoint                  | S3-compatible                                                                     |
+| `STORAGE_BUCKET`                                                             | API     | s3             | `supplify-dev`               | Per env bucket                                                                    |
+| `STORAGE_ACCESS_KEY_ID`                                                      | API     | s3             | key                          |                                                                                   |
+| `STORAGE_SECRET_ACCESS_KEY`                                                  | API     | s3             | secret                       |                                                                                   |
+| `STORAGE_REGION`                                                             | API     | s3             | `auto`                       |                                                                                   |
+| `STORAGE_PUBLIC_READ`                                                        | API     | s3             | `true`/`false`               | `false` for Railway Buckets (use API `/api/files/object`)                         |
+| `STORAGE_S3_FORCE_PATH_STYLE`                                                | API     | s3             | `true`/`false`               | Auto `false` for Railway endpoints; `true` for MinIO                              |
+| Railway `ENDPOINT`, `BUCKET`, `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`, `REGION` | API     | bucket service | —                            | Auto-map to `STORAGE_*` when unset                                                |
 
 See [../operations/STORAGE_UPLOADS.md](../operations/STORAGE_UPLOADS.md) for where file bytes are stored, the presign → PUT flow, and Railway volume / R2 setup.
 
