@@ -21,7 +21,7 @@ export async function fetchActiveGpsDeliveryRows({ limit = 500 } = {}) {
       da.order_id,
       da.supplier_id,
       da.driver_id,
-      o.order_number,
+      'ORD-' || UPPER(SUBSTRING(o.id::text FROM 1 FOR 8)) AS order_number,
       dll.latitude,
       dll.longitude,
       dll.recorded_at,

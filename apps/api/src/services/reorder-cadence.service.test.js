@@ -31,6 +31,7 @@ describe('reorder-cadence missed detection', () => {
               label: 'Chicken from ABC',
               restaurant_name: 'Restaurant X',
               supplier_name: 'ABC',
+              reminder_date: new Date('2026-06-01T00:00:00Z'),
             },
           ],
         }
@@ -46,5 +47,6 @@ describe('reorder-cadence missed detection', () => {
     const missed = await getMissedCadencesForToday({ now: monday })
     expect(missed.length).toBe(1)
     expect(missed[0].restaurant_name).toBe('Restaurant X')
+    expect(missed[0].reminderDate).toBe('2026-06-01')
   })
 })

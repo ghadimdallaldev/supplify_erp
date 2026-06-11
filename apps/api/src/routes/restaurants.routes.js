@@ -1,5 +1,12 @@
 import express from 'express'
-import { requireAuth, requireRole, getSupplierIdForRequest } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  requirePermission,
+  getSupplierIdForRequest,
+  getRestaurantIdForRequest,
+} from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -17,15 +24,6 @@ const brandingUpdateSchema = z.object({
   brandAccent: z.string().optional().nullable(),
   brandDisplayName: z.string().max(120).optional().nullable(),
 })
-
-const customBrandingGate = requireFeature(
-  'custom_branding',
-  async (req) => {
-    const { getRestaurantIdForRequest } = await import('../lib/rbac.js')
-    return getRestaurantIdForRequest(req)
-  },
-  () => 'RESTAURANT'
-)
 
 const router = express.Router()
 
@@ -284,11 +282,16 @@ router.get('/me', requireAuth, requireRole(['RESTAURANT']), async (req, res) => 
 router.get(
   '/me/branding',
   requireAuth,
+  resolveTenantContext,
   requireRole(['RESTAURANT']),
-  customBrandingGate,
+  requirePermission('SETTINGS_VIEW'),
+  requireFeature(
+    'custom_branding',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
   async (req, res, next) => {
     try {
-      const { getRestaurantIdForRequest } = await import('../lib/rbac.js')
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) throw new NotFoundError('Restaurant not found')
       const branding = await getTenantBranding(restaurantId, 'RESTAURANT')
@@ -302,11 +305,16 @@ router.get(
 router.patch(
   '/me/branding',
   requireAuth,
+  resolveTenantContext,
   requireRole(['RESTAURANT']),
-  customBrandingGate,
+  requirePermission('SETTINGS_EDIT'),
+  requireFeature(
+    'custom_branding',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
   async (req, res, next) => {
     try {
-      const { getRestaurantIdForRequest } = await import('../lib/rbac.js')
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) throw new NotFoundError('Restaurant not found')
       const body = brandingUpdateSchema.parse(req.body)

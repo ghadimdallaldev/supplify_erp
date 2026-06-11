@@ -50,3 +50,12 @@ export function normalizeListResponse<T>(response: unknown): T[] {
   }
   return []
 }
+
+/** RTK baseQuery unwraps `{ ok, data: payload }` to `payload` for object endpoints. */
+export function normalizeObjectResponse<T>(response: unknown): T {
+  if (response && typeof response === 'object' && 'data' in response) {
+    const nested = (response as { data?: T }).data
+    if (nested !== undefined) return nested
+  }
+  return response as T
+}

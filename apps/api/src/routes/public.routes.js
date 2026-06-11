@@ -19,6 +19,9 @@ import {
   staffPortalCheckOut,
   submitStaffPortalPto,
   submitStaffPortalSwap,
+  acknowledgeStaffAnnouncement,
+  setStaffAvailability,
+  getStaffAvailability,
 } from '../services/staff-portal-self.service.js'
 import {
   acceptWaitlistOffer,
@@ -978,6 +981,97 @@ router.post('/staff/swaps', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'STAFF_SWAP_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/staff/announcements/:id/ack', async (req, res) => {
+  try {
+    const token = req.body?.token || req.query.token
+    const session = await ensureStaffSession(token)
+    if (!session) {
+      return res.status(401).json({
+        ok: false,
+        data: null,
+        error: { name: 'INVALID_SESSION', message: 'Session expired or invalid' },
+        requestId: req.requestId,
+      })
+    }
+    const data = await acknowledgeStaffAnnouncement(
+      session.staff_id,
+      session.restaurant_id,
+      req.params.id
+    )
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (error) {
+    const status = error.status || 400
+    res.status(status).json({
+      ok: false,
+      data: null,
+      error: { name: error.name || 'STAFF_ACK_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/staff/availability', async (req, res) => {
+  try {
+    const params = staffDashboardSchema.parse({ token: req.query.token })
+    const session = await ensureStaffSession(params.token)
+    if (!session) {
+      return res.status(401).json({
+        ok: false,
+        data: null,
+        error: { name: 'INVALID_SESSION', message: 'Session expired or invalid' },
+        requestId: req.requestId,
+      })
+    }
+    const data = await getStaffAvailability(session.staff_id, session.restaurant_id)
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (error) {
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'STAFF_AVAILABILITY_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/staff/availability', async (req, res) => {
+  try {
+    const token = req.body?.token
+    const session = await ensureStaffSession(token)
+    if (!session) {
+      return res.status(401).json({
+        ok: false,
+        data: null,
+        error: { name: 'INVALID_SESSION', message: 'Session expired or invalid' },
+        requestId: req.requestId,
+      })
+    }
+    const payload = z
+      .object({
+        weekday: z.number().int().min(0).max(6),
+        availability: z.object({
+          blocks: z.array(
+            z.object({
+              start: z.string(),
+              end: z.string(),
+            })
+          ),
+        }),
+        notes: z.string().optional(),
+      })
+      .parse(req.body)
+    const data = await setStaffAvailability(session.staff_id, session.restaurant_id, payload)
+    res.status(201).json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (error) {
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'STAFF_AVAILABILITY_ERROR', message: error.message },
       requestId: req.requestId,
     })
   }

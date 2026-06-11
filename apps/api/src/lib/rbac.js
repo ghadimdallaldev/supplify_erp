@@ -178,16 +178,16 @@ export async function upsertUser(userInfo, roles = []) {
     const rolesLower = (roles || []).map((r) => String(r).toLowerCase())
     const hasRole = (name) => rolesLower.includes(name.toLowerCase())
 
-    // Role from Keycloak or seeded demo emails only — self-signup stays PENDING until /register/complete.
+    // Platform roles take precedence over staff_portal for dual-role Keycloak users.
     let explicitRole = null
     if (hasRole('admin')) {
       explicitRole = 'ADMIN'
-    } else if (hasRole('staff_portal') || hasRole('staff_portal_user')) {
-      explicitRole = STAFF_PORTAL_APP_ROLE
     } else if (hasRole('supplier')) {
       explicitRole = 'SUPPLIER'
     } else if (hasRole('restaurant')) {
       explicitRole = 'RESTAURANT'
+    } else if (hasRole('staff_portal') || hasRole('staff_portal_user')) {
+      explicitRole = STAFF_PORTAL_APP_ROLE
     } else {
       const emailLower = (email || '').toLowerCase()
       if (emailLower === 'admin@supplify.com' || emailLower === 'supplifyadmin@supplify.com') {
@@ -199,6 +199,20 @@ export async function upsertUser(userInfo, roles = []) {
       }
     }
     const insertRole = explicitRole || 'PENDING'
+
+    const PLATFORM_ROLES = new Set(['ADMIN', 'SUPPLIER', 'RESTAURANT'])
+    const existingLookup = await query(
+      `SELECT role FROM app_user WHERE keycloak_sub = $1 OR LOWER(email) = LOWER($2) LIMIT 1`,
+      [sub, email]
+    )
+    const existingRole = existingLookup.rows[0]?.role
+    if (
+      existingRole &&
+      PLATFORM_ROLES.has(existingRole) &&
+      explicitRole === STAFF_PORTAL_APP_ROLE
+    ) {
+      explicitRole = null
+    }
 
     // Match by keycloak_sub or email so seeded placeholder subs (e.g. admin-sub) link on first login
     const result = await query(

@@ -17,6 +17,7 @@ vi.mock('../lib/rbac.js', () => ({
   requireRole: () => (req, res, next) => next(),
   resolveTenantContext: (req, res, next) => next(),
   requirePermission: () => (req, res, next) => next(),
+  requirePlatformAppAccess: (req, res, next) => next(),
   getRestaurantIdForRequest: vi.fn().mockResolvedValue('rest-1'),
 }))
 
@@ -24,14 +25,46 @@ vi.mock('../lib/tenant.js', () => ({
   getRestaurantIdByEmail: vi.fn().mockResolvedValue('rest-1'),
 }))
 
+vi.mock('../lib/staff-portal-auth.js', () => ({
+  requireStaffPortalAuth: (req, res, next) => next(),
+  requirePlatformAppAccess: (req, res, next) => next(),
+  STAFF_PORTAL_APP_ROLE: 'STAFF_PORTAL',
+}))
+
+vi.mock('../lib/route-permissions.js', () => ({
+  staffMutationGuard: (req, res, next) => next(),
+}))
+
+vi.mock('../lib/staff-list-cache.js', () => ({
+  cachedStaffList: (_key, _id, _req, fn) => fn(),
+  staffListCacheInvalidationMiddleware: (req, res, next) => next(),
+}))
+
 vi.mock('../services/notification.service.js', () => ({
   notifyStaffPtoRequest: vi.fn(),
   notifyStaffSwapRequest: vi.fn(),
+  notifyStaffAnnouncement: vi.fn(),
+  notifyStaffDocumentUploaded: vi.fn(),
+  notifyStaffShiftEvent: vi.fn(),
+  notifyStaffPtoDecision: vi.fn(),
+  notifyStaffSwapDecision: vi.fn(),
+}))
+
+const fetchLabourSummaryMock = vi.fn()
+vi.mock('../services/staff-labour-summary.service.js', () => ({
+  fetchLabourSummary: (...args) => fetchLabourSummaryMock(...args),
+}))
+
+const computePayrollPreviewMock = vi.fn()
+vi.mock('../services/staff-payroll.service.js', () => ({
+  computePayrollPreview: (...args) => computePayrollPreviewMock(...args),
+  previewToPayrollTotals: (preview) => preview,
 }))
 
 const queryMock = vi.fn()
 vi.mock('../lib/db.js', () => ({
   query: (...args) => queryMock(...args),
+  withTransaction: (fn) => fn({ query: (...args) => queryMock(...args) }),
 }))
 
 vi.mock('../lib/logger.js', () => ({
@@ -111,5 +144,86 @@ describe('staff.routes', () => {
     expect(res.body.ok).toBe(true)
     expect(res.body.data[0].status).toBe('PUBLISHED')
     expect(res.body.data[0].staff.name).toBe('Alex R.')
+  })
+
+  it('GET /labour-summary returns manager dashboard data', async () => {
+    fetchLabourSummaryMock.mockResolvedValueOnce({
+      date: '2026-06-11',
+      counts: { scheduledToday: 3, clockedInNow: 1 },
+      alerts: [],
+    })
+
+    const res = await request(app).get('/api/staff/labour-summary?date=2026-06-11').expect(200)
+
+    expect(res.body.ok).toBe(true)
+    expect(res.body.data.counts.scheduledToday).toBe(3)
+    expect(fetchLabourSummaryMock).toHaveBeenCalledWith('rest-1', '2026-06-11')
+  })
+
+  it('GET /payroll/preview returns hours rollup', async () => {
+    computePayrollPreviewMock.mockResolvedValueOnce({
+      periodStart: '2026-06-01',
+      periodEnd: '2026-06-14',
+      totalHours: 40,
+      estimatedLabourCost: 800,
+      staffLines: [],
+    })
+
+    const res = await request(app)
+      .get('/api/staff/payroll/preview?periodStart=2026-06-01&periodEnd=2026-06-14')
+      .expect(200)
+
+    expect(res.body.data.totalHours).toBe(40)
+  })
+
+  it('POST /swaps/:id/decision APPROVED reassigns shift on cover', async () => {
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'swap-1',
+            restaurant_id: 'rest-1',
+            shift_id: 'shift-1',
+            requested_by: 'staff-1',
+            proposed_cover_id: 'staff-2',
+            status: 'COMPLETED',
+            reason: null,
+            manager_note: null,
+            created_at: '2026-06-01T00:00:00.000Z',
+            updated_at: '2026-06-01T00:00:00.000Z',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'swap-1',
+            restaurant_id: 'rest-1',
+            shift_id: 'shift-1',
+            requested_by: 'staff-1',
+            proposed_cover_id: 'staff-2',
+            status: 'COMPLETED',
+            shift_role: 'Server',
+            shift_starts_at: '2026-06-11T09:00:00.000Z',
+            shift_ends_at: '2026-06-11T17:00:00.000Z',
+            shift_date: '2026-06-11',
+            requester_name: 'Alex',
+            cover_name: 'Jordan',
+            cover_id: 'staff-2',
+          },
+        ],
+      })
+
+    const res = await request(app)
+      .post('/api/staff/swaps/swap-1/decision')
+      .send({ status: 'APPROVED' })
+      .expect(200)
+
+    expect(res.body.data.status).toBe('COMPLETED')
+    const shiftUpdate = queryMock.mock.calls.find((call) =>
+      String(call[0]).includes('UPDATE staff_shift')
+    )
+    expect(shiftUpdate).toBeTruthy()
   })
 })

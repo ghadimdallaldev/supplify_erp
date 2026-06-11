@@ -202,6 +202,7 @@ describe('RBAC Utilities', () => {
         display_name: 'Admin User',
         role: 'ADMIN',
       }
+      query.mockResolvedValueOnce({ rows: [{ role: 'ADMIN' }] })
       query.mockResolvedValueOnce({ rows: [linkedUser] })
 
       const user = await upsertUser(
@@ -215,10 +216,35 @@ describe('RBAC Utilities', () => {
       )
 
       expect(user).toEqual(linkedUser)
-      expect(query).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE keycloak_sub = $1 OR LOWER(email) = LOWER($2)'),
-        ['real-keycloak-uuid', 'admin@supplify.com', 'Admin User', 'ADMIN', 'ADMIN']
+    })
+
+    it('preserves RESTAURANT role when Keycloak only reports staff_portal', async () => {
+      const { query } = await import('./db.js')
+      const linkedUser = {
+        id: 'user-mgr',
+        keycloak_sub: 'dual-role-sub',
+        email: 'manager@example.com',
+        display_name: 'Manager User',
+        role: 'RESTAURANT',
+      }
+      query.mockResolvedValueOnce({ rows: [{ role: 'RESTAURANT' }] })
+      query.mockResolvedValueOnce({ rows: [linkedUser] })
+
+      const user = await upsertUser(
+        {
+          sub: 'dual-role-sub',
+          email: 'manager@example.com',
+          given_name: 'Manager',
+          family_name: 'User',
+        },
+        ['staff_portal']
       )
+
+      expect(user.role).toBe('RESTAURANT')
+      const upsertCall = query.mock.calls.find((call) =>
+        String(call[0]).includes('UPDATE app_user')
+      )
+      expect(upsertCall?.[1]?.[3]).toBeNull()
     })
 
     it('inserts new user when no row matches sub or email', async () => {
@@ -230,6 +256,7 @@ describe('RBAC Utilities', () => {
         display_name: 'New User',
         role: 'PENDING',
       }
+      query.mockResolvedValueOnce({ rows: [] })
       query.mockResolvedValueOnce({ rows: [newUser] })
 
       const user = await upsertUser(
