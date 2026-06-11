@@ -374,9 +374,20 @@ async function phaseSupplier() {
     }
     if (route === '/api/orders' && r?.outcome === 'PASS') {
       const orders = r.data?.data?.orders ?? r.data?.orders ?? r.data?.data
-      if (Array.isArray(orders) && orders[0]?.id) {
-        context.ids.order = orders[0].id
-        await request('GET', `/api/orders/${orders[0].id}`, { role: 'supplier', expect: [200, 404] })
+      if (Array.isArray(orders) && orders.length) {
+        const first = orders[0]
+        if (first?.id) {
+          context.ids.order = first.id
+          context.ids.orderRestaurantId = first.restaurant_id ?? null
+          await request('GET', `/api/orders/${first.id}`, { role: 'supplier', expect: [200, 404] })
+        }
+        const crossTenant = orders.find(
+          (o) => o?.id && o.restaurant_id && o.restaurant_id !== first?.restaurant_id
+        )
+        if (crossTenant?.id) {
+          context.ids.crossTenantOrder = crossTenant.id
+          context.ids.crossTenantOrderRestaurantId = crossTenant.restaurant_id
+        }
       }
     }
     if (route === '/api/suppliers/me' && r?.outcome === 'PASS') {
@@ -453,7 +464,8 @@ async function phaseRestaurant() {
     }
     if (route === '/api/restaurants/me' && r?.outcome === 'PASS') {
       const me = r.data?.data ?? r.data
-      if (me?.id) context.ids.ownRestaurant = me.id
+      const restaurantId = me?.restaurant?.id ?? me?.id
+      if (restaurantId) context.ids.ownRestaurant = restaurantId
     }
   }
 
@@ -467,14 +479,30 @@ async function phaseRestaurant() {
   await request('GET', '/api/inventory', { role: 'restaurant', expect: [403, 401, 404], label: 'restaurant→supplier inventory' })
   await request('GET', '/api/supplier/command-center', { role: 'restaurant', expect: [403, 401, 404], label: 'restaurant→supplier command-center' })
 
-  if (context.ids.order && context.ids.otherRestaurant) {
-    await request('GET', `/api/orders/${context.ids.order}`, {
+  const crossOrderId = context.ids.crossTenantOrder ?? context.ids.order
+  const crossOrderRestaurantId =
+    context.ids.crossTenantOrderRestaurantId ?? context.ids.orderRestaurantId
+  const ownRestaurant = context.ids.ownRestaurant
+
+  if (crossOrderId && ownRestaurant && crossOrderRestaurantId && crossOrderRestaurantId !== ownRestaurant) {
+    await request('GET', `/api/orders/${crossOrderId}`, {
       role: 'restaurant',
       expect: [403, 404],
-      label: 'cross-tenant: restaurant→supplier-scoped order (if mismatched)',
+      label: 'cross-tenant: restaurant→other restaurant order',
+    })
+  } else if (context.ids.order && ownRestaurant && context.ids.orderRestaurantId === ownRestaurant) {
+    await request('GET', `/api/orders/${context.ids.order}`, {
+      role: 'restaurant',
+      expect: [200],
+      label: 'same-tenant: restaurant→own order from supplier list sample',
     })
   } else {
-    skip('cross-tenant restaurant order', 'GET', 'restaurant', `${SKIP.NO_CONTEXT} — no order/other-restaurant id for cross-tenant probe`)
+    skip(
+      'cross-tenant restaurant order',
+      'GET',
+      'restaurant',
+      `${SKIP.NO_CONTEXT} — no mismatched order/restaurant id for cross-tenant probe`
+    )
   }
 }
 

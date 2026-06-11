@@ -366,6 +366,65 @@ describe('Orders Routes', () => {
       })
     })
 
+    it('returns 403 when tenantContext restaurant does not own the order', async () => {
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getRequestTenant).mockResolvedValue(null)
+
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'order-other',
+            restaurant_id: 'other-restaurant-id',
+            status: 'PLACED',
+            total_amount: 50,
+            restaurant_name: 'Other Restaurant',
+          },
+        ],
+      })
+
+      const gatedApp = express()
+      gatedApp.use(express.json())
+      gatedApp.use((req, res, next) => {
+        req.requestId = 'test-request-id'
+        req.user = mockUser
+        req.userData = { ...mockUser, role: 'RESTAURANT', email: 'restaurant@example.com' }
+        req.tenantContext = {
+          tenantId: 'restaurant-1',
+          tenantType: 'RESTAURANT',
+          permissions: ['ORDERS_VIEW'],
+        }
+        next()
+      })
+      gatedApp.use('/api/orders', ordersRoutes)
+      const { errorHandler } = await import('../middlewares/errorHandler.js')
+      gatedApp.use(errorHandler)
+
+      const response = await request(gatedApp).get('/api/orders/order-other').expect(403)
+
+      expect(response.body.error.name).toBe('FORBIDDEN')
+    })
+
+    it('returns 403 when restaurant tenant accesses another restaurant order', async () => {
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'b5f13bd6-8f64-4e24-9a48-5f64e8da18ca',
+            restaurant_id: 'other-restaurant-id',
+            status: 'PLACED',
+            total_amount: 100.5,
+            restaurant_name: 'Other Restaurant',
+          },
+        ],
+      })
+
+      const response = await request(app)
+        .get('/api/orders/b5f13bd6-8f64-4e24-9a48-5f64e8da18ca')
+        .expect(403)
+
+      expect(response.body.ok).toBe(false)
+      expect(response.body.error.name).toBe('FORBIDDEN')
+    })
+
     it('should return 404 for non-existent order', async () => {
       // Mock: order query returns empty (order not found)
       // The route queries: order with restaurant join (returns empty), then throws NotFoundError
