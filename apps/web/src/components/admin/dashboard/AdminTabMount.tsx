@@ -1,8 +1,9 @@
-import { Suspense, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
+import { LazyTabMount } from '../../LazyTabMount'
 import { AdminTabLoading } from './adminDashboardShared'
 import type { AdminTabKey } from './adminDashboardShared'
 
-/** Mount tab content only when selected — avoids hooks, queries, and lazy chunks until opened. */
+/** Admin dashboard wrapper around shared LazyTabMount. */
 export function AdminTabMount({
   tab,
   selectedTab,
@@ -14,10 +15,14 @@ export function AdminTabMount({
   children: ReactNode
   className?: string
 }) {
-  if (selectedTab !== tab) return null
   return (
-    <Suspense fallback={<AdminTabLoading />}>
-      {className ? <div className={className}>{children}</div> : children}
-    </Suspense>
+    <LazyTabMount
+      tab={tab}
+      selectedTab={selectedTab}
+      className={className}
+      fallback={<AdminTabLoading />}
+    >
+      {children}
+    </LazyTabMount>
   )
 }

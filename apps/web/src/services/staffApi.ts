@@ -1,4 +1,4 @@
-import { api } from './api'
+import { api } from './api/base'
 import type {
   StaffMember,
   StaffShift,
@@ -14,8 +14,10 @@ import type {
   StaffIncident,
   StaffPerformanceNote,
   StaffPayrollExport,
+  StaffLabourSummary,
+  StaffPayrollPreview,
 } from '../types'
-import { normalizeListResponse } from '../lib/apiError'
+import { normalizeListResponse, normalizeObjectResponse } from '../lib/apiError'
 
 interface CreateStaffMemberInput {
   firstName: string
@@ -145,6 +147,7 @@ interface CreatePayrollExportInput {
   periodEnd: string
   totals?: Record<string, unknown>
   exportUrl?: string
+  usePreview?: boolean
 }
 
 /** Shared RTK cache defaults for staff list queries (reduces repeat middleware hits on tab switch). */
@@ -476,6 +479,17 @@ export const staffApi = api.injectEndpoints({
           : [{ type: 'StaffPayroll' as const, id: 'LIST' }],
       ...staffQueryCache,
     }),
+    getStaffPayrollPreview: build.query<
+      StaffPayrollPreview,
+      { periodStart: string; periodEnd: string }
+    >({
+      query: ({ periodStart, periodEnd }) => ({
+        url: '/api/staff/payroll/preview',
+        params: { periodStart, periodEnd },
+      }),
+      transformResponse: (response: unknown) =>
+        normalizeObjectResponse<StaffPayrollPreview>(response),
+    }),
     createStaffPayrollExport: build.mutation<StaffPayrollExport, CreatePayrollExportInput>({
       query: (body) => ({
         url: '/api/staff/payroll',
@@ -483,6 +497,33 @@ export const staffApi = api.injectEndpoints({
         body,
       }),
       invalidatesTags: [{ type: 'StaffPayroll', id: 'LIST' }],
+    }),
+    updateStaffPayrollExport: build.mutation<
+      StaffPayrollExport,
+      { id: string; status: StaffPayrollExport['status'] }
+    >({
+      query: ({ id, status }) => ({
+        url: `/api/staff/payroll/${id}`,
+        method: 'PATCH',
+        body: { status },
+      }),
+      invalidatesTags: (result) =>
+        result
+          ? [
+              { type: 'StaffPayroll', id: result.id },
+              { type: 'StaffPayroll', id: 'LIST' },
+            ]
+          : [{ type: 'StaffPayroll', id: 'LIST' }],
+    }),
+    getStaffLabourSummary: build.query<StaffLabourSummary, { date?: string }>({
+      query: ({ date }) => ({
+        url: '/api/staff/labour-summary',
+        params: date ? { date } : undefined,
+      }),
+      transformResponse: (response: unknown) =>
+        normalizeObjectResponse<StaffLabourSummary>(response),
+      providesTags: [{ type: 'StaffTimeEntry', id: 'LIST' }],
+      ...staffQueryCache,
     }),
     getStaffPortalAccess: build.query<
       {
@@ -579,7 +620,11 @@ export const {
   useGetStaffPerformanceNotesQuery,
   useCreateStaffPerformanceNoteMutation,
   useGetStaffPayrollExportsQuery,
+  useGetStaffPayrollPreviewQuery,
+  useLazyGetStaffPayrollPreviewQuery,
   useCreateStaffPayrollExportMutation,
+  useUpdateStaffPayrollExportMutation,
+  useGetStaffLabourSummaryQuery,
   useGetStaffPortalAccessQuery,
   useCreateStaffPortalAccountMutation,
   useSendStaffPortalInviteMutation,
