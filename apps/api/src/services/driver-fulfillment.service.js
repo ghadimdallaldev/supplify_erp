@@ -12,6 +12,7 @@ export const DRIVER_STATUS_TRANSITIONS = {
 }
 
 const ACTIVE_ASSIGNMENT_STATUSES = ['assigned', 'picked_up', 'out_for_delivery']
+const NON_REASSIGNED_STATUSES = ['reassigned']
 
 export async function assertSupplierOwnsOrder(supplierId, orderId) {
   const { rows } = await query(
@@ -36,6 +37,20 @@ export async function getActiveDriverAssignment(orderId) {
      ORDER BY da.assigned_at DESC
      LIMIT 1`,
     [orderId, ACTIVE_ASSIGNMENT_STATUSES]
+  )
+  return rows[0] ?? null
+}
+
+export async function getLatestDriverAssignment(orderId) {
+  const { rows } = await query(
+    `SELECT da.*, d.full_name AS driver_name, d.phone AS driver_phone,
+            d.vehicle_type, d.vehicle_plate
+     FROM driver_assignments da
+     JOIN drivers d ON d.id = da.driver_id
+     WHERE da.order_id = $1 AND da.status <> ALL($2::text[])
+     ORDER BY da.created_at DESC
+     LIMIT 1`,
+    [orderId, NON_REASSIGNED_STATUSES]
   )
   return rows[0] ?? null
 }
@@ -69,8 +84,9 @@ export async function assignDriverToOrder({ supplierId, orderId, driverId, assig
 
     const { rows: assignments } = await client.query(
       `INSERT INTO driver_assignments (
-         order_id, warehouse_assignment_id, driver_id, supplier_id, assigned_by, status
-       ) VALUES ($1, $2, $3, $4, $5, 'assigned')
+         order_id, warehouse_assignment_id, driver_id, supplier_id, assigned_by, status,
+         scheduled_delivery_date
+       ) VALUES ($1, $2, $3, $4, $5, 'assigned', CURRENT_DATE)
        RETURNING *`,
       [orderId, whRows[0]?.id ?? null, driverId, supplierId, assignedByUserId ?? null]
     )
@@ -120,9 +136,16 @@ export async function updateDeliveryStatus({
   failureReason,
   userId,
 }) {
-  const assignment = await getActiveDriverAssignment(orderId)
+  const assignment =
+    status === 'assigned'
+      ? await getLatestDriverAssignment(orderId)
+      : await getActiveDriverAssignment(orderId)
   if (!assignment || assignment.supplier_id !== supplierId) {
     throw new ValidationError('No active driver assignment for this order')
+  }
+
+  if (status === 'assigned' && assignment.status !== 'rescheduled') {
+    throw new ValidationError('Only rescheduled assignments can be marked ready to dispatch')
   }
 
   if (assignment.status === status) {
@@ -151,6 +174,8 @@ export async function updateDeliveryStatus({
       params.push(failureReason ?? null)
     } else if (status === 'rescheduled') {
       assignmentUpdate += `, notes = COALESCE($2, notes)`
+    } else if (status === 'assigned' && assignment.status === 'rescheduled') {
+      assignmentUpdate += `, scheduled_delivery_date = CURRENT_DATE`
     }
 
     const whereParam = params.length + 1

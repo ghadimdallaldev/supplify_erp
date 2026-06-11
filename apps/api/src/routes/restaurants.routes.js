@@ -1,5 +1,12 @@
 import express from 'express'
-import { requireAuth, requireRole, getSupplierIdForRequest } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  requirePermission,
+  getSupplierIdForRequest,
+  getRestaurantIdForRequest,
+} from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -10,6 +17,13 @@ import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../lib/safe-update.js'
 import { deliveredOrderStatusInSql } from '../lib/order-statuses.js'
 import { invalidateTenantProfileCache } from '../lib/tenant-profile-cache.js'
+import { getTenantBranding, updateTenantBranding } from '../services/branding.service.js'
+
+const brandingUpdateSchema = z.object({
+  brandPrimary: z.string().optional().nullable(),
+  brandAccent: z.string().optional().nullable(),
+  brandDisplayName: z.string().max(120).optional().nullable(),
+})
 
 const router = express.Router()
 
@@ -264,6 +278,54 @@ router.get('/me', requireAuth, requireRole(['RESTAURANT']), async (req, res) => 
     })
   }
 })
+
+router.get(
+  '/me/branding',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT']),
+  requirePermission('SETTINGS_VIEW'),
+  requireFeature(
+    'custom_branding',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new NotFoundError('Restaurant not found')
+      const branding = await getTenantBranding(restaurantId, 'RESTAURANT')
+      res.json({ ok: true, data: { branding }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.patch(
+  '/me/branding',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT']),
+  requirePermission('SETTINGS_EDIT'),
+  requireFeature(
+    'custom_branding',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new NotFoundError('Restaurant not found')
+      const body = brandingUpdateSchema.parse(req.body)
+      const branding = await updateTenantBranding(restaurantId, 'RESTAURANT', body)
+      invalidateTenantProfileCache(restaurantId, 'RESTAURANT')
+      res.json({ ok: true, data: { branding }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 
 // Delivery destination coordinates (ETA readiness)
 router.get('/me/delivery-locations', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {

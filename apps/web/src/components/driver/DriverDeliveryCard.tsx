@@ -54,11 +54,11 @@ export function DriverDeliveryCard({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 space-y-1">
             {isNext ? (
-              <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--brand-mid)]">
-                Up next
+              <p className="text-xs font-bold uppercase tracking-wide text-[var(--brand-mid)]">
+                Next stop
               </p>
             ) : null}
-            <h2 className="truncate text-base font-semibold text-[var(--text)]">
+            <h2 className="truncate text-lg font-semibold text-[var(--text)]">
               {order.restaurantName}
             </h2>
             <p className="text-xs text-[var(--text-muted)]">{formatOrderRef(order.orderId)}</p>
@@ -93,10 +93,11 @@ export function DriverDeliveryCard({
           href={`https://maps.google.com/?q=${encodeURIComponent(order.deliveryArea || order.restaurantName)}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 text-sm font-medium text-[var(--brand-mid)]"
+          className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 text-base font-semibold text-[var(--brand-mid)]"
+          aria-label="Open Maps"
         >
-          <Navigation className="h-4 w-4" aria-hidden />
-          Navigate
+          <Navigation className="h-5 w-5" aria-hidden />
+          Open Maps
         </a>
 
         <textarea

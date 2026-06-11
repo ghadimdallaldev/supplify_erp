@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Building2, Clock, MessageSquare, Pin, ShoppingCart } from 'lucide-react'
+import { Building2, Clock, MessageSquare, Pin, Plus, Store } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -22,6 +22,7 @@ type Props = {
   onListFilterChange: (value: string) => void
   userRole?: string
   formatConversationDate: (date: string) => string
+  onNewMessage?: () => void
   className?: string
 }
 
@@ -33,6 +34,7 @@ export function ChatConversationList({
   onListFilterChange,
   userRole,
   formatConversationDate,
+  onNewMessage,
   className = '',
 }: Props) {
   const hasConversations = conversations.length > 0
@@ -101,15 +103,21 @@ export function ChatConversationList({
               {!listFilter && userRole === 'SUPPLIER' && (
                 <>
                   <p className="text-xs px-2">
-                    Restaurants start conversations with you. When someone messages, it will appear
-                    here.
+                    Message a restaurant to get started, or browse your customer list.
                   </p>
-                  <Button variant="outline" size="sm" className="mt-1" asChild>
-                    <Link to="/app/orders">
-                      <ShoppingCart className="mr-2 h-4 w-4" />
-                      View orders
-                    </Link>
-                  </Button>
+                  {onNewMessage ? (
+                    <Button variant="outline" size="sm" className="mt-1" onClick={onNewMessage}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      New message
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" className="mt-1" asChild>
+                      <Link to="/app/restaurants">
+                        <Store className="mr-2 h-4 w-4" />
+                        Browse restaurants
+                      </Link>
+                    </Button>
+                  )}
                 </>
               )}
             </div>

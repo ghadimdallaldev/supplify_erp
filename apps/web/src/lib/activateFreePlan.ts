@@ -20,9 +20,6 @@ export async function activateFreePlanFromPlans(
     return { ok: false, message: 'Free plan is not available. Contact support.' }
   }
 
-  const monthly = Number(freePlan.price_per_month ?? 0)
-  const yearly = freePlan.price_per_year != null ? Number(freePlan.price_per_year) : monthly * 12
-
   const idempotencyKey =
     typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `free_${Date.now()}`
 

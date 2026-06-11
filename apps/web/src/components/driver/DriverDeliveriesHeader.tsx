@@ -1,11 +1,14 @@
 import { RefreshCw, Radio, Truck } from 'lucide-react'
 import { Button } from '../ui/button'
+import { getDriverGpsBannerLabel } from '../../lib/driverDeliveryUi'
 
 type Props = {
   activeCount: number
   doneCount: number
   trackingActive: boolean
   trackableCount: number
+  permissionDenied: boolean
+  gpsError?: string | null
   isLoading: boolean
   onRefresh: () => void
 }
@@ -15,9 +18,18 @@ export function DriverDeliveriesHeader({
   doneCount,
   trackingActive,
   trackableCount,
+  permissionDenied,
+  gpsError,
   isLoading,
   onRefresh,
 }: Props) {
+  const gpsLabel = getDriverGpsBannerLabel({
+    trackableCount,
+    trackingActive,
+    permissionDenied,
+    gpsError,
+  })
+
   return (
     <div className="space-y-3" data-testid="driver-deliveries-header">
       <div className="flex items-start justify-between gap-3">
@@ -27,8 +39,8 @@ export function DriverDeliveriesHeader({
               <Truck className="h-5 w-5" aria-hidden />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-[var(--text)]">My deliveries</h1>
-              <p className="text-sm text-[var(--text-muted)]">Tap an action when you arrive</p>
+              <h1 className="text-xl font-bold text-[var(--text)]">Today&apos;s deliveries</h1>
+              <p className="text-sm text-[var(--text-muted)]">Tap a button when you arrive</p>
             </div>
           </div>
         </div>
@@ -53,17 +65,19 @@ export function DriverDeliveriesHeader({
             {doneCount} done
           </span>
         ) : null}
-        {trackableCount > 0 ? (
+        {gpsLabel ? (
           <span
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold ${
               trackingActive
                 ? 'bg-emerald-600 text-white'
-                : 'border border-[var(--app-border)] bg-[var(--surface)] text-[var(--text-muted)]'
+                : permissionDenied || gpsError
+                  ? 'border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100'
+                  : 'border border-[var(--app-border)] bg-[var(--surface)] text-[var(--text-muted)]'
             }`}
             data-testid="driver-gps-tracking-badge"
           >
             <Radio className="h-3 w-3" aria-hidden />
-            {trackingActive ? 'Live GPS' : 'GPS waiting'}
+            {gpsLabel}
           </span>
         ) : null}
       </div>

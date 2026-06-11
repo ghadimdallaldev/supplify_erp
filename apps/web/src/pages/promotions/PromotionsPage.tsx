@@ -2,8 +2,12 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
+import { StatusBadge } from '../../components/ui/status-badge'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { PageHeader } from '../../components/ui/page-header'
+import { Select, SelectTrigger } from '../../components/ui/select'
+import { Skeleton } from '../../components/ui/skeleton'
 import {
   Dialog,
   DialogContent,
@@ -31,23 +35,27 @@ import {
 } from '../../components/deals/DealTargetingPickers'
 import toast from 'react-hot-toast'
 import { RequirePermission } from '../../components/RequirePermission'
-import { Loader2, Plus, BarChart3, Send } from 'lucide-react'
-
-const CTA_TYPES = [
-  { value: 'order_now', label: 'Order now' },
-  { value: 'use_coupon', label: 'Use coupon' },
-  { value: 'message_supplier', label: 'Message supplier' },
-  { value: 'view_products', label: 'View products' },
-] as const
-
-const PROMO_TYPES = [
-  'percentage_discount',
-  'fixed_discount',
-  'free_shipping',
-  'buy_x_get_y',
-] as const
+import { FeatureLockedCard } from '../../components/FeatureLockedCard'
+import { DealsPerformanceSummary } from '../../components/promotions/DealsPerformanceSummary'
+import { useWorkspaceRole } from '../../hooks/useWorkspaceRole'
+import { Plus, BarChart3, Send } from 'lucide-react'
+import { EmptyState } from '../../components/ui/empty-state'
+import {
+  COUPON_FIELD_HELPER,
+  DEAL_SCHEDULE_ENDS_HELPER,
+  DEAL_SCHEDULE_SECTION_HELPER,
+  SUPPLIER_CTA_TYPES,
+  SUPPLIER_DEAL_TYPES,
+  SUPPLIER_EMPTY_STATE,
+  formatDealStatusLabel,
+  formatDealTypeLabel,
+  getCtaHelperText,
+  getDealTypeHelperText,
+} from '../../lib/dealDisplayLabels'
 
 export function PromotionsPage() {
+  const { persona } = useWorkspaceRole()
+  const copy = persona.promotionsCopy
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const promotionsEnabled = isEntitlementFeatureEnabled(
     entitlementsData?.entitlements,
@@ -64,7 +72,7 @@ export function PromotionsPage() {
   const [createPricingKey, setCreatePricingKey] = useState('')
   const [form, setForm] = useState({
     name: '',
-    type: 'percentage_discount' as (typeof PROMO_TYPES)[number],
+    type: 'percentage_discount' as (typeof SUPPLIER_DEAL_TYPES)[number],
     discountValue: '10',
     minOrderAmount: '',
     couponCode: '',
@@ -91,13 +99,12 @@ export function PromotionsPage() {
   if (!promotionsEnabled) {
     return (
       <div className="space-y-4">
-        <h1 className="text-[21px] font-black text-[var(--text)]">Promotions</h1>
-        <Card>
-          <CardContent className="py-8 text-sm text-[var(--text-muted)]">
-            Promotions and deals are not on your plan. Upgrade to create featured listings and
-            supplier discounts.
-          </CardContent>
-        </Card>
+        <PageHeader title="Deals" />
+        <FeatureLockedCard
+          featureKey="promotions"
+          featureName="Deals"
+          currentPlan={entitlementsData?.entitlements?.plan?.name ?? null}
+        />
       </div>
     )
   }
@@ -169,20 +176,22 @@ export function PromotionsPage() {
   }
 
   return (
-    <RequirePermission anyOf={['PROMOTIONS_VIEW', 'PROMOTIONS_MANAGE']} title="promotions">
+    <RequirePermission anyOf={['PROMOTIONS_VIEW', 'PROMOTIONS_MANAGE']} title="deals">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-[21px] font-black text-[var(--text)]">Deals & Promotions</h1>
-            <p className="text-xs text-[var(--text-muted)] mt-1">
-              Create deals and boost visibility to new restaurants
-            </p>
-          </div>
-          <Button onClick={() => setShowCreate(true)} disabled={!promotionGate.canCreate}>
-            <Plus className="h-4 w-4 mr-2" />
-            {promotionGate.canCreate ? 'New promotion' : 'Deal limit reached'}
-          </Button>
-        </div>
+        <PageHeader
+          title={copy.title}
+          description={copy.subtitle}
+          actions={
+            !persona.readOnly ? (
+              <Button onClick={() => setShowCreate(true)} disabled={!promotionGate.canCreate}>
+                <Plus className="h-4 w-4 mr-2" />
+                {promotionGate.canCreate ? copy.newButton : 'Deal limit reached'}
+              </Button>
+            ) : undefined
+          }
+        />
+
+        <DealsPerformanceSummary title={copy.performanceTitle} />
 
         {!promotionGate.canCreate && promotionGate.limit != null ? (
           <div
@@ -193,43 +202,66 @@ export function PromotionsPage() {
           </div>
         ) : promotionGate.limit != null ? (
           <p className="text-sm text-[var(--text-muted)]">
-            Deals on your plan: {promotionGate.current}/{promotionGate.limit}
+            Active deals on your plan: {promotionGate.current}/{promotionGate.limit}
           </p>
         ) : null}
 
         <Card>
-          <CardContent className="pt-6">
-            <Label>Status filter</Label>
-            <select
-              className="mt-1 h-10 rounded-md border px-3 text-sm"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="">All</option>
-              <option value="draft">Draft</option>
-              <option value="pending_approval">Pending approval</option>
-              <option value="rejected">Rejected</option>
-              <option value="approved_pending_payment">Awaiting payment</option>
-              <option value="active">Live</option>
-              <option value="paused">Paused</option>
-              <option value="expired">Expired</option>
-            </select>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Your promotions</CardTitle>
+          <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <CardTitle>{copy.listTitle}</CardTitle>
+            <div className="w-full max-w-xs shrink-0">
+              <Label htmlFor="promotion-status-filter" className="text-xs text-[var(--text-muted)]">
+                Status filter
+              </Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger id="promotion-status-filter" className="mt-1.5">
+                  <option value="">All</option>
+                  <option value="draft">Draft</option>
+                  <option value="pending_approval">Pending approval</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="approved_pending_payment">Awaiting payment</option>
+                  <option value="active">Live</option>
+                  <option value="paused">Paused</option>
+                  <option value="expired">Expired</option>
+                </SelectTrigger>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             {error ? (
               <p className="text-sm text-[var(--red)]">
-                Could not load promotions. Refresh the page or check your plan permissions.
+                Could not load deals. Refresh the page or check your plan permissions.
               </p>
             ) : isLoading ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex flex-col gap-3 rounded-lg border border-[var(--app-border)] p-4"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-44" />
+                        <Skeleton className="h-3 w-28" />
+                      </div>
+                      <Skeleton className="h-6 w-20" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : promotions.length === 0 ? (
-              <p className="text-sm text-[var(--text-muted)]">No promotions yet.</p>
+              <EmptyState
+                title={SUPPLIER_EMPTY_STATE.title}
+                description={SUPPLIER_EMPTY_STATE.description}
+                action={
+                  !persona.readOnly && promotionGate.canCreate ? (
+                    <Button onClick={() => setShowCreate(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      {SUPPLIER_EMPTY_STATE.cta}
+                    </Button>
+                  ) : undefined
+                }
+              />
             ) : (
               <div className="space-y-3">
                 {promotions.map((p) => {
@@ -242,20 +274,19 @@ export function PromotionsPage() {
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <p className="font-semibold">{String(p.name)}</p>
-                          <p className="text-xs text-[var(--text-muted)] capitalize">
-                            {String(p.type || '').replace(/_/g, ' ')}
+                          <p className="text-xs text-[var(--text-muted)]">
+                            {formatDealTypeLabel(p.type)}
                             {p.discount_value != null
                               ? ` · ${p.discount_value}${p.type === 'percentage_discount' ? '%' : ''}`
                               : ''}
                           </p>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline">{String(p.status)}</Badge>
-                          {p.is_promoted ? <Badge variant="secondary">Boosted</Badge> : null}
-                          {(p.status === 'pending_approval' ||
-                            p.status === 'pending_admin_approval') && (
-                            <Badge variant="secondary">Pending approval</Badge>
-                          )}
+                          <StatusBadge
+                            status={String(p.status)}
+                            label={formatDealStatusLabel(p.status)}
+                          />
+                          {p.is_promoted ? <Badge variant="secondary">Sponsored</Badge> : null}
                           {p.status === 'rejected' && p.rejection_reason ? (
                             <p className="text-xs text-[var(--red)] w-full">
                               Rejected: {String(p.rejection_reason)}
@@ -270,7 +301,10 @@ export function PromotionsPage() {
                             </p>
                           ) : null}
                           {p.status === 'approved_pending_payment' && (
-                            <Badge variant="secondary">Awaiting boost payment</Badge>
+                            <StatusBadge
+                              status="approved_pending_payment"
+                              label="Awaiting boost payment"
+                            />
                           )}
                           {p.status === 'draft' && (
                             <>
@@ -356,7 +390,7 @@ export function PromotionsPage() {
         <Dialog open={showCreate} onOpenChange={setShowCreate}>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>New promotion</DialogTitle>
+              <DialogTitle>{copy.newButton}</DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
               <div>
@@ -367,20 +401,29 @@ export function PromotionsPage() {
                 />
               </div>
               <div>
-                <Label>Type</Label>
-                <select
-                  className="w-full h-10 border rounded-md px-3 text-sm"
+                <Label>Deal type</Label>
+                <Select
                   value={form.type}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, type: e.target.value as (typeof PROMO_TYPES)[number] }))
+                  onValueChange={(value) =>
+                    setForm((f) => ({
+                      ...f,
+                      type: value as (typeof SUPPLIER_DEAL_TYPES)[number],
+                    }))
                   }
                 >
-                  {PROMO_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t.replace(/_/g, ' ')}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    {SUPPLIER_DEAL_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {formatDealTypeLabel(t)}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
+                {getDealTypeHelperText(form.type) ? (
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    {getDealTypeHelperText(form.type)}
+                  </p>
+                ) : null}
               </div>
               <div>
                 <Label>Discount value</Label>
@@ -399,18 +442,24 @@ export function PromotionsPage() {
                 />
               </div>
               <div>
-                <Label>CTA</Label>
-                <select
-                  className="w-full h-10 border rounded-md px-3 text-sm"
+                <Label>CTA type</Label>
+                <Select
                   value={form.ctaType}
-                  onChange={(e) => setForm((f) => ({ ...f, ctaType: e.target.value }))}
+                  onValueChange={(value) => setForm((f) => ({ ...f, ctaType: value }))}
                 >
-                  {CTA_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    {SUPPLIER_CTA_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
+                {getCtaHelperText(form.ctaType) ? (
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    {getCtaHelperText(form.ctaType)}
+                  </p>
+                ) : null}
               </div>
               {form.ctaType === 'use_coupon' ? (
                 <div>
@@ -419,34 +468,58 @@ export function PromotionsPage() {
                     value={form.couponCode}
                     onChange={(e) => setForm((f) => ({ ...f, couponCode: e.target.value }))}
                   />
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">{COUPON_FIELD_HELPER}</p>
                 </div>
               ) : null}
-              <DealTargetingPickers value={targeting} onChange={setTargeting} />
+              <div>
+                <Label className="text-base font-semibold">Deal targeting</Label>
+                <div className="mt-2">
+                  <DealTargetingPickers value={targeting} onChange={setTargeting} />
+                </div>
+              </div>
               <div className="border-t pt-3">
-                <Label className="text-base font-semibold">Boost visibility</Label>
+                <Label className="text-base font-semibold">Boost this deal</Label>
                 <p className="text-xs text-[var(--text-muted)] mb-2">
-                  Required when submitting for approval. Restaurants only see live boosted deals.
+                  Optional paid sponsored placement. Required when submitting for approval —
+                  restaurants only see live boosted deals in their feed.
                 </p>
-                <DealBoostPackagePicker
-                  selectedPricingKey={createPricingKey}
-                  onSelect={setCreatePricingKey}
-                />
+                <Label className="text-sm font-medium">Boost package</Label>
+                <div className="mt-2">
+                  <DealBoostPackagePicker
+                    selectedPricingKey={createPricingKey}
+                    onSelect={setCreatePricingKey}
+                  />
+                </div>
               </div>
               <div>
-                <Label>Starts</Label>
-                <Input
-                  type="datetime-local"
-                  value={form.startsAt}
-                  onChange={(e) => setForm((f) => ({ ...f, startsAt: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Ends (optional)</Label>
-                <Input
-                  type="datetime-local"
-                  value={form.endsAt}
-                  onChange={(e) => setForm((f) => ({ ...f, endsAt: e.target.value }))}
-                />
+                <Label className="text-base font-semibold">Deal schedule</Label>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {DEAL_SCHEDULE_SECTION_HELPER}
+                </p>
+                <div className="mt-2 space-y-3">
+                  <div>
+                    <Label>Starts</Label>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      When the discount or coupon becomes redeemable.
+                    </p>
+                    <Input
+                      type="datetime-local"
+                      value={form.startsAt}
+                      onChange={(e) => setForm((f) => ({ ...f, startsAt: e.target.value }))}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label>Ends (optional)</Label>
+                    <p className="text-xs text-[var(--text-muted)]">{DEAL_SCHEDULE_ENDS_HELPER}</p>
+                    <Input
+                      type="datetime-local"
+                      value={form.endsAt}
+                      onChange={(e) => setForm((f) => ({ ...f, endsAt: e.target.value }))}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
             <DialogFooter className="flex-col sm:flex-row gap-2">

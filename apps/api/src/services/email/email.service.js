@@ -1,6 +1,7 @@
 import { config } from '../../config/env.js'
 import { logger } from '../../lib/logger.js'
 import { sendMail, isEmailConfigured as isTransportConfigured } from '../mailer.service.js'
+import { query } from '../../lib/db.js'
 import { claimEmailDelivery, finalizeEmailDelivery } from './email-delivery-log.js'
 import { renderTemplate } from './templates/registry.js'
 
@@ -20,15 +21,13 @@ export function logEmailBootMode() {
 function resolveActiveProvider() {
   if (!config.EMAIL_ENABLED) return 'disabled'
   if (config.EMAIL_LOG_ONLY) return 'log_only'
-  if (config.EMAIL_PROVIDER === 'sendgrid' || config.SENDGRID_API_KEY) return 'sendgrid'
   if (config.SMTP_HOST) return 'smtp'
   return 'none'
 }
 
 function resolveFromHeader() {
-  const email =
-    config.EMAIL_FROM_ADDRESS || config.EMAIL_FROM || config.SENDGRID_FROM_EMAIL || config.SMTP_FROM
-  const name = config.EMAIL_FROM_NAME || config.SENDGRID_FROM_NAME || 'Supplify'
+  const email = config.EMAIL_FROM_ADDRESS || config.EMAIL_FROM || config.SMTP_FROM
+  const name = config.EMAIL_FROM_NAME || 'Supplify'
   if (email && name) return `"${name}" <${email}>`
   return email || undefined
 }
@@ -42,6 +41,18 @@ function redactRecipient(email) {
   if (!email) return '[none]'
   const [local, domain] = String(email).split('@')
   return domain ? `${local?.slice(0, 2) || ''}***@${domain}` : '[redacted]'
+}
+
+async function persistRetryPayload(logId, payload) {
+  if (!logId || !payload) return
+  try {
+    await query(`UPDATE email_delivery_log SET retry_payload = $1::jsonb WHERE id = $2`, [
+      JSON.stringify(payload),
+      logId,
+    ])
+  } catch (error) {
+    logger.warn('Failed to persist email retry_payload', { logId, error: error.message })
+  }
 }
 
 /**
@@ -62,6 +73,7 @@ export async function sendEmail({
   entityId = null,
   skipDedup = false,
   throwOnError = false,
+  retryPayload = null,
 }) {
   logEmailBootMode()
 
@@ -108,6 +120,18 @@ export async function sendEmail({
     attachments,
     replyTo: replyTo || config.EMAIL_REPLY_TO || undefined,
     from: resolveFromHeader(),
+  }
+
+  const storedRetryPayload = retryPayload || {
+    to: recipients,
+    subject,
+    html,
+    text: text || null,
+    tenantId,
+    entityId,
+  }
+  if (logId) {
+    await persistRetryPayload(logId, storedRetryPayload)
   }
 
   if (config.EMAIL_LOG_ONLY) {
@@ -204,6 +228,14 @@ export async function sendTemplateEmail({
     entityId,
     skipDedup,
     throwOnError,
+    retryPayload: {
+      template,
+      data,
+      to,
+      subject: subject || rendered.subject,
+      tenantId,
+      entityId,
+    },
   })
 }
 

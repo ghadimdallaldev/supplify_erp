@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react'
 import {
   useGetBranchesQuery,
   useGetOrgBranchesQuery,
@@ -51,7 +51,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     data: supplierOrgData,
     isLoading: supplierOrgLoading,
     isError: supplierOrgError,
-  } = useGetOrgBranchesQuery(undefined, { skip: !isSupplier || isDriverRole })
+  } = useGetOrgBranchesQuery(undefined, {
+    skip: !isSupplier || isDriverRole || !multiBranchFeature,
+  })
 
   const {
     data: restaurantOrgData,

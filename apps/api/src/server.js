@@ -47,10 +47,6 @@ import adminDashboardRoutes from './routes/admin-dashboard.routes.js'
 import branchesRoutes from './routes/branches.routes.js'
 import orgRoutes from './routes/org.routes.js'
 import warehousesRoutes from './routes/warehouses.routes.js'
-import { executeScheduledOrders } from './services/scheduled-orders.service.js'
-import { checkOverdueInvoices } from './jobs/invoice-overdue.job.js'
-import { runSubscriptionBillingJob } from './jobs/subscription-billing.job.js'
-import { checkExpiredWaitlistOffers } from './services/waitlistPromotion.js'
 import { billingAccessMiddleware } from './middlewares/billingAccess.js'
 import { billingRoutes } from './routes/billing.routes.js'
 import { ensureOrderCancellationColumns } from './lib/migrator.js'
@@ -59,13 +55,8 @@ import { publicRoutes } from './routes/public.routes.js'
 import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
 import { driversRoutes } from './routes/drivers.routes.js'
 import { supplierOpsRoutes } from './routes/supplier-ops.routes.js'
-import { runFulfillmentExceptionChecks } from './jobs/fulfillment-exceptions.job.js'
-import { runOperationalRemindersJob } from './jobs/operational-reminders.job.js'
 import { promotionsRoutes } from './routes/promotions.routes.js'
 import { tenantAuditRoutes } from './routes/tenant-audit.routes.js'
-import { runDeactivateExpiredPromotionsJob } from './jobs/promotions-expiry.job.js'
-import { runDriverLocationRetentionJob } from './jobs/driver-location-retention.job.js'
-import { runFreeSandboxExpiryJob } from './jobs/free-sandbox-expiry.job.js'
 import { disputesRoutes } from './routes/disputes.routes.js'
 import { creditNotesRoutes } from './routes/credit-notes.routes.js'
 import { pushRoutes } from './routes/push.routes.js'
@@ -74,11 +65,10 @@ import { reportsRoutes } from './routes/reports.routes.js'
 import { tenantRolesRoutes } from './routes/tenant-roles.routes.js'
 import branchInvitationsRoutes from './routes/branch-invitations.routes.js'
 import branchInvitationsPublicRoutes from './routes/branch-invitations-public.routes.js'
+import { quoteRequestsRoutes } from './routes/quote-requests.routes.js'
 import restaurantOrgRoutes from './routes/restaurant-org.routes.js'
 import restaurantInvitationsRoutes from './routes/restaurant-invitations.routes.js'
-import { expireOldBranchInvitations } from './lib/branch-invitations.js'
-import { expireOldRestaurantInvitations } from './lib/restaurant-invitations.js'
-import { runCronJob, CRON_JOBS } from './lib/cron-runner.js'
+import { registerCronJobs } from './lib/register-cron-jobs.js'
 import path from 'node:path'
 import { ensureStorageReady, checkStorageHealth } from './services/storage/storage.service.js'
 import { pool, closePool, warmupPool, startPoolKeepalive, stopPoolKeepalive } from './lib/db.js'
@@ -86,6 +76,11 @@ import { getKeycloakConfig } from './lib/auth.js'
 import { requestTimingMiddleware } from './middlewares/request-timing.js'
 import { disconnectCache, isRedisConnected } from './lib/cache.js'
 import { runFullStartupMigrations } from './lib/startup-migrations.js'
+import {
+  markStartupMigrationsReady,
+  requireStartupMigrationsReady,
+  isStartupMigrationsReady,
+} from './lib/startup-readiness.js'
 import {
   getMemorySnapshot,
   shouldExposeMemoryOnHealth,
@@ -104,11 +99,15 @@ if (config.REDIS_URL && isLikelyPublicRedisUrl(config.REDIS_URL)) {
 
 /** Run after HTTP listen so Railway health checks get a response during slow DB work. */
 async function runStartupSchemaTasks() {
-  if (config.NODE_ENV === 'test') return
+  if (config.NODE_ENV === 'test') {
+    markStartupMigrationsReady()
+    return
+  }
 
   try {
     await runFullStartupMigrations()
     await ensureOrderCancellationColumns()
+    markStartupMigrationsReady()
   } catch (error) {
     logger.error(`Database migration failed after listen — shutting down: ${error.message}`, {
       error: error.message,
@@ -322,13 +321,21 @@ app.get('/health', async (req, res) => {
 app.get('/ready', async (req, res) => {
   try {
     await pool.query('SELECT 1')
+    if (!isStartupMigrationsReady()) {
+      return res.status(503).json({
+        status: 'migrating',
+        service: 'supplify-api',
+        env: config.APP_ENV,
+      })
+    }
     res.json({ status: 'ok', service: 'supplify-api', env: config.APP_ENV })
   } catch {
     res.status(503).json({ status: 'degraded', service: 'supplify-api', env: config.APP_ENV })
   }
 })
 
-// API routes
+// API routes — blocked until startup SQL migrations finish on this instance
+app.use(requireStartupMigrationsReady)
 app.use('/auth', authLimiter)
 app.use('/auth', authRoutes)
 app.use('/api/register', authLimiter)
@@ -357,6 +364,7 @@ app.use('/api/chat', chatRoutes)
 app.use('/api/invoices', invoicesRoutes)
 app.use('/api/payments', paymentsRoutes)
 app.use('/api/quick-lists', quickListsRoutes)
+app.use('/api/quote-requests', quoteRequestsRoutes)
 app.use('/api/restaurant-inventory', restaurantInventoryRoutes)
 app.use('/api/restaurant-onboarding', restaurantOnboardingRoutes)
 app.use('/api/receiving', receivingRoutes)
@@ -491,16 +499,7 @@ server.listen(PORT, HOST, () => {
     logger.error('Startup schema tasks failed', { error: error.message })
   })
 
-  const scheduledOrdersIntervalMs = config.CRON_SCHEDULED_ORDERS_INTERVAL_MS
-
-  const runScheduledOrdersCron = () =>
-    runCronJob(CRON_JOBS.SCHEDULED_ORDERS, () => executeScheduledOrders()).catch((err) => {
-      logger.error('Error in scheduled orders execution:', err)
-    })
-
-  runScheduledOrdersCron()
-  trackInterval(runScheduledOrdersCron, scheduledOrdersIntervalMs)
-  logger.info('Scheduled orders cron job started', { intervalMs: scheduledOrdersIntervalMs })
+  registerCronJobs({ trackInterval })
 
   if (config.NODE_ENV !== 'production') {
     import('./lib/keycloak-admin.js')
@@ -516,89 +515,6 @@ server.listen(PORT, HOST, () => {
         })
       })
   }
-
-  const invoiceOverdueIntervalMs = 24 * 60 * 60 * 1000
-  const runInvoiceOverdueCron = () =>
-    runCronJob(CRON_JOBS.INVOICE_OVERDUE, () => checkOverdueInvoices()).catch((err) =>
-      logger.error('Invoice overdue job failed:', err)
-    )
-  runInvoiceOverdueCron()
-  trackInterval(runInvoiceOverdueCron, invoiceOverdueIntervalMs)
-  logger.info('Invoice overdue job started', { intervalMs: invoiceOverdueIntervalMs })
-
-  const billingIntervalMs = 60 * 60 * 1000
-  const runBillingCron = () =>
-    runCronJob(CRON_JOBS.SUBSCRIPTION_BILLING, () => runSubscriptionBillingJob()).catch((err) =>
-      logger.error('Subscription billing job failed:', err)
-    )
-  runBillingCron()
-  trackInterval(runBillingCron, billingIntervalMs)
-  logger.info('Subscription billing job started', { intervalMs: billingIntervalMs })
-
-  const waitlistIntervalMs = 15 * 60 * 1000
-  const runWaitlistCron = () =>
-    runCronJob(CRON_JOBS.WAITLIST_OFFERS, () => checkExpiredWaitlistOffers()).catch((err) =>
-      logger.error('Waitlist expired-offers job failed:', err)
-    )
-  runWaitlistCron()
-  trackInterval(runWaitlistCron, waitlistIntervalMs)
-  logger.info('Waitlist expired-offers job started', { intervalMs: waitlistIntervalMs })
-
-  const promotionsIntervalMs = 30 * 60 * 1000
-  const runPromotionsCron = () =>
-    runCronJob(CRON_JOBS.PROMOTIONS_EXPIRY, () => runDeactivateExpiredPromotionsJob()).catch(
-      (err) => logger.error('Promotions expiry job failed:', err)
-    )
-  runPromotionsCron()
-  trackInterval(runPromotionsCron, promotionsIntervalMs)
-  logger.info('Promotions expiry job started', { intervalMs: promotionsIntervalMs })
-
-  const invitationIntervalMs = 60 * 60 * 1000
-  const runInvitationExpiryCron = () =>
-    runCronJob(CRON_JOBS.INVITATION_EXPIRY, () =>
-      Promise.all([expireOldBranchInvitations(), expireOldRestaurantInvitations()])
-    ).catch((err) => logger.error('Invitation expiry job failed:', err))
-  runInvitationExpiryCron()
-  trackInterval(runInvitationExpiryCron, invitationIntervalMs)
-  logger.info('Invitation expiry job started', { intervalMs: invitationIntervalMs })
-
-  const sandboxIntervalMs = 60 * 60 * 1000
-  const runSandboxCron = () =>
-    runCronJob(CRON_JOBS.FREE_SANDBOX_EXPIRY, () => runFreeSandboxExpiryJob()).catch((err) =>
-      logger.error('Free sandbox expiry job failed:', err)
-    )
-  runSandboxCron()
-  trackInterval(runSandboxCron, sandboxIntervalMs)
-  logger.info('Free sandbox expiry job started', { intervalMs: sandboxIntervalMs })
-
-  const fulfillmentIntervalMs = 30 * 60 * 1000
-  const runFulfillmentCron = () =>
-    runCronJob(CRON_JOBS.FULFILLMENT_EXCEPTIONS, () => runFulfillmentExceptionChecks()).catch(
-      (err) => logger.error('Fulfillment exceptions job failed:', err)
-    )
-  runFulfillmentCron()
-  trackInterval(runFulfillmentCron, fulfillmentIntervalMs)
-  logger.info('Fulfillment exceptions job started', { intervalMs: fulfillmentIntervalMs })
-
-  const operationalRemindersIntervalMs = config.CRON_OPERATIONAL_REMINDERS_INTERVAL_MS
-  const runOperationalRemindersCron = () =>
-    runCronJob(CRON_JOBS.OPERATIONAL_REMINDERS, () => runOperationalRemindersJob()).catch((err) =>
-      logger.error('Operational reminders job failed:', err)
-    )
-  runOperationalRemindersCron()
-  trackInterval(runOperationalRemindersCron, operationalRemindersIntervalMs)
-  logger.info('Operational reminders job started', { intervalMs: operationalRemindersIntervalMs })
-
-  const driverLocationRetentionIntervalMs = 24 * 60 * 60 * 1000
-  const runDriverLocationRetentionCron = () =>
-    runCronJob(CRON_JOBS.DRIVER_LOCATION_RETENTION, () => runDriverLocationRetentionJob()).catch(
-      (err) => logger.error('Driver location retention job failed:', err)
-    )
-  runDriverLocationRetentionCron()
-  trackInterval(runDriverLocationRetentionCron, driverLocationRetentionIntervalMs)
-  logger.info('Driver location retention job started', {
-    intervalMs: driverLocationRetentionIntervalMs,
-  })
 })
 
 export default app

@@ -4,12 +4,15 @@ import { Card, CardContent } from '../../components/ui/card'
 import { Label } from '../../components/ui/label'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/empty-state'
+import { Select, SelectTrigger } from '../../components/ui/select'
+import { Skeleton } from '../../components/ui/skeleton'
 import { DealCard } from '../../components/deals/DealCard'
 import { useGetActivePromotionsQuery, useGetEntitlementsQuery } from '../../services/api'
 import { getDealRedeemGate } from '../../lib/planLimits'
 import { LIMIT_UPGRADE_COPY } from '../../lib/upgradeCopy'
-import { Loader2, Sparkles, Store } from 'lucide-react'
+import { Sparkles, Store } from 'lucide-react'
 import { useAppSelector } from '../../hooks/redux'
+import { RESTAURANT_EMPTY_STATE } from '../../lib/dealDisplayLabels'
 import { RequirePermission } from '../../components/RequirePermission'
 
 const SORT_OPTIONS = [
@@ -43,7 +46,7 @@ export function DealsPage() {
   )
 
   const { data, isLoading } = useGetActivePromotionsQuery(queryParams)
-  const promotions = data?.promotions || []
+  const promotions = useMemo(() => data?.promotions || [], [data])
 
   const suppliers = useMemo(() => {
     const map = new Map<string, string>()
@@ -88,32 +91,28 @@ export function DealsPage() {
           <CardContent className="pt-6 flex flex-wrap gap-4 items-end">
             <div>
               <Label>Sort</Label>
-              <select
-                className="mt-1 h-10 rounded-md border px-3 text-sm block min-w-[160px]"
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-              >
-                {SORT_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+              <Select value={sort} onValueChange={setSort}>
+                <SelectTrigger className="mt-1 min-w-[160px]">
+                  {SORT_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
             <div>
               <Label>Supplier</Label>
-              <select
-                className="mt-1 h-10 rounded-md border px-3 text-sm block min-w-[180px]"
-                value={supplierFilter}
-                onChange={(e) => setSupplierFilter(e.target.value)}
-              >
-                <option value="">All suppliers</option>
-                {suppliers.map(([id, name]) => (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                ))}
-              </select>
+              <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+                <SelectTrigger className="mt-1 min-w-[180px]">
+                  <option value="">All suppliers</option>
+                  {suppliers.map(([id, name]) => (
+                    <option key={id} value={id}>
+                      {name}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
             </div>
             <label className="flex items-center gap-2 text-sm pb-2 cursor-pointer">
               <input
@@ -133,8 +132,24 @@ export function DealsPage() {
         ) : null}
 
         {isLoading ? (
-          <div className="flex justify-center py-16" aria-busy="true">
-            <Loader2 className="h-8 w-8 animate-spin text-[var(--brand-mid)]" />
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" aria-busy="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="space-y-3 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <Skeleton className="h-5 w-32" />
+                  <Skeleton className="h-6 w-16" />
+                </div>
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+                <div className="flex items-center justify-between gap-3 pt-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-9 w-28" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : promotions.length === 0 ? (
           <DealsEmptyState
@@ -171,10 +186,10 @@ function MotionDealsHeader() {
     <div>
       <h1 className="text-[21px] font-black text-[var(--text)] flex items-center gap-2">
         <Sparkles className="h-5 w-5 text-[var(--brand)]" />
-        Deals & promotions
+        Available deals
       </h1>
       <p className="text-xs text-[var(--text-muted)] mt-1">
-        Deals from suppliers you follow, plus sponsored offers from new suppliers
+        Supplier deals from suppliers you follow, plus sponsored placement from new suppliers
       </p>
     </div>
   )
@@ -197,7 +212,7 @@ function DealsEmptyState({
     return (
       <EmptyState
         title={supplierName ? `No deals from ${supplierName}` : 'No deals for this supplier'}
-        description="They may not have active promotions right now. Browse your full feed or pick another supplier."
+        description="They may not have active deals right now. Browse your full feed or pick another supplier."
         icon={<Store className="h-6 w-6" aria-hidden />}
         action={
           <Button type="button" variant="outline" size="sm" onClick={onClearSupplier}>
@@ -212,7 +227,7 @@ function DealsEmptyState({
     return (
       <EmptyState
         title="No deals expiring in the next 7 days"
-        description="Turn off “Expiring within 7 days” to see everything in your feed, or check back as promotions go live."
+        description="Turn off “Expiring within 7 days” to see everything in your feed, or check back as new deals go live."
         icon={<Sparkles className="h-6 w-6" aria-hidden />}
         action={
           <Button type="button" variant="outline" size="sm" onClick={onClearExpiringSoon}>
@@ -225,8 +240,8 @@ function DealsEmptyState({
 
   return (
     <EmptyState
-      title="No deals in your feed yet"
-      description="Follow suppliers you order from to unlock their promotions. Sponsored offers from new suppliers will show up here when available."
+      title={RESTAURANT_EMPTY_STATE.title}
+      description={RESTAURANT_EMPTY_STATE.description}
       icon={<Sparkles className="h-6 w-6" aria-hidden />}
       action={
         <Button

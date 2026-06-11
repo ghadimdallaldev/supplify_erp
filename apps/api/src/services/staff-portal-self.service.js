@@ -53,6 +53,7 @@ export async function fetchStaffPortalDashboard(staffId, restaurantId) {
     swapsResult,
     announcementsResult,
     documentsResult,
+    teammatesResult,
   ] = await Promise.all([
     query(
       `
@@ -118,6 +119,17 @@ export async function fetchStaffPortalDashboard(staffId, restaurantId) {
       `,
       [restaurantId, staffId]
     ),
+    query(
+      `
+        SELECT id, display_name
+        FROM staff_member
+        WHERE restaurant_id = $1
+          AND id != $2
+          AND status = 'ACTIVE'
+        ORDER BY display_name
+      `,
+      [restaurantId, staffId]
+    ),
   ])
 
   return {
@@ -127,6 +139,10 @@ export async function fetchStaffPortalDashboard(staffId, restaurantId) {
     swapRequests: swapsResult.rows,
     announcements: announcementsResult.rows,
     documents: documentsResult.rows,
+    teammates: teammatesResult.rows.map((row) => ({
+      id: row.id,
+      displayName: row.display_name,
+    })),
   }
 }
 
@@ -256,6 +272,28 @@ export async function submitStaffPortalSwap(staffId, restaurantId, payload) {
     throw err
   }
 
+  if (payload.proposedCoverId) {
+    if (payload.proposedCoverId === staffId) {
+      const err = new Error('You cannot propose yourself as cover')
+      err.name = 'INVALID_COVER'
+      err.status = 400
+      throw err
+    }
+    const { rows: coverRows } = await query(
+      `
+        SELECT id FROM staff_member
+        WHERE id = $1 AND restaurant_id = $2 AND status = 'ACTIVE'
+      `,
+      [payload.proposedCoverId, restaurantId]
+    )
+    if (!coverRows.length) {
+      const err = new Error('Proposed cover does not belong to this restaurant')
+      err.name = 'INVALID_COVER'
+      err.status = 400
+      throw err
+    }
+  }
+
   const { rows } = await query(
     `
       INSERT INTO staff_shift_swap (
@@ -272,12 +310,31 @@ export async function submitStaffPortalSwap(staffId, restaurantId, payload) {
       payload.reason ?? null,
     ]
   )
+  const swapRow = rows[0]
+  const joined = await query(
+    `
+      SELECT s.*,
+             sh.role AS shift_role,
+             sh.starts_at AS shift_starts_at,
+             sh.ends_at AS shift_ends_at,
+             sh.shift_date,
+             requester.display_name AS requester_name,
+             cover.display_name AS cover_name,
+             cover.id AS cover_id
+      FROM staff_shift_swap s
+      JOIN staff_shift sh ON sh.id = s.shift_id
+      JOIN staff_member requester ON requester.id = s.requested_by
+      LEFT JOIN staff_member cover ON cover.id = s.proposed_cover_id
+      WHERE s.id = $1
+    `,
+    [swapRow.id]
+  )
   try {
-    await notifyStaffSwapRequest(rows[0])
+    await notifyStaffSwapRequest(joined.rows[0])
   } catch (notifyError) {
     logger.warn('Staff swap notification failed', { error: notifyError.message })
   }
-  return rows[0]
+  return swapRow
 }
 
 export async function acknowledgeStaffAnnouncement(staffId, restaurantId, announcementId) {

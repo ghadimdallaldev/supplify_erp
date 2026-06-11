@@ -1,98 +1,47 @@
 import { useEffect, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams, Link as RouterLink, Link } from 'react-router-dom'
 import {
   useGetOrderQuery,
   useUpdateOrderMutation,
   useGetOrderInvoicesQuery,
   useSendOrderReminderMutation,
   useGetEntitlementsQuery,
-  useGetOrderAmendmentsQuery,
-  useCreateOrderAmendmentMutation,
-  useAcceptOrderAmendmentMutation,
-  useRejectOrderAmendmentMutation,
-  useCancelOrderAmendmentMutation,
   useGetDisputesQuery,
   useGetIncomingDisputesQuery,
-  useGetReceivingHistoryQuery,
-  useGetCreditNotesQuery,
-  useGetOrderTrackingQuery,
 } from '../services/api'
-import { Link as RouterLink } from 'react-router-dom'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { isOrderEligibleForDispute } from '../lib/orderDisputeEligibility'
-import { getActiveDisputeForOrder, getDisputesForOrder } from '../lib/disputeHelpers'
+import { getActiveDisputeForOrder } from '../lib/disputeHelpers'
 import { OrderDisputeBanner } from '../components/disputes/OrderDisputeBanner'
 import { OpenDisputeDialog } from '../components/disputes/OpenDisputeDialog'
 import { RequirePermission } from '../components/RequirePermission'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
-import { Input } from '../components/ui/input'
+import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
-import {
-  ArrowLeft,
-  Calendar,
-  DollarSign,
-  Package,
-  FileText,
-  Truck,
-  AlertCircle,
-  Printer,
-  Download,
-  Edit,
-  Check,
-  X,
-  ClipboardList,
-  MapPin,
-} from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { ArrowLeft, AlertCircle, Check } from 'lucide-react'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { usePermissions } from '../hooks/usePermissions'
 import toast from 'react-hot-toast'
-import { formatPrice } from '../utils/format'
-import { buildOrderTimeline } from '../lib/orderTimeline'
-import { OrderOperationsTimeline } from '../components/orders/OrderOperationsTimeline'
-import { OrderDeliveryTrackingPanel } from '../components/orders/OrderDeliveryTrackingPanel'
-import { RestaurantOrderTrackingPanel } from '../components/orders/RestaurantOrderTrackingPanel'
-import { isRestaurantOrderTracking, isSupplierOrderTracking } from '../types'
-import { OrderSubstitutionPanel } from '../components/supplier/OrderSubstitutionPanel'
-import { SupplierFulfillmentIssuePanel } from '../components/supplier/SupplierFulfillmentIssuePanel'
 import { DeclineOrderDialog } from '../components/orders/DeclineOrderDialog'
 import { getOrderCancellationBanner, getOrderStatusLabel } from '../lib/orderStatusDisplay'
 import { formatOrderRef, isDisputeReplacementOrder } from '../lib/orderPlacement'
 import { pageHeaderRowClass } from '../components/ui/card-layout'
-import { apiUrl } from '../lib/apiBase'
-
-function formatAddressLines(address?: Record<string, string | undefined> | null): string[] {
-  if (!address || typeof address !== 'object') return []
-  const lines: string[] = []
-  if (address.street) lines.push(address.street)
-  const cityLine = [address.city, address.region, address.postalCode || address.zip]
-    .filter(Boolean)
-    .join(', ')
-  if (cityLine) lines.push(cityLine)
-  if (address.country) lines.push(address.country)
-  return lines
-}
-
-function formatOperatingHours(hours: unknown): string | null {
-  if (!hours || typeof hours !== 'object') return null
-  const entries = Object.entries(hours as Record<string, { open?: string; close?: string }>)
-  if (!entries.length) return null
-  return entries
-    .map(([day, window]) => `${day}: ${window?.open ?? '—'} – ${window?.close ?? '—'}`)
-    .join('; ')
-}
-
-const VALID_ORDER_TABS = [
-  'timeline',
-  'details',
-  'items',
-  'invoice',
-  'picking',
-  'delivery',
-  'packing',
-] as const
+import { LazyTabMount } from '../components/LazyTabMount'
+import {
+  VALID_ORDER_TABS,
+  getOrderStatusColor,
+  OrderDetailTabLoading,
+} from '../components/orders/detail/orderDetailShared'
+import {
+  LazyOrderDeliveryTab,
+  LazyOrderDetailsTab,
+  LazyOrderInvoiceTab,
+  LazyOrderItemsTab,
+  LazyOrderPackingTab,
+  LazyOrderPickingTab,
+  LazyOrderTimelineTab,
+} from '../components/orders/detail/lazyOrderDetailTabs'
 
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -103,9 +52,9 @@ export function OrderDetailPage() {
   const canDeclineOrder = can('ORDERS_MANAGE')
   const canOpenDispute = can('ORDERS_CREATE') || can('RECEIVING_MANAGE')
   const [activeTab, setActiveTab] = useState<string>('timeline')
-  const [showPickingNotes, setShowPickingNotes] = useState(false)
-  const [showDeliveryNotes, setShowDeliveryNotes] = useState(false)
   const [showOpenDispute, setShowOpenDispute] = useState(false)
+  const [showDeclineDialog, setShowDeclineDialog] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
 
   useEffect(() => {
     if (tabFromUrl && VALID_ORDER_TABS.includes(tabFromUrl as (typeof VALID_ORDER_TABS)[number])) {
@@ -114,77 +63,29 @@ export function OrderDetailPage() {
   }, [tabFromUrl])
 
   const { data, isLoading, error, refetch } = useGetOrderQuery(id!)
-  const { data: orderTracking } = useGetOrderTrackingQuery(id!, { skip: !id })
   const { data: entitlementsData } = useGetEntitlementsQuery()
-  const amendmentsEnabled = isEntitlementFeatureEnabled(
-    entitlementsData?.entitlements,
-    'order_amendments'
-  )
   const disputesEnabled = isEntitlementFeatureEnabled(
     entitlementsData?.entitlements,
     'disputes_returns'
   )
-  const {
-    data: invoicesData,
-    isLoading: isLoadingInvoices,
-    refetch: refetchInvoices,
-  } = useGetOrderInvoicesQuery(id!, { skip: !id })
-  const { data: amendmentsData, refetch: refetchAmendments } = useGetOrderAmendmentsQuery(id!, {
-    skip: !id,
-  })
+  const { data: invoicesData } = useGetOrderInvoicesQuery(id!, { skip: !id })
   const { data: disputesData } = useGetDisputesQuery(undefined, {
     skip: !id || isSupplier || !disputesEnabled,
   })
   const { data: incomingDisputesData } = useGetIncomingDisputesQuery(undefined, {
     skip: !id || !isSupplier || !disputesEnabled,
   })
-  const { data: receivingHistoryData } = useGetReceivingHistoryQuery(undefined, {
-    skip: !id || isSupplier,
-  })
-  const { data: creditNotesData } = useGetCreditNotesQuery(undefined, {
-    skip: !id || !disputesEnabled,
-  })
-  const [createAmendment] = useCreateOrderAmendmentMutation()
-  const [acceptAmendment] = useAcceptOrderAmendmentMutation()
-  const [rejectAmendment] = useRejectOrderAmendmentMutation()
-  const [cancelAmendment] = useCancelOrderAmendmentMutation()
   const [updateOrder] = useUpdateOrderMutation()
   const [sendReminder, { isLoading: isSendingReminder }] = useSendOrderReminderMutation()
-  const [showAmendmentForm, setShowAmendmentForm] = useState(false)
-  const [amendmentDescription, setAmendmentDescription] = useState('')
-  const [showDeclineDialog, setShowDeclineDialog] = useState(false)
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PLACED':
-        return 'default'
-      case 'ACKNOWLEDGED':
-        return 'secondary'
-      case 'PROCESSING':
-        return 'default'
-      case 'SHIPPED':
-        return 'default'
-      case 'DELIVERED':
-        return 'default'
-      case 'COMPLETED':
-        return 'default'
-      case 'CANCELLED':
-        return 'destructive'
-      default:
-        return 'secondary'
-    }
-  }
-
-  const [isUpdating, setIsUpdating] = useState(false)
 
   const handleStatusUpdate = async (
     newStatus: string,
     extra?: { decline_reason?: string; cancel_reason?: string }
   ) => {
-    if (!id || isUpdating) return // Prevent multiple clicks
+    if (!id || isUpdating) return
 
     try {
-      setIsUpdating(true) // Set immediately - button will be replaced by disabled button
+      setIsUpdating(true)
       await updateOrder({ id, data: { status: newStatus, ...extra } }).unwrap()
       const successLabel =
         newStatus === 'CANCELLED' && isSupplier
@@ -198,82 +99,23 @@ export function OrderDetailPage() {
     }
   }
 
-  const [downloadingPdf, setDownloadingPdf] = useState(false)
-  const [printingPdf, setPrintingPdf] = useState(false)
-
-  const fetchPackingSlipPdfBlob = async () => {
-    if (!id) throw new Error('Missing order id')
-    const res = await fetch(apiUrl(`/api/orders/${id}/packing-slip/pdf`), {
-      credentials: 'include',
-    })
-    if (!res.ok) throw new Error('Failed to fetch packing slip PDF')
-    return res.blob()
-  }
-
-  const handlePrintPackingSlip = async () => {
-    if (!id || printingPdf) return
-    setPrintingPdf(true)
-    try {
-      const blob = await fetchPackingSlipPdfBlob()
-      const url = URL.createObjectURL(blob)
-      const printWindow = window.open(url, '_blank')
-      if (!printWindow) {
-        URL.revokeObjectURL(url)
-        toast.error('Allow pop-ups to print the packing slip')
-        return
-      }
-      printWindow.addEventListener('load', () => {
-        printWindow.focus()
-        printWindow.print()
-      })
-      toast.success('Opening packing slip for printing…')
-    } catch {
-      toast.error('Could not print packing slip')
-    } finally {
-      setPrintingPdf(false)
-    }
-  }
-
-  const handleDownloadPackingSlipPdf = async () => {
-    if (!id || downloadingPdf) return
-    setDownloadingPdf(true)
-    try {
-      const blob = await fetchPackingSlipPdfBlob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `packing-slip-${id.slice(0, 8)}.pdf`
-      a.click()
-      URL.revokeObjectURL(url)
-      toast.success('Packing slip PDF downloaded')
-    } catch {
-      toast.error('Could not download packing slip PDF')
-    } finally {
-      setDownloadingPdf(false)
-    }
-  }
-
   const handleSendReminder = async () => {
     if (!id || isSendingReminder) return
 
     try {
       await sendReminder(id).unwrap()
       toast.success('Reminder sent to supplier successfully')
-      refetch() // Refresh order data to update reminder count
+      refetch()
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to send reminder')
     }
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
-      </div>
-    )
+    return <DetailPageSkeleton rows={6} />
   }
 
-  if (error || !data) {
+  if (error || !data || !id) {
     return (
       <div className="text-center py-12">
         <p className="text-[var(--red)]">Order not found</p>
@@ -282,46 +124,15 @@ export function OrderDetailPage() {
   }
 
   const order = data.order
-  const orderAny = order as Record<string, unknown>
-  const promotionInfo = (orderAny.promotion || orderAny.applied_promotion) as
-    | {
-        promotionName?: string
-        discountAmount?: number
-        promotion_name?: string
-        discount_amount?: number
-      }
-    | undefined
-  const itemsSubtotal = (order.items || []).reduce((s, i) => s + Number(i.line_total || 0), 0)
-  const promotionDiscount =
-    Number(promotionInfo?.discountAmount ?? promotionInfo?.discount_amount) ||
-    (itemsSubtotal > Number(order.total_amount) && Number(order.total_amount) > 0
-      ? itemsSubtotal - Number(order.total_amount)
-      : 0)
-  const amendments = amendmentsData?.amendments || []
-  const deliveryAddress = (order as any).branch_address ?? (order as any).restaurant_address
-  const deliveryInstructions =
-    (order as any).branch_delivery_instructions ?? (order as any).restaurant_delivery_instructions
-  const deliveryPhone = (order as any).branch_phone ?? (order as any).restaurant_phone
-  const addressLines = formatAddressLines(deliveryAddress)
-  const operatingHoursLabel = formatOperatingHours((order as any).restaurant_operating_hours)
-
   const cancellationBanner = getOrderCancellationBanner(
     order,
     isSupplier ? 'SUPPLIER' : 'RESTAURANT'
   )
   const statusLabel = getOrderStatusLabel(order, isSupplier ? 'SUPPLIER' : 'RESTAURANT')
-
   const allDisputes = isSupplier
     ? (incomingDisputesData?.disputes ?? [])
     : (disputesData?.disputes ?? [])
-  const orderDisputes = getDisputesForOrder(allDisputes, order.id)
   const activeDispute = getActiveDisputeForOrder(allDisputes, order.id)
-  const orderReceivingReports = (receivingHistoryData?.reports ?? []).filter(
-    (report: Record<string, unknown>) => String(report.order_id ?? report.orderId) === order.id
-  )
-  const replacementOrders = (order as Record<string, unknown>).replacementOrders as
-    | Array<Record<string, unknown>>
-    | undefined
   const sourceDispute = (order as Record<string, unknown>).sourceDispute as
     | Record<string, unknown>
     | null
@@ -332,37 +143,6 @@ export function OrderDetailPage() {
       (order as Record<string, unknown>).sourceOrderId ??
       ''
   )
-
-  const deliveryAssignmentForTimeline = (() => {
-    if (isRestaurantOrderTracking(orderTracking) && orderTracking.delivery) {
-      return {
-        status: orderTracking.delivery.status,
-        driverName: orderTracking.driver?.name ?? null,
-        assignedAt: orderTracking.delivery.assignedAt ?? null,
-        pickedUpAt: orderTracking.delivery.pickedUpAt ?? null,
-        deliveredAt: orderTracking.delivery.deliveredAt ?? null,
-      }
-    }
-    if (isSupplierOrderTracking(orderTracking) && orderTracking.assignment) {
-      return {
-        status: orderTracking.assignment.status,
-        driverName: orderTracking.assignment.driverName ?? null,
-      }
-    }
-    return null
-  })()
-
-  const timelineEvents = buildOrderTimeline({
-    order,
-    viewerRole: isSupplier ? 'SUPPLIER' : 'RESTAURANT',
-    amendments,
-    invoices: invoicesData?.invoices ?? [],
-    disputes: orderDisputes,
-    receivingReports: orderReceivingReports,
-    creditNotes: creditNotesData?.creditNotes ?? [],
-    replacementOrders: replacementOrders ?? [],
-    deliveryAssignment: deliveryAssignmentForTimeline,
-  })
 
   return (
     <RequirePermission permission="ORDERS_VIEW" title="order details">
@@ -404,7 +184,7 @@ export function OrderDetailPage() {
             </div>
           </div>
         )}
-        {/* Header */}
+
         <div className={pageHeaderRowClass}>
           <div className="flex flex-col gap-3 min-w-0 sm:flex-row sm:items-center sm:gap-4">
             <Button variant="outline" size="sm" className="self-start shrink-0" asChild>
@@ -426,7 +206,7 @@ export function OrderDetailPage() {
                 Replacement
               </Badge>
             )}
-            <Badge variant={getStatusColor(order.status)} className="text-lg px-3 py-1">
+            <Badge variant={getOrderStatusColor(order.status)} className="text-lg px-3 py-1">
               {statusLabel}
             </Badge>
             {!isSupplier && order.status === 'PLACED' && (
@@ -492,7 +272,6 @@ export function OrderDetailPage() {
                     size="sm"
                     variant="default"
                     onClick={() => handleStatusUpdate('DELIVERED')}
-                    disabled={false}
                   >
                     Mark Delivered
                   </Button>
@@ -523,7 +302,6 @@ export function OrderDetailPage() {
           </div>
         </div>
 
-        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList>
             <TabsTrigger value="timeline">Timeline</TabsTrigger>
@@ -543,743 +321,77 @@ export function OrderDetailPage() {
             {isSupplier && <TabsTrigger value="packing">Packing Slip</TabsTrigger>}
           </TabsList>
 
-          {/* Timeline Tab (default) */}
           <TabsContent value="timeline" className="space-y-4">
-            {isSupplier && id && <OrderSubstitutionPanel orderId={id} />}
-            {isSupplier && id && order?.items?.length > 0 && (
-              <SupplierFulfillmentIssuePanel orderId={id} items={order.items} />
-            )}
-            {isSupplier && id && <OrderDeliveryTrackingPanel orderId={id} />}
-            {!isSupplier && id && (
-              <RestaurantOrderTrackingPanel orderId={id} orderStatus={order.status} />
-            )}
-            <OrderOperationsTimeline
-              events={timelineEvents}
-              viewerRole={isSupplier ? 'SUPPLIER' : 'RESTAURANT'}
-            />
+            <LazyTabMount
+              tab="timeline"
+              selectedTab={activeTab}
+              fallback={<OrderDetailTabLoading />}
+            >
+              <LazyOrderTimelineTab orderId={id} />
+            </LazyTabMount>
           </TabsContent>
 
-          {/* Order Details Tab */}
           <TabsContent value="details">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Order Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-[var(--text-muted)]">Order ID</p>
-                        <p className="font-medium">{order.id}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-[var(--text-muted)]">Status</p>
-                        <Badge variant={getStatusColor(order.status)}>{order.status}</Badge>
-                      </div>
-                      <div>
-                        <p className="text-sm text-[var(--text-muted)]">Created</p>
-                        <p className="font-medium">{new Date(order.created_at).toLocaleString()}</p>
-                      </div>
-                      {order.placed_at && (
-                        <div>
-                          <p className="text-sm text-[var(--text-muted)]">Placed</p>
-                          <p className="font-medium">
-                            {new Date(order.placed_at).toLocaleString()}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {order.notes && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Order Notes</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm">{order.notes}</p>
-                    </CardContent>
-                  </Card>
-                )}
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Amendments</CardTitle>
-                    {!['CANCELLED', 'COMPLETED'].includes(order.status) && amendmentsEnabled && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setShowAmendmentForm((v) => !v)}
-                      >
-                        Request change
-                      </Button>
-                    )}
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {showAmendmentForm && (
-                      <div className="space-y-2">
-                        <Input
-                          placeholder="Describe the requested change"
-                          value={amendmentDescription}
-                          onChange={(e) => setAmendmentDescription(e.target.value)}
-                        />
-                        <Button
-                          size="sm"
-                          onClick={async () => {
-                            if (!amendmentDescription.trim()) {
-                              toast.error('Description required')
-                              return
-                            }
-                            try {
-                              await createAmendment({
-                                orderId: order.id,
-                                body: {
-                                  changeType: 'other',
-                                  description: amendmentDescription,
-                                },
-                              }).unwrap()
-                              toast.success('Amendment requested')
-                              setAmendmentDescription('')
-                              setShowAmendmentForm(false)
-                              refetchAmendments()
-                            } catch (e: unknown) {
-                              const err = e as { data?: { error?: { message?: string } } }
-                              toast.error(
-                                err?.data?.error?.message || 'Failed to request amendment'
-                              )
-                            }
-                          }}
-                        >
-                          Submit
-                        </Button>
-                      </div>
-                    )}
-                    {amendments.length === 0 ? (
-                      <p className="text-sm text-[var(--text-muted)]">
-                        No amendments on this order.
-                      </p>
-                    ) : (
-                      amendments.map((a) => (
-                        <div
-                          key={String(a.id)}
-                          className="rounded-lg border border-[var(--app-border)] p-3 text-sm"
-                        >
-                          <div className="flex justify-between gap-2">
-                            <span className="font-medium capitalize">
-                              {String(a.change_type || a.changeType).replace(/_/g, ' ')}
-                            </span>
-                            <Badge variant="outline">{String(a.status)}</Badge>
-                          </div>
-                          <p className="text-[var(--text-muted)] mt-1">{String(a.description)}</p>
-                          {a.status === 'pending' && (
-                            <div className="flex gap-2 mt-2">
-                              <Button
-                                size="sm"
-                                onClick={async () => {
-                                  await acceptAmendment({
-                                    orderId: order.id,
-                                    amendmentId: String(a.id),
-                                  }).unwrap()
-                                  toast.success('Amendment accepted')
-                                  refetchAmendments()
-                                  refetch()
-                                }}
-                              >
-                                Accept
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={async () => {
-                                  const notes = window.prompt('Rejection notes')
-                                  if (!notes) return
-                                  await rejectAmendment({
-                                    orderId: order.id,
-                                    amendmentId: String(a.id),
-                                    responseNotes: notes,
-                                  }).unwrap()
-                                  toast.success('Amendment rejected')
-                                  refetchAmendments()
-                                }}
-                              >
-                                Reject
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={async () => {
-                                  await cancelAmendment({
-                                    orderId: order.id,
-                                    amendmentId: String(a.id),
-                                  }).unwrap()
-                                  refetchAmendments()
-                                }}
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Order Summary</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-[var(--text-muted)]">Subtotal</span>
-                      <span>
-                        $
-                        {formatPrice(
-                          promotionDiscount > 0
-                            ? Number(order.total_amount) + promotionDiscount
-                            : order.total_amount
-                        )}
-                      </span>
-                    </div>
-                    {promotionDiscount > 0 ? (
-                      <div className="flex items-center justify-between text-sm text-[var(--mint)]">
-                        <span>
-                          Promotion
-                          {promotionInfo?.promotionName || promotionInfo?.promotion_name
-                            ? ` (${promotionInfo.promotionName || promotionInfo.promotion_name})`
-                            : ''}
-                        </span>
-                        <span>-${formatPrice(promotionDiscount)}</span>
-                      </div>
-                    ) : null}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-[var(--text-muted)]">Shipping</span>
-                      <span>$0.00</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-[var(--text-muted)]">Tax</span>
-                      <span>$0.00</span>
-                    </div>
-                    <div className="border-t pt-4">
-                      <div className="flex items-center justify-between font-semibold text-lg">
-                        <span>Total</span>
-                        <span>${formatPrice(order.total_amount)}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Quick Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {!isSupplier &&
-                      (order.status === 'COMPLETED' || order.status === 'DELIVERED') && (
-                        <Button className="w-full" variant="default" asChild>
-                          <Link to={`/app/receiving?order=${order.id}`}>
-                            <Package className="h-4 w-4 mr-2" />
-                            Receive this order
-                          </Link>
-                        </Button>
-                      )}
-                    <Button
-                      className="w-full"
-                      variant="outline"
-                      onClick={() => handlePrintPackingSlip()}
-                      disabled={printingPdf}
-                    >
-                      <Printer className="h-4 w-4 mr-2" />
-                      {printingPdf ? 'Preparing…' : 'Print Packing Slip'}
-                    </Button>
-                    <Button
-                      className="w-full"
-                      variant="outline"
-                      onClick={handleDownloadPackingSlipPdf}
-                      disabled={downloadingPdf}
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      {downloadingPdf ? 'Downloading...' : 'Download PDF'}
-                    </Button>
-                    {isSupplier && (
-                      <Button className="w-full" variant="outline">
-                        <Edit className="h-4 w-4 mr-2" />
-                        Add Internal Note
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
+            <LazyTabMount
+              tab="details"
+              selectedTab={activeTab}
+              fallback={<OrderDetailTabLoading />}
+            >
+              <LazyOrderDetailsTab orderId={id} />
+            </LazyTabMount>
           </TabsContent>
 
-          {/* Items Tab */}
           <TabsContent value="items">
-            <Card>
-              <CardHeader>
-                <CardTitle>Order Items</CardTitle>
-                <CardDescription>{order.items?.length || 0} items</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {(order as any).multiLocationFulfillment && (
-                  <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-                    This order is being fulfilled from multiple warehouse locations.
-                  </div>
-                )}
-                <div className="space-y-4">
-                  {order.items?.map((item: any, idx: number) => {
-                    const assignment = ((order as any).warehouseAssignments || []).find(
-                      (a: any) => a.order_item_id === item.id
-                    )
-                    return (
-                      <div
-                        key={item.id || idx}
-                        className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)]"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2 flex-wrap">
-                              <h4 className="font-semibold text-lg">
-                                {item.product_name || 'Product'}
-                              </h4>
-                              <Badge variant="outline">SKU: {item.product_sku || 'N/A'}</Badge>
-                              {assignment && (
-                                <Badge variant="secondary">
-                                  {assignment.warehouse_name} · {assignment.status}
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-[var(--text-muted)]">
-                              <div>
-                                <span className="font-medium">Quantity:</span> {item.quantity}
-                              </div>
-                              <div>
-                                <span className="font-medium">Unit Price:</span> $
-                                {formatPrice(item.unit_price)}
-                              </div>
-                              {item.supplier_name && (
-                                <div>
-                                  <span className="font-medium">Supplier:</span>{' '}
-                                  {item.supplier_name}
-                                </div>
-                              )}
-                              {item.location && (
-                                <div>
-                                  <span className="font-medium">Location:</span> {item.location}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-2xl font-bold text-[var(--brand-mid)]">
-                              ${formatPrice(item.line_total)}
-                            </p>
-                            <p className="text-sm text-[var(--text-muted)]">
-                              {item.quantity} × ${formatPrice(item.unit_price)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+            <LazyTabMount tab="items" selectedTab={activeTab} fallback={<OrderDetailTabLoading />}>
+              <LazyOrderItemsTab orderId={id} />
+            </LazyTabMount>
           </TabsContent>
 
-          {/* Invoice Tab (Restaurant Only) */}
           {!isSupplier && (
             <TabsContent value="invoice">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
-                        Invoice
-                        {invoicesData?.invoices && invoicesData.invoices.length > 1 ? 's' : ''}{' '}
-                        {invoicesData?.invoices?.length > 0 && `(${invoicesData.invoices.length})`}
-                      </CardTitle>
-                      <CardDescription>
-                        {order.status === 'COMPLETED' ||
-                        order.status === 'DELIVERED' ||
-                        order.status === 'RECEIVED_FULL'
-                          ? 'Invoice details and payment information'
-                          : 'Invoice will be generated after delivery and receiving'}
-                      </CardDescription>
-                    </div>
-                    {invoicesData?.invoices?.length > 0 && (
-                      <Button variant="outline" asChild>
-                        <Link to="/app/invoices">
-                          View All Invoices
-                          <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
-                        </Link>
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingInvoices ? (
-                    <div className="flex items-center justify-center py-12">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand)]"></div>
-                    </div>
-                  ) : invoicesData?.invoices && invoicesData.invoices.length > 0 ? (
-                    <div className="space-y-4">
-                      {invoicesData.invoices.map((invoice: any) => {
-                        const remaining =
-                          parseFloat(invoice.total_amount || 0) -
-                          parseFloat(invoice.total_paid || 0)
-                        const isOverdue =
-                          invoice.due_date &&
-                          new Date(invoice.due_date) < new Date() &&
-                          remaining > 0
-
-                        return (
-                          <div
-                            key={invoice.id}
-                            className={`border rounded-lg p-6 hover:shadow-md transition-shadow ${
-                              isOverdue ? 'border-red-300 bg-[var(--red-pale)]' : ''
-                            }`}
-                          >
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
-                                  <h3 className="text-xl font-semibold">
-                                    {invoice.invoice_number}
-                                  </h3>
-                                  <Badge variant={getStatusColor(invoice.status)}>
-                                    {invoice.status}
-                                  </Badge>
-                                  {isOverdue && <Badge variant="destructive">Overdue</Badge>}
-                                </div>
-                                <p className="text-sm text-[var(--text-muted)] font-medium">
-                                  {invoice.supplier_name}
-                                </p>
-                                <div className="flex gap-4 text-xs text-[var(--text-muted)] mt-2">
-                                  <span>
-                                    Invoice Date:{' '}
-                                    {new Date(invoice.invoice_date).toLocaleDateString()}
-                                  </span>
-                                  <span>
-                                    Due Date: {new Date(invoice.due_date).toLocaleDateString()}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-2xl font-bold">
-                                  ${formatPrice(invoice.total_amount)}
-                                </p>
-                                <p
-                                  className={`text-sm font-semibold ${remaining > 0 ? 'text-[var(--red)]' : 'text-[var(--mint)]'}`}
-                                >
-                                  Balance: ${formatPrice(remaining)}
-                                </p>
-                                {parseFloat(String(invoice.total_paid || 0)) > 0 && (
-                                  <p className="text-xs text-[var(--mint)]">
-                                    Paid: ${formatPrice(invoice.total_paid)}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex gap-2 mt-4">
-                              <Button variant="outline" size="sm" asChild>
-                                <Link to={`/app/invoices?invoice=${invoice.id}`}>
-                                  <FileText className="h-4 w-4 mr-2" />
-                                  View Details
-                                </Link>
-                              </Button>
-                              {remaining > 0 && (
-                                <Button size="sm" asChild>
-                                  <Link to={`/app/invoices?invoice=${invoice.id}&pay=true`}>
-                                    <DollarSign className="h-4 w-4 mr-2" />
-                                    Pay Invoice
-                                  </Link>
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : order.status === 'COMPLETED' || order.status === 'DELIVERED' ? (
-                    <div className="text-center py-12">
-                      <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
-                      <p className="text-lg font-semibold text-[var(--text)] mb-2">
-                        Invoice Not Yet Generated
-                      </p>
-                      <p className="text-[var(--text-muted)]">
-                        Invoice is created when the restaurant confirms receiving. Check back after
-                        receipt is recorded.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
-                      <p className="text-lg font-semibold text-[var(--text)] mb-2">
-                        Invoice Not Available
-                      </p>
-                      <p className="text-[var(--text-muted)]">
-                        Invoice will be generated when the order is completed.
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <LazyTabMount
+                tab="invoice"
+                selectedTab={activeTab}
+                fallback={<OrderDetailTabLoading />}
+              >
+                <LazyOrderInvoiceTab orderId={id} />
+              </LazyTabMount>
             </TabsContent>
           )}
 
-          {/* Picking Notes Tab (Supplier Only) */}
           {isSupplier && (
             <TabsContent value="picking">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <ClipboardList className="h-5 w-5" />
-                        Picking Notes & Labels
-                      </CardTitle>
-                      <CardDescription>Internal picking instructions and labels</CardDescription>
-                    </div>
-                    <Button onClick={() => handlePrintPackingSlip()}>
-                      <Printer className="h-4 w-4 mr-2" />
-                      Print Picking List
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {order.items?.map((item: any, idx: number) => (
-                      <div key={item.id || idx} className="border rounded-lg p-4">
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
-                          <div>
-                            <p className="text-sm font-medium text-[var(--text-muted)]">Product</p>
-                            <p className="font-semibold">{item.product_name}</p>
-                            <p className="text-xs text-[var(--text-muted)] mt-1">
-                              SKU: {item.product_sku}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-[var(--text-muted)]">Quantity</p>
-                            <p className="text-lg font-bold">{item.quantity}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-[var(--text-muted)]">
-                              Warehouse Location
-                            </p>
-                            <p className="font-medium">{item.location_code || 'Not assigned'}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-[var(--text-muted)]">
-                              Lot/Expiry
-                            </p>
-                            <p className="text-sm">—</p>
-                          </div>
-                        </div>
-                        {item.picking_notes && (
-                          <div className="mt-3 pt-3 border-t">
-                            <p className="text-sm font-medium text-[var(--text-muted)]">
-                              Picking Notes:
-                            </p>
-                            <p className="text-sm">{item.picking_notes}</p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+              <LazyTabMount
+                tab="picking"
+                selectedTab={activeTab}
+                fallback={<OrderDetailTabLoading />}
+              >
+                <LazyOrderPickingTab orderId={id} />
+              </LazyTabMount>
             </TabsContent>
           )}
 
-          {/* Delivery Info Tab (Supplier Only) */}
           {isSupplier && (
             <TabsContent value="delivery">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Truck className="h-5 w-5" />
-                      Delivery Instructions
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <p className="text-sm font-medium text-[var(--text-muted)] mb-1">
-                        Delivery Time Window
-                      </p>
-                      <p className="text-sm">{operatingHoursLabel || 'Not specified'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-[var(--text-muted)] mb-1">
-                        Access Instructions
-                      </p>
-                      <p className="text-sm">{deliveryInstructions || 'Not specified'}</p>
-                    </div>
-                    {deliveryPhone && (
-                      <div>
-                        <p className="text-sm font-medium text-[var(--text-muted)] mb-1">Contact</p>
-                        <p className="text-sm">{deliveryPhone}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <MapPin className="h-5 w-5" />
-                      Delivery Address
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <p className="font-medium">{order.restaurant_name}</p>
-                      {(order as any).branch_name && (
-                        <p className="text-sm text-[var(--text-muted)]">
-                          Branch: {(order as any).branch_name}
-                        </p>
-                      )}
-                      {addressLines.length > 0 ? (
-                        <p className="text-sm text-[var(--text-muted)]">
-                          {addressLines.map((line) => (
-                            <span key={line} className="block">
-                              {line}
-                            </span>
-                          ))}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-[var(--text-muted)]">
-                          No delivery address on file
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <LazyTabMount
+                tab="delivery"
+                selectedTab={activeTab}
+                fallback={<OrderDetailTabLoading />}
+              >
+                <LazyOrderDeliveryTab orderId={id} />
+              </LazyTabMount>
             </TabsContent>
           )}
 
-          {/* Packing Slip Tab (Supplier Only) */}
           {isSupplier && (
             <TabsContent value="packing">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <Package className="h-5 w-5" />
-                        Packing Slip
-                      </CardTitle>
-                      <CardDescription>Print-ready packing slip for shipping</CardDescription>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button onClick={() => handlePrintPackingSlip()} disabled={printingPdf}>
-                        <Printer className="h-4 w-4 mr-2" />
-                        {printingPdf ? 'Preparing…' : 'Print'}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={handleDownloadPackingSlipPdf}
-                        disabled={downloadingPdf}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        {downloadingPdf ? 'Downloading...' : 'Download PDF'}
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="border-2 border-dashed border-[var(--app-border-mid)] rounded-lg p-8 space-y-6">
-                    {/* Header */}
-                    <div className="text-center">
-                      <h2 className="text-2xl font-bold">PACKING SLIP</h2>
-                      <p className="text-sm text-[var(--text-muted)]">
-                        Order #{order.id.slice(-8).toUpperCase()}
-                      </p>
-                    </div>
-
-                    {/* Ship To */}
-                    <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-                      <div>
-                        <p className="text-sm font-bold text-[var(--text-muted)] mb-2">SHIP TO:</p>
-                        <p className="font-semibold">{order.restaurant_name}</p>
-                        {addressLines.length > 0 ? (
-                          addressLines.map((line) => (
-                            <p key={line} className="text-sm">
-                              {line}
-                            </p>
-                          ))
-                        ) : (
-                          <p className="text-sm text-[var(--text-muted)]">
-                            No delivery address on file
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-[var(--text-muted)] mb-2">
-                          ORDER DETAILS:
-                        </p>
-                        <p className="text-sm">
-                          Order Date: {new Date(order.created_at).toLocaleDateString()}
-                        </p>
-                        <p className="text-sm">Status: {order.status}</p>
-                        <p className="text-sm">Items: {order.items?.length || 0}</p>
-                      </div>
-                    </div>
-
-                    {/* Items Table */}
-                    <div>
-                      <table className="w-full border-collapse">
-                        <thead>
-                          <tr className="border-b-2 border-[var(--app-border-mid)]">
-                            <th className="text-left py-2 px-3 text-sm font-bold">Item</th>
-                            <th className="text-left py-2 px-3 text-sm font-bold">SKU</th>
-                            <th className="text-right py-2 px-3 text-sm font-bold">Qty</th>
-                            <th className="text-right py-2 px-3 text-sm font-bold">Unit Price</th>
-                            <th className="text-right py-2 px-3 text-sm font-bold">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {order.items?.map((item: any, idx: number) => (
-                            <tr key={item.id || idx} className="border-b">
-                              <td className="py-3 px-3 text-sm">{item.product_name}</td>
-                              <td className="py-3 px-3 text-sm text-[var(--text-muted)]">
-                                {item.product_sku}
-                              </td>
-                              <td className="py-3 px-3 text-sm text-right">{item.quantity}</td>
-                              <td className="py-3 px-3 text-sm text-right">
-                                ${formatPrice(item.unit_price)}
-                              </td>
-                              <td className="py-3 px-3 text-sm text-right font-medium">
-                                ${formatPrice(item.line_total)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Footer */}
-                    <div className="border-t-2 pt-4 flex justify-between">
-                      <div>
-                        <p className="text-sm text-[var(--text-muted)]">
-                          Thank you for your business!
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-lg">
-                          Total: ${formatPrice(order.total_amount)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <LazyTabMount
+                tab="packing"
+                selectedTab={activeTab}
+                fallback={<OrderDetailTabLoading />}
+              >
+                <LazyOrderPackingTab orderId={id} />
+              </LazyTabMount>
             </TabsContent>
           )}
         </Tabs>

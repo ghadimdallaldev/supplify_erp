@@ -69,8 +69,8 @@ export const LIMIT_KEY_LABELS: Record<string, string> = {
   users: 'Users',
   storage_mb: 'Storage (MB)',
   suppliers_per_restaurant: 'Suppliers',
-  promotions: 'Deals & promotions',
-  deal_redemptions_per_day: 'Deal redemptions (today)',
+  promotions: 'Active deals',
+  deal_redemptions_per_day: 'Deal redemptions per day',
 }
 
 export const FEATURE_KEY_LABELS: Record<string, string> = {
@@ -87,7 +87,7 @@ export const FEATURE_KEY_LABELS: Record<string, string> = {
   multi_warehouse: 'Multi-warehouse',
   fulfillment: 'Fulfillment & logistics',
   driver_management: 'Driver management',
-  promotions: 'Promotions',
+  promotions: 'Deals',
   supplier_deals: 'Supplier deals',
 }
 

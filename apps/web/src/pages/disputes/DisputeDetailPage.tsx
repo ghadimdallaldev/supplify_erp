@@ -9,6 +9,7 @@ import {
   useCancelDisputeMutation,
 } from '../../services/api'
 import { useImpersonation } from '../../hooks/useImpersonation'
+import { usePermissions } from '../../hooks/usePermissions'
 import { RequirePermission } from '../../components/RequirePermission'
 import { isEntitlementFeatureEnabled } from '../../lib/planLimits'
 import { formatPrice } from '../../utils/format'
@@ -20,6 +21,7 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Textarea } from '../../components/ui/textarea'
+import { Select, SelectTrigger } from '../../components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -43,6 +45,8 @@ function statusBadge(status: string) {
 export function DisputeDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { isEffectiveSupplier: isSupplier } = useImpersonation()
+  const { can } = usePermissions()
+  const canManageSupplierDisputes = can('FULFILLMENT_MANAGE')
 
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const disputesEnabled = isEntitlementFeatureEnabled(
@@ -166,7 +170,10 @@ export function DisputeDetailPage() {
   }
 
   return (
-    <RequirePermission permission="ORDERS_VIEW" title="dispute details">
+    <RequirePermission
+      permission={isSupplier ? 'FULFILLMENT_VIEW' : 'ORDERS_VIEW'}
+      title="dispute details"
+    >
       <div className="space-y-6">
         <Button variant="outline" size="sm" asChild>
           <Link to="/app/disputes">
@@ -180,21 +187,23 @@ export function DisputeDetailPage() {
           description={`${String(dispute.type || '').replace(/_/g, ' ')} · ${status.replace(/_/g, ' ')}`}
           actions={
             <div className="flex flex-wrap gap-2">
-              {isSupplier && status === 'open' && (
+              {isSupplier && canManageSupplierDisputes && status === 'open' && (
                 <Button size="sm" variant="outline" onClick={handleReview}>
                   Mark under review
                 </Button>
               )}
-              {isSupplier && (status === 'open' || status === 'under_review') && (
-                <>
-                  <Button size="sm" onClick={() => setResolveOpen(true)}>
-                    Resolve
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setRejectOpen(true)}>
-                    Reject
-                  </Button>
-                </>
-              )}
+              {isSupplier &&
+                canManageSupplierDisputes &&
+                (status === 'open' || status === 'under_review') && (
+                  <>
+                    <Button size="sm" onClick={() => setResolveOpen(true)}>
+                      Resolve
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setRejectOpen(true)}>
+                      Reject
+                    </Button>
+                  </>
+                )}
               {!isSupplier && status === 'open' && (
                 <Button size="sm" variant="outline" onClick={handleCancel} disabled={cancelling}>
                   Cancel dispute
@@ -385,16 +394,14 @@ export function DisputeDetailPage() {
             <div className="space-y-3">
               <div>
                 <Label>Resolution</Label>
-                <select
-                  className="w-full h-10 rounded-md border px-3 text-sm"
-                  value={resolutionType}
-                  onChange={(e) => setResolutionType(e.target.value)}
-                >
-                  <option value="credit_note">Credit note</option>
-                  <option value="replacement">Replacement</option>
-                  <option value="refund">Refund</option>
-                  <option value="no_action">No action</option>
-                </select>
+                <Select value={resolutionType} onValueChange={setResolutionType}>
+                  <SelectTrigger>
+                    <option value="credit_note">Credit note</option>
+                    <option value="replacement">Replacement</option>
+                    <option value="refund">Refund</option>
+                    <option value="no_action">No action</option>
+                  </SelectTrigger>
+                </Select>
               </div>
               {resolutionType === 'credit_note' && (
                 <div>

@@ -23,7 +23,7 @@ export const LIMIT_KEY_LABELS: Record<string, string> = {
   scheduled_quick_lists: 'Scheduled quick lists',
   deal_redemptions_per_day: 'Deal redemptions per day',
   supplier_products_skus: 'Supplier product SKUs',
-  promotions: 'Active promotions',
+  promotions: 'Active deals',
 }
 
 export function formatPlanCodeLabel(code: string | null | undefined): string {

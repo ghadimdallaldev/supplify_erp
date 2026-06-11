@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '../components/ui/select'
 import { toast } from 'react-hot-toast'
+import { EmptyState } from '../components/ui/empty-state'
 import {
   useGetMeQuery,
   useGetStaffPortalDashboardQuery,
@@ -29,6 +30,13 @@ import {
   useSubmitStaffPortalSwapMutation,
   useSubmitStaffSelfPtoMutation,
   useSubmitStaffSelfSwapMutation,
+  useLogoutMutation,
+  useAcknowledgeStaffPortalAnnouncementMutation,
+  useAcknowledgeStaffSelfAnnouncementMutation,
+  useGetStaffSelfAvailabilityQuery,
+  useGetStaffPortalAvailabilityQuery,
+  useSetStaffSelfAvailabilityMutation,
+  useSetStaffPortalAvailabilityMutation,
 } from '../services/api'
 import type { StaffPortalDashboard, StaffTimeEntry } from '../types'
 import { getApiErrorMessage } from '../lib/apiError'
@@ -43,17 +51,18 @@ const PTO_TYPES = [
 ]
 
 function useStaffToken() {
-  const [searchParams] = useSearchParams()
-  const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
   const token = searchParams.get('token')
 
   useEffect(() => {
     if (token) {
       localStorage.setItem('staff.portal.token', token)
+      searchParams.delete('token')
+      setSearchParams(searchParams, { replace: true })
     }
-  }, [token])
+  }, [token, searchParams, setSearchParams])
 
-  const storedToken = useMemo(() => localStorage.getItem('staff.portal.token'), [location.key])
+  const storedToken = useMemo(() => localStorage.getItem('staff.portal.token'), [])
 
   return token ?? storedToken ?? ''
 }
@@ -123,6 +132,29 @@ export function StaffSelfServiceDashboard() {
     proposedCoverId: '',
     reason: '',
   })
+  const [availabilityForm, setAvailabilityForm] = useState({
+    weekday: '1',
+    start: '09:00',
+    end: '17:00',
+    notes: '',
+  })
+
+  const [logout] = useLogoutMutation()
+  const [ackPortalAnnouncement] = useAcknowledgeStaffPortalAnnouncementMutation()
+  const [ackSelfAnnouncement] = useAcknowledgeStaffSelfAnnouncementMutation()
+  const { data: selfAvailability = [] } = useGetStaffSelfAvailabilityQuery(undefined, {
+    skip: !accountMode,
+  })
+  const { data: portalAvailability = [] } = useGetStaffPortalAvailabilityQuery(
+    { token },
+    { skip: !magicLinkMode || !token }
+  )
+  const availability = magicLinkMode ? portalAvailability : selfAvailability
+  const [setSelfAvailability, { isLoading: savingSelfAvailability }] =
+    useSetStaffSelfAvailabilityMutation()
+  const [setPortalAvailability, { isLoading: savingPortalAvailability }] =
+    useSetStaffPortalAvailabilityMutation()
+  const savingAvailability = magicLinkMode ? savingPortalAvailability : savingSelfAvailability
 
   useEffect(() => {
     if (!magicLinkMode && me && !accountMode) {
@@ -191,6 +223,55 @@ export function StaffSelfServiceDashboard() {
     }
   }
 
+  const handleEndSession = async () => {
+    if (magicLinkMode) {
+      localStorage.removeItem('staff.portal.token')
+      navigate('/staff/login', { replace: true })
+      return
+    }
+    try {
+      await logout().unwrap()
+    } catch {
+      /* still redirect */
+    }
+    navigate('/staff/login', { replace: true })
+  }
+
+  const handleAckAnnouncement = async (announcementId: string) => {
+    try {
+      if (magicLinkMode) {
+        await ackPortalAnnouncement({ token, announcementId }).unwrap()
+      } else {
+        await ackSelfAnnouncement(announcementId).unwrap()
+      }
+      toast.success('Announcement acknowledged')
+      refetch()
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to acknowledge announcement'))
+    }
+  }
+
+  const handleSaveAvailability = async (event: React.FormEvent) => {
+    event.preventDefault()
+    const body = {
+      weekday: Number(availabilityForm.weekday),
+      availability: {
+        blocks: [{ start: availabilityForm.start, end: availabilityForm.end }],
+      },
+      notes: availabilityForm.notes || undefined,
+    }
+    try {
+      if (magicLinkMode) {
+        await setPortalAvailability({ token, ...body }).unwrap()
+      } else {
+        await setSelfAvailability(body).unwrap()
+      }
+      toast.success('Availability saved')
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to save availability'))
+    }
+  }
+
   const openEntry = timeEntries.find((e: StaffTimeEntry) => !e.clockOutAt)
   const handleClockIn = async () => {
     if (!magicLinkMode && !accountMode) return
@@ -253,439 +334,504 @@ export function StaffSelfServiceDashboard() {
     )
   }
 
-  const { staff, upcomingShifts, ptoRequests, swapRequests, announcements, documents } = data
+  const {
+    staff,
+    upcomingShifts,
+    ptoRequests,
+    swapRequests,
+    announcements,
+    documents,
+    teammates = [],
+  } = data
+  const nextShift = upcomingShifts[0]
 
   return (
-    <div className="min-h-screen bg-slate-900/90 py-12 px-4">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        <header className="flex flex-col items-start justify-between gap-3 text-white lg:flex-row lg:items-center">
-          <div>
-            <p className="text-sm uppercase tracking-wide text-[var(--text-muted)]">Welcome back</p>
-            <h1 className="text-3xl font-bold tracking-tight">{staff.display_name}</h1>
-            <p className="text-sm text-[var(--text-muted)]">Role: {staff.role}</p>
-            <p className="mt-1 max-w-xl text-xs text-slate-400">
-              Staff portal — view your schedule, clock in/out, and submit requests. Restaurant
-              managers use the main app under Staff operations.
-            </p>
+    <div className="min-h-screen bg-slate-900/90 pb-12">
+      <div className="sticky top-0 z-20 border-b border-white/10 bg-slate-900/95 px-4 py-3 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">{staff.display_name}</p>
+            {openEntry ? (
+              <p className="text-xs text-[var(--mint)]">
+                Clocked in since{' '}
+                {new Date(openEntry.clockInAt).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </p>
+            ) : (
+              <p className="text-xs text-slate-400">You&apos;re off the clock</p>
+            )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="bg-[var(--mint-pale)]/10 text-[var(--mint)]">
-              {upcomingShifts.length} upcoming shifts
-            </Badge>
-            <Badge
-              variant="secondary"
-              className="bg-[var(--brand-pale)]/10 text-[var(--brand-mid)]"
+          <div className="flex gap-2">
+            {openEntry ? (
+              <Button
+                className="min-h-11 flex-1 sm:flex-none"
+                variant="outline"
+                onClick={handleClockOut}
+                disabled={checkingOut}
+              >
+                {checkingOut ? 'Clocking out…' : 'Clock out'}
+              </Button>
+            ) : (
+              <Button
+                className="min-h-11 flex-1 bg-[var(--mint)] sm:flex-none hover:opacity-90"
+                onClick={handleClockIn}
+                disabled={checkingIn}
+              >
+                {checkingIn ? 'Clocking in…' : 'Clock in'}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              className="min-h-11 text-slate-300 hover:text-white"
+              onClick={handleEndSession}
             >
-              {announcements.length} announcements
-            </Badge>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>
-              Refresh data
+              {magicLinkMode ? 'End session' : 'Sign out'}
             </Button>
           </div>
+        </div>
+      </div>
+
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-6">
+        <header className="text-white">
+          <p className="text-sm uppercase tracking-wide text-slate-400">Staff portal</p>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{staff.display_name}</h1>
+          <p className="text-sm text-slate-400">Role: {staff.role}</p>
         </header>
 
-        <Card className="border-[var(--mint)]/35 bg-[var(--mint-pale)]/50 dark:border-[var(--mint)]/50 dark:bg-[var(--mint)]/15">
-          <CardHeader>
-            <CardTitle>Time clock</CardTitle>
-            <CardDescription>
-              Clock in when you start and clock out when you leave. Your recent check-ins are listed
-              below.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              {openEntry ? (
-                <>
-                  <p className="text-sm font-medium text-[var(--mint)] dark:text-[var(--mint)]">
-                    Clocked in since{' '}
-                    {new Date(openEntry.clockInAt).toLocaleString(undefined, {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleClockOut}
-                    disabled={checkingOut}
-                    className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200"
-                  >
-                    {checkingOut ? 'Clocking out…' : 'Clock out'}
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  size="sm"
-                  onClick={handleClockIn}
-                  disabled={checkingIn}
-                  className="bg-[var(--mint)] hover:opacity-90"
-                >
-                  {checkingIn ? 'Clocking in…' : 'Clock in'}
-                </Button>
-              )}
-            </div>
-            <div>
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-                Recent check-ins & check-outs
+        {nextShift ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Next shift</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="font-semibold text-[var(--text)]">{nextShift.role}</p>
+              <p className="text-sm text-[var(--text-muted)]">
+                {new Date(nextShift.shift_date).toLocaleDateString()} ·{' '}
+                {new Date(nextShift.starts_at).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}{' '}
+                –{' '}
+                {new Date(nextShift.ends_at).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
               </p>
-              {timeEntries.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)]">
-                  No time entries yet. Clock in to start.
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {timeEntries.slice(0, 15).map((entry: StaffTimeEntry) => (
-                    <li
-                      key={entry.id}
-                      className="flex items-center justify-between rounded-lg border border-[var(--app-border)] bg-white px-3 py-2 text-sm dark:border-[var(--app-border-mid)] dark:bg-[var(--text)]"
-                    >
-                      <span className="text-[var(--text-muted)] dark:text-[var(--text-muted)]">
-                        {new Date(entry.clockInAt).toLocaleDateString()} · In{' '}
-                        {new Date(entry.clockInAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                        {entry.clockOutAt
-                          ? ` → Out ${new Date(entry.clockOutAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                          : ' (open)'}
-                      </span>
-                      <Badge
-                        variant={entry.clockOutAt ? 'secondary' : 'default'}
-                        className="text-xs"
-                      >
-                        {entry.clockOutAt ? 'Closed' : 'Open'}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>My shifts</CardTitle>
+            <CardDescription>Tap a shift to select it for a swap request.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {upcomingShifts.length === 0 ? (
+              <EmptyState
+                title="No shifts scheduled"
+                description="Check back when your manager publishes the schedule."
+              />
+            ) : (
+              upcomingShifts.map((shift: StaffPortalDashboard['upcomingShifts'][number]) => (
+                <button
+                  key={shift.id}
+                  type="button"
+                  onClick={() => setSwapForm((prev) => ({ ...prev, shiftId: shift.id }))}
+                  className={`flex w-full min-h-11 items-center justify-between rounded-xl border px-4 py-3 text-left text-sm transition ${
+                    swapForm.shiftId === shift.id
+                      ? 'border-[var(--brand)] bg-[var(--brand-pale)] text-[var(--brand-mid)]'
+                      : 'border-[var(--app-border)] bg-white'
+                  }`}
+                >
+                  <div>
+                    <p className="font-semibold text-[var(--text)]">{shift.role}</p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {new Date(shift.shift_date).toLocaleDateString()} ·{' '}
+                      {new Date(shift.starts_at).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="capitalize">
+                    {shift.status.toLowerCase()}
+                  </Badge>
+                </button>
+              ))
+            )}
           </CardContent>
         </Card>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Upcoming shifts</CardTitle>
-              <CardDescription>
-                Tap a shift to request a swap or mark your availability.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {upcomingShifts.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)]">
-                  No scheduled shifts yet. Check back soon!
-                </p>
-              ) : (
-                upcomingShifts.map((shift: StaffPortalDashboard['upcomingShifts'][number]) => (
-                  <div
-                    key={shift.id}
-                    className={`flex items-center justify-between rounded-xl border px-4 py-3 text-sm transition ${
-                      swapForm.shiftId === shift.id
-                        ? 'border-[var(--brand)] bg-[var(--brand-pale)] text-[var(--brand-mid)]'
-                        : 'border-[var(--app-border)]'
-                    }`}
+        <Card>
+          <CardHeader>
+            <CardTitle>Request time off</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-3" onSubmit={handleSubmitPto}>
+              <div>
+                <Label>Type</Label>
+                <Select
+                  value={ptoForm.type}
+                  onValueChange={(value) => setPtoForm((prev) => ({ ...prev, type: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PTO_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <Label>Start date</Label>
+                  <Input
+                    type="date"
+                    value={ptoForm.startDate}
+                    onChange={(event) =>
+                      setPtoForm((prev) => ({ ...prev, startDate: event.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>End date</Label>
+                  <Input
+                    type="date"
+                    value={ptoForm.endDate}
+                    onChange={(event) =>
+                      setPtoForm((prev) => ({ ...prev, endDate: event.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Hours (optional)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={ptoForm.hoursRequested}
+                  onChange={(event) =>
+                    setPtoForm((prev) => ({ ...prev, hoursRequested: event.target.value }))
+                  }
+                />
+              </div>
+              <div>
+                <Label>Reason (optional)</Label>
+                <Textarea
+                  value={ptoForm.reason}
+                  placeholder="Tell your manager why you need time off."
+                  onChange={(event) =>
+                    setPtoForm((prev) => ({ ...prev, reason: event.target.value }))
+                  }
+                />
+              </div>
+              <Button type="submit" className="min-h-11 w-full" disabled={submittingPto}>
+                {submittingPto ? 'Submitting…' : 'Submit request'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Request shift swap</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-3" onSubmit={handleSubmitSwap}>
+              <div>
+                <Label>Preferred cover (optional)</Label>
+                <Select
+                  value={swapForm.proposedCoverId || '__none__'}
+                  onValueChange={(value) =>
+                    setSwapForm((prev) => ({
+                      ...prev,
+                      proposedCoverId: value === '__none__' ? '' : value,
+                    }))
+                  }
+                >
+                  <SelectTrigger className="min-h-11 w-full">
+                    <SelectValue placeholder="Select teammate" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No preference</SelectItem>
+                    {teammates.map((mate) => (
+                      <SelectItem key={mate.id} value={mate.id}>
+                        {mate.displayName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Reason</Label>
+                <Textarea
+                  value={swapForm.reason}
+                  placeholder="Why do you need a swap?"
+                  onChange={(event) =>
+                    setSwapForm((prev) => ({ ...prev, reason: event.target.value }))
+                  }
+                />
+              </div>
+              <Button
+                type="submit"
+                className="min-h-11 w-full"
+                disabled={submittingSwap || !swapForm.shiftId}
+              >
+                {submittingSwap ? 'Submitting…' : 'Send swap request'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>My availability</CardTitle>
+            <CardDescription>Let managers know when you prefer to work.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-3" onSubmit={handleSaveAvailability}>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <Label>Weekday</Label>
+                  <Select
+                    value={availabilityForm.weekday}
+                    onValueChange={(value) =>
+                      setAvailabilityForm((prev) => ({ ...prev, weekday: value }))
+                    }
                   >
-                    <div>
-                      <p className="font-semibold text-[var(--text)]">{shift.role}</p>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        {new Date(shift.shift_date).toLocaleDateString()} •{' '}
-                        {new Date(shift.starts_at).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}{' '}
-                        –{' '}
-                        {new Date(shift.ends_at).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="capitalize">
-                      {shift.status.toLowerCase()}
+                    <SelectTrigger className="min-h-11">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                        <SelectItem key={day} value={String(index)}>
+                          {day}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Start</Label>
+                  <Input
+                    type="time"
+                    className="min-h-11"
+                    value={availabilityForm.start}
+                    onChange={(e) =>
+                      setAvailabilityForm((prev) => ({ ...prev, start: e.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>End</Label>
+                  <Input
+                    type="time"
+                    className="min-h-11"
+                    value={availabilityForm.end}
+                    onChange={(e) =>
+                      setAvailabilityForm((prev) => ({ ...prev, end: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+              <Button type="submit" className="min-h-11 w-full" disabled={savingAvailability}>
+                {savingAvailability ? 'Saving…' : 'Save availability'}
+              </Button>
+            </form>
+            {availability.length > 0 ? (
+              <ul className="mt-4 space-y-2 text-sm text-[var(--text-muted)]">
+                {availability.map((row, index) => (
+                  <li key={`${row.weekday}-${index}`}>
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][row.weekday]}:{' '}
+                    {(row.availability?.blocks || [])
+                      .map((b) => `${b.start}–${b.end}`)
+                      .join(', ') || '—'}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Announcements</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {announcements.length === 0 ? (
+              <EmptyState title="No announcements" description="You're all caught up." />
+            ) : (
+              announcements.map((announcement: StaffPortalDashboard['announcements'][number]) => (
+                <div
+                  key={announcement.id}
+                  className="rounded-xl border border-[var(--app-border)] p-4"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold text-[var(--text)]">{announcement.title}</p>
+                    <Badge variant={announcement.acknowledged ? 'default' : 'outline'}>
+                      {announcement.acknowledged ? 'Acknowledged' : 'Unread'}
                     </Badge>
                   </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Request time off</CardTitle>
-                <CardDescription>
-                  Managers will review and respond in the staff app.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form className="space-y-3" onSubmit={handleSubmitPto}>
-                  <div>
-                    <Label>Type</Label>
-                    <Select
-                      value={ptoForm.type}
-                      onValueChange={(value) => setPtoForm((prev) => ({ ...prev, type: value }))}
+                  <p className="mt-2 text-sm text-[var(--text-muted)]">{announcement.body}</p>
+                  {announcement.require_ack && !announcement.acknowledged ? (
+                    <Button
+                      size="sm"
+                      className="mt-3 min-h-11 w-full sm:w-auto"
+                      onClick={() => handleAckAnnouncement(announcement.id)}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PTO_TYPES.map((type) => (
-                          <SelectItem key={type.value} value={type.value}>
-                            {type.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div>
-                      <Label>Start date</Label>
-                      <Input
-                        type="date"
-                        value={ptoForm.startDate}
-                        onChange={(event) =>
-                          setPtoForm((prev) => ({ ...prev, startDate: event.target.value }))
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label>End date</Label>
-                      <Input
-                        type="date"
-                        value={ptoForm.endDate}
-                        onChange={(event) =>
-                          setPtoForm((prev) => ({ ...prev, endDate: event.target.value }))
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Hours (optional)</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step={0.5}
-                      value={ptoForm.hoursRequested}
-                      onChange={(event) =>
-                        setPtoForm((prev) => ({ ...prev, hoursRequested: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label>Reason (optional)</Label>
-                    <Textarea
-                      value={ptoForm.reason}
-                      placeholder="Tell your manager why you need time off."
-                      onChange={(event) =>
-                        setPtoForm((prev) => ({ ...prev, reason: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={submittingPto}>
-                    {submittingPto ? 'Submitting…' : 'Submit request'}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+                      Acknowledge
+                    </Button>
+                  ) : null}
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Request shift swap</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form className="space-y-3" onSubmit={handleSubmitSwap}>
-                  <div>
-                    <Label>Shift</Label>
-                    <Select
-                      value={swapForm.shiftId}
-                      onValueChange={(value) =>
-                        setSwapForm((prev) => ({ ...prev, shiftId: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select shift" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {upcomingShifts.map(
-                          (shift: StaffPortalDashboard['upcomingShifts'][number]) => (
-                            <SelectItem key={shift.id} value={shift.id}>
-                              {new Date(shift.shift_date).toLocaleDateString()} – {shift.role}
-                            </SelectItem>
-                          )
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Preferred cover (optional)</Label>
-                    <Input
-                      placeholder="Enter teammate ID if you have a cover in mind"
-                      value={swapForm.proposedCoverId}
-                      onChange={(event) =>
-                        setSwapForm((prev) => ({ ...prev, proposedCoverId: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label>Reason</Label>
-                    <Textarea
-                      value={swapForm.reason}
-                      placeholder="Why do you need a swap?"
-                      onChange={(event) =>
-                        setSwapForm((prev) => ({ ...prev, reason: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={submittingSwap || !swapForm.shiftId}
+        <Card>
+          <CardHeader>
+            <CardTitle>Time entries</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {timeEntries.length === 0 ? (
+              <EmptyState
+                title="No time entries yet"
+                description="Clock in to start tracking time."
+              />
+            ) : (
+              <ul className="space-y-2">
+                {timeEntries.slice(0, 15).map((entry: StaffTimeEntry) => (
+                  <li
+                    key={entry.id}
+                    className="flex min-h-11 items-center justify-between rounded-lg border border-[var(--app-border)] bg-white px-3 py-2 text-sm"
                   >
-                    {submittingSwap ? 'Submitting…' : 'Send swap request'}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                    <span className="text-[var(--text-muted)]">
+                      {new Date(entry.clockInAt).toLocaleDateString()} · In{' '}
+                      {new Date(entry.clockInAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                      {entry.clockOutAt
+                        ? ` → Out ${new Date(entry.clockOutAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                        : ' (open)'}
+                    </span>
+                    <Badge variant={entry.clockOutAt ? 'secondary' : 'default'} className="text-xs">
+                      {entry.clockOutAt ? 'Closed' : 'Open'}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Announcements</CardTitle>
-              <CardDescription>
-                Stay updated with important messages from leadership.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {announcements.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)]">
-                  No announcements yet. Check again soon.
-                </p>
-              ) : (
-                announcements.map((announcement: StaffPortalDashboard['announcements'][number]) => (
-                  <div
-                    key={announcement.id}
-                    className="rounded-xl border border-[var(--app-border)] p-4"
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-[var(--text)]">{announcement.title}</p>
-                      <Badge variant={announcement.acknowledged ? 'default' : 'outline'}>
-                        {announcement.acknowledged ? 'Acknowledged' : 'Unread'}
-                      </Badge>
-                    </div>
-                    <p className="mt-2 text-sm text-[var(--text-muted)]">{announcement.body}</p>
-                    <p className="mt-3 text-xs text-[var(--text-muted)]">
-                      Posted {new Date(announcement.published_at).toLocaleString()}
+        <Card>
+          <CardHeader>
+            <CardTitle>Documents & resources</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {documents.length === 0 ? (
+              <EmptyState title="No documents" description="Nothing assigned right now." />
+            ) : (
+              documents.map((document: StaffPortalDashboard['documents'][number]) => (
+                <div
+                  key={document.id}
+                  className="flex min-h-11 items-center justify-between rounded-xl border border-[var(--app-border)] p-4"
+                >
+                  <div>
+                    <p className="font-medium text-[var(--text)]">
+                      {document.title ?? document.doc_type}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Uploaded {new Date(document.uploaded_at).toLocaleDateString()}
+                      {document.expires_at
+                        ? ` · Expires ${new Date(document.expires_at).toLocaleDateString()}`
+                        : ''}
                     </p>
                   </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Documents & resources</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {documents.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)]">
-                  You’re all caught up! No documents assigned right now.
-                </p>
-              ) : (
-                documents.map((document: StaffPortalDashboard['documents'][number]) => (
-                  <div
-                    key={document.id}
-                    className="flex items-center justify-between rounded-xl border border-[var(--app-border)] p-4"
+                  <a
+                    href={document.file_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="min-h-11 flex items-center text-xs font-medium text-[var(--brand-mid)] hover:underline"
                   >
-                    <div>
-                      <p className="font-medium text-[var(--text)]">
-                        {document.title ?? document.doc_type}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        Uploaded {new Date(document.uploaded_at).toLocaleDateString()}
-                        {document.expires_at
-                          ? ` • Expires ${new Date(document.expires_at).toLocaleDateString()}`
-                          : ''}
-                      </p>
-                    </div>
-                    <a
-                      href={document.file_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs font-medium text-[var(--brand-mid)] hover:underline"
-                    >
-                      View
-                    </a>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                    View
+                  </a>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent PTO requests</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {ptoRequests.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)]">No requests submitted yet.</p>
-              ) : (
-                ptoRequests.map((request: StaffPortalDashboard['ptoRequests'][number]) => (
-                  <div
-                    key={request.id}
-                    className="flex items-center justify-between rounded-xl border border-[var(--app-border)] px-4 py-3 text-sm"
-                  >
-                    <div>
-                      <p className="font-medium text-[var(--text)]">{request.type}</p>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        {new Date(request.start_date).toLocaleDateString()} →{' '}
-                        {new Date(request.end_date).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="capitalize">
-                      {request.status.toLowerCase()}
-                    </Badge>
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent PTO requests</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {ptoRequests.length === 0 ? (
+              <EmptyState
+                title="No PTO requests"
+                description="Submit time off above when needed."
+              />
+            ) : (
+              ptoRequests.map((request: StaffPortalDashboard['ptoRequests'][number]) => (
+                <div
+                  key={request.id}
+                  className="flex min-h-11 items-center justify-between rounded-xl border border-[var(--app-border)] px-4 py-3 text-sm"
+                >
+                  <div>
+                    <p className="font-medium text-[var(--text)]">{request.type}</p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {new Date(request.start_date).toLocaleDateString()} →{' '}
+                      {new Date(request.end_date).toLocaleDateString()}
+                    </p>
                   </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
+                  <Badge variant="outline" className="capitalize">
+                    {request.status.toLowerCase()}
+                  </Badge>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Swap history</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {swapRequests.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)]">No swap activity yet.</p>
-              ) : (
-                swapRequests.map((swap: StaffPortalDashboard['swapRequests'][number]) => (
-                  <div
-                    key={swap.id}
-                    className="flex items-center justify-between rounded-xl border border-[var(--app-border)] px-4 py-3 text-sm"
-                  >
-                    <div>
-                      <p className="font-medium text-[var(--text)]">
-                        {swap.reason || 'Shift swap request'}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        {new Date(swap.created_at).toLocaleString()}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="capitalize">
-                      {swap.status.toLowerCase()}
-                    </Badge>
+        <Card>
+          <CardHeader>
+            <CardTitle>Swap history</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {swapRequests.length === 0 ? (
+              <EmptyState title="No swap activity" description="Request a swap from My shifts." />
+            ) : (
+              swapRequests.map((swap: StaffPortalDashboard['swapRequests'][number]) => (
+                <div
+                  key={swap.id}
+                  className="flex min-h-11 items-center justify-between rounded-xl border border-[var(--app-border)] px-4 py-3 text-sm"
+                >
+                  <div>
+                    <p className="font-medium text-[var(--text)]">
+                      {swap.reason || 'Shift swap request'}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {new Date(swap.created_at).toLocaleString()}
+                    </p>
                   </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                  <Badge variant="outline" className="capitalize">
+                    {swap.status.toLowerCase()}
+                  </Badge>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

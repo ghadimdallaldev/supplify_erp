@@ -1,34 +1,30 @@
 import { Navigate } from 'react-router-dom'
+import { PageLoading } from '../components/ui/page-loading'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
-import { usePermissions } from '../hooks/usePermissions'
 
-/** Default app home: drivers → deliveries; other suppliers → Command Center; restaurants → dashboard. */
+/** Default app home tailored to workspace role persona. */
 export function SupplierHome() {
-  const { isEffectiveSupplier, isPlatformAdmin, isImpersonating } = useImpersonation()
-  const { isDriverRole } = useWorkspaceRole()
-  const { canAny } = usePermissions()
-  const isAdminNotImpersonating = isPlatformAdmin && !isImpersonating
+  const {
+    isEffectiveSupplier,
+    isPlatformAdmin,
+    isImpersonating,
+    isLoading: impersonationLoading,
+  } = useImpersonation()
+  const { persona } = useWorkspaceRole()
 
-  if (isEffectiveSupplier && !isAdminNotImpersonating) {
-    if (isDriverRole) {
-      return <Navigate to="/app/driver-deliveries" replace />
+  if (isPlatformAdmin) {
+    if (impersonationLoading) {
+      return <PageLoading label="Loading…" />
     }
-    if (
-      canAny(
-        'ORDERS_MANAGE',
-        'INVOICES_VIEW',
-        'CATALOG_EDIT',
-        'FULFILLMENT_VIEW',
-        'PROMOTIONS_MANAGE'
-      )
-    ) {
-      return <Navigate to="/app/command-center" replace />
-    }
-    if (canAny('FULFILLMENT_VIEW', 'DRIVER_DELIVERIES_VIEW')) {
-      return <Navigate to="/app/fulfillment" replace />
+    if (!isImpersonating) {
+      return <Navigate to="/app/admin" replace />
     }
   }
 
-  return <Navigate to="/app/dashboard" replace />
+  if (isEffectiveSupplier) {
+    return <Navigate to={persona.homePath} replace />
+  }
+
+  return <Navigate to={persona.homePath} replace />
 }

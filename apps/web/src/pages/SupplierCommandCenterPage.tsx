@@ -19,6 +19,8 @@ import {
   ClipboardList,
   ArrowRight,
   BarChart3,
+  Percent,
+  FileText,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatCurrency } from '../utils/format'
@@ -27,11 +29,15 @@ import {
   ReorderReminderReviewDialog,
   type ReminderDraft,
 } from '../components/supplier/ReorderReminderReviewDialog'
+import { SupplierFollowUpPanel } from '../components/supplier/SupplierFollowUpPanel'
+import { usePermissions } from '../hooks/usePermissions'
+import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
+import { getCommandCenterLayout } from '../lib/workspaceRoleProfile'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
 import { EmptyState } from '../components/ui/empty-state'
 
-const QUICK_ACTIONS = [
+const OPS_QUICK_ACTIONS = [
   { label: 'Deliveries', href: '/app/fulfillment', icon: Truck, testId: 'qa-deliveries' },
   { label: 'Receivables', href: '/app/invoices', icon: DollarSign, testId: 'qa-invoices' },
   { label: 'Reorder', href: '#reorder', icon: Users, testId: 'qa-reorder' },
@@ -39,6 +45,42 @@ const QUICK_ACTIONS = [
   { label: 'Disputes', href: '/app/disputes', icon: Scale, testId: 'qa-disputes' },
   { label: 'Deals', href: '/app/promotions', icon: Tag, testId: 'qa-deals' },
 ]
+
+const SALES_QUICK_ACTIONS = [
+  { label: 'Deals', href: '/app/promotions', icon: Tag, testId: 'qa-deals' },
+  { label: 'Restaurants', href: '/app/restaurants', icon: Users, testId: 'qa-restaurants' },
+  { label: 'Reorder leads', href: '#reorder', icon: Users, testId: 'qa-reorder' },
+]
+
+const FULFILLMENT_QUICK_ACTIONS = [
+  { label: 'Fulfillment board', href: '/app/fulfillment', icon: Truck, testId: 'qa-deliveries' },
+  { label: 'Orders', href: '/app/orders', icon: Package, testId: 'qa-orders' },
+  { label: 'Low stock', href: '/app/inventory', icon: Warehouse, testId: 'qa-inventory' },
+]
+
+const CATALOG_QUICK_ACTIONS = [
+  { label: 'Products', href: '/app/products', icon: Package, testId: 'qa-products' },
+  {
+    label: 'Contract pricing',
+    href: '/app/contract-pricing',
+    icon: Percent,
+    testId: 'qa-pricing',
+  },
+  { label: 'Low stock', href: '/app/inventory', icon: Warehouse, testId: 'qa-inventory' },
+]
+
+const FINANCE_QUICK_ACTIONS = [
+  { label: 'Invoices', href: '/app/invoices', icon: FileText, testId: 'qa-invoices' },
+  { label: 'Restaurants', href: '/app/restaurants', icon: Users, testId: 'qa-restaurants' },
+]
+
+const QUICK_ACTION_SETS = {
+  ops: OPS_QUICK_ACTIONS,
+  sales: SALES_QUICK_ACTIONS,
+  fulfillment: FULFILLMENT_QUICK_ACTIONS,
+  catalog: CATALOG_QUICK_ACTIONS,
+  finance: FINANCE_QUICK_ACTIONS,
+} as const
 
 function KpiCard({
   label,
@@ -55,27 +97,47 @@ function KpiCard({
   testId: string
   extra?: ReactNode
 }) {
-  const inner = (
-    <div
-      data-testid={testId}
-      className="flex min-h-[88px] flex-col gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5"
-    >
+  const shellClass =
+    'flex min-h-[88px] flex-col gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5'
+  const main = (
+    <>
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-[var(--text-muted)]">{label}</span>
         <Icon size={16} className="shrink-0 text-[var(--brand)]" />
       </div>
       <span className="text-xl font-extrabold text-[var(--text)]">{value}</span>
-      {extra}
-    </div>
+    </>
   )
+
+  if (href && extra) {
+    return (
+      <div data-testid={testId} className={shellClass}>
+        <Link to={href} className="no-underline hover:opacity-90 transition-opacity block">
+          {main}
+        </Link>
+        {extra}
+      </div>
+    )
+  }
+
   if (href) {
     return (
-      <Link to={href} className="no-underline hover:opacity-90 transition-opacity">
-        {inner}
+      <Link
+        to={href}
+        data-testid={testId}
+        className="no-underline hover:opacity-90 transition-opacity"
+      >
+        <div className={shellClass}>{main}</div>
       </Link>
     )
   }
-  return inner
+
+  return (
+    <div data-testid={testId} className={shellClass}>
+      {main}
+      {extra}
+    </div>
+  )
 }
 
 function formatOrderDate(iso: string | undefined) {
@@ -92,6 +154,23 @@ function formatOrderDate(iso: string | undefined) {
 }
 
 export function SupplierCommandCenterPage() {
+  const { can } = usePermissions()
+  const { persona } = useWorkspaceRole()
+  const hubMode = persona.commandCenterMode ?? 'full'
+  const layout = getCommandCenterLayout(hubMode, can)
+  const hubTitle = persona.overviewNav?.label ?? 'Command Center'
+  const hubDescription =
+    hubMode === 'sales'
+      ? 'Deals, reorder leads, and restaurant follow-ups'
+      : hubMode === 'fulfillment'
+        ? 'Orders to pick, deliveries in progress, and stock alerts'
+        : hubMode === 'catalog'
+          ? 'Catalog health, pricing, and low-stock items'
+          : hubMode === 'finance'
+            ? 'Receivables, overdue accounts, and collections'
+            : persona.readOnly
+              ? 'Read-only snapshot of supplier priorities'
+              : "Today's priorities — action items, not just charts"
   const { data, isLoading, isError, error, refetch, isFetching } =
     useGetSupplierCommandCenterQuery()
   const { data: atRiskData } = useGetSupplierAtRiskOrdersQuery()
@@ -103,7 +182,7 @@ export function SupplierCommandCenterPage() {
 
   const handleDraftReminder = async (restaurantId: string) => {
     try {
-      const result = await createDraft(restaurantId).unwrap()
+      const result = await createDraft({ restaurantId, openChat: false }).unwrap()
       const draft = result.draft ?? result
       if (draft?.autoSent) {
         toast.error('Unexpected: reminder was marked as sent')
@@ -123,16 +202,21 @@ export function SupplierCommandCenterPage() {
     }
   }
 
-  const gateProps = {
-    anyOf: [
-      'ORDERS_MANAGE',
-      'INVOICES_VIEW',
-      'CATALOG_EDIT',
-      'FULFILLMENT_VIEW',
-      'PROMOTIONS_MANAGE',
-    ],
-    title: 'command center',
-  }
+  const gateProps =
+    hubMode === 'sales'
+      ? { anyOf: ['PROMOTIONS_VIEW'] as const, title: 'sales hub' }
+      : {
+          anyOf: [
+            'ORDERS_MANAGE',
+            'INVOICES_VIEW',
+            'CATALOG_EDIT',
+            'FULFILLMENT_VIEW',
+            'PROMOTIONS_MANAGE',
+            'PROMOTIONS_VIEW',
+          ] as const,
+          title: 'command center',
+        }
+  const quickActions = QUICK_ACTION_SETS[layout.quickActions]
 
   if (isLoading) {
     return (
@@ -181,26 +265,35 @@ export function SupplierCommandCenterPage() {
   return (
     <RequirePermission {...gateProps}>
       <div data-testid="supplier-command-center-page" className="page-stack">
+        {persona.readOnly && (
+          <p
+            className="rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-3 py-2 text-xs text-[var(--text-muted)]"
+            role="status"
+          >
+            Read-only workspace · {persona.roleLabel} — you can view priorities but cannot take
+            actions.
+          </p>
+        )}
         <PageHeader
-          title="Command Center"
+          title={hubTitle}
           description={
-            isFetching && !isLoading
-              ? "Today's priorities — action items, not just charts (Refreshing...)"
-              : "Today's priorities — action items, not just charts"
+            isFetching && !isLoading ? `${hubDescription} (Refreshing...)` : hubDescription
           }
           actions={
-            <Button
-              variant="outline"
-              size="sm"
-              asChild
-              data-testid="link-analytics-dashboard"
-              className="w-full sm:w-auto"
-            >
-              <Link to="/app/dashboard">
-                <BarChart3 className="h-4 w-4 mr-1.5" />
-                Analytics dashboard
-              </Link>
-            </Button>
+            layout.showAnalyticsLink ? (
+              <Button
+                variant="outline"
+                size="sm"
+                asChild
+                data-testid="link-analytics-dashboard"
+                className="w-full sm:w-auto"
+              >
+                <Link to="/app/dashboard">
+                  <BarChart3 className="h-4 w-4 mr-1.5" />
+                  Analytics dashboard
+                </Link>
+              </Button>
+            ) : undefined
           }
         />
 
@@ -209,7 +302,7 @@ export function SupplierCommandCenterPage() {
           aria-label="Quick actions"
           data-testid="command-center-quick-actions"
         >
-          {QUICK_ACTIONS.map(({ label, href, icon: Icon, testId }) => (
+          {quickActions.map(({ label, href, icon: Icon, testId }) => (
             <Link
               key={testId}
               to={href}
@@ -222,267 +315,308 @@ export function SupplierCommandCenterPage() {
           ))}
         </nav>
 
-        <div className="dashboard-kpi-grid">
-          <KpiCard
-            testId="kpi-orders-prepare"
-            label="Orders to prepare today"
-            value={kpis?.ordersToPrepareToday ?? 0}
-            icon={Package}
-            href="/app/orders"
-          />
-          <KpiCard
-            testId="kpi-deliveries-pending"
-            label="Deliveries pending"
-            value={kpis?.deliveriesPendingToday ?? 0}
-            icon={Truck}
-            href="/app/fulfillment"
-            extra={
-              previews?.deliveryGpsSummary ? (
-                <div
-                  data-testid="delivery-gps-summary"
-                  className="mt-1 border-t border-[var(--app-border)] pt-2 text-xs"
-                >
-                  <p className="mb-1.5 font-semibold text-[var(--text-muted)]">GPS today</p>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[var(--text)]">
-                    <span>
-                      <span className="font-bold text-[var(--mint)]">
-                        {previews.deliveryGpsSummary.live ?? 0}
-                      </span>{' '}
-                      Live
-                    </span>
-                    <span>
-                      <span className="font-bold text-amber-600">
-                        {previews.deliveryGpsSummary.stale ?? 0}
-                      </span>{' '}
-                      Stale
-                    </span>
-                    <span>
-                      <span className="font-bold">{previews.deliveryGpsSummary.noGps ?? 0}</span> No
-                      GPS
-                    </span>
-                    <span>
-                      <span className="font-bold text-[var(--red)]">
-                        {previews.deliveryGpsSummary.failed ?? 0}
-                      </span>{' '}
-                      Failed
-                    </span>
-                  </div>
-                  <Link
-                    to="/app/fulfillment?tab=tracking"
-                    className="mt-2 inline-flex items-center gap-1 font-semibold text-[var(--brand-mid)] hover:underline"
-                  >
-                    Open tracking
-                    <ArrowRight className="h-3 w-3" aria-hidden />
-                  </Link>
-                </div>
-              ) : undefined
+        {(layout.showOpsKpis || layout.showSalesKpi || layout.showFinanceKpi) && (
+          <div
+            className={
+              hubMode === 'sales' || hubMode === 'finance' ? 'max-w-sm' : 'dashboard-kpi-grid'
             }
-          />
-          <KpiCard
-            testId="kpi-unpaid-balance"
-            label="Unpaid balance"
-            value={formatCurrency(kpis?.unpaidBalance ?? 0)}
-            icon={DollarSign}
-            href="/app/invoices"
-          />
-          <KpiCard
-            testId="kpi-reorder-due"
-            label="Due to reorder"
-            value={kpis?.customersDueReorder ?? 0}
-            icon={Users}
-            href="#reorder"
-          />
-        </div>
-
-        <section
-          data-testid="todays-priorities"
-          className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5"
-        >
-          <h2 className="text-[15px] font-extrabold mb-2.5 flex items-center gap-2 text-[var(--text)]">
-            <ClipboardList size={16} />
-            Today&apos;s priorities
-          </h2>
-          {(data?.todaysPriorities || []).length === 0 ? (
-            <div data-testid="priorities-empty">
-              <EmptyState
-                title="No urgent items"
-                description="You're caught up for now."
-                icon={<ClipboardList className="h-5 w-5" />}
-              />
-            </div>
-          ) : (
-            <ul className="list-none p-0 m-0 flex flex-col gap-2">
-              {data!.todaysPriorities.map((item: { id: string; title: string; href: string }) => (
-                <li key={item.id}>
-                  <Link
-                    to={item.href}
-                    data-testid={`priority-${item.id}`}
-                    className="flex items-center justify-between gap-2 rounded-[10px] border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2.5 text-[13px] font-semibold text-[var(--text)] no-underline hover:border-[var(--brand-light)]"
-                  >
-                    {item.title}
-                    <ArrowRight size={14} className="text-[var(--text-muted)] shrink-0" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <div className="dashboard-content-grid">
-          <PreviewCard title="Deliveries" testId="preview-deliveries" href="/app/fulfillment">
-            {(previews?.deliveries || []).length === 0 ? (
-              <EmptyInline>No active deliveries right now.</EmptyInline>
-            ) : (
-              previews!.deliveries.map(
-                (d: {
-                  orderId: string
-                  restaurantName: string
-                  deliveryStatus: string
-                  driverName?: string
-                }) => (
-                  <div
-                    key={d.orderId}
-                    className="text-xs py-1 border-b border-[var(--app-border)] last:border-0"
-                  >
-                    <Link
-                      to={`/app/orders/${d.orderId}`}
-                      className="font-medium text-[var(--brand)] hover:underline"
-                    >
-                      {d.restaurantName}
-                    </Link>
-                    <span className="text-[var(--text-muted)]">
-                      {' '}
-                      — {formatDeliveryStatus(d.deliveryStatus)}
-                      {d.driverName ? ` · ${d.driverName}` : ''}
-                    </span>
-                  </div>
-                )
-              )
-            )}
-          </PreviewCard>
-
-          <PreviewCard title="Who owes me" testId="preview-receivables" href="/app/invoices">
-            <div className="text-[13px] font-bold">
-              {formatCurrency(previews?.receivables?.unpaidTotal ?? 0)} unpaid
-            </div>
-            <div className="text-xs text-[var(--text-muted)] mt-0.5">
-              Overdue: {formatCurrency(previews?.receivables?.overdueTotal ?? 0)}
-            </div>
-            {(previews?.receivables?.topDebtors || []).length === 0 ? (
-              <EmptyInline className="mt-2">No open balances.</EmptyInline>
-            ) : (
-              (previews?.receivables?.topDebtors || [])
-                .slice(0, 3)
-                .map((d: { restaurantId: string; restaurantName: string; balanceDue: number }) => (
-                  <Link
-                    key={d.restaurantId}
-                    to={`/app/restaurants/${d.restaurantId}`}
-                    className="block text-xs mt-1.5 text-[var(--text)] hover:text-[var(--brand)]"
-                    data-testid={`debtor-link-${d.restaurantId}`}
-                  >
-                    {d.restaurantName}: {formatCurrency(d.balanceDue)}
-                  </Link>
-                ))
-            )}
-          </PreviewCard>
-
-          <PreviewCard title="Low stock" testId="preview-low-stock" href="/app/inventory">
-            {(previews?.lowStock || []).length === 0 ? (
-              <EmptyInline>Stock levels look healthy.</EmptyInline>
-            ) : (
-              previews!.lowStock.map(
-                (p: { productId: string; name: string; availableQty: number; sku?: string }) => (
-                  <Link
-                    key={p.productId}
-                    to={`/app/products/${p.productId}`}
-                    className="block text-xs py-1 text-[var(--text)] hover:text-[var(--brand)]"
-                  >
-                    {p.name} — {p.availableQty} left
-                  </Link>
-                )
-              )
-            )}
-          </PreviewCard>
-        </div>
-
-        <section
-          id="reorder"
-          data-testid="reorder-opportunities"
-          className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5"
-        >
-          <h2 className="text-[15px] font-extrabold mb-2.5 flex items-center gap-2 text-[var(--text)]">
-            <Users size={16} />
-            Reorder opportunities
-            {(kpis?.customersDueReorder ?? 0) > 0 && (
-              <span className="text-xs font-normal text-[var(--text-muted)]">
-                ({kpis!.customersDueReorder} due)
-              </span>
-            )}
-          </h2>
-          {(previews?.reorderOpportunities || []).length === 0 ? (
-            <div data-testid="reorder-empty">
-              <EmptyState
-                title="No reorder opportunities"
-                description="No restaurants are past their usual reorder window right now."
-                icon={<Users className="h-5 w-5" />}
-              />
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {previews!.reorderOpportunities.map(
-                (c: {
-                  restaurantId: string
-                  restaurantName: string
-                  suggestedFollowUp?: string
-                  avgDaysBetween?: number
-                  lastOrderAt?: string
-                  daysSinceLastOrder?: number
-                  suggestedProducts?: Array<{ productName: string; sku: string }>
-                }) => (
-                  <div
-                    key={c.restaurantId}
-                    data-testid={`reorder-customer-${c.restaurantId}`}
-                    className="rounded-[10px] border border-[var(--app-border)] bg-[var(--surface)] p-3"
-                  >
-                    <div className="font-bold text-[13px]">{c.restaurantName}</div>
-                    <ul className="mt-2 text-xs text-[var(--text-muted)] space-y-1 list-disc pl-4">
-                      <li>Usually orders every ~{c.avgDaysBetween ?? '—'} days</li>
-                      <li>
-                        Last order: {formatOrderDate(c.lastOrderAt)} ({c.daysSinceLastOrder ?? '—'}{' '}
-                        days ago)
-                      </li>
-                      {c.suggestedProducts && c.suggestedProducts.length > 0 && (
-                        <li>
-                          Often orders:{' '}
-                          {c.suggestedProducts
-                            .slice(0, 3)
-                            .map((p) => p.productName)
-                            .join(', ')}
-                        </li>
-                      )}
-                    </ul>
-                    <div className="action-bar mt-3">
-                      <Button
-                        size="sm"
-                        disabled={drafting}
-                        data-testid={`reorder-draft-${c.restaurantId}`}
-                        className="w-full sm:w-auto"
-                        onClick={() => handleDraftReminder(c.restaurantId)}
+          >
+            {layout.showOpsKpis && (
+              <>
+                <KpiCard
+                  testId="kpi-orders-prepare"
+                  label="Orders to prepare today"
+                  value={kpis?.ordersToPrepareToday ?? 0}
+                  icon={Package}
+                  href="/app/orders"
+                />
+                <KpiCard
+                  testId="kpi-deliveries-pending"
+                  label="Deliveries pending"
+                  value={kpis?.deliveriesPendingToday ?? 0}
+                  icon={Truck}
+                  href="/app/fulfillment"
+                  extra={
+                    previews?.deliveryGpsSummary ? (
+                      <div
+                        data-testid="delivery-gps-summary"
+                        className="mt-1 border-t border-[var(--app-border)] pt-2 text-xs"
                       >
-                        Review reminder
-                      </Button>
-                      <Button size="sm" variant="outline" asChild className="w-full sm:w-auto">
-                        <Link to={`/app/restaurants/${c.restaurantId}`}>View customer</Link>
-                      </Button>
-                    </div>
-                  </div>
-                )
-              )}
-            </div>
-          )}
-        </section>
+                        <p className="mb-1.5 font-semibold text-[var(--text-muted)]">GPS today</p>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[var(--text)]">
+                          <span>
+                            <span className="font-bold text-[var(--mint)]">
+                              {previews.deliveryGpsSummary.live ?? 0}
+                            </span>{' '}
+                            Live
+                          </span>
+                          <span>
+                            <span className="font-bold text-amber-600">
+                              {previews.deliveryGpsSummary.stale ?? 0}
+                            </span>{' '}
+                            Stale
+                          </span>
+                          <span>
+                            <span className="font-bold">
+                              {previews.deliveryGpsSummary.noGps ?? 0}
+                            </span>{' '}
+                            No GPS
+                          </span>
+                          <span>
+                            <span className="font-bold text-[var(--red)]">
+                              {previews.deliveryGpsSummary.failed ?? 0}
+                            </span>{' '}
+                            Failed
+                          </span>
+                        </div>
+                        <Link
+                          to="/app/fulfillment?tab=tracking"
+                          className="mt-2 inline-flex items-center gap-1 font-semibold text-[var(--brand-mid)] hover:underline"
+                        >
+                          Open tracking
+                          <ArrowRight className="h-3 w-3" aria-hidden />
+                        </Link>
+                      </div>
+                    ) : undefined
+                  }
+                />
+              </>
+            )}
+            {layout.showFinanceKpi && (
+              <KpiCard
+                testId="kpi-unpaid-balance"
+                label="Unpaid balance"
+                value={formatCurrency(kpis?.unpaidBalance ?? 0)}
+                icon={DollarSign}
+                href="/app/invoices"
+              />
+            )}
+            {layout.showSalesKpi && (
+              <KpiCard
+                testId="kpi-reorder-due"
+                label="Restaurants due to reorder"
+                value={kpis?.customersDueReorder ?? 0}
+                icon={Users}
+                href="#reorder"
+              />
+            )}
+          </div>
+        )}
 
-        {(atRiskData?.atRisk?.length ?? 0) > 0 && (
+        {layout.showPriorities && (
+          <section
+            data-testid="todays-priorities"
+            className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5"
+          >
+            <h2 className="text-[15px] font-extrabold mb-2.5 flex items-center gap-2 text-[var(--text)]">
+              <ClipboardList size={16} />
+              Today&apos;s priorities
+            </h2>
+            {(data?.todaysPriorities || []).length === 0 ? (
+              <div data-testid="priorities-empty">
+                <EmptyState
+                  title="No urgent items"
+                  description="You're caught up for now."
+                  icon={<ClipboardList className="h-5 w-5" />}
+                />
+              </div>
+            ) : (
+              <ul className="list-none p-0 m-0 flex flex-col gap-2">
+                {data!.todaysPriorities.map((item: { id: string; title: string; href: string }) => (
+                  <li key={item.id}>
+                    <Link
+                      to={item.href}
+                      data-testid={`priority-${item.id}`}
+                      className="flex items-center justify-between gap-2 rounded-[10px] border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2.5 text-[13px] font-semibold text-[var(--text)] no-underline hover:border-[var(--brand-light)]"
+                    >
+                      {item.title}
+                      <ArrowRight size={14} className="text-[var(--text-muted)] shrink-0" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+
+        {(layout.showDeliveryPreview ||
+          layout.showReceivablesPreview ||
+          layout.showLowStockPreview) && (
+          <div className="dashboard-content-grid">
+            {layout.showDeliveryPreview && (
+              <PreviewCard title="Deliveries" testId="preview-deliveries" href="/app/fulfillment">
+                {(previews?.deliveries || []).length === 0 ? (
+                  <EmptyInline>No active deliveries right now.</EmptyInline>
+                ) : (
+                  previews!.deliveries.map(
+                    (d: {
+                      orderId: string
+                      restaurantName: string
+                      deliveryStatus: string
+                      driverName?: string
+                    }) => (
+                      <div
+                        key={d.orderId}
+                        className="text-xs py-1 border-b border-[var(--app-border)] last:border-0"
+                      >
+                        <Link
+                          to={`/app/orders/${d.orderId}`}
+                          className="font-medium text-[var(--brand)] hover:underline"
+                        >
+                          {d.restaurantName}
+                        </Link>
+                        <span className="text-[var(--text-muted)]">
+                          {' '}
+                          — {formatDeliveryStatus(d.deliveryStatus)}
+                          {d.driverName ? ` · ${d.driverName}` : ''}
+                        </span>
+                      </div>
+                    )
+                  )
+                )}
+              </PreviewCard>
+            )}
+
+            {layout.showReceivablesPreview && (
+              <PreviewCard title="Who owes me" testId="preview-receivables" href="/app/invoices">
+                <div className="text-[13px] font-bold">
+                  {formatCurrency(previews?.receivables?.unpaidTotal ?? 0)} unpaid
+                </div>
+                <div className="text-xs text-[var(--text-muted)] mt-0.5">
+                  Overdue: {formatCurrency(previews?.receivables?.overdueTotal ?? 0)}
+                </div>
+                {(previews?.receivables?.topDebtors || []).length === 0 ? (
+                  <EmptyInline className="mt-2">No open balances.</EmptyInline>
+                ) : (
+                  (previews?.receivables?.topDebtors || [])
+                    .slice(0, 3)
+                    .map(
+                      (d: { restaurantId: string; restaurantName: string; balanceDue: number }) => (
+                        <Link
+                          key={d.restaurantId}
+                          to={`/app/restaurants/${d.restaurantId}`}
+                          className="block text-xs mt-1.5 text-[var(--text)] hover:text-[var(--brand)]"
+                          data-testid={`debtor-link-${d.restaurantId}`}
+                        >
+                          {d.restaurantName}: {formatCurrency(d.balanceDue)}
+                        </Link>
+                      )
+                    )
+                )}
+              </PreviewCard>
+            )}
+
+            {layout.showLowStockPreview && (
+              <PreviewCard title="Low stock" testId="preview-low-stock" href="/app/inventory">
+                {(previews?.lowStock || []).length === 0 ? (
+                  <EmptyInline>Stock levels look healthy.</EmptyInline>
+                ) : (
+                  previews!.lowStock.map(
+                    (p: {
+                      productId: string
+                      name: string
+                      availableQty: number
+                      sku?: string
+                    }) => (
+                      <Link
+                        key={p.productId}
+                        to={`/app/products/${p.productId}`}
+                        className="block text-xs py-1 text-[var(--text)] hover:text-[var(--brand)]"
+                      >
+                        {p.name} — {p.availableQty} left
+                      </Link>
+                    )
+                  )
+                )}
+              </PreviewCard>
+            )}
+          </div>
+        )}
+
+        {layout.showReorder && <SupplierFollowUpPanel className="mb-4" />}
+
+        {layout.showReorder && (
+          <section
+            id="reorder"
+            data-testid="reorder-opportunities"
+            className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5"
+          >
+            <h2 className="text-[15px] font-extrabold mb-2.5 flex items-center gap-2 text-[var(--text)]">
+              <Users size={16} />
+              Reorder opportunities
+              {(kpis?.customersDueReorder ?? 0) > 0 && (
+                <span className="text-xs font-normal text-[var(--text-muted)]">
+                  ({kpis!.customersDueReorder} due)
+                </span>
+              )}
+            </h2>
+            {(previews?.reorderOpportunities || []).length === 0 ? (
+              <div data-testid="reorder-empty">
+                <EmptyState
+                  title="No reorder opportunities"
+                  description="No restaurants are past their usual reorder window right now."
+                  icon={<Users className="h-5 w-5" />}
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {previews!.reorderOpportunities.map(
+                  (c: {
+                    restaurantId: string
+                    restaurantName: string
+                    suggestedFollowUp?: string
+                    avgDaysBetween?: number
+                    lastOrderAt?: string
+                    daysSinceLastOrder?: number
+                    suggestedProducts?: Array<{ productName: string; sku: string }>
+                  }) => (
+                    <div
+                      key={c.restaurantId}
+                      data-testid={`reorder-customer-${c.restaurantId}`}
+                      className="rounded-[10px] border border-[var(--app-border)] bg-[var(--surface)] p-3"
+                    >
+                      <div className="font-bold text-[13px]">{c.restaurantName}</div>
+                      <ul className="mt-2 text-xs text-[var(--text-muted)] space-y-1 list-disc pl-4">
+                        <li>Usually orders every ~{c.avgDaysBetween ?? '—'} days</li>
+                        <li>
+                          Last order: {formatOrderDate(c.lastOrderAt)} (
+                          {c.daysSinceLastOrder ?? '—'} days ago)
+                        </li>
+                        {c.suggestedProducts && c.suggestedProducts.length > 0 && (
+                          <li>
+                            Often orders:{' '}
+                            {c.suggestedProducts
+                              .slice(0, 3)
+                              .map((p) => p.productName)
+                              .join(', ')}
+                          </li>
+                        )}
+                      </ul>
+                      <div className="action-bar mt-3">
+                        {layout.allowReorderActions && (
+                          <Button
+                            size="sm"
+                            disabled={drafting}
+                            data-testid={`reorder-draft-${c.restaurantId}`}
+                            className="w-full sm:w-auto"
+                            onClick={() => handleDraftReminder(c.restaurantId)}
+                          >
+                            Review reminder
+                          </Button>
+                        )}
+                        <Button size="sm" variant="outline" asChild className="w-full sm:w-auto">
+                          <Link to={`/app/restaurants/${c.restaurantId}`}>View customer</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
+        {layout.showAtRisk && (atRiskData?.atRisk?.length ?? 0) > 0 && (
           <section
             data-testid="at-risk-expected-orders"
             className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5"
@@ -509,34 +643,36 @@ export function SupplierCommandCenterPage() {
           </section>
         )}
 
-        <section
-          data-testid="preview-boosted-deals"
-          className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5"
-        >
-          <h2 className="text-[15px] font-extrabold mb-2 flex items-center gap-2">
-            <Tag size={16} />
-            Boosted deals (30 days)
-          </h2>
-          {previews?.boostedDeals ? (
-            <>
-              <p className="text-[13px] m-0">
-                {previews.boostedDeals.activeBoostedDeals} active ·{' '}
-                {previews.boostedDeals.totalViews} impressions · {previews.boostedDeals.totalClicks}{' '}
-                clicks
-              </p>
-              <Link
-                to="/app/deals"
-                className="text-xs text-[var(--brand)] font-semibold mt-2 inline-block"
-              >
-                Manage deals →
-              </Link>
-            </>
-          ) : (
-            <EmptyInline>No boosted deal activity in the last 30 days.</EmptyInline>
-          )}
-        </section>
+        {layout.showBoostedDeals && (
+          <section
+            data-testid="preview-boosted-deals"
+            className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5"
+          >
+            <h2 className="text-[15px] font-extrabold mb-2 flex items-center gap-2">
+              <Tag size={16} />
+              Boosted deals (30 days)
+            </h2>
+            {previews?.boostedDeals ? (
+              <>
+                <p className="text-[13px] m-0">
+                  {previews.boostedDeals.activeBoostedDeals} active ·{' '}
+                  {previews.boostedDeals.totalViews} impressions ·{' '}
+                  {previews.boostedDeals.totalClicks} clicks
+                </p>
+                <Link
+                  to="/app/promotions"
+                  className="text-xs text-[var(--brand)] font-semibold mt-2 inline-block"
+                >
+                  Manage deals →
+                </Link>
+              </>
+            ) : (
+              <EmptyInline>No boosted deal activity in the last 30 days.</EmptyInline>
+            )}
+          </section>
+        )}
 
-        {(kpis?.openDisputes ?? 0) > 0 && (
+        {layout.showDisputeAlerts && (kpis?.openDisputes ?? 0) > 0 && (
           <Link
             to="/app/disputes"
             data-testid="preview-disputes"
@@ -546,7 +682,7 @@ export function SupplierCommandCenterPage() {
             {kpis!.openDisputes} dispute(s) need your response
           </Link>
         )}
-        {(kpis?.fulfillmentAlerts ?? 0) > 0 && (
+        {layout.showFulfillmentAlerts && (kpis?.fulfillmentAlerts ?? 0) > 0 && (
           <Link
             to="/app/fulfillment"
             data-testid="preview-fulfillment-alerts"

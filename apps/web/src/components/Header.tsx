@@ -40,7 +40,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/app/reports': 'Reports',
   '/app/disputes': 'Disputes',
   '/app/deals': 'Deals',
-  '/app/promotions': 'Promotions',
+  '/app/promotions': 'Deals',
   '/app/driver-deliveries': 'My Deliveries',
   '/app/onboarding': 'Onboarding',
   '/app/org': 'Organization',
@@ -416,31 +416,6 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
                           <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>
                             {new Date(notification.created_at).toLocaleString()}
                           </div>
-                          {(() => {
-                            const meta =
-                              typeof notification.metadata === 'string'
-                                ? JSON.parse(notification.metadata || '{}')
-                                : notification.metadata || {}
-                            const whatsappUrl = meta?.whatsappUrl
-                            return whatsappUrl ? (
-                              <a
-                                href={whatsappUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  display: 'inline-flex',
-                                  marginTop: 4,
-                                  fontSize: 11,
-                                  fontWeight: 500,
-                                  color: 'var(--mint)',
-                                  textDecoration: 'none',
-                                }}
-                                onClick={(event) => event.stopPropagation()}
-                              >
-                                Open in WhatsApp
-                              </a>
-                            ) : null
-                          })()}
                         </div>
                         {!notification.is_read && (
                           <div

@@ -1,6 +1,6 @@
-import { Button } from '../ui/button'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { useGetPromotionAnalyticsQuery } from '../../services/api'
+import { formatBoostStatusLabel } from '../../lib/dealDisplayLabels'
 import { Loader2 } from 'lucide-react'
 
 export function DealAnalyticsDialog({
@@ -20,7 +20,7 @@ export function DealAnalyticsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Deal performance</DialogTitle>
+          <DialogTitle>{promo ? 'Boost analytics' : 'Deal performance'}</DialogTitle>
         </DialogHeader>
         {isLoading ? (
           <Loader2 className="h-6 w-6 animate-spin" />
@@ -28,7 +28,7 @@ export function DealAnalyticsDialog({
           <div className="grid grid-cols-2 gap-3 text-sm">
             <Stat label="Views" value={a?.views} />
             <Stat label="Clicks" value={a?.clicks} />
-            <Stat label="Orders" value={a?.orders_influenced ?? a?.orders} />
+            <Stat label="Deal redemptions" value={a?.orders_influenced ?? a?.orders} />
             <Stat label="Messages" value={a?.messages} />
             <Stat label="Coupon uses" value={a?.couponUses} />
             <Stat
@@ -36,13 +36,14 @@ export function DealAnalyticsDialog({
               value={a?.conversionRate != null ? `${a.conversionRate}%` : '—'}
             />
             <Stat
-              label="Total discount"
+              label="Discount amount"
               value={a?.total_discount != null ? `$${Number(a.total_discount).toFixed(2)}` : '—'}
             />
             {promo ? (
               <div className="col-span-2 text-xs text-[var(--text-muted)] border-t pt-2">
-                Boost: {String(promo.status)} · budget ${Number(promo.budget || 0).toFixed(2)} ·{' '}
-                {String(promo.impressions || 0)} impressions
+                Boost: {formatBoostStatusLabel(promo.status)} · budget $
+                {Number(promo.budget || 0).toFixed(2)} · {String(promo.impressions || 0)}{' '}
+                impressions · sponsored placement
               </div>
             ) : null}
           </div>

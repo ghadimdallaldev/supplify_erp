@@ -19,6 +19,9 @@ import {
   staffPortalCheckOut,
   submitStaffPortalPto,
   submitStaffPortalSwap,
+  acknowledgeStaffAnnouncement,
+  setStaffAvailability,
+  getStaffAvailability,
 } from '../services/staff-portal-self.service.js'
 import {
   acceptWaitlistOffer,
@@ -33,6 +36,13 @@ import {
   CAPACITY_CONSUMING_STATUSES,
   DEFAULT_DURATION_MINUTES,
 } from '../lib/reservation-availability.js'
+import {
+  getPublicSupplierProfile,
+  listPublicSupplierProducts,
+  listAuthenticatedRestaurantProducts,
+  resolvePublicSupplierByIdOrSlug,
+} from '../services/public-supplier-catalog.service.js'
+import { requireAuth, getRestaurantIdForRequest } from '../lib/rbac.js'
 
 const router = express.Router()
 
@@ -186,6 +196,103 @@ router.get('/restaurants/:idOrSlug', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'PUBLIC_RESTAURANT_ERROR', message: 'Unable to load restaurant' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+const publicSupplierProductsSchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().optional(),
+  q: z.string().optional(),
+  category: z.string().optional(),
+})
+
+router.get('/suppliers/:idOrSlug', async (req, res) => {
+  try {
+    const data = await getPublicSupplierProfile(req.params.idOrSlug)
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (error) {
+    if (error.name === 'NotFoundError') {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'SUPPLIER_NOT_FOUND', message: 'Supplier catalog not found' },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Public supplier fetch failed', { error: error.message })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'PUBLIC_SUPPLIER_ERROR', message: 'Unable to load supplier catalog' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/suppliers/:idOrSlug/products', async (req, res) => {
+  try {
+    const params = publicSupplierProductsSchema.parse(req.query)
+    const supplier = await resolvePublicSupplierByIdOrSlug(req.params.idOrSlug)
+    const data = await listPublicSupplierProducts(supplier.id, params)
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (error) {
+    if (error.name === 'NotFoundError') {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'SUPPLIER_NOT_FOUND', message: 'Supplier catalog not found' },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Public supplier products fetch failed', { error: error.message })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'PUBLIC_SUPPLIER_PRODUCTS_ERROR', message: 'Unable to load products' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/suppliers/:idOrSlug/products/priced', requireAuth, async (req, res) => {
+  try {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Restaurant login required for pricing' },
+        requestId: req.requestId,
+      })
+    }
+    const params = publicSupplierProductsSchema.parse(req.query)
+    const supplier = await resolvePublicSupplierByIdOrSlug(req.params.idOrSlug)
+    const data = await listAuthenticatedRestaurantProducts(supplier.id, restaurantId, params)
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (error) {
+    if (error.name === 'NotFoundError') {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'SUPPLIER_NOT_FOUND', message: 'Supplier catalog not found' },
+        requestId: req.requestId,
+      })
+    }
+    if (error.name === 'ForbiddenError') {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Public supplier priced products fetch failed', { error: error.message })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'PUBLIC_SUPPLIER_PRICED_ERROR', message: 'Unable to load priced products' },
       requestId: req.requestId,
     })
   }
@@ -874,6 +981,97 @@ router.post('/staff/swaps', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'STAFF_SWAP_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/staff/announcements/:id/ack', async (req, res) => {
+  try {
+    const token = req.body?.token || req.query.token
+    const session = await ensureStaffSession(token)
+    if (!session) {
+      return res.status(401).json({
+        ok: false,
+        data: null,
+        error: { name: 'INVALID_SESSION', message: 'Session expired or invalid' },
+        requestId: req.requestId,
+      })
+    }
+    const data = await acknowledgeStaffAnnouncement(
+      session.staff_id,
+      session.restaurant_id,
+      req.params.id
+    )
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (error) {
+    const status = error.status || 400
+    res.status(status).json({
+      ok: false,
+      data: null,
+      error: { name: error.name || 'STAFF_ACK_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/staff/availability', async (req, res) => {
+  try {
+    const params = staffDashboardSchema.parse({ token: req.query.token })
+    const session = await ensureStaffSession(params.token)
+    if (!session) {
+      return res.status(401).json({
+        ok: false,
+        data: null,
+        error: { name: 'INVALID_SESSION', message: 'Session expired or invalid' },
+        requestId: req.requestId,
+      })
+    }
+    const data = await getStaffAvailability(session.staff_id, session.restaurant_id)
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (error) {
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'STAFF_AVAILABILITY_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/staff/availability', async (req, res) => {
+  try {
+    const token = req.body?.token
+    const session = await ensureStaffSession(token)
+    if (!session) {
+      return res.status(401).json({
+        ok: false,
+        data: null,
+        error: { name: 'INVALID_SESSION', message: 'Session expired or invalid' },
+        requestId: req.requestId,
+      })
+    }
+    const payload = z
+      .object({
+        weekday: z.number().int().min(0).max(6),
+        availability: z.object({
+          blocks: z.array(
+            z.object({
+              start: z.string(),
+              end: z.string(),
+            })
+          ),
+        }),
+        notes: z.string().optional(),
+      })
+      .parse(req.body)
+    const data = await setStaffAvailability(session.staff_id, session.restaurant_id, payload)
+    res.status(201).json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (error) {
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'STAFF_AVAILABILITY_ERROR', message: error.message },
       requestId: req.requestId,
     })
   }

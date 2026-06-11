@@ -73,58 +73,102 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto -mx-1 px-1">
-              <table className="w-full min-w-[720px] text-sm" data-testid="routes-table">
-                <thead>
-                  <tr className="border-b text-left text-[var(--text-muted)]">
-                    <th className="p-2 font-medium">Route</th>
-                    <th className="p-2 font-medium">Driver</th>
-                    <th className="p-2 font-medium">Date</th>
-                    <th className="p-2 font-medium">Area</th>
-                    <th className="p-2 font-medium">Stops</th>
-                    <th className="p-2 font-medium">Progress</th>
-                    <th className="p-2 font-medium">Status</th>
-                    <th className="p-2 font-medium text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {routes.map((route) => (
-                    <tr
-                      key={route.id}
-                      className={`border-b border-[var(--app-border)] hover:bg-[var(--brand-ultra)] ${
-                        selectedId === route.id ? 'bg-[var(--brand-ultra)]' : ''
-                      }`}
+            <>
+              <div className="space-y-3 sm:hidden" data-testid="routes-mobile-list">
+                {routes.map((route) => (
+                  <article
+                    key={route.id}
+                    className={`rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4 shadow-sm ${
+                      selectedId === route.id ? 'ring-2 ring-[var(--brand-mid)]/30' : ''
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-[var(--text)]">{route.routeLabel}</p>
+                        <p className="text-sm text-[var(--text-muted)]">{route.driverName}</p>
+                      </div>
+                      <Badge variant={route.status === 'IN_PROGRESS' ? 'default' : 'secondary'}>
+                        {route.status === 'PLANNED' ? 'Route planned' : route.status}
+                      </Badge>
+                    </div>
+                    <p className="mt-2 text-sm text-[var(--text-muted)]">
+                      {route.scheduledDate
+                        ? new Date(route.scheduledDate).toLocaleDateString()
+                        : '—'}
+                      {route.area ? ` · ${route.area}` : ''}
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--text)]">
+                      {Array.isArray(route.stops) ? route.stops.length : route.stops} stops ·{' '}
+                      {route.completedStops} done
+                    </p>
+                    <Button
+                      className="mt-3 min-h-[44px] w-full"
+                      size="lg"
+                      variant="outline"
+                      onClick={() => setSelectedId(route.id)}
                     >
-                      <td className="p-2 font-medium">{route.routeLabel}</td>
-                      <td className="p-2">{route.driverName}</td>
-                      <td className="p-2 whitespace-nowrap">
-                        {route.scheduledDate
-                          ? new Date(route.scheduledDate).toLocaleDateString()
-                          : '—'}
-                      </td>
-                      <td className="p-2 text-[var(--text-muted)]">{route.area || '—'}</td>
-                      <td className="p-2 tabular-nums">
-                        {Array.isArray(route.stops) ? route.stops.length : route.stops}
-                      </td>
-                      <td className="p-2 text-xs text-[var(--text-muted)]">
-                        {route.completedStops} done · {route.failedStops} failed
-                        {route.rescheduledStops > 0 ? ` · ${route.rescheduledStops} resched` : ''}
-                      </td>
-                      <td className="p-2">
-                        <Badge variant={route.status === 'IN_PROGRESS' ? 'default' : 'secondary'}>
-                          {route.status}
-                        </Badge>
-                      </td>
-                      <td className="p-2 text-right">
-                        <Button size="sm" variant="outline" onClick={() => setSelectedId(route.id)}>
-                          View
-                        </Button>
-                      </td>
+                      View route
+                    </Button>
+                  </article>
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto -mx-1 px-1 sm:block">
+                <table className="w-full min-w-[720px] text-sm" data-testid="routes-table">
+                  <thead>
+                    <tr className="border-b text-left text-[var(--text-muted)]">
+                      <th className="p-2 font-medium">Route</th>
+                      <th className="p-2 font-medium">Driver</th>
+                      <th className="p-2 font-medium">Date</th>
+                      <th className="p-2 font-medium">Area</th>
+                      <th className="p-2 font-medium">Stops</th>
+                      <th className="p-2 font-medium">Progress</th>
+                      <th className="p-2 font-medium">Status</th>
+                      <th className="p-2 font-medium text-right">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {routes.map((route) => (
+                      <tr
+                        key={route.id}
+                        className={`border-b border-[var(--app-border)] hover:bg-[var(--brand-ultra)] ${
+                          selectedId === route.id ? 'bg-[var(--brand-ultra)]' : ''
+                        }`}
+                      >
+                        <td className="p-2 font-medium">{route.routeLabel}</td>
+                        <td className="p-2">{route.driverName}</td>
+                        <td className="p-2 whitespace-nowrap">
+                          {route.scheduledDate
+                            ? new Date(route.scheduledDate).toLocaleDateString()
+                            : '—'}
+                        </td>
+                        <td className="p-2 text-[var(--text-muted)]">{route.area || '—'}</td>
+                        <td className="p-2 tabular-nums">
+                          {Array.isArray(route.stops) ? route.stops.length : route.stops}
+                        </td>
+                        <td className="p-2 text-xs text-[var(--text-muted)]">
+                          {route.completedStops} done · {route.failedStops} failed
+                          {route.rescheduledStops > 0 ? ` · ${route.rescheduledStops} resched` : ''}
+                        </td>
+                        <td className="p-2">
+                          <Badge variant={route.status === 'IN_PROGRESS' ? 'default' : 'secondary'}>
+                            {route.status}
+                          </Badge>
+                        </td>
+                        <td className="p-2 text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSelectedId(route.id)}
+                          >
+                            View
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

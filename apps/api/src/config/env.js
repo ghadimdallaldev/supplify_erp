@@ -2,7 +2,7 @@ import dotenv from 'dotenv'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { existsSync } from 'node:fs'
-import { loadRailwayApiEnvDefaults } from './load-railway-env.js'
+import { isRailwayRuntime, loadRailwayApiEnvDefaults } from './load-railway-env.js'
 import { resolveNativeDatabaseUrl } from './resolve-database-url.js'
 import {
   envBool,
@@ -21,7 +21,9 @@ const repoRoot = path.resolve(apiEnvDir, '../..')
 loadRailwayApiEnvDefaults(repoRoot)
 dotenv.config({ path: path.join(apiEnvDir, '.env') })
 const dockerSyncPath = path.join(apiEnvDir, '.env.docker-sync')
-if (existsSync(dockerSyncPath)) {
+// Local Docker port overrides must not stomp Railway CLI / hosted DATABASE_URL (railway run injects
+// postgres.railway.internal; .env.docker-sync would otherwise redirect seeds to localhost).
+if (existsSync(dockerSyncPath) && !isRailwayRuntime()) {
   dotenv.config({ path: dockerSyncPath, override: true })
 }
 
@@ -155,28 +157,15 @@ export const config = {
       : `http://localhost:${process.env.PORT || 4000}`),
   REDIS_URL: resolveRedisUrl(),
   E2E_SECRET: process.env.E2E_SECRET || '',
-  TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || '',
-  TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || '',
-  TWILIO_WHATSAPP_FROM: process.env.TWILIO_WHATSAPP_FROM || '',
   EMAIL_ENABLED: envBool(process.env.EMAIL_ENABLED, true),
   EMAIL_LOG_ONLY: envBool(process.env.EMAIL_LOG_ONLY, false),
-  EMAIL_PROVIDER:
-    process.env.EMAIL_PROVIDER ||
-    (process.env.SENDGRID_API_KEY ? 'sendgrid' : process.env.SMTP_HOST ? 'smtp' : ''),
-  EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || process.env.SENDGRID_FROM_NAME || 'Supplify',
+  EMAIL_PROVIDER: process.env.EMAIL_PROVIDER || (process.env.SMTP_HOST ? 'smtp' : ''),
+  EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || 'Supplify',
   EMAIL_FROM_ADDRESS:
-    process.env.EMAIL_FROM_ADDRESS ||
-    process.env.EMAIL_FROM ||
-    process.env.SENDGRID_FROM_EMAIL ||
-    process.env.SMTP_FROM ||
-    '',
+    process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_FROM || process.env.SMTP_FROM || '',
   EMAIL_REPLY_TO: process.env.EMAIL_REPLY_TO || '',
   EMAIL_TEST_TO: process.env.EMAIL_TEST_TO || '',
-  EMAIL_FROM: process.env.EMAIL_FROM || process.env.SENDGRID_FROM_EMAIL || '',
-  EMAIL_API_KEY: process.env.EMAIL_API_KEY || process.env.SENDGRID_API_KEY || '',
-  SENDGRID_API_KEY: process.env.SENDGRID_API_KEY || '',
-  SENDGRID_FROM_EMAIL: process.env.SENDGRID_FROM_EMAIL || '',
-  SENDGRID_FROM_NAME: process.env.SENDGRID_FROM_NAME || 'Supplify',
+  EMAIL_FROM: process.env.EMAIL_FROM || '',
   SMTP_FROM:
     process.env.SMTP_FROM ||
     process.env.EMAIL_FROM_ADDRESS ||
@@ -258,6 +247,35 @@ export const config = {
   DELIVERY_ETA_MIN_MULTIPLIER: envFloat(process.env.DELIVERY_ETA_MIN_MULTIPLIER, 1.0),
   DELIVERY_ETA_MAX_MULTIPLIER: envFloat(process.env.DELIVERY_ETA_MAX_MULTIPLIER, 1.5),
   DELIVERY_ETA_SERVICE_TIME_MINUTES: envFloat(process.env.DELIVERY_ETA_SERVICE_TIME_MINUTES, 5),
+  DELIVERY_ROLLOVER_ENABLED: envBool(process.env.DELIVERY_ROLLOVER_ENABLED, false),
+  DELIVERY_ROLLOVER_CUTOFF_HOUR: envInt(process.env.DELIVERY_ROLLOVER_CUTOFF_HOUR, 3),
+  DELIVERY_ROLLOVER_TIMEZONE: process.env.DELIVERY_ROLLOVER_TIMEZONE || 'Asia/Beirut',
+  DELIVERY_ROLLOVER_KEEP_DRIVER: envBool(process.env.DELIVERY_ROLLOVER_KEEP_DRIVER, true),
+  CRON_DELIVERY_ROLLOVER_INTERVAL_MS: envInt(
+    process.env.CRON_DELIVERY_ROLLOVER_INTERVAL_MS,
+    60 * 60 * 1000
+  ),
+  DEFAULT_TENANT_TIMEZONE:
+    process.env.DEFAULT_TENANT_TIMEZONE || process.env.DELIVERY_ROLLOVER_TIMEZONE || 'Asia/Beirut',
+  EMAIL_RETRY_MAX_ATTEMPTS: envInt(process.env.EMAIL_RETRY_MAX_ATTEMPTS, 3),
+  EMAIL_RETRY_LOOKBACK_DAYS: envInt(process.env.EMAIL_RETRY_LOOKBACK_DAYS, 7),
+  CRON_EMAIL_RETRY_INTERVAL_MS: envInt(process.env.CRON_EMAIL_RETRY_INTERVAL_MS, 60 * 60 * 1000),
+  EMAIL_DIGEST_LOOKBACK_HOURS: envInt(process.env.EMAIL_DIGEST_LOOKBACK_HOURS, 24),
+  CRON_EMAIL_DIGEST_INTERVAL_MS: envInt(
+    process.env.CRON_EMAIL_DIGEST_INTERVAL_MS,
+    24 * 60 * 60 * 1000
+  ),
+  CRON_STALE_GPS_INTERVAL_MS: envInt(process.env.CRON_STALE_GPS_INTERVAL_MS, 15 * 60 * 1000),
+  CRON_LOG_RETENTION_INTERVAL_MS: envInt(
+    process.env.CRON_LOG_RETENTION_INTERVAL_MS,
+    24 * 60 * 60 * 1000
+  ),
+  NOTIFICATION_LOG_RETENTION_DAYS: envInt(process.env.NOTIFICATION_LOG_RETENTION_DAYS, 90),
+  EMAIL_DELIVERY_LOG_RETENTION_DAYS: envInt(process.env.EMAIL_DELIVERY_LOG_RETENTION_DAYS, 180),
+  ADMIN_AUDIT_LOG_RETENTION_DAYS: envInt(process.env.ADMIN_AUDIT_LOG_RETENTION_DAYS, 365),
+  STAFF_PORTAL_SESSION_RETENTION_DAYS: envInt(process.env.STAFF_PORTAL_SESSION_RETENTION_DAYS, 30),
+  GPS_STALE_ALERT_LOG_RETENTION_DAYS: envInt(process.env.GPS_STALE_ALERT_LOG_RETENTION_DAYS, 30),
+  EMAIL_DIGEST_LOG_RETENTION_DAYS: envInt(process.env.EMAIL_DIGEST_LOG_RETENTION_DAYS, 90),
 }
 
 if (!config.STORAGE_PUBLIC_URL) {

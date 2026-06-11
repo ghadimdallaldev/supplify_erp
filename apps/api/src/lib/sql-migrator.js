@@ -15,6 +15,44 @@ function readMigrationSql(filePath) {
   return buf.toString('utf8')
 }
 
+async function loadAppliedMigrationVersions() {
+  const { rows: colRows } = await query(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'schema_migrations'
+      AND column_name IN ('version', 'migration')
+  `)
+  const names = new Set(colRows.map((r) => r.column_name))
+  const col = names.has('version') ? 'version' : names.has('migration') ? 'migration' : 'version'
+  const { rows } = await query(`SELECT ${col} AS version FROM schema_migrations`)
+  return new Set(rows.map((row) => row.version))
+}
+
+async function recordAppliedMigration(file) {
+  const { rows: colRows } = await query(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'schema_migrations'
+      AND column_name IN ('version', 'migration')
+  `)
+  const names = new Set(colRows.map((r) => r.column_name))
+  if (names.has('version')) {
+    await query(
+      'INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT (version) DO NOTHING',
+      [file]
+    )
+    return
+  }
+  if (names.has('migration')) {
+    await query(
+      'INSERT INTO schema_migrations (migration) VALUES ($1) ON CONFLICT (migration) DO NOTHING',
+      [file]
+    )
+  }
+}
+
 export async function baseSchemaExists() {
   const { rows } = await query(`
     SELECT EXISTS (
@@ -37,8 +75,7 @@ export async function runAllSqlMigrations() {
     )
   `)
 
-  const { rows: appliedRows } = await query('SELECT version FROM schema_migrations')
-  const applied = new Set(appliedRows.map((row) => row.version))
+  const applied = await loadAppliedMigrationVersions()
 
   const files = readdirSync(migrationsDir)
     .filter((f) => f.endsWith('.sql'))
@@ -71,7 +108,7 @@ export async function runAllSqlMigrations() {
       }
     }
 
-    await query('INSERT INTO schema_migrations (version) VALUES ($1)', [file])
+    await recordAppliedMigration(file)
     applied.add(file)
     logger.info({ event: 'db.migration.applied', file })
   }

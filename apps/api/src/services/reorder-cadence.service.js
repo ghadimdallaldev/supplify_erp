@@ -1,4 +1,10 @@
 import { query } from '../lib/db.js'
+import { formatYmd } from '../lib/reservation-board-date.js'
+import {
+  getDefaultTenantTimezone,
+  getRestaurantTimezone,
+  getZonedDayOfWeek,
+} from '../lib/tenant-timezone.js'
 
 export const MIN_ORDERS_FOR_CADENCE = 4
 export const LOOKBACK_DAYS = 180
@@ -10,10 +16,11 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
  * Recompute cadence patterns for a restaurant (or all restaurants when restaurantId null).
  */
 export async function recomputeCadencePatterns({ restaurantId = null } = {}) {
-  const params = [LOOKBACK_DAYS, MIN_ORDERS_FOR_CADENCE]
+  const defaultTz = getDefaultTenantTimezone()
+  const params = [LOOKBACK_DAYS, MIN_ORDERS_FOR_CADENCE, defaultTz]
   let restaurantFilter = ''
   if (restaurantId) {
-    restaurantFilter = 'AND o.restaurant_id = $3'
+    restaurantFilter = 'AND o.restaurant_id = $4'
     params.push(restaurantId)
   }
 
@@ -31,9 +38,12 @@ export async function recomputeCadencePatterns({ restaurantId = null } = {}) {
         oi.supplier_id,
         oi.product_id,
         p.category_id,
-        EXTRACT(DOW FROM COALESCE(o.placed_at, o.created_at))::int AS dow,
+        EXTRACT(DOW FROM (
+          COALESCE(o.placed_at, o.created_at) AT TIME ZONE COALESCE(NULLIF(TRIM(r.timezone), ''), $3)
+        ))::int AS dow,
         COUNT(DISTINCT o.id)::int AS order_count
       FROM customer_order o
+      JOIN restaurant r ON r.id = o.restaurant_id
       JOIN order_item oi ON oi.order_id = o.id
       JOIN product p ON p.id = oi.product_id
       WHERE o.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
@@ -112,9 +122,12 @@ export async function recomputeCadencePatterns({ restaurantId = null } = {}) {
         o.restaurant_id,
         oi.supplier_id,
         p.category_id,
-        EXTRACT(DOW FROM COALESCE(o.placed_at, o.created_at))::int AS dow,
+        EXTRACT(DOW FROM (
+          COALESCE(o.placed_at, o.created_at) AT TIME ZONE COALESCE(NULLIF(TRIM(r.timezone), ''), $3)
+        ))::int AS dow,
         COUNT(DISTINCT o.id)::int AS order_count
       FROM customer_order o
+      JOIN restaurant r ON r.id = o.restaurant_id
       JOIN order_item oi ON oi.order_id = o.id
       JOIN product p ON p.id = oi.product_id
       WHERE o.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
@@ -168,78 +181,55 @@ export async function recomputeCadencePatterns({ restaurantId = null } = {}) {
   return { patternsProcessed: inserted }
 }
 
-async function hasRecentOrder({ restaurantId, supplierId, productId, categoryId, cadenceLevel }) {
-  const { rows } = await query(
-    `
-    SELECT 1 FROM customer_order o
-    JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $2
-    LEFT JOIN product p ON p.id = oi.product_id
-    WHERE o.restaurant_id = $1
-      AND o.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
-      AND COALESCE(o.placed_at, o.created_at) >= NOW() - ($3::int || ' days')::interval
-      AND (
-        ($4::uuid IS NOT NULL AND oi.product_id = $4)
-        OR ($5::uuid IS NOT NULL AND p.category_id = $5)
-        OR ($4 IS NULL AND $5 IS NULL)
-      )
-    LIMIT 1
-    `,
-    [
-      restaurantId,
-      supplierId,
-      REPLACEMENT_GRACE_DAYS,
-      cadenceLevel === 'product' ? productId : null,
-      cadenceLevel === 'category' ? categoryId : null,
-    ]
-  )
-  return rows.length > 0
-}
-
-async function hasReminderSent(cadenceId, reminderDate) {
-  const { rows } = await query(
-    `SELECT 1 FROM reorder_cadence_reminder_log WHERE cadence_id = $1 AND reminder_date = $2`,
-    [cadenceId, reminderDate]
-  )
-  return rows.length > 0
-}
-
 export async function getMissedCadencesForToday({ now = new Date() } = {}) {
-  const dow = now.getUTCDay()
-  const todayDate = now.toISOString().slice(0, 10)
+  const defaultTz = getDefaultTenantTimezone()
 
   const { rows } = await query(
     `
-    SELECT c.*, r.name AS restaurant_name, s.name AS supplier_name
+    SELECT
+      c.*,
+      r.name AS restaurant_name,
+      s.name AS supplier_name,
+      ((now() AT TIME ZONE COALESCE(NULLIF(TRIM(r.timezone), ''), $2)))::date AS reminder_date
     FROM restaurant_order_cadence c
     JOIN restaurant r ON r.id = c.restaurant_id
     JOIN supplier s ON s.id = c.supplier_id
-    WHERE c.is_active = true AND c.day_of_week = $1
+    WHERE c.is_active = true
+      AND c.day_of_week = EXTRACT(DOW FROM (now() AT TIME ZONE COALESCE(NULLIF(TRIM(r.timezone), ''), $2)))::int
+      AND NOT EXISTS (
+        SELECT 1 FROM reorder_cadence_reminder_log l
+        WHERE l.cadence_id = c.id
+          AND l.reminder_date = ((now() AT TIME ZONE COALESCE(NULLIF(TRIM(r.timezone), ''), $2)))::date
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM customer_order o
+        JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = c.supplier_id
+        LEFT JOIN product p ON p.id = oi.product_id
+        WHERE o.restaurant_id = c.restaurant_id
+          AND o.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
+          AND COALESCE(o.placed_at, o.created_at) >= NOW() - ($1::int || ' days')::interval
+          AND (
+            (c.cadence_level = 'product' AND oi.product_id = c.product_id)
+            OR (c.cadence_level = 'category' AND p.category_id = c.category_id)
+          )
+      )
     `,
-    [dow]
+    [REPLACEMENT_GRACE_DAYS, defaultTz]
   )
 
-  const missed = []
-  for (const cadence of rows) {
-    const orderedToday = await hasRecentOrder({
-      restaurantId: cadence.restaurant_id,
-      supplierId: cadence.supplier_id,
-      productId: cadence.product_id,
-      categoryId: cadence.category_id,
-      cadenceLevel: cadence.cadence_level,
-    })
-    if (orderedToday) continue
-    if (await hasReminderSent(cadence.id, todayDate)) continue
-    missed.push({
-      ...cadence,
-      dayName: DAY_NAMES[cadence.day_of_week],
-      reminderDate: todayDate,
-    })
-  }
-  return missed
+  return rows.map((cadence) => ({
+    ...cadence,
+    dayName: DAY_NAMES[cadence.day_of_week],
+    reminderDate:
+      typeof cadence.reminder_date === 'string'
+        ? cadence.reminder_date.slice(0, 10)
+        : formatYmd(cadence.reminder_date),
+  }))
 }
 
 export async function listRestaurantReminders(restaurantId) {
-  const dow = new Date().getUTCDay()
+  const tz = await getRestaurantTimezone(restaurantId)
+  const dow = getZonedDayOfWeek(new Date(), tz)
   const { rows } = await query(
     `
     SELECT c.*, s.name AS supplier_name
@@ -281,42 +271,75 @@ export async function runCadenceReminderCheck({ notify = true } = {}) {
   if (!notify) return { missedCount: missed.length, notificationsSent: 0 }
 
   const { notifyTenantUsers } = await import('./notification.service.js')
+  const { isFeatureEnabled } = await import('../lib/subscription.js')
   let notificationsSent = 0
 
   for (const cadence of missed) {
+    const restaurantSmartReorder = await isFeatureEnabled(
+      cadence.restaurant_id,
+      'RESTAURANT',
+      'smart_reorder'
+    )
+    const supplierSmartReorder = await isFeatureEnabled(
+      cadence.supplier_id,
+      'SUPPLIER',
+      'smart_reorder'
+    )
+    if (!restaurantSmartReorder && !supplierSmartReorder) continue
+
+    const claim = await query(
+      `
+      INSERT INTO reorder_cadence_reminder_log (cadence_id, reminder_date, restaurant_notified, supplier_notified)
+      VALUES ($1, $2, false, false)
+      ON CONFLICT (cadence_id, reminder_date) DO NOTHING
+      RETURNING id
+      `,
+      [cadence.id, cadence.reminderDate]
+    )
+    if (claim.rows.length === 0) continue
+
     const dayName = DAY_NAMES[cadence.day_of_week]
     const restaurantMsg = `You usually order ${cadence.label} on ${dayName}s. No order was placed today.`
     const supplierMsg = `${cadence.restaurant_name} usually orders ${cadence.label} every ${dayName} but has not ordered yet.`
 
-    await notifyTenantUsers({
-      tenantId: cadence.restaurant_id,
-      tenantType: 'RESTAURANT',
-      notificationType: 'ORDER',
-      notificationCategory: 'reorder_cadence_missed',
-      title: 'Suggested reorder reminder',
-      message: restaurantMsg,
-      referenceType: 'QUICK_LIST',
-      metadata: { link: '/app/quick-lists', cadenceId: cadence.id },
-    })
+    let restaurantNotified = false
+    let supplierNotified = false
 
-    await notifyTenantUsers({
-      tenantId: cadence.supplier_id,
-      tenantType: 'SUPPLIER',
-      notificationType: 'ORDER',
-      notificationCategory: 'reorder_cadence_missed',
-      title: 'Expected order not placed',
-      message: supplierMsg,
-      referenceType: 'ORDER',
-      metadata: { link: '/app/supplier/command-center', cadenceId: cadence.id },
-    })
+    if (restaurantSmartReorder) {
+      await notifyTenantUsers({
+        tenantId: cadence.restaurant_id,
+        tenantType: 'RESTAURANT',
+        notificationType: 'ORDER',
+        notificationCategory: 'reorder_cadence_missed',
+        title: 'Suggested reorder reminder',
+        message: restaurantMsg,
+        referenceType: 'QUICK_LIST',
+        metadata: { link: '/app/quick-lists', cadenceId: cadence.id },
+      })
+      restaurantNotified = true
+    }
+
+    if (supplierSmartReorder) {
+      await notifyTenantUsers({
+        tenantId: cadence.supplier_id,
+        tenantType: 'SUPPLIER',
+        notificationType: 'ORDER',
+        notificationCategory: 'reorder_cadence_missed',
+        title: 'Expected order not placed',
+        message: supplierMsg,
+        referenceType: 'ORDER',
+        metadata: { link: '/app/supplier/command-center', cadenceId: cadence.id },
+      })
+      supplierNotified = true
+    }
 
     await query(
       `
-      INSERT INTO reorder_cadence_reminder_log (cadence_id, reminder_date, restaurant_notified, supplier_notified)
-      VALUES ($1, $2, true, true)
-      ON CONFLICT (cadence_id, reminder_date) DO NOTHING
+      UPDATE reorder_cadence_reminder_log
+      SET restaurant_notified = $3, supplier_notified = $4
+      WHERE cadence_id = $1 AND reminder_date = $2
       `,
-      [cadence.id, cadence.reminderDate]
+      [cadence.id, cadence.reminderDate, restaurantNotified, supplierNotified]
     )
     notificationsSent += 1
   }

@@ -1,12 +1,29 @@
 import express from 'express'
-import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  requirePermission,
+  getSupplierIdForRequest,
+} from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 import { notifySupplierLowStock, notifyOutOfStock } from '../services/notification.service.js'
+import { requireFeature } from '../lib/subscription.js'
+import {
+  computeSupplierStockFlags,
+  DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD,
+} from '../lib/supplier-stock-status.js'
 
 const router = express.Router()
+
+const inventoryManagementGate = requireFeature(
+  'inventory_management',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
 
 router.use(requireAuth, resolveTenantContext, requirePermission('INVENTORY_VIEW'))
 
@@ -25,21 +42,31 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
         p.sku,
         p.supplier_id,
         s.name as supplier_name,
-        0 as low_stock_threshold,
+        COALESCE(pis.low_stock_threshold, ${DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD}) as low_stock_threshold,
         w.name as warehouse_name,
         w.code as warehouse_code
       FROM inventory i
       JOIN product p ON p.id = i.product_id
       JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
       LEFT JOIN warehouse w ON w.id = i.warehouse_id
     `
 
     const queryParams = []
 
-    // For suppliers, only show their own products
+    // For suppliers, only show their active workspace products
     if (req.userData.role === 'SUPPLIER') {
-      inventoryQuery += ` WHERE s.contact_email = $1`
-      queryParams.push(req.userData.email)
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
+        return res.json({
+          ok: true,
+          data: { inventory: [] },
+          error: null,
+          requestId: req.requestId,
+        })
+      }
+      inventoryQuery += ` WHERE p.supplier_id = $1`
+      queryParams.push(supplierId)
     }
 
     inventoryQuery += ` ORDER BY p.name`
@@ -48,12 +75,17 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
     const { rows } = await query(inventoryQuery, queryParams)
 
     // Format the data for frontend
-    const formattedInventory = rows.map((row) => ({
-      ...row,
-      isLowStock: row.low_stock_threshold
-        ? parseFloat(row.available_qty) < row.low_stock_threshold
-        : false,
-    }))
+    const formattedInventory = rows.map((row) => {
+      const flags = computeSupplierStockFlags(row.available_qty, row.low_stock_threshold)
+      return {
+        ...row,
+        low_stock_threshold: flags.lowStockThreshold,
+        isLowStock: flags.isLowStock,
+        isOutOfStock: flags.isOutOfStock,
+        isInStock: flags.isInStock,
+        stockStatus: flags.stockStatus,
+      }
+    })
 
     res.json({
       ok: true,
@@ -124,23 +156,15 @@ const inventorySettingsSchema = z.object({
   backorderEtaDays: z.number().int().min(0).optional(),
 })
 
-// Helper: Check if user owns the product
-async function checkProductOwnership(productId, userEmail) {
-  const { rows } = await query(
-    `
-    SELECT p.*, s.contact_email 
-    FROM product p 
-    JOIN supplier s ON s.id = p.supplier_id 
-    WHERE p.id = $1
-  `,
-    [productId]
-  )
+// Helper: Check if supplier workspace owns the product
+async function checkProductOwnership(productId, supplierId) {
+  const { rows } = await query(`SELECT p.* FROM product p WHERE p.id = $1`, [productId])
 
   if (rows.length === 0) {
     throw new NotFoundError('Product not found')
   }
 
-  if (rows[0].contact_email !== userEmail) {
+  if (supplierId && rows[0].supplier_id !== supplierId) {
     throw new ValidationError('You can only manage inventory for your own products')
   }
 
@@ -213,6 +237,7 @@ router.get('/product/:productId', requireAuth, async (req, res) => {
 // Update inventory (direct update without adjustment log)
 router.patch(
   '/product/:productId',
+  inventoryManagementGate,
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
   requirePermission('INVENTORY_EDIT'),
@@ -223,7 +248,8 @@ router.patch(
 
       // Verify product ownership for suppliers
       if (req.userData.role === 'SUPPLIER') {
-        await checkProductOwnership(productId, req.userData.email)
+        const supplierId = await getSupplierIdForRequest(req)
+        await checkProductOwnership(productId, supplierId)
       }
 
       // Update or insert inventory
@@ -283,6 +309,7 @@ router.patch(
 // Create inventory adjustment (with reason tracking)
 router.post(
   '/product/:productId/adjustment',
+  inventoryManagementGate,
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
   requirePermission('INVENTORY_EDIT'),
@@ -293,7 +320,8 @@ router.post(
 
       // Verify product ownership for suppliers
       if (req.userData.role === 'SUPPLIER') {
-        await checkProductOwnership(productId, req.userData.email)
+        const supplierId = await getSupplierIdForRequest(req)
+        await checkProductOwnership(productId, supplierId)
       }
 
       // Start transaction
@@ -352,8 +380,8 @@ router.post(
           [productId]
         )
 
-        if (settings.length > 0 && newQty < settings[0].low_stock_threshold) {
-          const threshold = settings[0].low_stock_threshold
+        const threshold = settings[0]?.low_stock_threshold ?? DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD
+        if (computeSupplierStockFlags(newQty, threshold).isLowStock) {
           await query(
             `
           INSERT INTO inventory_alert (product_id, warehouse_id, alert_type, threshold_value, current_value)
@@ -480,6 +508,7 @@ router.get('/product/:productId/adjustments', requireAuth, async (req, res) => {
 // Manage product inventory settings
 router.patch(
   '/product/:productId/settings',
+  inventoryManagementGate,
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
   requirePermission('INVENTORY_EDIT'),
@@ -490,7 +519,8 @@ router.patch(
 
       // Verify product ownership for suppliers
       if (req.userData.role === 'SUPPLIER') {
-        await checkProductOwnership(productId, req.userData.email)
+        const supplierId = await getSupplierIdForRequest(req)
+        await checkProductOwnership(productId, supplierId)
       }
 
       const { rows } = await query(
@@ -583,10 +613,19 @@ router.get('/alerts', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (re
 
     const queryParams = []
 
-    // For suppliers, only show their own products
+    // For suppliers, only show their active workspace products
     if (req.userData.role === 'SUPPLIER') {
-      alertsQuery += ` AND s.contact_email = $1`
-      queryParams.push(req.userData.email)
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
+        return res.json({
+          ok: true,
+          data: { alerts: [] },
+          error: null,
+          requestId: req.requestId,
+        })
+      }
+      alertsQuery += ` AND p.supplier_id = $1`
+      queryParams.push(supplierId)
     }
 
     alertsQuery += ` ORDER BY ia.created_at DESC LIMIT 50`
@@ -624,12 +663,12 @@ router.patch(
 
       // Verify ownership for suppliers
       if (req.userData.role === 'SUPPLIER') {
+        const supplierId = await getSupplierIdForRequest(req)
         const { rows: alerts } = await query(
           `
-        SELECT ia.*, s.contact_email
+        SELECT ia.*, p.supplier_id
         FROM inventory_alert ia
         JOIN product p ON p.id = ia.product_id
-        JOIN supplier s ON s.id = p.supplier_id
         WHERE ia.id = $1
       `,
           [alertId]
@@ -639,7 +678,7 @@ router.patch(
           throw new NotFoundError('Alert not found')
         }
 
-        if (alerts[0].contact_email !== req.userData.email) {
+        if (!supplierId || alerts[0].supplier_id !== supplierId) {
           return res.status(403).json({
             ok: false,
             data: null,

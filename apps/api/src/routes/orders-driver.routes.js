@@ -57,7 +57,14 @@ async function resolveSupplierId(req) {
 
 const assignSchema = z.object({ driver_id: z.string().uuid() })
 const deliveryStatusSchema = z.object({
-  status: z.enum(['picked_up', 'out_for_delivery', 'delivered', 'failed', 'rescheduled']),
+  status: z.enum([
+    'assigned',
+    'picked_up',
+    'out_for_delivery',
+    'delivered',
+    'failed',
+    'rescheduled',
+  ]),
   notes: z.string().optional().nullable(),
   failure_reason: z.string().optional().nullable(),
 })

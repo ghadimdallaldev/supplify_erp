@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
+import { Select, SelectTrigger } from '../ui/select'
 import { Textarea } from '../ui/textarea'
 import {
   useGetOrderFulfillmentIssuesQuery,
@@ -105,17 +106,15 @@ export function SupplierFulfillmentIssuePanel({
       <div className="space-y-3">
         <div>
           <Label className="text-xs">Affected line</Label>
-          <select
-            className="mt-1 w-full rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-2 py-2 text-sm"
-            value={orderItemId}
-            onChange={(e) => setOrderItemId(e.target.value)}
-          >
-            {items.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.product_name} ({item.quantity} {item.unit || 'unit'})
-              </option>
-            ))}
-          </select>
+          <Select value={orderItemId} onValueChange={setOrderItemId}>
+            <SelectTrigger className="mt-1">
+              {items.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.product_name} ({item.quantity} {item.unit || 'unit'})
+                </option>
+              ))}
+            </SelectTrigger>
+          </Select>
         </div>
 
         <div className="grid grid-cols-2 gap-2">

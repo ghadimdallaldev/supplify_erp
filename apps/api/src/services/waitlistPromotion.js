@@ -3,7 +3,7 @@ import { logger } from '../lib/logger.js'
 import { isFeatureEnabled } from '../lib/subscription.js'
 import { config } from '../config/env.js'
 import { sendTemplateEmail } from './email/email.service.js'
-import { buildWhatsAppUrl } from '../lib/whatsapp.js'
+import { sendWhatsAppMessage } from './whatsapp.service.js'
 import {
   getRestaurantSlotAvailability,
   assertSlotBookable,
@@ -70,10 +70,11 @@ export async function notifyGuestWaitlistOffer(waitlistEntry, restaurantName) {
   }
 
   if (customerPhone) {
-    const guestWhatsAppUrl = buildWhatsAppUrl(customerPhone, message)
-    if (guestWhatsAppUrl) {
-      results.whatsapp = true
-      results.whatsappUrl = guestWhatsAppUrl
+    try {
+      const waResult = await sendWhatsAppMessage({ to: customerPhone, message })
+      results.whatsapp = Boolean(waResult.sent)
+    } catch (error) {
+      logger.error('Waitlist offer WhatsApp failed', { error: error.message })
     }
   }
 

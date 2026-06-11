@@ -48,14 +48,8 @@ export async function safeOperationalQuery(name, sql, fallback, params = []) {
 }
 
 export function getEmailConfigSummary() {
-  const provider =
-    config.EMAIL_PROVIDER || (config.EMAIL_API_KEY ? 'sendgrid' : config.SMTP_HOST ? 'smtp' : '')
-  const providerConfigured = Boolean(
-    provider &&
-      (provider === 'sendgrid'
-        ? Boolean(config.EMAIL_API_KEY && config.EMAIL_FROM)
-        : Boolean(config.SMTP_HOST && config.SMTP_USER))
-  )
+  const provider = config.EMAIL_PROVIDER || (config.SMTP_HOST ? 'smtp' : '')
+  const providerConfigured = Boolean(provider && config.SMTP_HOST && config.SMTP_PASS)
   return {
     enabled: config.EMAIL_ENABLED,
     logOnly: config.EMAIL_LOG_ONLY,

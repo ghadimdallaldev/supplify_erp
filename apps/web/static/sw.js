@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-globals */
 /** @type {string} */
-const CACHE_VERSION = 'supplify-static-v1'
+const CACHE_VERSION = 'supplify-static-v2'
 /** @type {string[]} */
 const PRECACHE_URLS = [
   '/offline.html',

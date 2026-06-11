@@ -60,7 +60,7 @@ function StopActions({
             disabled={disabled}
             onClick={() => onStopStatus(stop.id, stop.orderId, 'OUT_FOR_DELIVERY')}
           >
-            Deliver next
+            I&apos;m on the way
           </Button>
         ) : null}
         {showDeliver ? (
@@ -75,7 +75,7 @@ function StopActions({
             disabled={disabled}
             onClick={() => onStopStatus(stop.id, stop.orderId, 'DELIVERED')}
           >
-            Mark delivered
+            Delivered
           </Button>
         ) : null}
         {showFailed ? (
@@ -86,7 +86,7 @@ function StopActions({
             disabled={disabled}
             onClick={() => onStopStatus(stop.id, stop.orderId, 'FAILED')}
           >
-            Failed
+            Problem
           </Button>
         ) : null}
       </div>

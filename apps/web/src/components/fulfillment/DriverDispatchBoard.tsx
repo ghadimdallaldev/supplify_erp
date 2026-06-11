@@ -4,10 +4,10 @@ import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Label } from '../ui/label'
+import { Select, SelectTrigger } from '../ui/select'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { Skeleton } from '../ui/skeleton'
-import { formatPrice } from '../../utils/format'
 import { CheckCircle, AlertTriangle, Loader2, Route } from 'lucide-react'
 import { CreateRouteDialog } from './CreateRouteDialog'
 import { canSelectOrderForRoute } from './fulfillmentDispatchUtils'
@@ -19,6 +19,7 @@ import {
   useReassignDriverOnOrderMutation,
   useUpdateOrderDeliveryStatusMutation,
   useSubmitOrderProofOfDeliveryMutation,
+  useRolloverAssignmentToTomorrowMutation,
 } from '../../services/api'
 import { usePermissions } from '../../hooks/usePermissions'
 import { DispatchOrderRow } from './DispatchOrderRow'
@@ -70,6 +71,7 @@ export function DriverDispatchBoard({
   const [updateDeliveryStatus, { isLoading: updatingStatus }] =
     useUpdateOrderDeliveryStatusMutation()
   const [submitPod, { isLoading: submittingPod }] = useSubmitOrderProofOfDeliveryMutation()
+  const [rolloverAssignment, { isLoading: rollingOver }] = useRolloverAssignmentToTomorrowMutation()
 
   const driverLabel = (d: { full_name?: string; fullName?: string }) =>
     d.full_name ?? d.fullName ?? 'Driver'
@@ -105,11 +107,23 @@ export function DriverDispatchBoard({
     }
   }
 
+  const moveToTomorrow = async (order: DispatchOrderCard) => {
+    const assignmentId = order.assignment?.id
+    if (!assignmentId) return
+    try {
+      await rolloverAssignment({ assignmentId }).unwrap()
+      toast.success('Moved to tomorrow')
+    } catch (e: unknown) {
+      const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
+      toast.error(msg || 'Could not move to tomorrow')
+    }
+  }
+
   const advanceStatus = async (order: DispatchOrderCard, next: string) => {
     try {
       await updateDeliveryStatus({
         orderId: order.id,
-        status: next as 'picked_up' | 'out_for_delivery' | 'delivered' | 'rescheduled',
+        status: next as 'picked_up' | 'out_for_delivery' | 'delivered' | 'rescheduled' | 'assigned',
       }).unwrap()
       if (next === 'delivered') {
         setPodOrder(order)
@@ -351,10 +365,10 @@ export function DriverDispatchBoard({
                       <Button
                         size="sm"
                         variant="ghost"
-                        disabled={updatingStatus}
-                        onClick={() => advanceStatus(order, 'rescheduled')}
+                        disabled={updatingStatus || rollingOver}
+                        onClick={() => moveToTomorrow(order)}
                       >
-                        Reschedule
+                        Move to tomorrow
                       </Button>
                     </div>
                   )}
@@ -420,10 +434,10 @@ export function DriverDispatchBoard({
                         <Button
                           size="sm"
                           variant="ghost"
-                          disabled={updatingStatus}
-                          onClick={() => advanceStatus(order, 'rescheduled')}
+                          disabled={updatingStatus || rollingOver}
+                          onClick={() => moveToTomorrow(order)}
                         >
-                          Reschedule
+                          Move to tomorrow
                         </Button>
                       </>
                     )}
@@ -474,20 +488,17 @@ export function DriverDispatchBoard({
                 <DialogTitle>Assign driver</DialogTitle>
               </DialogHeader>
               <Label htmlFor="assign-driver-select">Driver</Label>
-              <select
-                id="assign-driver-select"
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
-                value={selectedDriverId}
-                onChange={(e) => setSelectedDriverId(e.target.value)}
-              >
-                <option value="">Select driver…</option>
-                {drivers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {driverLabel(d)}
-                    {d.vehicleType ? ` (${d.vehicleType})` : ''}
-                  </option>
-                ))}
-              </select>
+              <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+                <SelectTrigger id="assign-driver-select">
+                  <option value="">Select driver…</option>
+                  {drivers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {driverLabel(d)}
+                      {d.vehicleType ? ` (${d.vehicleType})` : ''}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setAssignOrder(null)}>
                   Cancel
@@ -506,19 +517,16 @@ export function DriverDispatchBoard({
                 <DialogTitle>Reassign driver</DialogTitle>
               </DialogHeader>
               <Label htmlFor="reassign-driver-select">New driver</Label>
-              <select
-                id="reassign-driver-select"
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
-                value={selectedDriverId}
-                onChange={(e) => setSelectedDriverId(e.target.value)}
-              >
-                <option value="">Select driver…</option>
-                {drivers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {driverLabel(d)}
-                  </option>
-                ))}
-              </select>
+              <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+                <SelectTrigger id="reassign-driver-select">
+                  <option value="">Select driver…</option>
+                  {drivers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {driverLabel(d)}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setReassignOrder(null)}>
                   Cancel

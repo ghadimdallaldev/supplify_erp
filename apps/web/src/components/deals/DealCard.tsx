@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
@@ -20,22 +21,30 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../../utils/format'
-import { useAppDispatch, useAppSelector } from '../../hooks/redux'
+import { useAppDispatch } from '../../hooks/redux'
+import { useImpersonation } from '../../hooks/useImpersonation'
 import { getDealRedeemGate } from '../../lib/planLimits'
 import { LIMIT_UPGRADE_COPY } from '../../lib/upgradeCopy'
 import { openBrowseUpgrade } from '../../lib/openBrowseUpgrade'
 import { cn } from '../../lib/utils'
 import { cardActionBtnClass, cardShellClass } from '../ui/card-layout'
+import {
+  COUPON_COPIED_TOAST,
+  COUPON_LINKED_HELPER,
+  formatDealTypeLabel,
+  getCtaLabel,
+} from '../../lib/dealDisplayLabels'
 
 export type DealRecord = Record<string, unknown>
 
 function formatDiscount(deal: DealRecord) {
   const type = String(deal.type || '')
   const val = deal.discount_value
-  if (val == null) return String(type).replace(/_/g, ' ')
-  if (type === 'percentage_discount') return `${val}% off`
-  if (type === 'fixed_discount') return `${formatPrice(Number(val))} off`
-  return String(type).replace(/_/g, ' ')
+  if (val == null) return formatDealTypeLabel(type)
+  if (type === 'percentage_discount' || type === 'percentage_off') return `${val}% off`
+  if (type === 'fixed_discount' || type === 'fixed_off') return `${formatPrice(Number(val))} off`
+  if (type === 'free_shipping') return 'Free shipping'
+  return formatDealTypeLabel(type)
 }
 
 function formatValidUntil(deal: DealRecord) {
@@ -48,16 +57,7 @@ function formatValidUntil(deal: DealRecord) {
 }
 
 function ctaLabel(deal: DealRecord) {
-  switch (deal.cta_type) {
-    case 'use_coupon':
-      return 'Use coupon'
-    case 'message_supplier':
-      return 'Message supplier'
-    case 'view_products':
-      return 'View products'
-    default:
-      return 'Order now'
-  }
+  return getCtaLabel(deal.cta_type, 'restaurant')
 }
 
 function CtaIcon({ cta }: { cta: string }) {
@@ -102,9 +102,11 @@ export function DealCard({
 }) {
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
-  const { user } = useAppSelector((state) => state.auth)
+  const { isEffectiveRestaurant, shouldLoadTenantEntitlements } = useImpersonation()
+  const cardRef = useRef<HTMLDivElement>(null)
+  const viewTracked = useRef(false)
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
-    skip: !user || user.role !== 'RESTAURANT',
+    skip: !shouldLoadTenantEntitlements || !isEffectiveRestaurant,
   })
   const dealRedeemGate = getDealRedeemGate(entitlementsData?.entitlements)
   const canRedeem = canRedeemProp ?? dealRedeemGate.canRedeem
@@ -117,13 +119,38 @@ export function DealCard({
   const supplierId = String(deal.supplier_id || '')
   const isSponsored = Boolean(deal.is_sponsored)
 
-  const trackClick = async () => {
+  const trackInteraction = async (interactionType: 'view' | 'click') => {
     try {
-      await recordInteraction({ id: dealId, interactionType: 'click' }).unwrap()
+      await recordInteraction({ id: dealId, interactionType }).unwrap()
     } catch {
-      /* non-blocking */
+      /* non-blocking analytics */
     }
   }
+
+  const trackClick = () => trackInteraction('click')
+
+  useEffect(() => {
+    viewTracked.current = false
+    if (!isEffectiveRestaurant) return
+    const el = cardRef.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (!entry?.isIntersecting || viewTracked.current) return
+        viewTracked.current = true
+        recordInteraction({ id: dealId, interactionType: 'view' })
+          .unwrap()
+          .catch(() => {})
+        observer.disconnect()
+      },
+      { threshold: 0.35, rootMargin: '0px' }
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [dealId, isEffectiveRestaurant, recordInteraction])
 
   const handleCta = async () => {
     await trackClick()
@@ -142,7 +169,7 @@ export function DealCard({
       try {
         const result = await redeemCoupon(dealId).unwrap()
         await navigator.clipboard.writeText(result.couponCode)
-        toast.success(`Coupon copied: ${result.couponCode}`)
+        toast.success(COUPON_COPIED_TOAST)
         navigate(
           `/app/cart?coupon=${encodeURIComponent(result.couponCode)}&supplierId=${supplierId}`
         )
@@ -173,70 +200,75 @@ export function DealCard({
   }
 
   return (
-    <Card
-      className={`${cardShellClass} ${isSponsored ? 'border-[var(--brand)] ring-1 ring-[var(--brand)]/20' : ''}`}
-    >
-      {deal.image_url ? (
-        <img
-          src={String(deal.image_url)}
-          alt={String(deal.name)}
-          className="w-full h-36 object-cover"
-        />
-      ) : (
-        <DealBannerPlaceholderInner />
-      )}
-      <CardHeader className="pb-2">
-        <div className="flex flex-col gap-2 min-w-0">
-          <div className="flex items-start justify-between gap-2 min-w-0">
-            <CardTitle className="text-base min-w-0 flex-1">
-              <span className="flex items-center gap-2 min-w-0">
-                <Tag className="h-4 w-4 shrink-0 text-[var(--brand)]" />
-                <span className="truncate">{String(deal.name)}</span>
-              </span>
-            </CardTitle>
-            <DealBadges deal={deal} isSponsored={isSponsored} />
+    <div ref={cardRef} className="h-full">
+      <Card
+        className={`${cardShellClass} h-full ${isSponsored ? 'border-[var(--brand)] ring-1 ring-[var(--brand)]/20' : ''}`}
+      >
+        {deal.image_url ? (
+          <img
+            src={String(deal.image_url)}
+            alt={String(deal.name)}
+            className="w-full h-36 object-cover"
+          />
+        ) : (
+          <DealBannerPlaceholderInner />
+        )}
+        <CardHeader className="pb-2">
+          <div className="flex flex-col gap-2 min-w-0">
+            <div className="flex items-start justify-between gap-2 min-w-0">
+              <CardTitle className="text-base min-w-0 flex-1">
+                <span className="flex items-center gap-2 min-w-0">
+                  <Tag className="h-4 w-4 shrink-0 text-[var(--brand)]" />
+                  <span className="truncate">{String(deal.name)}</span>
+                </span>
+              </CardTitle>
+              <DealBadges deal={deal} isSponsored={isSponsored} />
+            </div>
+            <p className="text-xs text-[var(--text-muted)] flex items-center gap-1 min-w-0">
+              <Building2 className="h-3 w-3 shrink-0" />
+              <span className="truncate">{String(deal.supplier_name || 'Supplier')}</span>
+            </p>
           </div>
-          <p className="text-xs text-[var(--text-muted)] flex items-center gap-1 min-w-0">
-            <Building2 className="h-3 w-3 shrink-0" />
-            <span className="truncate">{String(deal.supplier_name || 'Supplier')}</span>
-          </p>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3 text-sm">
-        <p className="font-semibold text-[var(--brand)]">{formatDiscount(deal)}</p>
-        {deal.min_order_amount != null && Number(deal.min_order_amount) > 0 ? (
-          <p className="text-xs text-[var(--text-muted)]">
-            Min order: {formatPrice(Number(deal.min_order_amount))}
-          </p>
-        ) : null}
-        {deal.coupon_code ? (
-          <p className="text-xs font-mono bg-[var(--app-muted)] px-2 py-1 rounded inline-block">
-            {canRedeem ? (
-              <>Code: {String(deal.coupon_code)}</>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p className="font-semibold text-[var(--brand)]">{formatDiscount(deal)}</p>
+          {deal.min_order_amount != null && Number(deal.min_order_amount) > 0 ? (
+            <p className="text-xs text-[var(--text-muted)]">
+              Min order: {formatPrice(Number(deal.min_order_amount))}
+            </p>
+          ) : null}
+          {deal.coupon_code ? (
+            <div className="space-y-1">
+              <p className="text-xs font-mono bg-[var(--app-muted)] px-2 py-1 rounded inline-block">
+                {canRedeem ? (
+                  <>Code: {String(deal.coupon_code)}</>
+                ) : (
+                  <>Apply limit reached — upgrade for more redemptions</>
+                )}
+              </p>
+              <p className="text-xs text-[var(--text-muted)]">{COUPON_LINKED_HELPER}</p>
+            </div>
+          ) : null}
+          {deal.description ? (
+            <p className="text-[var(--text-muted)] line-clamp-2">{String(deal.description)}</p>
+          ) : null}
+          <p className="text-xs text-[var(--text-muted)]">Valid until {formatValidUntil(deal)}</p>
+          <Button
+            size="sm"
+            className={cn('w-full', cardActionBtnClass())}
+            onClick={handleCta}
+            disabled={messaging}
+          >
+            {!canRedeem && ctaNeedsRedeem(deal) ? (
+              <Lock className="h-4 w-4 mr-2" />
             ) : (
-              <>Apply limit reached — upgrade for more redemptions</>
+              <CtaIcon cta={String(deal.cta_type || 'order_now')} />
             )}
-          </p>
-        ) : null}
-        {deal.description ? (
-          <p className="text-[var(--text-muted)] line-clamp-2">{String(deal.description)}</p>
-        ) : null}
-        <p className="text-xs text-[var(--text-muted)]">Valid until {formatValidUntil(deal)}</p>
-        <Button
-          size="sm"
-          className={cn('w-full', cardActionBtnClass())}
-          onClick={handleCta}
-          disabled={messaging}
-        >
-          {!canRedeem && ctaNeedsRedeem(deal) ? (
-            <Lock className="h-4 w-4 mr-2" />
-          ) : (
-            <CtaIcon cta={String(deal.cta_type || 'order_now')} />
-          )}
-          {!canRedeem && ctaNeedsRedeem(deal) ? 'Daily limit reached' : ctaLabel(deal)}
-        </Button>
-      </CardContent>
-    </Card>
+            {!canRedeem && ctaNeedsRedeem(deal) ? 'Daily limit reached' : ctaLabel(deal)}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 

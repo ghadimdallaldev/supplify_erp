@@ -30,6 +30,10 @@ const STATUS_TONE_MAP: Record<string, StatusTone> = {
   RECEIVED_WITH_DISPUTE: 'warning',
   PAST_DUE: 'danger',
   past_due: 'danger',
+  OVERDUE: 'danger',
+  ISSUED: 'info',
+  PARTIALLY_PAID: 'warning',
+  VOID: 'muted',
   failed: 'danger',
   FAILED: 'danger',
   rejected: 'danger',
@@ -45,6 +49,9 @@ const STATUS_TONE_MAP: Record<string, StatusTone> = {
   INACTIVE: 'muted',
   draft: 'neutral',
   DRAFT: 'neutral',
+  IN_STOCK: 'success',
+  LOW_STOCK: 'warning',
+  OUT_OF_STOCK: 'danger',
 }
 
 const TONE_CLASSES: Record<StatusTone, string> = {

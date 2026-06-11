@@ -9,7 +9,7 @@ Placeholders to replace before launch: `[Company Legal Name]`, `[Company Address
 
 ## 1. Scope
 
-This Supplier Agreement applies to suppliers using Supplify to list products, receive orders, manage catalogs, fulfill deliveries, issue invoices, create deals, boost promotions, manage warehouses, manage drivers, and interact with restaurants.
+This Supplier Agreement applies to suppliers using Supplify to list products, receive orders, manage catalogs, fulfill deliveries, issue invoices, create deals, purchase boosts for sponsored placement, manage warehouses, manage drivers, and interact with restaurants.
 
 ## 2. Supplier Status
 

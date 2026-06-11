@@ -44,6 +44,8 @@ export function DispatchOrderRow({
 }: Props) {
   const driver = order.assignment?.driver
   const assignmentStatus = order.assignment?.status ?? order.delivery_status ?? 'pending'
+  const scheduledDeliveryDate = order.assignment?.scheduled_delivery_date ?? null
+  const rolledOver = Boolean(order.assignment?.rolled_over_at)
   const area = order.delivery_area?.trim()
   const areaLabel = area || 'Area not set'
   const tracking = order.tracking ?? null
@@ -94,6 +96,18 @@ export function DispatchOrderRow({
             ) : order.active_route_number && order.active_route_status === 'PLANNED' ? (
               <Badge variant="outline" data-testid="dispatch-planned-route-badge">
                 Planned route · {order.active_route_number}
+              </Badge>
+            ) : null}
+            {assignmentStatus === 'rescheduled' && rolledOver ? (
+              <Badge
+                variant="outline"
+                className="border-amber-400 text-amber-800"
+                data-testid="dispatch-rollover-badge"
+              >
+                Moved to tomorrow
+                {scheduledDeliveryDate
+                  ? ` · ${new Date(scheduledDeliveryDate).toLocaleDateString()}`
+                  : ''}
               </Badge>
             ) : null}
           </div>
@@ -154,13 +168,13 @@ export function DispatchOrderRow({
             <Button
               type="button"
               variant="outline"
-              size="sm"
-              className="whitespace-nowrap"
+              size="lg"
+              className="min-h-[44px] w-full whitespace-nowrap sm:h-9 sm:w-auto"
               data-testid={`dispatch-view-tracking-${order.id}`}
               onClick={() => onViewTracking(order.id)}
             >
-              <Navigation className="h-3.5 w-3.5 mr-1" aria-hidden />
-              View tracking
+              <Navigation className="h-4 w-4 mr-1.5" aria-hidden />
+              Track delivery
             </Button>
           )}
           <Button variant="outline" size="sm" className="whitespace-nowrap" asChild>

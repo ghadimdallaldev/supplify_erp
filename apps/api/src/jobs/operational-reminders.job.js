@@ -8,8 +8,8 @@ import { logger } from '../lib/logger.js'
 /**
  * Daily operational reminders: inventory expiry + missed reorder cadence.
  */
-export async function runOperationalRemindersJob() {
-  const expiry = await runExpiryReminderCheck()
+export async function runOperationalRemindersJob({ dryRun = false } = {}) {
+  const expiry = await runExpiryReminderCheck({ dryRun })
   const cadenceRecompute = await recomputeCadencePatterns()
   const cadence = await runCadenceReminderCheck({ notify: true })
 

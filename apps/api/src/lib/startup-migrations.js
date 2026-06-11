@@ -5,6 +5,7 @@
 import { config } from '../config/env.js'
 import { logger } from './logger.js'
 import { baseSchemaExists, runAllSqlMigrations } from './sql-migrator.js'
+import { ensureQuoteRequestSchema } from './ensure-quote-request-schema.js'
 import { ensureReservationsSchema, ensureStaffAppSchema } from './migrator.js'
 import { isOrgMigrationComplete } from './supplier-org.js'
 import {
@@ -19,24 +20,26 @@ import { migrateSuppliersToOrgs } from '../../scripts/migrate-suppliers-to-orgs.
  */
 export async function runFullStartupMigrations(options = {}) {
   const hasBaseSchema = await baseSchemaExists()
-  const shouldRun = options.force || config.RUN_MIGRATIONS_ON_START || !hasBaseSchema
+  const shouldRunBackfills = options.force || config.RUN_MIGRATIONS_ON_START || !hasBaseSchema
 
-  if (!shouldRun) {
-    logger.debug('Startup migrations skipped', {
-      runMigrationsOnStart: config.RUN_MIGRATIONS_ON_START,
-      baseSchemaExists: hasBaseSchema,
-    })
-    return { skipped: true }
-  }
-
-  logger.info('Running full startup migrations', {
+  logger.info('Running startup SQL migrations', {
     runMigrationsOnStart: config.RUN_MIGRATIONS_ON_START,
     baseSchemaExists: hasBaseSchema,
     forced: Boolean(options.force),
   })
 
+  // Always apply pending numbered SQL files — new API code depends on them.
   await runAllSqlMigrations()
+  await ensureQuoteRequestSchema()
   await Promise.all([ensureStaffAppSchema(), ensureReservationsSchema()])
+
+  if (!shouldRunBackfills) {
+    logger.debug('Startup backfills skipped', {
+      runMigrationsOnStart: config.RUN_MIGRATIONS_ON_START,
+      baseSchemaExists: hasBaseSchema,
+    })
+    return { skipped: false, backfillsSkipped: true }
+  }
 
   if (process.env.SKIP_TENANT_ROLE_BACKFILL === '1') {
     logger.info('SKIP_TENANT_ROLE_BACKFILL=1 — tenant role backfill skipped')
@@ -57,5 +60,5 @@ export async function runFullStartupMigrations(options = {}) {
   }
 
   logger.info('Full startup migrations completed')
-  return { skipped: false }
+  return { skipped: false, backfillsSkipped: false }
 }

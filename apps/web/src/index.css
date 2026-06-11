@@ -121,6 +121,40 @@
     padding-right: env(safe-area-inset-right);
   }
 
+  html[data-admin-compact='true'] .admin-page-shell {
+    font-size: 0.9375rem;
+  }
+
+  html[data-admin-compact='true'] .admin-page-shell .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.75rem;
+  }
+
+  html[data-admin-compact='true'] .admin-page-shell .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 1rem;
+  }
+
+  html[data-admin-compact='true'] .admin-page-shell .px-4 {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  html[data-admin-compact='true'] .admin-page-shell .py-3 {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  html[data-admin-compact='true'] .admin-page-shell .p-4 {
+    padding: 0.75rem;
+  }
+
+  html[data-admin-compact='true'] .admin-page-shell .sm\:p-6 {
+    padding: 1rem;
+  }
+
+  .driver-sticky-action-bar {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
   /* Branded text selection */
   ::selection {
     background: var(--brand-pale);
@@ -225,8 +259,8 @@
 
   .dashboard-kpi-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
 
   @media (min-width: 640px) {

@@ -6,6 +6,7 @@ import { StaffPortalGuard } from './components/StaffPortalGuard'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterCompletePage } from './pages/RegisterCompletePage'
+import { LegalReacceptPage } from './pages/LegalReacceptPage'
 import { InviteAcceptPage } from './pages/InviteAcceptPage'
 import { BranchInviteAcceptPage } from './pages/BranchInviteAcceptPage'
 import { OAuthRedirect } from './components/OAuthRedirect'
@@ -145,6 +146,28 @@ const LegalHubPage = lazy(() =>
 const LegalDocumentPage = lazy(() =>
   import('./pages/LegalDocumentPage').then((m) => ({ default: m.LegalDocumentPage }))
 )
+const PublicSupplierCatalogPage = lazy(() =>
+  import('./pages/PublicSupplierCatalogPage').then((m) => ({
+    default: m.PublicSupplierCatalogPage,
+  }))
+)
+const QuoteRequestsPage = lazy(() =>
+  import('./pages/QuoteRequestsPage').then((m) => ({ default: m.QuoteRequestsPage }))
+)
+const QuoteRequestDetailPage = lazy(() =>
+  import('./pages/QuoteRequestDetailPage').then((m) => ({ default: m.QuoteRequestDetailPage }))
+)
+const CreateQuoteRequestPage = lazy(() =>
+  import('./pages/CreateQuoteRequestPage').then((m) => ({ default: m.CreateQuoteRequestPage }))
+)
+const SupplierQuoteInboxPage = lazy(() =>
+  import('./pages/SupplierQuoteInboxPage').then((m) => ({ default: m.SupplierQuoteInboxPage }))
+)
+const SupplierQuoteResponsePage = lazy(() =>
+  import('./pages/SupplierQuoteResponsePage').then((m) => ({
+    default: m.SupplierQuoteResponsePage,
+  }))
+)
 
 function PageLoader() {
   return <PageLoading />
@@ -216,6 +239,14 @@ const router = createBrowserRouter([
     ),
   },
   {
+    path: '/supplier/:idOrSlug',
+    element: (
+      <LazyPage>
+        <PublicSupplierCatalogPage />
+      </LazyPage>
+    ),
+  },
+  {
     path: '/staff',
     element: (
       <LazyPage>
@@ -234,6 +265,10 @@ const router = createBrowserRouter([
   {
     path: '/register/complete',
     element: <RegisterCompletePage />,
+  },
+  {
+    path: '/legal/reaccept',
+    element: <LegalReacceptPage />,
   },
   {
     path: '/invite/branch',
@@ -482,6 +517,46 @@ const router = createBrowserRouter([
         element: (
           <LazyPage>
             <SupplierDetailPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/quote-requests',
+        element: (
+          <LazyPage>
+            <QuoteRequestsPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/quote-requests/new',
+        element: (
+          <LazyPage>
+            <CreateQuoteRequestPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/quote-requests/supplier',
+        element: (
+          <LazyPage>
+            <SupplierQuoteInboxPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/quote-requests/supplier/:quoteRequestSupplierId',
+        element: (
+          <LazyPage>
+            <SupplierQuoteResponsePage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/quote-requests/:id',
+        element: (
+          <LazyPage>
+            <QuoteRequestDetailPage />
           </LazyPage>
         ),
       },

@@ -27,8 +27,6 @@ export function ChatThread({
   groupedMessages,
   searchQuery,
   userRole,
-  orders = [],
-  replyingToId,
   onReply,
   otherPartyTyping,
   formatMessageDate,
@@ -61,11 +59,9 @@ export function ChatThread({
                         : format(new Date(group.date), 'MMMM d, yyyy')}
                   </div>
                 </div>
-                {group.messages.map((msg: Record<string, unknown>, msgIndex: number) => {
+                {group.messages.map((msg: Record<string, unknown>) => {
                   const isMyMessage =
                     String(msg.sender_type || '') === String(userRole || '').toUpperCase()
-                  const prevMsg =
-                    msgIndex > 0 ? (group.messages[msgIndex - 1] as Record<string, unknown>) : null
 
                   return (
                     <div

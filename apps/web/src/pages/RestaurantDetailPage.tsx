@@ -18,6 +18,7 @@ import {
   Package,
   Calendar,
   Activity,
+  MessageSquare,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
@@ -136,10 +137,22 @@ export function RestaurantDetailPage() {
             <p className="text-[var(--text-muted)] mt-1">{restaurant.slug}</p>
           </div>
         </div>
-        <Button variant={isPinned ? 'default' : 'outline'} size="sm" onClick={handlePinToggle}>
-          <Pin className="h-4 w-4 mr-2" />
-          {isPinned ? 'Pinned' : 'Pin Restaurant'}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {user?.role === 'SUPPLIER' && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => navigate(`/app/chat?restaurant=${restaurant.id}`)}
+            >
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Message
+            </Button>
+          )}
+          <Button variant={isPinned ? 'default' : 'outline'} size="sm" onClick={handlePinToggle}>
+            <Pin className="h-4 w-4 mr-2" />
+            {isPinned ? 'Pinned' : 'Pin Restaurant'}
+          </Button>
+        </div>
       </div>
 
       {/* Contact Information */}

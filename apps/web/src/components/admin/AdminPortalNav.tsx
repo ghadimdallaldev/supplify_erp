@@ -5,19 +5,19 @@ import { Building2, Settings, Shield, Users } from 'lucide-react'
 const ADMIN_LINKS = [
   {
     href: '/app/admin',
-    label: 'Platform overview',
+    label: 'Platform',
     icon: Shield,
     match: (path: string) => path === '/app/admin',
   },
   {
     href: '/app/admin/suppliers',
-    label: 'Supplier admin',
+    label: 'Suppliers',
     icon: Building2,
     match: (path: string) => path.startsWith('/app/admin/suppliers'),
   },
   {
     href: '/app/admin/restaurants',
-    label: 'Restaurant admin',
+    label: 'Restaurants',
     icon: Users,
     match: (path: string) => path.startsWith('/app/admin/restaurants'),
   },
@@ -45,10 +45,10 @@ export function AdminPortalNav() {
             key={href}
             to={href}
             className={cn(
-              'inline-flex min-h-9 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium no-underline transition-colors',
+              'inline-flex min-h-8 items-center gap-1.5 rounded-lg border-b-2 px-2.5 py-1.5 text-sm font-medium no-underline transition-colors',
               active
-                ? 'bg-[var(--brand-pale)] text-[var(--brand)]'
-                : 'text-[var(--text-muted)] hover:bg-[var(--brand-ultra)] hover:text-[var(--text)]'
+                ? 'border-[var(--brand)] bg-[var(--brand-pale)] text-[var(--brand)]'
+                : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--brand-ultra)] hover:text-[var(--text)]'
             )}
             aria-current={active ? 'page' : undefined}
           >

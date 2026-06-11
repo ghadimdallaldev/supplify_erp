@@ -39,7 +39,7 @@ We may collect the following categories of data:
 - Prices and price lists
 - Orders and order items
 - Invoices, credit notes, payments, receivables
-- Deals, boosts, promotions, and performance data
+- Deals, boosts, coupon codes, redemptions, and performance data
 - Inventory and stock records
 - Reservation and waitlist records
 - Disputes and replacement records

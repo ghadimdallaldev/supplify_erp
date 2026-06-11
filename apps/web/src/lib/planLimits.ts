@@ -77,13 +77,11 @@ export type BranchAddGate = {
   planCode?: string | null
 }
 
-function planCodeLower(entitlements: Entitlements | null | undefined): string {
-  return (entitlements?.plan?.code ?? entitlements?.plan?.name ?? '').toLowerCase()
-}
-
 function canBuyBranchAddons(entitlements: Entitlements | null | undefined): boolean {
-  const code = planCodeLower(entitlements)
-  return code === 'gold' || code === 'platinum'
+  if (!multiBranchEnabled(entitlements)) return false
+  const limit = limitNumber(entitlements?.limits?.branches)
+  if (limit === -1) return true
+  return (limit ?? 0) > 1
 }
 
 /** Whether the tenant may create another restaurant/supplier branch under the current plan. */
@@ -308,8 +306,8 @@ export function getWarehouseAddGate(
     return { canAdd: true, reason: 'ok', current: currentCount, limit: null, planName }
   }
   if (currentCount >= limit) {
-    const code = planCodeLower(entitlements)
-    const reason = code === 'gold' || code === 'platinum' ? 'addon_or_upgrade' : 'upgrade_plan'
+    const canAddon = multiWarehousePlanEnabled(entitlements) || (limit != null && limit > 1)
+    const reason = canAddon ? 'addon_or_upgrade' : 'upgrade_plan'
     return { canAdd: false, reason, current: currentCount, limit, planName }
   }
   return { canAdd: true, reason: 'ok', current: currentCount, limit, planName }
@@ -438,7 +436,6 @@ export function formatOrderPlaceGateMessage(gate: OrderPlaceGate): string {
 
   if (gate.reason === 'would_exceed' && gate.limit != null) {
     const remaining = gate.remaining ?? 0
-    const orderWord = gate.ordersRequested === 1 ? 'order' : 'orders'
     const supplierNote =
       gate.ordersRequested > 1
         ? ` This cart creates ${gate.ordersRequested} orders (one per supplier).`
@@ -478,7 +475,7 @@ export function getPlanLimitGate(
           : limitKey === 'deal_redemptions_per_day'
             ? 'deal redemption today'
             : limitKey === 'promotions'
-              ? 'promotion'
+              ? 'active deal'
               : limitKey.replace(/_/g, ' ')
 
   return {

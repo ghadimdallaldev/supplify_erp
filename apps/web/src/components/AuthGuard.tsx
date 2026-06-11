@@ -4,6 +4,8 @@ import { useGetMeQuery, useGetRegisterStatusQuery } from '../services/api'
 import { useAppDispatch } from '../hooks/redux'
 import { setUser, clearUser, setLoading } from '../features/auth/authSlice'
 import { refetchAppSession, hasStaleRegistrationState } from '../lib/refetchAppSession'
+import { needsLegalReacceptance } from '../lib/legalReacceptanceGate'
+import { applyAdminPreferences, clearAdminPreferences } from '../lib/adminPreferences'
 import type { ReactNode } from 'react'
 
 interface AuthGuardProps {
@@ -20,12 +22,16 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const dispatch = useAppDispatch()
   const redirectedToRegister = useRef(false)
   const isAppRoute = isAppShellRoute(location.pathname)
+  const onLegalReacceptPage = location.pathname === '/legal/reaccept'
 
   const { data, error, isLoading } = useGetMeQuery(undefined, {
     refetchOnMountOrArgChange: false,
     refetchOnFocus: false,
     refetchOnReconnect: true,
   })
+  const needsLegalReacceptanceGate =
+    isAppRoute && needsLegalReacceptance(data) && !onLegalReacceptPage
+
   const { data: registerStatus, isLoading: registerStatusLoading } = useGetRegisterStatusQuery(
     undefined,
     {
@@ -52,6 +58,16 @@ export function AuthGuard({ children }: AuthGuardProps) {
   }, [staleRegistrationState, dispatch])
 
   useEffect(() => {
+    if (data?.role === 'ADMIN' && data.adminPreferences) {
+      applyAdminPreferences(data.adminPreferences)
+      return
+    }
+    if (data && data.role !== 'ADMIN') {
+      clearAdminPreferences()
+    }
+  }, [data?.role, data?.adminPreferences])
+
+  useEffect(() => {
     if (isLoading) {
       dispatch(setLoading(true))
       return
@@ -72,6 +88,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return
     }
 
+    if (needsLegalReacceptanceGate) {
+      navigate('/legal/reaccept', { replace: true })
+      return
+    }
+
     if (!needsRegister) {
       redirectedToRegister.current = false
       return
@@ -81,7 +102,16 @@ export function AuthGuard({ children }: AuthGuardProps) {
       redirectedToRegister.current = true
       navigate('/register/complete', { replace: true })
     }
-  }, [data, error, isLoading, needsRegister, dispatch, navigate])
+  }, [
+    data,
+    error,
+    isLoading,
+    needsRegister,
+    needsLegalReacceptanceGate,
+    dispatch,
+    navigate,
+    isAppRoute,
+  ])
 
   if (!isAppRoute) {
     return <>{children}</>
@@ -114,7 +144,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     )
   }
 
-  if (needsRegister) {
+  if (needsRegister || needsLegalReacceptanceGate) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
         <div className="w-full max-w-md space-y-4 px-6">

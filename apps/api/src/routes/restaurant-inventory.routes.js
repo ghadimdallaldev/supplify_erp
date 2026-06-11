@@ -6,7 +6,13 @@ import {
   resolveTenantContext,
   requirePermission,
 } from '../lib/rbac.js'
-import { requireFeature } from '../lib/subscription.js'
+import {
+  requireFeature,
+  checkLimit,
+  buildLimitExceededPayload,
+  getTenantSubscription,
+  getRecommendedPlanNames,
+} from '../lib/subscription.js'
 import { isFeatureEnabledForTenant } from '../lib/feature-flags.js'
 import { query, withTransaction } from '../lib/db.js'
 import { startStage, mark } from '../middlewares/request-timing.js'
@@ -27,6 +33,10 @@ import {
   listRestaurantReminders,
   recomputeCadencePatterns,
 } from '../services/reorder-cadence.service.js'
+import {
+  getReorderAssistance,
+  suppressReorderSuggestion,
+} from '../services/restaurant-reorder-assistance.service.js'
 
 const router = express.Router()
 
@@ -416,6 +426,34 @@ router.post(
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) {
         throw new ValidationError('Restaurant not found')
+      }
+
+      // Enforce restaurant_inventory_skus limit when adding a new tracked SKU
+      const { rows: existingSku } = await query(
+        `SELECT 1 FROM restaurant_inventory WHERE restaurant_id = $1 AND product_id = $2 LIMIT 1`,
+        [restaurantId, productId]
+      )
+      if (existingSku.length === 0) {
+        const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'restaurant_inventory_skus')
+        if (limitCheck.isOverLimit && !limitCheck.isUnlimited) {
+          const [subscription, recommendedPlans] = await Promise.all([
+            getTenantSubscription(restaurantId, 'RESTAURANT'),
+            getRecommendedPlanNames('RESTAURANT'),
+          ])
+          const err = buildLimitExceededPayload(
+            limitCheck,
+            'restaurant_inventory_skus',
+            subscription?.plan_name || subscription?.plan_display_name,
+            recommendedPlans,
+            'Restaurant inventory SKU limit reached for your plan'
+          )
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: err,
+            requestId: req.requestId,
+          })
+        }
       }
 
       await withTransaction(async (client) => {
@@ -1088,8 +1126,11 @@ router.post(
     try {
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) throw new ValidationError('Restaurant not found')
-      const result = await runExpiryReminderCheck({ restaurantId })
-      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+      const { runManualCronJob, CRON_JOBS } = await import('../lib/cron-runner.js')
+      const { result } = await runManualCronJob(CRON_JOBS.OPERATIONAL_REMINDERS, () =>
+        runExpiryReminderCheck({ restaurantId })
+      )
+      res.json({ ok: true, data: result ?? {}, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)
     }
@@ -1130,6 +1171,55 @@ router.post(
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) throw new ValidationError('Restaurant not found')
       const result = await recomputeCadencePatterns({ restaurantId })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+const suppressSchema = z.object({
+  scopeType: z.enum(['product', 'cadence', 'supplier_product']),
+  scopeId: z.string().min(1),
+  action: z.enum(['snooze', 'not_needed']),
+  snoozeDays: z.number().int().min(1).max(90).optional(),
+})
+
+router.get(
+  '/reorder-assistance',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requireFeature(
+    'smart_reorder',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const data = await getReorderAssistance(restaurantId)
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/reorder-assistance/suppress',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  requireFeature(
+    'smart_reorder',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const body = suppressSchema.parse(req.body)
+      const result = await suppressReorderSuggestion(restaurantId, body)
       res.json({ ok: true, data: result, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)

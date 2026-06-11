@@ -10,13 +10,13 @@ import {
   useGetBillingStatusQuery,
   useRecordConversionEventMutation,
 } from '../services/api'
-import { activateFreePlanFromPlans, openFreePlanCheckout } from '../lib/activateFreePlan'
+import { activateFreePlanFromPlans } from '../lib/activateFreePlan'
 import toast from 'react-hot-toast'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { openCheckoutPayment } from '../lib/openPaymentModal'
-import { Check, Lock, Minus, TrendingUp } from 'lucide-react'
+import { Check, Minus, TrendingUp } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useEffect, useRef } from 'react'
 import { useImpersonation } from '../hooks/useImpersonation'
