@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS menu_category (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE menu_category
+  ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branch(id) ON DELETE SET NULL;
+
 CREATE INDEX IF NOT EXISTS idx_menu_category_restaurant ON menu_category(restaurant_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_menu_category_branch ON menu_category(branch_id) WHERE branch_id IS NOT NULL;
 
@@ -30,6 +33,9 @@ CREATE TABLE IF NOT EXISTS menu_item (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE menu_item
+  ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branch(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_menu_item_category ON menu_item(category_id, is_available);
 CREATE INDEX IF NOT EXISTS idx_menu_item_restaurant ON menu_item(restaurant_id, is_available);
@@ -75,6 +81,9 @@ CREATE TABLE IF NOT EXISTS branch_fulfillment_config (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE branch_fulfillment_config
+  ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branch(id) ON DELETE CASCADE;
+
 CREATE TABLE IF NOT EXISTS delivery_zone (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   branch_id UUID NOT NULL REFERENCES branch(id) ON DELETE CASCADE,
@@ -86,6 +95,9 @@ CREATE TABLE IF NOT EXISTS delivery_zone (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE delivery_zone
+  ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branch(id) ON DELETE CASCADE;
 
 CREATE INDEX IF NOT EXISTS idx_delivery_zone_branch ON delivery_zone(branch_id, is_active);
 
@@ -128,6 +140,9 @@ CREATE TABLE IF NOT EXISTS consumer_order (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE consumer_order
+  ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branch(id) ON DELETE RESTRICT;
 
 CREATE INDEX IF NOT EXISTS idx_consumer_order_restaurant ON consumer_order(restaurant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_consumer_order_branch ON consumer_order(branch_id, status);
