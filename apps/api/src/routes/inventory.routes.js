@@ -12,6 +12,10 @@ import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 import { notifySupplierLowStock, notifyOutOfStock } from '../services/notification.service.js'
 import { requireFeature } from '../lib/subscription.js'
+import {
+  computeSupplierStockFlags,
+  DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD,
+} from '../lib/supplier-stock-status.js'
 
 const router = express.Router()
 
@@ -38,12 +42,13 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
         p.sku,
         p.supplier_id,
         s.name as supplier_name,
-        0 as low_stock_threshold,
+        COALESCE(pis.low_stock_threshold, ${DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD}) as low_stock_threshold,
         w.name as warehouse_name,
         w.code as warehouse_code
       FROM inventory i
       JOIN product p ON p.id = i.product_id
       JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
       LEFT JOIN warehouse w ON w.id = i.warehouse_id
     `
 
@@ -70,12 +75,17 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
     const { rows } = await query(inventoryQuery, queryParams)
 
     // Format the data for frontend
-    const formattedInventory = rows.map((row) => ({
-      ...row,
-      isLowStock: row.low_stock_threshold
-        ? parseFloat(row.available_qty) < row.low_stock_threshold
-        : false,
-    }))
+    const formattedInventory = rows.map((row) => {
+      const flags = computeSupplierStockFlags(row.available_qty, row.low_stock_threshold)
+      return {
+        ...row,
+        low_stock_threshold: flags.lowStockThreshold,
+        isLowStock: flags.isLowStock,
+        isOutOfStock: flags.isOutOfStock,
+        isInStock: flags.isInStock,
+        stockStatus: flags.stockStatus,
+      }
+    })
 
     res.json({
       ok: true,
@@ -370,8 +380,8 @@ router.post(
           [productId]
         )
 
-        if (settings.length > 0 && newQty < settings[0].low_stock_threshold) {
-          const threshold = settings[0].low_stock_threshold
+        const threshold = settings[0]?.low_stock_threshold ?? DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD
+        if (computeSupplierStockFlags(newQty, threshold).isLowStock) {
           await query(
             `
           INSERT INTO inventory_alert (product_id, warehouse_id, alert_type, threshold_value, current_value)

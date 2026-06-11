@@ -60,11 +60,19 @@ export function errorHandler(err, req, res, next) {
     statusCode = 409
     errorName = 'CONFLICT'
     message = 'Resource already exists'
+  } else if (err.code === '42P01') {
+    statusCode = 503
+    errorName = 'SCHEMA_NOT_READY'
+    message = 'Database schema is not up to date. Retry after the API finishes migrating.'
   } else if (err.code === '23503') {
     // PostgreSQL foreign key violation
     statusCode = 400
     errorName = 'VALIDATION_ERROR'
     message = 'Referenced resource does not exist'
+  } else if (err.name === 'ZodError') {
+    statusCode = 400
+    errorName = 'VALIDATION_ERROR'
+    message = err.errors?.map((e) => e.message).join('; ') || 'Validation failed'
   }
 
   // Send error response only if headers haven't been sent
