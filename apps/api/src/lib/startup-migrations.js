@@ -5,6 +5,7 @@
 import { config } from '../config/env.js'
 import { logger } from './logger.js'
 import { baseSchemaExists, runAllSqlMigrations } from './sql-migrator.js'
+import { ensureQuoteRequestSchema } from './ensure-quote-request-schema.js'
 import { ensureReservationsSchema, ensureStaffAppSchema } from './migrator.js'
 import { isOrgMigrationComplete } from './supplier-org.js'
 import {
@@ -29,6 +30,7 @@ export async function runFullStartupMigrations(options = {}) {
 
   // Always apply pending numbered SQL files — new API code depends on them.
   await runAllSqlMigrations()
+  await ensureQuoteRequestSchema()
   await Promise.all([ensureStaffAppSchema(), ensureReservationsSchema()])
 
   if (!shouldRunBackfills) {

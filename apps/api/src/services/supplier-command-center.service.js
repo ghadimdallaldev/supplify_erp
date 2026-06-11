@@ -3,6 +3,7 @@ import { getSupplierReceivables } from './supplier-receivables.service.js'
 import { getReorderIntelligence } from './supplier-reorder-intelligence.service.js'
 import { buildTrackingPayload } from '../lib/delivery-tracking-payload.js'
 import { isGpsTrackingEnabled } from '../lib/delivery-tracking-payload.js'
+import { DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD } from '../lib/supplier-stock-status.js'
 
 const OPEN_INVOICE_STATUSES = ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE']
 
@@ -125,13 +126,13 @@ async function countOrdersNeedingSupplierAction(supplierId) {
 async function getLowStockProducts(supplierId) {
   const { rows } = await query(
     `
-    SELECT p.id, p.name, p.sku, i.available_qty, pis.low_stock_threshold AS reorder_point
+    SELECT p.id, p.name, p.sku, i.available_qty, COALESCE(pis.low_stock_threshold, ${DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD}) AS reorder_point
     FROM product p
     JOIN inventory i ON i.product_id = p.id
     LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
     WHERE p.supplier_id = $1
-      AND pis.low_stock_threshold IS NOT NULL
-      AND i.available_qty < pis.low_stock_threshold
+      AND i.available_qty > 0
+      AND i.available_qty <= COALESCE(pis.low_stock_threshold, ${DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD})
     ORDER BY i.available_qty ASC
     LIMIT 20
     `,
