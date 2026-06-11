@@ -5,6 +5,10 @@ vi.mock('../lib/db.js', () => ({
   query: vi.fn(),
 }))
 
+vi.mock('../lib/ensure-tenant-branding-schema.js', () => ({
+  ensureTenantBrandingSchema: vi.fn().mockResolvedValue(undefined),
+}))
+
 describe('branding.service', () => {
   it('accepts valid hex colors', () => {
     expect(validateHexColor('#5b21b6', 'brandPrimary')).toBe('#5b21b6')

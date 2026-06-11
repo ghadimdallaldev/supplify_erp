@@ -1,6 +1,25 @@
 import { query } from '../lib/db.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 
+let brandingSchemaReadyPromise = null
+
+async function ensureBrandingSchemaReady() {
+  if (!brandingSchemaReadyPromise) {
+    brandingSchemaReadyPromise = import('../lib/ensure-tenant-branding-schema.js')
+      .then((m) => m.ensureTenantBrandingSchema())
+      .catch((err) => {
+        brandingSchemaReadyPromise = null
+        throw err
+      })
+  }
+  return brandingSchemaReadyPromise
+}
+
+/** @internal Test helper */
+export function resetBrandingSchemaReadyForTests() {
+  brandingSchemaReadyPromise = null
+}
+
 const DEFAULT_BRAND = {
   brandPrimary: '#5b21b6',
   brandMid: '#7c3aed',
@@ -81,6 +100,7 @@ function mapRow(row) {
 }
 
 export async function getTenantBranding(tenantId, tenantType) {
+  await ensureBrandingSchemaReady()
   const table = tenantType === 'RESTAURANT' ? 'restaurant' : 'supplier'
   const { rows } = await query(
     `SELECT logo_url, brand_primary, brand_accent, brand_display_name FROM ${table} WHERE id = $1`,
@@ -91,6 +111,7 @@ export async function getTenantBranding(tenantId, tenantType) {
 }
 
 export async function updateTenantBranding(tenantId, tenantType, payload) {
+  await ensureBrandingSchemaReady()
   const table = tenantType === 'RESTAURANT' ? 'restaurant' : 'supplier'
 
   const sets = []

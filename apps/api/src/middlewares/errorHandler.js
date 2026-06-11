@@ -60,7 +60,7 @@ export function errorHandler(err, req, res, next) {
     statusCode = 409
     errorName = 'CONFLICT'
     message = 'Resource already exists'
-  } else if (err.code === '42P01') {
+  } else if (err.code === '42P01' || err.code === '42703') {
     statusCode = 503
     errorName = 'SCHEMA_NOT_READY'
     message = 'Database schema is not up to date. Retry after the API finishes migrating.'
