@@ -2,8 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('../lib/db.js', () => {
   const queryMock = vi.fn()
-  return { query: queryMock, pool: { query: queryMock }, withTransaction: vi.fn() }
+  return {
+    query: queryMock,
+    migrationQuery: queryMock,
+    pool: { query: queryMock },
+    withTransaction: vi.fn(),
+  }
 })
+
+vi.mock('../lib/ensure-delivery-schema.js', () => ({
+  ensureDeliverySchema: vi.fn().mockResolvedValue(undefined),
+}))
 
 describe('supplier pain-killer services', () => {
   let db
@@ -184,15 +193,19 @@ Valid Product,SKU2,abc`
       db.query
         .mockResolvedValueOnce({
           rows: [
+            { table_name: 'customer_order', column_name: 'placed_at' },
+            { table_name: 'customer_order', column_name: 'branch_id' },
             { table_name: 'delivery_zone', column_name: 'warehouse_id' },
             { table_name: 'delivery_zone', column_name: 'supplier_id' },
             { table_name: 'delivery_zone', column_name: 'name' },
+            { table_name: 'restaurant', column_name: 'address_json' },
             { table_name: 'restaurant', column_name: 'delivery_latitude' },
             { table_name: 'restaurant', column_name: 'delivery_longitude' },
             { table_name: 'restaurant', column_name: 'delivery_location_label' },
             { table_name: 'branch', column_name: 'delivery_latitude' },
             { table_name: 'branch', column_name: 'delivery_longitude' },
             { table_name: 'branch', column_name: 'delivery_location_label' },
+            { table_name: 'drivers', column_name: 'full_name' },
           ],
         })
         .mockResolvedValueOnce({
@@ -200,6 +213,9 @@ Valid Product,SKU2,abc`
             { table_name: 'proof_of_delivery' },
             { table_name: 'order_warehouse_assignment' },
             { table_name: 'delivery_zone' },
+            { table_name: 'branch' },
+            { table_name: 'driver_assignments' },
+            { table_name: 'drivers' },
           ],
         })
         .mockResolvedValueOnce({
