@@ -13,10 +13,11 @@ import {
   useGetNotificationPreferencesQuery,
   useUpdateNotificationPreferencesMutation,
 } from '../services/api'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { keycloakRealm, keycloakUrl } from '../lib/env'
 import { AdminPortalNav } from '../components/admin/AdminPortalNav'
 import { AdminPageHeader } from '../components/admin/AdminPageHeader'
+import { PageShell } from '../components/ui/page-shell'
 import { getAdminPageHeader } from '../lib/adminPageHeaders'
 
 const DEFAULT_NOTIFICATION_PREFS = {
@@ -159,7 +160,7 @@ export function SettingsPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {isAdminSettings && <AdminPortalNav />}
-      <div className="min-h-0 flex-1 space-y-4 p-4 sm:p-6">
+      <PageShell className="min-h-0 flex-1 p-4 sm:p-6">
         <AdminPageHeader title={header.title} subtitle={header.subtitle} />
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -348,7 +349,7 @@ export function SettingsPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </PageShell>
     </div>
   )
 }

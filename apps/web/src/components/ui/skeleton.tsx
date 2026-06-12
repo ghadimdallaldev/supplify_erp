@@ -35,4 +35,9 @@ function TableSkeleton({
   )
 }
 
-export { Skeleton, TableSkeleton }
+/** Wrap loaded content for skeleton → content crossfade (Emil blur pattern). */
+function ContentReveal({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn('content-reveal', className)} {...props} />
+}
+
+export { Skeleton, TableSkeleton, ContentReveal }

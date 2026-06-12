@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 
 interface LogoUploadProps {
   currentLogo?: string | null
@@ -15,6 +15,12 @@ interface LogoUploadProps {
     fileName: string
     fileType: string
   }>
+  uploadLabel?: string
+  changeLabel?: string
+  removeLabel?: string
+  helperText?: string
+  previewAlt?: string
+  previewClassName?: string
 }
 
 export function LogoUpload({
@@ -23,6 +29,12 @@ export function LogoUpload({
   entityId: _entityId,
   entityName,
   getPresignedUrl,
+  uploadLabel = 'Upload Logo',
+  changeLabel = 'Change Logo',
+  removeLabel = 'Remove Logo',
+  helperText = 'Recommended: Square image, at least 200x200px. Max size: 5MB',
+  previewAlt,
+  previewClassName = 'w-32 h-32',
 }: LogoUploadProps) {
   const [isUploading, setIsUploading] = useState(false)
   const [preview, setPreview] = useState<string | null>(currentLogo || null)
@@ -93,7 +105,7 @@ export function LogoUpload({
 
     try {
       await onUpload(fileUrl)
-      toast.success('Logo uploaded successfully!')
+      toast.success('Image uploaded successfully!')
     } catch (error: unknown) {
       console.error('Logo save error:', error)
       setPreview(currentLogo || null)
@@ -109,7 +121,7 @@ export function LogoUpload({
     try {
       await onUpload('') // Empty string removes the logo
       setPreview(null)
-      toast.success('Logo removed successfully!')
+      toast.success('Image removed successfully!')
     } catch (error: unknown) {
       console.error('Logo remove error:', error)
       setPreview(currentLogo || null)
@@ -121,11 +133,13 @@ export function LogoUpload({
     <div className="space-y-4">
       <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
         <div className="relative">
-          <div className="w-32 h-32 rounded-lg border-2 border-[var(--app-border-mid)] flex items-center justify-center bg-[var(--brand-ultra)] overflow-hidden">
+          <div
+            className={`${previewClassName} rounded-lg border-2 border-[var(--app-border-mid)] flex items-center justify-center bg-[var(--brand-ultra)] overflow-hidden`}
+          >
             {preview ? (
               <img
                 src={preview}
-                alt={`${entityName} logo`}
+                alt={previewAlt ?? `${entityName} logo`}
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -148,7 +162,7 @@ export function LogoUpload({
               className="w-full sm:w-auto"
             >
               <Upload className="h-4 w-4 mr-2" />
-              {currentLogo ? 'Change Logo' : 'Upload Logo'}
+              {currentLogo ? changeLabel : uploadLabel}
             </Button>
             {currentLogo && (
               <Button
@@ -159,13 +173,11 @@ export function LogoUpload({
                 className="w-full sm:w-auto"
               >
                 <X className="h-4 w-4 mr-2" />
-                Remove Logo
+                {removeLabel}
               </Button>
             )}
           </div>
-          <p className="text-sm text-[var(--text-muted)]">
-            Recommended: Square image, at least 200x200px. Max size: 5MB
-          </p>
+          <p className="text-sm text-[var(--text-muted)]">{helperText}</p>
         </div>
       </div>
       <input

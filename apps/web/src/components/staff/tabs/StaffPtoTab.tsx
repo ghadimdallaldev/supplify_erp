@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { format } from 'date-fns'
 
-import { toast } from 'react-hot-toast'
+import { toast } from 'sonner'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 

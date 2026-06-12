@@ -1,5 +1,6 @@
 import { query } from '../lib/db.js'
 import { getCache, setCache, deleteCache } from '../lib/cache.js'
+import { resolveConsumerOrderingStatus } from '../lib/consumer-ordering-hours.js'
 
 const MENU_CACHE_TTL_SECONDS = 300
 
@@ -21,6 +22,37 @@ export async function resolveRestaurantBySlug(slugOrId) {
     [slugOrId]
   )
   return rows[0] || null
+}
+
+export async function getPublicConsumerStorefront(slugOrId) {
+  const byId = isUuid(slugOrId)
+  const { rows } = await query(
+    byId
+      ? `
+        SELECT id, slug, name, phone, logo_url, operating_hours
+        FROM restaurant WHERE id = $1
+        `
+      : `
+        SELECT id, slug, name, phone, logo_url, operating_hours
+        FROM restaurant WHERE slug = $1
+        `,
+    [slugOrId]
+  )
+  const restaurant = rows[0]
+  if (!restaurant) return null
+
+  const { branches } = await getFulfillmentOptions(restaurant.id, null)
+  return {
+    restaurant: {
+      id: restaurant.id,
+      slug: restaurant.slug,
+      name: restaurant.name,
+      phone: restaurant.phone,
+      logoUrl: restaurant.logo_url,
+      operatingHours: restaurant.operating_hours,
+    },
+    branches,
+  }
 }
 
 export async function invalidateMenuCache(restaurantId, branchId = null) {
@@ -477,6 +509,10 @@ export async function getFulfillmentOptions(restaurantId, branchId) {
         minOrderAmount: Number(config?.min_order_amount ?? 0),
         deliveryFee: Number(config?.delivery_fee ?? 0),
         estimatedPrepMinutes: config?.estimated_prep_minutes ?? 30,
+        liveOrderStart: config?.live_order_start ?? '12:00',
+        liveOrderEnd: config?.live_order_end ?? '00:00',
+        allowPreordersOutsideLiveHours: config?.allow_preorders_outside_live_hours ?? true,
+        ordering: resolveConsumerOrderingStatus(config ?? {}),
         deliveryZones: zonesByBranch[branch.id] || [],
       }
     }),

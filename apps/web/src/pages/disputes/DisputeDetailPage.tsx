@@ -32,7 +32,7 @@ import {
 } from '../../components/ui/dialog'
 import { TableScroll } from '../../components/ui/table-scroll'
 import { ArrowLeft, Loader2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 
 function statusBadge(status: string) {
   const s = status?.toLowerCase()

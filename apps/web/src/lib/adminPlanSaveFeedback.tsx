@@ -1,5 +1,5 @@
-import toast from 'react-hot-toast'
-import { formatAdminPlanValidationError } from './adminPlanSaveFeedback'
+import { toast } from 'sonner'
+import { formatAdminPlanValidationError } from './adminPlanSaveFeedback.ts'
 
 export function notifyAdminPlanSaveSuccess(
   planLabel: string,
@@ -13,11 +13,9 @@ export function notifyAdminPlanSaveSuccess(
   }
 
   toast.custom(
-    (t) => (
+    (id) => (
       <div
-        className={`max-w-md rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 shadow-lg ${
-          t.visible ? 'animate-enter' : 'animate-leave'
-        }`}
+        className="max-w-md rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 shadow-lg transition-[transform,opacity] duration-200 ease-out"
         role="status"
       >
         <p className="font-semibold text-amber-950">Saved with warnings</p>
@@ -31,8 +29,8 @@ export function notifyAdminPlanSaveSuccess(
         </ul>
         <button
           type="button"
-          className="mt-3 text-xs font-medium text-amber-800 underline"
-          onClick={() => toast.dismiss(t.id)}
+          className="mt-3 text-xs font-medium text-amber-800 underline erp-pressable"
+          onClick={() => toast.dismiss(id)}
         >
           Dismiss
         </button>
@@ -46,19 +44,17 @@ export function notifyAdminPlanSaveError(err: unknown) {
   const message = formatAdminPlanValidationError(err)
 
   toast.custom(
-    (t) => (
+    (id) => (
       <div
-        className={`max-w-md rounded-lg border border-red-300 bg-red-50 px-4 py-3 shadow-lg ${
-          t.visible ? 'animate-enter' : 'animate-leave'
-        }`}
+        className="max-w-md rounded-lg border border-red-300 bg-red-50 px-4 py-3 shadow-lg transition-[transform,opacity] duration-200 ease-out"
         role="alert"
       >
         <p className="font-semibold text-red-950">Plan save failed</p>
         <p className="mt-2 whitespace-pre-wrap text-sm text-red-900">{message}</p>
         <button
           type="button"
-          className="mt-3 text-xs font-medium text-red-800 underline"
-          onClick={() => toast.dismiss(t.id)}
+          className="mt-3 text-xs font-medium text-red-800 underline erp-pressable"
+          onClick={() => toast.dismiss(id)}
         >
           Dismiss
         </button>

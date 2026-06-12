@@ -334,6 +334,7 @@ router.get('/', async (req, res) => {
     const availableQtyExpr = needsInventoryJoin
       ? 'COALESCE(inv.total_available, 0) as available_qty'
       : '0::int as available_qty'
+    const countParams = [...queryParams]
     const favoritedExpr =
       restaurantId && userId
         ? `EXISTS (
@@ -407,7 +408,6 @@ router.get('/', async (req, res) => {
       ${whereClause}
     `
 
-    const countParams = queryParams.slice(0, -2)
     const [mainResult, countResult] = await Promise.all([
       query(sql, queryParams),
       query(countSql, countParams),

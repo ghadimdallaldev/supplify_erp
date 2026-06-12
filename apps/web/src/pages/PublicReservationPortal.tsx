@@ -1,33 +1,22 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { Badge } from '../components/ui/badge'
-import { toast } from 'react-hot-toast'
+import { Skeleton } from '../components/ui/skeleton'
+import { toast } from 'sonner'
 import {
   useGetPublicRestaurantQuery,
   useLazyGetPublicReservationAvailabilityQuery,
   useCreatePublicReservationMutation,
   useJoinPublicWaitlistMutation,
 } from '../services/api'
-import type { PublicAvailabilitySlot } from '../types'
+import { PublicPageLayout, PublicPanel } from '../components/public/PublicPageLayout'
+import { ReservationTimeSlotGrid, formatTime } from '../components/public/ReservationTimeSlotGrid'
+import { cn } from '../lib/utils'
 import { CalendarDays, Clock3, Sparkles, Users } from 'lucide-react'
-
-function formatTime(isoString: string) {
-  return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatSlotLabel(slot: PublicAvailabilitySlot, totalCapacity?: number) {
-  if (slot.status === 'past') return 'Past'
-  if (!slot.isAvailable) return 'Full'
-  const left = slot.seatsLeft ?? slot.capacityAvailable
-  if (totalCapacity != null && left >= totalCapacity) return 'Available'
-  if (slot.status === 'limited') return `${left} left — limited`
-  return `${left} seat${left === 1 ? '' : 's'} left`
-}
 
 export function PublicReservationPortal() {
   const { restaurantIdOrSlug } = useParams<{ restaurantIdOrSlug?: string }>()
@@ -87,12 +76,11 @@ export function PublicReservationPortal() {
         return
       }
       setShowWaitlistForm(false)
-      toast.success('Availability refreshed')
-    } catch (error: any) {
+      toast.success('Availability updated')
+    } catch (error: unknown) {
       setAvailabilityChecked(false)
-      toast.error(
-        error?.data?.message || error?.data?.error?.message || 'Unable to check availability'
-      )
+      const err = error as { data?: { message?: string; error?: { message?: string } } }
+      toast.error(err?.data?.message || err?.data?.error?.message || 'Unable to check availability')
     }
   }
 
@@ -131,9 +119,10 @@ export function PublicReservationPortal() {
       toast.success('Reservation confirmed!')
       const reservation = response.reservation
       navigate(`/reserve/confirmation?token=${reservation.manageToken}`)
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { data?: { message?: string; error?: { message?: string } } }
       const message =
-        error?.data?.error?.message || error?.data?.message || 'Unable to create reservation'
+        err?.data?.error?.message || err?.data?.message || 'Unable to create reservation'
       toast.error(message)
       if (
         message.toLowerCase().includes('just booked') ||
@@ -161,339 +150,307 @@ export function PublicReservationPortal() {
       }).unwrap()
       toast.success('You are on the waitlist. We will contact you when a table opens.')
       setShowWaitlistForm(false)
-    } catch (error: any) {
-      toast.error(error?.data?.error?.message || error?.data?.message || 'Could not join waitlist')
+    } catch (error: unknown) {
+      const err = error as { data?: { message?: string; error?: { message?: string } } }
+      toast.error(err?.data?.error?.message || err?.data?.message || 'Could not join waitlist')
     }
   }
 
-  // No restaurant in URL – show “use your restaurant’s link” message
   if (!restaurantIdOrSlug) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4">
-        <Card className="max-w-md border-white/10 bg-white/95 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle>Reserve a table</CardTitle>
-            <CardDescription>
-              Use the reservation link provided by your restaurant. Each restaurant has its own
-              unique link.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+      <PublicPageLayout
+        centered
+        narrow
+        title="Reserve a table"
+        subtitle="Use the reservation link provided by your restaurant. Each venue has its own booking page."
+      />
     )
   }
 
-  // Loading restaurant
   if (loadingRestaurant) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4">
-        <Card className="max-w-md border-white/10 bg-white/95 backdrop-blur-sm">
-          <CardContent className="py-8 text-center text-[var(--text-muted)]">Loading…</CardContent>
-        </Card>
-      </div>
+      <PublicPageLayout narrow={false}>
+        <div className="mx-auto max-w-3xl space-y-4">
+          <Skeleton className="h-14 w-14 rounded-2xl" />
+          <Skeleton className="h-8 w-2/3" />
+          <Skeleton className="h-48 w-full rounded-xl" />
+        </div>
+      </PublicPageLayout>
     )
   }
 
-  // Restaurant not found
   if (restaurantNotFound || !restaurant) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4">
-        <Card className="max-w-md border-white/10 bg-white/95 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle>Restaurant not found</CardTitle>
-            <CardDescription>
-              This reservation link is invalid or the restaurant may have been removed.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+      <PublicPageLayout
+        centered
+        narrow
+        title="Restaurant not found"
+        subtitle="This reservation link is invalid or the restaurant may have been removed."
+      />
     )
   }
 
   const restaurantName = restaurant.name
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-8 sm:py-12 px-4">
-      <div className="mx-auto w-full max-w-6xl space-y-4 sm:space-y-6">
-        <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-4 text-white backdrop-blur-sm sm:px-6">
-          <p className="section-label !text-white/75">Reservations</p>
-          <h1 className="mt-1 text-xl font-black sm:text-2xl">Book a table at {restaurantName}</h1>
-          <p className="mt-1.5 text-sm text-white/80">
-            Pick your date and party size, then confirm in under a minute.
-          </p>
-        </div>
-
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 lg:flex-row lg:gap-6">
-          <Card className="w-full border-white/10 bg-white/95 backdrop-blur-sm lg:sticky lg:top-6 lg:h-fit lg:w-2/5">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-[var(--brand-mid)]" />
-                Reservation details
-              </CardTitle>
-              <CardDescription>
-                Choose your party size, date, and preferred time slot.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <Label className="flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                    Party size
-                  </Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={form.partySize}
-                    onChange={(event) => {
-                      setAvailabilityChecked(false)
-                      setForm((prev) => ({
-                        ...prev,
-                        partySize: Number(event.target.value) || prev.partySize,
-                        selectedSlot: '',
-                      }))
-                    }}
-                  />
-                </div>
-                <div>
-                  <Label className="flex items-center gap-1.5">
-                    <CalendarDays className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                    Date
-                  </Label>
-                  <Input
-                    type="date"
-                    value={form.date}
-                    onChange={(event) => {
-                      setAvailabilityChecked(false)
-                      setForm((prev) => ({ ...prev, date: event.target.value, selectedSlot: '' }))
-                    }}
-                  />
-                </div>
-              </div>
-
-              <Button
-                variant="default"
-                onClick={handleCheckAvailability}
-                disabled={loadingAvailability}
-                className="w-full sm:w-auto"
-              >
-                {loadingAvailability ? 'Checking…' : 'Check availability'}
-              </Button>
-
-              <div className="space-y-2">
-                <Label className="flex items-center gap-1.5">
-                  <Clock3 className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                  Available times
+    <PublicPageLayout
+      title={`Book at ${restaurantName}`}
+      subtitle="Choose your date and party size, pick a time, then confirm in under a minute."
+      logoInitial={restaurantName.charAt(0).toUpperCase()}
+      className="pb-12"
+    >
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
+        <PublicPanel
+          title="When are you coming?"
+          description="Set your party size and date, then check which times are open."
+          className="lg:sticky lg:top-6 lg:w-[42%] lg:shrink-0"
+        >
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label
+                  htmlFor="partySize"
+                  className="flex items-center gap-1.5 text-[var(--text-mid)]"
+                >
+                  <Users className="h-3.5 w-3.5 text-[var(--text-muted)]" aria-hidden />
+                  Party size
                 </Label>
-                {bookingWindow?.openTime && bookingWindow?.closeTime && !bookingWindow.closed ? (
-                  <p className="text-[10px] text-[var(--text-muted)]">
-                    Booking window: {bookingWindow.openTime} – {bookingWindow.closeTime}
-                    {totalCapacity != null ? ` · ${totalCapacity} seats in your dining room` : ''}
-                  </p>
-                ) : null}
-                {slots.length === 0 ? (
-                  <p className="text-xs text-[var(--text-muted)]">
-                    {!availabilityChecked
-                      ? 'Choose a date, then click “Check availability” to view open time slots.'
-                      : 'No time slots for this date. The restaurant may need tables configured in Reservations, or try a smaller party size or another date.'}
-                  </p>
-                ) : !hasBookableSlot ? (
-                  <p className="text-xs text-[var(--text-muted)]">
-                    All listed times are full for your party size. Try another date or join the
-                    waitlist below.
-                  </p>
-                ) : null}
-                {slots.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    {slots.map((slot) => (
-                      <button
-                        type="button"
-                        className={`flex min-h-[52px] flex-col rounded-lg border px-3 py-2 text-left text-xs transition ${
-                          slot.startTime === form.selectedSlot
-                            ? 'border-[var(--brand)] bg-[var(--brand-pale)] text-[var(--brand-mid)]'
-                            : slot.isAvailable
-                              ? 'border-[var(--app-border)] hover:border-[var(--brand)]/50 hover:text-[var(--brand-mid)]'
-                              : 'border-[var(--app-border)] text-[var(--text-muted)]'
-                        }`}
-                        key={slot.startTime}
-                        disabled={!slot.isAvailable}
-                        onClick={() =>
-                          setForm((prev) => ({ ...prev, selectedSlot: slot.startTime }))
-                        }
-                      >
-                        <span className="font-medium">{formatTime(slot.startTime)}</span>
-                        <span
-                          className={
-                            slot.status === 'past'
-                              ? 'text-[var(--text-muted)]'
-                              : !slot.isAvailable
-                                ? 'text-[var(--red)] font-medium'
-                                : ''
-                          }
-                        >
-                          {formatSlotLabel(slot, totalCapacity)}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
+                <Input
+                  id="partySize"
+                  type="number"
+                  min={1}
+                  max={50}
+                  className="mt-1.5 h-11"
+                  value={form.partySize}
+                  onChange={(event) => {
+                    setAvailabilityChecked(false)
+                    setForm((prev) => ({
+                      ...prev,
+                      partySize: Number(event.target.value) || prev.partySize,
+                      selectedSlot: '',
+                    }))
+                  }}
+                />
               </div>
+              <div>
+                <Label
+                  htmlFor="resDate"
+                  className="flex items-center gap-1.5 text-[var(--text-mid)]"
+                >
+                  <CalendarDays className="h-3.5 w-3.5 text-[var(--text-muted)]" aria-hidden />
+                  Date
+                </Label>
+                <Input
+                  id="resDate"
+                  type="date"
+                  className="mt-1.5 h-11"
+                  value={form.date}
+                  onChange={(event) => {
+                    setAvailabilityChecked(false)
+                    setForm((prev) => ({ ...prev, date: event.target.value, selectedSlot: '' }))
+                  }}
+                />
+              </div>
+            </div>
 
-              {(showWaitlistForm || (availabilityChecked && !hasBookableSlot)) &&
-              totalCapacity != null &&
-              form.partySize <= totalCapacity ? (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
-                  <p className="text-xs font-medium text-amber-900 flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Join the waitlist
-                  </p>
-                  <p className="text-[10px] text-amber-800">
-                    No tables for your party right now. Leave your details and the restaurant will
-                    reach out when space opens.
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full border-amber-300"
-                    disabled={joiningWaitlist || !form.customerName.trim()}
-                    onClick={handleJoinWaitlist}
-                  >
-                    {joiningWaitlist ? 'Joining…' : 'Join waitlist'}
-                  </Button>
-                </div>
-              ) : null}
+            <Button
+              variant="default"
+              onClick={handleCheckAvailability}
+              disabled={loadingAvailability}
+              className="consumer-pressable w-full bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
+            >
+              {loadingAvailability ? 'Checking…' : 'Check availability'}
+            </Button>
 
-              {totalCapacity != null && form.partySize > totalCapacity ? (
-                <p className="text-xs text-[var(--red)]">
-                  Party size ({form.partySize}) exceeds dining room capacity ({totalCapacity}). Use
-                  the waitlist or choose fewer guests.
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5 text-[var(--text-mid)]">
+                <Clock3 className="h-3.5 w-3.5 text-[var(--text-muted)]" aria-hidden />
+                Available times
+              </Label>
+              {bookingWindow?.openTime && bookingWindow?.closeTime && !bookingWindow.closed ? (
+                <p className="text-xs text-[var(--text-muted)]">
+                  Booking window {bookingWindow.openTime} – {bookingWindow.closeTime}
+                  {totalCapacity != null ? ` · ${totalCapacity} seats in dining room` : ''}
                 </p>
               ) : null}
-            </CardContent>
-          </Card>
 
-          <Card className="w-full border-white/10 bg-white/95 backdrop-blur-sm lg:w-3/5">
-            <CardHeader>
-              <CardTitle>Guest details</CardTitle>
-              <CardDescription>
-                Fill in your contact information to confirm your reservation at {restaurantName}.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4" onSubmit={handleCreateReservation}>
-                <div className="rounded-lg border border-[var(--app-border)] bg-[var(--app-bg-subtle)] px-3 py-2 text-sm">
+              {slots.length === 0 ? (
+                <p className="rounded-lg bg-[var(--brand-ultra)] px-3 py-2.5 text-sm text-[var(--text-muted)]">
+                  {!availabilityChecked
+                    ? 'Pick a date and tap “Check availability” to see open times.'
+                    : 'No slots for this date. Try another day or a smaller party size.'}
+                </p>
+              ) : !hasBookableSlot ? (
+                <p className="rounded-lg bg-[var(--amber-pale)] px-3 py-2.5 text-sm text-[var(--amber)]">
+                  All times are full for your party. Try another date or join the waitlist below.
+                </p>
+              ) : (
+                <ReservationTimeSlotGrid
+                  slots={slots}
+                  selectedSlot={form.selectedSlot}
+                  onSelect={(startTime) =>
+                    setForm((prev) => ({ ...prev, selectedSlot: startTime }))
+                  }
+                  totalCapacity={totalCapacity}
+                />
+              )}
+            </div>
+
+            {(showWaitlistForm || (availabilityChecked && !hasBookableSlot)) &&
+            totalCapacity != null &&
+            form.partySize <= totalCapacity ? (
+              <div className="space-y-2 rounded-xl border border-[var(--amber-mid)]/30 bg-[var(--amber-pale)] p-3">
+                <p className="flex items-center gap-1.5 text-sm font-medium text-[var(--amber)]">
+                  <Sparkles className="h-4 w-4" aria-hidden />
+                  Join the waitlist
+                </p>
+                <p className="text-xs leading-relaxed text-[var(--text-mid)]">
+                  Leave your details and the restaurant will reach out when a table opens.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="consumer-pressable w-full border-[var(--amber-mid)]/40"
+                  disabled={joiningWaitlist || !form.customerName.trim()}
+                  onClick={handleJoinWaitlist}
+                >
+                  {joiningWaitlist ? 'Joining…' : 'Join waitlist'}
+                </Button>
+              </div>
+            ) : null}
+
+            {totalCapacity != null && form.partySize > totalCapacity ? (
+              <p className="text-sm text-[var(--red)]">
+                Party of {form.partySize} exceeds dining room capacity ({totalCapacity}). Reduce
+                guests or join the waitlist.
+              </p>
+            ) : null}
+          </div>
+        </PublicPanel>
+
+        <PublicPanel
+          title="Your details"
+          description={`Contact info to confirm your table at ${restaurantName}.`}
+          className="lg:min-w-0 lg:flex-1"
+        >
+          <form className="space-y-4" onSubmit={handleCreateReservation}>
+            <div
+              className={cn(
+                'rounded-xl border px-3 py-2.5 text-sm',
+                selectedSlotDetails
+                  ? 'border-[var(--brand-light)]/40 bg-[var(--brand-pale)]/50 text-[var(--text)]'
+                  : 'border-[var(--app-border)] bg-[var(--brand-ultra)] text-[var(--text-muted)]'
+              )}
+            >
+              {selectedSlotDetails ? (
+                <>
+                  Booking for <strong>{form.partySize}</strong> guest
+                  {form.partySize === 1 ? '' : 's'} on{' '}
+                  <strong>{new Date(form.date).toLocaleDateString()}</strong> at{' '}
+                  <strong>{formatTime(selectedSlotDetails.startTime)}</strong>.
+                </>
+              ) : (
+                'Select a time above after checking availability.'
+              )}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <Label htmlFor="customerName">Name</Label>
+                <Input
+                  id="customerName"
+                  className="mt-1.5"
+                  value={form.customerName}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, customerName: event.target.value }))
+                  }
+                  required
+                  autoComplete="name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="customerEmail">
+                  Email <span className="text-[var(--red)]">*</span>
+                </Label>
+                <Input
+                  id="customerEmail"
+                  type="email"
+                  className="mt-1.5"
+                  value={form.customerEmail}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, customerEmail: event.target.value }))
+                  }
+                  required
+                  autoComplete="email"
+                />
+              </div>
+              <div>
+                <Label htmlFor="customerPhone">
+                  Phone <span className="text-[var(--red)]">*</span>
+                </Label>
+                <Input
+                  id="customerPhone"
+                  type="tel"
+                  className="mt-1.5"
+                  value={form.customerPhone}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, customerPhone: event.target.value }))
+                  }
+                  required
+                  autoComplete="tel"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Label>Selected time</Label>
+                <div className="mt-1.5 flex min-h-[44px] items-center rounded-lg border border-[var(--app-border)] px-3 text-sm">
                   {selectedSlotDetails ? (
-                    <span className="text-[var(--text)]">
-                      Booking for <strong>{form.partySize}</strong> guest
-                      {form.partySize === 1 ? '' : 's'} on{' '}
-                      <strong>{new Date(form.date).toLocaleDateString()}</strong> at{' '}
-                      <strong>{formatTime(selectedSlotDetails.startTime)}</strong>.
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">{formatTime(selectedSlotDetails.startTime)}</Badge>
+                      <span>{new Date(form.date).toLocaleDateString()}</span>
+                    </div>
                   ) : (
-                    <span className="text-[var(--text-muted)]">
-                      Pick a time on the left to finalize your reservation.
-                    </span>
+                    <span className="text-[var(--text-muted)]">No time selected yet</span>
                   )}
                 </div>
+              </div>
+            </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div>
-                    <Label>Name</Label>
-                    <Input
-                      value={form.customerName}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, customerName: event.target.value }))
-                      }
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label>
-                      Email <span className="text-[var(--red)]">*</span>
-                    </Label>
-                    <Input
-                      type="email"
-                      value={form.customerEmail}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, customerEmail: event.target.value }))
-                      }
-                      required
-                      autoComplete="email"
-                    />
-                  </div>
-                  <div>
-                    <Label>
-                      Phone <span className="text-[var(--red)]">*</span>
-                    </Label>
-                    <Input
-                      type="tel"
-                      value={form.customerPhone}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, customerPhone: event.target.value }))
-                      }
-                      required
-                      autoComplete="tel"
-                    />
-                  </div>
-                  <div>
-                    <Label>Selected time</Label>
-                    <div className="flex min-h-[44px] items-center rounded-md border border-[var(--app-border)] px-3 text-sm">
-                      {selectedSlotDetails ? (
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">
-                            {formatTime(selectedSlotDetails.startTime)}
-                          </Badge>
-                          <span>{new Date(form.date).toLocaleDateString()}</span>
-                        </div>
-                      ) : (
-                        <span className="text-[var(--text-muted)]">
-                          Pick a time slot to continue
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+            <div>
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={form.notes}
+                onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
+                placeholder="Special occasions, allergies, seating preferences…"
+                className="mt-1.5 min-h-[100px]"
+              />
+            </div>
 
-                <div>
-                  <Label>Notes</Label>
-                  <Textarea
-                    value={form.notes}
-                    onChange={(event) =>
-                      setForm((prev) => ({ ...prev, notes: event.target.value }))
-                    }
-                    placeholder="Tell us about special occasions, allergies, or seating preferences."
-                    className="min-h-[120px]"
-                  />
-                </div>
+            <Button
+              type="submit"
+              disabled={creatingReservation || !canConfirm}
+              className="consumer-pressable w-full bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
+            >
+              {creatingReservation ? 'Reserving…' : 'Confirm reservation'}
+            </Button>
 
-                <Button
-                  type="submit"
-                  disabled={creatingReservation || !canConfirm}
-                  className="w-full"
-                >
-                  {creatingReservation ? 'Reserving…' : 'Confirm reservation'}
-                </Button>
+            {!canConfirm && !creatingReservation ? (
+              <p className="text-xs text-[var(--text-muted)]">
+                {!form.selectedSlot
+                  ? 'Select an available time after checking availability.'
+                  : 'Enter your name, email, and phone to confirm.'}
+              </p>
+            ) : null}
 
-                {!canConfirm && !creatingReservation ? (
-                  <p className="text-xs text-[var(--text-muted)]">
-                    {!form.selectedSlot
-                      ? 'Select an available time on the left after checking availability.'
-                      : 'Enter your name, email, and phone to confirm.'}
-                  </p>
-                ) : null}
-
-                <p className="text-xs text-[var(--text-muted)]">
-                  By completing this booking you agree to receive reservation updates for this
-                  visit. To modify or cancel, use the confirmation link sent after booking.
-                </p>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+            <p className="text-xs leading-relaxed text-[var(--text-muted)]">
+              By booking you agree to receive reservation updates for this visit. Modify or cancel
+              using the confirmation link sent after booking.
+            </p>
+          </form>
+        </PublicPanel>
       </div>
-    </div>
+    </PublicPageLayout>
   )
 }
 

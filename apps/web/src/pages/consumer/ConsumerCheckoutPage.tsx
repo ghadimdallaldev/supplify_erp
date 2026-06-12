@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   useCreatePublicConsumerOrderMutation,
   useGetPublicConsumerFulfillmentOptionsQuery,
-  useGetPublicConsumerRestaurantQuery,
+  useGetPublicConsumerStorefrontQuery,
   useGetConsumerLoyaltyPreviewQuery,
   type ConsumerFulfillmentType,
 } from '../../services/consumerApi'
@@ -16,10 +16,28 @@ import { Textarea } from '../../components/ui/textarea'
 import { Badge } from '../../components/ui/badge'
 import { Skeleton } from '../../components/ui/skeleton'
 import { Switch } from '../../components/ui/switch'
+import { Alert, AlertDescription } from '../../components/ui/alert'
 import { formatPrice } from '../../utils/format'
-import { toast } from 'react-hot-toast'
-import { clearCartStorage, loadCart, cartLineTotal, type CartLine } from '../../lib/consumerCart'
-import { ArrowLeft, Truck, Store, Utensils, Gift } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  clearCartStorage,
+  formatModifierLabels,
+  cartLineTotal,
+  type CartLine,
+} from '../../lib/consumerCart'
+import { useConsumerCart } from '../../hooks/useConsumerCart'
+import { matchDeliveryZone, zoneDeliveryFee, zoneMinOrder } from '../../lib/deliveryZones'
+import { orderingStatusFromBranch, toDatetimeLocalValue } from '../../lib/consumerOrderingHours'
+import {
+  ArrowLeft,
+  Clock,
+  Truck,
+  Store,
+  Utensils,
+  Gift,
+  AlertTriangle,
+  CalendarClock,
+} from 'lucide-react'
 
 const fulfillmentOptions: Array<{
   value: ConsumerFulfillmentType
@@ -37,10 +55,13 @@ export function ConsumerCheckoutPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { isAuthenticated, member } = useConsumerAuth()
-  const [cart] = useState<CartLine[]>(() => loadCart(slug))
+  const { cart } = useConsumerCart(slug)
   const [branchId, setBranchId] = useState(searchParams.get('branchId') ?? '')
   const [fulfillmentType, setFulfillmentType] = useState<ConsumerFulfillmentType>('TAKEAWAY')
   const [redeemPoints, setRedeemPoints] = useState(false)
+  const [scheduleMode, setScheduleMode] = useState<'asap' | 'scheduled'>('asap')
+  const [scheduledFor, setScheduledFor] = useState('')
+  const [deliveryZoneId, setDeliveryZoneId] = useState<string | undefined>()
   const [form, setForm] = useState({
     guestName: '',
     guestEmail: '',
@@ -51,16 +72,29 @@ export function ConsumerCheckoutPage() {
     notes: '',
   })
 
-  const { data: restaurant } = useGetPublicConsumerRestaurantQuery(slug, { skip: !slug })
+  const { data: storefront } = useGetPublicConsumerStorefrontQuery(slug, { skip: !slug })
+  const restaurant = storefront?.restaurant
   const { data: fulfillmentData, isLoading: loadingFulfillment } =
-    useGetPublicConsumerFulfillmentOptionsQuery({ restaurantSlug: slug }, { skip: !slug })
+    useGetPublicConsumerFulfillmentOptionsQuery(
+      { restaurantSlug: slug, branchId: branchId || undefined },
+      { skip: !slug }
+    )
   const [createOrder, { isLoading: placing }] = useCreatePublicConsumerOrderMutation()
 
-  const branches = fulfillmentData?.branches ?? []
+  const branches = fulfillmentData?.branches ?? storefront?.branches ?? []
   const selectedBranch = useMemo(
     () => branches.find((b) => b.branchId === branchId) ?? branches[0],
     [branches, branchId]
   )
+
+  const orderingStatus = useMemo(() => orderingStatusFromBranch(selectedBranch), [selectedBranch])
+
+  const minScheduleValue = useMemo(() => {
+    if (orderingStatus.nextLiveOrderAt) {
+      return toDatetimeLocalValue(new Date(orderingStatus.nextLiveOrderAt))
+    }
+    return toDatetimeLocalValue(new Date())
+  }, [orderingStatus.nextLiveOrderAt])
 
   useEffect(() => {
     if (!branchId && branches.length) {
@@ -69,13 +103,45 @@ export function ConsumerCheckoutPage() {
   }, [branches, branchId])
 
   useEffect(() => {
+    if (orderingStatus.mode === 'PREORDER_ONLY') {
+      setScheduleMode('scheduled')
+      if (!scheduledFor && orderingStatus.nextLiveOrderAt) {
+        setScheduledFor(toDatetimeLocalValue(new Date(orderingStatus.nextLiveOrderAt)))
+      }
+    }
+  }, [orderingStatus.mode, orderingStatus.nextLiveOrderAt, scheduledFor])
+
+  useEffect(() => {
     if (isAuthenticated && member?.displayName && !form.guestName) {
       setForm((f) => ({ ...f, guestName: member.displayName }))
     }
   }, [form.guestName, isAuthenticated, member?.displayName])
 
+  const matchedZone = useMemo(() => {
+    if (fulfillmentType !== 'DELIVERY' || !selectedBranch) return null
+    return matchDeliveryZone(selectedBranch.deliveryZones ?? [], form.postcode)
+  }, [fulfillmentType, selectedBranch, form.postcode])
+
+  useEffect(() => {
+    setDeliveryZoneId(matchedZone?.id)
+  }, [matchedZone?.id])
+
   const subtotal = cart.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0)
-  const deliveryFee = fulfillmentType === 'DELIVERY' ? (selectedBranch?.deliveryFee ?? 0) : 0
+  const minOrderAmount = useMemo(() => {
+    if (!selectedBranch) return 0
+    if (fulfillmentType === 'DELIVERY') {
+      return zoneMinOrder(matchedZone, selectedBranch.minOrderAmount)
+    }
+    return selectedBranch.minOrderAmount
+  }, [fulfillmentType, matchedZone, selectedBranch])
+
+  const deliveryFee =
+    fulfillmentType === 'DELIVERY'
+      ? zoneDeliveryFee(matchedZone, selectedBranch?.deliveryFee ?? 0)
+      : 0
+
+  const belowMinOrder = minOrderAmount > 0 && subtotal < minOrderAmount
+  const prepMinutes = selectedBranch?.estimatedPrepMinutes ?? 30
 
   const { data: loyaltyData } = useGetConsumerLoyaltyPreviewQuery(
     {
@@ -133,8 +199,37 @@ export function ConsumerCheckoutPage() {
       toast.error('Delivery address is required')
       return
     }
+    if (fulfillmentType === 'DELIVERY' && form.postcode.trim() && !matchedZone) {
+      toast.error('We do not deliver to this postcode')
+      return
+    }
+    if (belowMinOrder) {
+      toast.error(`Minimum order is ${formatPrice(minOrderAmount)}`)
+      return
+    }
     if (redeemPoints && redeemError) {
       toast.error(redeemError)
+      return
+    }
+    if (scheduleMode === 'scheduled' && !scheduledFor) {
+      toast.error('Please choose a scheduled time')
+      return
+    }
+    if (orderingStatus.mode === 'CLOSED') {
+      toast.error(orderingStatus.message)
+      return
+    }
+    if (orderingStatus.mode === 'PREORDER_ONLY' && scheduleMode !== 'scheduled') {
+      toast.error('Please schedule your order for when we open')
+      return
+    }
+    if (
+      scheduleMode === 'scheduled' &&
+      scheduledFor &&
+      orderingStatus.nextLiveOrderAt &&
+      new Date(scheduledFor) < new Date(orderingStatus.nextLiveOrderAt)
+    ) {
+      toast.error('Scheduled time is before the next available ordering window')
       return
     }
 
@@ -148,6 +243,13 @@ export function ConsumerCheckoutPage() {
         guestPhone: form.guestPhone.trim() || undefined,
         notes: form.notes.trim() || undefined,
         pointsToRedeem: redeemPoints ? pointsToRedeem : undefined,
+        deliveryZoneId: fulfillmentType === 'DELIVERY' ? deliveryZoneId : undefined,
+        scheduledFor:
+          scheduleMode === 'scheduled' && scheduledFor
+            ? new Date(scheduledFor).toISOString()
+            : orderingStatus.mode === 'PREORDER_ONLY' && scheduledFor
+              ? new Date(scheduledFor).toISOString()
+              : undefined,
         deliveryAddress:
           fulfillmentType === 'DELIVERY'
             ? {
@@ -177,9 +279,9 @@ export function ConsumerCheckoutPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4 p-4">
+    <div className="space-y-4 p-4 pb-8">
       <Button variant="ghost" size="sm" asChild>
-        <Link to={`/order/${slug}/menu`}>
+        <Link to={branchId ? `/order/${slug}/menu?branchId=${branchId}` : `/order/${slug}/menu`}>
           <ArrowLeft className="mr-1 h-4 w-4" />
           Back to menu
         </Link>
@@ -188,13 +290,19 @@ export function ConsumerCheckoutPage() {
       <div>
         <h1 className="text-2xl font-semibold">Checkout</h1>
         <p className="text-muted-foreground">{restaurant?.name}</p>
+        {prepMinutes > 0 && (
+          <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            Est. prep time ~{prepMinutes} min
+          </p>
+        )}
       </div>
 
       {!isAuthenticated && preview?.programEnabled && (
-        <Card className="border-primary/20 bg-primary/5">
+        <Card className="border-[var(--brand-pale)] bg-[var(--brand-pale)]/30">
           <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-2">
-              <Gift className="mt-0.5 h-5 w-5 text-primary" />
+              <Gift className="mt-0.5 h-5 w-5 text-[var(--brand-mid)]" />
               <div>
                 <p className="font-medium">
                   Earn {preview.earnPoints > 0 ? `${preview.earnPoints} pts` : 'rewards'} on this
@@ -218,7 +326,7 @@ export function ConsumerCheckoutPage() {
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
             Your cart is empty.{' '}
-            <Link to={`/order/${slug}/menu`} className="text-primary underline">
+            <Link to={`/order/${slug}/menu`} className="text-[var(--brand-mid)] underline">
               Browse the menu
             </Link>
           </CardContent>
@@ -227,18 +335,49 @@ export function ConsumerCheckoutPage() {
 
       {!!cart.length && (
         <form onSubmit={handleSubmit} className="space-y-4">
+          {orderingStatus.mode !== 'LIVE' && (
+            <Alert
+              variant={orderingStatus.mode === 'CLOSED' ? 'destructive' : 'default'}
+              className={
+                orderingStatus.mode === 'PREORDER_ONLY'
+                  ? 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40'
+                  : undefined
+              }
+            >
+              <CalendarClock className="h-4 w-4" />
+              <AlertDescription>{orderingStatus.message}</AlertDescription>
+            </Alert>
+          )}
+
+          {belowMinOrder && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Minimum order is {formatPrice(minOrderAmount)}. Add{' '}
+                {formatPrice(minOrderAmount - subtotal)} more to checkout.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Your order</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {cart.map((line) => (
-                <div key={line.cartKey} className="flex justify-between text-sm">
-                  <span>
-                    {line.quantity}× {line.name}
-                    {line.notes ? ` (${line.notes})` : ''}
-                  </span>
-                  <span>{formatPrice(cartLineTotal(line))}</span>
+              {cart.map((line: CartLine) => (
+                <div key={line.cartKey} className="space-y-0.5">
+                  <div className="flex justify-between text-sm">
+                    <span>
+                      {line.quantity}× {line.name}
+                    </span>
+                    <span>{formatPrice(cartLineTotal(line))}</span>
+                  </div>
+                  {formatModifierLabels(line) && (
+                    <p className="text-xs text-muted-foreground">{formatModifierLabels(line)}</p>
+                  )}
+                  {line.notes && (
+                    <p className="text-xs italic text-muted-foreground">Note: {line.notes}</p>
+                  )}
                 </div>
               ))}
               <div className="flex justify-between border-t pt-2 text-sm">
@@ -247,7 +386,9 @@ export function ConsumerCheckoutPage() {
               </div>
               {deliveryFee > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Delivery</span>
+                  <span className="text-muted-foreground">
+                    Delivery{matchedZone ? ` · ${matchedZone.name}` : ''}
+                  </span>
                   <span>{formatPrice(deliveryFee)}</span>
                 </div>
               )}
@@ -258,15 +399,11 @@ export function ConsumerCheckoutPage() {
                 </div>
               )}
               <div className="flex justify-between border-t pt-2 font-medium">
-                <span>Total</span>
+                <span>
+                  Total · Cash on {fulfillmentType === 'DELIVERY' ? 'delivery' : 'pickup'}
+                </span>
                 <span>{formatPrice(effectiveTotal)}</span>
               </div>
-              {isAuthenticated && preview?.programEnabled && preview.earnPoints > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  You&apos;ll earn ~{preview.earnPoints} pts when this order is delivered (food
-                  subtotal only).
-                </p>
-              )}
             </CardContent>
           </Card>
 
@@ -299,7 +436,6 @@ export function ConsumerCheckoutPage() {
           <Card>
             <CardHeader>
               <CardTitle>Branch</CardTitle>
-              <CardDescription>Select where to prepare your order.</CardDescription>
             </CardHeader>
             <CardContent>
               {loadingFulfillment ? (
@@ -325,7 +461,6 @@ export function ConsumerCheckoutPage() {
           <Card>
             <CardHeader>
               <CardTitle>Fulfillment</CardTitle>
-              <CardDescription>How would you like to receive your order?</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-2 sm:grid-cols-3">
               {fulfillmentOptions.map(({ value, label, icon: Icon }) => {
@@ -338,7 +473,7 @@ export function ConsumerCheckoutPage() {
                     onClick={() => setFulfillmentType(value)}
                     className={`flex flex-col items-center gap-2 rounded-lg border p-4 text-sm transition ${
                       fulfillmentType === value
-                        ? 'border-primary bg-primary/5'
+                        ? 'border-[var(--brand-mid)] bg-[var(--brand-pale)]'
                         : 'hover:bg-muted/50'
                     } ${!available ? 'cursor-not-allowed opacity-50' : ''}`}
                   >
@@ -348,6 +483,61 @@ export function ConsumerCheckoutPage() {
                   </button>
                 )
               })}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>When</CardTitle>
+              <CardDescription>
+                {orderingStatus.mode === 'LIVE'
+                  ? 'Order now or schedule for later.'
+                  : orderingStatus.mode === 'PREORDER_ONLY'
+                    ? 'Live ordering is closed — pick a time from when we open.'
+                    : 'Ordering is closed right now.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {orderingStatus.allowAsap && (
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={scheduleMode === 'asap' ? 'default' : 'outline'}
+                    className="flex-1"
+                    onClick={() => setScheduleMode('asap')}
+                  >
+                    ASAP (~{prepMinutes} min)
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={scheduleMode === 'scheduled' ? 'default' : 'outline'}
+                    className="flex-1"
+                    onClick={() => setScheduleMode('scheduled')}
+                  >
+                    Schedule
+                  </Button>
+                </div>
+              )}
+              {(scheduleMode === 'scheduled' || !orderingStatus.allowAsap) && (
+                <div className="space-y-1">
+                  <Label htmlFor="scheduledFor">
+                    {orderingStatus.mode === 'PREORDER_ONLY' ? 'Preorder for *' : 'Preferred time'}
+                  </Label>
+                  <Input
+                    id="scheduledFor"
+                    type="datetime-local"
+                    value={scheduledFor}
+                    onChange={(e) => setScheduledFor(e.target.value)}
+                    min={minScheduleValue}
+                    required={!orderingStatus.allowAsap}
+                  />
+                  {orderingStatus.nextLiveOrderAt && (
+                    <p className="text-xs text-muted-foreground">
+                      Earliest: {new Date(orderingStatus.nextLiveOrderAt).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -409,7 +599,7 @@ export function ConsumerCheckoutPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="postcode">Postcode</Label>
+                    <Label htmlFor="postcode">Postcode *</Label>
                     <Input
                       id="postcode"
                       value={form.postcode}
@@ -417,6 +607,13 @@ export function ConsumerCheckoutPage() {
                     />
                   </div>
                 </div>
+                {form.postcode.trim() && (
+                  <p className="text-xs text-muted-foreground">
+                    {matchedZone
+                      ? `Delivery zone: ${matchedZone.name} · fee ${formatPrice(deliveryFee)}`
+                      : 'Enter a valid postcode for your delivery zone'}
+                  </p>
+                )}
               </CardContent>
             </Card>
           )}
@@ -435,7 +632,20 @@ export function ConsumerCheckoutPage() {
             </CardContent>
           </Card>
 
-          <Button type="submit" className="w-full" disabled={placing || !branchId}>
+          <Button
+            type="submit"
+            className="w-full bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
+            disabled={
+              placing ||
+              !branchId ||
+              belowMinOrder ||
+              orderingStatus.mode === 'CLOSED' ||
+              (fulfillmentType === 'DELIVERY' &&
+                !!form.postcode.trim() &&
+                !matchedZone &&
+                (selectedBranch?.deliveryZones?.length ?? 0) > 0)
+            }
+          >
             {placing ? 'Placing order…' : `Place order · ${formatPrice(effectiveTotal)}`}
           </Button>
         </form>

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { prefetchRouteChunk } from '../../lib/routeChunkPrefetch'
+import { cn } from '../../lib/utils'
 import type { SidebarNavItem, SidebarNavSectionConfig } from './sidebarNavConfig'
 import { isNavItemActive } from './sidebarNavConfig'
 
@@ -28,8 +29,8 @@ export function SidebarNavSection({
     badges
 
   return (
-    <div style={{ marginBottom: 6 }}>
-      <div className="px-1.5 pb-0.5 pt-2 text-[9.5px] font-bold uppercase tracking-wider text-[var(--sidebar-section)]">
+    <div className="mb-1.5">
+      <div className="section-label px-1.5 pb-0.5 pt-2 text-[var(--sidebar-section)]">
         {section.label}
       </div>
       {section.items.map((item) => (
@@ -80,136 +81,77 @@ function SidebarNavLink({
       onFocus={() => prefetchRouteChunk(item.href)}
       onClick={() => onNavigate?.()}
       data-testid={item.testId || `nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        paddingLeft: 6,
-        paddingRight: 8,
-        height: 34,
-        borderRadius: 7,
-        textDecoration: 'none',
-        position: 'relative',
-        background: isActive ? 'var(--brand-pale)' : 'transparent',
-        color: isActive ? 'var(--brand)' : 'var(--text-muted)',
-        fontWeight: isActive ? 600 : 500,
-        fontSize: 13,
-        marginBottom: 1,
-      }}
-      className="sidebar-nav-item"
+      className={cn(
+        'sidebar-nav-item relative mb-px flex h-[34px] items-center gap-2 rounded-md px-2 text-[13px] no-underline',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30 focus-visible:ring-offset-1',
+        isActive
+          ? 'bg-[var(--brand-pale)] font-semibold text-[var(--brand)]'
+          : 'font-medium text-[var(--text-muted)]'
+      )}
     >
       {isActive && (
         <span
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            width: 3,
-            height: 18,
-            borderRadius: '0 3px 3px 0',
-            background: 'var(--mint-mid)',
-          }}
+          aria-hidden
+          className="absolute left-0 top-1/2 h-[18px] w-px -translate-y-1/2 rounded-r bg-[var(--mint-mid)]"
         />
       )}
       <span
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: 7,
-          background: isActive ? 'rgba(91,33,182,0.12)' : 'var(--brand-ultra)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-        }}
+        className={cn(
+          'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
+          isActive ? 'bg-[var(--brand)]/10' : 'bg-[var(--brand-ultra)]'
+        )}
       >
-        <item.icon size={14} style={{ color: isActive ? 'var(--brand)' : 'var(--text-muted)' }} />
+        <item.icon
+          size={14}
+          className={isActive ? 'text-[var(--brand)]' : 'text-[var(--text-muted)]'}
+          aria-hidden
+        />
       </span>
-      <span
-        style={{
-          flex: 1,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {item.name}
-      </span>
-      {showPendingBadge && (
-        <span
-          style={{
-            background: 'var(--amber-mid)',
-            color: '#000',
-            fontSize: 10,
-            fontWeight: 700,
-            borderRadius: 8,
-            padding: '1px 5px',
-            minWidth: 18,
-            textAlign: 'center',
-          }}
-        >
-          {pendingOrders > 99 ? '99+' : pendingOrders}
-        </span>
-      )}
+      <span className="min-w-0 flex-1 truncate">{item.name}</span>
+      {showPendingBadge && <NavCountBadge count={pendingOrders} variant="amber" />}
       {showDisputesBadge && (
-        <span
-          style={{
-            background: 'var(--amber-mid)',
-            color: '#000',
-            fontSize: 10,
-            fontWeight: 700,
-            borderRadius: 8,
-            padding: '1px 5px',
-            minWidth: 18,
-            textAlign: 'center',
-          }}
-          title="Active disputes"
-        >
-          {activeDisputeCount > 99 ? '99+' : activeDisputeCount}
-        </span>
+        <NavCountBadge count={activeDisputeCount} variant="amber" title="Active disputes" />
       )}
-      {showUnreadBadge && (
-        <span
-          style={{
-            background: 'var(--red)',
-            color: '#fff',
-            fontSize: 10,
-            fontWeight: 700,
-            borderRadius: 8,
-            padding: '1px 5px',
-            minWidth: 18,
-            textAlign: 'center',
-          }}
-        >
-          {unreadCount > 9 ? '9+' : unreadCount}
-        </span>
-      )}
+      {showUnreadBadge && <NavCountBadge count={unreadCount} variant="red" cap={9} />}
       {showOrderUsage && orderUsageBadge && (
         <span
           title="Daily orders used today"
-          style={{
-            background: orderUsageBadge.atLimit
-              ? 'var(--red)'
+          className={cn(
+            'min-w-[18px] rounded-lg px-1.5 py-px text-center text-[10px] font-bold',
+            orderUsageBadge.atLimit
+              ? 'bg-[var(--red)] text-white'
               : orderUsageBadge.nearLimit
-                ? 'var(--amber-mid)'
-                : 'var(--brand-ultra)',
-            color: orderUsageBadge.atLimit
-              ? '#fff'
-              : orderUsageBadge.nearLimit
-                ? '#000'
-                : 'var(--text-muted)',
-            fontSize: 10,
-            fontWeight: 700,
-            borderRadius: 8,
-            padding: '1px 5px',
-            minWidth: 18,
-            textAlign: 'center',
-          }}
+                ? 'bg-[var(--amber-mid)] text-black'
+                : 'bg-[var(--brand-ultra)] text-[var(--text-muted)]'
+          )}
         >
           {orderUsageBadge.label}
         </span>
       )}
     </Link>
+  )
+}
+
+function NavCountBadge({
+  count,
+  variant,
+  cap = 99,
+  title,
+}: {
+  count: number
+  variant: 'amber' | 'red'
+  cap?: number
+  title?: string
+}) {
+  return (
+    <span
+      title={title}
+      className={cn(
+        'min-w-[18px] rounded-lg px-1.5 py-px text-center text-[10px] font-bold',
+        variant === 'red' ? 'bg-[var(--red)] text-white' : 'bg-[var(--amber-mid)] text-black'
+      )}
+    >
+      {count > cap ? `${cap}+` : count}
+    </span>
   )
 }

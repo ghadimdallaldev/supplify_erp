@@ -38,6 +38,15 @@ const fulfillmentConfigSchema = z.object({
   minOrderAmount: z.number().nonnegative().optional(),
   deliveryFee: z.number().nonnegative().optional(),
   estimatedPrepMinutes: z.number().int().positive().optional(),
+  liveOrderStart: z
+    .string()
+    .regex(/^\d{1,2}:\d{2}$/)
+    .optional(),
+  liveOrderEnd: z
+    .string()
+    .regex(/^(\d{1,2}:\d{2}|24:00)$/)
+    .optional(),
+  allowPreordersOutsideLiveHours: z.boolean().optional(),
 })
 
 const deliveryZoneCreateSchema = z.object({
@@ -132,9 +141,10 @@ consumerFulfillmentAdminRoutes.patch(
         `
       INSERT INTO branch_fulfillment_config (
         branch_id, delivery_enabled, takeaway_enabled, dine_in_enabled,
-        min_order_amount, delivery_fee, estimated_prep_minutes
+        min_order_amount, delivery_fee, estimated_prep_minutes,
+        live_order_start, live_order_end, allow_preorders_outside_live_hours
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, '12:00'), COALESCE($9, '00:00'), COALESCE($10, TRUE))
       ON CONFLICT (branch_id) DO UPDATE SET
         delivery_enabled = COALESCE($2, branch_fulfillment_config.delivery_enabled),
         takeaway_enabled = COALESCE($3, branch_fulfillment_config.takeaway_enabled),
@@ -142,6 +152,9 @@ consumerFulfillmentAdminRoutes.patch(
         min_order_amount = COALESCE($5, branch_fulfillment_config.min_order_amount),
         delivery_fee = COALESCE($6, branch_fulfillment_config.delivery_fee),
         estimated_prep_minutes = COALESCE($7, branch_fulfillment_config.estimated_prep_minutes),
+        live_order_start = COALESCE($8, branch_fulfillment_config.live_order_start),
+        live_order_end = COALESCE($9, branch_fulfillment_config.live_order_end),
+        allow_preorders_outside_live_hours = COALESCE($10, branch_fulfillment_config.allow_preorders_outside_live_hours),
         updated_at = now()
       RETURNING *
       `,
@@ -153,6 +166,9 @@ consumerFulfillmentAdminRoutes.patch(
           body.minOrderAmount ?? 0,
           body.deliveryFee ?? 0,
           body.estimatedPrepMinutes ?? 30,
+          body.liveOrderStart ?? null,
+          body.liveOrderEnd ?? null,
+          body.allowPreordersOutsideLiveHours ?? null,
         ]
       )
 

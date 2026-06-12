@@ -16,7 +16,7 @@ import { Input } from '../../ui/input'
 import { Package, Printer, Download, Edit } from 'lucide-react'
 import { isEntitlementFeatureEnabled } from '../../../lib/planLimits'
 import { useImpersonation } from '../../../hooks/useImpersonation'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { formatPrice } from '../../../utils/format'
 import {
   getOrderStatusColor,

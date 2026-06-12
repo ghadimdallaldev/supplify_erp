@@ -13,6 +13,7 @@ export type AddCartLineInput = {
   name: string
   unitPrice: number
   modifierOptionIds?: string[]
+  modifierLabels?: string[]
   notes?: string
   quantity?: number
 }
@@ -55,6 +56,7 @@ export function useConsumerCart(slug: string) {
                 unitPrice: input.unitPrice,
                 quantity,
                 modifierOptionIds,
+                modifierLabels: input.modifierLabels,
                 notes,
               },
             ]

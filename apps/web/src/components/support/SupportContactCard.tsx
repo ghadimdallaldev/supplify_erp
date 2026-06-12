@@ -4,7 +4,7 @@ import { useStartSupportChatMutation } from '../../services/api'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { MessageCircle, Loader2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 
 export function SupportContactCard() {
   const [startSupport, { isLoading }] = useStartSupportChatMutation()

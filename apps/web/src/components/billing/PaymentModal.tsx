@@ -16,7 +16,7 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Badge } from '../ui/badge'
 import { CreditCard, Lock, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 
 type BillingCycle = 'MONTHLY' | 'YEARLY'
 

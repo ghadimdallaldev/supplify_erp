@@ -18,7 +18,7 @@ import {
   useGetRestaurantWasteAnalyticsQuery,
 } from '../../services/api'
 import { formatCurrency, formatNumber } from '../../utils/format'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { AlertTriangle, Loader2, Recycle, TrendingDown } from 'lucide-react'
 
 const WASTE_CATEGORIES = [
@@ -228,12 +228,17 @@ export function RestaurantWastePanel({
                     })
                   : ''
                 return (
-                  <div key={String(row.date)} className="flex-1 flex flex-col items-center gap-1">
-                    <div
-                      className="w-full rounded-t bg-[var(--red)]/80 min-h-[8px] transition-all"
-                      style={{ height: `${height}%` }}
-                      title={`${dateLabel}: ${formatCurrency(cost)}`}
-                    />
+                  <div
+                    key={String(row.date)}
+                    className="flex h-full flex-1 flex-col items-center gap-1"
+                  >
+                    <div className="flex min-h-0 w-full flex-1 flex-col justify-end">
+                      <div
+                        className="h-full min-h-[8px] w-full origin-bottom rounded-t bg-[var(--red)]/80 transition-transform duration-200 ease-linear"
+                        style={{ transform: `scaleY(${height / 100})` }}
+                        title={`${dateLabel}: ${formatCurrency(cost)}`}
+                      />
+                    </div>
                     <span className="text-[10px] text-[var(--text-muted)] text-center leading-tight">
                       {dateLabel.split(',')[0]}
                     </span>

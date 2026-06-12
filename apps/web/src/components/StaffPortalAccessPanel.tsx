@@ -1,4 +1,4 @@
-import { toast } from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import type { StaffMember } from '../types'
@@ -10,22 +10,30 @@ import {
   useResetStaffPortalAccessMutation,
   useDisableStaffPortalAccessMutation,
 } from '../services/staffApi'
+import { cn } from '../lib/utils'
 
 const statusLabels: Record<string, string> = {
-  none: 'No portal account',
-  invited: 'Invited',
-  active: 'Active',
-  disabled: 'Disabled',
+  none: 'No portal access',
+  invited: 'Invite pending',
+  active: 'Portal active',
+  disabled: 'Access disabled',
 }
 
 interface StaffPortalAccessPanelProps {
   member: StaffMember
   canManage: boolean
+  compact?: boolean
 }
 
-export function StaffPortalAccessPanel({ member, canManage }: StaffPortalAccessPanelProps) {
+export function StaffPortalAccessPanel({
+  member,
+  canManage,
+  compact = false,
+}: StaffPortalAccessPanelProps) {
   const portal = member.portalAccess
   const status = portal?.status ?? 'none'
+  const magicLinkOnly = Boolean(portal?.magicLinkEnabled)
+  const label = magicLinkOnly ? 'Magic link' : (statusLabels[status] ?? status)
 
   const [createAccount, { isLoading: creating }] = useCreateStaffPortalAccountMutation()
   const [sendInvite, { isLoading: inviting }] = useSendStaffPortalInviteMutation()
@@ -54,7 +62,7 @@ export function StaffPortalAccessPanel({ member, canManage }: StaffPortalAccessP
   const handleInvite = async () => {
     try {
       await sendInvite(member.id).unwrap()
-      toast.success('Invite email sent')
+      toast.success('Sign-in link sent to their work email')
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, 'Unable to send invite'))
     }
@@ -93,59 +101,99 @@ export function StaffPortalAccessPanel({ member, canManage }: StaffPortalAccessP
     }
   }
 
+  const badgeVariant =
+    status === 'active' ? 'default' : status === 'disabled' ? 'destructive' : 'outline'
+
   if (!canManage) {
     return (
-      <div className="mt-2 text-xs text-[var(--text-muted)]">
-        Portal: {statusLabels[status] ?? status}
+      <p className={cn('text-xs text-[var(--text-muted)]', compact ? 'mt-1' : 'mt-2')}>
+        Portal: {label}
         {portal?.lastLoginAt
           ? ` · Last login ${new Date(portal.lastLoginAt).toLocaleString()}`
           : null}
-      </div>
+      </p>
     )
   }
 
   return (
-    <div className="mt-3 w-full space-y-2 border-t border-[var(--app-border)] pt-3">
+    <div
+      className={cn(
+        'space-y-2',
+        compact
+          ? 'mt-3 border-t border-[var(--app-border)] pt-3'
+          : 'mt-3 w-full border-t border-[var(--app-border)] pt-3'
+      )}
+    >
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-[var(--text-muted)]">Staff portal</span>
-        <Badge variant={status === 'active' ? 'default' : 'outline'}>
-          {statusLabels[status] ?? status}
+        <span className="text-xs font-medium text-[var(--text-mid)]">Staff portal</span>
+        <Badge
+          variant={badgeVariant}
+          className={magicLinkOnly ? 'bg-[var(--brand-pale)] text-[var(--brand-mid)]' : undefined}
+        >
+          {label}
         </Badge>
         {portal?.lastLoginAt ? (
           <span className="text-xs text-[var(--text-muted)]">
-            Last login {new Date(portal.lastLoginAt).toLocaleString()}
+            Last login {new Date(portal.lastLoginAt).toLocaleDateString()}
           </span>
         ) : null}
       </div>
       <div className="flex flex-wrap gap-2">
-        {status === 'none' || status === 'disabled' ? (
-          <Button size="sm" variant="outline" disabled={creating} onClick={handleCreate}>
-            {creating ? 'Creating…' : 'Create portal account'}
+        {!portal?.hasAccount && (status === 'none' || status === 'disabled' || magicLinkOnly) ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="consumer-pressable min-h-9"
+            disabled={creating}
+            onClick={handleCreate}
+          >
+            {creating ? 'Creating…' : 'Add password login'}
           </Button>
         ) : null}
-        {status === 'invited' || status === 'active' ? (
+        {magicLinkOnly || status === 'invited' || (status === 'active' && portal?.hasAccount) ? (
           <>
-            <Button size="sm" variant="outline" disabled={inviting} onClick={handleInvite}>
-              {inviting ? 'Sending…' : status === 'invited' ? 'Resend invite' : 'Send login invite'}
+            <Button
+              size="sm"
+              variant="outline"
+              className="consumer-pressable min-h-9"
+              disabled={inviting}
+              onClick={handleInvite}
+            >
+              {inviting ? 'Sending…' : magicLinkOnly ? 'Send magic link' : 'Send login invite'}
             </Button>
-            <Button size="sm" variant="outline" disabled={copying} onClick={handleCopyLink}>
-              {copying ? 'Copying…' : 'Copy login link'}
-            </Button>
-            {status === 'active' ? (
-              <>
-                <Button size="sm" variant="outline" disabled={resetting} onClick={handleReset}>
-                  {resetting ? 'Resetting…' : 'Reset access'}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  disabled={disabling}
-                  onClick={handleDisable}
-                >
-                  {disabling ? 'Disabling…' : 'Disable access'}
-                </Button>
-              </>
+            {portal?.hasAccount ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="consumer-pressable min-h-9"
+                disabled={copying}
+                onClick={handleCopyLink}
+              >
+                {copying ? 'Copying…' : 'Copy login link'}
+              </Button>
             ) : null}
+          </>
+        ) : null}
+        {portal?.hasAccount && status === 'active' ? (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              className="consumer-pressable min-h-9"
+              disabled={resetting}
+              onClick={handleReset}
+            >
+              {resetting ? 'Resetting…' : 'Reset access'}
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="consumer-pressable min-h-9"
+              disabled={disabling}
+              onClick={handleDisable}
+            >
+              {disabling ? 'Disabling…' : 'Disable'}
+            </Button>
           </>
         ) : null}
       </div>

@@ -6,7 +6,7 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Skeleton } from '../ui/skeleton'
 import { EmptyState } from '../ui/empty-state'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Palette } from 'lucide-react'
 
 const HEX_RE = /^#([0-9A-Fa-f]{6})$/

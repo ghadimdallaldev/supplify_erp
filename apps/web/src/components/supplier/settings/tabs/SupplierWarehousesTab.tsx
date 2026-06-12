@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from '../../../ui/dialog'
 import { Warehouse, MapPin, Loader2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { WarehouseFulfillmentSettings } from '../../../settings/WarehouseFulfillmentSettings'
 import { useAppDispatch, useAppSelector } from '../../../../hooks/redux'
 import { usePermissions } from '../../../../hooks/usePermissions'

@@ -4,22 +4,21 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import listPlugin from '@fullcalendar/list'
-import { AnimatePresence, motion } from 'framer-motion'
 import { format } from 'date-fns'
 import {
   CalendarDays,
   Filter,
   RefreshCcw,
-  X,
   Loader2,
   ArrowLeft,
   ArrowRight,
   Lock,
   TrendingUp,
 } from 'lucide-react'
-import { toast } from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet'
 import { Select, SelectTrigger, SelectItem } from './ui/select'
 import { useOrdersCalendar, OrdersCalendarFetchError } from '../hooks/useOrdersCalendar'
 import { useGetEntitlementsQuery } from '../services/api'
@@ -224,7 +223,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
         return (
           <div className="group relative flex h-full items-center justify-center">
             <div
-              className={`h-3.5 w-3.5 rounded-full shadow-sm transition-transform duration-150 group-hover:scale-150 ${dotTheme}`}
+              className={`h-3.5 w-3.5 rounded-full shadow-sm transition-transform duration-150 [@media(hover:hover)_and_(pointer:fine)]:group-hover:scale-150 ${dotTheme}`}
             />
             <div className="pointer-events-none absolute left-1/2 top-full z-30 hidden w-60 -translate-x-1/2 translate-y-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 text-xs text-[var(--text-mid)] shadow-xl group-hover:block">
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
@@ -281,7 +280,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
 
       return (
         <div
-          className={`supplify-calendar-event group relative border-l-4 p-2 rounded-lg shadow-sm transition-all hover:shadow-md ${statusTheme}`}
+          className={`supplify-calendar-event group relative border-l-4 p-2 rounded-lg shadow-sm transition-[box-shadow] duration-150 hover:shadow-md ${statusTheme}`}
         >
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide">
@@ -587,41 +586,28 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
         </div>
       </div>
 
-      <AnimatePresence>
-        {selectedEvent && (
-          <>
-            <motion.div
-              className="fixed inset-0 z-40 bg-black/30"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedEvent(null)}
-            />
-            <motion.aside
-              className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto border-l border-[var(--app-border)] bg-[var(--surface)] p-6 shadow-xl"
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">
-                    {selectedEvent.type?.replace(/_/g, ' ')}
-                  </p>
-                  <h3 className="text-xl font-semibold text-[var(--text)]">
-                    Order #{selectedEvent.orderId?.slice(0, 8) ?? selectedEvent.id}
-                  </h3>
-                  {selectedEvent.status && (
-                    <Badge className="mt-2" variant="secondary">
-                      {selectedEvent.status.replace(/_/g, ' ')}
-                    </Badge>
-                  )}
-                </div>
-                <Button variant="ghost" size="icon" onClick={() => setSelectedEvent(null)}>
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
+      <Sheet
+        open={!!selectedEvent}
+        onOpenChange={(open) => {
+          if (!open) setSelectedEvent(null)
+        }}
+      >
+        <SheetContent side="right" className="overflow-y-auto p-6">
+          {selectedEvent && (
+            <>
+              <SheetHeader className="pr-8">
+                <SheetDescription className="text-xs uppercase tracking-wide">
+                  {selectedEvent.type?.replace(/_/g, ' ')}
+                </SheetDescription>
+                <SheetTitle className="text-xl">
+                  Order #{selectedEvent.orderId?.slice(0, 8) ?? selectedEvent.id}
+                </SheetTitle>
+                {selectedEvent.status && (
+                  <Badge className="mt-2 w-fit" variant="secondary">
+                    {selectedEvent.status.replace(/_/g, ' ')}
+                  </Badge>
+                )}
+              </SheetHeader>
 
               <div className="mt-6 space-y-4 text-sm text-[var(--text-muted)]">
                 <div className="flex items-center justify-between text-base font-semibold text-[var(--text)]">
@@ -699,10 +685,10 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
                   </p>
                 </div>
               </div>
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

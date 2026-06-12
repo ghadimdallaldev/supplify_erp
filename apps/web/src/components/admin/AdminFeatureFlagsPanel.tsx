@@ -5,7 +5,7 @@ import { Badge } from '../ui/badge'
 import { StatusBadge } from '../ui/status-badge'
 import { Select, SelectTrigger } from '../ui/select'
 import { Loader2, Flag } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import {
   useClearTenantFeatureOverrideMutation,
   useGetAdminFeatureFlagsQuery,

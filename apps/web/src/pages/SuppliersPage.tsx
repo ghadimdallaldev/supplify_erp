@@ -30,7 +30,7 @@ import {
 } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { Link, useNavigate } from 'react-router-dom'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { formatPrice } from '../utils/format'
 import { useDebouncedSearch } from '../hooks/useDebouncedSearch'
 import { SearchHistoryDropdown } from '../components/search/SearchHistoryDropdown'
@@ -45,6 +45,7 @@ import {
 } from '../components/ui/card-layout'
 import { EmptyState } from '../components/ui/empty-state'
 import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { cn } from '../lib/utils'
 
@@ -242,7 +243,7 @@ export function SuppliersPage() {
   }
 
   return (
-    <div className="space-y-5 min-w-0" data-testid="suppliers-page">
+    <PageShell data-testid="suppliers-page">
       <PageHeader
         title="Suppliers"
         description={
@@ -504,7 +505,7 @@ export function SuppliersPage() {
             return (
               <Card
                 key={supplier.id}
-                className={`${cardShellClass} hover:shadow-lg transition-all duration-200 group`}
+                className={`${cardShellClass} transition-[box-shadow,transform] duration-200 ease-out [@media(hover:hover)_and_(pointer:fine)]:hover:shadow-lg group`}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start gap-3 min-w-0">
@@ -809,6 +810,6 @@ export function SuppliersPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   )
 }

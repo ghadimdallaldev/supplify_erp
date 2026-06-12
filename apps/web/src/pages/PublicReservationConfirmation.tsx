@@ -1,9 +1,10 @@
 import { Link, useSearchParams } from 'react-router-dom'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
+import { Skeleton } from '../components/ui/skeleton'
 import { useGetPublicReservationDetailsQuery } from '../services/api'
-import { Loader2 } from 'lucide-react'
+import { PublicPageLayout, PublicPanel } from '../components/public/PublicPageLayout'
+import { CalendarCheck, Loader2 } from 'lucide-react'
 
 function formatWhen(iso: string) {
   const d = new Date(iso)
@@ -36,87 +37,91 @@ export function PublicReservationConfirmation() {
   const restaurantSlug = (reservation as { restaurantSlug?: string })?.restaurantSlug
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4 py-16">
-      <Card className="w-full max-w-xl border-white/10 bg-white/95 text-[var(--text)] shadow-xl">
-        <CardHeader className="space-y-2 text-center">
-          <CardTitle className="text-3xl font-semibold tracking-tight">
-            Reservation confirmed
-          </CardTitle>
-          <CardDescription>
-            {restaurantName
-              ? `Your table at ${restaurantName} is booked.`
-              : 'Thanks for booking with Supplify.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {isLoading ? (
-            <div className="flex justify-center py-8 text-[var(--text-muted)]">
-              <Loader2 className="h-6 w-6 animate-spin" />
+    <PublicPageLayout
+      centered
+      narrow
+      title="You're booked"
+      subtitle={
+        restaurantName
+          ? `Your table at ${restaurantName} is confirmed.`
+          : 'Thanks for booking with us.'
+      }
+    >
+      <PublicPanel className="w-full">
+        {isLoading ? (
+          <div className="flex flex-col items-center gap-3 py-6">
+            <Loader2 className="h-6 w-6 animate-spin text-[var(--brand-mid)]" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+        ) : isError || !reservation ? (
+          <p className="py-4 text-center text-sm leading-relaxed text-[var(--text-muted)]">
+            {token
+              ? 'We could not load your reservation. Use the link from your confirmation email or contact the restaurant.'
+              : 'Your reservation is confirmed. Check your email for the manage link.'}
+          </p>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex justify-center">
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--mint-pale)] text-[var(--mint)]">
+                <CalendarCheck className="h-6 w-6" aria-hidden />
+              </span>
             </div>
-          ) : isError || !reservation ? (
-            <p className="text-center text-sm text-[var(--text-muted)]">
-              {token
-                ? 'We could not load your reservation details. Use the link from your confirmation email or contact the restaurant.'
-                : 'Your reservation is confirmed. Check your email for the manage link.'}
-            </p>
-          ) : (
-            <div className="space-y-4 rounded-xl border border-[var(--app-border)] bg-[var(--brand-ultra)]/50 p-4 text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[var(--text-muted)]">Status</span>
-                <Badge variant="outline" className="capitalize">
-                  {reservation.status?.toLowerCase()}
-                </Badge>
+            <dl className="divide-y divide-[var(--app-border)] text-sm">
+              <div className="flex items-center justify-between gap-3 py-2.5">
+                <dt className="text-[var(--text-muted)]">Status</dt>
+                <dd>
+                  <Badge variant="outline" className="capitalize">
+                    {reservation.status?.toLowerCase()}
+                  </Badge>
+                </dd>
               </div>
               {when ? (
                 <>
-                  <div className="flex justify-between gap-4">
-                    <span className="text-[var(--text-muted)]">Date</span>
-                    <span className="text-right font-medium">{when.date}</span>
+                  <div className="flex justify-between gap-4 py-2.5">
+                    <dt className="text-[var(--text-muted)]">Date</dt>
+                    <dd className="text-right font-medium text-[var(--text)]">{when.date}</dd>
                   </div>
-                  <div className="flex justify-between gap-4">
-                    <span className="text-[var(--text-muted)]">Time</span>
-                    <span className="font-medium">{when.time}</span>
+                  <div className="flex justify-between gap-4 py-2.5">
+                    <dt className="text-[var(--text-muted)]">Time</dt>
+                    <dd className="font-medium tabular-nums text-[var(--text)]">{when.time}</dd>
                   </div>
                 </>
               ) : null}
-              <div className="flex justify-between gap-4">
-                <span className="text-[var(--text-muted)]">Party size</span>
-                <span className="font-medium">{partySize} guests</span>
+              <div className="flex justify-between gap-4 py-2.5">
+                <dt className="text-[var(--text-muted)]">Party size</dt>
+                <dd className="font-medium text-[var(--text)]">{partySize} guests</dd>
               </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-[var(--text-muted)]">Name</span>
-                <span className="font-medium">{customerName}</span>
+              <div className="flex justify-between gap-4 py-2.5">
+                <dt className="text-[var(--text-muted)]">Name</dt>
+                <dd className="font-medium text-[var(--text)]">{customerName}</dd>
               </div>
-            </div>
-          )}
+            </dl>
+          </div>
+        )}
 
+        <div className="mt-6 space-y-3">
           {manageHref ? (
-            <div className="space-y-3 text-center">
-              <Link to={manageHref} className="block">
-                <Button className="w-full">Manage or cancel reservation</Button>
-              </Link>
-              <p className="text-xs text-[var(--text-muted)]">
-                Reschedule or cancel your visit using your private manage link.
+            <>
+              <Button
+                asChild
+                className="consumer-pressable w-full bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
+              >
+                <Link to={manageHref}>Manage or cancel</Link>
+              </Button>
+              <p className="text-center text-xs text-[var(--text-muted)]">
+                Reschedule or cancel using your private manage link.
               </p>
-            </div>
+            </>
           ) : null}
 
-          {restaurantSlug ? (
-            <div className="text-center">
-              <Link to={`/reserve/${restaurantSlug}`}>
-                <Button variant="outline">Book another table</Button>
-              </Link>
-            </div>
-          ) : (
-            <div className="text-center">
-              <Link to="/reserve">
-                <Button variant="outline">Book another table</Button>
-              </Link>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+          <Button asChild variant="outline" className="consumer-pressable w-full">
+            <Link to={restaurantSlug ? `/reserve/${restaurantSlug}` : '/reserve'}>
+              Book another table
+            </Link>
+          </Button>
+        </div>
+      </PublicPanel>
+    </PublicPageLayout>
   )
 }
 

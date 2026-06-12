@@ -4,6 +4,7 @@ import {
   redeemConsumerLoyaltyAtCheckout,
   validateConsumerLoyaltyRedeem,
 } from './loyalty.service.js'
+import { validateConsumerOrderSchedule } from '../lib/consumer-ordering-hours.js'
 
 export const CONSUMER_ORDER_STATUS_CHAIN = Object.freeze([
   'RECEIVED',
@@ -255,6 +256,8 @@ export async function createConsumerOrder(restaurantId, payload) {
     deliveryZoneId
   )
   assertFulfillmentAllowed(fulfillmentType, config)
+
+  validateConsumerOrderSchedule(config, scheduledFor || null)
 
   if (fulfillmentType === 'DELIVERY' && !deliveryAddress) {
     throw Object.assign(new Error('Delivery address required'), {

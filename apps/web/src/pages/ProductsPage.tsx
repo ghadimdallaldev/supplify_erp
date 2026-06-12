@@ -19,12 +19,15 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
 import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
+import { filterControlClass } from '../components/ui/filter-control'
 import { DataTableShell } from '../components/ui/data-table-shell'
+import { cn } from '../lib/utils'
 import { Plus, Upload, FileQuestion, Heart } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useCartActions } from '../hooks/useCartActions'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { apiUrl } from '../lib/apiBase'
 import { canUseSupplierDeals } from '../lib/planFeatureGates'
 import { PermissionGate } from '../components/PermissionGate'
@@ -343,7 +346,7 @@ export function ProductsPage() {
 
   return (
     <RequirePermission anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']} title="products">
-      <div className="space-y-6" data-testid="products-page">
+      <PageShell data-testid="products-page">
         <PageHeader
           title="Products"
           description={
@@ -402,6 +405,7 @@ export function ProductsPage() {
               onChange={setSearch}
               placeholder="Search products..."
               aria-label="Search products"
+              inputClassName={cn(filterControlClass, 'pl-10')}
             />
           }
           filters={
@@ -526,7 +530,7 @@ export function ProductsPage() {
             />
           )}
         </Suspense>
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

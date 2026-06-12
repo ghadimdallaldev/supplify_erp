@@ -16,7 +16,7 @@ import { Textarea } from '../ui/textarea'
 import { Select, SelectItem, SelectTrigger } from '../ui/select'
 import { Loader2, Download, CreditCard, ArrowRightLeft, FileText } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { formatPrice } from '../../utils/format'
 import { apiUrl } from '../../lib/apiBase'
 

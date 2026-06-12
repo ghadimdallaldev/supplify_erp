@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Badge } from '../ui/badge'
 import { useGetPromotionPricingQuery, usePromoteDealMutation } from '../../services/api'
 import { Megaphone, Sparkles, TrendingUp, Zap } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 
 type PricingOption = {
   pricing_key: string

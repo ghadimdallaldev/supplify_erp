@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
 import {
   useLogoutMutation,
@@ -10,11 +10,13 @@ import {
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { Button } from './ui/button'
 import { Bell, X, TrendingUp, Settings, ChevronRight, Menu, Search } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { BranchSwitcher } from './BranchSwitcher'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useNotificationBadge } from '../hooks/useNotificationBadge'
 import { useImpersonation } from '../hooks/useImpersonation'
+import { CommandPalette } from './search/CommandPalette'
+import { cn } from '../lib/utils'
 
 const PAGE_NAMES: Record<string, string> = {
   '/app/dashboard': 'Dashboard',
@@ -55,8 +57,39 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
   const dispatch = useAppDispatch()
   const location = useLocation()
   const [logout] = useLogoutMutation()
-  const [showNotifications, setShowNotifications] = useState(false)
+  const [commandOpen, setCommandOpen] = useState(false)
+  const [notificationsMounted, setNotificationsMounted] = useState(false)
+  const [notificationsVisible, setNotificationsVisible] = useState(false)
   const navigate = useNavigate()
+
+  const openCommandPalette = useCallback(() => setCommandOpen(true), [])
+
+  const openNotifications = useCallback(() => {
+    setNotificationsMounted(true)
+    requestAnimationFrame(() => setNotificationsVisible(true))
+  }, [])
+
+  const closeNotifications = useCallback(() => {
+    setNotificationsVisible(false)
+    window.setTimeout(() => setNotificationsMounted(false), 150)
+  }, [])
+
+  const toggleNotifications = useCallback(() => {
+    if (notificationsMounted && notificationsVisible) {
+      closeNotifications()
+    } else {
+      openNotifications()
+    }
+  }, [notificationsMounted, notificationsVisible, closeNotifications, openNotifications])
+
+  useEffect(() => {
+    if (!notificationsVisible) return
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') closeNotifications()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [notificationsVisible, closeNotifications])
   const [markAllAsRead] = useMarkAllNotificationsReadMutation()
   const [recordConversionEvent] = useRecordConversionEventMutation()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
@@ -166,7 +199,9 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
           Supplify
         </span>
         <ChevronRight size={13} className="hidden shrink-0 text-[var(--text-muted)] xs:block" />
-        <span className="truncate text-[13px] font-semibold text-[var(--text)]">{pageName}</span>
+        <span className="truncate text-[13px] font-normal text-[var(--text-muted)]">
+          {pageName}
+        </span>
         {workspaceLabel && (
           <>
             <ChevronRight size={13} className="hidden shrink-0 text-[var(--text-muted)] sm:block" />
@@ -231,20 +266,20 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
           </>
         )}
 
-        {/* Quick jump to catalog */}
+        {/* Command palette */}
         <button
           type="button"
           className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] md:hidden"
-          aria-label="Go to products catalog"
-          onClick={() => navigate('/app/products')}
+          aria-label="Open command palette"
+          onClick={openCommandPalette}
         >
           <Search size={16} style={{ color: 'var(--text-muted)' }} />
         </button>
         <button
           type="button"
           className="hidden h-[34px] min-w-[140px] cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-2.5 text-left transition-colors hover:border-[var(--app-border-mid)] md:flex lg:min-w-[200px]"
-          aria-label="Go to products catalog"
-          onClick={() => navigate('/app/products')}
+          aria-label="Open command palette"
+          onClick={openCommandPalette}
         >
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden>
             <circle cx="5.5" cy="5.5" r="4" stroke="var(--text-muted)" strokeWidth="1.3" />
@@ -258,14 +293,20 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
           <span style={{ flex: 1, fontSize: 12, color: 'var(--text-muted)' }}>
             Search products…
           </span>
+          <kbd className="hidden rounded border border-[var(--app-border)] bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)] lg:inline">
+            ⌘K
+          </kbd>
         </button>
+
+        <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
 
         {/* Notification bell */}
         <div style={{ position: 'relative' }}>
           <button
             type="button"
+            className="erp-pressable"
             aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
-            aria-expanded={showNotifications}
+            aria-expanded={notificationsVisible}
             style={{
               width: 36,
               height: 36,
@@ -278,7 +319,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
               cursor: 'pointer',
               position: 'relative',
             }}
-            onClick={() => setShowNotifications(!showNotifications)}
+            onClick={toggleNotifications}
           >
             <Bell size={16} style={{ color: 'var(--text-muted)' }} />
             {unreadCount > 0 && (
@@ -297,10 +338,13 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
             )}
           </button>
 
-          {showNotifications && (
+          {notificationsMounted && (
             <div
               data-testid="notifications-dropdown"
-              className="fixed inset-x-3 top-[calc(3.5rem+env(safe-area-inset-top))] z-50 max-h-[min(70vh,24rem)] overflow-y-auto rounded-xl border border-[var(--app-border)] bg-[var(--surface)] shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-11 sm:w-[min(100vw-1.5rem,20rem)]"
+              className={cn(
+                'fixed inset-x-3 top-[calc(3.5rem+env(safe-area-inset-top))] z-50 max-h-[min(70vh,24rem)] overflow-y-auto rounded-xl border border-[var(--app-border)] bg-[var(--surface)] shadow-lg transition-opacity duration-150 ease-out motion-reduce:transition-none sm:absolute sm:inset-x-auto sm:right-0 sm:top-11 sm:w-[min(100vw-1.5rem,20rem)]',
+                notificationsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
+              )}
             >
               <div
                 style={{
@@ -345,7 +389,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
                       alignItems: 'center',
                       color: 'var(--text-muted)',
                     }}
-                    onClick={() => setShowNotifications(false)}
+                    onClick={closeNotifications}
                   >
                     <X size={14} />
                   </button>
@@ -386,16 +430,16 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
                         const link = typeof meta.link === 'string' ? meta.link : null
                         if (link) {
                           navigate(link)
-                          setShowNotifications(false)
+                          closeNotifications()
                           return
                         }
                         if (notification.reference_type === 'ORDER' && notification.reference_id) {
                           navigate(`/app/orders/${notification.reference_id}`)
-                          setShowNotifications(false)
+                          closeNotifications()
                         }
                         if (notification.reference_type === 'DEAL' && notification.reference_id) {
                           navigate(`/app/deals?highlight=${notification.reference_id}`)
-                          setShowNotifications(false)
+                          closeNotifications()
                         }
                       }}
                     >

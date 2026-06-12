@@ -1,6 +1,7 @@
-import { Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { Badge } from '../ui/badge'
+import { Skeleton } from '../ui/skeleton'
+import { cn } from '../../lib/utils'
 import type { StaffMember, StaffPtoRequest, StaffShiftSwap } from '../../types'
 
 export interface StaffFormState {
@@ -80,10 +81,22 @@ export type StaffTabKey =
   | 'documents'
   | 'reports'
 
-export function StaffTabLoading({ className = 'py-12' }: { className?: string }) {
+export function StaffTabLoading({ className }: { className?: string }) {
   return (
-    <div className={`flex justify-center text-[var(--text-muted)] ${className}`}>
-      <Loader2 className="h-8 w-8 animate-spin" />
+    <div className={cn('space-y-6', className)} aria-busy="true" aria-label="Loading tab">
+      <div className="rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-6 shadow-sm">
+        <Skeleton className="h-6 w-40" />
+        <Skeleton className="mt-2 h-4 w-full max-w-md" />
+        <div className="mt-6 space-y-3">
+          <Skeleton className="h-14 w-full rounded-lg" />
+          <Skeleton className="h-14 w-full rounded-lg" />
+          <Skeleton className="h-14 w-full rounded-lg" />
+        </div>
+      </div>
+      <div className="rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-6 shadow-sm">
+        <Skeleton className="h-6 w-32" />
+        <Skeleton className="mt-4 h-32 w-full rounded-lg" />
+      </div>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   useGetFulfillmentExceptionsQuery,
@@ -10,6 +10,8 @@ import { isMultiWarehouseActive } from '../lib/planLimits'
 import { RequirePermission } from '../components/RequirePermission'
 import { usePermissions } from '../hooks/usePermissions'
 import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
+import { StatusBadge } from '../components/ui/status-badge'
 import { Label } from '../components/ui/label'
 import { Select, SelectTrigger } from '../components/ui/select'
 import { LazyTabMount } from '../components/LazyTabMount'
@@ -45,7 +47,7 @@ export function FulfillmentPage() {
 
   return (
     <RequirePermission permission="FULFILLMENT_VIEW" title="fulfillment">
-      <div className="page-stack max-w-full overflow-x-hidden p-0 sm:p-0">
+      <PageShell maxWidth="full" className="overflow-x-hidden">
         <PageHeader
           title="Fulfillment & logistics"
           description="Pick lists, driver dispatch, routes, and delivery tracking."
@@ -86,9 +88,12 @@ export function FulfillmentPage() {
             <TabsTrigger value="exceptions" className="relative text-xs sm:text-sm">
               Exceptions
               {(exceptionsResponse?.openCount ?? 0) > 0 && (
-                <span className="ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--red)] px-1 text-[10px] font-bold text-white">
-                  {exceptionsResponse?.openCount}
-                </span>
+                <StatusBadge
+                  status="OVERDUE"
+                  label={String(exceptionsResponse?.openCount)}
+                  showDot={false}
+                  className="ml-1 min-h-5 min-w-[1.25rem] justify-center rounded-full px-1 py-0 text-[10px] leading-none"
+                />
               )}
             </TabsTrigger>
           </TabsList>
@@ -123,7 +128,7 @@ export function FulfillmentPage() {
             </LazyTabMount>
           </TabsContent>
         </Tabs>
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

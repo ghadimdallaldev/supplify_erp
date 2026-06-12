@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { DealBoostPackagePicker } from './DealBoostPackagePicker'
 import { useSubmitPromotionMutation } from '../../services/api'
 import { Send } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 
 export function SubmitDealDialog({
   dealId,

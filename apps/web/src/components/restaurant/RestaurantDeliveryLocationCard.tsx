@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MapPin, Save, Loader2, ExternalLink, CheckCircle2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'

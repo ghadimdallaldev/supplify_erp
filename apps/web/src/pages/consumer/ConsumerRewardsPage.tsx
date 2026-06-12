@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
 import { Skeleton } from '../../components/ui/skeleton'
 import { ArrowLeft, Gift, LogOut } from 'lucide-react'
-import { toast } from 'react-hot-toast'
+import { toast } from 'sonner'
 
 function formatLedgerType(type: string) {
   switch (type) {
@@ -23,7 +23,7 @@ function formatLedgerType(type: string) {
 export function ConsumerRewardsPage() {
   const { restaurantSlug } = useParams<{ restaurantSlug: string }>()
   const slug = restaurantSlug ?? ''
-  const { isAuthenticated, isLoading, member, loyaltyPoints, recentLedger, logout } =
+  const { isAuthenticated, isLoading, member, loyaltyPoints, recentLedger, recentOrders, logout } =
     useConsumerAuth()
 
   if (!isLoading && !isAuthenticated) {
@@ -72,6 +72,33 @@ export function ConsumerRewardsPage() {
               {member?.displayName && (
                 <p className="mt-1 text-sm text-muted-foreground">Hi, {member.displayName}</p>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Your orders</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {!recentOrders.length && (
+                <p className="text-sm text-muted-foreground">No orders yet.</p>
+              )}
+              {recentOrders.map((order) => (
+                <Link
+                  key={order.id}
+                  to={`/order/${slug}/receipt/${order.receipt_token}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border p-3 transition hover:border-[var(--brand-light)]"
+                >
+                  <div>
+                    <p className="text-sm font-medium">{order.order_number}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(order.created_at).toLocaleString()} ·{' '}
+                      {order.fulfillment_type.replace('_', ' ')}
+                    </p>
+                  </div>
+                  <Badge variant="secondary">{order.status.replace('_', ' ')}</Badge>
+                </Link>
+              ))}
             </CardContent>
           </Card>
 

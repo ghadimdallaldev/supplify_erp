@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Card, CardContent } from '../components/ui/card'
 import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
+import { KpiCard } from '../components/ui/kpi-card'
+import { SettingsHubLayout } from '../components/settings/SettingsHubLayout'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Package, ShoppingCart, Clock, DollarSign } from 'lucide-react'
 import { RequirePermission } from '../components/RequirePermission'
@@ -101,76 +102,42 @@ export function SupplierSettingsPage() {
 
   return (
     <RequirePermission permission="SETTINGS_VIEW" title="supplier settings">
-      <div className="space-y-4 sm:space-y-6">
-        <div>
-          <h1 className="text-[21px] font-black text-[var(--text)]">Supplier Settings</h1>
-          <p className="text-[var(--text-muted)] mt-2">Manage your business profile and settings</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-br from-[var(--brand-ultra)] to-[var(--brand-pale)] border-[var(--app-border)]">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[var(--brand-mid)]">Total Products</p>
-                  <p className="text-2xl font-bold text-[var(--text)]">
-                    {statistics.totalProducts}
-                  </p>
-                  <p className="text-xs text-[var(--brand-mid)] mt-1">
-                    {statistics.activeProducts} active
-                  </p>
-                </div>
-                <Package className="h-10 w-10 text-[var(--brand-mid)]" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-[var(--mint-pale)] to-[var(--mint-pale)] border-[var(--mint)]/35">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[var(--mint)]">Total Orders</p>
-                  <p className="text-2xl font-bold text-[var(--mint)]">{statistics.totalOrders}</p>
-                  <p className="text-xs text-[var(--mint)] mt-1">
-                    {statistics.completedOrders} completed
-                  </p>
-                </div>
-                <ShoppingCart className="h-10 w-10 text-[var(--mint)]" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-[var(--amber-pale)] to-[var(--amber-pale)] border-[var(--amber-mid)]/35">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[var(--amber)]">Pending Orders</p>
-                  <p className="text-2xl font-bold text-[var(--amber)]">
-                    {statistics.pendingOrders}
-                  </p>
-                  <p className="text-xs text-[var(--amber)] mt-1">Awaiting fulfillment</p>
-                </div>
-                <Clock className="h-10 w-10 text-[var(--amber-mid)]" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-[var(--brand-pale)] to-[var(--brand-ultra)] border-[var(--app-border)]">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[var(--brand-mid)]">Total Revenue</p>
-                  <p className="text-2xl font-bold text-[var(--text)]">
-                    {formatCurrency(statistics.totalRevenue)}
-                  </p>
-                  <p className="text-xs text-[var(--brand-mid)] mt-1">All-time</p>
-                </div>
-                <DollarSign className="h-10 w-10 text-[var(--brand-mid)]" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
+      <SettingsHubLayout
+        title="Supplier Settings"
+        description="Manage your business profile and settings"
+        stats={
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <KpiCard
+              label="Total Products"
+              value={statistics.totalProducts}
+              description={`${statistics.activeProducts} active`}
+              icon={Package}
+              tone="brand"
+            />
+            <KpiCard
+              label="Total Orders"
+              value={statistics.totalOrders}
+              description={`${statistics.completedOrders} completed`}
+              icon={ShoppingCart}
+              tone="success"
+            />
+            <KpiCard
+              label="Pending Orders"
+              value={statistics.pendingOrders}
+              description="Awaiting fulfillment"
+              icon={Clock}
+              tone="warning"
+            />
+            <KpiCard
+              label="Total Revenue"
+              value={formatCurrency(statistics.totalRevenue)}
+              description="All-time"
+              icon={DollarSign}
+              tone="brand"
+            />
+          </div>
+        }
+      >
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="justify-start">
             <TabsTrigger value="profile">Profile</TabsTrigger>
@@ -297,7 +264,7 @@ export function SupplierSettingsPage() {
         </Tabs>
 
         <SupplierPushNotificationBanner />
-      </div>
+      </SettingsHubLayout>
     </RequirePermission>
   )
 }

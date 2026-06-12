@@ -36,6 +36,7 @@ import {
   formatAddressLine,
   pageHeaderRowClass,
 } from '../components/ui/card-layout'
+import { PageShell } from '../components/ui/page-shell'
 
 export function RestaurantsPage() {
   const { user } = useAppSelector((state) => state.auth)
@@ -229,7 +230,7 @@ export function RestaurantsPage() {
     }
 
     return (
-      <div className="space-y-6">
+      <PageShell data-testid="restaurants-page">
         <div>
           <h1 className="text-[21px] font-black text-[var(--text)]">Restaurants</h1>
           <p className="text-[var(--text-muted)] mt-2">Manage restaurants in the marketplace</p>
@@ -283,7 +284,7 @@ export function RestaurantsPage() {
             <p className="text-[var(--text-muted)]">No restaurants found</p>
           </div>
         )}
-      </div>
+      </PageShell>
     )
   }
 
@@ -300,7 +301,7 @@ export function RestaurantsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <PageShell data-testid="restaurants-page">
       {/* Header */}
       <div className={pageHeaderRowClass}>
         <div className="min-w-0">
@@ -491,7 +492,7 @@ export function RestaurantsPage() {
             return (
               <Card
                 key={restaurant.id}
-                className={`${cardShellClass} hover:shadow-lg transition-all duration-200 group`}
+                className={`${cardShellClass} transition-[box-shadow,transform] duration-200 ease-out [@media(hover:hover)_and_(pointer:fine)]:hover:shadow-lg group`}
               >
                 <CardHeader className="pb-3 space-y-2">
                   <CardStatusBadges>
@@ -771,6 +772,6 @@ export function RestaurantsPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   )
 }

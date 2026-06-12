@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { toast } from 'react-hot-toast'
-import { AlertCircle } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
+import { toast } from 'sonner'
+import { AlertCircle, Clock3, Plus, Smartphone, Users } from 'lucide-react'
+import { EmptyState } from '../../ui/empty-state'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
 import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
+import { Skeleton } from '../../ui/skeleton'
 import {
   Dialog,
   DialogContent,
@@ -24,11 +25,12 @@ import {
   useGetStaffMembersQuery,
   useGetStaffTimeEntriesQuery,
 } from '../../../services/staffApi'
-import type { StaffMember } from '../../../types'
+import type { StaffMember, StaffTimeEntry } from '../../../types'
 import { formatPrice } from '../../../utils/format'
 import { usePermissions } from '../../../hooks/usePermissions'
 import { StaffPortalAccessPanel } from '../../StaffPortalAccessPanel'
 import { getApiErrorMessage } from '../../../lib/apiError'
+import { cn } from '../../../lib/utils'
 import {
   clampToISODate,
   initialStaffForm,
@@ -36,6 +38,163 @@ import {
   wageTypeOptions,
   type StaffFormState,
 } from '../staffShared'
+
+function TeamSummaryStat({
+  label,
+  value,
+  hint,
+}: {
+  label: string
+  value: string | number
+  hint?: string
+}) {
+  return (
+    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-3 sm:px-4">
+      <p className="text-xs text-[var(--text-muted)]">{label}</p>
+      <p className="mt-0.5 text-xl font-semibold tabular-nums text-[var(--text)]">{value}</p>
+      {hint ? <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">{hint}</p> : null}
+    </div>
+  )
+}
+
+function StaffMemberRow({
+  member,
+  openEntry,
+  rowClockLoading,
+  canWriteStaff,
+  onCheckIn,
+  onCheckOut,
+}: {
+  member: StaffMember
+  openEntry?: StaffTimeEntry
+  rowClockLoading: boolean
+  canWriteStaff: boolean
+  onCheckIn: (staff: StaffMember) => void
+  onCheckOut: (staff: StaffMember, entryId: string) => void
+}) {
+  const isOnShift = Boolean(openEntry)
+  const initial = member.displayName.charAt(0).toUpperCase()
+  const accent = member.profileColor || '#7c3aed'
+
+  return (
+    <li className="px-4 py-4 sm:px-5">
+      <div className="flex flex-col gap-3">
+        <div className="flex items-start gap-3">
+          <div
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-[var(--text)]"
+            style={{ backgroundColor: `color-mix(in srgb, ${accent} 18%, white)` }}
+            aria-hidden
+          >
+            {initial}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-semibold text-[var(--text)]">{member.displayName}</p>
+              {renderStaffStatus(member.status)}
+              <Badge
+                variant={isOnShift ? 'default' : 'outline'}
+                className={cn(
+                  'text-[10px]',
+                  isOnShift && 'bg-[var(--mint)] hover:bg-[var(--mint)]'
+                )}
+              >
+                {isOnShift ? 'On shift' : 'Off shift'}
+              </Badge>
+            </div>
+            <p className="mt-0.5 truncate text-sm text-[var(--text-mid)]">{member.role}</p>
+            <p className="mt-1 truncate text-xs text-[var(--text-muted)]">
+              {member.email || 'No email on file'}
+              {member.phone ? ` · ${member.phone}` : ''}
+            </p>
+          </div>
+        </div>
+
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-[var(--text-muted)] sm:grid-cols-3">
+          <div>
+            <dt className="sr-only">Wage</dt>
+            <dd>
+              {member.wageType.toLowerCase()}
+              {member.wageRate ? ` · ${formatPrice(member.wageRate)}` : ''}
+            </dd>
+          </div>
+          {member.hireDate ? (
+            <div>
+              <dt className="sr-only">Hired</dt>
+              <dd>Hired {format(parseISO(member.hireDate), 'MMM d, yyyy')}</dd>
+            </div>
+          ) : null}
+          {isOnShift && openEntry ? (
+            <div className="col-span-2 sm:col-span-1">
+              <dt className="sr-only">Clocked in</dt>
+              <dd className="text-[var(--mint)]">
+                Since {format(new Date(openEntry.clockInAt), 'p')}
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+
+        {canWriteStaff ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {isOnShift ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="erp-pressable pwa-touch-target w-full sm:w-auto"
+                onClick={() => openEntry && onCheckOut(member, openEntry.id)}
+                disabled={rowClockLoading}
+              >
+                {rowClockLoading ? 'Closing…' : 'Clock out'}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className="erp-pressable pwa-touch-target w-full bg-[var(--brand-mid)] hover:bg-[var(--brand)] sm:w-auto"
+                onClick={() => onCheckIn(member)}
+                disabled={rowClockLoading}
+              >
+                {rowClockLoading ? 'Clocking…' : 'Clock in'}
+              </Button>
+            )}
+          </div>
+        ) : null}
+
+        <StaffPortalAccessPanel member={member} canManage={canWriteStaff} compact />
+      </div>
+    </li>
+  )
+}
+
+function TimeEntryRow({ entry }: { entry: StaffTimeEntry }) {
+  const isOpen = !entry.clockOutAt
+  return (
+    <li className="px-4 py-3 sm:px-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-medium text-[var(--text)]">{entry.staffName ?? 'Staff member'}</p>
+          <p className="text-xs text-[var(--text-muted)]">{entry.role}</p>
+        </div>
+        <Badge
+          variant="outline"
+          className={cn(
+            'shrink-0 text-[10px]',
+            isOpen
+              ? 'border-[var(--amber)] bg-[var(--amber-pale)] text-[var(--amber)]'
+              : 'border-[var(--mint)] bg-[var(--mint-pale)] text-[var(--mint)]'
+          )}
+        >
+          {isOpen ? 'Open' : 'Closed'}
+        </Badge>
+      </div>
+      <p className="mt-2 text-xs text-[var(--text-muted)]">
+        In {format(new Date(entry.clockInAt), 'MMM d · p')}
+        {entry.clockOutAt ? <> → Out {format(new Date(entry.clockOutAt), 'p')}</> : null}
+      </p>
+      {entry.breakMinutes ? (
+        <p className="mt-1 text-xs text-[var(--text-muted)]">Break {entry.breakMinutes} min</p>
+      ) : null}
+    </li>
+  )
+}
 
 export function StaffTeamTab() {
   const { canAny } = usePermissions()
@@ -64,7 +223,7 @@ export function StaffTeamTab() {
   const [clockActionStaffId, setClockActionStaffId] = useState<string | null>(null)
 
   const openEntryByStaffId = useMemo(() => {
-    const map = new Map<string, (typeof timeEntries)[number]>()
+    const map = new Map<string, StaffTimeEntry>()
     timeEntries
       .filter((entry) => !entry.clockOutAt)
       .forEach((entry) => {
@@ -79,6 +238,9 @@ export function StaffTeamTab() {
       .sort((a, b) => new Date(b.clockInAt).getTime() - new Date(a.clockInAt).getTime())
       .slice(0, 8)
   }, [timeEntries])
+
+  const onShiftCount = openEntryByStaffId.size
+  const portalEnabledCount = staffMembers.filter((m) => m.portalAccess?.enabled).length
 
   const handleStaffInputChange = (field: keyof StaffFormState, value: string) => {
     setStaffForm((prev) => ({
@@ -148,15 +310,65 @@ export function StaffTeamTab() {
     }
   }
 
-  return (
-    <div className="space-y-6">
-      {canWriteStaff ? (
-        <div className="flex justify-end">
+  const timeEntriesPanel = (
+    <section className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]">
+      <header className="border-b border-[var(--app-border)] px-4 py-4 sm:px-5">
+        <div className="flex items-start gap-2">
+          <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand-mid)]" aria-hidden />
+          <div>
+            <h2 className="text-base font-semibold text-[var(--text)]">Latest time entries</h2>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Who clocked in or out in the last seven days.
+            </p>
+          </div>
+        </div>
+      </header>
+      {timeEntriesLoading ? (
+        <div className="space-y-3 p-4">
+          <Skeleton className="h-14 w-full rounded-lg" />
+          <Skeleton className="h-14 w-full rounded-lg" />
+        </div>
+      ) : recentEntries.length === 0 ? (
+        <EmptyState
+          className="py-10"
+          title="No punches yet"
+          description="Clock someone in from the team list, or ask staff to use the portal on their phone."
+          icon={<Clock3 className="h-8 w-8" aria-hidden />}
+        />
+      ) : (
+        <ul className="divide-y divide-[var(--app-border)]">
+          {recentEntries.map((entry) => (
+            <TimeEntryRow key={entry.id} entry={entry} />
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+
+  const teamDirectoryPanel = (
+    <section className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]">
+      <header className="flex flex-col gap-3 border-b border-[var(--app-border)] px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
+        <div className="flex items-start gap-2">
+          <Users className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand-mid)]" aria-hidden />
+          <div>
+            <h2 className="text-base font-semibold text-[var(--text)]">Team directory</h2>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Roles, contact info, clock status, and portal access.
+            </p>
+          </div>
+        </div>
+        {canWriteStaff ? (
           <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
             <DialogTrigger asChild>
-              <Button>Add staff</Button>
+              <Button
+                size="sm"
+                className="erp-pressable pwa-touch-target w-full shrink-0 bg-[var(--brand-mid)] hover:bg-[var(--brand)] sm:w-auto"
+              >
+                <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+                Add staff
+              </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[min(90dvh,100vh)] overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))]">
               <DialogHeader>
                 <DialogTitle>Add staff member</DialogTitle>
                 <DialogDescription>
@@ -169,6 +381,7 @@ export function StaffTeamTab() {
                     <Label htmlFor="firstName">First name</Label>
                     <Input
                       id="firstName"
+                      className="mt-1.5 min-h-11"
                       value={staffForm.firstName}
                       onChange={(event) => handleStaffInputChange('firstName', event.target.value)}
                     />
@@ -177,6 +390,7 @@ export function StaffTeamTab() {
                     <Label htmlFor="lastName">Last name</Label>
                     <Input
                       id="lastName"
+                      className="mt-1.5 min-h-11"
                       value={staffForm.lastName}
                       onChange={(event) => handleStaffInputChange('lastName', event.target.value)}
                     />
@@ -186,6 +400,7 @@ export function StaffTeamTab() {
                   <Label htmlFor="displayName">Display name</Label>
                   <Input
                     id="displayName"
+                    className="mt-1.5 min-h-11"
                     value={staffForm.displayName}
                     onChange={(event) => handleStaffInputChange('displayName', event.target.value)}
                     placeholder="Optional alias used in the app"
@@ -197,6 +412,8 @@ export function StaffTeamTab() {
                     <Input
                       id="email"
                       type="email"
+                      inputMode="email"
+                      className="mt-1.5 min-h-11"
                       value={staffForm.email}
                       onChange={(event) => handleStaffInputChange('email', event.target.value)}
                     />
@@ -205,6 +422,9 @@ export function StaffTeamTab() {
                     <Label htmlFor="phone">Phone</Label>
                     <Input
                       id="phone"
+                      type="tel"
+                      inputMode="tel"
+                      className="mt-1.5 min-h-11"
                       value={staffForm.phone}
                       onChange={(event) => handleStaffInputChange('phone', event.target.value)}
                     />
@@ -214,6 +434,7 @@ export function StaffTeamTab() {
                   <Label htmlFor="role">Role</Label>
                   <Input
                     id="role"
+                    className="mt-1.5 min-h-11"
                     value={staffForm.role}
                     onChange={(event) => handleStaffInputChange('role', event.target.value)}
                     placeholder="Server, kitchen, barista..."
@@ -226,7 +447,7 @@ export function StaffTeamTab() {
                       value={staffForm.wageType}
                       onValueChange={(value) => handleStaffInputChange('wageType', value)}
                     >
-                      <SelectTrigger id="wageType" className="mt-1 w-full">
+                      <SelectTrigger id="wageType" className="mt-1.5 min-h-11 w-full">
                         {wageTypeOptions.map((option) => (
                           <option key={option} value={option}>
                             {option.charAt(0) + option.slice(1).toLowerCase()}
@@ -242,6 +463,7 @@ export function StaffTeamTab() {
                       type="number"
                       min={0}
                       step={0.01}
+                      className="mt-1.5 min-h-11"
                       value={staffForm.wageRate}
                       onChange={(event) => handleStaffInputChange('wageRate', event.target.value)}
                     />
@@ -253,6 +475,7 @@ export function StaffTeamTab() {
                     <Input
                       id="hireDate"
                       type="date"
+                      className="mt-1.5 min-h-11"
                       value={staffForm.hireDate}
                       onChange={(event) => handleStaffInputChange('hireDate', event.target.value)}
                     />
@@ -262,6 +485,7 @@ export function StaffTeamTab() {
                     <Input
                       id="profileColor"
                       type="color"
+                      className="mt-1.5 min-h-11"
                       value={staffForm.profileColor || '#2563eb'}
                       onChange={(event) =>
                         handleStaffInputChange('profileColor', event.target.value || '#2563eb')
@@ -271,182 +495,88 @@ export function StaffTeamTab() {
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={handleCreateStaff} disabled={creatingStaff}>
+                <Button
+                  className="erp-pressable pwa-touch-target w-full sm:w-auto"
+                  onClick={handleCreateStaff}
+                  disabled={creatingStaff}
+                >
                   {creatingStaff ? 'Adding…' : 'Add staff member'}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
+        ) : null}
+      </header>
+
+      {staffLoadError ? (
+        <div className="flex flex-col items-center gap-3 px-4 py-10 text-center sm:px-5">
+          <AlertCircle className="h-8 w-8 text-[var(--red)]" />
+          <p className="max-w-md text-sm text-[var(--text-muted)]">
+            {getApiErrorMessage(staffLoadErrorDetail, 'Unable to load staff directory.')}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="erp-pressable"
+            onClick={() => refetchStaffMembers()}
+          >
+            Try again
+          </Button>
         </div>
-      ) : null}
+      ) : staffLoading ? (
+        <div className="space-y-0 divide-y divide-[var(--app-border)]">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="px-4 py-4 sm:px-5">
+              <Skeleton className="h-16 w-full rounded-lg" />
+            </div>
+          ))}
+        </div>
+      ) : staffMembers.length === 0 ? (
+        <EmptyState
+          className="py-10"
+          title="No staff yet"
+          description="Add your first teammate to start scheduling and clocking time."
+          icon={<Users className="h-8 w-8" aria-hidden />}
+        />
+      ) : (
+        <ul className="divide-y divide-[var(--app-border)]">
+          {staffMembers.map((member) => (
+            <StaffMemberRow
+              key={member.id}
+              member={member}
+              openEntry={openEntryByStaffId.get(member.id)}
+              rowClockLoading={clockActionStaffId === member.id}
+              canWriteStaff={canWriteStaff}
+              onCheckIn={handleCheckIn}
+              onCheckOut={handleCheckOut}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
+  )
 
-      <div className="grid gap-6 xl:grid-cols-[1.5fr,1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Team directory</CardTitle>
-            <CardDescription>
-              Active staff with quick access to roles, contact details, and clock status.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {staffLoadError ? (
-              <div className="flex flex-col items-center gap-3 py-8 text-center">
-                <AlertCircle className="h-8 w-8 text-[var(--red)]" />
-                <p className="text-sm text-[var(--text-muted)] max-w-md">
-                  {getApiErrorMessage(staffLoadErrorDetail, 'Unable to load staff directory.')}
-                </p>
-                <Button variant="outline" size="sm" onClick={() => refetchStaffMembers()}>
-                  Try again
-                </Button>
-              </div>
-            ) : staffLoading ? (
-              <p className="text-sm text-[var(--text-muted)]">Loading staff…</p>
-            ) : staffMembers.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">
-                <p>No staff yet. Add your first teammate to start scheduling and clocking time.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {staffMembers.map((member) => {
-                  const openEntry = openEntryByStaffId.get(member.id)
-                  const isOnShift = Boolean(openEntry)
-                  const rowClockLoading = clockActionStaffId === member.id
-                  return (
-                    <div
-                      key={member.id}
-                      className="flex flex-col gap-3 rounded-xl border border-[var(--app-border)] bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="h-2.5 w-2.5 rounded-full"
-                            style={{ backgroundColor: member.profileColor || '#2563eb' }}
-                          />
-                          <p className="text-sm font-semibold text-[var(--text)]">
-                            {member.displayName}
-                          </p>
-                          {renderStaffStatus(member.status)}
-                        </div>
-                        <p className="text-xs text-[var(--text-muted)]">
-                          {member.role} · {member.email || 'No email'}
-                        </p>
-                        {member.phone ? (
-                          <p className="text-xs text-[var(--text-muted)]">{member.phone}</p>
-                        ) : null}
-                      </div>
-                      <div className="flex flex-col items-start gap-2 text-xs text-[var(--text-muted)] sm:flex-row sm:items-center">
-                        <div className="space-y-1">
-                          <p>
-                            Wage: {member.wageType.toLowerCase()}{' '}
-                            {member.wageRate ? `· ${formatPrice(member.wageRate)}` : ''}
-                          </p>
-                          {member.hireDate ? (
-                            <p>Hired {format(parseISO(member.hireDate), 'MMM d, yyyy')}</p>
-                          ) : null}
-                          <p>
-                            Status:{' '}
-                            <span className="font-medium text-[var(--text-mid)]">
-                              {isOnShift ? 'On shift' : 'Off shift'}
-                            </span>
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {isOnShift ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openEntry && handleCheckOut(member, openEntry.id)}
-                              disabled={rowClockLoading}
-                            >
-                              {rowClockLoading ? 'Closing…' : 'Clock out'}
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              onClick={() => handleCheckIn(member)}
-                              disabled={rowClockLoading}
-                            >
-                              {rowClockLoading ? 'Clocking…' : 'Clock in'}
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                      <StaffPortalAccessPanel member={member} canManage={canWriteStaff} />
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+  return (
+    <div className="space-y-4 sm:space-y-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <TeamSummaryStat label="Active staff" value={staffMembers.length} />
+        <TeamSummaryStat label="On shift now" value={onShiftCount} />
+        <TeamSummaryStat
+          label="Portal access"
+          value={portalEnabledCount}
+          hint="Magic link or password"
+        />
+        <TeamSummaryStat label="Recent punches" value={recentEntries.length} hint="Last 7 days" />
+      </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Latest time entries</CardTitle>
-            <CardDescription>
-              Review who just clocked in, clocked out, and any breaks captured.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {timeEntriesLoading ? (
-              <p className="text-sm text-[var(--text-muted)]">Loading time entries…</p>
-            ) : recentEntries.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">
-                <p>No time entries in the last few days.</p>
-              </div>
-            ) : (
-              recentEntries.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="rounded-xl border border-[var(--app-border)] bg-white p-4 shadow-sm"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--text)]">{entry.staffName}</p>
-                      <p className="text-xs text-[var(--text-muted)]">{entry.role}</p>
-                    </div>
-                    <Badge
-                      className={
-                        entry.clockOutAt
-                          ? 'bg-[var(--mint-pale)] text-[var(--mint)]'
-                          : 'bg-[var(--amber-pale)] text-[var(--amber)]'
-                      }
-                    >
-                      {entry.clockOutAt ? 'Closed' : 'Open'}
-                    </Badge>
-                  </div>
-                  <div className="mt-3 grid gap-2 text-xs text-[var(--text-muted)]">
-                    <p>
-                      Clock in:{' '}
-                      <span className="text-[var(--text-mid)]">
-                        {format(new Date(entry.clockInAt), 'MMM d, yyyy · p')} (
-                        {entry.clockInMethod || 'web'})
-                      </span>
-                    </p>
-                    {entry.clockOutAt ? (
-                      <p>
-                        Clock out:{' '}
-                        <span className="text-[var(--text-mid)]">
-                          {format(new Date(entry.clockOutAt), 'MMM d, yyyy · p')} (
-                          {entry.clockOutMethod || 'web'})
-                        </span>
-                      </p>
-                    ) : null}
-                    {entry.breakMinutes ? (
-                      <p>
-                        Breaks:{' '}
-                        <span className="text-[var(--text-mid)]">{entry.breakMinutes} min</span>
-                      </p>
-                    ) : null}
-                    {entry.note ? (
-                      <p className="text-[var(--text-muted)]">Note: {entry.note}</p>
-                    ) : null}
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+      <p className="flex items-center gap-2 text-xs text-[var(--text-muted)] sm:hidden">
+        <Smartphone className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        Staff clock in from their phones at /staff — managers clock in here.
+      </p>
+
+      <div className="flex flex-col gap-6 xl:grid xl:grid-cols-[1.5fr,1fr]">
+        <div className="order-2 xl:order-1">{teamDirectoryPanel}</div>
+        <div className="order-1 xl:order-2">{timeEntriesPanel}</div>
       </div>
     </div>
   )

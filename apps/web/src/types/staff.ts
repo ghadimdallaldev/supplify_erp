@@ -5,6 +5,7 @@ export type StaffWageType = 'HOURLY' | 'SALARY' | 'CONTRACT' | 'OTHER'
 export interface StaffPortalAccessInfo {
   hasAccount: boolean
   enabled: boolean
+  magicLinkEnabled?: boolean
   status: 'none' | 'invited' | 'active' | 'disabled'
   invitedAt?: string | null
   lastLoginAt?: string | null
