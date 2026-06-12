@@ -49,7 +49,12 @@ export async function getDeliveryZoneJoinSql({ supplierParam } = {}) {
   return `LEFT JOIN delivery_zone dz ON FALSE`
 }
 
-/** Reset cached schema mode (tests only). */
-export function resetDeliveryZoneJoinCacheForTests() {
+/** Reset cached schema mode after DDL (startup ensure / tests). */
+export function resetDeliveryZoneJoinCache() {
   cachedDeliveryZoneJoinMode = null
+}
+
+/** @deprecated use resetDeliveryZoneJoinCache */
+export function resetDeliveryZoneJoinCacheForTests() {
+  resetDeliveryZoneJoinCache()
 }
