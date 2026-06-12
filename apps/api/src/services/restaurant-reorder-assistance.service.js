@@ -1,7 +1,9 @@
 import { query } from '../lib/db.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
+import { resolveSmartReorderCapabilities } from '../lib/smart-reorder-tier.js'
 import { listRestaurantReminders } from './reorder-cadence.service.js'
 import { listExpiryLots } from './inventory-expiry.service.js'
+import { getCachedForecasts, refreshIfStale } from './reorder-forecast-cache.service.js'
 
 const URGENCY_RANK = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 }
 
@@ -13,6 +15,7 @@ const REASON_LABELS = {
   frequent: 'Frequently ordered',
   quick_list: 'On a recurring order list',
   not_ordered_recently: 'Last ordered a while ago',
+  forecast: 'Forecasted reorder need',
 }
 
 export async function getActiveSuppressions(restaurantId) {
@@ -247,10 +250,32 @@ function mergeAndDedupe(items) {
   )
 }
 
+function applyForecastToSuggestion(item, forecastByProduct) {
+  if (!item.productId) return item
+  const forecast = forecastByProduct.get(item.productId)
+  if (!forecast || forecast.signals?.insufficientHistory) return item
+
+  const merged = { ...item, forecast }
+  if (forecast.forecastReorderQty != null && forecast.confidence >= 0.35) {
+    merged.suggestedQty = Math.max(merged.suggestedQty ?? 1, Math.ceil(forecast.forecastReorderQty))
+    if (forecast.urgency) {
+      merged.urgency = forecast.urgency
+    }
+    merged.reasonLabel = forecast.explanation || merged.reasonLabel
+    merged.reasonCode = 'forecast'
+  }
+  return merged
+}
+
 /**
  * Unified reorder assistance for a restaurant.
+ * @param {string} restaurantId
+ * @param {{ limit?: number, branchId?: string | null, smartReorderFeatureValue?: unknown }} opts
  */
-export async function getReorderAssistance(restaurantId, { limit = 40 } = {}) {
+export async function getReorderAssistance(restaurantId, opts = {}) {
+  const { limit = 40, branchId = null, smartReorderFeatureValue } = opts
+  const capabilities = resolveSmartReorderCapabilities(smartReorderFeatureValue)
+
   const suppressions = await getActiveSuppressions(restaurantId)
 
   const [stock, cadence, expiry, quickList] = await Promise.all([
@@ -260,15 +285,36 @@ export async function getReorderAssistance(restaurantId, { limit = 40 } = {}) {
     fetchQuickListSuggestions(restaurantId),
   ])
 
-  const filtered = [...stock, ...cadence, ...expiry, ...quickList].filter(
+  let filtered = [...stock, ...cadence, ...expiry, ...quickList].filter(
     (item) => !isSuppressed(suppressions, item.scopeType, item.scopeId)
   )
+
+  let forecasts = []
+  if (capabilities.capabilities.forecast && smartReorderFeatureValue !== undefined) {
+    try {
+      await refreshIfStale(restaurantId, smartReorderFeatureValue)
+      forecasts = await getCachedForecasts(restaurantId, { branchId })
+      const forecastByProduct = new Map(
+        forecasts
+          .filter((f) => f.branchId == null || f.branchId === branchId)
+          .map((f) => [f.productId, f])
+      )
+      filtered = filtered.map((item) => applyForecastToSuggestion(item, forecastByProduct))
+    } catch {
+      // Graceful fallback — keep heuristic suggestions when forecast tables unavailable
+    }
+  }
 
   const suggestions = mergeAndDedupe(filtered).slice(0, limit)
 
   return {
     suggestions,
     total: suggestions.length,
+    smartReorder: {
+      tier: capabilities.tier,
+      capabilities: capabilities.capabilities,
+    },
+    forecasts: capabilities.capabilities.forecast ? forecasts.slice(0, limit) : [],
   }
 }
 

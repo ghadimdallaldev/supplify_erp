@@ -37,8 +37,21 @@ import {
   getReorderAssistance,
   suppressReorderSuggestion,
 } from '../services/restaurant-reorder-assistance.service.js'
+import {
+  getCachedForecasts,
+  refreshRestaurantForecasts,
+  markReorderForecastDirty,
+} from '../services/reorder-forecast-cache.service.js'
+import { resolveSmartReorderCapabilities } from '../lib/smart-reorder-tier.js'
 
 const router = express.Router()
+
+async function getSmartReorderFeatureValue(req) {
+  const tenant = req.tenantContext
+  if (!tenant?.tenantId) return false
+  const sub = await getTenantSubscription(tenant.tenantId, tenant.tenantType)
+  return sub?.features?.smart_reorder
+}
 
 const inventoryManagementGate = requireFeature(
   'inventory_management',
@@ -376,6 +389,11 @@ router.post(
         return adjustment
       })
 
+      await markReorderForecastDirty(restaurantId, {
+        productId,
+        reason: 'inventory_adjustment',
+      })
+
       logger.info('Inventory adjusted', {
         productId,
         adjustmentType: adjustmentData.adjustmentType,
@@ -498,6 +516,11 @@ router.post(
       `,
           [restaurantId, productId, quantity, balanceBefore, balanceAfter, reason || null]
         )
+      })
+
+      await markReorderForecastDirty(restaurantId, {
+        productId,
+        reason: 'inventory_add',
       })
 
       logger.info('Inventory added', {
@@ -1197,8 +1220,84 @@ router.get(
     try {
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) throw new ValidationError('Restaurant not found')
-      const data = await getReorderAssistance(restaurantId)
+      const smartReorderFeatureValue = await getSmartReorderFeatureValue(req)
+      const branchId = req.query.branchId ? String(req.query.branchId) : null
+      const data = await getReorderAssistance(restaurantId, {
+        smartReorderFeatureValue,
+        branchId,
+      })
       res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/reorder-forecasts',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requireFeature(
+    'smart_reorder',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const featureValue = await getSmartReorderFeatureValue(req)
+      const caps = resolveSmartReorderCapabilities(featureValue)
+      if (!caps.capabilities.forecast) {
+        return res.json({
+          ok: true,
+          data: { forecasts: [], smartReorder: caps },
+          error: null,
+          requestId: req.requestId,
+        })
+      }
+      const branchId = req.query.branchId ? String(req.query.branchId) : null
+      const forecasts = await getCachedForecasts(restaurantId, { branchId })
+      res.json({
+        ok: true,
+        data: { forecasts, smartReorder: caps },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/reorder-forecasts/refresh',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  requireFeature(
+    'smart_reorder',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const featureValue = await getSmartReorderFeatureValue(req)
+      const branchId = req.body?.branchId ?? req.query?.branchId ?? null
+      const result = await refreshRestaurantForecasts(restaurantId, {
+        featureValue,
+        branchId: branchId ? String(branchId) : null,
+        force: true,
+      })
+      const forecasts = await getCachedForecasts(restaurantId, {
+        branchId: branchId ? String(branchId) : null,
+      })
+      res.json({
+        ok: true,
+        data: { ...result, forecasts },
+        error: null,
+        requestId: req.requestId,
+      })
     } catch (err) {
       next(err)
     }

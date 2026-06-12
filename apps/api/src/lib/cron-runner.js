@@ -20,6 +20,7 @@ export const CRON_JOBS = {
   EMAIL_DIGEST: 'email_digest',
   STALE_GPS_ALERTS: 'stale_gps_alerts',
   LOG_RETENTION: 'log_retention',
+  REORDER_FORECAST: 'reorder_forecast',
 }
 
 /** Manual HTTP/CLI triggers — bypass CRONS_ENABLED but still use advisory lock. */

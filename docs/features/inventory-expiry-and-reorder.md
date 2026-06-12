@@ -79,6 +79,16 @@ Operational features for restaurant inventory expiry, supplier shortage/substitu
 
 ---
 
+## Feature 4b: Deterministic reorder forecasts (Gold / Platinum)
+
+See [ai-smart-reorder.md](./ai-smart-reorder.md) for full spec.
+
+- Cached per restaurant / branch / product in `reorder_forecast`
+- Gold: 30/90-day usage + lead time; Platinum: seasonality + trend
+- Enriches `GET /reorder-assistance` without replacing cadence, expiry, or quick-list signals
+
+---
+
 ## Feature 4: Smart reorder reminders (cadence)
 
 ### Behavior

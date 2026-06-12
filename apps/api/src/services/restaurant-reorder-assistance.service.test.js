@@ -49,6 +49,10 @@ describe('restaurant-reorder-assistance.service', () => {
     vi.doMock('./inventory-expiry.service.js', () => ({
       listExpiryLots: vi.fn(async () => ({ lots: [] })),
     }))
+    vi.doMock('./reorder-forecast-cache.service.js', () => ({
+      refreshIfStale: vi.fn(async () => ({ refreshed: false })),
+      getCachedForecasts: vi.fn(async () => []),
+    }))
 
     const { getReorderAssistance } = await import('./restaurant-reorder-assistance.service.js')
     const result = await getReorderAssistance('r1')
@@ -98,6 +102,10 @@ describe('restaurant-reorder-assistance.service', () => {
     }))
     vi.doMock('./inventory-expiry.service.js', () => ({
       listExpiryLots: vi.fn(async () => ({ lots: [] })),
+    }))
+    vi.doMock('./reorder-forecast-cache.service.js', () => ({
+      refreshIfStale: vi.fn(async () => ({ refreshed: false })),
+      getCachedForecasts: vi.fn(async () => []),
     }))
 
     const { getReorderAssistance } = await import('./restaurant-reorder-assistance.service.js')

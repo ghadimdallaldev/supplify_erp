@@ -30,6 +30,7 @@ Scheduled quick lists additionally use a **`quick_list_execution` ledger** (one 
 | Email digest              | 24 h                                            | [`email-digest.job.js`](../../apps/api/src/jobs/email-digest.job.js) — daily rollup for users with `notify_email_digest=true`                                                                                                  |
 | Stale GPS alerts          | 15 min                                          | [`stale-gps-alerts.job.js`](../../apps/api/src/jobs/stale-gps-alerts.job.js) — supplier alerts for stale active delivery GPS                                                                                                   |
 | Log retention             | 24 h                                            | [`log-retention.job.js`](../../apps/api/src/jobs/log-retention.job.js) — purges old logs/sessions per retention env vars                                                                                                       |
+| Reorder forecast          | 24 h                                            | [`reorder-forecast.job.js`](../../apps/api/src/jobs/reorder-forecast.job.js) — refreshes stale/dirty `reorder_forecast` rows for tenants with `smart_reorder`                                                                  |
 
 ## Environment variables
 

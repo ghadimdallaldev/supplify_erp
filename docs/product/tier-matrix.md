@@ -197,15 +197,15 @@ AI quick lists, AI smart reorder, advanced/custom reports, full API/webhooks, we
 
 ### Cross-tier (string labels ≠ behavior)
 
-| Keys                          | Issue                                                                                              |
-| ----------------------------- | -------------------------------------------------------------------------------------------------- |
-| `reports`                     | `basic_kpis` vs `usage_cost_dashboards` vs `advanced_forecasting_custom_reports` — same route gate |
-| `smart_reorder`               | `full_90day_trends` vs `ai_forecast_seasonality` — same reorder route                              |
-| `finance_invoices`            | `record_payments` / `expense_analytics` / `advanced_finance_dashboard` — same gate                 |
-| `receiving_quality`           | photos / scoring / supplier_performance — same gate                                                |
-| `waste_tracking` (restaurant) | `manual_entry` / `analytics_dashboard` / `cost_percentage_vs_sales` — same waste route gate        |
-| `api_integrations`            | `api_key_access` vs `full_api_webhooks` — no differentiated API product gate                       |
-| `notifications`               | `email_whatsapp_webhook` — **no webhook channel** in notification service                          |
+| Keys                          | Issue                                                                                                                                                        |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `reports`                     | `basic_kpis` vs `usage_cost_dashboards` vs `advanced_forecasting_custom_reports` — same route gate                                                           |
+| `smart_reorder`               | `full_90day_trends` (Gold forecast) vs `ai_forecast_seasonality` (Platinum + seasonality/trend) — see [ai-smart-reorder.md](../features/ai-smart-reorder.md) |
+| `finance_invoices`            | `record_payments` / `expense_analytics` / `advanced_finance_dashboard` — same gate                                                                           |
+| `receiving_quality`           | photos / scoring / supplier_performance — same gate                                                                                                          |
+| `waste_tracking` (restaurant) | `manual_entry` / `analytics_dashboard` / `cost_percentage_vs_sales` — same waste route gate                                                                  |
+| `api_integrations`            | `api_key_access` vs `full_api_webhooks` — no differentiated API product gate                                                                                 |
+| `notifications`               | `email_whatsapp_webhook` — **no webhook channel** in notification service                                                                                    |
 
 ### Reservations
 

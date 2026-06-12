@@ -103,11 +103,11 @@ describe('registerCronJobs', () => {
     vi.clearAllMocks()
   })
 
-  it('registers 16 cron jobs in non-test environments', async () => {
+  it('registers 17 cron jobs in non-test environments', async () => {
     const { registerCronJobs } = await import('./register-cron-jobs.js')
     const result = registerCronJobs({ trackInterval })
-    expect(result).toEqual({ registered: 16, skipped: false })
-    expect(trackInterval).toHaveBeenCalledTimes(16)
+    expect(result).toEqual({ registered: 17, skipped: false })
+    expect(trackInterval).toHaveBeenCalledTimes(17)
   })
 })
 
