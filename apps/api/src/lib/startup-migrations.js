@@ -5,6 +5,7 @@
 import { config } from '../config/env.js'
 import { logger } from './logger.js'
 import { baseSchemaExists, runAllSqlMigrations } from './sql-migrator.js'
+import { ensureDeliverySchema } from './ensure-delivery-schema.js'
 import { ensureQuoteRequestSchema } from './ensure-quote-request-schema.js'
 import { ensureTenantBrandingSchema } from './ensure-tenant-branding-schema.js'
 import { ensureReservationsSchema, ensureStaffAppSchema } from './migrator.js'
@@ -33,6 +34,7 @@ export async function runFullStartupMigrations(options = {}) {
   await runAllSqlMigrations()
   await ensureQuoteRequestSchema()
   await ensureTenantBrandingSchema()
+  await ensureDeliverySchema()
   await Promise.all([ensureStaffAppSchema(), ensureReservationsSchema()])
 
   if (!shouldRunBackfills) {
