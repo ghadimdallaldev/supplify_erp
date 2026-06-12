@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { Package, ShoppingCart, AlertTriangle, Loader2, Warehouse } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { Skeleton } from '../ui/skeleton'
 import { StatusBadge } from '../ui/status-badge'
@@ -188,10 +188,12 @@ export function DashboardWidgetGrid(props: any) {
                       <div
                         style={{
                           height: '100%',
-                          width: `${pct}%`,
+                          width: '100%',
                           background: color,
                           borderRadius: 4,
-                          transition: 'width 0.4s ease',
+                          transformOrigin: 'left',
+                          transform: `scaleX(${pct / 100})`,
+                          transition: 'transform 200ms ease-out',
                         }}
                       />
                     </div>

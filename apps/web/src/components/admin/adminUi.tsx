@@ -2,6 +2,8 @@ import React from 'react'
 import { Button } from '../ui/button'
 import { Loader2 } from 'lucide-react'
 import { EmptyState } from '../ui/empty-state'
+import { Skeleton } from '../ui/skeleton'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { StatusBadge, formatStatusLabel, getStatusTone, type StatusTone } from '../ui/status-badge'
 
 export type AdminStatusTone = StatusTone
@@ -68,11 +70,22 @@ export function AdminLoadingSkeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div className="space-y-2 py-2" data-testid="admin-loading-skeleton">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="h-10 animate-pulse rounded-md bg-[var(--surface-mid)]" />
+        <Skeleton key={i} className="h-10" />
       ))}
     </div>
   )
 }
+
+export function AdminTooltip({ label, children }: { label: string; children: React.ReactElement }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+export { TooltipProvider }
 
 export function AdminErrorState({
   title = 'Something went wrong',

@@ -3,6 +3,7 @@ import { NotFoundError, ValidationError, ForbiddenError } from '../middlewares/e
 import { assertSupplierOwnsOrder, updateDeliveryStatus } from './driver-fulfillment.service.js'
 import { getLatestLocationsForDrivers } from './driver-location.service.js'
 import { buildTrackingPayload } from '../lib/delivery-tracking-payload.js'
+import { getDeliveryZoneJoinSql } from '../lib/delivery-zone-join.js'
 import {
   isPlannedRouteEligibleStatus,
   isDispatchEligibleStatus,
@@ -130,6 +131,7 @@ async function loadRouteStopsForRoutes(routeIds, client = null) {
   if (!routeIds.length) return map
 
   const db = client ? (sql, p) => client.query(sql, p) : query
+  const deliveryZoneJoin = await getDeliveryZoneJoinSql()
   const { rows } = await db(
     `
     SELECT
@@ -152,7 +154,7 @@ async function loadRouteStopsForRoutes(routeIds, client = null) {
       ORDER BY da2.created_at DESC LIMIT 1
     ) da ON true
     LEFT JOIN order_warehouse_assignment owa ON owa.order_id = o.id
-    LEFT JOIN delivery_zone dz ON dz.warehouse_id = owa.warehouse_id
+    ${deliveryZoneJoin}
     WHERE rs.route_id = ANY($1::uuid[])
     ORDER BY rs.route_id, rs.sequence_number ASC
     `,

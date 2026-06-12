@@ -2,7 +2,7 @@ import { Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog'
 import { formatPrice } from '../../utils/format'
-import { cartLineTotal, type CartLine } from '../../lib/consumerCart'
+import { cartLineTotal, formatModifierLabels, type CartLine } from '../../lib/consumerCart'
 
 type CartDrawerProps = {
   open: boolean
@@ -45,8 +45,8 @@ export function CartDrawer({
             >
               <div className="min-w-0 flex-1">
                 <p className="font-medium">{line.name}</p>
-                {line.modifierOptionIds.length > 0 && (
-                  <p className="text-xs text-muted-foreground">Customizations selected</p>
+                {formatModifierLabels(line) && (
+                  <p className="text-xs text-muted-foreground">{formatModifierLabels(line)}</p>
                 )}
                 {line.notes && <p className="text-xs text-muted-foreground">Note: {line.notes}</p>}
                 <p className="mt-1 text-sm">{formatPrice(line.unitPrice)} each</p>

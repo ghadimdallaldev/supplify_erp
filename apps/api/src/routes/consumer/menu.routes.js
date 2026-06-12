@@ -21,6 +21,11 @@ import {
   updateModifierOption,
   deleteModifierOption,
 } from '../../services/consumer-menu.service.js'
+import {
+  previewMenuImport,
+  executeMenuImport,
+  MENU_IMPORT_TEMPLATE,
+} from '../../services/consumer-menu-import.service.js'
 
 const router = express.Router({ mergeParams: true })
 
@@ -67,6 +72,12 @@ const modifierOptionSchema = z.object({
 })
 
 const modifierOptionUpdateSchema = modifierOptionSchema.omit({ modifierGroupId: true }).partial()
+
+const menuImportSchema = z.object({
+  csv: z.string().min(1),
+  branchId: z.string().uuid().nullable().optional(),
+  updateExisting: z.boolean().optional(),
+})
 
 function jsonOk(res, data) {
   res.json({ ok: true, data, error: null, requestId: res.req.requestId })
@@ -447,3 +458,42 @@ consumerMenuAdminRoutes.delete(
     }
   }
 )
+
+consumerMenuAdminRoutes.get('/import/template', requirePermission('CATALOG_VIEW'), (_req, res) => {
+  jsonOk(res, { csv: MENU_IMPORT_TEMPLATE })
+})
+
+consumerMenuAdminRoutes.post(
+  '/import/preview',
+  requirePermission('CATALOG_EDIT'),
+  async (req, res) => {
+    try {
+      const body = menuImportSchema.parse(req.body)
+      const preview = previewMenuImport(body.csv)
+      jsonOk(res, preview)
+    } catch (error) {
+      logger.error('Menu import preview failed', { error: error.message })
+      jsonError(
+        res,
+        400,
+        error.name || 'MENU_IMPORT_PREVIEW_ERROR',
+        error.message || 'Unable to preview import'
+      )
+    }
+  }
+)
+
+consumerMenuAdminRoutes.post('/import', requirePermission('CATALOG_EDIT'), async (req, res) => {
+  try {
+    const body = menuImportSchema.parse(req.body)
+    const restaurantId = await requireRestaurantId(req)
+    const result = await executeMenuImport(restaurantId, body.csv, {
+      branchId: body.branchId ?? null,
+      updateExisting: body.updateExisting ?? true,
+    })
+    jsonOk(res, result)
+  } catch (error) {
+    logger.error('Menu import failed', { error: error.message })
+    jsonError(res, 400, error.name || 'MENU_IMPORT_ERROR', error.message || 'Unable to import menu')
+  }
+})

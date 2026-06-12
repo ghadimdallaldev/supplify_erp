@@ -7,6 +7,7 @@ import {
 } from './fulfillment.routes.js'
 import { consumerAuthPublicRoutes } from './auth.routes.js'
 import { consumerLoyaltyPublicRoutes } from './loyalty.routes.js'
+import { consumerStorefrontPublicRoutes } from './storefront.routes.js'
 
 /** Authenticated restaurant admin routes */
 export const consumerRoutes = express.Router()
@@ -23,3 +24,4 @@ consumerPublicRoutes.use('/loyalty', consumerLoyaltyPublicRoutes)
 consumerPublicRoutes.use('/menu', consumerMenuPublicRoutes)
 consumerPublicRoutes.use('/orders', consumerOrdersPublicRoutes)
 consumerPublicRoutes.use('/fulfillment-options', consumerFulfillmentPublicRoutes)
+consumerPublicRoutes.use('/storefront', consumerStorefrontPublicRoutes)

@@ -1,5 +1,6 @@
 import express from 'express'
 import { z } from 'zod'
+import { query } from '../../lib/db.js'
 import { logger } from '../../lib/logger.js'
 import { resolveRestaurantBySlug } from '../../services/consumer-menu.service.js'
 import {
@@ -97,7 +98,7 @@ consumerAuthPublicRoutes.post('/logout', (req, res) => {
 consumerAuthPublicRoutes.get('/me', optionalAuthConsumer, async (req, res) => {
   try {
     if (!req.consumerMember) {
-      return jsonOk(res, { member: null, program: null, recentLedger: [] })
+      return jsonOk(res, { member: null, program: null, recentLedger: [], recentOrders: [] })
     }
 
     const restaurant = await resolveRestaurantBySlug(req.params.restaurantSlug)
@@ -106,10 +107,21 @@ consumerAuthPublicRoutes.get('/me', optionalAuthConsumer, async (req, res) => {
     }
 
     const result = await getConsumerMemberBalance(restaurant.id, req.consumerMember.id)
+    const { rows: recentOrders } = await query(
+      `
+      SELECT id, order_number, status, fulfillment_type, total_amount, created_at, receipt_token
+      FROM consumer_order
+      WHERE restaurant_id = $1 AND consumer_member_id = $2
+      ORDER BY created_at DESC
+      LIMIT 10
+      `,
+      [restaurant.id, req.consumerMember.id]
+    )
     jsonOk(res, {
       member: req.consumerMember,
       program: result.program,
       recentLedger: result.recentLedger,
+      recentOrders,
     })
   } catch (error) {
     logger.error('Consumer me failed', { error: error.message })

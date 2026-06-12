@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Card, CardContent } from '../components/ui/card'
 import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
+import { KpiCard } from '../components/ui/kpi-card'
+import { SettingsHubLayout } from '../components/settings/SettingsHubLayout'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   Building2,
@@ -94,73 +95,43 @@ export function RestaurantOnboardingPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-[21px] font-black text-[var(--text)]">Account Setup</h1>
-        <p className="text-[var(--text-muted)] mt-2">
-          Complete your business profile and preferences
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-[var(--brand-ultra)] to-[var(--brand-pale)] border-[var(--app-border)]">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[var(--brand-mid)]">Total Orders</p>
-                <p className="text-2xl font-bold text-[var(--text)]">{statistics.totalOrders}</p>
-                <p className="text-xs text-[var(--brand-mid)] mt-1">All orders</p>
-              </div>
-              <ShoppingCart className="h-10 w-10 text-[var(--brand-mid)]" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-[var(--mint-pale)] to-[var(--mint-pale)] border-[var(--mint)]/35">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[var(--mint)]">Completed Orders</p>
-                <p className="text-2xl font-bold text-[var(--mint)]">
-                  {statistics.completedOrders}
-                </p>
-                <p className="text-xs text-[var(--mint)] mt-1">Received</p>
-              </div>
-              <Package className="h-10 w-10 text-[var(--mint)]" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-[var(--amber-pale)] to-[var(--amber-pale)] border-[var(--amber-mid)]/35">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[var(--amber)]">Pending Orders</p>
-                <p className="text-2xl font-bold text-[var(--amber)]">{statistics.pendingOrders}</p>
-                <p className="text-xs text-[var(--amber)] mt-1">In progress</p>
-              </div>
-              <Clock className="h-10 w-10 text-[var(--amber-mid)]" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-[var(--brand-pale)] to-[var(--brand-ultra)] border-[var(--app-border)]">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[var(--brand-mid)]">Total Spent</p>
-                <p className="text-2xl font-bold text-[var(--text)]">
-                  {formatCurrency(statistics.totalSpent)}
-                </p>
-                <p className="text-xs text-[var(--brand-mid)] mt-1">All-time</p>
-              </div>
-              <DollarSign className="h-10 w-10 text-[var(--brand-mid)]" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+    <SettingsHubLayout
+      title="Account Setup"
+      description="Complete your business profile and preferences"
+      stats={
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            label="Total Orders"
+            value={statistics.totalOrders}
+            description="All orders"
+            icon={ShoppingCart}
+            tone="brand"
+          />
+          <KpiCard
+            label="Completed Orders"
+            value={statistics.completedOrders}
+            description="Received"
+            icon={Package}
+            tone="success"
+          />
+          <KpiCard
+            label="Pending Orders"
+            value={statistics.pendingOrders}
+            description="In progress"
+            icon={Clock}
+            tone="warning"
+          />
+          <KpiCard
+            label="Total Spent"
+            value={formatCurrency(statistics.totalSpent)}
+            description="All-time"
+            icon={DollarSign}
+            tone="brand"
+          />
+        </div>
+      }
+    >
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="justify-start">
           <TabsTrigger value="profile">
             <Building2 className="mr-0 h-4 w-4 sm:mr-2" />
@@ -252,6 +223,6 @@ export function RestaurantOnboardingPage() {
           </LazyTabMount>
         </TabsContent>
       </Tabs>
-    </div>
+    </SettingsHubLayout>
   )
 }

@@ -19,7 +19,7 @@ import {
   Eye,
   Lock,
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { formatPrice } from '../../utils/format'
 import { useAppDispatch } from '../../hooks/redux'
 import { useImpersonation } from '../../hooks/useImpersonation'

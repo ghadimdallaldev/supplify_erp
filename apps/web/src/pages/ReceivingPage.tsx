@@ -41,7 +41,7 @@ import {
 } from '../services/api'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { FeatureLockedCard } from '../components/FeatureLockedCard'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { formatPrice } from '../utils/format'
 import { isOrderReadyForReceiving } from '../lib/orderReceiving'
 import {

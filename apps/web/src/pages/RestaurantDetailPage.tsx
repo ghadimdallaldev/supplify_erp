@@ -20,7 +20,7 @@ import {
   Activity,
   MessageSquare,
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { formatPrice } from '../utils/format'
 import { CardAddressBlock, pageHeaderRowClass } from '../components/ui/card-layout'

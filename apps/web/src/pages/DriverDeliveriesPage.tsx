@@ -18,7 +18,7 @@ import {
   useUpdateFulfillmentRouteStopMutation,
   useUpdateOrderDeliveryStatusMutation,
 } from '../services/api'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { useDriverLocationTracking } from '../hooks/useDriverLocationTracking'
 import { isTrackableDeliveryStatus } from '../lib/driverGpsTracking'
 import {

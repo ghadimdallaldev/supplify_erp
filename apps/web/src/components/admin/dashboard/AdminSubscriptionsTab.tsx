@@ -8,7 +8,7 @@ import {
   useExtendAdminFreeTrialMutation,
 } from '../../../services/api'
 import { formatPlanDisplayName } from '../../../lib/planComparison'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { AdminTabLoading } from './adminDashboardShared'
 
 export type AdminChangePlanTarget = {

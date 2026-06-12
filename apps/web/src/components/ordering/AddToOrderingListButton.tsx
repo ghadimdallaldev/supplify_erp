@@ -6,7 +6,7 @@ import {
   useCreateQuickListMutation,
 } from '../../services/api'
 import { Button } from '../ui/button'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 
 type Props = {
   productId: string

@@ -12,7 +12,7 @@ import {
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { downloadCsv } from '../utils/csvExport'
 import { Loader2, Download } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 
 import { getApiBase } from '../lib/env'
 

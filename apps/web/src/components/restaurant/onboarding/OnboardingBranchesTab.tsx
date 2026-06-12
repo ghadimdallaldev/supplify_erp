@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from '../../ui/dialog'
 import { FileText, Phone, MapPin, Plus, Trash2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { useAppDispatch } from '../../../hooks/redux'
 import { useAppSelector } from '../../../hooks/redux'
 import {

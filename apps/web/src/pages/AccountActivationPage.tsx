@@ -8,7 +8,7 @@ import { activateFreePlanFromPlans } from '../lib/activateFreePlan'
 import { canLeaveActivationPage } from '../lib/refetchAppSession'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 
 export function AccountActivationPage() {
   const dispatch = useAppDispatch()

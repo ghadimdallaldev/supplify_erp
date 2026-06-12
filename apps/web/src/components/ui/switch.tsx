@@ -18,11 +18,10 @@ export const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
           ref={ref}
           {...props}
         />
-        <span className="h-5 w-9 rounded-full bg-[var(--app-border-mid)] transition peer-checked:bg-[var(--brand)]"></span>
-        <span className="absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 translate-x-1 rounded-full bg-[var(--surface)] shadow transition peer-checked:translate-x-[19px]"></span>
+        <span className="h-5 w-9 rounded-full bg-[var(--app-border-mid)] transition-colors duration-150 ease-out peer-checked:bg-[var(--brand)]"></span>
+        <span className="absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 translate-x-1 rounded-full bg-[var(--surface)] shadow transition-transform duration-[160ms] ease-out peer-checked:translate-x-[19px]"></span>
       </label>
     )
-  },
+  }
 )
 Switch.displayName = 'Switch'
-

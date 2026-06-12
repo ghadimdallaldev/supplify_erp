@@ -38,7 +38,7 @@ import {
   useAddRestaurantInventoryMutation,
   useAdjustRestaurantInventoryMutation,
 } from '../../../services/api'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { EmptyState } from '../../ui/empty-state'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select'
 import {

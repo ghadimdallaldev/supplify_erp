@@ -11,7 +11,7 @@ import {
   useSuggestOrderSubstitutionIssueMutation,
   useOpenOrderFulfillmentChatMutation,
 } from '../../services/api'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { MessageSquare, AlertTriangle } from 'lucide-react'
 
 type OrderItem = {

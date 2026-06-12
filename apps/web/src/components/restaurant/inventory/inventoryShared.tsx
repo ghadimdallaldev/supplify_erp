@@ -77,7 +77,7 @@ export function calculateReorderQuantity(item: any) {
 }
 
 export function summaryCardClass(active: boolean) {
-  return `cursor-pointer transition-all hover:shadow-md ${active ? 'ring-2 ring-[var(--brand-mid)] ring-offset-2' : ''}`
+  return `cursor-pointer transition-shadow duration-200 ease hover:shadow-md ${active ? 'ring-2 ring-[var(--brand-mid)] ring-offset-2' : ''}`
 }
 
 export function InventoryTabLoading({ className = 'py-12' }: { className?: string }) {

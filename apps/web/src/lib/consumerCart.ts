@@ -5,6 +5,7 @@ export type CartLine = {
   unitPrice: number
   quantity: number
   modifierOptionIds: string[]
+  modifierLabels?: string[]
   notes?: string
 }
 
@@ -20,13 +21,29 @@ export function buildCartKey(
   return `${menuItemId}|${sortedMods}|${notePart}`
 }
 
+function cartStorageKey(slug: string): string {
+  return `${CART_KEY_PREFIX}${slug}`
+}
+
 export function loadCart(slug: string): CartLine[] {
   if (!slug) return []
   try {
-    const raw = sessionStorage.getItem(`${CART_KEY_PREFIX}${slug}`)
+    const raw =
+      localStorage.getItem(cartStorageKey(slug)) ?? sessionStorage.getItem(cartStorageKey(slug))
     if (!raw) return []
     const parsed = JSON.parse(raw) as CartLine[]
-    return Array.isArray(parsed) ? parsed : []
+    if (!Array.isArray(parsed)) return []
+    if (
+      sessionStorage.getItem(cartStorageKey(slug)) &&
+      !localStorage.getItem(cartStorageKey(slug))
+    ) {
+      localStorage.setItem(cartStorageKey(slug), raw)
+      sessionStorage.removeItem(cartStorageKey(slug))
+    }
+    return parsed.map((line) => ({
+      ...line,
+      modifierOptionIds: line.modifierOptionIds ?? [],
+    }))
   } catch {
     return []
   }
@@ -34,12 +51,13 @@ export function loadCart(slug: string): CartLine[] {
 
 export function saveCart(slug: string, lines: CartLine[]) {
   if (!slug) return
-  sessionStorage.setItem(`${CART_KEY_PREFIX}${slug}`, JSON.stringify(lines))
+  localStorage.setItem(cartStorageKey(slug), JSON.stringify(lines))
 }
 
 export function clearCartStorage(slug: string) {
   if (!slug) return
-  sessionStorage.removeItem(`${CART_KEY_PREFIX}${slug}`)
+  localStorage.removeItem(cartStorageKey(slug))
+  sessionStorage.removeItem(cartStorageKey(slug))
 }
 
 export function cartLineTotal(line: CartLine): number {
@@ -50,4 +68,10 @@ export function cartTotals(lines: CartLine[]) {
   const count = lines.reduce((sum, line) => sum + line.quantity, 0)
   const total = lines.reduce((sum, line) => sum + cartLineTotal(line), 0)
   return { count, total }
+}
+
+export function formatModifierLabels(line: CartLine): string | null {
+  if (line.modifierLabels?.length) return line.modifierLabels.join(', ')
+  if (line.modifierOptionIds.length) return 'Customizations selected'
+  return null
 }

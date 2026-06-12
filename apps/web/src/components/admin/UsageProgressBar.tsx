@@ -31,8 +31,11 @@ export function UsageProgressBar({
       aria-valuemax={limit === -1 || limit == null ? undefined : limit}
     >
       <div
-        className={cn('h-full transition-all', barColors[status])}
-        style={{ width: `${width}%` }}
+        className={cn(
+          'h-full w-full origin-left transition-transform duration-200 ease-linear',
+          barColors[status]
+        )}
+        style={{ transform: `scaleX(${width / 100})` }}
       />
     </div>
   )

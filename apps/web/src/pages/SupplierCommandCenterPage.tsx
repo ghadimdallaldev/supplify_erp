@@ -24,7 +24,7 @@ import {
   Percent,
   FileText,
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { formatCurrency } from '../utils/format'
 import { formatDeliveryStatus } from '../lib/deliveryStatusLabels'
 import {

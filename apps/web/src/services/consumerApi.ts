@@ -10,6 +10,7 @@ export type ConsumerMenuItem = {
   name: string
   description?: string | null
   base_price: number
+  image_url?: string | null
   is_available: boolean
   modifierGroups?: Array<{
     id: string
@@ -32,6 +33,19 @@ export type ConsumerMenuCategory = {
   items: ConsumerMenuItem[]
 }
 
+export type ConsumerOrderingMode = 'LIVE' | 'PREORDER_ONLY' | 'CLOSED'
+
+export type ConsumerOrderingStatus = {
+  mode: ConsumerOrderingMode
+  allowAsap: boolean
+  allowPreorders: boolean
+  liveOrderStart: string
+  liveOrderEnd: string
+  allowPreordersOutsideLiveHours: boolean
+  nextLiveOrderAt: string | null
+  message: string
+}
+
 export type ConsumerFulfillmentBranch = {
   branchId: string
   branchName: string
@@ -42,6 +56,10 @@ export type ConsumerFulfillmentBranch = {
   minOrderAmount: number
   deliveryFee: number
   estimatedPrepMinutes: number
+  liveOrderStart?: string
+  liveOrderEnd?: string
+  allowPreordersOutsideLiveHours?: boolean
+  ordering?: ConsumerOrderingStatus
   deliveryZones: Array<{
     id: string
     name: string
@@ -76,6 +94,9 @@ export type ConsumerFulfillmentConfig = {
   minOrderAmount: number
   deliveryFee: number
   estimatedPrepMinutes: number
+  liveOrderStart?: string
+  liveOrderEnd?: string
+  allowPreordersOutsideLiveHours?: boolean
 }
 
 export type ConsumerDeliveryZone = {
@@ -158,6 +179,29 @@ export type ConsumerMeResponse = {
   member: ConsumerMember | null
   program: ConsumerLoyaltyProgram | null
   recentLedger: ConsumerLoyaltyLedgerEntry[]
+  recentOrders?: ConsumerMemberOrder[]
+}
+
+export type ConsumerMemberOrder = {
+  id: string
+  order_number: string
+  status: ConsumerOrderStatus
+  fulfillment_type: ConsumerFulfillmentType
+  total_amount: number
+  created_at: string
+  receipt_token: string
+}
+
+export type ConsumerStorefront = {
+  restaurant: {
+    id: string
+    slug: string
+    name: string
+    phone?: string | null
+    logoUrl?: string | null
+    operatingHours?: Record<string, { open?: string; close?: string; closed?: boolean }> | null
+  }
+  branches: ConsumerFulfillmentBranch[]
 }
 
 export const consumerApi = api.injectEndpoints({
@@ -167,6 +211,9 @@ export const consumerApi = api.injectEndpoints({
       string
     >({
       query: (slug) => `/api/public/restaurants/${encodeURIComponent(slug)}`,
+    }),
+    getPublicConsumerStorefront: build.query<ConsumerStorefront, string>({
+      query: (slug) => `/api/public/consumer/${encodeURIComponent(slug)}/storefront`,
     }),
     getPublicConsumerMenu: build.query<
       {
@@ -263,6 +310,7 @@ export const consumerApi = api.injectEndpoints({
         basePrice: number
         description?: string
         branchId?: string | null
+        imageUrl?: string | null
       }
     >({
       query: (body) => ({ url: '/api/consumer/menu/items', method: 'POST', body }),
@@ -278,6 +326,7 @@ export const consumerApi = api.injectEndpoints({
         description?: string
         branchId?: string | null
         isAvailable?: boolean
+        imageUrl?: string | null
       }
     >({
       query: ({ id, ...body }) => ({
@@ -289,6 +338,46 @@ export const consumerApi = api.injectEndpoints({
     }),
     deleteConsumerMenuItem: build.mutation<{ deleted: boolean }, string>({
       query: (id) => ({ url: `/api/consumer/menu/items/${id}`, method: 'DELETE' }),
+      invalidatesTags: [{ type: 'ConsumerMenu', id: 'ADMIN' }],
+    }),
+    previewConsumerMenuImport: build.mutation<
+      {
+        totalRows: number
+        validCount: number
+        errorCount: number
+        preview: Array<{
+          rowNumber: number
+          status: 'valid' | 'error'
+          mapped: Record<string, unknown>
+          errors: Array<{ field: string; message: string }>
+        }>
+      },
+      { csv: string }
+    >({
+      query: (body) => ({
+        url: '/api/consumer/menu/import/preview',
+        method: 'POST',
+        body,
+      }),
+    }),
+    importConsumerMenu: build.mutation<
+      {
+        summary: {
+          categoriesCreated: number
+          itemsCreated: number
+          itemsUpdated: number
+          skipped: number
+          failed: number
+        }
+        errors: Array<{ rowNumber: number; errors: Array<{ field: string; message: string }> }>
+      },
+      { csv: string; branchId?: string | null; updateExisting?: boolean }
+    >({
+      query: (body) => ({
+        url: '/api/consumer/menu/import',
+        method: 'POST',
+        body,
+      }),
       invalidatesTags: [{ type: 'ConsumerMenu', id: 'ADMIN' }],
     }),
     createConsumerModifierGroup: build.mutation<
@@ -393,6 +482,9 @@ export const consumerApi = api.injectEndpoints({
         minOrderAmount?: number
         deliveryFee?: number
         estimatedPrepMinutes?: number
+        liveOrderStart?: string
+        liveOrderEnd?: string
+        allowPreordersOutsideLiveHours?: boolean
       }
     >({
       query: ({ branchId, ...body }) => ({
@@ -542,6 +634,7 @@ export const consumerApi = api.injectEndpoints({
 
 export const {
   useGetPublicConsumerRestaurantQuery,
+  useGetPublicConsumerStorefrontQuery,
   useGetPublicConsumerMenuQuery,
   useGetPublicConsumerFulfillmentOptionsQuery,
   useCreatePublicConsumerOrderMutation,
@@ -552,6 +645,8 @@ export const {
   useCreateConsumerMenuItemMutation,
   useUpdateConsumerMenuItemMutation,
   useDeleteConsumerMenuItemMutation,
+  usePreviewConsumerMenuImportMutation,
+  useImportConsumerMenuMutation,
   useCreateConsumerModifierGroupMutation,
   useUpdateConsumerModifierGroupMutation,
   useDeleteConsumerModifierGroupMutation,
@@ -573,3 +668,9 @@ export const {
   useGetConsumerLoyaltyProgramQuery,
   useUpsertConsumerLoyaltyProgramMutation,
 } = consumerApi
+
+export const MENU_IMPORT_CSV_TEMPLATE = `category,name,price,description,available,image_url
+Starters,Hummus & Bread,12.00,Classic chickpea dip with warm bread,true,
+Starters,Mutabal,11.00,Smoky eggplant dip,true,
+Mains,Chicken Shawarma,16.50,,true,
+Drinks,Fresh Lemonade,5.00,,true,`

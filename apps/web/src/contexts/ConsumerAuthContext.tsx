@@ -7,6 +7,7 @@ import {
   useGetConsumerMeQuery,
   type ConsumerLoyaltyLedgerEntry,
   type ConsumerMember,
+  type ConsumerMemberOrder,
 } from '../services/consumerApi'
 
 type ConsumerAuthContextValue = {
@@ -14,6 +15,7 @@ type ConsumerAuthContextValue = {
   member: ConsumerMember | null
   loyaltyPoints: number
   recentLedger: ConsumerLoyaltyLedgerEntry[]
+  recentOrders: ConsumerMemberOrder[]
   isLoading: boolean
   isAuthenticated: boolean
   login: (username: string, password: string) => Promise<void>
@@ -71,6 +73,7 @@ export function ConsumerAuthProvider({
       member,
       loyaltyPoints: member?.loyaltyPoints ?? 0,
       recentLedger: data?.recentLedger ?? [],
+      recentOrders: data?.recentOrders ?? [],
       isLoading: isLoading || isFetching,
       isAuthenticated: Boolean(member),
       login,
@@ -82,6 +85,7 @@ export function ConsumerAuthProvider({
     }),
     [
       data?.recentLedger,
+      data?.recentOrders,
       isFetching,
       isLoading,
       login,

@@ -24,7 +24,7 @@ import {
   type DisputeLineItemDraft,
 } from '../../lib/disputeHelpers'
 import { getQuantityUnitRules, normalizeReceivedQuantity } from '../../lib/quantityUnit'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 
 const DISPUTE_TYPES = [

@@ -10,7 +10,7 @@ import { Button } from '../ui/button'
 import { Label } from '../ui/label'
 import { Switch } from '../ui/switch'
 import { Input } from '../ui/input'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Route, Loader2 } from 'lucide-react'
 
 type Props = {
