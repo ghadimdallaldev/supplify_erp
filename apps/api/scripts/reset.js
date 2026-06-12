@@ -1,3 +1,8 @@
+/**
+ * Drop and recreate core tables (legacy reset). Prefer db:wipe-commercial or wipe-all for demos.
+ *
+ * DEV ONLY — never run against Railway preprod/prod.
+ */
 import { pool, query } from '../src/lib/db.js'
 import { logger } from '../src/lib/logger.js'
 import { isMainModule } from './lib/is-main.mjs'

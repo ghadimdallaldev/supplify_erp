@@ -1,6 +1,8 @@
 /**
  * Wipe all restaurant/supplier tenants and commercial data (no re-seed).
  *
+ * DEV ONLY — never run against Railway preprod/prod.
+ *
  * Run from repo root:  pnpm --filter @supplify/api db:wipe-commercial
  * Or from apps/api:    node scripts/wipe-commercial-only.js
  */

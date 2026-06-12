@@ -2,6 +2,8 @@
  * Nuclear reset: drop public schema (all tables, users, sessions, migrations)
  * then re-apply SQL migrations for an empty database.
  *
+ * DEV ONLY — never run against Railway preprod/prod.
+ *
  * Usage: node scripts/wipe-all-data.js
  * Requires DATABASE_URL in apps/api/.env
  */

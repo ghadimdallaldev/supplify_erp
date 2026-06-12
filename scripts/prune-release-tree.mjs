@@ -65,6 +65,7 @@ function pruneApiScripts() {
       'migrate.js',
       'run-migration.js',
       'migrate-users-to-roles.js',
+      'migrate-suppliers-to-orgs.js',
       'sync-system-roles.mjs',
       'lib',
     ])
