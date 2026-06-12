@@ -1,5 +1,6 @@
 import { migrationQuery, query } from './db.js'
 import { logger } from './logger.js'
+import { resetDeliveryBoardSqlCacheForTests } from './delivery-board-schema.js'
 import { resetDeliveryZoneJoinCache } from './delivery-zone-join.js'
 
 async function tableExists(tableName) {
@@ -34,6 +35,8 @@ export async function ensureDeliverySchema() {
 
   if (!(await tableExists('delivery_zone'))) {
     logger.debug('delivery_zone table missing — skipping zone column ensure')
+    resetDeliveryZoneJoinCache()
+    resetDeliveryBoardSqlCacheForTests()
     return
   }
 
@@ -63,5 +66,6 @@ export async function ensureDeliverySchema() {
   `)
 
   resetDeliveryZoneJoinCache()
+  resetDeliveryBoardSqlCacheForTests()
   logger.info('Delivery schema ensure completed')
 }

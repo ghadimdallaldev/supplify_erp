@@ -179,9 +179,28 @@ Valid Product,SKU2,abc`
   describe('getSupplierDeliveryBoard', () => {
     it('groups orders by delivery area', async () => {
       vi.mocked(db.query).mockReset()
+      const { resetDeliveryBoardSqlCacheForTests } = await import('../lib/delivery-board-schema.js')
+      resetDeliveryBoardSqlCacheForTests()
       db.query
         .mockResolvedValueOnce({
-          rows: [{ column_name: 'warehouse_id' }, { column_name: 'supplier_id' }],
+          rows: [
+            { table_name: 'delivery_zone', column_name: 'warehouse_id' },
+            { table_name: 'delivery_zone', column_name: 'supplier_id' },
+            { table_name: 'delivery_zone', column_name: 'name' },
+            { table_name: 'restaurant', column_name: 'delivery_latitude' },
+            { table_name: 'restaurant', column_name: 'delivery_longitude' },
+            { table_name: 'restaurant', column_name: 'delivery_location_label' },
+            { table_name: 'branch', column_name: 'delivery_latitude' },
+            { table_name: 'branch', column_name: 'delivery_longitude' },
+            { table_name: 'branch', column_name: 'delivery_location_label' },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            { table_name: 'proof_of_delivery' },
+            { table_name: 'order_warehouse_assignment' },
+            { table_name: 'delivery_zone' },
+          ],
         })
         .mockResolvedValueOnce({
           rows: [
@@ -196,6 +215,9 @@ Valid Product,SKU2,abc`
               driver_name: null,
               has_pod: false,
               scheduled_at: new Date(),
+              destination_latitude: null,
+              destination_longitude: null,
+              destination_label: 'A',
             },
             {
               order_id: 'o2',
@@ -208,6 +230,9 @@ Valid Product,SKU2,abc`
               driver_name: 'Driver',
               has_pod: false,
               scheduled_at: new Date(),
+              destination_latitude: null,
+              destination_longitude: null,
+              destination_label: 'B',
             },
           ],
         })

@@ -1,7 +1,8 @@
 import { query } from '../lib/db.js'
+import { getDeliveryBoardSqlFragments } from '../lib/delivery-board-schema.js'
+import { logger } from '../lib/logger.js'
 import { getLatestLocationsForDrivers, isGpsTrackingEnabled } from './driver-location.service.js'
 import { buildTrackingPayload, buildDriverLastSeenAlias } from '../lib/delivery-tracking-payload.js'
-import { getDeliveryZoneJoinSql } from '../lib/delivery-zone-join.js'
 
 /**
  * Daily delivery board with filters and area grouping.
@@ -10,6 +11,8 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
   const { date, status, driverId, area } = filters
   const params = [supplierId]
   let paramIdx = 2
+
+  const sql = await getDeliveryBoardSqlFragments()
 
   const conditions = [
     `oi.supplier_id = $1`,
@@ -21,7 +24,6 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
     params.push(date)
     paramIdx += 1
   } else {
-    // Default window when no date filter — avoids loading full order history.
     conditions.push(`COALESCE(o.placed_at, o.created_at) >= NOW() - interval '14 days'`)
   }
 
@@ -32,7 +34,7 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
   }
 
   if (area) {
-    conditions.push(`COALESCE(dz.name, 'Unassigned area') ILIKE $${paramIdx}`)
+    conditions.push(`${sql.deliveryAreaExpr} ILIKE $${paramIdx}`)
     params.push(`%${area}%`)
     paramIdx += 1
   }
@@ -55,24 +57,22 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
     }
   }
 
-  const deliveryZoneJoin = await getDeliveryZoneJoinSql({ supplierParam: '$1' })
-
   const { rows } = await query(
     `
     SELECT DISTINCT ON (o.id)
       o.id AS order_id,
       o.status AS order_status,
       r.name AS restaurant_name,
-      COALESCE(dz.name, r.address_json->>'city', 'Unassigned area') AS delivery_area,
+      ${sql.deliveryAreaExpr} AS delivery_area,
       da.id AS assignment_id,
       COALESCE(da.status, 'pending') AS delivery_status,
       d.id AS driver_id,
       d.full_name AS driver_name,
-      EXISTS (SELECT 1 FROM proof_of_delivery pod WHERE pod.order_id = o.id) AS has_pod,
+      ${sql.hasPodExpr} AS has_pod,
       COALESCE(o.placed_at, o.created_at) AS scheduled_at,
-      COALESCE(b.delivery_latitude, r.delivery_latitude) AS destination_latitude,
-      COALESCE(b.delivery_longitude, r.delivery_longitude) AS destination_longitude,
-      COALESCE(b.delivery_location_label, r.delivery_location_label, r.name) AS destination_label
+      ${sql.destinationLatitudeExpr} AS destination_latitude,
+      ${sql.destinationLongitudeExpr} AS destination_longitude,
+      ${sql.destinationLabelExpr} AS destination_label
     FROM customer_order o
     JOIN order_item oi ON oi.order_id = o.id
     JOIN restaurant r ON r.id = o.restaurant_id
@@ -83,8 +83,7 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
       ORDER BY da2.created_at DESC LIMIT 1
     ) da ON true
     LEFT JOIN drivers d ON d.id = da.driver_id
-    LEFT JOIN order_warehouse_assignment owa ON owa.order_id = o.id
-    ${deliveryZoneJoin}
+    ${sql.zoneJoinSql}
     WHERE ${conditions.join(' AND ')}
     ORDER BY o.id, scheduled_at DESC
     LIMIT 500
@@ -93,9 +92,14 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
   )
 
   const driverIds = [...new Set(rows.map((r) => r.driver_id).filter(Boolean))]
-  const locationMap = isGpsTrackingEnabled()
-    ? await getLatestLocationsForDrivers(driverIds)
-    : new Map()
+  let locationMap = new Map()
+  if (isGpsTrackingEnabled() && driverIds.length) {
+    try {
+      locationMap = await getLatestLocationsForDrivers(driverIds)
+    } catch (error) {
+      logger.warn('Delivery board GPS lookup skipped', { error: error.message })
+    }
+  }
 
   const orders = rows.map((r) => {
     const locRow = r.driver_id ? locationMap.get(r.driver_id) : null
