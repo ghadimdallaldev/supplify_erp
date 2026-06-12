@@ -1,7 +1,11 @@
 import { query } from './db.js'
 import { logger } from './logger.js'
 import { config } from '../config/env.js'
-import { buildAdminOperationalOverviewCounters } from './admin-operational-metrics.js'
+import {
+  buildAdminOperationalOverviewCounters,
+  getAiPlatformConfigSummary,
+  getAiReorderMetrics,
+} from './admin-operational-metrics.js'
 import { buildTenantLimitOverviewCounts } from './admin-tenant-usage-metrics.js'
 
 const PAID_PLAN_EXCLUDE = `LOWER(sp.code) NOT IN ('free', 'enterprise')`
@@ -209,6 +213,11 @@ export async function buildAdminOverviewMetrics() {
   const mrr = parseFloat(revenueRow.mrr || 0)
   const orderRow = orderStatsRows[0] || {}
   const tenantLimitCounts = await buildTenantLimitOverviewCounts(safeOverviewQuery)
+  const [operational, aiReorderMetrics] = await Promise.all([
+    buildAdminOperationalOverviewCounters(),
+    getAiReorderMetrics(),
+  ])
+  const aiPlatform = getAiPlatformConfigSummary()
 
   const payload = {
     tenantCounts,
@@ -249,7 +258,15 @@ export async function buildAdminOverviewMetrics() {
       pendingDealPayments: parseInt(pendingPaymentDealStatsRows[0]?.count, 10) || 0,
       overdueInvoices: parseInt(overdueInvoiceStatsRows[0]?.count, 10) || 0,
     },
-    operational: await buildAdminOperationalOverviewCounters(),
+    operational,
+    aiReorder: {
+      requests24h: aiReorderMetrics.totalRequests,
+      successRate:
+        aiReorderMetrics.successRate != null
+          ? Math.round(aiReorderMetrics.successRate * 100)
+          : null,
+      aiEnabled: aiPlatform.envReady,
+    },
     tenantsOverLimit: tenantLimitCounts.tenantsOverLimit,
     tenantsNearLimit: tenantLimitCounts.tenantsNearLimit,
     activity: {

@@ -19,8 +19,16 @@ vi.mock('./cache.js', () => ({
   setCache: vi.fn().mockResolvedValue(undefined),
   deleteCache: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('./feature-flags.js', () => ({
-  resolveAllFeaturesForTenant: vi.fn().mockResolvedValue({ features: {}, featureSources: {} }),
+const mockResolveAllFeatures = vi.fn().mockResolvedValue({ features: {}, featureSources: {} })
+vi.mock('./feature-flags.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    resolveAllFeaturesForTenant: (...args) => mockResolveAllFeatures(...args),
+  }
+})
+vi.mock('./ai-platform.js', () => ({
+  isAiPlatformEnabledForTenant: vi.fn().mockResolvedValue(true),
 }))
 vi.mock('./org-billing-tenant.js', () => ({
   resolveOrgBillingTenantId: vi.fn(async (tenantId) => tenantId),
@@ -397,6 +405,70 @@ describe('Subscription lib', () => {
       expect(result).not.toBeNull()
       expect(result.limits.chats_per_day).toBe(20)
       expect(result.overrides).toHaveLength(1)
+    })
+
+    it('includes smartReorder block for restaurant with full_90day_trends', async () => {
+      const { getEntitlements } = await import('./subscription.js')
+      const subRow = {
+        id: 'sub-rest',
+        plan_id: 'plan-gold',
+        plan_name: 'Gold',
+        plan_code: 'gold',
+        limits: { ai_requests_per_day: 20 },
+        features: { smart_reorder: 'full_90day_trends', ai_platform: true },
+        tenant_type: 'RESTAURANT',
+        plan_display_name: 'Gold',
+        plan_price_per_month: 149,
+        plan_price_per_year: null,
+        plan_tenant_type: 'RESTAURANT',
+        pending_plan_id: null,
+        pending_effective_at: null,
+      }
+      mockResolveAllFeatures.mockResolvedValueOnce({
+        features: { smart_reorder: 'full_90day_trends', ai_platform: true },
+        featureSources: {},
+      })
+      mockQuery.mockImplementation((sql) => {
+        const text = typeof sql === 'string' ? sql : ''
+        if (text.includes('plan_limit_override') || text.includes('tenant_limit_override')) {
+          return Promise.resolve({ rows: [] })
+        }
+        if (text.includes('pending_plan_id') && text.includes('FROM subscription')) {
+          return Promise.resolve({
+            rows: [
+              {
+                id: 'sub-rest',
+                plan_id: 'plan-gold',
+                pending_plan_id: null,
+                pending_effective_at: null,
+              },
+            ],
+          })
+        }
+        if (text.includes('FROM subscription s') && text.includes('JOIN subscription_plan')) {
+          return Promise.resolve({ rows: [subRow] })
+        }
+        if (text.includes('COUNT') || text.includes('current_value')) {
+          return Promise.resolve({ rows: [{ c: 0, current_value: 0 }] })
+        }
+        return Promise.resolve({ rows: [] })
+      })
+
+      const result = await getEntitlements('rest-1', 'RESTAURANT')
+
+      expect(result).not.toBeNull()
+      expect(result.smartReorder).toMatchObject({
+        tier: 'gold',
+        capabilities: {
+          assistance: true,
+          forecast: true,
+          forecast90d: true,
+          seasonality: false,
+          llmExplain: true,
+          nlAsk: false,
+        },
+        aiPlatformEnabled: true,
+      })
     })
   })
 

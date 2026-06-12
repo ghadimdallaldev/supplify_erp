@@ -7,6 +7,7 @@ import { redactEmail } from '../services/email/email-delivery-log.js'
 import { getBillingStatus } from './billing/billing-service.js'
 import { getEffectiveFeaturesForTenant } from './feature-flags.js'
 import { resolveActiveBillingSubscription } from './org-billing-tenant.js'
+import { isAiEnvEnabled } from './ai-platform.js'
 
 const OPEN_ISSUE_STATUSES = `('shortage_reported', 'substitution_suggested', 'waiting_restaurant_approval')`
 const FAILED_EMAIL_THRESHOLD = 5
@@ -64,6 +65,60 @@ export function getGpsConfigSummary() {
     restaurantTrackingAllowed: config.GPS_ALLOW_RESTAURANT_LIVE_TRACKING,
     showDriverName: config.GPS_RESTAURANT_SHOW_DRIVER_NAME,
     showDriverPhone: config.GPS_RESTAURANT_SHOW_DRIVER_PHONE,
+  }
+}
+
+export function getAiPlatformConfigSummary() {
+  return {
+    enabled: config.AI_ENABLED,
+    provider: config.AI_PROVIDER || 'none',
+    model: config.AI_MODEL || null,
+    envReady: isAiEnvEnabled(),
+  }
+}
+
+export async function getAiReorderMetrics() {
+  const [statsRows, topRows] = await Promise.all([
+    safeOperationalQuery(
+      'aiReorderMetrics24h',
+      `SELECT
+         COUNT(*)::int AS total,
+         COUNT(*) FILTER (WHERE success = true)::int AS success_count,
+         COUNT(*) FILTER (WHERE success = false)::int AS failed_count
+       FROM reorder_ai_request_log
+       WHERE created_at >= NOW() - INTERVAL '24 hours'`,
+      [{ total: 0, success_count: 0, failed_count: 0 }]
+    ),
+    safeOperationalQuery(
+      'aiReorderTopRestaurants24h',
+      `SELECT
+         l.restaurant_id,
+         r.name AS restaurant_name,
+         COUNT(*)::int AS request_count
+       FROM reorder_ai_request_log l
+       JOIN restaurant r ON r.id = l.restaurant_id
+       WHERE l.created_at >= NOW() - INTERVAL '24 hours'
+       GROUP BY l.restaurant_id, r.name
+       ORDER BY request_count DESC
+       LIMIT 5`,
+      []
+    ),
+  ])
+
+  const row = statsRows[0] || {}
+  const total = parseInt(row.total, 10) || 0
+  const successCount = parseInt(row.success_count, 10) || 0
+  const failedCount = parseInt(row.failed_count, 10) || 0
+
+  return {
+    totalRequests: total,
+    successRate: total > 0 ? Math.round((successCount / total) * 1000) / 1000 : null,
+    failedCount,
+    topRestaurants: topRows.map((r) => ({
+      restaurantId: r.restaurant_id,
+      restaurantName: r.restaurant_name,
+      requestCount: parseInt(r.request_count, 10) || 0,
+    })),
   }
 }
 
@@ -175,7 +230,7 @@ function buildWarnings(ctx) {
  * Lightweight counters for admin overview (subset of operational summary).
  */
 export async function buildAdminOperationalOverviewCounters() {
-  const [emailStats, fulfillmentStats, gpsRows, expiryStats] = await Promise.all([
+  const [emailStats, fulfillmentStats, gpsRows, expiryStats, aiReorderMetrics] = await Promise.all([
     safeOperationalQuery(
       'emailFailed24h',
       `SELECT
@@ -217,6 +272,7 @@ export async function buildAdminOperationalOverviewCounters() {
        WHERE is_archived = false AND expiry_date < CURRENT_DATE`,
       [{ count: 0 }]
     ),
+    getAiReorderMetrics(),
   ])
 
   const emailRow = emailStats[0] || {}
@@ -227,12 +283,15 @@ export async function buildAdminOperationalOverviewCounters() {
     openFulfillmentIssues: parseInt(fulfillmentStats[0]?.count, 10) || 0,
     staleGpsDeliveries: gpsSummary.stale,
     expiredInventoryLots: parseInt(expiryStats[0]?.count, 10) || 0,
+    aiReorderRequests24h: aiReorderMetrics.totalRequests,
+    aiReorderFailed24h: aiReorderMetrics.failedCount,
   }
 }
 
 export async function buildAdminOperationalSummary() {
   const emailConfig = getEmailConfigSummary()
   const gpsConfig = getGpsConfigSummary()
+  const aiPlatform = getAiPlatformConfigSummary()
 
   const [
     emailStats,
@@ -245,6 +304,7 @@ export async function buildAdminOperationalSummary() {
     adoptionRows,
     subscriptionRows,
     pendingDealsRow,
+    aiReorderMetrics,
   ] = await Promise.all([
     safeOperationalQuery(
       'emailStats24h',
@@ -359,6 +419,7 @@ export async function buildAdminOperationalSummary() {
        WHERE status IN ('pending_approval', 'pending_admin_approval', 'approved_pending_payment')`,
       [{ count: 0 }]
     ),
+    getAiReorderMetrics(),
   ])
 
   const emailRow = emailStats[0] || {}
@@ -459,6 +520,8 @@ export async function buildAdminOperationalSummary() {
     gpsDeliveries: gpsDeliveriesPayload,
     adoption,
     subscription,
+    aiPlatform,
+    aiReorder: aiReorderMetrics,
     warnings: warnings.slice(0, 15),
   }
 }

@@ -353,3 +353,95 @@ export async function suppressReorderSuggestion(
 
   return rows[0]
 }
+
+async function findQuickListForApply(restaurantId, supplierId) {
+  const { rows } = await query(
+    `
+    SELECT id, name
+    FROM quick_list
+    WHERE restaurant_id = $1
+      AND ($2::uuid IS NULL OR supplier_id = $2)
+    ORDER BY updated_at DESC
+    LIMIT 1
+    `,
+    [restaurantId, supplierId || null]
+  )
+  return rows[0] || null
+}
+
+/**
+ * Validate apply items against current suggestions; optionally add to an existing quick list.
+ * Does not place orders.
+ *
+ * @param {string} restaurantId
+ * @param {{ items: Array<{ productId: string, qty: number, supplierId?: string }>, branchId?: string | null, smartReorderFeatureValue?: unknown }} opts
+ */
+export async function applyReorderAssistance(restaurantId, opts = {}) {
+  const { items, branchId = null, smartReorderFeatureValue } = opts
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new ValidationError('items is required')
+  }
+
+  const assistance = await getReorderAssistance(restaurantId, {
+    branchId,
+    smartReorderFeatureValue,
+  })
+
+  const suggestionByProduct = new Map()
+  for (const suggestion of assistance.suggestions) {
+    if (suggestion.productId) {
+      suggestionByProduct.set(String(suggestion.productId), suggestion)
+    }
+  }
+
+  const added = []
+  for (const item of items) {
+    const productId = String(item.productId)
+    const suggestion = suggestionByProduct.get(productId)
+    if (!suggestion) {
+      throw new ValidationError(`Product ${productId} is not in current reorder suggestions`)
+    }
+
+    const supplierId = item.supplierId || suggestion.supplierId
+    if (!supplierId) {
+      throw new ValidationError(`supplierId is required for product ${productId}`)
+    }
+
+    const qty = Math.max(1, Math.ceil(item.qty ?? suggestion.suggestedQty ?? 1))
+    const quickList = await findQuickListForApply(restaurantId, supplierId)
+
+    if (quickList) {
+      const { rows: products } = await query(
+        `SELECT id FROM product WHERE id = $1 AND supplier_id = $2`,
+        [productId, supplierId]
+      )
+      if (products.length === 0) {
+        throw new ValidationError(`Product ${productId} does not belong to supplier ${supplierId}`)
+      }
+
+      await query(
+        `
+        INSERT INTO quick_list_item (quick_list_id, product_id, supplier_id, quantity)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (quick_list_id, product_id) DO UPDATE SET
+          quantity = EXCLUDED.quantity,
+          updated_at = now()
+        `,
+        [quickList.id, productId, supplierId, qty]
+      )
+
+      added.push({
+        productId,
+        quickListId: quickList.id,
+        message: `Added ${qty} to ordering list "${quickList.name}" (suggested: ${suggestion.suggestedQty ?? qty})`,
+      })
+    } else {
+      added.push({
+        productId,
+        message: `Suggested qty ${suggestion.suggestedQty ?? qty} — create an ordering list or add from supplier catalog`,
+      })
+    }
+  }
+
+  return { added }
+}

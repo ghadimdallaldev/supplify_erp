@@ -10,15 +10,16 @@ Supplify tracks resource usage in real-time to enforce plan limits, provide anal
 
 ### Restaurant Usage
 
-| Metric               | Description                                                                                      | Enforcement                 |
-| -------------------- | ------------------------------------------------------------------------------------------------ | --------------------------- |
-| **Branches**         | Number of active branches/locations                                                              | Hard cap                    |
-| **Orders Per Day**   | Orders placed today (resets daily)                                                               | Hard cap                    |
-| **Products Tracked** | Products in restaurant inventory                                                                 | Hard cap                    |
-| **Chats Per Day**    | Messages sent today (resets daily)                                                               | Hard cap                    |
-| **Storage Used**     | Files uploaded via presign (logos, product images, chat attachments) + staff documents with size | Hard cap at plan limit (MB) |
-| **Exports Per Day**  | CSV/API exports today                                                                            | Hard cap (Gold+)            |
-| **Webhooks**         | Active webhook subscriptions                                                                     | Hard cap (Platinum)         |
+| Metric                  | Description                                                                                      | Enforcement                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------ | --------------------------- |
+| **Branches**            | Number of active branches/locations                                                              | Hard cap                    |
+| **Orders Per Day**      | Orders placed today (resets daily)                                                               | Hard cap                    |
+| **Products Tracked**    | Products in restaurant inventory                                                                 | Hard cap                    |
+| **Chats Per Day**       | Messages sent today (resets daily)                                                               | Hard cap                    |
+| **Storage Used**        | Files uploaded via presign (logos, product images, chat attachments) + staff documents with size | Hard cap at plan limit (MB) |
+| **Exports Per Day**     | CSV/API exports today                                                                            | Hard cap (Gold+)            |
+| **Webhooks**            | Active webhook subscriptions                                                                     | Hard cap (Platinum)         |
+| **AI Requests Per Day** | LLM calls on Smart Reorder `explain` / `ask` (Gold 20, Platinum 100)                             | Soft at 80%; see below      |
 
 ### Supplier Usage
 
@@ -48,7 +49,7 @@ Usage counters update automatically when:
 
 ### Reset Schedule
 
-- **Daily counters** (orders, chats): reset at midnight UTC
+- **Daily counters** (orders, chats, `ai_requests_per_day`): reset at midnight UTC
 - **Daily limits**: reset at midnight UTC
 - **Period counters** (branches, warehouses, products): never reset (cumulative)
 
@@ -96,6 +97,13 @@ When usage reaches **100% of limit**:
 - Error: "Daily order limit reached (100/100). Upgrade to Gold for 500 orders/day."
 - Can still view past orders, products, chat, etc.
 - Only new order creation is blocked
+
+### AI assist (`ai_requests_per_day`)
+
+Restaurant-only meter (migration `0167`). Counts successful LLM attempts on `POST /reorder-assistance/explain` and `ask`; heuristic fallbacks when `ai_platform` is off or env has no provider do **not** increment.
+
+- **80%:** Entitlements / usage UI shows warning badge (same pattern as other daily meters).
+- **100%:** `explain` returns heuristic summary with `usageLimited: true` (200). `ask` returns **400** `VALIDATION_ERROR` (“Daily AI assist limit reached for your plan”). Core reorder assistance and forecasts remain available.
 
 ---
 

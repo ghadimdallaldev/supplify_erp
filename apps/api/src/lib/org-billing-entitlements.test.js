@@ -18,6 +18,10 @@ vi.mock('./warehouse-helpers.js', () => ({
   getWarehouseSupplierColumn: vi.fn().mockResolvedValue('tenant_id'),
 }))
 
+vi.mock('./ai-platform.js', () => ({
+  isAiPlatformEnabledForTenant: vi.fn().mockResolvedValue(true),
+}))
+
 import { query } from './db.js'
 
 const goldSubRow = {
@@ -26,7 +30,7 @@ const goldSubRow = {
   plan_name: 'Gold',
   plan_code: 'gold',
   limits: { branches: 3, multi_branch: true, warehouses: 3 },
-  features: { multi_branch: true },
+  features: { multi_branch: true, smart_reorder: 'full_90day_trends', ai_platform: true },
   tenant_type: 'RESTAURANT',
   plan_display_name: 'Gold',
   plan_price_per_month: 149,
@@ -86,5 +90,18 @@ describe('org billing entitlements', () => {
     expect(ent.plan.code).toBe('gold')
     expect(ent.features.multi_branch).toBe(true)
     expect(ent.tenantId).toBe('child-rest')
+    expect(ent.smartReorder).toMatchObject({
+      tier: 'gold',
+      aiPlatformEnabled: true,
+      capabilities: {
+        assistance: true,
+        forecast: true,
+        forecast90d: true,
+        seasonality: false,
+        trendAdjustment: false,
+        llmExplain: true,
+        nlAsk: false,
+      },
+    })
   })
 })

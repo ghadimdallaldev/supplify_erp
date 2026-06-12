@@ -89,6 +89,17 @@ See [ai-smart-reorder.md](./ai-smart-reorder.md) for full spec.
 
 ---
 
+## Feature 5: AI Smart Reorder assistant (Gold / Platinum)
+
+See [ai-smart-reorder.md](./ai-smart-reorder.md) § Phase 2.
+
+- **Gold** (`full_90day_trends`): `POST /reorder-assistance/explain` — LLM or heuristic summary of suggestions
+- **Platinum** (`ai_forecast_seasonality`): above + `POST /reorder-assistance/ask` — natural-language product matching
+- Gated by plan `smart_reorder` tier, feature flag `ai_platform`, env `AI_ENABLED` + provider key
+- Metered: `ai_requests_per_day` (Gold 20, Platinum 100); heuristic fallbacks do not consume quota
+
+---
+
 ## Feature 4: Smart reorder reminders (cadence)
 
 ### Behavior
@@ -146,7 +157,7 @@ After pushing to Railway (API + web redeploy from `deploy/railway/<env>/`):
    DATABASE_URL="<that env's Postgres URL>" pnpm db:migrate
    ```
 
-   Required files: `0133_restaurant_inventory_lots.sql`, `0134_order_fulfillment_issues.sql`, `0135_reorder_cadence_and_quick_list_branch.sql`.
+   Required files: `0133_restaurant_inventory_lots.sql`, `0134_order_fulfillment_issues.sql`, `0135_reorder_cadence_and_quick_list_branch.sql`, `0166_reorder_forecast.sql`, `0167_ai_platform_and_usage.sql`.
 
 2. **API env** — committed `deploy/railway/<env>/api.env` already sets `CRONS_ENABLED=true`. Operational reminders use the default 24 h interval (`CRON_OPERATIONAL_REMINDERS_INTERVAL_MS=86400000`); override only if you need a different cadence.
 

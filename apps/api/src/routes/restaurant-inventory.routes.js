@@ -36,6 +36,7 @@ import {
 import {
   getReorderAssistance,
   suppressReorderSuggestion,
+  applyReorderAssistance,
 } from '../services/restaurant-reorder-assistance.service.js'
 import {
   getCachedForecasts,
@@ -1317,6 +1318,20 @@ const reorderAskSchema = z.object({
   branchId: z.string().uuid().optional(),
 })
 
+const reorderApplySchema = z.object({
+  items: z
+    .array(
+      z.object({
+        productId: z.string().uuid(),
+        qty: z.number().positive(),
+        supplierId: z.string().uuid().optional(),
+      })
+    )
+    .min(1)
+    .max(50),
+  branchId: z.string().uuid().optional(),
+})
+
 router.post(
   '/reorder-assistance/explain',
   requireRole(['RESTAURANT', 'ADMIN']),
@@ -1392,6 +1407,33 @@ router.post(
       const body = suppressSchema.parse(req.body)
       const result = await suppressReorderSuggestion(restaurantId, body)
       res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/reorder-assistance/apply',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  requireFeature(
+    'smart_reorder',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const body = reorderApplySchema.parse(req.body ?? {})
+      const smartReorderFeatureValue = await getSmartReorderFeatureValue(req)
+      const data = await applyReorderAssistance(restaurantId, {
+        items: body.items,
+        branchId: body.branchId ?? null,
+        smartReorderFeatureValue,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)
     }

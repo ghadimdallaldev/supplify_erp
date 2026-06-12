@@ -225,7 +225,7 @@ Tests: `auth.routes.test.js`, `rbac.test.js`. Web: `apps/web/src/lib/authRedirec
 
 Canonical keys in `apps/api/src/lib/feature-keys.js`:
 
-**Restaurant:** `chat`, `order_calendar`, `reports`, `smart_reorder`, `multi_branch`, `receiving_quality`, `disputes_returns`, `finance_invoices`, `quick_lists`, `inventory_management`, `waste_tracking`, `advanced_roles`, `notifications`, `supplier_deals`, `order_amendments`, `supplier_reviews`, `push_notifications`, `tenant_audit_log`, `waitlist_auto_promo`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`
+**Restaurant:** `chat`, `order_calendar`, `reports`, `smart_reorder`, `ai_platform`, `multi_branch`, `receiving_quality`, `disputes_returns`, `finance_invoices`, `quick_lists`, `inventory_management`, `waste_tracking`, `advanced_roles`, `notifications`, `supplier_deals`, `order_amendments`, `supplier_reviews`, `push_notifications`, `tenant_audit_log`, `waitlist_auto_promo`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`
 
 **Supplier:** `chat`, `order_calendar`, `reports`, `multi_branch`, `warehouses`, `multi_warehouse`, `fulfillment`, `fulfillment_tools`, `driver_management`, `disputes_returns`, `quick_lists`, `inventory_management`, `promotions`, `order_amendments`, `push_notifications`, `tenant_audit_log`, `advanced_roles`, `notifications`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`
 

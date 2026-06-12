@@ -14,6 +14,20 @@ vi.mock('./admin-operational-metrics.js', () => ({
     openFulfillmentIssues: 0,
     staleGpsDeliveries: 0,
     expiredInventoryLots: 0,
+    aiReorderRequests24h: 0,
+    aiReorderFailed24h: 0,
+  }),
+  getAiReorderMetrics: vi.fn().mockResolvedValue({
+    totalRequests: 0,
+    successRate: null,
+    failedCount: 0,
+    topRestaurants: [],
+  }),
+  getAiPlatformConfigSummary: vi.fn().mockReturnValue({
+    enabled: false,
+    provider: 'openai',
+    model: 'gpt-4o-mini',
+    envReady: false,
   }),
 }))
 

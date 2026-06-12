@@ -171,6 +171,7 @@ export const {
   useGetReorderAssistanceQuery,
   useExplainReorderAssistanceMutation,
   useAskReorderAssistanceMutation,
+  useApplyReorderAssistanceMutation,
   useSuppressReorderSuggestionMutation,
   useGetOrderFulfillmentIssuesQuery,
   useReportOrderShortageMutation,

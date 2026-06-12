@@ -75,17 +75,18 @@ Features: `fulfillment_tools: false` on all restaurant paid tiers (intentional).
 
 ## 6. Feature gate findings
 
-| Finding                                                                   | Classification                         | Action                                           |
-| ------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------ |
-| Supplier invoices 403 on Gold                                             | Gate exists, plan missing key          | **Fixed** (`0144`)                               |
-| `driver_management: false` bypassed via `fulfillment_tools` alias         | Runtime bug                            | **Fixed** (`shouldResolveFeatureAlias`)          |
-| Sidebar showed Invoices without `finance_invoices`                        | Frontend/backend mismatch              | **Fixed**                                        |
-| Supplier inventory writes ungated                                         | FEATURE IMPLEMENTED BUT NOT PLAN-GATED | **Fixed** (`inventory_management` gate)          |
-| Order amendment accept/reject ungated                                     | Partial gate                           | **Fixed**                                        |
-| Reservations module                                                       | FEATURE IMPLEMENTED BUT NOT PLAN-GATED | Documented; no catalog key                       |
-| Reports / smart_reorder tier strings                                      | PLAN ENABLED BUT NOT WIRED             | Same API for all tiers; strings are display-only |
-| `notifications`, `api_integrations`, `support_sla`                        | Catalog keys                           | RBAC or marketing; not route-gated               |
-| Restaurant `fulfillment_tools` in DB but not in `RESTAURANT_FEATURE_KEYS` | Admin validation gap                   | **Fixed** (key added)                            |
+| Finding                                                                   | Classification                         | Action                                                                                           |
+| ------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Supplier invoices 403 on Gold                                             | Gate exists, plan missing key          | **Fixed** (`0144`)                                                                               |
+| `driver_management: false` bypassed via `fulfillment_tools` alias         | Runtime bug                            | **Fixed** (`shouldResolveFeatureAlias`)                                                          |
+| Sidebar showed Invoices without `finance_invoices`                        | Frontend/backend mismatch              | **Fixed**                                                                                        |
+| Supplier inventory writes ungated                                         | FEATURE IMPLEMENTED BUT NOT PLAN-GATED | **Fixed** (`inventory_management` gate)                                                          |
+| Order amendment accept/reject ungated                                     | Partial gate                           | **Fixed**                                                                                        |
+| Reservations module                                                       | FEATURE IMPLEMENTED BUT NOT PLAN-GATED | Documented; no catalog key                                                                       |
+| Reports tier strings                                                      | PLAN ENABLED BUT NOT WIRED             | Same API for all tiers; strings are display-only                                                 |
+| smart_reorder tier strings                                                | **Wired** (2026-06)                    | `resolveSmartReorderCapabilities()` — see [ai-smart-reorder.md](../features/ai-smart-reorder.md) |
+| `notifications`, `api_integrations`, `support_sla`                        | Catalog keys                           | RBAC or marketing; not route-gated                                                               |
+| Restaurant `fulfillment_tools` in DB but not in `RESTAURANT_FEATURE_KEYS` | Admin validation gap                   | **Fixed** (key added)                                                                            |
 
 ---
 

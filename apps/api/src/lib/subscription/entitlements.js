@@ -32,6 +32,8 @@ import {
   buildLimitExceededPayload,
   buildFeatureNotAvailablePayload,
 } from './plans.js'
+import { resolveSmartReorderCapabilities } from '../smart-reorder-tier.js'
+import { isAiPlatformEnabledForTenant } from '../ai-platform.js'
 
 export { HIDDEN_ENTITLEMENT_LIMIT_KEYS }
 export { normalizePlanCode, formatPlanDisplayName } from '../plan-codes.js'
@@ -851,6 +853,23 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
         usageWindowMeta[k] = { date: new Date().toISOString().slice(0, 10) }
     })
 
+    let smartReorder = null
+    if (tenantType === 'RESTAURANT') {
+      const smartReorderValue = features.smart_reorder ?? subscription.features?.smart_reorder
+      const caps = resolveSmartReorderCapabilities(smartReorderValue)
+      const aiPlatformFeature = Boolean(features.ai_platform)
+      const aiPlatformEnabled = await isAiPlatformEnabledForTenant(billingTenantId, tenantType)
+      smartReorder = {
+        tier: caps.tier,
+        capabilities: {
+          ...caps.capabilities,
+          llmExplain: caps.capabilities.forecast && aiPlatformFeature,
+          nlAsk: caps.capabilities.seasonality && aiPlatformFeature,
+        },
+        aiPlatformEnabled,
+      }
+    }
+
     const payload = {
       tenantType,
       tenantId,
@@ -906,6 +925,7 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
                 : null,
             }
           : null,
+      smartReorder,
     }
 
     await setCache(cacheKey, payload, ENTITLEMENTS_CACHE_TTL).catch(() => {})

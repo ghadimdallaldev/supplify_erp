@@ -7,6 +7,7 @@ import {
   MessageSquare,
   Package,
   ShoppingCart,
+  Sparkles,
   Tag,
 } from 'lucide-react'
 import type { AdminOverview } from '../../lib/adminOverview'
@@ -107,6 +108,43 @@ export function AdminOperationsSnapshot({
           />
         </div>
       </div>
+
+      {overview?.aiReorder && (
+        <div>
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            AI Reorder
+          </p>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            <AdminKpiCard
+              label="AI requests 24h"
+              value={overview.aiReorder.requests24h ?? 0}
+              icon={Sparkles}
+              tone="brand"
+            />
+            <AdminKpiCard
+              label="Success rate"
+              value={
+                overview.aiReorder.successRate != null
+                  ? `${Math.round(overview.aiReorder.successRate)}%`
+                  : 'N/A'
+              }
+              icon={Sparkles}
+              tone={
+                overview.aiReorder.successRate != null && overview.aiReorder.successRate < 90
+                  ? 'warning'
+                  : 'success'
+              }
+            />
+            <AdminKpiCard
+              label="AI_ENABLED"
+              value={overview.aiReorder.aiEnabled ? 'On' : 'Off'}
+              description="Platform LLM kill switch"
+              icon={Sparkles}
+              tone={overview.aiReorder.aiEnabled ? 'success' : 'neutral'}
+            />
+          </div>
+        </div>
+      )}
 
       <div>
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">

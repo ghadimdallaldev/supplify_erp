@@ -200,28 +200,32 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 ## 3.1 Restaurant feature gates
 
-| ID       | Feature key            | Free account                                                          | Silver account                     | Gold account                 | Pass? |
-| -------- | ---------------------- | --------------------------------------------------------------------- | ---------------------------------- | ---------------------------- | ----- |
-| GATE-R01 | `chat`                 | `/app/chat` → 403/paywall                                             | Loads                              | Loads                        |       |
-| GATE-R02 | `quick_lists`          | `/app/quick-lists` → 403/paywall                                      | Loads                              | Loads                        |       |
-| GATE-R03 | `receiving_quality`    | `/app/receiving` → 403/paywall                                        | Loads                              | Loads                        |       |
-| GATE-R04 | `finance_invoices`     | `/app/invoices` → 403/paywall                                         | Loads                              | Loads                        |       |
-| GATE-R05 | `inventory_management` | `/app/restaurant-inventory` → 403/paywall                             | Loads                              | Loads                        |       |
-| GATE-R06 | `order_calendar`       | Dashboard calendar widget → paywall; `GET /api/orders/calendar` → 403 | 200 + calendar data                | 200 + calendar data          |       |
-| GATE-R07 | `disputes_returns`     | `GET /api/disputes` → 403                                             | 200                                | 200                          |       |
-| GATE-R08 | `advanced_roles`       | Settings → Team: no role management UI                                | Hidden/locked (Gold+)              | Available                    |       |
-| GATE-R09 | `reports`              | `GET /api/reports` → 403                                              | 200 (`basic_kpis`)                 | 200                          |       |
-| GATE-R10 | `smart_reorder`        | Reorder suggestions API → 403                                         | 403 (Gold+)                        | 200 or available             |       |
-| GATE-R11 | `waste_tracking`       | Inventory → Waste tab; waste analytics                                | Manual entry only (`manual_entry`) | Analytics dashboard (Gold+)  |       |
-| GATE-R12 | `tenant_audit_log`     | Settings → Activity tab → hidden or 403                               | Hidden/locked (Gold+)              | Visible and loads            |       |
-| GATE-R13 | `order_amendments`     | Order amendment API → 403                                             | 200                                | 200                          |       |
-| GATE-R14 | `push_notifications`   | Push endpoint → 403                                                   | 200 (if VAPID configured)          | 200                          |       |
-| GATE-R15 | `supplier_reviews`     | Reviews API → 403                                                     | 200                                | 200                          |       |
-| GATE-R16 | `custom_branding`      | Settings branding section → hidden or locked                          | Locked (Gold+)                     | Branding upload available    |       |
-| GATE-R17 | `multi_branch`         | Settings → Branches: cannot add 2nd branch                            | 1 branch max (cannot add 2nd)      | Up to 3 branches             |       |
-| GATE-R18 | `feature_flags_access` | Tenant flag override API → 403                                        | 403 (Gold+)                        | 200 (if UI exposed)          |       |
-| GATE-R19 | `supplier_deals`       | `/app/deals` loads (sandbox); **1 redemption/day** cap                | Loads; 10/day cap                  | Loads; 50/day cap            |       |
-| GATE-R20 | `waitlist_auto_promo`  | Cancel reservation → no auto-offer to waitlist                        | No auto-offer                      | Auto-offer on cancel (Gold+) |       |
+| ID        | Feature key            | Free account                                                            | Silver account                     | Gold account                  | Pass? |
+| --------- | ---------------------- | ----------------------------------------------------------------------- | ---------------------------------- | ----------------------------- | ----- |
+| GATE-R01  | `chat`                 | `/app/chat` → 403/paywall                                               | Loads                              | Loads                         |       |
+| GATE-R02  | `quick_lists`          | `/app/quick-lists` → 403/paywall                                        | Loads                              | Loads                         |       |
+| GATE-R03  | `receiving_quality`    | `/app/receiving` → 403/paywall                                          | Loads                              | Loads                         |       |
+| GATE-R04  | `finance_invoices`     | `/app/invoices` → 403/paywall                                           | Loads                              | Loads                         |       |
+| GATE-R05  | `inventory_management` | `/app/restaurant-inventory` → 403/paywall                               | Loads                              | Loads                         |       |
+| GATE-R06  | `order_calendar`       | Dashboard calendar widget → paywall; `GET /api/orders/calendar` → 403   | 200 + calendar data                | 200 + calendar data           |       |
+| GATE-R07  | `disputes_returns`     | `GET /api/disputes` → 403                                               | 200                                | 200                           |       |
+| GATE-R08  | `advanced_roles`       | Settings → Team: no role management UI                                  | Hidden/locked (Gold+)              | Available                     |       |
+| GATE-R09  | `reports`              | `GET /api/reports` → 403                                                | 200 (`basic_kpis`)                 | 200                           |       |
+| GATE-R10  | `smart_reorder`        | `GET /api/restaurant-inventory/reorder-assistance` → 403                | 403                                | 200; `smartReorder.tier` gold |       |
+| GATE-R10a | `smart_reorder` tier   | `POST …/reorder-assistance/explain` → 403                               | 403                                | 200 (heuristic or LLM)        |       |
+| GATE-R10b | `smart_reorder` tier   | `POST …/reorder-assistance/ask` → 403 (requires Platinum account)       | 403                                | 403                           |       |
+| GATE-R10c | `ai_requests_per_day`  | At daily limit: `explain` → 200 heuristic + `usageLimited`; `ask` → 400 | N/A (Silver off)                   | Manual on Gold test tenant    |       |
+| GATE-R10d | `ai_platform`          | Admin global off: `explain`/`ask` return heuristic (`usedLlm: false`)   | Same                               | Same                          |       |
+| GATE-R11  | `waste_tracking`       | Inventory → Waste tab; waste analytics                                  | Manual entry only (`manual_entry`) | Analytics dashboard (Gold+)   |       |
+| GATE-R12  | `tenant_audit_log`     | Settings → Activity tab → hidden or 403                                 | Hidden/locked (Gold+)              | Visible and loads             |       |
+| GATE-R13  | `order_amendments`     | Order amendment API → 403                                               | 200                                | 200                           |       |
+| GATE-R14  | `push_notifications`   | Push endpoint → 403                                                     | 200 (if VAPID configured)          | 200                           |       |
+| GATE-R15  | `supplier_reviews`     | Reviews API → 403                                                       | 200                                | 200                           |       |
+| GATE-R16  | `custom_branding`      | Settings branding section → hidden or locked                            | Locked (Gold+)                     | Branding upload available     |       |
+| GATE-R17  | `multi_branch`         | Settings → Branches: cannot add 2nd branch                              | 1 branch max (cannot add 2nd)      | Up to 3 branches              |       |
+| GATE-R18  | `feature_flags_access` | Tenant flag override API → 403                                          | 403 (Gold+)                        | 200 (if UI exposed)           |       |
+| GATE-R19  | `supplier_deals`       | `/app/deals` loads (sandbox); **1 redemption/day** cap                  | Loads; 10/day cap                  | Loads; 50/day cap             |       |
+| GATE-R20  | `waitlist_auto_promo`  | Cancel reservation → no auto-offer to waitlist                          | No auto-offer                      | Auto-offer on cancel (Gold+)  |       |
 
 ## 3.2 Supplier feature gates
 

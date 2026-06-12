@@ -281,13 +281,14 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 ## Reporting & Analytics
 
-| feature_key           | display_name                       | applies_to | permissions_required | limit_key | backend_enforcement                                                                    | frontend_surfaces                               | plan_availability                          |
-| --------------------- | ---------------------------------- | ---------- | -------------------- | --------- | -------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------ |
-| reports               | Analytics / reports (feature flag) | MULTI      | —                    | —         | routes use `requireFeature('reports')`                                                 | SubscriptionInfo.tsx (features.reports)         | Gold+                                      |
-| smart_reorder         | Smart reorder (feature flag)       | MULTI      | —                    | —         | isFeatureEnabled — not used on any route                                               | SubscriptionInfo.tsx (features.smart_reorder)   | UI only; **PARTIAL**                       |
-| multi_branch          | Multi-branch (feature flag)        | RESTAURANT | —                    | —         | Branch limit enforced in plan-enforcement.js; no requireFeature('multi_branch')        | SubscriptionInfo.tsx (features.multi_branch)    | UI label; branch limit enforced separately |
-| reservation_analytics | Reservation analytics              | RESTAURANT | RESERVATIONS_VIEW    | —         | reservations.routes.js (same router)                                                   | ReservationAnalyticsPanel.tsx                   | UNKNOWN                                    |
-| invoice_analytics     | Invoice analytics                  | RESTAURANT | —                    | —         | restaurant-finance.routes.js GET /invoices/analytics (aggregates + time-series points) | DashboardPage (Spend Trend chart), InvoicesPage | UNKNOWN                                    |
+| feature_key           | display_name                       | applies_to | permissions_required | limit_key           | backend_enforcement                                                                                             | frontend_surfaces                               | plan_availability                          |
+| --------------------- | ---------------------------------- | ---------- | -------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------ |
+| reports               | Analytics / reports (feature flag) | MULTI      | —                    | —                   | routes use `requireFeature('reports')`                                                                          | SubscriptionInfo.tsx (features.reports)         | Gold+                                      |
+| smart_reorder         | Smart reorder (feature flag)       | RESTAURANT | INVENTORY_VIEW       | —                   | `requireFeature('smart_reorder')` on reorder-assistance/forecasts; tier via `resolveSmartReorderCapabilities()` | ReorderAssistancePanel.tsx, Dashboard widget    | Gold+ forecasts; Platinum ask              |
+| ai_platform           | AI platform (LLM assist)           | RESTAURANT | —                    | ai_requests_per_day | `isAiPlatformEnabledForTenant` on explain/ask; admin + plan override                                            | ReorderAssistancePanel.tsx                      | Gold+ default on                           |
+| multi_branch          | Multi-branch (feature flag)        | RESTAURANT | —                    | —                   | Branch limit enforced in plan-enforcement.js; no requireFeature('multi_branch')                                 | SubscriptionInfo.tsx (features.multi_branch)    | UI label; branch limit enforced separately |
+| reservation_analytics | Reservation analytics              | RESTAURANT | RESERVATIONS_VIEW    | —                   | reservations.routes.js (same router)                                                                            | ReservationAnalyticsPanel.tsx                   | UNKNOWN                                    |
+| invoice_analytics     | Invoice analytics                  | RESTAURANT | —                    | —                   | restaurant-finance.routes.js GET /invoices/analytics (aggregates + time-series points)                          | DashboardPage (Spend Trend chart), InvoicesPage | UNKNOWN                                    |
 
 ---
 
@@ -313,6 +314,7 @@ Canonical list of all implemented features. Single source of truth for backend e
 | branches                  | RESTAURANT | plan-enforcement.js checkBranchLimit; branches.routes.js                                    |
 | warehouses                | SUPPLIER   | plan-enforcement.js checkWarehouseLimit; warehouses.routes.js                               |
 | branches (supplier org)   | SUPPLIER   | org.routes.js POST /branches; plan-enforcement checkBranchLimit (supplier org member count) |
+| ai_requests_per_day       | RESTAURANT | reorder-ai.service.js (`checkAndIncrementUsage` on LLM explain/ask)                         |
 
 ---
 
@@ -320,7 +322,7 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 - **Plans (from migration 0022 / UI):** Free, Silver, Gold, Platinum
 
-**RESTAURANT** (22 keys): `chat`, `order_calendar`, `reports`, `smart_reorder`, `multi_branch`, `receiving_quality`, `disputes_returns`, `finance_invoices`, `quick_lists`, `inventory_management`, `waste_tracking`, `advanced_roles`, `notifications`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`, `supplier_reviews`, `push_notifications`, `order_amendments`, `tenant_audit_log`, `waitlist_auto_promo`, `supplier_deals`
+**RESTAURANT** (23 keys): `chat`, `order_calendar`, `reports`, `smart_reorder`, `ai_platform`, `multi_branch`, `receiving_quality`, `disputes_returns`, `finance_invoices`, `quick_lists`, `inventory_management`, `waste_tracking`, `advanced_roles`, `notifications`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`, `supplier_reviews`, `push_notifications`, `order_amendments`, `tenant_audit_log`, `waitlist_auto_promo`, `supplier_deals`
 
 **SUPPLIER** (22 keys): `chat`, `order_calendar`, `reports`, `multi_branch`, `warehouses`, `multi_warehouse`, `fulfillment_tools`, `fulfillment`, `driver_management`, `disputes_returns`, `quick_lists`, `inventory_management`, `advanced_roles`, `notifications`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`, `promotions`, `push_notifications`, `order_amendments`, `tenant_audit_log`
 
@@ -330,10 +332,9 @@ Canonical source: `apps/api/src/lib/feature-keys.js`
 
 ## Features in UI but not enforced in backend
 
-1. **smart_reorder** – Shown in SubscriptionInfo as plan feature; no route uses `requireFeature('smart_reorder')`. UI only.
-2. **multi_branch** – Shown as feature; branch limit is enforced via `checkBranchLimit` (limits.branches), not via feature flag.
-3. **Fulfillment** – `fulfillment.routes.js` now uses `requireFeature('fulfillment')` for the supplier's dedicated fulfillment routes. The general FulfillmentPage concept may still render without a hard feature gate on the page shell, but core API routes are gated.
-4. **Order create** – Router requires ORDERS_VIEW only; ORDERS_CREATE not checked on POST.
+1. **multi_branch** – Shown as feature; branch limit is enforced via `checkBranchLimit` (limits.branches), not via feature flag.
+2. **Fulfillment** – `fulfillment.routes.js` now uses `requireFeature('fulfillment')` for the supplier's dedicated fulfillment routes. The general FulfillmentPage concept may still render without a hard feature gate on the page shell, but core API routes are gated.
+3. **Order create** – Router requires ORDERS_VIEW only; ORDERS_CREATE not checked on POST.
 
 **Fixed since last audit (2026-05-21):**
 

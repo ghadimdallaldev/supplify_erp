@@ -53,6 +53,7 @@ const LIMIT_DISPLAY_ORDER: Record<string, string[]> = {
     'orders_per_day',
     'open_conversations',
     'chats_per_day',
+    'ai_requests_per_day',
     'suppliers_per_restaurant',
     'restaurant_inventory_skus',
     'branches',
@@ -153,9 +154,12 @@ export function SubscriptionInfo() {
     return null
   }
 
+  const aiPlatformEnabled = isEntitlementFeatureEnabled(e, 'ai_platform')
+
   const keyFeatureOffNotes = {
     chat: featureOffNote('chat'),
     smart_reorder: featureOffNote('smart_reorder'),
+    ai_platform: featureOffNote('ai_platform'),
     reports: featureOffNote('reports'),
     multi_branch: featureOffNote('multi_branch'),
     custom_branding: featureOffNote('custom_branding'),
@@ -164,15 +168,20 @@ export function SubscriptionInfo() {
   const keyFeatureTierNotes = {
     chat: planTierOffNote('chat'),
     smart_reorder: planTierOffNote('smart_reorder'),
+    ai_platform: planTierOffNote('ai_platform'),
     reports: planTierOffNote('reports'),
     multi_branch: planTierOffNote('multi_branch'),
     custom_branding: planTierOffNote('custom_branding'),
   } as const
 
   const limitEntries = (
-    Object.entries(limits).filter(
-      ([key, limit]) => shouldShowEntitlementLimit(key) && limit !== null && limit !== undefined
-    ) as [string, number][]
+    Object.entries(limits).filter(([key, limit]) => {
+      if (!shouldShowEntitlementLimit(key) || limit === null || limit === undefined) return false
+      if (key === 'ai_requests_per_day') {
+        return aiPlatformEnabled && typeof limit === 'number' && limit > 0
+      }
+      return true
+    }) as [string, number][]
   ).sort(([keyA], [keyB]) => {
     const order = LIMIT_DISPLAY_ORDER[e.tenantType] ?? []
     const indexA = order.indexOf(keyA)
@@ -535,6 +544,22 @@ export function SubscriptionInfo() {
                 <p className="mt-1 text-xs text-slate-700">{keyFeatureTierNotes.smart_reorder}</p>
               )}
             </div>
+            {e.tenantType === 'RESTAURANT' && (
+              <div>
+                <div>
+                  <span className="text-[var(--text-muted)]">AI Platform:</span>{' '}
+                  <Badge variant={aiPlatformEnabled ? 'default' : 'secondary'} className="ml-2">
+                    {getFeatureDisplay(features.ai_platform)}
+                  </Badge>
+                </div>
+                {keyFeatureOffNotes.ai_platform && (
+                  <p className="mt-1 text-xs text-amber-900">{keyFeatureOffNotes.ai_platform}</p>
+                )}
+                {!keyFeatureOffNotes.ai_platform && keyFeatureTierNotes.ai_platform && (
+                  <p className="mt-1 text-xs text-slate-700">{keyFeatureTierNotes.ai_platform}</p>
+                )}
+              </div>
+            )}
             <div>
               <div>
                 <span className="text-[var(--text-muted)]">Analytics:</span>{' '}

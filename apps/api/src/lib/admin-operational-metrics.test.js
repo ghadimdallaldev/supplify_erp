@@ -4,20 +4,30 @@ vi.mock('./db.js', () => ({ query: vi.fn() }))
 vi.mock('./logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },
 }))
+const mockConfig = vi.hoisted(() => ({
+  EMAIL_ENABLED: true,
+  EMAIL_LOG_ONLY: false,
+  EMAIL_PROVIDER: 'smtp',
+  SMTP_HOST: 'smtp.example.com',
+  SMTP_USER: 'user',
+  SMTP_PASS: 'secret',
+  GPS_TRACKING_ENABLED: true,
+  GPS_ALLOW_RESTAURANT_LIVE_TRACKING: true,
+  GPS_RESTAURANT_SHOW_DRIVER_NAME: true,
+  GPS_RESTAURANT_SHOW_DRIVER_PHONE: false,
+  GPS_STALE_AFTER_SECONDS: 300,
+  AI_ENABLED: false,
+  AI_PROVIDER: 'openai',
+  AI_MODEL: 'gpt-4o-mini',
+  OPENAI_API_KEY: '',
+}))
+
 vi.mock('../config/env.js', () => ({
-  config: {
-    EMAIL_ENABLED: true,
-    EMAIL_LOG_ONLY: false,
-    EMAIL_PROVIDER: 'smtp',
-    SMTP_HOST: 'smtp.example.com',
-    SMTP_USER: 'user',
-    SMTP_PASS: 'secret',
-    GPS_TRACKING_ENABLED: true,
-    GPS_ALLOW_RESTAURANT_LIVE_TRACKING: true,
-    GPS_RESTAURANT_SHOW_DRIVER_NAME: true,
-    GPS_RESTAURANT_SHOW_DRIVER_PHONE: false,
-    GPS_STALE_AFTER_SECONDS: 300,
-  },
+  config: mockConfig,
+}))
+
+vi.mock('./ai-platform.js', () => ({
+  isAiEnvEnabled: vi.fn(() => mockConfig.AI_ENABLED && Boolean(mockConfig.OPENAI_API_KEY)),
 }))
 vi.mock('./billing/billing-service.js', () => ({
   getBillingStatus: vi.fn().mockResolvedValue({ access: { isLocked: false } }),
@@ -37,6 +47,8 @@ import {
   classifyGpsDeliveryState,
   summarizeGpsDeliveryRows,
   getEmailConfigSummary,
+  getAiPlatformConfigSummary,
+  getAiReorderMetrics,
   buildAdminOperationalSummary,
   listAdminEmailDeliveryLogs,
   buildTenantOperationalSnapshot,
@@ -46,6 +58,8 @@ import { buildTrackingPayload } from './delivery-tracking-payload.js'
 describe('admin-operational-metrics', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockConfig.AI_ENABLED = false
+    mockConfig.OPENAI_API_KEY = ''
   })
 
   describe('classifyGpsDeliveryState', () => {
@@ -79,6 +93,86 @@ describe('admin-operational-metrics', () => {
       expect(cfg).not.toHaveProperty('SMTP_PASS')
       expect(cfg).not.toHaveProperty('EMAIL_API_KEY')
       expect(cfg.providerConfigured).toBe(true)
+    })
+  })
+
+  describe('getAiPlatformConfigSummary', () => {
+    it('does not expose API keys', () => {
+      mockConfig.OPENAI_API_KEY = 'sk-secret'
+      const cfg = getAiPlatformConfigSummary()
+      expect(cfg).not.toHaveProperty('OPENAI_API_KEY')
+      expect(JSON.stringify(cfg)).not.toContain('sk-secret')
+      expect(cfg).toMatchObject({
+        enabled: false,
+        provider: 'openai',
+        model: 'gpt-4o-mini',
+        envReady: false,
+      })
+    })
+
+    it('reports envReady when AI is enabled with provider key', () => {
+      mockConfig.AI_ENABLED = true
+      mockConfig.OPENAI_API_KEY = 'sk-test'
+      const cfg = getAiPlatformConfigSummary()
+      expect(cfg.envReady).toBe(true)
+      expect(cfg.enabled).toBe(true)
+    })
+  })
+
+  describe('getAiReorderMetrics', () => {
+    it('returns zeroed metrics when log table is empty', async () => {
+      query
+        .mockResolvedValueOnce({ rows: [{ total: 0, success_count: 0, failed_count: 0 }] })
+        .mockResolvedValueOnce({ rows: [] })
+      const metrics = await getAiReorderMetrics()
+      expect(metrics).toEqual({
+        totalRequests: 0,
+        successRate: null,
+        failedCount: 0,
+        topRestaurants: [],
+      })
+    })
+
+    it('returns zeroed metrics when reorder_ai_request_log is missing (42P01)', async () => {
+      const err = new Error('relation does not exist')
+      err.code = '42P01'
+      query.mockRejectedValue(err)
+      const metrics = await getAiReorderMetrics()
+      expect(metrics.totalRequests).toBe(0)
+      expect(metrics.failedCount).toBe(0)
+      expect(metrics.successRate).toBeNull()
+      expect(metrics.topRestaurants).toEqual([])
+    })
+
+    it('computes success rate and top restaurants', async () => {
+      query
+        .mockResolvedValueOnce({
+          rows: [{ total: 10, success_count: 8, failed_count: 2 }],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              restaurant_id: 'r1',
+              restaurant_name: 'Cafe One',
+              request_count: 6,
+            },
+            {
+              restaurant_id: 'r2',
+              restaurant_name: 'Bistro Two',
+              request_count: 4,
+            },
+          ],
+        })
+
+      const metrics = await getAiReorderMetrics()
+
+      expect(metrics.totalRequests).toBe(10)
+      expect(metrics.failedCount).toBe(2)
+      expect(metrics.successRate).toBe(0.8)
+      expect(metrics.topRestaurants).toEqual([
+        { restaurantId: 'r1', restaurantName: 'Cafe One', requestCount: 6 },
+        { restaurantId: 'r2', restaurantName: 'Bistro Two', requestCount: 4 },
+      ])
     })
   })
 
@@ -134,12 +228,21 @@ describe('admin-operational-metrics', () => {
   })
 
   describe('buildAdminOperationalSummary', () => {
-    it('returns warnings array', async () => {
+    it('returns warnings array and AI sections', async () => {
       query.mockResolvedValue({ rows: [{}] })
       const summary = await buildAdminOperationalSummary()
       expect(Array.isArray(summary.warnings)).toBe(true)
       expect(summary.email).toBeDefined()
       expect(summary.gps).toBeDefined()
+      expect(summary.aiPlatform).toMatchObject({
+        enabled: false,
+        provider: 'openai',
+      })
+      expect(summary.aiReorder).toMatchObject({
+        totalRequests: expect.any(Number),
+        failedCount: expect.any(Number),
+        topRestaurants: expect.any(Array),
+      })
     })
   })
 })

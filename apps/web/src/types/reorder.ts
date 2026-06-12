@@ -59,7 +59,20 @@ export interface ReorderAssistanceItem {
     explanation?: string
     confidence?: number
     forecastReorderQty?: number
+    reorderByDate?: string | null
   }
+}
+
+export interface ReorderForecast {
+  productId: string
+  branchId?: string | null
+  productName?: string
+  productUnit?: string
+  confidence: number
+  forecastReorderQty?: number | null
+  reorderByDate?: string | null
+  explanation?: string
+  urgency?: string
 }
 
 export interface ReorderAiExplainResult {
@@ -90,5 +103,5 @@ export interface ReorderAssistanceResponse {
     tier: string
     capabilities: Record<string, boolean>
   }
-  forecasts?: unknown[]
+  forecasts?: ReorderForecast[]
 }

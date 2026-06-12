@@ -38,6 +38,7 @@ Values from live `subscription_plan.features`. **On** = enabled (`evaluatePlanFe
 | `finance_invoices`                         | expense_analytics     | record_payments  | expense_analytics     | advanced_finance_dashboard          |
 | `reports`                                  | usage_cost_dashboards | basic_kpis       | usage_cost_dashboards | advanced_forecasting_custom_reports |
 | `smart_reorder`                            | full_90day_trends     | off              | full_90day_trends     | ai_forecast_seasonality             |
+| `ai_platform`                              | off                   | off              | on                    | on                                  |
 | `waitlist_auto_promo`                      | on                    | off              | on                    | on                                  |
 | `advanced_roles`                           | on                    | off              | on                    | on                                  |
 | `tenant_audit_log`                         | on                    | off              | on                    | on                                  |
@@ -75,6 +76,7 @@ Values from live `subscription_plan.features`. **On** = enabled (`evaluatePlanFe
 | `scheduled_quick_lists`         |          1 |      3 |             15 |      unlimited |
 | `deal_redemptions_per_day`      |          1 |     10 |             50 |      unlimited |
 | `scheduled_order_grace_per_day` |          1 |      0 |              0 |              0 |
+| `ai_requests_per_day`           |          0 |      0 |             20 |            100 |
 
 **Not on restaurant plans:** `promotions` (supplier-only). Restaurants use **`deal_redemptions_per_day`** for marketplace deal caps.
 
@@ -171,7 +173,8 @@ Binary on/off per key (non-empty string = on). **Tier strings are not compared**
 | ------------------------ | -------------------------------------------------------------------------------- |
 | Branches                 | `plan-enforcement` + org-wide count + add-ons + Enterprise cap (6)               |
 | Warehouses               | `limits.warehouses` + add-ons (supplier org-wide count) + `warehouses` feature   |
-| Smart reorder            | `smart_reorder` on/off                                                           |
+| Smart reorder            | `smart_reorder` on/off; tier via `resolveSmartReorderCapabilities()` (see below) |
+| AI platform (LLM assist) | `ai_platform` + env `AI_ENABLED`; `ai_requests_per_day` on LLM calls only        |
 | Reports / waste reports  | `reports` / `waste_tracking` on/off                                              |
 | Advanced roles           | `advanced_roles`                                                                 |
 | Activity log             | `tenant_audit_log`                                                               |
@@ -180,6 +183,14 @@ Binary on/off per key (non-empty string = on). **Tier strings are not compared**
 | Restaurant deal redeem   | `supplier_deals` + `deal_redemptions_per_day`                                    |
 | Notifications            | `resolveAllowedChannels(notifications)` → in-app, email, WhatsApp (not webhooks) |
 | Custom branding PATCH    | `custom_branding` on/off                                                         |
+
+**`smart_reorder` capabilities** (`resolveSmartReorderCapabilities()`):
+
+| Plan value / tier                | Assistance | Forecast (30/90d) | Explain endpoint | Ask endpoint | Seasonality / trend |
+| -------------------------------- | :--------: | :---------------: | :--------------: | :----------: | :-----------------: |
+| off / Silver                     |     —      |         —         |        —         |      —       |          —          |
+| `full_90day_trends` (Gold)       |     ✓      |         ✓         |        ✓         |      —       |          —          |
+| `ai_forecast_seasonality` (Plat) |     ✓      |         ✓         |        ✓         |      ✓       |          ✓          |
 
 ### Free Trial behavior (unchanged)
 
@@ -193,19 +204,19 @@ Binary on/off per key (non-empty string = on). **Tier strings are not compared**
 
 ### Platinum-only strings (see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md))
 
-AI quick lists, AI smart reorder, advanced/custom reports, full API/webhooks, webhook notifications, white-label domain, read receipts, central purchasing, advanced finance/receiving/inventory strings — **marketing/catalog** until separate implementation.
+AI quick lists, advanced/custom reports, full API/webhooks, webhook notifications, white-label domain, read receipts, central purchasing, advanced finance/receiving/inventory strings — **marketing/catalog** until separate implementation. **Smart reorder forecasts + LLM assist** are implemented — see [ai-smart-reorder.md](../features/ai-smart-reorder.md).
 
 ### Cross-tier (string labels ≠ behavior)
 
-| Keys                          | Issue                                                                                                                                                        |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `reports`                     | `basic_kpis` vs `usage_cost_dashboards` vs `advanced_forecasting_custom_reports` — same route gate                                                           |
-| `smart_reorder`               | `full_90day_trends` (Gold forecast) vs `ai_forecast_seasonality` (Platinum + seasonality/trend) — see [ai-smart-reorder.md](../features/ai-smart-reorder.md) |
-| `finance_invoices`            | `record_payments` / `expense_analytics` / `advanced_finance_dashboard` — same gate                                                                           |
-| `receiving_quality`           | photos / scoring / supplier_performance — same gate                                                                                                          |
-| `waste_tracking` (restaurant) | `manual_entry` / `analytics_dashboard` / `cost_percentage_vs_sales` — same waste route gate                                                                  |
-| `api_integrations`            | `api_key_access` vs `full_api_webhooks` — no differentiated API product gate                                                                                 |
-| `notifications`               | `email_whatsapp_webhook` — **no webhook channel** in notification service                                                                                    |
+| Keys                          | Issue                                                                                                                                                                                     |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reports`                     | `basic_kpis` vs `usage_cost_dashboards` vs `advanced_forecasting_custom_reports` — same route gate                                                                                        |
+| `smart_reorder`               | **Enforced** — `resolveSmartReorderCapabilities()` gates forecast model, explain (Gold+), ask (Platinum). See capability table in [ai-smart-reorder.md](../features/ai-smart-reorder.md). |
+| `finance_invoices`            | `record_payments` / `expense_analytics` / `advanced_finance_dashboard` — same gate                                                                                                        |
+| `receiving_quality`           | photos / scoring / supplier_performance — same gate                                                                                                                                       |
+| `waste_tracking` (restaurant) | `manual_entry` / `analytics_dashboard` / `cost_percentage_vs_sales` — same waste route gate                                                                                               |
+| `api_integrations`            | `api_key_access` vs `full_api_webhooks` — no differentiated API product gate                                                                                                              |
+| `notifications`               | `email_whatsapp_webhook` — **no webhook channel** in notification service                                                                                                                 |
 
 ### Reservations
 

@@ -88,8 +88,11 @@ Legacy key `products` was replaced by `restaurant_inventory_skus` / `supplier_pr
 | quick_list_items          |            500 |
 | scheduled_quick_lists     |             15 |
 | deal_redemptions_per_day  |             50 |
+| ai_requests_per_day       |             20 |
 
-**Features on:** `smart_reorder` (`full_90day_trends`), `waitlist_auto_promo`, `advanced_roles`, `tenant_audit_log`, `multi_branch`, `reports` (`usage_cost_dashboards`), `api_integrations` (`api_key_access`), `waste_tracking` (`analytics_dashboard`), `custom_branding` (`logo_colors`), `notifications` (`email_and_whatsapp`), plus Silver-equivalent deals/calendar/disputes.
+**Features on:** `smart_reorder` (`full_90day_trends`), `ai_platform`, `waitlist_auto_promo`, `advanced_roles`, `tenant_audit_log`, `multi_branch`, `reports` (`usage_cost_dashboards`), `api_integrations` (`api_key_access`), `waste_tracking` (`analytics_dashboard`), `custom_branding` (`logo_colors`), `notifications` (`email_and_whatsapp`), plus Silver-equivalent deals/calendar/disputes.
+
+**Smart reorder (Gold):** Deterministic 30/90-day forecasts + `POST /reorder-assistance/explain` (LLM when `ai_platform` + env enabled; else heuristic). No `ask` endpoint (403).
 
 **Features off:** `fulfillment_tools` (restaurant), `feature_flags_access` beyond addon toggles (Platinum: experimental).
 
@@ -120,8 +123,11 @@ Top self-serve tier: most operational meters **unlimited** (`-1`), but **branche
 | Most other restaurant meters  | unlimited (-1) |
 | storage_mb                    | 30,720 (30 GB) |
 | scheduled_order_grace_per_day |              0 |
+| ai_requests_per_day           |            100 |
 
-**Feature strings (see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md)):** `ai_smart_automation`, `ai_forecast_seasonality`, `advanced_forecasting_custom_reports`, `full_api_webhooks`, `white_label_domain`, `central_purchasing`, `cost_percentage_vs_sales`, etc. — many are **not tier-differentiated in route code yet**.
+**Smart reorder (Platinum):** `smart_reorder` = `ai_forecast_seasonality` — Gold forecasts plus weekday seasonality and 7d/30d trend adjustment; adds `POST /reorder-assistance/ask` for natural-language product matching. LLM gated by `ai_platform` + env; metered via `ai_requests_per_day`.
+
+**Feature strings (see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md)):** `ai_smart_automation`, `advanced_forecasting_custom_reports`, `full_api_webhooks`, `white_label_domain`, `central_purchasing`, `cost_percentage_vs_sales`, etc. — many are **not tier-differentiated in route code yet**. Smart reorder tier strings **are** enforced — see [ai-smart-reorder.md](../features/ai-smart-reorder.md).
 
 ### Supplier Platinum
 

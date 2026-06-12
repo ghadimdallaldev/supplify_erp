@@ -211,6 +211,20 @@ export const restaurantInventoryApi = api.injectEndpoints({
         body,
       }),
     }),
+    applyReorderAssistance: builder.mutation<
+      { added: Array<{ productId: string; quickListId?: string; message: string }> },
+      {
+        items: Array<{ productId: string; qty: number; supplierId?: string }>
+        branchId?: string
+      }
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-inventory/reorder-assistance/apply',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['RestaurantInventory'],
+    }),
     suppressReorderSuggestion: builder.mutation<
       unknown,
       {

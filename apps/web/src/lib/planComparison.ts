@@ -114,6 +114,25 @@ export function formatPlanFeatureCell(
     return { enabled: true, caption: 'Included' }
   }
 
+  if (featureKey === 'smart_reorder') {
+    if (rawVal === false || rawVal == null || rawVal === '' || rawVal === 'disabled') {
+      return { enabled: false }
+    }
+    if (rawVal === 'full_90day_trends' || rawVal === true) {
+      return { enabled: true, caption: '90-day forecasting' }
+    }
+    if (rawVal === 'ai_forecast_seasonality') {
+      return { enabled: true, caption: 'Seasonality + NL ask' }
+    }
+    return { enabled: true, caption: 'Included' }
+  }
+
+  if (featureKey === 'ai_platform') {
+    const enabled =
+      typeof rawVal === 'boolean' ? rawVal : rawVal !== 'false' && rawVal != null && rawVal !== ''
+    return { enabled, caption: enabled ? 'LLM assist' : undefined }
+  }
+
   const enabled =
     typeof rawVal === 'boolean' ? rawVal : rawVal !== 'false' && rawVal != null && rawVal !== ''
   return { enabled }

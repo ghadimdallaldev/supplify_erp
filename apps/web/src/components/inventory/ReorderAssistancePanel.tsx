@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   useGetReorderAssistanceQuery,
+  useGetEntitlementsQuery,
   useSuppressReorderSuggestionMutation,
   useGetQuickListsQuery,
   useAddItemToQuickListMutation,
@@ -28,13 +29,54 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '../../lib/utils'
-import type { ReorderAiExplainResult } from '../../types/reorder'
+import { getUsageMeterDisplay } from '../../lib/usageDisplay'
+import { featureEnabled } from '../../lib/planLimits'
+import type {
+  ReorderAiAskResult,
+  ReorderAiExplainResult,
+  ReorderAssistanceItem,
+  ReorderForecast,
+} from '../../types/reorder'
 
 const URGENCY_STYLES: Record<string, string> = {
   URGENT: 'bg-red-100 text-red-800 border-red-200',
   HIGH: 'bg-amber-100 text-amber-900 border-amber-200',
   MEDIUM: 'bg-slate-100 text-slate-800 border-slate-200',
   LOW: 'bg-slate-50 text-slate-600 border-slate-100',
+}
+
+function resolveItemForecast(
+  item: ReorderAssistanceItem,
+  forecasts?: ReorderForecast[]
+): ReorderAssistanceItem['forecast'] | null {
+  if (item.forecast?.confidence != null || item.forecast?.reorderByDate) {
+    return item.forecast
+  }
+  if ((item.reasonCode === 'forecast' || item.forecast) && item.productId && forecasts?.length) {
+    const match = forecasts.find((f) => f.productId === item.productId)
+    if (match) {
+      return {
+        confidence: match.confidence,
+        reorderByDate: match.reorderByDate,
+        explanation: match.explanation,
+        forecastReorderQty: match.forecastReorderQty ?? undefined,
+      }
+    }
+  }
+  return item.forecast ?? null
+}
+
+function formatForecastConfidence(confidence?: number | null): string | null {
+  if (confidence == null || !Number.isFinite(confidence)) return null
+  const pct = confidence <= 1 ? Math.round(confidence * 100) : Math.round(confidence)
+  return `${pct}% confidence`
+}
+
+function formatReorderByDate(date?: string | null): string | null {
+  if (!date) return null
+  const parsed = new Date(date)
+  if (Number.isNaN(parsed.getTime())) return null
+  return `Reorder by ${parsed.toLocaleDateString()}`
 }
 
 const REASON_STYLES: Record<string, string> = {
@@ -60,6 +102,7 @@ export function ReorderAssistancePanel({
   className,
 }: ReorderAssistancePanelProps) {
   const { data, isLoading, isError, refetch } = useGetReorderAssistanceQuery()
+  const { data: entitlementsData } = useGetEntitlementsQuery()
   const { data: quickListsData } = useGetQuickListsQuery()
   const [suppressSuggestion, { isLoading: isSuppressing }] = useSuppressReorderSuggestionMutation()
   const [addItemToQuickList] = useAddItemToQuickListMutation()
@@ -69,11 +112,27 @@ export function ReorderAssistancePanel({
   const [explainOpen, setExplainOpen] = useState(false)
   const [explainResult, setExplainResult] = useState<ReorderAiExplainResult | null>(null)
   const [askQuery, setAskQuery] = useState('')
+  const [askOpen, setAskOpen] = useState(false)
+  const [askResult, setAskResult] = useState<ReorderAiAskResult | null>(null)
+  const [askBusyProductId, setAskBusyProductId] = useState<string | null>(null)
 
   const suggestions = data?.suggestions ?? []
+  const forecasts = data?.forecasts ?? []
   const visible = maxItems ? suggestions.slice(0, maxItems) : suggestions
   const canExplain = data?.smartReorder?.capabilities?.forecast === true
   const canAsk = data?.smartReorder?.capabilities?.seasonality === true
+
+  const entitlements = entitlementsData?.entitlements
+  const aiPlatformEnabled = featureEnabled(entitlements?.features?.ai_platform)
+  const aiRequestLimit = entitlements?.limits?.ai_requests_per_day ?? 0
+  const aiRequestUsage = entitlements?.usage?.ai_requests_per_day ?? 0
+  const showAiUsageMeter =
+    aiPlatformEnabled && typeof aiRequestLimit === 'number' && aiRequestLimit > 0
+  const aiUsageMeter = showAiUsageMeter
+    ? getUsageMeterDisplay(aiRequestUsage, aiRequestLimit)
+    : null
+  const aiUsageWarning = (aiUsageMeter?.pct ?? 0) >= 80 && !aiUsageMeter?.atCap
+  const aiUsageAtCap = aiUsageMeter?.atCap === true
 
   const handleSnooze = async (item: (typeof suggestions)[0]) => {
     try {
@@ -146,21 +205,43 @@ export function ReorderAssistancePanel({
 
   const handleAsk = async () => {
     const q = askQuery.trim()
-    if (!q) return
+    if (!q || aiUsageAtCap) return
     try {
       const result = await askAssistance({ query: q }).unwrap()
       if (result.matchedProducts.length === 0) {
         toast.message(result.clarifyingQuestion || 'No matching products found')
         return
       }
-      const names = result.matchedProducts
-        .map((m) => m.productName || 'item')
-        .slice(0, 3)
-        .join(', ')
-      toast.success(`Matched: ${names} — review and add from suggestions below`)
+      setAskResult(result)
+      setAskOpen(true)
       setAskQuery('')
     } catch (e: any) {
       toast.error(e?.data?.error?.message || 'Could not parse your request')
+    }
+  }
+
+  const handleAskAddToList = async (match: ReorderAiAskResult['matchedProducts'][0]) => {
+    const lists = quickListsData?.quickLists || []
+    if (lists.length === 0) {
+      toast.error('Create an ordering list first')
+      return
+    }
+    const suggestion = suggestions.find((s) => s.productId === match.productId)
+    setAskBusyProductId(match.productId)
+    try {
+      await addItemToQuickList({
+        quickListId: lists[0].id,
+        body: {
+          productId: match.productId,
+          supplierId: suggestion?.supplierId,
+          quantity: match.qty ?? 1,
+        },
+      }).unwrap()
+      toast.success(`Added to ${lists[0].name}`)
+    } catch (e: any) {
+      toast.error(e?.data?.error?.message || 'Failed to add to list')
+    } finally {
+      setAskBusyProductId(null)
     }
   }
 
@@ -236,26 +317,45 @@ export function ReorderAssistancePanel({
                 </Button>
               )}
               {canAsk && (
-                <div className="flex flex-1 gap-2">
-                  <Input
-                    placeholder='Ask: "order more tomatoes for the weekend"'
-                    value={askQuery}
-                    onChange={(e) => setAskQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAsk()}
-                    className="h-8 text-sm"
-                  />
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={isAsking || !askQuery.trim()}
-                    onClick={handleAsk}
-                  >
-                    {isAsking ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <MessageSquare className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder='Ask: "order more tomatoes for the weekend"'
+                      value={askQuery}
+                      onChange={(e) => setAskQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAsk()}
+                      className="h-8 text-sm"
+                      disabled={aiUsageAtCap}
+                    />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={isAsking || !askQuery.trim() || aiUsageAtCap}
+                      onClick={handleAsk}
+                      title={aiUsageAtCap ? 'Daily AI assist limit reached' : undefined}
+                    >
+                      {isAsking ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <MessageSquare className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </div>
+                  {showAiUsageMeter && aiUsageMeter && (
+                    <p
+                      className={cn(
+                        'text-xs',
+                        aiUsageAtCap
+                          ? 'text-amber-700 font-medium'
+                          : aiUsageWarning
+                            ? 'text-amber-600'
+                            : 'text-[var(--text-muted)]'
+                      )}
+                    >
+                      {aiUsageMeter.display}/{aiUsageMeter.limit} AI assists today
+                      {aiUsageAtCap ? ' — limit reached' : ''}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -268,107 +368,188 @@ export function ReorderAssistancePanel({
             </p>
           ) : (
             <ul className="divide-y divide-[var(--app-border)]">
-              {visible.map((item) => (
-                <li key={item.id} className="py-3 first:pt-0 last:pb-0">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium text-sm text-[var(--text)] truncate">
-                          {item.productName}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            'text-xs',
-                            URGENCY_STYLES[item.urgency] || URGENCY_STYLES.LOW
-                          )}
-                        >
-                          {item.urgency}
-                        </Badge>
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <span
-                          className={cn(
-                            'inline-flex rounded px-1.5 py-0.5 text-xs font-medium',
-                            REASON_STYLES[item.reasonCode] || REASON_STYLES.not_ordered_recently
-                          )}
-                        >
-                          {item.reasonLabel}
-                        </span>
-                        {item.supplierName && (
-                          <span className="text-xs text-[var(--text-muted)]">
-                            {item.supplierName}
+              {visible.map((item) => {
+                const forecast = resolveItemForecast(item, forecasts)
+                const showForecastBadges =
+                  item.reasonCode === 'forecast' || forecast?.confidence != null
+                const confidenceLabel = formatForecastConfidence(forecast?.confidence)
+                const reorderByLabel = formatReorderByDate(forecast?.reorderByDate)
+
+                return (
+                  <li key={item.id} className="py-3 first:pt-0 last:pb-0">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-sm text-[var(--text)] truncate">
+                            {item.productName}
                           </span>
-                        )}
-                        {item.suggestedQty != null && (
-                          <span className="text-xs text-[var(--text-muted)]">
-                            Suggest: {item.suggestedQty}
-                            {item.productUnit ? ` ${item.productUnit}` : ''}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-1 shrink-0">
-                      {item.productId && (
-                        <>
-                          <Button variant="outline" size="sm" asChild>
-                            <Link to={`/app/products/${item.productId}`}>
-                              <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                              View
-                            </Link>
-                          </Button>
-                          <Button
+                          <Badge
                             variant="outline"
-                            size="sm"
-                            disabled={busyId === item.id}
-                            onClick={() => handleAddToQuickList(item)}
-                          >
-                            {busyId === item.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <>
-                                <ListPlus className="h-3.5 w-3.5 mr-1" />
-                                List
-                              </>
+                            className={cn(
+                              'text-xs',
+                              URGENCY_STYLES[item.urgency] || URGENCY_STYLES.LOW
                             )}
-                          </Button>
-                          <Button variant="default" size="sm" asChild>
-                            <Link
-                              to={`/app/products/${item.productId}`}
-                              state={{ addToCartQty: item.suggestedQty }}
+                          >
+                            {item.urgency}
+                          </Badge>
+                          {showForecastBadges && confidenceLabel && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs bg-violet-50 text-violet-800 border-violet-200"
                             >
-                              <ShoppingCart className="h-3.5 w-3.5 mr-1" />
-                              Cart
-                            </Link>
-                          </Button>
-                        </>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={isSuppressing}
-                        onClick={() => handleSnooze(item)}
-                        title="Snooze 7 days"
-                      >
-                        <Clock className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={isSuppressing}
-                        onClick={() => handleNotNeeded(item)}
-                        title="Not needed"
-                      >
-                        <Ban className="h-3.5 w-3.5" />
-                      </Button>
+                              {confidenceLabel}
+                            </Badge>
+                          )}
+                          {showForecastBadges && reorderByLabel && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs bg-violet-50 text-violet-700 border-violet-100"
+                            >
+                              {reorderByLabel}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <span
+                            className={cn(
+                              'inline-flex rounded px-1.5 py-0.5 text-xs font-medium',
+                              REASON_STYLES[item.reasonCode] || REASON_STYLES.not_ordered_recently
+                            )}
+                          >
+                            {item.reasonLabel}
+                          </span>
+                          {item.supplierName && (
+                            <span className="text-xs text-[var(--text-muted)]">
+                              {item.supplierName}
+                            </span>
+                          )}
+                          {item.suggestedQty != null && (
+                            <span className="text-xs text-[var(--text-muted)]">
+                              Suggest: {item.suggestedQty}
+                              {item.productUnit ? ` ${item.productUnit}` : ''}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1 shrink-0">
+                        {item.productId && (
+                          <>
+                            <Button variant="outline" size="sm" asChild>
+                              <Link to={`/app/products/${item.productId}`}>
+                                <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                                View
+                              </Link>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={busyId === item.id}
+                              onClick={() => handleAddToQuickList(item)}
+                            >
+                              {busyId === item.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <>
+                                  <ListPlus className="h-3.5 w-3.5 mr-1" />
+                                  List
+                                </>
+                              )}
+                            </Button>
+                            <Button variant="default" size="sm" asChild>
+                              <Link
+                                to={`/app/products/${item.productId}`}
+                                state={{ addToCartQty: item.suggestedQty }}
+                              >
+                                <ShoppingCart className="h-3.5 w-3.5 mr-1" />
+                                Cart
+                              </Link>
+                            </Button>
+                          </>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={isSuppressing}
+                          onClick={() => handleSnooze(item)}
+                          title="Snooze 7 days"
+                        >
+                          <Clock className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={isSuppressing}
+                          onClick={() => handleNotNeeded(item)}
+                          title="Not needed"
+                        >
+                          <Ban className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={askOpen} onOpenChange={setAskOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Matched products</DialogTitle>
+            <DialogDescription>
+              Review quantities before adding to your ordering list.
+            </DialogDescription>
+          </DialogHeader>
+          {askResult && (
+            <ul className="space-y-3">
+              {askResult.matchedProducts.map((match) => (
+                <li
+                  key={match.productId}
+                  className="rounded-md border border-[var(--app-border)] p-3 space-y-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-medium text-sm">
+                        {match.productName ||
+                          suggestions.find((s) => s.productId === match.productId)?.productName ||
+                          'Product'}
+                      </p>
+                      <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                        Suggested qty: {match.qty}
+                        {match.confidence != null &&
+                          ` · ${formatForecastConfidence(match.confidence)}`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={askBusyProductId === match.productId}
+                      onClick={() => handleAskAddToList(match)}
+                    >
+                      {askBusyProductId === match.productId ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                      ) : (
+                        <ListPlus className="h-3.5 w-3.5 mr-1" />
+                      )}
+                      Add to list
+                    </Button>
+                    <Button variant="default" size="sm" asChild>
+                      <Link to={`/app/products/${match.productId}`}>
+                        <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                        View product
+                      </Link>
+                    </Button>
                   </div>
                 </li>
               ))}
             </ul>
           )}
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={explainOpen} onOpenChange={setExplainOpen}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
