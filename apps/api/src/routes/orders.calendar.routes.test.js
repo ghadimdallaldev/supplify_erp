@@ -110,7 +110,7 @@ describe('orders.calendar.routes', () => {
     const response = await request(app).get('/api/orders/calendar').expect(200)
 
     expect(response.body.ok).toBe(true)
-    expect(response.body.data.events).toHaveLength(3)
+    expect(response.body.data.events).toHaveLength(2)
     expect(response.body.data.filters.statuses).toEqual(
       expect.arrayContaining(['DELIVERED', 'ISSUED'])
     )

@@ -93,36 +93,6 @@ function buildOrderEvents(order, roleContext) {
     role: roleContext,
   })
 
-  if (!CANCELLED_STATUSES.has((order.status || '').toUpperCase())) {
-    const deliveryStatusCategory = COMPLETED_STATUSES.has((order.status || '').toUpperCase())
-      ? 'completed'
-      : statusCategory === 'pending'
-        ? 'in_transit'
-        : statusCategory
-
-    events.push({
-      id: `${order.id}-delivery`,
-      orderId: order.id,
-      type: roleContext === 'RESTAURANT' ? 'DELIVERY_SCHEDULE' : 'DELIVERY_PICKUP',
-      source: 'ORDER',
-      title: roleContext === 'RESTAURANT' ? 'Delivery Window' : 'Pickup Schedule',
-      status: order.status,
-      statusCategory: deliveryStatusCategory,
-      start: order.updated_at || order.placed_at || order.created_at,
-      end: null,
-      totalAmount: Number(order.total_amount) || 0,
-      currency: order.currency,
-      counterpartName: counterpart,
-      supplierId: suppliersSummary.primary?.id || null,
-      supplierName: suppliersSummary.primary?.name || null,
-      supplierList: suppliersSummary.list,
-      branchId: order.branch_id,
-      branchName: order.branch_name,
-      categories: order.categories || [],
-      role: roleContext,
-    })
-  }
-
   return events
 }
 
