@@ -72,7 +72,9 @@ DELETE /api/admin-dashboard/tenants/RESTAURANT/{restaurantId}/feature-overrides/
 
 ## Canonical feature keys
 
-**RESTAURANT** (22 keys): chat, order_calendar, reports, smart_reorder, multi_branch, receiving_quality, disputes_returns, finance_invoices, quick_lists, inventory_management, waste_tracking, advanced_roles, notifications, api_integrations, support_sla, custom_branding, feature_flags_access, supplier_reviews, push_notifications, order_amendments, tenant_audit_log, waitlist_auto_promo, supplier_deals
+**RESTAURANT** (23 keys): chat, order_calendar, reports, smart_reorder, **ai_platform**, multi_branch, receiving_quality, disputes_returns, finance_invoices, quick_lists, inventory_management, waste_tracking, advanced_roles, notifications, api_integrations, support_sla, custom_branding, feature_flags_access, supplier_reviews, push_notifications, order_amendments, tenant_audit_log, waitlist_auto_promo, supplier_deals
+
+`ai_platform` enables LLM explain/ask for Smart Reorder when `AI_ENABLED` and provider credentials are set on the API. Gold/Platinum plans default to on; Silver/Free default off.
 
 **Removed:** `approvals_budgets` (not shown in admin UI)
 

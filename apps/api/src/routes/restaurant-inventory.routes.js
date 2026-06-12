@@ -17,7 +17,7 @@ import { isFeatureEnabledForTenant } from '../lib/feature-flags.js'
 import { query, withTransaction } from '../lib/db.js'
 import { startStage, mark } from '../middlewares/request-timing.js'
 import { logger } from '../lib/logger.js'
-import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
+import { ForbiddenError, NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 import {
   listExpiryLots,
@@ -42,7 +42,11 @@ import {
   refreshRestaurantForecasts,
   markReorderForecastDirty,
 } from '../services/reorder-forecast-cache.service.js'
-import { resolveSmartReorderCapabilities } from '../lib/smart-reorder-tier.js'
+import {
+  resolveSmartReorderCapabilities,
+  hasSmartReorderCapability,
+} from '../lib/smart-reorder-tier.js'
+import { explainReorderSuggestions, parseReorderIntent } from '../services/reorder-ai.service.js'
 
 const router = express.Router()
 
@@ -1298,6 +1302,74 @@ router.post(
         error: null,
         requestId: req.requestId,
       })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+const reorderExplainSchema = z.object({
+  branchId: z.string().uuid().optional(),
+})
+
+const reorderAskSchema = z.object({
+  query: z.string().min(1).max(500),
+  branchId: z.string().uuid().optional(),
+})
+
+router.post(
+  '/reorder-assistance/explain',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requireFeature(
+    'smart_reorder',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const smartReorderFeatureValue = await getSmartReorderFeatureValue(req)
+      if (!hasSmartReorderCapability(smartReorderFeatureValue, 'forecast')) {
+        throw new ForbiddenError('AI reorder explanations require Gold or Platinum smart reorder')
+      }
+      const body = reorderExplainSchema.parse(req.body ?? {})
+      const data = await explainReorderSuggestions(restaurantId, {
+        smartReorderFeatureValue,
+        branchId: body.branchId ?? null,
+        userId: req.user?.id,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/reorder-assistance/ask',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requireFeature(
+    'smart_reorder',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const smartReorderFeatureValue = await getSmartReorderFeatureValue(req)
+      if (!hasSmartReorderCapability(smartReorderFeatureValue, 'seasonality')) {
+        throw new ForbiddenError('Natural-language reorder ask requires Platinum smart reorder')
+      }
+      const body = reorderAskSchema.parse(req.body)
+      const data = await parseReorderIntent(restaurantId, {
+        query: body.query,
+        smartReorderFeatureValue,
+        branchId: body.branchId ?? null,
+        userId: req.user?.id,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)
     }

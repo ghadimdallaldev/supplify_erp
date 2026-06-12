@@ -847,7 +847,7 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
     const usageWindowMeta = {}
     limitKeys.forEach((k) => {
       if (HIDDEN_ENTITLEMENT_LIMIT_KEYS.has(k)) return
-      if (k === 'orders_per_day' || k === 'chats_per_day')
+      if (k === 'orders_per_day' || k === 'chats_per_day' || k === 'ai_requests_per_day')
         usageWindowMeta[k] = { date: new Date().toISOString().slice(0, 10) }
     })
 

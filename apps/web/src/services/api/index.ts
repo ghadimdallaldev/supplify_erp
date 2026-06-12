@@ -169,6 +169,8 @@ export const {
   useDeleteExpiryLotMutation,
   useGetReorderRemindersQuery,
   useGetReorderAssistanceQuery,
+  useExplainReorderAssistanceMutation,
+  useAskReorderAssistanceMutation,
   useSuppressReorderSuggestionMutation,
   useGetOrderFulfillmentIssuesQuery,
   useReportOrderShortageMutation,

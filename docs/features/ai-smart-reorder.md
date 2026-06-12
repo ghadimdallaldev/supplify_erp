@@ -1,6 +1,6 @@
-# AI Smart Reorder — Phase 1 (Deterministic Forecasting)
+# AI Smart Reorder
 
-Phase 1 adds **cached, deterministic demand forecasts** for restaurant reorder assistance. No LLM or natural-language assistant in this phase.
+Restaurant reorder assistance with **deterministic forecasting** (Phase 1) and an optional **LLM layer** (Phase 2) gated by env, plan, and feature flags.
 
 ## Capabilities by tier
 
@@ -29,11 +29,13 @@ Branch attribution uses `COALESCE(inventory_movement_log.branch_id, customer_ord
 
 ## API
 
-| Method | Path                                                  | Permission / feature                   |
-| ------ | ----------------------------------------------------- | -------------------------------------- |
-| GET    | `/api/restaurant-inventory/reorder-assistance`        | `smart_reorder`, optional `?branchId=` |
-| GET    | `/api/restaurant-inventory/reorder-forecasts`         | `smart_reorder`                        |
-| POST   | `/api/restaurant-inventory/reorder-forecasts/refresh` | `smart_reorder`, `INVENTORY_MANAGE`    |
+| Method | Path                                                   | Permission / feature                   |
+| ------ | ------------------------------------------------------ | -------------------------------------- |
+| GET    | `/api/restaurant-inventory/reorder-assistance`         | `smart_reorder`, optional `?branchId=` |
+| GET    | `/api/restaurant-inventory/reorder-forecasts`          | `smart_reorder`                        |
+| POST   | `/api/restaurant-inventory/reorder-forecasts/refresh`  | `smart_reorder`, `INVENTORY_MANAGE`    |
+| POST   | `/api/restaurant-inventory/reorder-assistance/explain` | `smart_reorder` (Gold+ forecast tier)  |
+| POST   | `/api/restaurant-inventory/reorder-assistance/ask`     | `smart_reorder` (Platinum seasonality) |
 
 `reorder-assistance` response adds:
 
@@ -59,21 +61,50 @@ Migration `0166_reorder_forecast.sql`:
 - **Unit mismatch** on receiving lines: quantity kept, confidence penalized
 - **Missing tables** (pre-migration): assistance API unchanged
 
-## Tests
-
-```bash
-cd apps/api && pnpm test -- smart-reorder-tier reorder-forecast restaurant-reorder-assistance
-```
-
 ## Railway deploy
 
 ```bash
 DATABASE_URL="..." pnpm db:migrate
 ```
 
-Requires migration `0166_reorder_forecast.sql`. No new env vars for Phase 1.
+Requires migrations `0166_reorder_forecast.sql` and `0167_ai_platform_and_usage.sql`.
 
-## Phase 2 (not in this release)
+## Phase 2 — LLM assistant (hybrid)
 
-- OpenAI explanations and natural-language ask
-- `ai_platform` feature flag and `ai_requests_per_day` usage meter
+Gating layers (all must pass for LLM; heuristics still work when LLM is off):
+
+1. **Plan** — `smart_reorder` tier (`full_90day_trends` for explain; `ai_forecast_seasonality` for ask)
+2. **Feature flag** — `ai_platform` (plan default on Gold/Platinum; global + per-tenant overrides via admin)
+3. **Env** — `AI_ENABLED=true` and `OPENAI_API_KEY` when `AI_PROVIDER=openai`
+
+Usage metering: `ai_requests_per_day` (Gold 20, Platinum 100). LLM calls increment usage; heuristic fallbacks do not.
+
+| Endpoint  | LLM behavior                                | Heuristic fallback                    |
+| --------- | ------------------------------------------- | ------------------------------------- |
+| `explain` | Natural-language summary of suggestions     | Forecast explanations + reason labels |
+| `ask`     | Map NL query to allowed suggestion products | Keyword match on product names        |
+
+Audit: `reorder_ai_request_log` stores tokens, latency, and success per request.
+
+### Env vars
+
+| Variable                             | Default       | Notes                                 |
+| ------------------------------------ | ------------- | ------------------------------------- |
+| `AI_ENABLED`                         | `false`       | Platform kill switch                  |
+| `AI_PROVIDER`                        | `openai`      | Provider id                           |
+| `OPENAI_API_KEY`                     | —             | Required when provider is openai      |
+| `AI_MODEL`                           | `gpt-4o-mini` | Chat model                            |
+| `AI_MAX_REQUESTS_PER_TENANT_PER_DAY` | `50`          | Hard ceiling (plan limits also apply) |
+
+See [../operations/environment-variables.md](../operations/environment-variables.md) and `apps/api/.env.example`.
+
+### Admin
+
+- Global / per-tenant toggle: `ai_platform` in Admin → Features ([feature-flags.md](../admin/feature-flags.md))
+- Disable globally without redeploy: set `AI_ENABLED=false` on API service
+
+## Tests
+
+```bash
+cd apps/api && pnpm test -- smart-reorder-tier reorder-forecast reorder-ai ai-platform restaurant-reorder-assistance
+```

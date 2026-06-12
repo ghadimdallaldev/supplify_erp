@@ -120,6 +120,9 @@ importers:
       nodemailer:
         specifier: ^7.0.13
         version: 7.0.13
+      openai:
+        specifier: ^6.42.0
+        version: 6.42.0(zod@3.25.76)
       pdfkit:
         specifier: ^0.13.0
         version: 0.13.0
@@ -8005,6 +8008,20 @@ packages:
     dependencies:
       mimic-function: 5.0.1
     dev: true
+
+  /openai@6.42.0(zod@3.25.76):
+    resolution: {integrity: sha512-1WFEt/uXMXOLhYRNkgJWo08Y2YNvNwpVU72K7ibrWgWpNOXd4VojXLbe6SQ4bLiUQ3Y8jz4IiyVkylJCL1DtZg==}
+    peerDependencies:
+      ws: ^8.18.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      ws:
+        optional: true
+      zod:
+        optional: true
+    dependencies:
+      zod: 3.25.76
+    dev: false
 
   /optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}

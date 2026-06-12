@@ -92,6 +92,18 @@ See [../features/email-system.md](../features/email-system.md) for templates, de
 | `CRON_SCHEDULED_ORDERS_INTERVAL_MS` | API | optional | `300000` (dev), `3600000` (prod) | Quick list auto-order poll interval |
 | `CRON_OPERATIONAL_REMINDERS_INTERVAL_MS` | API | optional | `86400000` (24 h) | Inventory expiry + reorder cadence reminder job |
 
+### AI platform (Smart Reorder LLM)
+
+| Variable                             | Used by | Required    | Default       | Notes                                                 |
+| ------------------------------------ | ------- | ----------- | ------------- | ----------------------------------------------------- |
+| `AI_ENABLED`                         | API     | optional    | `false`       | Kill switch; heuristic reorder assist still works     |
+| `AI_PROVIDER`                        | API     | optional    | `openai`      | Provider id                                           |
+| `OPENAI_API_KEY`                     | API     | when LLM on | —             | Secret; never commit                                  |
+| `AI_MODEL`                           | API     | optional    | `gpt-4o-mini` | OpenAI chat model                                     |
+| `AI_MAX_REQUESTS_PER_TENANT_PER_DAY` | API     | optional    | `50`          | Hard ceiling; plan `ai_requests_per_day` also applies |
+
+Tenant gating: plan feature `ai_platform` + admin global/per-tenant overrides. See [../features/ai-smart-reorder.md](../features/ai-smart-reorder.md).
+
 See [../operations/cron-jobs.md](../operations/cron-jobs.md) for the full job inventory.
 
 ### Delivery GPS / live tracking (API)
