@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus, Trash2, Phone, MapPin, FileText } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -34,14 +34,18 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
   const [form, setForm] = useState({ name: '', phone: '', address: '' })
   const { data: entitlementsData } = useGetEntitlementsQuery()
 
-  const { data: orgBranchesData, refetch: refetchOrg, isLoading: orgLoading } =
-    useGetOrgBranchesQuery(undefined, { skip: !isSupplier })
+  const {
+    data: orgBranchesData,
+    refetch: refetchOrg,
+    isLoading: orgLoading,
+  } = useGetOrgBranchesQuery(undefined, { skip: !isSupplier })
   const useSupplierOrg = isSupplier && Boolean(orgBranchesData?.organizationId)
 
-  const { data: linkedData, refetch: refetchLinked, isLoading: linkedLoading } = useGetBranchesQuery(
-    undefined,
-    { skip: useSupplierOrg }
-  )
+  const {
+    data: linkedData,
+    refetch: refetchLinked,
+    isLoading: linkedLoading,
+  } = useGetBranchesQuery(undefined, { skip: useSupplierOrg })
   const [createBranch, { isLoading: isCreatingLinked }] = useCreateBranchMutation()
   const [deleteBranch] = useDeleteBranchMutation()
   const [createOrgBranch, { isLoading: isCreatingOrg }] = useCreateOrgBranchMutation()
@@ -49,7 +53,9 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
 
   const entitlements = entitlementsData?.entitlements
   const branches = useSupplierOrg
-    ? (orgBranchesData?.branches ?? []).filter((b: { is_main_branch?: boolean }) => !b.is_main_branch)
+    ? (orgBranchesData?.branches ?? []).filter(
+        (b: { is_main_branch?: boolean }) => !b.is_main_branch
+      )
     : (linkedData?.accounts ?? []).filter((account: { isPrimary?: boolean }) => !account.isPrimary)
   const totalBranchAccounts = useSupplierOrg
     ? (orgBranchesData?.branches?.length ?? 1)
@@ -187,7 +193,12 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
                         ) : null}
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm" className="shrink-0" onClick={() => handleRemove(id)}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => handleRemove(id)}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>

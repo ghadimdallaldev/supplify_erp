@@ -4,7 +4,10 @@ See that file for the full feature matrix (restaurant, supplier, driver, admin).
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
-## 2026-06-11 — Quote requests & supplier mini-store (web-only)
+## 2026-06-12 — ERP web UI motion polish (web-only)
+
+- **Scope**: Emil design-eng motion pass on ERP shell (supplier, admin, fulfillment, staff, login): shared Sheet/Tooltip/Popover/Command primitives, Sonner toasts, motion tokens, skeleton unification.
+- **Reason**: Visual polish and perceived performance on web; no API or behavioral changes. Consumer B2C polish deferred to a follow-up pass. Mobile unchanged.
 
 - **Quote requests / RFQ**: Implemented on web only (`/app/quote-requests`). API at `/api/quote-requests`. Types in `apps/web/src/types/index.ts` for future mobile.
 - **Supplier mini-store**: Public page `/supplier/:slug` + public API. Mobile not in scope for v1.

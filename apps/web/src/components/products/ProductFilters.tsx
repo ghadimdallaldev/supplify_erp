@@ -3,6 +3,8 @@ import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
 import { Label } from '../ui/label'
 import { Select, SelectTrigger } from '../ui/select'
+import { filterControlClass } from '../ui/filter-control'
+import { cn } from '../../lib/utils'
 
 type ProductFiltersProps = {
   isSupplier: boolean
@@ -105,7 +107,7 @@ export function ProductFilterFields({
               onChange={(e) => setMinPrice(e.target.value)}
               min="0"
               step="0.01"
-              className="h-10 w-full min-w-0 sm:max-w-[7.5rem]"
+              className={cn(filterControlClass, 'min-w-0 sm:max-w-[7.5rem]')}
             />
             <span className="shrink-0 text-sm text-[var(--text-muted)]">–</span>
             <Input
@@ -116,7 +118,7 @@ export function ProductFilterFields({
               onChange={(e) => setMaxPrice(e.target.value)}
               min="0"
               step="0.01"
-              className="h-10 w-full min-w-0 sm:max-w-[7.5rem]"
+              className={cn(filterControlClass, 'min-w-0 sm:max-w-[7.5rem]')}
             />
             {(minPrice || maxPrice) && (
               <Button

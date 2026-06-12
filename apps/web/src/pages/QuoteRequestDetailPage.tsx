@@ -12,7 +12,7 @@ import { EmptyState } from '../components/ui/empty-state'
 import { Skeleton } from '../components/ui/skeleton'
 import { pageHeaderRowClass } from '../components/ui/card-layout'
 import { formatPrice } from '../utils/format'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { ArrowLeft, ShoppingCart } from 'lucide-react'
 import type { QuoteRequestSupplierEntry } from '../types'
 

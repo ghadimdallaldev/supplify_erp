@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Package, Plus, TrendingUp, Heart } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { EmptyState } from '../ui/empty-state'

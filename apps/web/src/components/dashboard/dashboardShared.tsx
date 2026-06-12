@@ -1,5 +1,6 @@
 import type { DashboardKpiKey } from '../../lib/workspaceRoleProfile'
 import { formatCurrency } from '../../utils/format'
+import { KpiCard as UiKpiCard, type KpiTone } from '../ui/kpi-card'
 
 /** Vertical rhythm between dashboard sections (KPIs, cards row, calendar). */
 export const DASHBOARD_STACK_GAP = 24
@@ -63,69 +64,22 @@ export interface KpiCardProps {
   sparkColor: string
 }
 
-export function KpiCard({
-  label,
-  value,
-  iconBg,
-  iconColor,
-  Icon,
-  meta,
-  sparkData,
-  sparkColor,
-}: KpiCardProps) {
+export function KpiCard({ label, value, iconBg, Icon, meta, sparkData, sparkColor }: KpiCardProps) {
+  const tone: KpiTone = iconBg.includes('mint')
+    ? 'success'
+    : iconBg.includes('amber')
+      ? 'warning'
+      : 'brand'
+
   return (
-    <div
-      className="kpi-card"
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--app-border)',
-        borderRadius: 12,
-        padding: 15,
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 8,
-        }}
-      >
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: 'var(--text-muted)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.07em',
-          }}
-        >
-          {label}
-        </span>
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            background: iconBg,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Icon size={15} style={{ color: iconColor }} />
-        </div>
-      </div>
-      <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', lineHeight: 1.1 }}>
-        {value === 0 || value === '0' || value === '$0.00' || value === formatCurrency(0) ? (
-          <span>{value}</span>
-        ) : (
-          value
-        )}
-      </div>
-      {meta && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{meta}</div>}
-      <Sparkline data={sparkData} color={sparkColor} />
-    </div>
+    <UiKpiCard
+      label={label}
+      value={value}
+      icon={Icon}
+      tone={tone}
+      description={meta}
+      sparkline={<Sparkline data={sparkData} color={sparkColor} />}
+    />
   )
 }
 

@@ -21,10 +21,15 @@ vi.mock('../../services/loyalty.service.js', () => ({
   getConsumerMemberBalance: vi.fn(),
 }))
 
+vi.mock('../../lib/db.js', () => ({
+  query: vi.fn(),
+}))
+
 import { consumerAuthPublicRoutes } from './auth.routes.js'
 import { resolveRestaurantBySlug } from '../../services/consumer-menu.service.js'
 import * as consumerAuthService from '../../services/consumer-auth.service.js'
 import { getConsumerMemberBalance } from '../../services/loyalty.service.js'
+import { query } from '../../lib/db.js'
 
 const mockMember = {
   id: 'member-1',
@@ -58,6 +63,7 @@ describe('Consumer Auth Routes', () => {
       program: { enabled: true, earnPointsPerCurrency: 1 },
       recentLedger: [],
     })
+    vi.mocked(query).mockResolvedValue({ rows: [] })
 
     app = express()
     app.use(express.json())
@@ -128,5 +134,6 @@ describe('Consumer Auth Routes', () => {
     expect(res.body.data.member).toBeNull()
     expect(res.body.data.program).toBeNull()
     expect(res.body.data.recentLedger).toEqual([])
+    expect(res.body.data.recentOrders).toEqual([])
   })
 })

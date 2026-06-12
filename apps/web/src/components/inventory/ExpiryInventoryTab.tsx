@@ -10,7 +10,7 @@ import {
   useCreateExpiryLotMutation,
   useDeleteExpiryLotMutation,
 } from '../../services/api'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { usePermissions } from '../../hooks/usePermissions'
 
 const STATUS_OPTIONS = [

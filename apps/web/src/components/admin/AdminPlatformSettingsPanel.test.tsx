@@ -7,8 +7,8 @@ vi.mock('../../services/api', () => ({
   useUpdateAdminPlatformSettingsMutation: () => [vi.fn(), { isLoading: false }],
 }))
 
-vi.mock('react-hot-toast', () => ({
-  default: { success: vi.fn(), error: vi.fn() },
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
 }))
 
 describe('AdminPlatformSettingsPanel', () => {
@@ -29,11 +29,11 @@ describe('AdminPlatformSettingsPanel', () => {
   })
 
   it('shows validation error for out-of-range value', async () => {
-    const toast = await import('react-hot-toast')
+    const { toast } = await import('sonner')
     render(<AdminPlatformSettingsPanel />)
     const input = screen.getAllByLabelText(/Trial length/i)[0]
     fireEvent.change(input, { target: { value: '10' } })
     fireEvent.click(screen.getAllByRole('button', { name: /Save/i })[0])
-    expect(toast.default.error).toHaveBeenCalledWith('Enter a number between 3 and 7 days')
+    expect(toast.error).toHaveBeenCalledWith('Enter a number between 3 and 7 days')
   })
 })

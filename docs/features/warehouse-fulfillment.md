@@ -75,6 +75,10 @@ Order creation (`POST /api/orders`, supplier manual create) calls `assignWarehou
 - Table name is `warehouse` (singular), not `warehouses`.
 - Assignments: `order_warehouse_assignment` → `customer_order` / `order_item`.
 - Per-warehouse stock: `warehouse_inventory`.
-- Zones extend existing `delivery_zone` with `warehouse_id`.
+- **`delivery_zone`** is shared between supplier warehouse zones and restaurant B2C branch zones on one table:
+  - Supplier: `supplier_id` + `warehouse_id` (+ optional geometry / postal codes)
+  - B2C consumer: `branch_id` + `postcode_prefix`
+- Migration `0161_consumer_ordering.sql` may create `delivery_zone` with branch columns only on fresh DBs; **`0165_supplier_delivery_zone_columns.sql`** adds missing supplier columns so warehouse zones and supplier delivery board joins work.
+- Supplier delivery board / route planning use `getDeliveryZoneJoinSql()` (`apps/api/src/lib/delivery-zone-join.js`) to pick warehouse vs branch join mode at runtime.
 
-Migration: `0081_warehouse_fulfillment.sql`.
+Migrations: `0081_warehouse_fulfillment.sql`, `0161_consumer_ordering.sql`, `0165_supplier_delivery_zone_columns.sql`.

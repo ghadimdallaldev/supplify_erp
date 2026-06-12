@@ -28,7 +28,7 @@ import {
   TrendingUp,
   Warehouse,
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { useState } from 'react'
 import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
@@ -42,8 +42,9 @@ import {
 } from '../lib/workspaceRoleProfile'
 import { formatPlanDisplayName } from '../lib/planComparison'
 import { formatCurrency } from '../utils/format'
+import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import {
-  DASHBOARD_STACK_GAP,
   DASHBOARD_CALENDAR_EXTRA_GAP,
   KpiCard,
   buildOrderSpendTrend,
@@ -303,26 +304,10 @@ export function DashboardPage() {
     : baseKpis
 
   return (
-    <div
-      data-testid="dashboard-page"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: DASHBOARD_STACK_GAP,
-        fontFamily: "'Inter', system-ui, sans-serif",
-      }}
-    >
+    <PageShell data-testid="dashboard-page" maxWidth="wide">
       {persona.readOnly && (
         <p
-          style={{
-            borderRadius: 8,
-            border: '1px solid var(--app-border)',
-            background: 'var(--brand-ultra)',
-            padding: '10px 12px',
-            fontSize: 12,
-            color: 'var(--text-muted)',
-            margin: 0,
-          }}
+          className="m-0 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-3 py-2.5 text-xs text-[var(--text-muted)]"
           role="status"
         >
           Read-only workspace · {persona.roleLabel}
@@ -337,17 +322,10 @@ export function DashboardPage() {
         totalProducts={stats?.totalProducts ?? 0}
       />
 
-      <div className="dashboard-page-header">
-        <div className="min-w-0">
-          <h1 style={{ fontSize: 21, fontWeight: 900, color: 'var(--text)', margin: 0 }}>
-            {dashboardConfig?.title ?? `${greeting}, ${firstName}`}
-          </h1>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-            {dashboardConfig?.description ?? formattedDate} &nbsp;·&nbsp; {persona.roleLabel}{' '}
-            &nbsp;·&nbsp; {planName}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title={dashboardConfig?.title ?? `${greeting}, ${firstName}`}
+        description={`${dashboardConfig?.description ?? formattedDate} · ${persona.roleLabel} · ${planName}`}
+      />
 
       <div className="dashboard-kpi-grid">
         {kpis.map((kpi) => (
@@ -419,6 +397,6 @@ export function DashboardPage() {
           </Suspense>
         </div>
       )}
-    </div>
+    </PageShell>
   )
 }

@@ -15,6 +15,8 @@ import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Skeleton } from '../components/ui/skeleton'
 import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
+import { filterControlClass } from '../components/ui/filter-control'
 import { DataTableShell } from '../components/ui/data-table-shell'
 import { RequirePermission } from '../components/RequirePermission'
 import { EmptyState } from '../components/ui/empty-state'
@@ -45,14 +47,13 @@ import {
   Scale,
 } from 'lucide-react'
 
-/** Shared height/padding so filter controls align and text does not touch borders. */
-const ordersFilterControlClass =
-  'h-10 min-h-10 w-full rounded-lg border border-[var(--app-border-mid)] bg-[var(--surface)] text-sm text-[var(--text)] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30 focus-visible:border-[var(--brand-mid)]'
+/** @deprecated use filterControlClass from components/ui/filter-control */
+const ordersFilterControlClass = filterControlClass
 import { Link } from 'react-router-dom'
 import { usePermissions } from '../hooks/usePermissions'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { formatPrice } from '../utils/format'
 import { DeclineOrderDialog } from '../components/orders/DeclineOrderDialog'
 import { getOrderStatusLabel } from '../lib/orderStatusDisplay'
@@ -216,16 +217,16 @@ export function OrdersPage() {
         })
         // Show additional toast with upgrade link
         setTimeout(() => {
-          toast(
-            (t) => (
+          toast.custom(
+            (id) => (
               <div className="flex items-center gap-3">
                 <span>💡 Want more orders? Upgrade your subscription!</span>
                 <button
                   onClick={() => {
-                    toast.dismiss(t.id)
+                    toast.dismiss(id)
                     window.location.href = '/app/settings'
                   }}
-                  className="px-3 py-1 text-sm font-medium text-white bg-[var(--brand)] rounded-md hover:bg-[var(--brand)]/90"
+                  className="px-3 py-1 text-sm font-medium text-white bg-[var(--brand)] rounded-md hover:bg-[var(--brand)]/90 erp-pressable"
                 >
                   View Plans
                 </button>
@@ -381,7 +382,7 @@ export function OrdersPage() {
 
   return (
     <RequirePermission permission="ORDERS_VIEW" title="orders">
-      <div className="space-y-6" data-testid="orders-page">
+      <PageShell data-testid="orders-page">
         <PageHeader
           title={ordersTitle}
           description={ordersDescription}
@@ -1027,7 +1028,7 @@ export function OrdersPage() {
             setDeclineOrderLabel(undefined)
           }}
         />
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

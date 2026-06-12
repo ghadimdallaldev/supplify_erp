@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
-import { toast } from 'react-hot-toast'
+import { toast } from 'sonner'
 import { ArrowLeft } from 'lucide-react'
 
 export function ConsumerAccountPage() {

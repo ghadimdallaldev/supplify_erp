@@ -6,7 +6,7 @@ import { Label } from '../../ui/label'
 import { Textarea } from '../../ui/textarea'
 import { Select, SelectTrigger } from '../../ui/select'
 import { Mail, Phone, Globe, Save, Loader2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { TenantBrandingPanel } from '../../settings/TenantBrandingPanel'
 import {
   useGetRestaurantMeQuery,

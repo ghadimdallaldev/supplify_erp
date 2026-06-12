@@ -22,7 +22,7 @@ import {
   useCreateAdminPlanMutation,
 } from '../../../services/api'
 import { Plus, Edit } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import {
   notifyAdminPlanSaveError,
   notifyAdminPlanSaveSuccess,

@@ -34,15 +34,16 @@ Single linear lifecycle for all fulfillment types:
 | Area               | Endpoints                                                                          |
 | ------------------ | ---------------------------------------------------------------------------------- |
 | Public auth        | `POST .../auth/signup`, `login`, `logout`, `GET .../auth/me`                       |
+| Public storefront  | `GET /api/public/consumer/:restaurantSlug/storefront` (home hero, hours, branches) |
 | Public menu        | `GET /api/public/consumer/:restaurantSlug/menu?branchId=`                          |
 | Public fulfillment | `GET /api/public/consumer/:restaurantSlug/fulfillment-options?branchId=`           |
 | Public orders      | `POST .../orders`, `GET .../orders/:receiptToken/receipt`, `POST .../orders/track` |
 | Public loyalty     | `GET .../loyalty/preview` (member session)                                         |
-| Admin menu         | `GET/POST/PATCH/DELETE /api/consumer/menu/*` (incl. modifiers)                     |
+| Admin menu         | `GET/POST/PATCH/DELETE /api/consumer/menu/*` (incl. modifiers, bulk import)        |
 | Admin orders       | `GET /api/consumer/orders`, `PATCH /api/consumer/orders/:id/status`                |
-| Admin fulfillment  | `GET/PATCH /api/consumer/fulfillment/:branchId`, zone CRUD                         |
+| Admin fulfillment  | `GET/PATCH /api/consumer/fulfillment/:branchId`, zone CRUD, live ordering hours    |
 
-Migrations: `0161_consumer_ordering.sql`, `0163_consumer_b2c_complete.sql`
+Migrations: `0161_consumer_ordering.sql`, `0163_consumer_b2c_complete.sql`, `0164_consumer_ordering_hours.sql`, `0165_supplier_delivery_zone_columns.sql` (unifies `delivery_zone` for B2C + supplier warehouse zones — required for supplier delivery board after B2C rollout)
 
 ## Infrastructure (Keycloak & Docker)
 
@@ -54,7 +55,7 @@ Migrations: `0161_consumer_ordering.sql`, `0163_consumer_b2c_complete.sql`
 | Identity store | `consumer_member` table (per restaurant)          | Keycloak + `app_user`                 |
 | Docker service | None extra — uses existing **api** + **postgres** | **keycloak** unchanged                |
 
-**Docker / env:** set `CONSUMER_AUTH_SECRET` on the API service (optional; falls back to `SESSION_SECRET`). Already wired in root `docker-compose.yml` and `deploy/docker-compose.*.yml`. Run `pnpm db:migrate` so migrations `0161`–`0163` apply.
+**Docker / env:** set `CONSUMER_AUTH_SECRET` on the API service (optional; falls back to `SESSION_SECRET`). Already wired in root `docker-compose.yml` and `deploy/docker-compose.*.yml`. Run `pnpm db:migrate` so migrations `0161`–`0165` apply on every environment.
 
 **Production:** use a dedicated `CONSUMER_AUTH_SECRET` (`openssl rand -hex 32`) so diner session tokens are signed independently of staff sessions. Cookie settings (`COOKIE_SECURE`, `COOKIE_SAME_SITE`, `WEB_ORIGINS`) apply to diner cookies the same as staff cookies.
 

@@ -4,7 +4,7 @@ import { Label } from '../ui/label'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { Clock, LayoutGrid, Loader2 } from 'lucide-react'
-import { toast } from 'react-hot-toast'
+import { toast } from 'sonner'
 import {
   useGetPublicBookingSettingsQuery,
   useUpdatePublicBookingSettingsMutation,

@@ -1,7 +1,14 @@
 import { lazy, Suspense, type ReactNode } from 'react'
-import { createBrowserRouter, RouterProvider, Outlet, useParams } from 'react-router-dom'
+import {
+  createBrowserRouter,
+  RouterProvider,
+  Outlet,
+  useParams,
+  useLocation,
+} from 'react-router-dom'
 import { ROUTER_FUTURE } from './lib/routerFuture'
 import { ConsumerAuthProvider } from './contexts/ConsumerAuthContext'
+import { ConsumerShell } from './components/consumer/ConsumerShell'
 import { AuthGuard } from './components/AuthGuard'
 import { StaffPortalGuard } from './components/StaffPortalGuard'
 import { Layout } from './components/Layout'
@@ -211,9 +218,14 @@ const ConsumerRewardsPage = lazy(() =>
 
 function ConsumerRouteLayout() {
   const { restaurantSlug } = useParams<{ restaurantSlug: string }>()
+  const location = useLocation()
+  const showBranchPicker =
+    location.pathname.includes('/menu') || location.pathname.includes('/checkout')
   return (
     <ConsumerAuthProvider restaurantSlug={restaurantSlug ?? ''}>
-      <Outlet />
+      <ConsumerShell slug={restaurantSlug ?? ''} showBranchPicker={showBranchPicker}>
+        <Outlet />
+      </ConsumerShell>
     </ConsumerAuthProvider>
   )
 }

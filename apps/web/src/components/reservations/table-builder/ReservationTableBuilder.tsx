@@ -16,7 +16,7 @@ import { Badge } from '../../ui/badge'
 import { Textarea } from '../../ui/textarea'
 import { findReservationForTable, lookupTableAssignment } from '../../../lib/reservation-tables'
 import { useSaveReservationTablesMutation } from '../../../services/reservationsApi'
-import { toast } from 'react-hot-toast'
+import { toast } from 'sonner'
 import {
   Circle,
   RectangleHorizontal,
@@ -1073,7 +1073,7 @@ export function ReservationTableBuilder({
 
           {/* ── Details panel ── */}
           {isDetailsOpen ? (
-            <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--surface)] p-5 shadow-lg transition-all lg:absolute lg:top-6 lg:right-6 lg:mt-0 lg:w-[360px] lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto lg:bg-white/95 lg:backdrop-blur">
+            <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--surface)] p-5 shadow-lg transition-[box-shadow,opacity,transform] duration-200 ease-out lg:absolute lg:top-6 lg:right-6 lg:mt-0 lg:w-[360px] lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto lg:bg-white/95 lg:backdrop-blur">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-[var(--text)]">Table details</h3>
                 <div className="flex gap-2">

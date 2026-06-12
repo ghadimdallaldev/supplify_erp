@@ -4,7 +4,7 @@ import {
 } from '../../services/api'
 import { Button } from '../ui/button'
 import { Skeleton } from '../ui/skeleton'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { AlertTriangle } from 'lucide-react'
 
 export function OrderSubstitutionPanel({ orderId }: { orderId: string }) {

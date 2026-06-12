@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useMediaQuery } from '../../hooks/useMediaQuery'
 import { Link } from 'react-router-dom'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { ArrowDown, ArrowUp, ChevronDown, Loader2, Star, XCircle } from 'lucide-react'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import type { DeliveryRouteDetail, DeliveryRouteStop } from '../../types'
 import {
   useCancelFulfillmentRouteMutation,
@@ -318,6 +320,7 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
   const { can } = usePermissions()
   const canManage = can('FULFILLMENT_MANAGE')
   const [expandedStops, setExpandedStops] = useState<Record<string, boolean>>({})
+  const isDesktop = useMediaQuery('(min-width: 640px)', false)
 
   const [reorderStops, { isLoading: reordering }] = useReorderFulfillmentRouteStopsMutation()
   const [setNextStop, { isLoading: settingNext }] = useSetNextFulfillmentRouteStopMutation()
@@ -390,30 +393,47 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
     setExpandedStops((prev) => ({ ...prev, [stopId]: !prev[stopId] }))
   }
 
-  return (
-    <div
-      data-testid="fulfillment-route-detail"
-      className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4 space-y-4"
-    >
+  const detailContent = (
+    <>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-lg leading-snug">{route.routeLabel}</h3>
-          <p className="text-sm text-[var(--text-muted)]">
-            {route.routeNumber} · {route.driverName}
-            {route.area ? ` · ${route.area}` : ''}
-          </p>
-          <p className="text-xs text-[var(--text-muted)] mt-1">
-            {new Date(route.scheduledDate).toLocaleDateString()} · {route.stops.length} stops ·{' '}
-            {route.completedStops} delivered · {route.failedStops} failed
-          </p>
+          {isDesktop ? (
+            <>
+              <SheetHeader className="space-y-1 p-0 text-left">
+                <SheetTitle className="text-lg leading-snug">{route.routeLabel}</SheetTitle>
+                <SheetDescription>
+                  {route.routeNumber} · {route.driverName}
+                  {route.area ? ` · ${route.area}` : ''}
+                </SheetDescription>
+              </SheetHeader>
+              <p className="text-xs text-[var(--text-muted)] mt-2">
+                {new Date(route.scheduledDate).toLocaleDateString()} · {route.stops.length} stops ·{' '}
+                {route.completedStops} delivered · {route.failedStops} failed
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 className="font-semibold text-lg leading-snug">{route.routeLabel}</h3>
+              <p className="text-sm text-[var(--text-muted)]">
+                {route.routeNumber} · {route.driverName}
+                {route.area ? ` · ${route.area}` : ''}
+              </p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">
+                {new Date(route.scheduledDate).toLocaleDateString()} · {route.stops.length} stops ·{' '}
+                {route.completedStops} delivered · {route.failedStops} failed
+              </p>
+            </>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <Badge variant={route.status === 'IN_PROGRESS' ? 'default' : 'secondary'}>
             {formatFulfillmentRouteStatus(route.status)}
           </Badge>
-          <Button variant="ghost" size="sm" className="min-h-[44px] sm:min-h-0" onClick={onClose}>
-            Close
-          </Button>
+          {!isDesktop ? (
+            <Button variant="ghost" size="sm" className="min-h-[44px] sm:min-h-0" onClick={onClose}>
+              Close
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -472,6 +492,33 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
           Cancel route
         </Button>
       )}
+    </>
+  )
+
+  if (isDesktop) {
+    return (
+      <Sheet open onOpenChange={(open) => !open && onClose()}>
+        <SheetContent
+          side="right"
+          className="flex h-full w-full flex-col gap-4 overflow-hidden sm:max-w-xl"
+        >
+          <div
+            data-testid="fulfillment-route-detail"
+            className="min-h-0 flex-1 space-y-4 overflow-y-auto"
+          >
+            {detailContent}
+          </div>
+        </SheetContent>
+      </Sheet>
+    )
+  }
+
+  return (
+    <div
+      data-testid="fulfillment-route-detail"
+      className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4 space-y-4"
+    >
+      {detailContent}
     </div>
   )
 }

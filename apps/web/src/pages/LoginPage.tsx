@@ -200,7 +200,7 @@ export function LoginPage() {
               )}
 
               {inviteRegistered && (
-                <Alert className="animate-in slide-in-from-top-2 border-emerald-200 bg-emerald-50">
+                <Alert className="border-emerald-200 bg-emerald-50 content-reveal">
                   <AlertDescription className="text-emerald-900">
                     Your account was created. Sign in with the email and password you set on the
                     invitation page.
@@ -209,7 +209,7 @@ export function LoginPage() {
               )}
 
               {error && (
-                <Alert variant="destructive" className="animate-in slide-in-from-top-2">
+                <Alert variant="destructive" className="content-reveal">
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
@@ -218,7 +218,7 @@ export function LoginPage() {
                 data-testid="login-button"
                 onClick={handleLogin}
                 disabled={isLoading || inEmbeddedFrame}
-                className="w-full h-12 text-base font-semibold transition-all"
+                className="w-full h-12 text-base font-semibold erp-pressable"
                 size="lg"
                 style={{ background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }}
               >

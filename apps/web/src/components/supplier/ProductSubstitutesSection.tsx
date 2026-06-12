@@ -7,7 +7,7 @@ import {
 } from '../../services/api'
 import { Button } from '../ui/button'
 import { Select, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 
 export function ProductSubstitutesSection({ productId }: { productId: string }) {
   const { data, isLoading, isError, refetch } = useGetProductSubstitutesQuery(productId)

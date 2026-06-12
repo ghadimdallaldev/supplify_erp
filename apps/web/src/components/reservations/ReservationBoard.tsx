@@ -20,7 +20,7 @@ import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Select, SelectItem, SelectTrigger } from '../ui/select'
-import { toast } from 'react-hot-toast'
+import { toast } from 'sonner'
 import { GripVertical } from 'lucide-react'
 
 const STATUS_COLUMNS: Array<{ id: ReservationStatus; title: string; tone: string }> = [

@@ -33,7 +33,7 @@ import {
   getDealRedeemGate,
 } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { formatPrice } from '../utils/format'
@@ -234,16 +234,16 @@ export function CartPage() {
         })
         // Show additional toast with upgrade link
         setTimeout(() => {
-          toast(
-            (t) => (
+          toast.custom(
+            (id) => (
               <div className="flex items-center gap-3">
                 <span>💡 Want more orders? Upgrade your subscription!</span>
                 <button
                   onClick={() => {
-                    toast.dismiss(t.id)
+                    toast.dismiss(id)
                     window.location.href = '/app/settings'
                   }}
-                  className="px-3 py-1 text-sm font-medium text-white bg-[var(--brand)] rounded-md hover:bg-[var(--brand)]/90"
+                  className="px-3 py-1 text-sm font-medium text-white bg-[var(--brand)] rounded-md hover:bg-[var(--brand)]/90 erp-pressable"
                 >
                   View Plans
                 </button>

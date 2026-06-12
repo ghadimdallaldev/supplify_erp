@@ -1,6 +1,7 @@
 import { query } from '../lib/db.js'
 import { getLatestLocationsForDrivers, isGpsTrackingEnabled } from './driver-location.service.js'
 import { buildTrackingPayload, buildDriverLastSeenAlias } from '../lib/delivery-tracking-payload.js'
+import { getDeliveryZoneJoinSql } from '../lib/delivery-zone-join.js'
 
 /**
  * Daily delivery board with filters and area grouping.
@@ -54,6 +55,8 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
     }
   }
 
+  const deliveryZoneJoin = await getDeliveryZoneJoinSql({ supplierParam: '$1' })
+
   const { rows } = await query(
     `
     SELECT DISTINCT ON (o.id)
@@ -81,7 +84,7 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
     ) da ON true
     LEFT JOIN drivers d ON d.id = da.driver_id
     LEFT JOIN order_warehouse_assignment owa ON owa.order_id = o.id
-    LEFT JOIN delivery_zone dz ON dz.warehouse_id = owa.warehouse_id AND dz.supplier_id = $1
+    ${deliveryZoneJoin}
     WHERE ${conditions.join(' AND ')}
     ORDER BY o.id, scheduled_at DESC
     LIMIT 500

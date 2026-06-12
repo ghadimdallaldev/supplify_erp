@@ -181,6 +181,9 @@ Valid Product,SKU2,abc`
       vi.mocked(db.query).mockReset()
       db.query
         .mockResolvedValueOnce({
+          rows: [{ column_name: 'warehouse_id' }, { column_name: 'supplier_id' }],
+        })
+        .mockResolvedValueOnce({
           rows: [
             {
               order_id: 'o1',

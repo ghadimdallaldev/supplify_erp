@@ -11,7 +11,7 @@ import {
   useGetConsumerLoyaltyProgramQuery,
   useUpsertConsumerLoyaltyProgramMutation,
 } from '../../services/consumerApi'
-import { toast } from 'react-hot-toast'
+import { toast } from 'sonner'
 
 export function ConsumerLoyaltyPage() {
   const { data, isLoading } = useGetConsumerLoyaltyProgramQuery()

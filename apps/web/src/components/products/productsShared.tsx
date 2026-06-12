@@ -1,6 +1,6 @@
 import { Skeleton } from '../ui/skeleton'
 import { Card, CardContent } from '../ui/card'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 
 export const EMPTY_PRODUCT_FORM = {
   name: '',

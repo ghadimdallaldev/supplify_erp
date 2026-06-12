@@ -11,7 +11,7 @@ import {
   useRecordConversionEventMutation,
 } from '../services/api'
 import { activateFreePlanFromPlans } from '../lib/activateFreePlan'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
 import { useNavigate, useLocation } from 'react-router-dom'

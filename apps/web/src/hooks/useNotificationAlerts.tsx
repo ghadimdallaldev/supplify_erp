@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Bell } from 'lucide-react'
 import { useGetNotificationsQuery, api } from '../services/api'
 import { useAppDispatch, useAppSelector } from './redux'
@@ -24,14 +24,12 @@ function showNotificationToast(notification: NotificationLike, onNavigate: (path
   const path = resolveNotificationUrl(notification)
 
   toast.custom(
-    (t) => (
+    (id) => (
       <button
         type="button"
-        className={`pointer-events-auto flex w-[min(100vw-2rem,380px)] gap-3 rounded-xl border border-[var(--brand)]/25 bg-[var(--surface)] p-4 text-left shadow-lg transition ${
-          t.visible ? 'animate-in slide-in-from-right' : 'opacity-0'
-        }`}
+        className="pointer-events-auto flex w-[min(100vw-2rem,380px)] gap-3 rounded-xl border border-[var(--brand)]/25 bg-[var(--surface)] p-4 text-left shadow-lg transition-[transform,opacity] duration-200 ease-out"
         onClick={() => {
-          toast.dismiss(t.id)
+          toast.dismiss(id)
           onNavigate(path)
         }}
       >

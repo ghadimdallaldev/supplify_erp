@@ -11,7 +11,7 @@ import {
   useRejectAdminDealMutation,
   usePauseAdminDealMutation,
 } from '../../services/api'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Loader2, Check, X, Pause, Search, RefreshCw, FilterX, ChevronRight } from 'lucide-react'
 import { AdminEmptyState, AdminLoadingState, AdminStatusBadge, formatAdminDate } from './adminUi'
 import { cn } from '../../lib/utils'

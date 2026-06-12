@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Skeleton } from '../../ui/skeleton'
 import type { SubscriptionPlan } from '../../../types'
 
 export function dedupeAdminPlans(raw: SubscriptionPlan[] | undefined) {
@@ -64,10 +64,44 @@ export function AdminTabScrollRow({
   )
 }
 
-export function AdminTabLoading({ className = 'py-12' }: { className?: string }) {
+export function AdminTabLoading({ className = 'py-4' }: { className?: string }) {
   return (
-    <div className={`flex justify-center text-[var(--text-muted)] ${className}`}>
-      <Loader2 className="h-8 w-8 animate-spin" />
+    <div className={`space-y-5 ${className}`} data-testid="admin-tab-loading">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="space-y-2 rounded-lg border border-[var(--app-border)] p-4">
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-8 w-14" />
+            <Skeleton className="h-3 w-24" />
+          </div>
+        ))}
+      </div>
+      <div className="space-y-3 rounded-lg border border-[var(--app-border)] p-4">
+        <Skeleton className="h-4 w-52" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 rounded-lg" />
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="space-y-3 rounded-lg border border-[var(--app-border)] p-5">
+          <Skeleton className="h-4 w-40" />
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="space-y-1.5">
+              <div className="flex justify-between">
+                <Skeleton className="h-3 w-28" />
+                <Skeleton className="h-3 w-8" />
+              </div>
+              <Skeleton className="h-1.5 w-full rounded-full" />
+            </div>
+          ))}
+        </div>
+        <div className="space-y-3 rounded-lg border border-[var(--app-border)] p-5">
+          <Skeleton className="h-4 w-44" />
+          <Skeleton className="h-24 w-full rounded-lg" />
+        </div>
+      </div>
     </div>
   )
 }

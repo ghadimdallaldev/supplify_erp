@@ -44,7 +44,7 @@ import {
 import { TableScroll } from '../../components/ui/table-scroll'
 import { EmptyState } from '../../components/ui/empty-state'
 import { formatPrice } from '../../utils/format'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Loader2, Scale } from 'lucide-react'
 
 type DisputeRow = {

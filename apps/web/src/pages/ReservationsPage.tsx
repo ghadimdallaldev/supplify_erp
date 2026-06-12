@@ -25,7 +25,7 @@ import { CalendarDays, Loader2, Link2, Copy, Star, Users, Sparkles } from 'lucid
 import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
 import { Select, SelectTrigger } from '../components/ui/select'
-import { toast } from 'react-hot-toast'
+import { toast } from 'sonner'
 import { copyToClipboard } from '../utils/clipboard'
 import { RequirePermission } from '../components/RequirePermission'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'

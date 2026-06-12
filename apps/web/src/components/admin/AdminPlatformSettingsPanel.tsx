@@ -7,7 +7,7 @@ import {
   useGetAdminPlatformSettingsQuery,
   useUpdateAdminPlatformSettingsMutation,
 } from '../../services/api'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 
 export function AdminPlatformSettingsPanel({

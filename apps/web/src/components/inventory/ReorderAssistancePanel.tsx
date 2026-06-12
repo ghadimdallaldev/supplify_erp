@@ -12,7 +12,7 @@ import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
 import { EmptyState } from '../ui/empty-state'
 import { ShoppingCart, ListPlus, Clock, Ban, ExternalLink, Sparkles, Loader2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { cn } from '../../lib/utils'
 
 const URGENCY_STYLES: Record<string, string> = {

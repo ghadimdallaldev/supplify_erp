@@ -12,7 +12,7 @@ import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { EmptyState } from '../components/ui/empty-state'
 import { pageHeaderRowClass } from '../components/ui/card-layout'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { ArrowLeft, Send } from 'lucide-react'
 import type { Product } from '../types'
 

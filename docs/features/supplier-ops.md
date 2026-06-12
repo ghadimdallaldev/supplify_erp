@@ -55,15 +55,15 @@ Service: `product-import.service.js`
 
 ## Other supplier-ops endpoints
 
-| Area                 | Path prefix                             | Feature gate       | Notes                                                                |
-| -------------------- | --------------------------------------- | ------------------ | -------------------------------------------------------------------- |
-| Reorder intelligence | `/reorder-intelligence`                 | `smart_reorder`    | At-risk customers, reminder drafts                                   |
-| Reorder assistance   | `/reorder-assistance`                   | `smart_reorder`    | Follow-up draft messages                                             |
-| Delivery board       | `/deliveries/board`                     | `fulfillment`      | Date/status/driver/area filters; driver-scoped when driver-only RBAC |
-| Product substitutes  | `/products/:productId/substitutes`      | —                  | CRUD substitute products                                             |
-| Order substitutions  | `/orders/:orderId/substitutions/*`      | `order_amendments` | Propose/accept/reject item swaps                                     |
-| Fulfillment issues   | `/orders/:orderId/fulfillment-issues/*` | —                  | Shortage, substitution, open-chat                                    |
-| At-risk cadence      | `/reorder-cadence/at-risk`              | `smart_reorder`    | Customers overdue for reorder                                        |
+| Area                 | Path prefix                             | Feature gate       | Notes                                                                                                                       |
+| -------------------- | --------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| Reorder intelligence | `/reorder-intelligence`                 | `smart_reorder`    | At-risk customers, reminder drafts                                                                                          |
+| Reorder assistance   | `/reorder-assistance`                   | `smart_reorder`    | Follow-up draft messages                                                                                                    |
+| Delivery board       | `/deliveries/board`                     | `fulfillment`      | Date/status/driver/area filters; driver-scoped when driver-only RBAC; zone join via `delivery-zone-join` + migration `0165` |
+| Product substitutes  | `/products/:productId/substitutes`      | —                  | CRUD substitute products                                                                                                    |
+| Order substitutions  | `/orders/:orderId/substitutions/*`      | `order_amendments` | Propose/accept/reject item swaps                                                                                            |
+| Fulfillment issues   | `/orders/:orderId/fulfillment-issues/*` | —                  | Shortage, substitution, open-chat                                                                                           |
+| At-risk cadence      | `/reorder-cadence/at-risk`              | `smart_reorder`    | Customers overdue for reorder                                                                                               |
 
 ## RBAC & plan gates
 

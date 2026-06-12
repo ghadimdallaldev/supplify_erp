@@ -1,12 +1,20 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
-import { toast } from 'react-hot-toast'
+import { toast } from 'sonner'
 import { useRequestStaffPortalLinkMutation } from '../services/api'
 import { redirectToAuth } from '../lib/authRedirect'
+import { PublicPageLayout, PublicPanel } from '../components/public/PublicPageLayout'
+import { CalendarDays, Clock3, FileText, Megaphone } from 'lucide-react'
+
+const FEATURES = [
+  { icon: CalendarDays, text: 'See upcoming shifts and coverage needs' },
+  { icon: Clock3, text: 'Clock in and out from your phone' },
+  { icon: Megaphone, text: 'Read announcements from your manager' },
+  { icon: FileText, text: 'Access policies and onboarding documents' },
+]
 
 export function StaffSelfServiceLogin() {
   const navigate = useNavigate()
@@ -35,77 +43,97 @@ export function StaffSelfServiceLogin() {
         response.message ||
           'If an account exists for this email, a sign-in link has been sent. Check your inbox.'
       )
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { data?: { message?: string; error?: { message?: string } } }
       toast.error(
-        error?.data?.message || error?.data?.error?.message || 'Unable to generate login link'
+        err?.data?.message || err?.data?.error?.message || 'Unable to generate login link'
       )
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-900/90 py-16 px-4 text-white">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 lg:flex-row">
-        <div className="w-full space-y-4 lg:w-1/2">
-          <h1 className="text-3xl font-bold tracking-tight">Supplify Staff Access</h1>
-          <p className="text-sm text-[var(--text-muted)]">
-            View your schedule, request time off, and clock in/out. Sign in with the account your
-            manager created, or request a one-time magic link to your work email.
-          </p>
-          <div className="rounded-2xl border border-white/10 bg-slate-800/60 p-5 text-sm">
-            <p className="font-semibold text-[var(--text-muted)]">What you can do</p>
-            <ul className="mt-3 list-disc space-y-2 pl-5 text-[var(--text-muted)]">
-              <li>See upcoming shifts and coverage needs</li>
-              <li>Request PTO and log shift swaps</li>
-              <li>Clock-in guidance and special announcements</li>
-              <li>Access documents, policies, and onboarding resources</li>
-            </ul>
-          </div>
-        </div>
-
-        <Card className="w-full bg-white/95 text-[var(--text-muted)] shadow-xl lg:w-1/2">
-          <CardHeader>
-            <CardTitle>Staff portal sign in</CardTitle>
-            <CardDescription>
-              Use your work email and password from your manager, or request a one-time magic link.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
+    <PublicPageLayout
+      wide
+      title="Staff portal"
+      subtitle="View your schedule, request time off, and clock in — from any device."
+      logoInitial="S"
+      className="pb-[max(3rem,env(safe-area-inset-bottom))]"
+    >
+      <div className="mx-auto grid w-full max-w-4xl grid-cols-1 gap-6 lg:grid-cols-2">
+        <PublicPanel
+          title="Sign in"
+          description="Use the account your manager created, or request a one-time link to your work email."
+          className="lg:col-start-2 lg:row-start-1"
+        >
+          <div className="space-y-5">
             <div className="space-y-2">
-              <Button type="button" className="w-full" onClick={handleKeycloakLogin}>
+              <Button
+                type="button"
+                className="consumer-pressable pwa-touch-target w-full bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
+                onClick={handleKeycloakLogin}
+              >
                 Sign in with email & password
               </Button>
               <p className="text-center text-xs text-[var(--text-muted)]">
                 For accounts created by your restaurant manager
               </p>
             </div>
-            <div className="relative">
+
+            <div className="relative py-1">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t border-[var(--app-border)]" />
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-[var(--text-muted)]">Or magic link</span>
+              <div className="relative flex justify-center">
+                <span className="bg-[var(--surface)] px-3 text-xs text-[var(--text-muted)]">
+                  or email a magic link
+                </span>
               </div>
             </div>
+
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div>
                 <Label htmlFor="email">Work email</Label>
                 <Input
                   id="email"
                   type="email"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  enterKeyHint="send"
+                  className="mt-1.5 h-11 text-base sm:text-sm"
                   placeholder="you@restaurant.com"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   required
+                  autoComplete="email"
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Sending magic link…' : 'Send magic link'}
+              <Button
+                type="submit"
+                variant="outline"
+                className="consumer-pressable pwa-touch-target w-full"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Sending…' : 'Send magic link'}
               </Button>
             </form>
-          </CardContent>
-        </Card>
+          </div>
+        </PublicPanel>
+
+        <PublicPanel title="What you can do here" className="h-fit lg:col-start-1 lg:row-start-1">
+          <ul className="space-y-3">
+            {FEATURES.map(({ icon: Icon, text }) => (
+              <li key={text} className="flex items-start gap-3 text-sm text-[var(--text-mid)]">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--brand-pale)] text-[var(--brand-mid)]">
+                  <Icon className="h-4 w-4" aria-hidden />
+                </span>
+                {text}
+              </li>
+            ))}
+          </ul>
+        </PublicPanel>
       </div>
-    </div>
+    </PublicPageLayout>
   )
 }
 
