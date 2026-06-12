@@ -2,12 +2,14 @@ import { Check } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import {
   CONSUMER_ORDER_STATUS_CHAIN,
-  CONSUMER_ORDER_STATUS_LABELS,
+  getConsumerStatusLabels,
   type ConsumerOrderTrackingStatus,
 } from '../../lib/consumerOrderTracking'
+import type { ConsumerFulfillmentType } from '../../services/consumerApi'
 
 type OrderStatusStepperProps = {
   status: string
+  fulfillmentType?: ConsumerFulfillmentType | string | null
   className?: string
 }
 
@@ -17,9 +19,14 @@ function stepIndex(status: string): number {
   return idx >= 0 ? idx : 0
 }
 
-export function OrderStatusStepper({ status, className }: OrderStatusStepperProps) {
+export function OrderStatusStepper({
+  status,
+  fulfillmentType,
+  className,
+}: OrderStatusStepperProps) {
   const currentIdx = stepIndex(status)
   const cancelled = status === 'CANCELLED'
+  const labels = getConsumerStatusLabels(fulfillmentType)
 
   return (
     <div className={cn('w-full', className)} aria-label="Order status">
@@ -33,13 +40,19 @@ export function OrderStatusStepper({ status, className }: OrderStatusStepperProp
             <div key={step} className="flex min-w-0 flex-1 flex-col items-center">
               <div className="flex w-full items-center">
                 {idx > 0 && (
-                  <div className={cn('h-0.5 flex-1', done || active ? 'bg-primary' : 'bg-muted')} />
+                  <div
+                    className={cn(
+                      'h-0.5 flex-1',
+                      done || active ? 'bg-[var(--brand-mid)]' : 'bg-muted'
+                    )}
+                  />
                 )}
                 <div
                   className={cn(
                     'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-xs font-semibold transition-colors',
-                    done && 'border-primary bg-primary text-primary-foreground',
-                    active && 'border-primary bg-background text-primary ring-2 ring-primary/20',
+                    done && 'border-[var(--brand-mid)] bg-[var(--brand-mid)] text-white',
+                    active &&
+                      'border-[var(--brand-mid)] bg-background text-[var(--brand-mid)] ring-2 ring-[var(--brand-pale)]',
                     upcoming && 'border-muted bg-background text-muted-foreground',
                     cancelled && 'border-muted bg-muted text-muted-foreground'
                   )}
@@ -48,18 +61,20 @@ export function OrderStatusStepper({ status, className }: OrderStatusStepperProp
                   {done ? <Check className="h-3.5 w-3.5" /> : idx + 1}
                 </div>
                 {idx < CONSUMER_ORDER_STATUS_CHAIN.length - 1 && (
-                  <div className={cn('h-0.5 flex-1', done ? 'bg-primary' : 'bg-muted')} />
+                  <div
+                    className={cn('h-0.5 flex-1', done ? 'bg-[var(--brand-mid)]' : 'bg-muted')}
+                  />
                 )}
               </div>
               <span
                 className={cn(
-                  'mt-1.5 max-w-[4.5rem] truncate text-center text-[10px] font-medium leading-tight sm:max-w-none sm:text-xs',
-                  active && 'text-primary',
+                  'mt-1.5 max-w-[4.5rem] text-center text-[10px] font-medium leading-tight sm:max-w-none sm:text-xs',
+                  active && 'text-[var(--brand-mid)]',
                   done && 'text-foreground',
                   (upcoming || cancelled) && 'text-muted-foreground'
                 )}
               >
-                {CONSUMER_ORDER_STATUS_LABELS[step]}
+                {labels[step]}
               </span>
             </div>
           )

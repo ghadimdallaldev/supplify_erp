@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../ui/card'
 import { Button } from '../../../ui/button'
 import { Bell, Save, Loader2, CheckCircle2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { useAppSelector } from '../../../../hooks/redux'
 import { usePushNotifications } from '../../../../hooks/usePushNotifications'
 import {

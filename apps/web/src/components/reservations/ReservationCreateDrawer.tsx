@@ -4,10 +4,18 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Textarea } from '../ui/textarea'
 import { Select, SelectItem, SelectTrigger } from '../ui/select'
-import { toast } from 'react-hot-toast'
+import { toast } from 'sonner'
 import { useCreateReservationMutation } from '../../services/reservationsApi'
 import type { ReservationTable } from '../../types'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '../ui/dialog'
 
 interface ReservationCreateDrawerProps {
   tables: ReservationTable[]
@@ -17,7 +25,11 @@ interface ReservationCreateDrawerProps {
 
 const DEFAULT_DURATION = 90
 
-export function ReservationCreateDrawer({ tables, branchId, onCreated }: ReservationCreateDrawerProps) {
+export function ReservationCreateDrawer({
+  tables,
+  branchId,
+  onCreated,
+}: ReservationCreateDrawerProps) {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({
     customerName: '',
@@ -70,7 +82,9 @@ export function ReservationCreateDrawer({ tables, branchId, onCreated }: Reserva
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Capture reservation</DialogTitle>
-          <DialogDescription>Log the essentials and let Supplify handle the capacity math for you.</DialogDescription>
+          <DialogDescription>
+            Log the essentials and let Supplify handle the capacity math for you.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
@@ -79,14 +93,18 @@ export function ReservationCreateDrawer({ tables, branchId, onCreated }: Reserva
               <Input
                 required
                 value={form.customerName}
-                onChange={(event) => setForm((prev) => ({ ...prev, customerName: event.target.value }))}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, customerName: event.target.value }))
+                }
               />
             </div>
             <div>
               <Label className="text-xs uppercase">Contact</Label>
               <Input
                 value={form.customerPhone}
-                onChange={(event) => setForm((prev) => ({ ...prev, customerPhone: event.target.value }))}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, customerPhone: event.target.value }))
+                }
                 placeholder="+971..."
               />
             </div>
@@ -96,7 +114,9 @@ export function ReservationCreateDrawer({ tables, branchId, onCreated }: Reserva
                 type="number"
                 min={1}
                 value={form.partySize}
-                onChange={(event) => setForm((prev) => ({ ...prev, partySize: Number(event.target.value) }))}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, partySize: Number(event.target.value) }))
+                }
               />
             </div>
             <div>
@@ -106,7 +126,9 @@ export function ReservationCreateDrawer({ tables, branchId, onCreated }: Reserva
                 min={30}
                 max={240}
                 value={form.durationMinutes}
-                onChange={(event) => setForm((prev) => ({ ...prev, durationMinutes: Number(event.target.value) }))}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, durationMinutes: Number(event.target.value) }))
+                }
               />
             </div>
             <div>
@@ -115,14 +137,21 @@ export function ReservationCreateDrawer({ tables, branchId, onCreated }: Reserva
                 type="datetime-local"
                 required
                 value={form.scheduledAt}
-                onChange={(event) => setForm((prev) => ({ ...prev, scheduledAt: event.target.value }))}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, scheduledAt: event.target.value }))
+                }
               />
             </div>
             <div>
               <Label className="text-xs uppercase">Preferred table</Label>
               <Select
                 value={form.tableId}
-                onChange={(event) => setForm((prev) => ({ ...prev, tableId: (event.target as HTMLInputElement).value }))}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    tableId: (event.target as HTMLInputElement).value,
+                  }))
+                }
               >
                 <SelectTrigger placeholder="Auto assign">
                   <option value="">Auto assign</option>
@@ -157,4 +186,3 @@ export function ReservationCreateDrawer({ tables, branchId, onCreated }: Reserva
     </Dialog>
   )
 }
-

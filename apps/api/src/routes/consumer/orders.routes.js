@@ -114,7 +114,11 @@ consumerOrdersPublicRoutes.post('/', optionalAuthConsumer, async (req, res) => {
         error.name === 'MODIFIER_MAX_EXCEEDED' ||
         error.name === 'INVALID_MODIFIER' ||
         error.name === 'LOYALTY_REDEEM_INVALID' ||
-        error.name === 'LOYALTY_AUTH_REQUIRED'
+        error.name === 'LOYALTY_AUTH_REQUIRED' ||
+        error.name === 'ORDERING_PREORDER_REQUIRED' ||
+        error.name === 'ORDERING_SCHEDULE_TOO_EARLY' ||
+        error.name === 'ORDERING_WINDOW_CLOSED' ||
+        error.name === 'SCHEDULE_INVALID'
           ? 400
           : error.name === 'BRANCH_NOT_FOUND' ||
               error.name === 'MENU_ITEM_UNAVAILABLE' ||

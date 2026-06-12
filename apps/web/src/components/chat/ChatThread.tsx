@@ -72,7 +72,7 @@ export function ChatThread({
                         className={`max-w-[85%] sm:max-w-[75%] ${isMyMessage ? 'flex flex-col items-end' : 'flex flex-col items-start'}`}
                       >
                         <div
-                          className={`rounded-2xl px-4 py-2.5 shadow-md transition-all hover:shadow-lg ${
+                          className={`rounded-2xl px-4 py-2.5 shadow-md transition-shadow duration-200 ease hover:shadow-lg ${
                             isMyMessage
                               ? 'border border-white/20 bg-gradient-to-br from-[var(--brand)] to-[var(--brand-mid)] text-white'
                               : 'border border-[var(--app-border)] bg-gradient-to-br from-[var(--surface)] via-[var(--brand-ultra)] to-[var(--brand-ultra)] text-[var(--text)]'

@@ -184,8 +184,8 @@ export function DriverRoutePanel({
         </div>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--app-border)]">
           <div
-            className="h-full rounded-full bg-[var(--brand-mid)] transition-all duration-300"
-            style={{ width: `${progress}%` }}
+            className="h-full w-full origin-left rounded-full bg-[var(--brand-mid)] transition-transform duration-200 ease-linear"
+            style={{ transform: `scaleX(${progress / 100})` }}
             role="progressbar"
             aria-valuenow={progress}
             aria-valuemin={0}

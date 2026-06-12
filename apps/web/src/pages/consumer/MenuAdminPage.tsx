@@ -15,7 +15,7 @@ import {
   useUpdateConsumerMenuItemMutation,
   type ConsumerMenuItem,
 } from '../../services/consumerApi'
-import { useGetRestaurantMeQuery } from '../../services/api'
+import { useGetRestaurantMeQuery, useGetPresignedUrlMutation } from '../../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -25,13 +25,28 @@ import { Switch } from '../../components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
 import { RequirePermission } from '../../components/RequirePermission'
 import { PageHeader } from '../../components/ui/page-header'
+import { PageShell } from '../../components/ui/page-shell'
+import { EmptyState } from '../../components/ui/empty-state'
+import { LogoUpload } from '../../components/LogoUpload'
+import { MenuBulkImportPanel } from '../../components/consumer/MenuBulkImportPanel'
 import { formatPrice } from '../../utils/format'
-import { toast } from 'react-hot-toast'
-import { Link2, Copy, Pencil, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  LayoutList,
+  Link2,
+  List,
+  Pencil,
+  Trash2,
+} from 'lucide-react'
 import { copyToClipboard } from '../../utils/clipboard'
+import { cn } from '../../lib/utils'
 
 export function MenuAdminPage() {
   const { data: me } = useGetRestaurantMeQuery()
+  const [getPresignedUrl] = useGetPresignedUrlMutation()
   const { data, isLoading, refetch } = useGetConsumerMenuAdminQuery()
   const [createCategory, { isLoading: creatingCategory }] = useCreateConsumerMenuCategoryMutation()
   const [createItem, { isLoading: creatingItem }] = useCreateConsumerMenuItemMutation()
@@ -50,6 +65,7 @@ export function MenuAdminPage() {
     name: '',
     basePrice: '',
     description: '',
+    imageUrl: null as string | null,
   })
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({
@@ -57,6 +73,7 @@ export function MenuAdminPage() {
     basePrice: '',
     description: '',
     isAvailable: true,
+    imageUrl: null as string | null,
   })
   const [modifierGroupForm, setModifierGroupForm] = useState({
     menuItemId: '',
@@ -70,6 +87,9 @@ export function MenuAdminPage() {
   >({})
 
   const [adminTab, setAdminTab] = useState('menu')
+  const [compactView, setCompactView] = useState(true)
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({})
+  const [expandedItemIds, setExpandedItemIds] = useState<Record<string, boolean>>({})
   const [fulfillmentBranchId, setFulfillmentBranchId] = useState('')
   const [fulfillmentForm, setFulfillmentForm] = useState({
     deliveryEnabled: false,
@@ -78,6 +98,9 @@ export function MenuAdminPage() {
     minOrderAmount: '0',
     deliveryFee: '0',
     estimatedPrepMinutes: '30',
+    liveOrderStart: '12:00',
+    liveOrderEnd: '00:00',
+    allowPreordersOutsideLiveHours: true,
   })
   const [zoneForm, setZoneForm] = useState({
     name: '',
@@ -118,6 +141,10 @@ export function MenuAdminPage() {
       minOrderAmount: String(selectedFulfillmentBranch.minOrderAmount),
       deliveryFee: String(selectedFulfillmentBranch.deliveryFee),
       estimatedPrepMinutes: String(selectedFulfillmentBranch.estimatedPrepMinutes),
+      liveOrderStart: selectedFulfillmentBranch.liveOrderStart ?? '12:00',
+      liveOrderEnd: selectedFulfillmentBranch.liveOrderEnd ?? '00:00',
+      allowPreordersOutsideLiveHours:
+        selectedFulfillmentBranch.allowPreordersOutsideLiveHours ?? true,
     })
   }, [selectedFulfillmentBranch])
 
@@ -133,6 +160,9 @@ export function MenuAdminPage() {
         minOrderAmount: Number(fulfillmentForm.minOrderAmount),
         deliveryFee: Number(fulfillmentForm.deliveryFee),
         estimatedPrepMinutes: Number(fulfillmentForm.estimatedPrepMinutes),
+        liveOrderStart: fulfillmentForm.liveOrderStart,
+        liveOrderEnd: fulfillmentForm.liveOrderEnd,
+        allowPreordersOutsideLiveHours: fulfillmentForm.allowPreordersOutsideLiveHours,
       }).unwrap()
       toast.success('Fulfillment settings saved')
       refetchFulfillment()
@@ -172,7 +202,22 @@ export function MenuAdminPage() {
   }
 
   const slug = me?.restaurant?.slug
+  const restaurantId = me?.restaurant?.id ?? ''
   const publicUrl = slug ? `${window.location.origin}/order/${slug}` : ''
+
+  const handleGetPresignedUrl = async (params: {
+    fileName: string
+    fileType: string
+    fileSize?: number
+  }) => getPresignedUrl(params).unwrap()
+
+  const handleCreateItemImageUpload = async (imageUrl: string) => {
+    setItemForm((f) => ({ ...f, imageUrl: imageUrl || null }))
+  }
+
+  const handleEditItemImageUpload = async (imageUrl: string) => {
+    setEditForm((f) => ({ ...f, imageUrl: imageUrl || null }))
+  }
 
   const handleCreateCategory = async (event: FormEvent) => {
     event.preventDefault()
@@ -199,8 +244,15 @@ export function MenuAdminPage() {
         name: itemForm.name.trim(),
         basePrice: Number(itemForm.basePrice),
         description: itemForm.description.trim() || undefined,
+        imageUrl: itemForm.imageUrl,
       }).unwrap()
-      setItemForm({ categoryId: itemForm.categoryId, name: '', basePrice: '', description: '' })
+      setItemForm({
+        categoryId: itemForm.categoryId,
+        name: '',
+        basePrice: '',
+        description: '',
+        imageUrl: null,
+      })
       toast.success('Item created')
       refetch()
     } catch (error: any) {
@@ -209,12 +261,14 @@ export function MenuAdminPage() {
   }
 
   const startEditItem = (item: ConsumerMenuItem) => {
+    setExpandedItemIds((prev) => ({ ...prev, [item.id]: true }))
     setEditingItemId(item.id)
     setEditForm({
       name: item.name,
       basePrice: String(item.base_price),
       description: item.description ?? '',
       isAvailable: item.is_available,
+      imageUrl: item.image_url ?? null,
     })
   }
 
@@ -228,6 +282,7 @@ export function MenuAdminPage() {
         basePrice: Number(editForm.basePrice),
         description: editForm.description.trim() || undefined,
         isAvailable: editForm.isAvailable,
+        imageUrl: editForm.imageUrl,
       }).unwrap()
       setEditingItemId(null)
       toast.success('Item updated')
@@ -315,9 +370,44 @@ export function MenuAdminPage() {
 
   const allItems = (data?.categories ?? []).flatMap((cat) => cat.items)
 
+  const totalMenuItems = (data?.categories ?? []).reduce((sum, cat) => sum + cat.items.length, 0)
+
+  const toggleCategoryCollapsed = (categoryId: string) => {
+    setCollapsedCategories((prev) => ({
+      ...prev,
+      [categoryId]: !prev[categoryId],
+    }))
+  }
+
+  const setAllCategoriesCollapsed = (collapsed: boolean) => {
+    const next: Record<string, boolean> = {}
+    for (const cat of data?.categories ?? []) {
+      next[cat.id] = collapsed
+    }
+    setCollapsedCategories(next)
+  }
+
+  const toggleItemExpanded = (itemId: string) => {
+    setExpandedItemIds((prev) => ({
+      ...prev,
+      [itemId]: !prev[itemId],
+    }))
+  }
+
+  const handleCompactViewChange = (checked: boolean) => {
+    setCompactView(checked)
+    if (checked) {
+      setAllCategoriesCollapsed(true)
+      setExpandedItemIds({})
+      setEditingItemId(null)
+    } else {
+      setAllCategoriesCollapsed(false)
+    }
+  }
+
   return (
     <RequirePermission permission="CATALOG_VIEW">
-      <div className="space-y-6">
+      <PageShell>
         <PageHeader
           title="Consumer menu"
           description="Manage your guest-facing menu for online ordering."
@@ -457,6 +547,66 @@ export function MenuAdminPage() {
                             }
                           />
                         </div>
+                      </div>
+
+                      <div className="rounded-lg border p-4 space-y-3">
+                        <div>
+                          <p className="font-medium">Online ordering hours</p>
+                          <p className="text-sm text-muted-foreground">
+                            Live (ASAP) orders between these times. Outside this window, diners can
+                            only place preorders scheduled for the next opening time (e.g. 12:00–
+                            midnight live, midnight–12:00 preorders).
+                          </p>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1">
+                            <Label htmlFor="liveOrderStart">Live orders from</Label>
+                            <Input
+                              id="liveOrderStart"
+                              type="time"
+                              value={fulfillmentForm.liveOrderStart}
+                              onChange={(e) =>
+                                setFulfillmentForm((f) => ({
+                                  ...f,
+                                  liveOrderStart: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="liveOrderEnd">Live orders until</Label>
+                            <Input
+                              id="liveOrderEnd"
+                              type="time"
+                              value={
+                                fulfillmentForm.liveOrderEnd === '00:00'
+                                  ? '00:00'
+                                  : fulfillmentForm.liveOrderEnd
+                              }
+                              onChange={(e) =>
+                                setFulfillmentForm((f) => ({
+                                  ...f,
+                                  liveOrderEnd: e.target.value || '00:00',
+                                }))
+                              }
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Use 00:00 for midnight (end of day).
+                            </p>
+                          </div>
+                        </div>
+                        <label className="flex items-center gap-2 text-sm">
+                          <Switch
+                            checked={fulfillmentForm.allowPreordersOutsideLiveHours}
+                            onCheckedChange={(checked) =>
+                              setFulfillmentForm((f) => ({
+                                ...f,
+                                allowPreordersOutsideLiveHours: checked,
+                              }))
+                            }
+                          />
+                          Allow preorders outside live hours
+                        </label>
                       </div>
 
                       <Button type="submit" disabled={savingFulfillment}>
@@ -652,6 +802,22 @@ export function MenuAdminPage() {
                         required
                       />
                     </div>
+                    <div className="space-y-1">
+                      <Label>Photo</Label>
+                      <LogoUpload
+                        currentLogo={itemForm.imageUrl}
+                        onUpload={handleCreateItemImageUpload}
+                        entityId={restaurantId}
+                        entityName={itemForm.name || 'Menu item'}
+                        getPresignedUrl={handleGetPresignedUrl}
+                        uploadLabel="Upload photo"
+                        changeLabel="Change photo"
+                        removeLabel="Remove photo"
+                        previewAlt={itemForm.name ? `${itemForm.name} photo` : 'Menu item photo'}
+                        previewClassName="w-40 h-28"
+                        helperText="Recommended: landscape photo, at least 800px wide. Max size: 5MB."
+                      />
+                    </div>
                     <Button
                       type="submit"
                       disabled={creatingItem || !(data?.categories ?? []).length}
@@ -748,220 +914,397 @@ export function MenuAdminPage() {
               </CardContent>
             </Card>
 
+            <MenuBulkImportPanel onImported={() => refetch()} />
+
             <Card>
-              <CardHeader>
-                <CardTitle>Current menu</CardTitle>
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle>Current menu</CardTitle>
+                  <CardDescription>
+                    {(data?.categories ?? []).length} categor
+                    {(data?.categories ?? []).length === 1 ? 'y' : 'ies'} · {totalMenuItems} item
+                    {totalMenuItems === 1 ? '' : 's'}
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm">
+                    {compactView ? (
+                      <LayoutList className="h-4 w-4 text-muted-foreground" aria-hidden />
+                    ) : (
+                      <List className="h-4 w-4 text-muted-foreground" aria-hidden />
+                    )}
+                    <span className="whitespace-nowrap">Compact view</span>
+                    <Switch checked={compactView} onCheckedChange={handleCompactViewChange} />
+                  </label>
+                  {compactView ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAllCategoriesCollapsed(false)}
+                      >
+                        Expand all
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAllCategoriesCollapsed(true)}
+                      >
+                        Collapse all
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4">
                 {isLoading && <Skeleton className="h-24 w-full" />}
                 {!isLoading &&
-                  (data?.categories ?? []).map((category) => (
-                    <div key={category.id} className="space-y-3">
-                      <h3 className="font-medium">{category.name}</h3>
-                      <ul className="space-y-4">
-                        {category.items.map((item) => (
-                          <li key={item.id} className="rounded-lg border p-3">
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <p className="font-medium">{item.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {formatPrice(Number(item.base_price))}
-                                  {!item.is_available && ' · Unavailable'}
-                                </p>
-                              </div>
-                              <div className="flex gap-1">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => startEditItem(item)}
-                                  aria-label={`Edit ${item.name}`}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="text-destructive"
-                                  onClick={() => handleDeleteItem(item.id, item.name)}
-                                  aria-label={`Delete ${item.name}`}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
+                  (data?.categories ?? []).map((category) => {
+                    const isCategoryCollapsed = collapsedCategories[category.id] ?? compactView
 
-                            {editingItemId === item.id && (
-                              <form
-                                onSubmit={handleUpdateItem}
-                                className="mt-3 space-y-2 border-t pt-3"
-                              >
-                                <Input
-                                  value={editForm.name}
-                                  onChange={(e) =>
-                                    setEditForm((f) => ({ ...f, name: e.target.value }))
-                                  }
-                                  required
-                                />
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={editForm.basePrice}
-                                  onChange={(e) =>
-                                    setEditForm((f) => ({ ...f, basePrice: e.target.value }))
-                                  }
-                                  required
-                                />
-                                <Input
-                                  value={editForm.description}
-                                  onChange={(e) =>
-                                    setEditForm((f) => ({ ...f, description: e.target.value }))
-                                  }
-                                  placeholder="Description"
-                                />
-                                <label className="flex items-center gap-2 text-sm">
-                                  <Switch
-                                    checked={editForm.isAvailable}
-                                    onCheckedChange={(checked) =>
-                                      setEditForm((f) => ({ ...f, isAvailable: checked }))
-                                    }
-                                  />
-                                  Available
-                                </label>
-                                <div className="flex gap-2">
-                                  <Button type="submit" size="sm" disabled={updatingItem}>
-                                    Save
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setEditingItemId(null)}
-                                  >
-                                    Cancel
-                                  </Button>
-                                </div>
-                              </form>
-                            )}
+                    return (
+                      <div key={category.id} className="overflow-hidden rounded-lg border">
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 bg-muted/30 px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
+                          onClick={() => toggleCategoryCollapsed(category.id)}
+                          aria-expanded={!isCategoryCollapsed}
+                        >
+                          {isCategoryCollapsed ? (
+                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          )}
+                          <span className="font-medium">{category.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {category.items.length} item{category.items.length === 1 ? '' : 's'}
+                          </span>
+                        </button>
 
-                            {(item.modifierGroups?.length ?? 0) > 0 && (
-                              <div className="mt-3 space-y-2 border-t pt-3">
-                                <p className="text-xs font-medium uppercase text-muted-foreground">
-                                  Modifiers
-                                </p>
-                                {item.modifierGroups!.map((group) => (
-                                  <div
-                                    key={group.id}
-                                    className="rounded-md bg-muted/40 p-2 text-sm"
-                                  >
+                        {!isCategoryCollapsed ? (
+                          <ul className={cn('divide-y', compactView ? '' : 'space-y-0')}>
+                            {category.items.map((item) => {
+                              const isItemExpanded = expandedItemIds[item.id] ?? !compactView
+                              const showItemDetails =
+                                !compactView || isItemExpanded || editingItemId === item.id
+
+                              return (
+                                <li
+                                  key={item.id}
+                                  className={cn(compactView && !showItemDetails && 'px-3 py-2')}
+                                >
+                                  {compactView && !showItemDetails ? (
                                     <div className="flex items-center justify-between gap-2">
-                                      <span className="font-medium">
-                                        {group.name}
-                                        {group.is_required && ' *'}
-                                        <span className="ml-1 text-xs text-muted-foreground">
-                                          ({group.min_selections}–{group.max_selections})
-                                        </span>
-                                      </span>
-                                      <Button
+                                      <button
                                         type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 text-destructive"
-                                        onClick={() =>
-                                          handleDeleteModifierGroup(group.id, group.name)
-                                        }
+                                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                                        onClick={() => toggleItemExpanded(item.id)}
                                       >
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                    <ul className="mt-1 space-y-1 pl-2">
-                                      {group.options.map((option) => (
-                                        <li
-                                          key={option.id}
-                                          className="flex items-center justify-between text-xs"
-                                        >
-                                          <span>
-                                            {option.name}
-                                            {Number(option.price_delta) > 0 &&
-                                              ` (+${formatPrice(Number(option.price_delta))})`}
+                                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                        <span className="truncate font-medium">{item.name}</span>
+                                        <span className="shrink-0 text-sm text-muted-foreground">
+                                          {formatPrice(Number(item.base_price))}
+                                        </span>
+                                        {!item.is_available ? (
+                                          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                                            Off
                                           </span>
+                                        ) : null}
+                                      </button>
+                                      <div className="flex shrink-0 gap-0.5">
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8"
+                                          onClick={() => startEditItem(item)}
+                                          aria-label={`Edit ${item.name}`}
+                                        >
+                                          <Pencil className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8 text-destructive"
+                                          onClick={() => handleDeleteItem(item.id, item.name)}
+                                          aria-label={`Delete ${item.name}`}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className={cn(compactView ? 'p-3' : 'p-3')}>
+                                      {compactView ? (
+                                        <button
+                                          type="button"
+                                          className="mb-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                                          onClick={() => toggleItemExpanded(item.id)}
+                                        >
+                                          <ChevronDown className="h-3.5 w-3.5" />
+                                          Collapse
+                                        </button>
+                                      ) : null}
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="flex gap-3">
+                                          {!compactView ? (
+                                            item.image_url ? (
+                                              <img
+                                                src={item.image_url}
+                                                alt=""
+                                                className="h-14 w-14 shrink-0 rounded-md object-cover"
+                                              />
+                                            ) : (
+                                              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-muted text-xs text-muted-foreground">
+                                                No photo
+                                              </div>
+                                            )
+                                          ) : null}
+                                          <div>
+                                            <p className="font-medium">{item.name}</p>
+                                            <p className="text-sm text-muted-foreground">
+                                              {formatPrice(Number(item.base_price))}
+                                              {!item.is_available && ' · Unavailable'}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <div className="flex gap-1">
                                           <Button
                                             type="button"
                                             variant="ghost"
-                                            size="sm"
-                                            className="h-6 text-destructive"
-                                            onClick={() =>
-                                              handleDeleteModifierOption(option.id, option.name)
-                                            }
+                                            size="icon"
+                                            onClick={() => startEditItem(item)}
+                                            aria-label={`Edit ${item.name}`}
                                           >
-                                            <Trash2 className="h-3 w-3" />
+                                            <Pencil className="h-4 w-4" />
                                           </Button>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                    <div className="mt-2 flex gap-2">
-                                      <Input
-                                        placeholder="Option name"
-                                        className="h-8 text-xs"
-                                        value={optionForms[group.id]?.name ?? ''}
-                                        onChange={(e) =>
-                                          setOptionForms((prev) => ({
-                                            ...prev,
-                                            [group.id]: {
-                                              name: e.target.value,
-                                              priceDelta: prev[group.id]?.priceDelta ?? '0',
-                                            },
-                                          }))
-                                        }
-                                      />
-                                      <Input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="Price +"
-                                        className="h-8 w-24 text-xs"
-                                        value={optionForms[group.id]?.priceDelta ?? '0'}
-                                        onChange={(e) =>
-                                          setOptionForms((prev) => ({
-                                            ...prev,
-                                            [group.id]: {
-                                              name: prev[group.id]?.name ?? '',
-                                              priceDelta: e.target.value,
-                                            },
-                                          }))
-                                        }
-                                      />
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        className="h-8"
-                                        disabled={creatingOption}
-                                        onClick={() => handleCreateModifierOption(group.id)}
-                                      >
-                                        Add
-                                      </Button>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="text-destructive"
+                                            onClick={() => handleDeleteItem(item.id, item.name)}
+                                            aria-label={`Delete ${item.name}`}
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      </div>
+
+                                      {editingItemId === item.id && (
+                                        <form
+                                          onSubmit={handleUpdateItem}
+                                          className="mt-3 space-y-2 border-t pt-3"
+                                        >
+                                          <Input
+                                            value={editForm.name}
+                                            onChange={(e) =>
+                                              setEditForm((f) => ({ ...f, name: e.target.value }))
+                                            }
+                                            required
+                                          />
+                                          <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={editForm.basePrice}
+                                            onChange={(e) =>
+                                              setEditForm((f) => ({
+                                                ...f,
+                                                basePrice: e.target.value,
+                                              }))
+                                            }
+                                            required
+                                          />
+                                          <Input
+                                            value={editForm.description}
+                                            onChange={(e) =>
+                                              setEditForm((f) => ({
+                                                ...f,
+                                                description: e.target.value,
+                                              }))
+                                            }
+                                            placeholder="Description"
+                                          />
+                                          <div className="space-y-1">
+                                            <Label>Photo</Label>
+                                            <LogoUpload
+                                              currentLogo={editForm.imageUrl}
+                                              onUpload={handleEditItemImageUpload}
+                                              entityId={restaurantId}
+                                              entityName={editForm.name || item.name}
+                                              getPresignedUrl={handleGetPresignedUrl}
+                                              uploadLabel="Upload photo"
+                                              changeLabel="Change photo"
+                                              removeLabel="Remove photo"
+                                              previewAlt={`${editForm.name || item.name} photo`}
+                                              previewClassName="w-40 h-28"
+                                              helperText="Recommended: landscape photo, at least 800px wide. Max size: 5MB."
+                                            />
+                                          </div>
+                                          <label className="flex items-center gap-2 text-sm">
+                                            <Switch
+                                              checked={editForm.isAvailable}
+                                              onCheckedChange={(checked) =>
+                                                setEditForm((f) => ({
+                                                  ...f,
+                                                  isAvailable: checked,
+                                                }))
+                                              }
+                                            />
+                                            Available
+                                          </label>
+                                          <div className="flex gap-2">
+                                            <Button type="submit" size="sm" disabled={updatingItem}>
+                                              Save
+                                            </Button>
+                                            <Button
+                                              type="button"
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => setEditingItemId(null)}
+                                            >
+                                              Cancel
+                                            </Button>
+                                          </div>
+                                        </form>
+                                      )}
+
+                                      {(item.modifierGroups?.length ?? 0) > 0 && (
+                                        <div className="mt-3 space-y-2 border-t pt-3">
+                                          <p className="text-xs font-medium uppercase text-muted-foreground">
+                                            Modifiers
+                                          </p>
+                                          {item.modifierGroups!.map((group) => (
+                                            <div
+                                              key={group.id}
+                                              className="rounded-md bg-muted/40 p-2 text-sm"
+                                            >
+                                              <div className="flex items-center justify-between gap-2">
+                                                <span className="font-medium">
+                                                  {group.name}
+                                                  {group.is_required && ' *'}
+                                                  <span className="ml-1 text-xs text-muted-foreground">
+                                                    ({group.min_selections}–{group.max_selections})
+                                                  </span>
+                                                </span>
+                                                <Button
+                                                  type="button"
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="h-7 text-destructive"
+                                                  onClick={() =>
+                                                    handleDeleteModifierGroup(group.id, group.name)
+                                                  }
+                                                >
+                                                  <Trash2 className="h-3 w-3" />
+                                                </Button>
+                                              </div>
+                                              <ul className="mt-1 space-y-1 pl-2">
+                                                {group.options.map((option) => (
+                                                  <li
+                                                    key={option.id}
+                                                    className="flex items-center justify-between text-xs"
+                                                  >
+                                                    <span>
+                                                      {option.name}
+                                                      {Number(option.price_delta) > 0 &&
+                                                        ` (+${formatPrice(Number(option.price_delta))})`}
+                                                    </span>
+                                                    <Button
+                                                      type="button"
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      className="h-6 text-destructive"
+                                                      onClick={() =>
+                                                        handleDeleteModifierOption(
+                                                          option.id,
+                                                          option.name
+                                                        )
+                                                      }
+                                                    >
+                                                      <Trash2 className="h-3 w-3" />
+                                                    </Button>
+                                                  </li>
+                                                ))}
+                                              </ul>
+                                              <div className="mt-2 flex gap-2">
+                                                <Input
+                                                  placeholder="Option name"
+                                                  className="h-8 text-xs"
+                                                  value={optionForms[group.id]?.name ?? ''}
+                                                  onChange={(e) =>
+                                                    setOptionForms((prev) => ({
+                                                      ...prev,
+                                                      [group.id]: {
+                                                        name: e.target.value,
+                                                        priceDelta:
+                                                          prev[group.id]?.priceDelta ?? '0',
+                                                      },
+                                                    }))
+                                                  }
+                                                />
+                                                <Input
+                                                  type="number"
+                                                  step="0.01"
+                                                  placeholder="Price +"
+                                                  className="h-8 w-24 text-xs"
+                                                  value={optionForms[group.id]?.priceDelta ?? '0'}
+                                                  onChange={(e) =>
+                                                    setOptionForms((prev) => ({
+                                                      ...prev,
+                                                      [group.id]: {
+                                                        name: prev[group.id]?.name ?? '',
+                                                        priceDelta: e.target.value,
+                                                      },
+                                                    }))
+                                                  }
+                                                />
+                                                <Button
+                                                  type="button"
+                                                  size="sm"
+                                                  className="h-8"
+                                                  disabled={creatingOption}
+                                                  onClick={() =>
+                                                    handleCreateModifierOption(group.id)
+                                                  }
+                                                >
+                                                  Add
+                                                </Button>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
-                                  </div>
-                                ))}
-                              </div>
+                                  )}
+                                </li>
+                              )
+                            })}
+                            {!category.items.length && (
+                              <li className="px-3 py-4 text-sm text-muted-foreground">
+                                No items yet
+                              </li>
                             )}
-                          </li>
-                        ))}
-                        {!category.items.length && (
-                          <li className="text-muted-foreground">No items yet</li>
-                        )}
-                      </ul>
-                    </div>
-                  ))}
+                          </ul>
+                        ) : null}
+                      </div>
+                    )
+                  })}
                 {!isLoading && !(data?.categories ?? []).length && (
-                  <p className="text-muted-foreground">No categories yet. Add one above.</p>
+                  <EmptyState
+                    title="No menu yet"
+                    description="Create a category above, import from CSV, or add items one at a time."
+                  />
                 )}
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

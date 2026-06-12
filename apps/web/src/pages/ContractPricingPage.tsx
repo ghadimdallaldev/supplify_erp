@@ -23,7 +23,7 @@ import {
 import { RequirePermission } from '../components/RequirePermission'
 import { usePermissions } from '../hooks/usePermissions'
 import { formatPrice } from '../utils/format'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Loader2, Plus, Pencil, Ban, Search } from 'lucide-react'
 
 const AGREEMENT_TYPES = ['CUSTOM', 'VOLUME', 'RELATIONSHIP', 'SPECIAL'] as const

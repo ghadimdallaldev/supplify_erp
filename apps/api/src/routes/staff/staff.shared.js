@@ -275,9 +275,12 @@ async function resolveRestaurantId(req) {
 
 function mapStaffRow(row) {
   const hasAccount = Boolean(row.user_id)
+  const magicLinkEnabled = Boolean(row.portal_access_enabled && !row.user_id)
   let portalStatus = 'none'
   if (hasAccount) {
     portalStatus = row.portal_access_enabled ? 'active' : 'disabled'
+  } else if (magicLinkEnabled) {
+    portalStatus = 'active'
   } else if (row.portal_invited_at) {
     portalStatus = 'invited'
   }
@@ -298,6 +301,7 @@ function mapStaffRow(row) {
     portalAccess: {
       hasAccount,
       enabled: Boolean(row.portal_access_enabled),
+      magicLinkEnabled,
       status: portalStatus,
       invitedAt: row.portal_invited_at,
       lastLoginAt: row.portal_last_login_at,

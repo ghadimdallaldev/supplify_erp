@@ -11,7 +11,7 @@ import { Skeleton } from '../ui/skeleton'
 import { CheckCircle, AlertTriangle, Loader2, Route } from 'lucide-react'
 import { CreateRouteDialog } from './CreateRouteDialog'
 import { canSelectOrderForRoute } from './fulfillmentDispatchUtils'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import type { DispatchOrderCard } from '../../types'
 import {
   useGetDriversQuery,
@@ -24,6 +24,7 @@ import {
 import { usePermissions } from '../../hooks/usePermissions'
 import { DispatchOrderRow } from './DispatchOrderRow'
 import { DeliveryTrackingDrawer } from './DeliveryTrackingDrawer'
+import { TooltipProvider } from '../ui/tooltip'
 import type { DispatchBoardData, DispatchSummaryStats } from './fulfillmentDispatchUtils'
 
 type Props = {
@@ -248,188 +249,120 @@ export function DriverDispatchBoard({
   const isEmpty = totalInView === 0
 
   return (
-    <div className="space-y-4">
-      {canPlanRoutes && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] p-3">
-          <Button
-            size="sm"
-            data-testid="create-route-button"
-            disabled={selectedOrders.length === 0}
-            onClick={() => setCreateRouteOpen(true)}
-          >
-            <Route className="mr-1 h-4 w-4" />
-            Create route ({selectedOrders.length})
-          </Button>
-          {selectedOrders.length === 0 && (
-            <span className="text-xs text-[var(--text-muted)]">
-              Select unassigned or assigned orders (not already on a route) to build a route.
-            </span>
-          )}
-        </div>
-      )}
-
-      <div
-        data-testid="delivery-board-stats"
-        className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6"
-      >
-        <SummaryChip label="Total orders" value={summary.total} />
-        <SummaryChip label="Pending" value={summary.pending} />
-        <SummaryChip label="Out for delivery" value={summary.outForDelivery} />
-        <SummaryChip label="Delivered" value={summary.delivered} />
-        <SummaryChip label="Failed" value={summary.failed} />
-        <SummaryChip label="Rescheduled" value={summary.rescheduled} />
-      </div>
-
-      {isEmpty ? (
-        <div
-          data-testid="dispatch-board-empty"
-          className="rounded-xl border border-dashed border-[var(--app-border)] bg-[var(--brand-ultra)] py-12 text-center"
-        >
-          <p className="text-sm text-[var(--text-muted)]">
-            {filtersActive
-              ? 'No deliveries match these filters.'
-              : 'No orders ready for dispatch right now.'}
-          </p>
-          {filtersActive && onClearFilters && (
+    <TooltipProvider delayDuration={300}>
+      <div className="space-y-4">
+        {canPlanRoutes && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] p-3">
             <Button
-              type="button"
-              variant="outline"
               size="sm"
-              className="mt-3"
-              onClick={onClearFilters}
+              data-testid="create-route-button"
+              disabled={selectedOrders.length === 0}
+              onClick={() => setCreateRouteOpen(true)}
             >
-              Clear filters
+              <Route className="mr-1 h-4 w-4" />
+              Create route ({selectedOrders.length})
             </Button>
-          )}
+            {selectedOrders.length === 0 && (
+              <span className="text-xs text-[var(--text-muted)]">
+                Select unassigned or assigned orders (not already on a route) to build a route.
+              </span>
+            )}
+          </div>
+        )}
+
+        <div
+          data-testid="delivery-board-stats"
+          className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6"
+        >
+          <SummaryChip label="Total orders" value={summary.total} />
+          <SummaryChip label="Pending" value={summary.pending} />
+          <SummaryChip label="Out for delivery" value={summary.outForDelivery} />
+          <SummaryChip label="Delivered" value={summary.delivered} />
+          <SummaryChip label="Failed" value={summary.failed} />
+          <SummaryChip label="Rescheduled" value={summary.rescheduled} />
         </div>
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
-          <DispatchColumn title="Unassigned" count={data.pending.length}>
-            {data.pending.map((order) => {
-              const sel = canSelectOrderForRoute(order)
-              return (
-                <DispatchOrderRow
-                  key={order.id}
-                  order={order}
-                  onViewTracking={openTracking}
-                  selectable={canPlanRoutes}
-                  selected={selectedIds.has(order.id)}
-                  onToggleSelect={() => toggleSelect(order)}
-                  selectDisabledReason={sel.ok ? undefined : sel.reason}
-                  actions={
-                    canManage ? (
-                      <Button size="sm" variant="default" onClick={() => setAssignOrder(order)}>
-                        Assign driver
-                      </Button>
-                    ) : undefined
-                  }
-                />
-              )
-            })}
-          </DispatchColumn>
 
-          <DispatchColumn title="Assigned" count={data.assigned.length}>
-            {data.assigned.map((order) => {
-              const sel = canSelectOrderForRoute(order)
-              return (
-                <DispatchOrderRow
-                  key={order.id}
-                  order={order}
-                  showDriver
-                  onViewTracking={openTracking}
-                  selectable={canPlanRoutes}
-                  selected={selectedIds.has(order.id)}
-                  onToggleSelect={() => toggleSelect(order)}
-                  selectDisabledReason={sel.ok ? undefined : sel.reason}
-                >
-                  {canManage && (
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={updatingStatus}
-                        onClick={() => advanceStatus(order, 'picked_up')}
-                      >
-                        Mark picked up
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setReassignOrder(order)
-                          setSelectedDriverId('')
-                        }}
-                      >
-                        Reassign
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={updatingStatus || rollingOver}
-                        onClick={() => moveToTomorrow(order)}
-                      >
-                        Move to tomorrow
-                      </Button>
-                    </div>
-                  )}
-                </DispatchOrderRow>
-              )
-            })}
-          </DispatchColumn>
-
-          <DispatchColumn title="Out for delivery" count={data.out_for_delivery.length}>
-            {data.out_for_delivery.map((order) => (
-              <DispatchOrderRow
-                key={order.id}
-                order={order}
-                showDriver
-                onViewTracking={openTracking}
+        {isEmpty ? (
+          <div
+            data-testid="dispatch-board-empty"
+            className="rounded-xl border border-dashed border-[var(--app-border)] bg-[var(--brand-ultra)] py-12 text-center"
+          >
+            <p className="text-sm text-[var(--text-muted)]">
+              {filtersActive
+                ? 'No deliveries match these filters.'
+                : 'No orders ready for dispatch right now.'}
+            </p>
+            {filtersActive && onClearFilters && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={onClearFilters}
               >
-                {canManage && (
-                  <div className="flex flex-wrap gap-2">
-                    {order.assignment?.status === 'rescheduled' && (
-                      <>
-                        <Badge variant="outline" className="border-amber-400 text-amber-700">
-                          Rescheduled
-                        </Badge>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={updatingStatus}
-                          onClick={() => advanceStatus(order, 'assigned')}
-                        >
-                          Ready to dispatch
+                Clear filters
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+            <DispatchColumn title="Unassigned" count={data.pending.length}>
+              {data.pending.map((order) => {
+                const sel = canSelectOrderForRoute(order)
+                return (
+                  <DispatchOrderRow
+                    key={order.id}
+                    order={order}
+                    onViewTracking={openTracking}
+                    selectable={canPlanRoutes}
+                    selected={selectedIds.has(order.id)}
+                    onToggleSelect={() => toggleSelect(order)}
+                    selectDisabledReason={sel.ok ? undefined : sel.reason}
+                    actions={
+                      canManage ? (
+                        <Button size="sm" variant="default" onClick={() => setAssignOrder(order)}>
+                          Assign driver
                         </Button>
-                      </>
-                    )}
-                    {order.assignment?.status === 'picked_up' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={updatingStatus}
-                        onClick={() => advanceStatus(order, 'out_for_delivery')}
-                      >
-                        Out for delivery
-                      </Button>
-                    )}
-                    {order.assignment?.status === 'out_for_delivery' && (
-                      <>
+                      ) : undefined
+                    }
+                  />
+                )
+              })}
+            </DispatchColumn>
+
+            <DispatchColumn title="Assigned" count={data.assigned.length}>
+              {data.assigned.map((order) => {
+                const sel = canSelectOrderForRoute(order)
+                return (
+                  <DispatchOrderRow
+                    key={order.id}
+                    order={order}
+                    showDriver
+                    onViewTracking={openTracking}
+                    selectable={canPlanRoutes}
+                    selected={selectedIds.has(order.id)}
+                    onToggleSelect={() => toggleSelect(order)}
+                    selectDisabledReason={sel.ok ? undefined : sel.reason}
+                  >
+                    {canManage && (
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           size="sm"
                           variant="outline"
                           disabled={updatingStatus}
-                          onClick={() => advanceStatus(order, 'delivered')}
+                          onClick={() => advanceStatus(order, 'picked_up')}
                         >
-                          <CheckCircle className="mr-1 h-3 w-3" />
-                          Mark delivered
+                          Mark picked up
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="text-[var(--red)]"
-                          onClick={() => setFailOrder(order)}
+                          onClick={() => {
+                            setReassignOrder(order)
+                            setSelectedDriverId('')
+                          }}
                         >
-                          Mark failed
+                          Reassign
                         </Button>
                         <Button
                           size="sm"
@@ -439,167 +372,240 @@ export function DriverDispatchBoard({
                         >
                           Move to tomorrow
                         </Button>
-                      </>
+                      </div>
                     )}
-                  </div>
-                )}
-              </DispatchOrderRow>
-            ))}
-          </DispatchColumn>
+                  </DispatchOrderRow>
+                )
+              })}
+            </DispatchColumn>
 
-          <DispatchColumn title="Delivered today" count={data.delivered_today.length}>
-            {data.delivered_today.map((order) => (
-              <DispatchOrderRow
-                key={order.id}
-                order={order}
-                showDriver
-                onViewTracking={openTracking}
-              >
-                <Badge
-                  variant="outline"
-                  className={
-                    order.has_pod
-                      ? 'border-[var(--mint)] text-[var(--mint)]'
-                      : 'border-amber-400 text-amber-600'
-                  }
+            <DispatchColumn title="Out for delivery" count={data.out_for_delivery.length}>
+              {data.out_for_delivery.map((order) => (
+                <DispatchOrderRow
+                  key={order.id}
+                  order={order}
+                  showDriver
+                  onViewTracking={openTracking}
                 >
-                  {order.has_pod ? 'POD on file' : 'No POD'}
-                </Badge>
-              </DispatchOrderRow>
-            ))}
-          </DispatchColumn>
-        </div>
-      )}
+                  {canManage && (
+                    <div className="flex flex-wrap gap-2">
+                      {order.assignment?.status === 'rescheduled' && (
+                        <>
+                          <Badge variant="outline" className="border-amber-400 text-amber-700">
+                            Rescheduled
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={updatingStatus}
+                            onClick={() => advanceStatus(order, 'assigned')}
+                          >
+                            Ready to dispatch
+                          </Button>
+                        </>
+                      )}
+                      {order.assignment?.status === 'picked_up' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={updatingStatus}
+                          onClick={() => advanceStatus(order, 'out_for_delivery')}
+                        >
+                          Out for delivery
+                        </Button>
+                      )}
+                      {order.assignment?.status === 'out_for_delivery' && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={updatingStatus}
+                            onClick={() => advanceStatus(order, 'delivered')}
+                          >
+                            <CheckCircle className="mr-1 h-3 w-3" />
+                            Mark delivered
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-[var(--red)]"
+                            onClick={() => setFailOrder(order)}
+                          >
+                            Mark failed
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={updatingStatus || rollingOver}
+                            onClick={() => moveToTomorrow(order)}
+                          >
+                            Move to tomorrow
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </DispatchOrderRow>
+              ))}
+            </DispatchColumn>
 
-      <CreateRouteDialog
-        open={createRouteOpen}
-        onClose={() => {
-          setCreateRouteOpen(false)
-          setSelectedIds(new Set())
-        }}
-        selectedOrders={selectedOrders}
-      />
+            <DispatchColumn title="Delivered today" count={data.delivered_today.length}>
+              {data.delivered_today.map((order) => (
+                <DispatchOrderRow
+                  key={order.id}
+                  order={order}
+                  showDriver
+                  onViewTracking={openTracking}
+                >
+                  <Badge
+                    variant="outline"
+                    className={
+                      order.has_pod
+                        ? 'border-[var(--mint)] text-[var(--mint)]'
+                        : 'border-amber-400 text-amber-600'
+                    }
+                  >
+                    {order.has_pod ? 'POD on file' : 'No POD'}
+                  </Badge>
+                </DispatchOrderRow>
+              ))}
+            </DispatchColumn>
+          </div>
+        )}
 
-      {canManage && (
-        <>
-          <Dialog open={!!assignOrder} onOpenChange={(o) => !o && setAssignOrder(null)}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Assign driver</DialogTitle>
-              </DialogHeader>
-              <Label htmlFor="assign-driver-select">Driver</Label>
-              <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
-                <SelectTrigger id="assign-driver-select">
-                  <option value="">Select driver…</option>
-                  {drivers.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {driverLabel(d)}
-                      {d.vehicleType ? ` (${d.vehicleType})` : ''}
-                    </option>
-                  ))}
-                </SelectTrigger>
-              </Select>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setAssignOrder(null)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleAssign} disabled={assigning || !selectedDriverId}>
-                  {assigning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Assign
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+        <CreateRouteDialog
+          open={createRouteOpen}
+          onClose={() => {
+            setCreateRouteOpen(false)
+            setSelectedIds(new Set())
+          }}
+          selectedOrders={selectedOrders}
+        />
 
-          <Dialog open={!!reassignOrder} onOpenChange={(o) => !o && setReassignOrder(null)}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Reassign driver</DialogTitle>
-              </DialogHeader>
-              <Label htmlFor="reassign-driver-select">New driver</Label>
-              <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
-                <SelectTrigger id="reassign-driver-select">
-                  <option value="">Select driver…</option>
-                  {drivers.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {driverLabel(d)}
-                    </option>
-                  ))}
-                </SelectTrigger>
-              </Select>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setReassignOrder(null)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleReassign} disabled={reassigning || !selectedDriverId}>
-                  Reassign
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+        {canManage && (
+          <>
+            <Dialog open={!!assignOrder} onOpenChange={(o) => !o && setAssignOrder(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Assign driver</DialogTitle>
+                </DialogHeader>
+                <Label htmlFor="assign-driver-select">Driver</Label>
+                <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+                  <SelectTrigger id="assign-driver-select">
+                    <option value="">Select driver…</option>
+                    {drivers.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {driverLabel(d)}
+                        {d.vehicleType ? ` (${d.vehicleType})` : ''}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setAssignOrder(null)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAssign} disabled={assigning || !selectedDriverId}>
+                    {assigning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Assign
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
-          <Dialog open={!!podOrder} onOpenChange={(o) => !o && setPodOrder(null)}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Proof of delivery (optional)</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-3">
-                <div>
-                  <Label>Recipient name</Label>
-                  <Input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} />
+            <Dialog open={!!reassignOrder} onOpenChange={(o) => !o && setReassignOrder(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Reassign driver</DialogTitle>
+                </DialogHeader>
+                <Label htmlFor="reassign-driver-select">New driver</Label>
+                <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+                  <SelectTrigger id="reassign-driver-select">
+                    <option value="">Select driver…</option>
+                    {drivers.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {driverLabel(d)}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setReassignOrder(null)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleReassign} disabled={reassigning || !selectedDriverId}>
+                    Reassign
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!podOrder} onOpenChange={(o) => !o && setPodOrder(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Proof of delivery (optional)</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div>
+                    <Label>Recipient name</Label>
+                    <Input
+                      value={recipientName}
+                      onChange={(e) => setRecipientName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Notes</Label>
+                    <Textarea
+                      value={proofNotes}
+                      onChange={(e) => setProofNotes(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label>Notes</Label>
-                  <Textarea
-                    value={proofNotes}
-                    onChange={(e) => setProofNotes(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setPodOrder(null)}>
-                  Skip
-                </Button>
-                <Button onClick={handlePodSubmit} disabled={submittingPod}>
-                  Save proof
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setPodOrder(null)}>
+                    Skip
+                  </Button>
+                  <Button onClick={handlePodSubmit} disabled={submittingPod}>
+                    Save proof
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
-          <Dialog open={!!failOrder} onOpenChange={(o) => !o && setFailOrder(null)}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Mark delivery failed</DialogTitle>
-              </DialogHeader>
-              <Label>Reason</Label>
-              <Textarea
-                value={failureReason}
-                onChange={(e) => setFailureReason(e.target.value)}
-                rows={3}
-              />
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setFailOrder(null)}>
-                  Cancel
-                </Button>
-                <Button variant="destructive" onClick={handleFail} disabled={updatingStatus}>
-                  Confirm failed
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </>
-      )}
+            <Dialog open={!!failOrder} onOpenChange={(o) => !o && setFailOrder(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Mark delivery failed</DialogTitle>
+                </DialogHeader>
+                <Label>Reason</Label>
+                <Textarea
+                  value={failureReason}
+                  onChange={(e) => setFailureReason(e.target.value)}
+                  rows={3}
+                />
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setFailOrder(null)}>
+                    Cancel
+                  </Button>
+                  <Button variant="destructive" onClick={handleFail} disabled={updatingStatus}>
+                    Confirm failed
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
+        )}
 
-      <DeliveryTrackingDrawer
-        orderId={trackingOrderId}
-        open={!!trackingOrderId}
-        onOpenChange={(open) => {
-          if (!open) setTrackingOrderId(null)
-        }}
-      />
-    </div>
+        <DeliveryTrackingDrawer
+          orderId={trackingOrderId}
+          open={!!trackingOrderId}
+          onOpenChange={(open) => {
+            if (!open) setTrackingOrderId(null)
+          }}
+        />
+      </div>
+    </TooltipProvider>
   )
 }
 

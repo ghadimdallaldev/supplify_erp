@@ -1,4 +1,4 @@
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Button } from '../../ui/button'
 import { useAppSelector } from '../../../hooks/redux'
 import { usePushNotifications } from '../../../hooks/usePushNotifications'

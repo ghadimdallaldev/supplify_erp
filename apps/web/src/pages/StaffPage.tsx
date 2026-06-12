@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { RequirePermission } from '../components/RequirePermission'
 
 import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 
 import { LazyTabMount } from '../components/LazyTabMount'
 
@@ -25,7 +26,7 @@ export function StaffPage() {
 
   return (
     <RequirePermission permission="STAFF_VIEW" title="staff management">
-      <div className="space-y-6">
+      <PageShell data-testid="staff-page">
         <PageHeader
           title="Staff operations"
           description="Schedule shifts, manage time, and keep your team aligned. This is the manager view — staff use their own portal at /staff/dashboard."
@@ -98,7 +99,7 @@ export function StaffPage() {
             </LazyTabMount>
           </TabsContent>
         </Tabs>
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

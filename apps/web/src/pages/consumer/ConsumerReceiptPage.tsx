@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useGetPublicConsumerReceiptQuery } from '../../services/consumerApi'
 import { OrderStatusStepper } from '../../components/consumer/OrderStatusStepper'
+import { OrderHistoryTimeline } from '../../components/consumer/OrderHistoryTimeline'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { Skeleton } from '../../components/ui/skeleton'
@@ -41,7 +42,7 @@ export function ConsumerReceiptPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-lg space-y-4 p-6">
+      <div className="space-y-4 p-4">
         <Skeleton className="h-8 w-1/2" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-40 w-full" />
@@ -50,23 +51,19 @@ export function ConsumerReceiptPage() {
   }
 
   if (isError || !data?.order) {
-    return (
-      <div className="mx-auto max-w-lg p-6 text-center text-muted-foreground">
-        Receipt not found.
-      </div>
-    )
+    return <div className="p-6 text-center text-muted-foreground">Receipt not found.</div>
   }
 
-  const { order, lines, loyalty } = data
+  const { order, lines, history, loyalty } = data
   const delivered = order.status === 'DELIVERED'
   const pointsEarned = loyalty?.pointsEarned
   const showEarnBanner = delivered && pointsEarned != null && pointsEarned > 0
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 p-6">
+    <div className="space-y-4 p-4 pb-8">
       <div className="text-center">
         <CheckCircle2
-          className={`mx-auto mb-2 h-10 w-10 ${delivered ? 'text-green-600' : 'text-primary'}`}
+          className={`mx-auto mb-2 h-10 w-10 ${delivered ? 'text-green-600' : 'text-[var(--brand-mid)]'}`}
         />
         <h1 className="text-2xl font-semibold">
           {delivered ? 'Order delivered' : 'Order confirmed'}
@@ -82,9 +79,6 @@ export function ConsumerReceiptPage() {
               <p className="font-medium text-green-900 dark:text-green-100">
                 +{pointsEarned} rewards points earned!
               </p>
-              <p className="text-sm text-green-800/80 dark:text-green-200/80">
-                Points are added to your rewards balance when the order is delivered.
-              </p>
               <Button
                 asChild
                 variant="link"
@@ -99,12 +93,23 @@ export function ConsumerReceiptPage() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Order status</CardTitle>
+          <CardTitle className="text-base">Live tracking</CardTitle>
         </CardHeader>
         <CardContent>
-          <OrderStatusStepper status={order.status} />
+          <OrderStatusStepper status={order.status} fulfillmentType={order.fulfillment_type} />
         </CardContent>
       </Card>
+
+      {history && history.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Status history</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <OrderHistoryTimeline history={history} fulfillmentType={order.fulfillment_type} />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -155,7 +160,7 @@ export function ConsumerReceiptPage() {
         <Button asChild variant="outline" className="flex-1">
           <Link to={`/order/${restaurantSlug}/track`}>Track another order</Link>
         </Button>
-        <Button asChild className="flex-1">
+        <Button asChild className="flex-1 bg-[var(--brand-mid)] hover:bg-[var(--brand)]">
           <Link to={`/order/${restaurantSlug}`}>Back to store</Link>
         </Button>
       </div>

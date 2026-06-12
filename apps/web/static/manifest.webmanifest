@@ -10,6 +10,20 @@
   "background_color": "#f1f5f9",
   "theme_color": "#5b21b6",
   "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Staff portal",
+      "short_name": "Staff",
+      "description": "Clock in, view shifts, and request time off",
+      "url": "/staff/login"
+    },
+    {
+      "name": "Order online",
+      "short_name": "Order",
+      "description": "Browse the menu and place an order",
+      "url": "/order"
+    }
+  ],
   "icons": [
     {
       "src": "/icons/icon-192.png",

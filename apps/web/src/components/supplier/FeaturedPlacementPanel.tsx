@@ -9,7 +9,7 @@ import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
 import { Sparkles, Loader2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { formatCurrency } from '../../utils/format'
 
 export function FeaturedPlacementPanel() {

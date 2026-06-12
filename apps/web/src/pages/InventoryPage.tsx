@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '../components/ui/dialog'
 import { Warehouse, Package, AlertTriangle, TrendingUp, Settings, Loader2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import {
   useGetInventoryListQuery,
   useGetWarehousesQuery,
@@ -23,6 +23,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import { formatNumber } from '../utils/format'
 import { KpiCard } from '../components/ui/kpi-card'
 import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { EmptyState } from '../components/ui/empty-state'
 import { StatusBadge } from '../components/ui/status-badge'
 import { Skeleton } from '../components/ui/skeleton'
@@ -106,68 +107,82 @@ export function InventoryPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-5">
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-7 w-48" style={{ background: 'var(--brand-ultra)' }} />
-          <Skeleton className="h-4 w-72" style={{ background: 'var(--brand-ultra)' }} />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
+      <RequirePermission permission="INVENTORY_VIEW" title="inventory">
+        <PageShell>
+          <div className="space-y-5">
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-7 w-48" style={{ background: 'var(--brand-ultra)' }} />
+              <Skeleton className="h-4 w-72" style={{ background: 'var(--brand-ultra)' }} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  style={{
+                    background: 'var(--surface)',
+                    border: '1px solid var(--app-border)',
+                    borderRadius: 12,
+                    padding: '12px 16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                  }}
+                >
+                  <Skeleton className="h-3 w-20" style={{ background: 'var(--brand-ultra)' }} />
+                  <Skeleton className="h-8 w-16" style={{ background: 'var(--brand-ultra)' }} />
+                </div>
+              ))}
+            </div>
             <div
-              key={i}
               style={{
                 background: 'var(--surface)',
                 border: '1px solid var(--app-border)',
                 borderRadius: 12,
-                padding: '12px 16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
+                padding: 16,
               }}
             >
-              <Skeleton className="h-3 w-20" style={{ background: 'var(--brand-ultra)' }} />
-              <Skeleton className="h-8 w-16" style={{ background: 'var(--brand-ultra)' }} />
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton
+                    key={i}
+                    className="h-11 w-full rounded-lg"
+                    style={{ background: 'var(--brand-ultra)' }}
+                  />
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
-        <div
-          style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--app-border)',
-            borderRadius: 12,
-            padding: 16,
-          }}
-        >
-          <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Skeleton
-                key={i}
-                className="h-11 w-full rounded-lg"
-                style={{ background: 'var(--brand-ultra)' }}
-              />
-            ))}
           </div>
-        </div>
-      </div>
+        </PageShell>
+      </RequirePermission>
     )
   }
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-        <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500" />
-        <p className="mb-1 font-semibold text-red-900">Failed to load inventory</p>
-        <p className="mb-4 text-sm text-red-700">There was a problem fetching inventory data.</p>
-        <Button onClick={() => refetch()} variant="outline" className="border-red-300 text-red-800">
-          Try again
-        </Button>
-      </div>
+      <RequirePermission permission="INVENTORY_VIEW" title="inventory">
+        <PageShell>
+          <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+            <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500" />
+            <p className="mb-1 font-semibold text-red-900">Failed to load inventory</p>
+            <p className="mb-4 text-sm text-red-700">
+              There was a problem fetching inventory data.
+            </p>
+            <Button
+              onClick={() => refetch()}
+              variant="outline"
+              className="border-red-300 text-red-800"
+            >
+              Try again
+            </Button>
+          </div>
+        </PageShell>
+      </RequirePermission>
     )
   }
 
   return (
     <RequirePermission permission="INVENTORY_VIEW" title="inventory">
-      <div className="space-y-6">
+      <PageShell>
         <PageHeader
           title="Inventory"
           description="Manage stock levels and adjustments across all warehouses"
@@ -284,7 +299,7 @@ export function InventoryPage() {
                               </div>
                             </div>
                           ) : (
-                            <span className="text-sm text-[var(--text-muted)]">â€”</span>
+                            <span className="text-sm text-[var(--text-muted)]">—</span>
                           )}
                         </td>
                         <td className="hidden py-3 px-4 text-right sm:table-cell">
@@ -402,7 +417,7 @@ export function InventoryPage() {
                           )}
                         </CardTitle>
                         <CardDescription>
-                          {warehouse.product_count || 0} products Â·{' '}
+                          {warehouse.product_count || 0} products ·{' '}
                           {warehouse.total_available_qty || 0} total available
                         </CardDescription>
                       </div>
@@ -611,7 +626,7 @@ export function InventoryPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

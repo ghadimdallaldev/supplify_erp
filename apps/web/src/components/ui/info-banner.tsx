@@ -9,22 +9,22 @@ const toneStyles: Record<
   { container: string; title: string; description: string; icon: string }
 > = {
   amber: {
-    container: 'border-amber-200 bg-amber-50 text-amber-950',
-    title: 'text-amber-950',
-    description: 'text-amber-900/90',
-    icon: 'text-amber-800',
+    container: 'border-[var(--amber-mid)]/35 bg-[var(--amber-pale)] text-[var(--text)]',
+    title: 'text-[var(--text)]',
+    description: 'text-[var(--text-mid)]',
+    icon: 'text-[var(--amber)]',
   },
   slate: {
-    container: 'border-slate-200 bg-slate-50 text-slate-900',
-    title: 'text-slate-900',
-    description: 'text-slate-700',
-    icon: 'text-slate-600',
+    container: 'border-[var(--app-border)] bg-[var(--app-bg-subtle)] text-[var(--text-mid)]',
+    title: 'text-[var(--text)]',
+    description: 'text-[var(--text-mid)]',
+    icon: 'text-[var(--text-muted)]',
   },
   red: {
-    container: 'border-red-200 bg-red-50 text-red-950',
-    title: 'text-red-950',
-    description: 'text-red-800',
-    icon: 'text-red-700',
+    container: 'border-[var(--red)]/30 bg-[var(--red-pale)] text-[var(--text)]',
+    title: 'text-[var(--text)]',
+    description: 'text-[var(--text-mid)]',
+    icon: 'text-[var(--red)]',
   },
   neutral: {
     container: 'border-[var(--app-border)] bg-[var(--bg)] text-[var(--text-mid)]',

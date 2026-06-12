@@ -44,7 +44,7 @@ import {
 } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { Link } from 'react-router-dom'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { formatCurrency, formatPrice } from '../utils/format'
 import { CardAddressBlock, pageHeaderRowClass } from '../components/ui/card-layout'
 

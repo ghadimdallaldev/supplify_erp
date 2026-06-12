@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Skeleton } from './ui/skeleton'
 import { useGetMeQuery } from '../services/api'
 import { needsLegalReacceptance } from '../lib/legalReacceptanceGate'
 
@@ -45,8 +46,15 @@ export function StaffPortalGuard({ children }: StaffPortalGuardProps) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white" />
+      <div
+        className="min-h-dvh bg-[var(--brand-ultra)] px-4 py-8 pwa-safe-top pwa-safe-bottom"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="mx-auto flex max-w-3xl flex-col gap-4">
+          <Skeleton className="h-14 w-full rounded-xl" />
+          <Skeleton className="h-32 w-full rounded-xl" />
+        </div>
       </div>
     )
   }

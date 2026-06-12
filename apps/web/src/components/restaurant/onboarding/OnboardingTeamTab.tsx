@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button } from '../../ui/button'
 import { Plus } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { useAppSelector } from '../../../hooks/redux'
 import {
   useGetRestaurantTeamQuery,

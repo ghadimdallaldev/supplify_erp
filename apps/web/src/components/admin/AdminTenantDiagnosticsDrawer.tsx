@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import {
   useGetAdminTenantOperationalSnapshotQuery,
   useGetAdminTenantEntitlementsQuery,
@@ -47,12 +47,12 @@ export function AdminTenantDiagnosticsDrawer({
   const usage = tenantType === 'SUPPLIER' ? supplierUsage?.usage : restaurantUsage?.usage
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{tenantName}</DialogTitle>
-          <DialogDescription>Read-only operational diagnostics · {tenantType}</DialogDescription>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>{tenantName}</SheetTitle>
+          <SheetDescription>Read-only operational diagnostics · {tenantType}</SheetDescription>
+        </SheetHeader>
 
         {snapLoading ? (
           <AdminLoadingState label="Loading diagnostics…" />
@@ -189,8 +189,8 @@ export function AdminTenantDiagnosticsDrawer({
             </div>
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   )
 }
 

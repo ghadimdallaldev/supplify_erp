@@ -21,7 +21,7 @@ import {
   type ConsumerOrderTrackingStatus,
 } from '../../lib/consumerOrderTracking'
 import { playNotificationSound, unlockNotificationAudio } from '../../lib/notificationAlerts'
-import { toast } from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Bell, BellOff } from 'lucide-react'
 
 type StatusFilter = 'ALL' | 'RECEIVED' | 'PREPARING' | 'SHIPPED'

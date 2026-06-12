@@ -12,7 +12,7 @@ import { Label } from '../../components/ui/label'
 import { formatPrice } from '../../utils/format'
 import { isConsumerOrderTerminal, type ConsumerOrderLine } from '../../lib/consumerOrderTracking'
 import { ArrowLeft, Search } from 'lucide-react'
-import { toast } from 'react-hot-toast'
+import { toast } from 'sonner'
 
 function formatModifiers(line: ConsumerOrderLine): string | null {
   const modifiers = line.modifiers ?? []
@@ -153,7 +153,10 @@ export function ConsumerTrackOrderPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <OrderStatusStepper status={tracked.order.status} />
+            <OrderStatusStepper
+              status={tracked.order.status}
+              fulfillmentType={tracked.order.fulfillment_type}
+            />
             <div className="space-y-3 text-sm">
               {tracked.lines.map((line) => {
                 const modifierText = formatModifiers(line)

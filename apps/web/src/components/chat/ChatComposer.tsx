@@ -155,7 +155,7 @@ export function ChatComposer({
                   key={emoji}
                   type="button"
                   onClick={() => onInsertEmoji(emoji)}
-                  className="rounded p-1 text-2xl hover:scale-125 hover:bg-[var(--brand-ultra)]"
+                  className="rounded p-1 text-2xl transition-transform duration-150 ease-out [@media(hover:hover)_and_(pointer:fine)]:hover:scale-125 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[var(--brand-ultra)] erp-pressable"
                 >
                   {emoji}
                 </button>

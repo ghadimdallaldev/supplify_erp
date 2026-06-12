@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Button } from '../../ui/button'
 import {
   Dialog,

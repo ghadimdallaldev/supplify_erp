@@ -13,7 +13,7 @@ import {
   useIgnoreFulfillmentExceptionMutation,
 } from '../../services/api'
 import { usePermissions } from '../../hooks/usePermissions'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 
 type Props = {
   warehouseId?: string

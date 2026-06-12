@@ -15,7 +15,7 @@ import {
   Copy,
   ExternalLink,
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { TenantBrandingPanel } from '../../../settings/TenantBrandingPanel'
 import { useAppSelector } from '../../../../hooks/redux'
 import { usePermissions } from '../../../../hooks/usePermissions'

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 import { formatPrice } from '../../utils/format'
 import { formatDeliveryStatus } from '../../lib/deliveryStatusLabels'
 import type { DispatchOrderCard } from '../../types'
@@ -31,6 +32,17 @@ function deliveryStatusVariant(
   return 'outline'
 }
 
+function TruncatedDriverName({ label }: { label: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="min-w-0 truncate">{label}</span>
+      </TooltipTrigger>
+      <TooltipContent side="top">{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 export function DispatchOrderRow({
   order,
   showDriver,
@@ -50,6 +62,9 @@ export function DispatchOrderRow({
   const areaLabel = area || 'Area not set'
   const tracking = order.tracking ?? null
   const gpsLabel = getGpsStatusLabel(tracking)
+  const driverLabel = driver
+    ? `${driver.full_name}${driver.vehicle_type ? ` · ${driver.vehicle_type}` : ''}`
+    : null
 
   return (
     <article
@@ -138,12 +153,11 @@ export function DispatchOrderRow({
 
           {showDriver && (
             <div className="text-xs text-[var(--text-muted)]">
-              {driver ? (
+              {driver && driverLabel ? (
                 <div className="space-y-1">
-                  <p className="inline-flex items-center gap-1 font-medium text-[var(--text)]">
-                    <Truck className="h-3 w-3" aria-hidden />
-                    {driver.full_name}
-                    {driver.vehicle_type ? ` · ${driver.vehicle_type}` : ''}
+                  <p className="inline-flex min-w-0 max-w-full items-center gap-1 font-medium text-[var(--text)]">
+                    <Truck className="h-3 w-3 shrink-0" aria-hidden />
+                    <TruncatedDriverName label={driverLabel} />
                   </p>
                   {driver.phone && (
                     <a

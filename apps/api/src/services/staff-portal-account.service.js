@@ -13,7 +13,10 @@ import { STAFF_PORTAL_APP_ROLE, STAFF_PORTAL_KEYCLOAK_ROLE } from '../lib/staff-
 import {
   buildStaffPortalLoginPageUrl,
   sendStaffPortalAccountInvite,
+  sendStaffPortalMagicLink,
 } from './staff-portal-mail.service.js'
+import { config } from '../config/env.js'
+import { isEmailConfigured } from './email/email.service.js'
 
 function generateTemporaryPassword() {
   return `${randomBytes(9).toString('base64url')}Aa1!`
@@ -45,9 +48,12 @@ export async function getStaffPortalAccessRow(staffId, restaurantId) {
 export function mapPortalAccessInfo(row) {
   if (!row) return null
   const hasAccount = Boolean(row.user_id)
+  const magicLinkEnabled = Boolean(row.portal_access_enabled && !row.user_id)
   let status = 'none'
   if (hasAccount) {
     status = row.portal_access_enabled ? 'active' : 'disabled'
+  } else if (magicLinkEnabled) {
+    status = 'active'
   } else if (row.portal_invited_at) {
     status = 'invited'
   }
@@ -55,6 +61,7 @@ export function mapPortalAccessInfo(row) {
     staffId: row.id,
     email: row.email,
     hasAccount,
+    magicLinkEnabled,
     portalAccessEnabled: row.portal_access_enabled,
     status,
     invitedAt: row.portal_invited_at,
@@ -191,11 +198,38 @@ export async function sendStaffPortalInviteEmail(staffId, restaurantId) {
     throw err
   }
   const email = await assertStaffEmail(staff)
-  if (!staff.user_id || !staff.portal_access_enabled) {
-    const err = new Error('Create a portal account before sending an invite')
-    err.name = 'PORTAL_ACCOUNT_REQUIRED'
+  if (!staff.portal_access_enabled) {
+    const err = new Error('Enable staff portal access before sending an invite')
+    err.name = 'PORTAL_ACCESS_DISABLED'
     err.status = 400
     throw err
+  }
+
+  if (!staff.user_id) {
+    const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000)
+    const session = await query(
+      `
+        INSERT INTO staff_portal_session (staff_id, expires_at)
+        VALUES ($1, $2)
+        RETURNING session_token, expires_at
+      `,
+      [staffId, expiresAt.toISOString()]
+    )
+    const sessionToken = session.rows[0].session_token
+    const sessionExpiresAt = session.rows[0].expires_at
+
+    await sendStaffPortalMagicLink({
+      to: email,
+      displayName: staff.display_name,
+      sessionToken,
+      expiresAt: sessionExpiresAt,
+    })
+
+    const info = mapPortalAccessInfo(await getStaffPortalAccessRow(staffId, restaurantId))
+    if (config.NODE_ENV === 'development' && !isEmailConfigured()) {
+      return { ...info, sessionToken, expiresAt: sessionExpiresAt }
+    }
+    return info
   }
 
   await query(

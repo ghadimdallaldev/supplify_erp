@@ -33,7 +33,7 @@ import {
   DealTargetingPickers,
   type DealTargetingValue,
 } from '../../components/deals/DealTargetingPickers'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { RequirePermission } from '../../components/RequirePermission'
 import { FeatureLockedCard } from '../../components/FeatureLockedCard'
 import { DealsPerformanceSummary } from '../../components/promotions/DealsPerformanceSummary'
