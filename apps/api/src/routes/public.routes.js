@@ -94,6 +94,32 @@ const staffSelfSwapSchema = z.object({
   reason: z.string().optional(),
 })
 
+let staffQueryTokenDeprecationLogged = false
+
+/**
+ * Resolve staff portal session token for public self-service routes.
+ * Prefer `Authorization: Bearer <token>`, then JSON/body `token`.
+ * Query string `?token=` is a deprecated fallback (logged once per process).
+ */
+function resolveStaffPortalToken(req) {
+  const authHeader = req.headers.authorization
+  if (authHeader?.startsWith('Bearer ')) {
+    const bearerToken = authHeader.slice(7).trim()
+    if (bearerToken) return bearerToken
+  }
+  if (req.body?.token) return req.body.token
+  if (req.query?.token) {
+    if (!staffQueryTokenDeprecationLogged) {
+      staffQueryTokenDeprecationLogged = true
+      logger.warn(
+        'Staff portal token in query string is deprecated; use Authorization: Bearer header or request body token'
+      )
+    }
+    return req.query.token
+  }
+  return null
+}
+
 const publicWaitlistSchema = z.object({
   restaurantId: z.string().uuid(),
   partySize: z.number().min(1).max(50),
@@ -792,7 +818,8 @@ router.post('/staff/session', async (req, res) => {
 
 router.get('/staff/dashboard', async (req, res) => {
   try {
-    const params = staffDashboardSchema.parse({ token: req.query.token })
+    const token = resolveStaffPortalToken(req)
+    const params = staffDashboardSchema.parse({ token })
     const session = await ensureStaffSession(params.token)
     if (!session) {
       return res.status(401).json({
@@ -830,7 +857,8 @@ router.get('/staff/dashboard', async (req, res) => {
 
 router.get('/staff/time-entries', async (req, res) => {
   try {
-    const params = staffDashboardSchema.parse({ token: req.query.token })
+    const token = resolveStaffPortalToken(req)
+    const params = staffDashboardSchema.parse({ token })
     const session = await ensureStaffSession(params.token)
     if (!session) {
       return res.status(401).json({
@@ -988,7 +1016,7 @@ router.post('/staff/swaps', async (req, res) => {
 
 router.post('/staff/announcements/:id/ack', async (req, res) => {
   try {
-    const token = req.body?.token || req.query.token
+    const token = resolveStaffPortalToken(req)
     const session = await ensureStaffSession(token)
     if (!session) {
       return res.status(401).json({
@@ -1017,7 +1045,8 @@ router.post('/staff/announcements/:id/ack', async (req, res) => {
 
 router.get('/staff/availability', async (req, res) => {
   try {
-    const params = staffDashboardSchema.parse({ token: req.query.token })
+    const token = resolveStaffPortalToken(req)
+    const params = staffDashboardSchema.parse({ token })
     const session = await ensureStaffSession(params.token)
     if (!session) {
       return res.status(401).json({

@@ -225,6 +225,7 @@ export async function completeTenantRegistration({
     )
   }
 
+  // Reject duplicate tenant rows for this email; linking to an existing tenant requires an invitation token.
   const tenantTable = type === 'SUPPLIER' ? 'supplier' : 'restaurant'
   const { rows: existingTenant } = await query(
     `SELECT id FROM ${tenantTable} WHERE LOWER(TRIM(contact_email)) = $1 LIMIT 1`,

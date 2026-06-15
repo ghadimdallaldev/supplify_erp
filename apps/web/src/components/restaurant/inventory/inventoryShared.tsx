@@ -1,4 +1,23 @@
-import { Loader2 } from 'lucide-react'
+import { Skeleton } from '../../ui/skeleton'
+
+export function InventoryTabLoading({ className }: { className?: string }) {
+  return (
+    <section
+      className={`overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)] ${className ?? ''}`}
+      aria-busy="true"
+      aria-label="Loading tab"
+    >
+      <div className="divide-y divide-[var(--app-border)]">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="space-y-2 px-4 py-4 sm:px-5">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-10 w-full max-w-md" />
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
 
 export type SortOption =
   | 'updated_desc'
@@ -78,12 +97,4 @@ export function calculateReorderQuantity(item: any) {
 
 export function summaryCardClass(active: boolean) {
   return `cursor-pointer transition-shadow duration-200 ease hover:shadow-md ${active ? 'ring-2 ring-[var(--brand-mid)] ring-offset-2' : ''}`
-}
-
-export function InventoryTabLoading({ className = 'py-12' }: { className?: string }) {
-  return (
-    <div className={`flex justify-center text-[var(--text-muted)] ${className}`}>
-      <Loader2 className="h-8 w-8 animate-spin" />
-    </div>
-  )
 }

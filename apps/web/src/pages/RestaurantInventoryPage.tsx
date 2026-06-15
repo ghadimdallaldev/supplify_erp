@@ -11,7 +11,7 @@ import {
 } from '../components/ui/dialog'
 import { Label } from '../components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
-import { Plus, Upload } from 'lucide-react'
+import { Plus, Upload, Package, Trash2, History, Calendar, BarChart3 } from 'lucide-react'
 import { useGetEntitlementsQuery } from '../services/api'
 import { toast } from 'sonner'
 import { formatNumber } from '../utils/format'
@@ -19,6 +19,7 @@ import { featureEnabled } from '../lib/planLimits'
 import { ReorderAssistancePanel } from '../components/inventory/ReorderAssistancePanel'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { LazyTabMount } from '../components/LazyTabMount'
 import { InventoryTabLoading } from '../components/restaurant/inventory/inventoryShared'
 import {
@@ -53,10 +54,10 @@ export function RestaurantInventoryPage() {
 
   return (
     <RequirePermission permission="INVENTORY_VIEW" title="inventory">
-      <div className="page-stack p-4 sm:p-6">
+      <PageShell className="space-y-6" data-testid="restaurant-inventory-page">
         <PageHeader
           title="Inventory"
-          description="Track your stock levels and manage inventory"
+          description="Track stock levels, waste, expiry, and movement across your kitchen."
           actions={
             <>
               <Button
@@ -81,15 +82,30 @@ export function RestaurantInventoryPage() {
           </div>
         )}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="inventory">Current Inventory</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="tabs-scroll h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
+            <TabsTrigger value="inventory" className="gap-1.5 text-xs sm:text-sm">
+              <Package className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Stock
+            </TabsTrigger>
             {wasteTrackingEnabled ? (
-              <TabsTrigger value="waste">Waste & spoilage</TabsTrigger>
+              <TabsTrigger value="waste" className="gap-1.5 text-xs sm:text-sm">
+                <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Waste
+              </TabsTrigger>
             ) : null}
-            <TabsTrigger value="history">Movement History</TabsTrigger>
-            <TabsTrigger value="expiry">Expiry tracking</TabsTrigger>
-            <TabsTrigger value="totals">Totals & Sources</TabsTrigger>
+            <TabsTrigger value="history" className="gap-1.5 text-xs sm:text-sm">
+              <History className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              History
+            </TabsTrigger>
+            <TabsTrigger value="expiry" className="gap-1.5 text-xs sm:text-sm">
+              <Calendar className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Expiry
+            </TabsTrigger>
+            <TabsTrigger value="totals" className="gap-1.5 text-xs sm:text-sm">
+              <BarChart3 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Totals
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="inventory" className="space-y-6">
@@ -271,7 +287,7 @@ export function RestaurantInventoryPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

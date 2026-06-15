@@ -62,11 +62,12 @@ import {
 import { LimitExceededBanner } from '../components/LimitExceededBanner'
 import { EmptyState } from '../components/ui/empty-state'
 import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
+import { SummaryStrip } from '../components/ui/app-panel'
 import { Select, SelectTrigger } from '../components/ui/select'
 import { Skeleton } from '../components/ui/skeleton'
 import { formatDaysOfWeekLabel, parseDaysOfWeek } from '../utils/parseDaysOfWeek'
 import { cn } from '../lib/utils'
-import { QuickListStatCard } from '../components/quick-lists/QuickListStatCard'
 import {
   LazyQuickListCreateDialog,
   LazyQuickListProductDialog,
@@ -534,7 +535,7 @@ export function QuickListsPage() {
 
   return (
     <RequirePermission permission="ORDERS_VIEW" title="quick lists">
-      <div className="space-y-5" data-testid="quick-lists-page">
+      <PageShell className="space-y-5" data-testid="quick-lists-page">
         {!quickListCreateGate.canUse && quickListCreateGate.limit != null && (
           <LimitExceededBanner
             limitKey="quick_lists"
@@ -578,57 +579,50 @@ export function QuickListsPage() {
           }
         />
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-          <QuickListStatCard
-            label="Total lists"
-            value={stats.total}
-            hint={
-              quickListCreateGate.limit != null
-                ? `${quickListCreateGate.current ?? stats.total} / ${quickListCreateGate.limit} on plan`
-                : undefined
-            }
-            icon={<Package className="h-5 w-5 text-[var(--brand-mid)]" />}
-            iconWrapClassName="bg-[var(--brand-pale)]"
-            active={filterStatus === 'all' && stats.total > 0}
-            onClick={stats.total > 0 ? () => setFilterStatus('all') : undefined}
-          />
-          <QuickListStatCard
-            label="Scheduled"
-            value={stats.scheduled}
-            hint={
-              stats.nextScheduledName && stats.nextScheduledDate
-                ? `Next: ${stats.nextScheduledName} · ${stats.nextScheduledDate}`
-                : quickListSchedulingEnabled && scheduledQuickListGate.limit != null
-                  ? `${scheduledQuickListGate.current ?? stats.scheduled} / ${scheduledQuickListGate.limit} slots`
-                  : 'Auto-order on a cadence'
-            }
-            icon={<Clock className="h-5 w-5 text-[var(--mint)]" />}
-            iconWrapClassName="bg-[var(--mint)]/15"
-            active={filterStatus === 'scheduled'}
-            onClick={stats.total > 0 ? () => setFilterStatus('scheduled') : undefined}
-          />
-          <QuickListStatCard
-            label="Active"
-            value={stats.active}
-            hint="Lists ready to use or run"
-            icon={<CheckCircle className="h-5 w-5 text-[var(--brand-mid)]" />}
-            iconWrapClassName="bg-[var(--brand-pale)]"
-          />
-          <QuickListStatCard
-            label="Total items"
-            value={stats.totalItems}
-            hint={
-              quickListItemGate.limit != null
-                ? `Up to ${quickListItemGate.limit} items per list`
-                : 'Products across all lists'
-            }
-            icon={<TrendingUp className="h-5 w-5 text-[var(--amber-mid)]" />}
-            iconWrapClassName="bg-[var(--amber-pale)]"
-          />
-        </div>
+        <SummaryStrip
+          testId="quick-lists-summary"
+          metrics={[
+            {
+              label: 'Total lists',
+              value: stats.total,
+              hint:
+                quickListCreateGate.limit != null
+                  ? `${quickListCreateGate.current ?? stats.total} / ${quickListCreateGate.limit} on plan`
+                  : undefined,
+              active: filterStatus === 'all' && stats.total > 0,
+              onClick: stats.total > 0 ? () => setFilterStatus('all') : undefined,
+            },
+            {
+              label: 'Scheduled',
+              value: stats.scheduled,
+              tone: 'mint',
+              hint:
+                stats.nextScheduledName && stats.nextScheduledDate
+                  ? `Next: ${stats.nextScheduledName} · ${stats.nextScheduledDate}`
+                  : quickListSchedulingEnabled && scheduledQuickListGate.limit != null
+                    ? `${scheduledQuickListGate.current ?? stats.scheduled} / ${scheduledQuickListGate.limit} slots`
+                    : 'Auto-order on a cadence',
+              active: filterStatus === 'scheduled',
+              onClick: stats.total > 0 ? () => setFilterStatus('scheduled') : undefined,
+            },
+            {
+              label: 'Active',
+              value: stats.active,
+              hint: 'Lists ready to use or run',
+            },
+            {
+              label: 'Total items',
+              value: stats.totalItems,
+              hint:
+                quickListItemGate.limit != null
+                  ? `Up to ${quickListItemGate.limit} items per list`
+                  : 'Products across all lists',
+            },
+          ]}
+        />
 
         {quickLists.length > 0 && (
-          <div className="flex flex-col gap-3 rounded-xl border border-[var(--app-border-mid)] bg-[var(--surface)] p-3 shadow-sm sm:flex-row sm:items-center sm:p-4">
+          <div className="flex flex-col gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 sm:flex-row sm:items-center sm:p-4">
             <div className="relative min-w-0 flex-1">
               <Search
                 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
@@ -1024,7 +1018,7 @@ export function QuickListsPage() {
             />
           )}
         </Suspense>
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

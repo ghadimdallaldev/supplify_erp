@@ -70,16 +70,19 @@ router.patch(
 
       const supplier = suppliers[0]
 
-      if (req.userData.role === 'SUPPLIER' && supplier.contact_email !== req.userData.email) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied',
-          },
-          requestId: req.requestId,
-        })
+      if (req.userData.role === 'SUPPLIER') {
+        const supplierId = await getSupplierIdForRequest(req)
+        if (!supplierId || supplier.id !== supplierId) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'FORBIDDEN',
+              message: 'Access denied',
+            },
+            requestId: req.requestId,
+          })
+        }
       }
 
       const {

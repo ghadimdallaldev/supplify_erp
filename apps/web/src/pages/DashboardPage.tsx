@@ -46,6 +46,7 @@ import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import {
   DASHBOARD_CALENDAR_EXTRA_GAP,
+  DashboardSummaryStrip,
   KpiCard,
   buildOrderSpendTrend,
   type KpiCardProps,
@@ -327,11 +328,22 @@ export function DashboardPage() {
         description={`${dashboardConfig?.description ?? formattedDate} · ${persona.roleLabel} · ${planName}`}
       />
 
-      <div className="dashboard-kpi-grid">
-        {kpis.map((kpi) => (
-          <KpiCard key={kpi.label} {...kpi} />
-        ))}
-      </div>
+      {isRestaurant ? (
+        <DashboardSummaryStrip
+          metrics={kpis.map((kpi) => ({
+            label: kpi.label,
+            value: kpi.value,
+            hint: kpi.meta,
+            tone: kpi.kpiKey === 'pending' ? 'amber' : kpi.kpiKey === 'orders' ? 'mint' : 'default',
+          }))}
+        />
+      ) : (
+        <div className="dashboard-kpi-grid">
+          {kpis.map((kpi) => (
+            <KpiCard key={kpi.label} {...kpi} />
+          ))}
+        </div>
+      )}
 
       <Suspense
         fallback={

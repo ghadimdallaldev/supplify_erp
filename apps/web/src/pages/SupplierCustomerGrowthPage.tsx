@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Upload, Users, Link2, Gift, AlertTriangle } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
@@ -6,6 +6,13 @@ import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
 import { Label } from '../components/ui/label'
 import { Skeleton } from '../components/ui/skeleton'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { EmptyState } from '../components/ui/empty-state'
@@ -18,6 +25,12 @@ import {
   useConnectProspectMutation,
   useSponsorProspectMutation,
 } from '../services/api/endpoints/growth'
+import {
+  lowestEligibleSponsorPlan,
+  normalizeEligibleSponsorPlans,
+  SPONSORSHIP_PLAN_LABELS,
+  type SponsorshipGiftPlanKey,
+} from '../lib/growthSponsorshipPlans'
 import { toast } from 'sonner'
 
 type ImportPreviewRow = {
@@ -71,6 +84,22 @@ export function SupplierCustomerGrowthPage() {
     validCount: number
     errorCount: number
   } | null>(null)
+
+  const eligibleSponsorPlans = useMemo(
+    () => normalizeEligibleSponsorPlans(metrics?.eligibleSponsorPlans),
+    [metrics?.eligibleSponsorPlans]
+  )
+  const defaultSponsorPlan = useMemo(
+    () => lowestEligibleSponsorPlan(eligibleSponsorPlans),
+    [eligibleSponsorPlans]
+  )
+  const [sponsorPlanCode, setSponsorPlanCode] = useState<SponsorshipGiftPlanKey>(defaultSponsorPlan)
+
+  useEffect(() => {
+    setSponsorPlanCode((current) =>
+      eligibleSponsorPlans.includes(current) ? current : defaultSponsorPlan
+    )
+  }, [defaultSponsorPlan, eligibleSponsorPlans])
 
   const handleFile = async (file: File) => {
     const text = await file.text()
@@ -250,6 +279,35 @@ export function SupplierCustomerGrowthPage() {
             <Users className="h-5 w-5" />
             Imported customers
           </CardTitle>
+          {eligibleSponsorPlans.length > 0 && (
+            <CardDescription className="flex flex-wrap items-center gap-2 pt-1">
+              <span>Sponsorship gift plan:</span>
+              <Select
+                value={sponsorPlanCode}
+                onValueChange={(value) => setSponsorPlanCode(value as SponsorshipGiftPlanKey)}
+              >
+                <SelectTrigger
+                  className="h-8 w-[160px]"
+                  data-testid="growth-sponsor-plan-picker"
+                  aria-label="Sponsorship gift plan"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {eligibleSponsorPlans.map((planKey) => (
+                    <SelectItem key={planKey} value={planKey}>
+                      {SPONSORSHIP_PLAN_LABELS[planKey]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {metrics?.sponsorshipLimit != null && (
+                <span className="text-xs text-[var(--text-muted)]">
+                  Limit: {metrics.sponsorshipLimit}/year on your supplier plan
+                </span>
+              )}
+            </CardDescription>
+          )}
         </CardHeader>
         <CardContent>
           {prospectsLoading ? (
@@ -345,7 +403,7 @@ export function SupplierCustomerGrowthPage() {
                                   try {
                                     await sponsorProspect({
                                       prospectId: p.id,
-                                      planCode: 'silver',
+                                      planCode: sponsorPlanCode,
                                     }).unwrap()
                                     toast.success('Sponsorship started')
                                     refetchProspects()

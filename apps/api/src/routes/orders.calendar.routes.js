@@ -301,70 +301,13 @@ router.get(
       }
 
       const whereClause = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : ''
-
-      const orderLimit = Math.min(params.pageSize * 6, 600)
-      const orderParams = [...baseParams, orderLimit]
-      const orderLimitPlaceholder = `$${orderParams.length}`
-
-      const orderSql = `
-      SELECT 
-        o.id,
-        o.status,
-        o.total_amount,
-        o.currency,
-        COALESCE(o.placed_at, o.created_at) AS placed_at,
-        o.created_at,
-        o.updated_at,
-        ${hasBranchColumn ? 'o.branch_id,' : ''}
-        ${hasBranchColumn ? 'b.name AS branch_name,' : ''}
-        o.restaurant_id,
-        r.name AS restaurant_name,
-        COALESCE((
-          SELECT json_agg(DISTINCT jsonb_build_object('id', s.id, 'name', s.name))
-          FROM order_item oi
-          JOIN supplier s ON s.id = oi.supplier_id
-          WHERE oi.order_id = o.id
-        ), '[]'::json) AS suppliers,
-        COALESCE((
-          SELECT array_remove(array_agg(DISTINCT p.category), NULL)
-          FROM order_item oi
-          JOIN product p ON p.id = oi.product_id
-          WHERE oi.order_id = o.id
-        ), ARRAY[]::text[]) AS categories
-      FROM customer_order o
-      JOIN restaurant r ON r.id = o.restaurant_id
-      ${hasBranchColumn ? 'LEFT JOIN branch b ON b.id = o.branch_id' : ''}
-      ${whereClause}
-      ORDER BY COALESCE(o.placed_at, o.created_at) DESC
-      LIMIT ${orderLimitPlaceholder}
-    `
-
-      const countSql = `
-      SELECT COUNT(*) AS count
-      FROM customer_order o
-      ${whereClause}
-    `
-
-      const [orderResult, countResult] = await Promise.all([
-        query(orderSql, orderParams),
-        query(countSql, baseParams),
-      ])
-
-      const orderRows = orderResult.rows || []
-      const totalOrders = Number(countResult.rows?.[0]?.count || 0)
-
-      const orderLookup = new Map()
-      orderRows.forEach((order) => {
-        const supplierSummary = summarizeSuppliers(order.suppliers)
-        order.supplierList = supplierSummary.list
-        orderLookup.set(order.id, order)
-      })
+      const pageOffset = (params.page - 1) * params.pageSize
 
       const invoiceParams = []
       const invoiceWhereParts = []
       const addInvoiceParam = (value) => {
         invoiceParams.push(value)
-        return `$${invoiceParams.length}`
+        return `$${baseParams.length + invoiceParams.length}`
       }
 
       if (effectiveRole === 'RESTAURANT') {
@@ -384,92 +327,211 @@ router.get(
       const invoiceWhereClause = invoiceWhereParts.length
         ? `WHERE ${invoiceWhereParts.join(' AND ')}`
         : ''
-      const invoiceLimit = Math.min(params.pageSize * 6, 600)
-      const invoiceParamsWithLimit = [...invoiceParams, invoiceLimit]
-      const invoiceLimitPlaceholder = `$${invoiceParamsWithLimit.length}`
 
-      const invoiceSql = `
-      SELECT 
-        i.id,
-        i.order_id,
-        i.invoice_date,
-        i.due_date,
-        i.total_amount,
-        i.currency,
-        i.status,
-        i.supplier_id,
-        i.restaurant_id,
-        i.created_at,
-        s.name AS supplier_name,
-        r.name AS restaurant_name
-      FROM invoice i
-      LEFT JOIN supplier s ON s.id = i.supplier_id
-      LEFT JOIN restaurant r ON r.id = i.restaurant_id
-      ${invoiceWhereClause}
-      ORDER BY i.due_date DESC NULLS LAST
-      LIMIT ${invoiceLimitPlaceholder}
-    `
+      const orderEventSql = `
+        SELECT
+          'order'::text AS source,
+          o.id::text AS source_id,
+          COALESCE(o.placed_at, o.created_at) AS event_start,
+          o.status::text AS event_status
+        FROM customer_order o
+        ${whereClause}
+      `
 
-      const invoiceResult = await query(invoiceSql, invoiceParamsWithLimit)
-      const invoiceRows = invoiceResult.rows || []
+      const invoiceEventSql = `
+        SELECT
+          'invoice'::text AS source,
+          i.id::text AS source_id,
+          COALESCE(i.due_date, i.invoice_date, i.created_at) AS event_start,
+          i.status::text AS event_status
+        FROM invoice i
+        ${invoiceWhereClause}
+      `
 
-      const events = []
+      const unionParams = [...baseParams, ...invoiceParams]
+      if (params.status) {
+        unionParams.push(params.status)
+      }
+      const statusFilterIdx = unionParams.length
+      const statusFilterSql = params.status ? `WHERE event_status = $${statusFilterIdx}` : ''
+
+      const paginationParams = [...unionParams, params.pageSize, pageOffset]
+      const limitIdx = paginationParams.length - 1
+      const offsetIdx = paginationParams.length
+
+      const paginatedSql = `
+        WITH combined AS (
+          ${orderEventSql}
+          UNION ALL
+          ${invoiceEventSql}
+        )
+        SELECT source, source_id, event_start, event_status
+        FROM combined
+        ${statusFilterSql}
+        ORDER BY event_start ASC
+        LIMIT $${limitIdx} OFFSET $${offsetIdx}
+      `
+
+      const countEventsSql = `
+        WITH combined AS (
+          ${orderEventSql}
+          UNION ALL
+          ${invoiceEventSql}
+        )
+        SELECT COUNT(*)::int AS count
+        FROM combined
+        ${statusFilterSql}
+      `
+
+      const orderCountSql = `
+        SELECT COUNT(*)::int AS count
+        FROM customer_order o
+        ${whereClause}
+      `
+
+      const invoiceCountSql = `
+        SELECT COUNT(*)::int AS count
+        FROM invoice i
+        ${invoiceWhereClause}
+      `
+
+      const [pageResult, totalEventResult, orderCountResult, invoiceCountResult] =
+        await Promise.all([
+          query(paginatedSql, paginationParams),
+          query(countEventsSql, unionParams),
+          query(orderCountSql, baseParams),
+          query(invoiceCountSql, invoiceParams),
+        ])
+
+      const totalEvents = Number(totalEventResult.rows?.[0]?.count || 0)
+      const totalOrders = Number(orderCountResult.rows?.[0]?.count || 0)
+      const totalInvoices = Number(invoiceCountResult.rows?.[0]?.count || 0)
+
+      const pageRows = pageResult.rows || []
+      const orderIds = pageRows.filter((r) => r.source === 'order').map((r) => r.source_id)
+      const invoiceIds = pageRows.filter((r) => r.source === 'invoice').map((r) => r.source_id)
+
+      let orderRows = []
+      if (orderIds.length > 0) {
+        const orderDetailSql = `
+          SELECT 
+            o.id,
+            o.status,
+            o.total_amount,
+            o.currency,
+            COALESCE(o.placed_at, o.created_at) AS placed_at,
+            o.created_at,
+            o.updated_at,
+            ${hasBranchColumn ? 'o.branch_id,' : ''}
+            ${hasBranchColumn ? 'b.name AS branch_name,' : ''}
+            o.restaurant_id,
+            r.name AS restaurant_name,
+            COALESCE((
+              SELECT json_agg(DISTINCT jsonb_build_object('id', s.id, 'name', s.name))
+              FROM order_item oi
+              JOIN supplier s ON s.id = oi.supplier_id
+              WHERE oi.order_id = o.id
+            ), '[]'::json) AS suppliers,
+            COALESCE((
+              SELECT array_remove(array_agg(DISTINCT p.category), NULL)
+              FROM order_item oi
+              JOIN product p ON p.id = oi.product_id
+              WHERE oi.order_id = o.id
+            ), ARRAY[]::text[]) AS categories
+          FROM customer_order o
+          JOIN restaurant r ON r.id = o.restaurant_id
+          ${hasBranchColumn ? 'LEFT JOIN branch b ON b.id = o.branch_id' : ''}
+          WHERE o.id = ANY($1::uuid[])
+        `
+        const orderDetailResult = await query(orderDetailSql, [orderIds])
+        orderRows = orderDetailResult.rows || []
+      }
+
+      let invoiceRows = []
+      if (invoiceIds.length > 0) {
+        const invoiceDetailSql = `
+          SELECT 
+            i.id,
+            i.order_id,
+            i.invoice_date,
+            i.due_date,
+            i.total_amount,
+            i.currency,
+            i.status,
+            i.supplier_id,
+            i.restaurant_id,
+            i.created_at,
+            s.name AS supplier_name,
+            r.name AS restaurant_name
+          FROM invoice i
+          LEFT JOIN supplier s ON s.id = i.supplier_id
+          LEFT JOIN restaurant r ON r.id = i.restaurant_id
+          WHERE i.id = ANY($1::uuid[])
+        `
+        const invoiceDetailResult = await query(invoiceDetailSql, [invoiceIds])
+        invoiceRows = invoiceDetailResult.rows || []
+      }
+
+      const orderLookup = new Map()
+      orderRows.forEach((order) => {
+        const supplierSummary = summarizeSuppliers(order.suppliers)
+        order.supplierList = supplierSummary.list
+        orderLookup.set(order.id, order)
+      })
+
+      const orderById = new Map(orderRows.map((order) => [order.id, order]))
+      const invoiceById = new Map(invoiceRows.map((invoice) => [invoice.id, invoice]))
+
+      const paginatedEvents = []
       const statusSet = new Set()
       const supplierMap = new Map()
       const branchMap = new Map()
       const categorySet = new Set()
 
-      for (const order of orderRows) {
-        const orderEvents = buildOrderEvents(order, effectiveRole)
-        for (const event of orderEvents) {
-          events.push(event)
-          if (event.status) statusSet.add(event.status)
-          if (effectiveRole === 'SUPPLIER') {
-            if (order.restaurant_id && order.restaurant_name) {
-              supplierMap.set(order.restaurant_id, order.restaurant_name)
+      for (const pageRow of pageRows) {
+        if (pageRow.source === 'order') {
+          const order = orderById.get(pageRow.source_id)
+          if (!order) continue
+          for (const event of buildOrderEvents(order, effectiveRole)) {
+            paginatedEvents.push(event)
+            if (event.status) statusSet.add(event.status)
+            if (effectiveRole === 'SUPPLIER') {
+              if (order.restaurant_id && order.restaurant_name) {
+                supplierMap.set(order.restaurant_id, order.restaurant_name)
+              }
+            } else if (event.supplierId && event.supplierName) {
+              supplierMap.set(event.supplierId, event.supplierName)
             }
-          } else if (event.supplierId && event.supplierName) {
-            supplierMap.set(event.supplierId, event.supplierName)
+            if (hasBranchColumn && event.branchId && event.branchName) {
+              branchMap.set(event.branchId, event.branchName)
+            }
+            if (Array.isArray(event.categories)) {
+              event.categories.filter(Boolean).forEach((category) => categorySet.add(category))
+            }
           }
-          if (hasBranchColumn && event.branchId && event.branchName) {
-            branchMap.set(event.branchId, event.branchName)
-          }
-          if (Array.isArray(event.categories)) {
-            event.categories.filter(Boolean).forEach((category) => categorySet.add(category))
-          }
+          continue
         }
-      }
 
-      for (const invoice of invoiceRows) {
+        const invoice = invoiceById.get(pageRow.source_id)
+        if (!invoice) continue
         const invoiceEvent = buildInvoiceEvents(invoice, effectiveRole, orderLookup)
-        if (invoiceEvent.start) {
-          events.push(invoiceEvent)
-          if (invoiceEvent.status) statusSet.add(invoiceEvent.status)
-          if (effectiveRole === 'SUPPLIER') {
-            if (invoice.restaurant_id && invoice.restaurant_name) {
-              supplierMap.set(invoice.restaurant_id, invoice.restaurant_name)
-            }
-          } else if (invoiceEvent.supplierId && invoiceEvent.supplierName) {
-            supplierMap.set(invoiceEvent.supplierId, invoiceEvent.supplierName)
+        if (!invoiceEvent.start) continue
+        paginatedEvents.push(invoiceEvent)
+        if (invoiceEvent.status) statusSet.add(invoiceEvent.status)
+        if (effectiveRole === 'SUPPLIER') {
+          if (invoice.restaurant_id && invoice.restaurant_name) {
+            supplierMap.set(invoice.restaurant_id, invoice.restaurant_name)
           }
-          if (hasBranchColumn && invoiceEvent.branchId && invoiceEvent.branchName) {
-            branchMap.set(invoiceEvent.branchId, invoiceEvent.branchName)
-          }
-          if (Array.isArray(invoiceEvent.categories)) {
-            invoiceEvent.categories.filter(Boolean).forEach((category) => categorySet.add(category))
-          }
+        } else if (invoiceEvent.supplierId && invoiceEvent.supplierName) {
+          supplierMap.set(invoiceEvent.supplierId, invoiceEvent.supplierName)
+        }
+        if (hasBranchColumn && invoiceEvent.branchId && invoiceEvent.branchName) {
+          branchMap.set(invoiceEvent.branchId, invoiceEvent.branchName)
+        }
+        if (Array.isArray(invoiceEvent.categories)) {
+          invoiceEvent.categories.filter(Boolean).forEach((category) => categorySet.add(category))
         }
       }
-
-      events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
-
-      const filteredEvents = params.status
-        ? events.filter((event) => event.status === params.status)
-        : events
-
-      const totalEvents = filteredEvents.length
-      const offset = (params.page - 1) * params.pageSize
-      const paginatedEvents = filteredEvents.slice(offset, offset + params.pageSize)
 
       const responseData = {
         tenant: {
@@ -491,7 +553,7 @@ router.get(
             : [],
           categories: Array.from(categorySet).sort(),
           totalOrders,
-          totalInvoices: invoiceRows.length,
+          totalInvoices,
         },
       }
 

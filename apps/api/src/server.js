@@ -81,6 +81,7 @@ import { pool, closePool, warmupPool, startPoolKeepalive, stopPoolKeepalive } fr
 import { getKeycloakConfig } from './lib/auth.js'
 import { requestTimingMiddleware } from './middlewares/request-timing.js'
 import { disconnectCache, isRedisConnected } from './lib/cache.js'
+import { createRateLimitStore } from './lib/rate-limit-store.js'
 import { runFullStartupMigrations } from './lib/startup-migrations.js'
 import {
   markStartupMigrationsReady,
@@ -202,7 +203,15 @@ const rateOpts = {
 const skipReadOnlyRequests = (req) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method)
 
 function createLimiter(max, message, extra = {}) {
-  return rateLimit({ ...rateOpts, max, message, ...extra })
+  const { storePrefix = 'rl:global', ...rest } = extra
+  const store = createRateLimitStore(storePrefix)
+  return rateLimit({
+    ...rateOpts,
+    max,
+    message,
+    ...(store ? { store } : {}),
+    ...rest,
+  })
 }
 
 const noopLimiter = (_req, _res, next) => next()
@@ -212,29 +221,35 @@ const limiter = config.RATE_LIMIT_ENABLED
 const authLimiter = config.RATE_LIMIT_ENABLED
   ? createLimiter(
       isProduction ? 30 : 500,
-      'Too many authentication attempts, please try again later.'
+      'Too many authentication attempts, please try again later.',
+      { storePrefix: 'rl:auth' }
     )
   : noopLimiter
 const staffLinkLimiter = config.RATE_LIMIT_ENABLED
   ? createLimiter(
       isProduction ? 10 : 100,
-      'Too many staff portal link requests, please try again later.'
+      'Too many staff portal link requests, please try again later.',
+      { storePrefix: 'rl:staff-link' }
     )
   : noopLimiter
 const publicLimiter = config.RATE_LIMIT_ENABLED
-  ? createLimiter(isProduction ? 60 : 200, rateLimitMessage)
+  ? createLimiter(isProduction ? 60 : 200, rateLimitMessage, { storePrefix: 'rl:public' })
   : noopLimiter
 const chatSendLimiter = config.RATE_LIMIT_ENABLED
-  ? createLimiter(300, 'Too many messages sent, please try again later.')
+  ? createLimiter(300, 'Too many messages sent, please try again later.', {
+      storePrefix: 'rl:chat',
+    })
   : noopLimiter
 const ordersWriteLimiter = config.RATE_LIMIT_ENABLED
   ? createLimiter(isProduction ? 120 : 500, 'Too many order requests, please try again later.', {
       skip: skipReadOnlyRequests,
+      storePrefix: 'rl:orders',
     })
   : noopLimiter
 const promotionsWriteLimiter = config.RATE_LIMIT_ENABLED
   ? createLimiter(isProduction ? 80 : 400, 'Too many promotion requests, please try again later.', {
       skip: skipReadOnlyRequests,
+      storePrefix: 'rl:promotions',
     })
   : noopLimiter
 
@@ -292,7 +307,10 @@ app.use((req, res, next) => {
   return csrfProtection(req, res, next)
 })
 
-if (config.STORAGE_DRIVER === 'local') {
+const mountLocalUploadsStatic =
+  config.STORAGE_DRIVER === 'local' &&
+  (config.NODE_ENV !== 'production' || config.STORAGE_PUBLIC_READ)
+if (mountLocalUploadsStatic) {
   const uploadsDir = path.resolve(config.STORAGE_LOCAL_PATH)
   app.use('/uploads', express.static(uploadsDir))
 }

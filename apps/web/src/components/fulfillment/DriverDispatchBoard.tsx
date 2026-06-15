@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
@@ -8,7 +7,7 @@ import { Select, SelectTrigger } from '../ui/select'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { Skeleton } from '../ui/skeleton'
-import { CheckCircle, AlertTriangle, Loader2, Route } from 'lucide-react'
+import { CheckCircle, AlertTriangle, Loader2, Route, PackageOpen } from 'lucide-react'
 import { CreateRouteDialog } from './CreateRouteDialog'
 import { canSelectOrderForRoute } from './fulfillmentDispatchUtils'
 import { toast } from 'sonner'
@@ -192,14 +191,10 @@ export function DriverDispatchBoard({
   if (isLoading) {
     return (
       <div className="space-y-4" data-testid="dispatch-board-loading">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 rounded-lg" />
-          ))}
-        </div>
+        <Skeleton className="h-14 w-full rounded-xl" />
         <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-48 rounded-xl" />
+            <Skeleton key={i} className="h-56 rounded-xl" />
           ))}
         </div>
       </div>
@@ -252,42 +247,45 @@ export function DriverDispatchBoard({
     <TooltipProvider delayDuration={300}>
       <div className="space-y-4">
         {canPlanRoutes && (
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] p-3">
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-4 py-3">
             <Button
               size="sm"
               data-testid="create-route-button"
               disabled={selectedOrders.length === 0}
               onClick={() => setCreateRouteOpen(true)}
             >
-              <Route className="mr-1 h-4 w-4" />
+              <Route className="mr-1.5 h-4 w-4" />
               Create route ({selectedOrders.length})
             </Button>
             {selectedOrders.length === 0 && (
-              <span className="text-xs text-[var(--text-muted)]">
+              <p className="text-xs text-[var(--text-mid)]">
                 Select unassigned or assigned orders (not already on a route) to build a route.
-              </span>
+              </p>
             )}
           </div>
         )}
 
-        <div
+        <section
           data-testid="delivery-board-stats"
-          className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6"
+          className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-4 py-3"
         >
-          <SummaryChip label="Total orders" value={summary.total} />
-          <SummaryChip label="Pending" value={summary.pending} />
-          <SummaryChip label="Out for delivery" value={summary.outForDelivery} />
-          <SummaryChip label="Delivered" value={summary.delivered} />
-          <SummaryChip label="Failed" value={summary.failed} />
-          <SummaryChip label="Rescheduled" value={summary.rescheduled} />
-        </div>
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+            <DispatchMetric label="Total orders" value={summary.total} emphasis />
+            <DispatchMetric label="Pending" value={summary.pending} />
+            <DispatchMetric label="Out for delivery" value={summary.outForDelivery} />
+            <DispatchMetric label="Delivered" value={summary.delivered} />
+            <DispatchMetric label="Failed" value={summary.failed} />
+            <DispatchMetric label="Rescheduled" value={summary.rescheduled} />
+          </div>
+        </section>
 
         {isEmpty ? (
           <div
             data-testid="dispatch-board-empty"
-            className="rounded-xl border border-dashed border-[var(--app-border)] bg-[var(--brand-ultra)] py-12 text-center"
+            className="rounded-xl border border-dashed border-[var(--app-border)] bg-[var(--brand-ultra)] px-4 py-12 text-center"
           >
-            <p className="text-sm text-[var(--text-muted)]">
+            <PackageOpen className="mx-auto mb-3 h-9 w-9 text-[var(--text-muted)]" aria-hidden />
+            <p className="text-sm text-[var(--text-mid)]">
               {filtersActive
                 ? 'No deliveries match these filters.'
                 : 'No orders ready for dispatch right now.'}
@@ -609,13 +607,27 @@ export function DriverDispatchBoard({
   )
 }
 
-function SummaryChip({ label, value }: { label: string; value: number }) {
+function DispatchMetric({
+  label,
+  value,
+  emphasis = false,
+}: {
+  label: string
+  value: number
+  emphasis?: boolean
+}) {
   return (
-    <div className="rounded-lg border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-        {label}
+    <div>
+      <p className="text-xs text-[var(--text-mid)]">{label}</p>
+      <p
+        className={
+          emphasis
+            ? 'mt-0.5 text-xl font-semibold tabular-nums text-[var(--text)]'
+            : 'mt-0.5 font-medium tabular-nums text-[var(--text)]'
+        }
+      >
+        {value}
       </p>
-      <p className="text-lg font-bold text-[var(--text)] tabular-nums">{value}</p>
     </div>
   )
 }
@@ -630,20 +642,20 @@ function DispatchColumn({
   children: React.ReactNode
 }) {
   return (
-    <Card className="min-w-0 overflow-hidden">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-base">{title}</CardTitle>
-          <Badge variant="outline">{count}</Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3 max-h-[min(70vh,720px)] overflow-y-auto overflow-x-hidden">
+    <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]">
+      <header className="flex items-center justify-between gap-2 border-b border-[var(--app-border)] px-4 py-3">
+        <h3 className="text-sm font-semibold text-[var(--text)]">{title}</h3>
+        <span className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-[var(--brand-pale)] px-2 text-xs font-semibold tabular-nums text-[var(--brand-mid)]">
+          {count}
+        </span>
+      </header>
+      <div className="max-h-[min(70vh,720px)] flex-1 divide-y divide-[var(--app-border)] overflow-y-auto overflow-x-hidden">
         {count === 0 ? (
-          <p className="text-sm text-[var(--text-muted)] py-4 text-center">Nothing here yet.</p>
+          <p className="py-8 text-center text-sm text-[var(--text-muted)]">Nothing here yet.</p>
         ) : (
           children
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }

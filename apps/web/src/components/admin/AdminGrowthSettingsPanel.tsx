@@ -10,18 +10,60 @@ import {
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 
+import { SPONSORSHIP_PLAN_KEYS, SPONSORSHIP_PLAN_LABELS } from '../../lib/growthSponsorshipPlans'
+
+type SponsorshipLimitForm = Record<(typeof SPONSORSHIP_PLAN_KEYS)[number], string>
+
+const EMPTY_SPONSORSHIP_LIMITS: SponsorshipLimitForm = {
+  silver: '2',
+  gold: '10',
+  platinum: '25',
+  enterprise: '',
+}
+
+function sponsorshipLimitsFromData(
+  limits: Record<string, number | null> | undefined
+): SponsorshipLimitForm {
+  return SPONSORSHIP_PLAN_KEYS.reduce((acc, key) => {
+    const value = limits?.[key]
+    acc[key] = value == null ? '' : String(value)
+    return acc
+  }, {} as SponsorshipLimitForm)
+}
+
+function parseSponsorshipLimits(form: SponsorshipLimitForm): Record<string, number | null> | null {
+  const parsed: Record<string, number | null> = {}
+  for (const key of SPONSORSHIP_PLAN_KEYS) {
+    const raw = form[key].trim()
+    if (!raw) {
+      parsed[key] = null
+      continue
+    }
+    const num = Number(raw)
+    if (!Number.isFinite(num) || num < 0 || !Number.isInteger(num)) {
+      toast.error(`Sponsorship limit for ${SPONSORSHIP_PLAN_LABELS[key]} must be a whole number`)
+      return null
+    }
+    parsed[key] = num
+  }
+  return parsed
+}
+
 export function AdminGrowthSettingsPanel() {
   const { data, isLoading } = useGetAdminGrowthSettingsQuery()
   const [update, { isLoading: saving }] = useUpdateAdminGrowthSettingsMutation()
   const [discount, setDiscount] = useState('20')
   const [validityDays, setValidityDays] = useState('90')
   const [rewardType, setRewardType] = useState<'free_month' | 'account_credit'>('free_month')
+  const [sponsorshipLimits, setSponsorshipLimits] =
+    useState<SponsorshipLimitForm>(EMPTY_SPONSORSHIP_LIMITS)
 
   useEffect(() => {
     if (data) {
       setDiscount(String(data.firstPaidDiscountPercent))
       setValidityDays(String(data.referralValidityDays))
       setRewardType(data.supplierRewardType)
+      setSponsorshipLimits(sponsorshipLimitsFromData(data.sponsorshipLimitsPerYear))
     }
   }, [data])
 
@@ -36,11 +78,14 @@ export function AdminGrowthSettingsPanel() {
       toast.error('Referral validity must be at least 1 day')
       return
     }
+    const parsedLimits = parseSponsorshipLimits(sponsorshipLimits)
+    if (!parsedLimits) return
     try {
       await update({
         firstPaidDiscountPercent: Math.round(discountNum),
         referralValidityDays: Math.round(validityNum),
         supplierRewardType: rewardType,
+        sponsorshipLimitsPerYear: parsedLimits,
       }).unwrap()
       toast.success('Growth program settings saved')
     } catch {
@@ -97,6 +142,33 @@ export function AdminGrowthSettingsPanel() {
                 <option value="account_credit">Account credit (platform billing)</option>
               </select>
             </div>
+            <fieldset className="space-y-3">
+              <legend className="text-sm font-medium text-[var(--text)]">
+                Sponsorship limits per year
+              </legend>
+              <p className="text-xs text-[var(--text-muted)]">
+                Max sponsored onboarding gifts a supplier can grant per calendar year, by plan tier.
+                Leave blank for unlimited.
+              </p>
+              {SPONSORSHIP_PLAN_KEYS.map((planKey) => (
+                <div key={planKey}>
+                  <Label htmlFor={`sponsorship-${planKey}`}>
+                    {SPONSORSHIP_PLAN_LABELS[planKey]} plan
+                  </Label>
+                  <Input
+                    id={`sponsorship-${planKey}`}
+                    type="number"
+                    min={0}
+                    placeholder={planKey === 'enterprise' ? 'Unlimited' : '0'}
+                    value={sponsorshipLimits[planKey]}
+                    onChange={(e) =>
+                      setSponsorshipLimits((prev) => ({ ...prev, [planKey]: e.target.value }))
+                    }
+                    className="mt-1"
+                  />
+                </div>
+              ))}
+            </fieldset>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? 'Saving…' : 'Save growth settings'}
             </Button>

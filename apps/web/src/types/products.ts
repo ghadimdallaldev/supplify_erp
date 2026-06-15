@@ -16,6 +16,7 @@ export interface Product {
   updated_at: string
   supplier_name?: string
   supplier_slug?: string
+  supplier_email?: string
   available_qty?: number
   current_price?: number
   currency?: string
@@ -70,13 +71,15 @@ export interface ProductFilters {
   favoritesOnly?: boolean
   limit?: number
   offset?: number
+  cursor?: string
 }
 
 export interface ProductsResponse {
   products: Product[]
   pagination: {
-    total: number
+    total: number | null
     limit: number
-    offset: number
+    offset: number | null
+    nextCursor?: string | null
   }
 }

@@ -1,6 +1,7 @@
 import express from 'express'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
+import rateLimit from 'express-rate-limit'
 import { z } from 'zod'
 import {
   requireAuth,
@@ -18,6 +19,7 @@ import {
 import { requireSupplierId } from '../lib/tenant-resolve.js'
 import { requireFeature } from '../lib/subscription.js'
 import { config } from '../config/env.js'
+import { createRateLimitStore } from '../lib/rate-limit-store.js'
 import { writeAuditLog } from '../lib/audit.js'
 import {
   IMPORT_ALLOWED_MIMES,
@@ -44,7 +46,11 @@ import {
   previewProductImport,
   executeProductImport,
   buildErrorReportCsv,
+  countProductImportRows,
+  createProductImportJob,
+  getProductImportJobStatus,
 } from '../services/product-import.service.js'
+import { startProductImportJob } from '../services/product-import-worker.js'
 import {
   previewImageImport,
   createImageImportJob,
@@ -95,6 +101,36 @@ const amendmentsGate = requireFeature(
 )
 
 router.use(requireAuth, resolveTenantContext, requireRole(['SUPPLIER', 'ADMIN']))
+
+const noopLimiter = (_req, _res, next) => next()
+
+function createUserKeyedLimiter({ windowMs, max, message, storePrefix = 'rl:supplier' }) {
+  if (!config.RATE_LIMIT_ENABLED) return noopLimiter
+  const store = createRateLimitStore(storePrefix)
+  return rateLimit({
+    windowMs,
+    max,
+    message,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => req.userData?.id || req.ip,
+    ...(store ? { store } : {}),
+  })
+}
+
+const productImportLimiter = createUserKeyedLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many product import requests, please try again later.',
+  storePrefix: 'rl:supplier:product-import',
+})
+
+const imageImportJobLimiter = createUserKeyedLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: 'Too many image import jobs, please try again later.',
+  storePrefix: 'rl:supplier:image-import',
+})
 
 async function resolveSupplier(req) {
   const tenant = await getRequestTenant(req)
@@ -326,6 +362,7 @@ const importPreviewSchema = z.object({
 
 router.post(
   '/products/import/preview',
+  productImportLimiter,
   requirePermission('CATALOG_EDIT'),
   async (req, res, next) => {
     try {
@@ -339,15 +376,65 @@ router.post(
   }
 )
 
-router.post('/products/import', requirePermission('CATALOG_EDIT'), async (req, res, next) => {
+router.post(
+  '/products/import',
+  productImportLimiter,
+  requirePermission('CATALOG_EDIT'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const body = importPreviewSchema.extend({ partial: z.boolean().optional() }).parse(req.body)
+      const rowCount = countProductImportRows(body.csv)
+
+      if (rowCount > config.PRODUCT_IMPORT_ASYNC_THRESHOLD) {
+        const preview = previewProductImport(body.csv, body.columnMapping)
+        const job = await createProductImportJob({
+          supplierId,
+          userId: req.userData.id,
+          csvText: body.csv,
+          partial: body.partial !== false,
+          columnMapping: body.columnMapping,
+          preview,
+        })
+
+        startProductImportJob(job.id)
+
+        await writeAuditLog(req, {
+          action_type: 'catalog.product_import.started',
+          tenant_type: 'SUPPLIER',
+          tenant_id: supplierId,
+          target_id: job.id,
+          payload_json: {
+            resource_type: 'catalog_product_import',
+            rowCount,
+            async: true,
+          },
+        })
+
+        return res.status(202).json({
+          ok: true,
+          data: { jobId: job.id, status: 'pending' },
+          error: null,
+          requestId: req.requestId,
+        })
+      }
+
+      const result = await executeProductImport(supplierId, body.csv, {
+        partial: body.partial !== false,
+        userId: req.userData.id,
+      })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get('/products/import/:jobId', requirePermission('CATALOG_EDIT'), async (req, res, next) => {
   try {
     const supplierId = await resolveSupplier(req)
-    const body = importPreviewSchema.extend({ partial: z.boolean().optional() }).parse(req.body)
-    const result = await executeProductImport(supplierId, body.csv, {
-      partial: body.partial !== false,
-      userId: req.userData.id,
-    })
-    res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    const job = await getProductImportJobStatus(req.params.jobId, supplierId)
+    res.json({ ok: true, data: job, error: null, requestId: req.requestId })
   } catch (err) {
     next(err)
   }
@@ -435,6 +522,7 @@ router.post(
 
 router.post(
   '/products/images/import',
+  imageImportJobLimiter,
   requirePermission('CATALOG_EDIT'),
   async (req, res, next) => {
     try {

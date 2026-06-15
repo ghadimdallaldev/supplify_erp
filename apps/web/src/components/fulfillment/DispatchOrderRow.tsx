@@ -69,7 +69,7 @@ export function DispatchOrderRow({
   return (
     <article
       data-testid={`dispatch-order-${order.id}`}
-      className="rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm"
+      className="p-3 transition-colors hover:bg-[var(--brand-ultra)]/50 sm:p-4"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         {selectable && (
@@ -87,7 +87,7 @@ export function DispatchOrderRow({
         )}
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="text-sm font-semibold text-[var(--text)] truncate">
+            <h4 className="truncate text-sm font-semibold text-[var(--text)]">
               {order.restaurant_name || 'Restaurant'}
             </h4>
             <Badge
@@ -116,7 +116,7 @@ export function DispatchOrderRow({
             {assignmentStatus === 'rescheduled' && rolledOver ? (
               <Badge
                 variant="outline"
-                className="border-amber-400 text-amber-800"
+                className="border-[var(--amber)] text-[var(--amber)]"
                 data-testid="dispatch-rollover-badge"
               >
                 Moved to tomorrow
@@ -127,7 +127,7 @@ export function DispatchOrderRow({
             ) : null}
           </div>
 
-          <p className="text-xs text-[var(--text-muted)]">
+          <p className="text-xs text-[var(--text-mid)]">
             <Link
               to={`/app/orders/${order.id}`}
               className="font-medium text-[var(--brand-mid)] hover:underline"
@@ -143,7 +143,7 @@ export function DispatchOrderRow({
             {formatPrice(order.total_amount)}
           </p>
 
-          <div className="flex flex-col gap-1 text-xs text-[var(--text-muted)]">
+          <div className="flex flex-col gap-1 text-xs text-[var(--text-mid)]">
             <p className="inline-flex items-start gap-1.5">
               <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--brand-mid)]" aria-hidden />
               <span>{areaLabel}</span>
@@ -152,7 +152,7 @@ export function DispatchOrderRow({
           </div>
 
           {showDriver && (
-            <div className="text-xs text-[var(--text-muted)]">
+            <div className="text-xs text-[var(--text-mid)]">
               {driver && driverLabel ? (
                 <div className="space-y-1">
                   <p className="inline-flex min-w-0 max-w-full items-center gap-1 font-medium text-[var(--text)]">
@@ -170,7 +170,7 @@ export function DispatchOrderRow({
                   )}
                 </div>
               ) : (
-                <p className="text-amber-700 font-medium">Unassigned</p>
+                <p className="font-medium text-[var(--amber)]">Unassigned</p>
               )}
             </div>
           )}
@@ -182,16 +182,16 @@ export function DispatchOrderRow({
             <Button
               type="button"
               variant="outline"
-              size="lg"
-              className="min-h-[44px] w-full whitespace-nowrap sm:h-9 sm:w-auto"
+              size="sm"
+              className="whitespace-nowrap"
               data-testid={`dispatch-view-tracking-${order.id}`}
               onClick={() => onViewTracking(order.id)}
             >
-              <Navigation className="h-4 w-4 mr-1.5" aria-hidden />
+              <Navigation className="mr-1.5 h-3.5 w-3.5" aria-hidden />
               Track delivery
             </Button>
           )}
-          <Button variant="outline" size="sm" className="whitespace-nowrap" asChild>
+          <Button variant="ghost" size="sm" className="whitespace-nowrap" asChild>
             <Link to={`/app/orders/${order.id}`}>View order</Link>
           </Button>
         </div>

@@ -7,6 +7,7 @@ type PublicPageLayoutProps = {
   subtitle?: string
   logoUrl?: string | null
   logoInitial?: string
+  headerActions?: ReactNode
   centered?: boolean
   narrow?: boolean
   wide?: boolean
@@ -20,6 +21,7 @@ export function PublicPageLayout({
   subtitle,
   logoUrl,
   logoInitial,
+  headerActions,
   centered = false,
   narrow = false,
   wide = false,
@@ -34,32 +36,49 @@ export function PublicPageLayout({
       {showHero && (
         <header className="border-b border-[var(--app-border)] bg-[var(--surface)] pwa-safe-top">
           <div className={cn('mx-auto px-4 py-5 sm:px-6', widthClass, centered && 'text-center')}>
-            <div className={cn('flex gap-4', centered && 'flex-col items-center')}>
-              {(logoUrl || logoInitial) &&
-                (logoUrl ? (
-                  <img
-                    src={logoUrl}
-                    alt=""
-                    className="h-14 w-14 shrink-0 rounded-2xl object-cover"
-                  />
-                ) : (
-                  <div
-                    aria-hidden
-                    className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--brand-pale)] text-xl font-semibold text-[var(--brand-mid)]"
-                  >
-                    {logoInitial}
-                  </div>
-                ))}
-              <div className={cn('min-w-0', centered && 'flex flex-col items-center')}>
-                {title && (
-                  <h1 className="text-xl font-semibold text-[var(--text)] sm:text-2xl">{title}</h1>
-                )}
-                {subtitle && (
-                  <p className="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">
-                    {subtitle}
-                  </p>
-                )}
+            <div
+              className={cn(
+                'flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between',
+                centered && 'sm:flex-col sm:items-center'
+              )}
+            >
+              <div className={cn('flex min-w-0 gap-4', centered && 'flex-col items-center')}>
+                {(logoUrl || logoInitial) &&
+                  (logoUrl ? (
+                    <img
+                      src={logoUrl}
+                      alt=""
+                      className="h-14 w-14 shrink-0 rounded-2xl object-cover sm:h-16 sm:w-16"
+                    />
+                  ) : (
+                    <div
+                      aria-hidden
+                      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--brand-pale)] text-xl font-semibold text-[var(--brand-mid)] sm:h-16 sm:w-16 sm:text-2xl"
+                    >
+                      {logoInitial}
+                    </div>
+                  ))}
+                <div className={cn('min-w-0', centered && 'flex flex-col items-center')}>
+                  {title && (
+                    <h1
+                      className="text-pretty text-xl font-semibold text-[var(--text)] sm:text-2xl"
+                      style={{ textWrap: 'balance' }}
+                    >
+                      {title}
+                    </h1>
+                  )}
+                  {subtitle && (
+                    <p className="mt-1 text-sm leading-relaxed text-[var(--text-mid)]">
+                      {subtitle}
+                    </p>
+                  )}
+                </div>
               </div>
+              {headerActions && (
+                <div className={cn('flex shrink-0 flex-wrap gap-2', centered && 'justify-center')}>
+                  {headerActions}
+                </div>
+              )}
             </div>
           </div>
         </header>

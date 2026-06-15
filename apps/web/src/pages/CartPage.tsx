@@ -75,6 +75,7 @@ export function CartPage() {
         return max
       }, 0)
     : 0
+  const checkoutTotal = Math.max(0, total - estimatedPromoDiscount)
   const {
     updateQuantity,
     removeItem,
@@ -282,7 +283,7 @@ export function CartPage() {
 
   return (
     <RequirePermission permission="ORDERS_CREATE" title="cart">
-      <div className="space-y-6" data-testid="cart-page">
+      <div className="space-y-6 pb-28 lg:pb-6" data-testid="cart-page">
         <PageHeader
           title={cartTitle}
           description={cartDescription}
@@ -461,7 +462,7 @@ export function CartPage() {
                 <div className="border-t pt-4">
                   <div className="flex items-center justify-between font-semibold text-lg">
                     <span>Total</span>
-                    <span>${formatPrice(Math.max(0, total - estimatedPromoDiscount))}</span>
+                    <span>${formatPrice(checkoutTotal)}</span>
                   </div>
                 </div>
                 {estimatedPromoDiscount > 0 ? (
@@ -485,7 +486,7 @@ export function CartPage() {
             <Button
               onClick={handlePlaceOrder}
               disabled={isPlacingOrder || !orderGate.canPlace || !canPlaceOrders}
-              className="w-full"
+              className="hidden w-full lg:flex"
               size="lg"
               data-testid="cart-place-order"
             >
@@ -501,7 +502,7 @@ export function CartPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full"
+                className="hidden w-full lg:flex"
                 onClick={() =>
                   openBrowseUpgrade(dispatch, {
                     currentPlan: orderGate.planName,
@@ -511,6 +512,31 @@ export function CartPage() {
               >
                 Upgrade to place more orders
               </Button>
+            )}
+          </div>
+        </div>
+
+        <div
+          className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 border-t border-[var(--app-border)] bg-[var(--surface)]/95 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur-sm lg:hidden"
+          data-testid="cart-mobile-checkout-bar"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs text-[var(--text-muted)]">Total</p>
+              <p className="text-lg font-semibold tabular-nums">${formatPrice(checkoutTotal)}</p>
+            </div>
+            {canPlaceOrders ? (
+              <Button
+                onClick={handlePlaceOrder}
+                disabled={isPlacingOrder || !orderGate.canPlace}
+                size="lg"
+                className="shrink-0"
+                data-testid="cart-mobile-place-order"
+              >
+                {isPlacingOrder ? 'Placing…' : !orderGate.canPlace ? 'Limit reached' : 'Checkout'}
+              </Button>
+            ) : (
+              <p className="text-xs text-[var(--text-muted)]">View-only access</p>
             )}
           </div>
         </div>

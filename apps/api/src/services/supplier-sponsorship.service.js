@@ -104,11 +104,13 @@ export async function sponsorProspect(supplierId, prospectId, { planCode, req = 
 
     if (restaurantId) {
       const { rows: subRows } = await client.query(
-        `SELECT id FROM subscription WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT'
+        `SELECT id, plan_id FROM subscription WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT'
          AND status NOT IN ('CANCELLED') ORDER BY created_at DESC LIMIT 1`,
         [restaurantId]
       )
       if (subRows.length) {
+        const subscriptionId = subRows[0].id
+        const fromPlanId = subRows[0].plan_id
         await client.query(
           `UPDATE subscription SET
              plan_id = $2, plan_name = $3, status = 'ACTIVE',
@@ -116,8 +118,19 @@ export async function sponsorProspect(supplierId, prospectId, { planCode, req = 
              account_locked_at = NULL, lock_reason = NULL,
              free_sandbox_expires_at = NULL, updated_at = now()
            WHERE id = $1`,
-          [subRows[0].id, planRows[0].id, planRows[0].name, periodStart, periodEnd]
+          [subscriptionId, planRows[0].id, planRows[0].name, periodStart, periodEnd]
         )
+        if (fromPlanId !== planRows[0].id) {
+          try {
+            await client.query(
+              `INSERT INTO subscription_change_log (subscription_id, from_plan_id, to_plan_id, changed_by_admin_id, reason)
+               VALUES ($1, $2, $3, NULL, $4)`,
+              [subscriptionId, fromPlanId, planRows[0].id, 'supplier_sponsorship']
+            )
+          } catch (e) {
+            if (e.code !== '42P01') throw e
+          }
+        }
       }
       await client.query(
         `INSERT INTO supplier_follow (supplier_id, restaurant_id) VALUES ($1, $2)

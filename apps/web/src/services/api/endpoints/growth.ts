@@ -33,6 +33,7 @@ export type SupplierGrowthMetrics = {
   revenueGenerated: number
   rewardsEarned: { freeMonths: number; accountCredit: number }
   sponsorshipLimit?: number | null
+  eligibleSponsorPlans?: string[]
 }
 
 export const growthApi = api.injectEndpoints({

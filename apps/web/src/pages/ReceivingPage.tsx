@@ -1,37 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
-import { Button } from '../components/ui/button'
-import { Input } from '../components/ui/input'
-import { Label } from '../components/ui/label'
-import { Textarea } from '../components/ui/textarea'
-import { Select, SelectTrigger } from '../components/ui/select'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { RequirePermission } from '../components/RequirePermission'
-import {
-  PackageCheck,
-  History,
-  Star,
-  Loader2,
-  Clock,
-  AlertCircle,
-  Truck,
-  CheckCircle,
-} from 'lucide-react'
+import { PackageCheck, History } from 'lucide-react'
 import { Badge } from '../components/ui/badge'
 import { PageHeader } from '../components/ui/page-header'
-import { EmptyState } from '../components/ui/empty-state'
-import { Skeleton } from '../components/ui/skeleton'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   useGetPendingOrdersForReceivingQuery,
@@ -42,13 +17,8 @@ import {
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { FeatureLockedCard } from '../components/FeatureLockedCard'
 import { toast } from 'sonner'
-import { formatPrice } from '../utils/format'
+import { normalizeReceivedQuantity } from '../lib/quantityUnit'
 import { isOrderReadyForReceiving } from '../lib/orderReceiving'
-import {
-  getQuantityUnitRules,
-  normalizeReceivedQuantity,
-  snapQuantityToUnit,
-} from '../lib/quantityUnit'
 import {
   disputeLineItemsFromReceiving,
   receivingFormToDisputeDrafts,
@@ -59,6 +29,7 @@ import { OpenDisputeDialog } from '../components/disputes/OpenDisputeDialog'
 import { ReceivingDialog } from '../components/receiving/ReceivingDialog'
 import { ReceivingPendingTab } from '../components/receiving/ReceivingPendingTab'
 import { ReceivingHistoryTab } from '../components/receiving/ReceivingHistoryTab'
+import { ReceivingSummaryStrip } from '../components/receiving/ReceivingPendingOrderRow'
 
 export function ReceivingPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -113,7 +84,6 @@ export function ReceivingPage() {
     })
   }
 
-  // Load received order IDs from localStorage on mount
   const [receivingOrderIds, setReceivingOrderIds] = useState<Set<string>>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('receivingOrderIds')
@@ -122,7 +92,6 @@ export function ReceivingPage() {
     return new Set()
   })
 
-  // Update localStorage whenever receivingOrderIds changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('receivingOrderIds', JSON.stringify(Array.from(receivingOrderIds)))
@@ -149,7 +118,6 @@ export function ReceivingPage() {
   const handleSubmitReceiving = async (formData: any) => {
     const orderId = selectedOrder.id
     try {
-      // Add to receivingOrderIds to show "Processing..." state
       setReceivingOrderIds((prev) => new Set([...prev, orderId]))
 
       const result = await createReport({
@@ -203,16 +171,13 @@ export function ReceivingPage() {
         toast.success('Receiving completed successfully')
       }
 
-      // Wait a moment for database transaction to commit
       await new Promise((resolve) => setTimeout(resolve, 500))
 
-      // Refetch both pending and history
       const [refetchPendingResult, refetchHistoryResult] = await Promise.all([
         refetchPending(),
         refetchHistory(),
       ])
 
-      // Check if order is now in history - retry if not found
       let historyCheckResult = refetchHistoryResult
       let reports = historyCheckResult?.data?.reports || []
       let reportFound = reports.some((r: any) => r.order_id === orderId)
@@ -232,29 +197,21 @@ export function ReceivingPage() {
         retries++
       }
 
-      // Order will be automatically removed from pending list by backend filter
-      // Keep it in receivingOrderIds if it's still in pending OR if it's not yet in history
       const orderStillPending = refetchPendingResult.data?.orders?.some(
         (o: any) => o.id === orderId
       )
 
       if (!orderStillPending && reportFound) {
-        // Order is gone from pending AND found in history - success!
         setReceivingOrderIds((prev) => {
           const next = new Set(prev)
           next.delete(orderId)
           return next
         })
       } else if (!reportFound) {
-        // Report not found in history - something went wrong
         console.error('Receiving report not found in history after', maxRetries, 'retries')
-        // Keep it in receivingOrderIds to show "Processing..." state
-      } else {
-        // Order still in pending but we created report - keep showing processing state
       }
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to create receiving report')
-      // Remove from receivingOrderIds on error
       setReceivingOrderIds((prev) => {
         const next = new Set(prev)
         next.delete(orderId)
@@ -263,7 +220,6 @@ export function ReceivingPage() {
     }
   }
 
-  // Deep link: open receive dialog when ?order=id is in URL and that order is in pending list
   useEffect(() => {
     if (!orderIdFromUrl || !pendingData?.orders?.length) return
     const order = pendingData.orders.find((o: any) => o.id === orderIdFromUrl)
@@ -281,9 +237,6 @@ export function ReceivingPage() {
     }
   }, [orderIdFromUrl, pendingData?.orders, setSearchParams])
 
-  // Sync receivingOrderIds with backend data
-  // Remove IDs for orders that are no longer in pending list OR have has_receiving_report = true
-  // This cleans up the state after orders are properly received
   useEffect(() => {
     if (pendingData?.orders) {
       setReceivingOrderIds((prev) => {
@@ -291,19 +244,10 @@ export function ReceivingPage() {
         const pendingIds = new Set(pendingData.orders.map((o: any) => o.id))
         let changed = false
 
-        // Remove IDs that are no longer in pending list (order was successfully received and filtered out)
         next.forEach((id) => {
           if (!pendingIds.has(id)) {
             next.delete(id)
             changed = true
-          }
-        })
-
-        // Also check if any pending orders have has_receiving_report = true
-        // These were received but still showing in list (shouldn't happen but handle it)
-        pendingData.orders.forEach((order: any) => {
-          if (order.has_receiving_report && next.has(order.id)) {
-            // Keep it disabled but it should be filtered out on next refetch
           }
         })
 
@@ -314,10 +258,17 @@ export function ReceivingPage() {
 
   const pendingOrders = (pendingData?.orders || []).map((order: any) => ({
     ...order,
-    // Ensure has_receiving_report is true if order is in receivingOrderIds or if backend says it has a report
     has_receiving_report: order.has_receiving_report || receivingOrderIds.has(order.id),
   }))
   const historyReports = historyData?.reports || []
+
+  const readyCount = useMemo(
+    () =>
+      pendingOrders.filter((order: any) =>
+        isOrderReadyForReceiving(order.status?.toUpperCase() || order.status || '')
+      ).length,
+    [pendingOrders]
+  )
 
   return (
     <RequirePermission permission="RECEIVING_VIEW" title="receiving">
@@ -329,54 +280,60 @@ export function ReceivingPage() {
           upgradeUrl="/app/settings?tab=subscription"
         />
       ) : (
-        <div className="page-stack overflow-x-hidden" data-testid="receiving-page">
-          <Card className="shadow-sm">
-            <CardContent className="space-y-4 p-4 md:p-5">
-              <PageHeader title={receivingTitle} description={receivingDescription} />
+        <div className="page-stack space-y-6 overflow-x-hidden" data-testid="receiving-page">
+          <PageHeader title={receivingTitle} description={receivingDescription} />
 
-              <div
-                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
-                data-testid="receiving-delivered-hint"
-              >
-                <strong>Delivered does not mean received.</strong> Confirm quantities on site even
-                when the supplier marks an order as delivered.
-              </div>
+          <div
+            className="rounded-xl border border-[var(--amber)]/25 bg-[var(--amber-pale)] px-4 py-3 text-sm text-[var(--text)]"
+            data-testid="receiving-delivered-hint"
+          >
+            <strong className="font-semibold">Delivered does not mean received.</strong> Confirm
+            quantities on site even when the supplier marks an order as delivered.
+          </div>
 
-              <Tabs defaultValue="pending" className="space-y-4">
-                <TabsList className="tabs-scroll h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
-                  <TabsTrigger value="pending" className="flex items-center gap-2">
-                    <PackageCheck className="h-4 w-4" />
-                    Pending Orders
-                    {pendingOrders.length > 0 && (
-                      <Badge variant="destructive">{pendingOrders.length}</Badge>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="history" className="flex items-center gap-2">
-                    <History className="h-4 w-4" />
-                    Receiving History
-                  </TabsTrigger>
-                </TabsList>
+          {!pendingLoading && !historyLoading ? (
+            <ReceivingSummaryStrip
+              pendingCount={pendingOrders.length}
+              readyCount={readyCount}
+              historyCount={historyReports.length}
+            />
+          ) : null}
 
-                <TabsContent value="pending" className="space-y-4">
-                  <ReceivingPendingTab
-                    pendingLoading={pendingLoading}
-                    pendingOrders={pendingOrders}
-                    receivingOrderIds={receivingOrderIds}
-                    canReceive={canReceive}
-                    isCreating={isCreating}
-                    onReceive={handleReceive}
-                  />
-                </TabsContent>
+          <Tabs defaultValue="pending" className="space-y-4">
+            <TabsList className="tabs-scroll h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
+              <TabsTrigger value="pending" className="gap-1.5 text-xs sm:text-sm">
+                <PackageCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Pending Orders
+                {pendingOrders.length > 0 ? (
+                  <Badge variant="destructive" className="ml-0.5">
+                    {pendingOrders.length}
+                  </Badge>
+                ) : null}
+              </TabsTrigger>
+              <TabsTrigger value="history" className="gap-1.5 text-xs sm:text-sm">
+                <History className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Receiving History
+              </TabsTrigger>
+            </TabsList>
 
-                <TabsContent value="history" className="space-y-4">
-                  <ReceivingHistoryTab
-                    historyLoading={historyLoading}
-                    historyReports={historyReports}
-                  />
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
+            <TabsContent value="pending" className="space-y-4">
+              <ReceivingPendingTab
+                pendingLoading={pendingLoading}
+                pendingOrders={pendingOrders}
+                receivingOrderIds={receivingOrderIds}
+                canReceive={canReceive}
+                isCreating={isCreating}
+                onReceive={handleReceive}
+              />
+            </TabsContent>
+
+            <TabsContent value="history" className="space-y-4">
+              <ReceivingHistoryTab
+                historyLoading={historyLoading}
+                historyReports={historyReports}
+              />
+            </TabsContent>
+          </Tabs>
 
           {selectedOrder && (
             <ReceivingDialog

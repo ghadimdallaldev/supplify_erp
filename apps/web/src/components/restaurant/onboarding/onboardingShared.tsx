@@ -1,5 +1,7 @@
-import { Loader2 } from 'lucide-react'
+import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
+import { Switch } from '../../ui/switch'
+import { Skeleton } from '../../ui/skeleton'
 import {
   Mail,
   MessageCircle,
@@ -134,10 +136,121 @@ export const RESTAURANT_ONBOARDING_TABS: RestaurantOnboardingTabKey[] = [
   'reviews',
 ]
 
-export function OnboardingTabLoading({ className = 'py-12' }: { className?: string }) {
+export function OnboardingTabLoading({ className = 'py-8' }: { className?: string }) {
   return (
-    <div className={`flex justify-center text-[var(--text-muted)] ${className}`}>
-      <Loader2 className="h-8 w-8 animate-spin" />
+    <section
+      className={`overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)] ${className}`}
+    >
+      <div className="divide-y divide-[var(--app-border)]">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="space-y-2 px-4 py-4 sm:px-5">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3 w-56" />
+            <Skeleton className="h-10 w-full max-w-md" />
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+export function RestaurantSettingsSummary({
+  totalOrders,
+  completedOrders,
+  pendingOrders,
+  totalSpent,
+}: {
+  totalOrders: number
+  completedOrders: number
+  pendingOrders: number
+  totalSpent: string
+}) {
+  return (
+    <section
+      data-testid="restaurant-settings-summary"
+      className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-4 py-3"
+    >
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+        <div>
+          <p className="text-xs text-[var(--text-mid)]">Total orders</p>
+          <p className="mt-0.5 text-xl font-semibold tabular-nums text-[var(--text)]">
+            {totalOrders}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-[var(--text-mid)]">Completed</p>
+          <p className="mt-0.5 font-medium tabular-nums text-[var(--mint)]">{completedOrders}</p>
+        </div>
+        <div>
+          <p className="text-xs text-[var(--text-mid)]">In progress</p>
+          <p className="mt-0.5 font-medium tabular-nums text-[var(--text)]">{pendingOrders}</p>
+        </div>
+        <div>
+          <p className="text-xs text-[var(--text-mid)]">Total spent</p>
+          <p className="mt-0.5 font-medium tabular-nums text-[var(--text)]">{totalSpent}</p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+export function SettingsSection({
+  title,
+  description,
+  children,
+  footer,
+}: {
+  title: string
+  description?: string
+  children: ReactNode
+  footer?: ReactNode
+}) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]">
+      <header className="border-b border-[var(--app-border)] px-4 py-4 sm:px-5">
+        <h2 className="text-sm font-semibold text-[var(--text)]">{title}</h2>
+        {description ? (
+          <p className="mt-0.5 text-xs text-[var(--text-mid)]">{description}</p>
+        ) : null}
+      </header>
+      <div className="p-4 sm:p-5">{children}</div>
+      {footer ? (
+        <div className="border-t border-[var(--app-border)] px-4 py-3 sm:px-5">{footer}</div>
+      ) : null}
+    </section>
+  )
+}
+
+export function PreferenceToggleRow({
+  label,
+  description,
+  icon: Icon,
+  checked,
+  onCheckedChange,
+  disabled,
+}: {
+  label: string
+  description: string
+  icon: LucideIcon
+  checked: boolean
+  onCheckedChange: (checked: boolean) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 px-4 py-3 transition-colors hover:bg-[var(--brand-ultra)]/50 sm:px-5">
+      <div className="flex min-w-0 gap-3">
+        <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand-mid)]" aria-hidden />
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-[var(--text)]">{label}</p>
+          <p className="mt-0.5 text-xs text-[var(--text-mid)]">{description}</p>
+        </div>
+      </div>
+      <Switch
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        disabled={disabled}
+        aria-label={label}
+      />
     </div>
   )
 }

@@ -1,16 +1,24 @@
 import { useMemo, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
-import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Select, SelectTrigger } from '../components/ui/select'
+import { PageHeader } from '../components/ui/page-header'
+import { Skeleton } from '../components/ui/skeleton'
+import { EmptyState } from '../components/ui/empty-state'
 import { useGetMyContractPricingQuery, useGetSuppliersQuery } from '../services/api'
 import { RequirePermission } from '../components/RequirePermission'
-import { ContractPriceDisplay } from '../components/ContractPriceDisplay'
-import { formatPrice } from '../utils/format'
 import { getApiErrorMessage } from '../lib/apiError'
 import { Button } from '../components/ui/button'
-import { Loader2, Search, AlertCircle } from 'lucide-react'
+import {
+  ContractPricesEmptyIcon,
+  ContractPricesSummaryStrip,
+  MyContractPriceRow,
+  MyContractPriceTableRow,
+  SupplierPriceFilter,
+  type MyContractPriceRowData,
+} from '../components/MyContractPriceRow'
+import { Search, AlertCircle, Filter } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 export function MyContractPricesPage() {
   const [search, setSearch] = useState('')
@@ -30,33 +38,52 @@ export function MyContractPricesPage() {
   )
   const { data: suppliersData } = useGetSuppliersQuery({ limit: 200, offset: 0 })
 
-  const pricing = data?.pricing ?? []
+  const pricing = (data?.pricing ?? []) as MyContractPriceRowData[]
   const summary = data?.summary ?? []
   const suppliers = suppliersData?.suppliers ?? []
   const showInitialLoad = isLoading && pricing.length === 0
 
+  const totalProducts = useMemo(
+    () => summary.reduce((sum, row) => sum + Number(row.product_count ?? 0), 0),
+    [summary]
+  )
+
   return (
     <RequirePermission permission="CATALOG_VIEW">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-[21px] font-black text-[var(--text)]">My Contract Prices</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
-            Special prices negotiated with your suppliers.
-          </p>
-        </div>
+        <PageHeader
+          title="My Contract Prices"
+          description="Special prices negotiated with your suppliers."
+        />
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Filters</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {!showInitialLoad && !isError && (totalProducts > 0 || pricing.length > 0) ? (
+          <ContractPricesSummaryStrip
+            productCount={pricing.length > 0 ? pricing.length : totalProducts}
+            supplierCount={summary.length}
+          />
+        ) : null}
+
+        <section className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Filter className="h-4 w-4 text-[var(--brand-mid)]" aria-hidden />
+            <p className="text-sm font-semibold text-[var(--text)]">Search & filter</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="w-full">
-              <Label htmlFor="search">Search</Label>
+              <Label
+                htmlFor="contract-price-search"
+                className="text-xs font-medium text-[var(--text-mid)]"
+              >
+                Search
+              </Label>
               <div className="relative mt-1">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-[var(--text-muted)]" />
+                <Search
+                  className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--text-mid)]"
+                  aria-hidden
+                />
                 <Input
-                  id="search"
-                  className="pl-8"
+                  id="contract-price-search"
+                  className="pl-9"
                   placeholder="Product or supplier…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -64,9 +91,14 @@ export function MyContractPricesPage() {
               </div>
             </div>
             <div className="w-full">
-              <Label htmlFor="supplier">Supplier</Label>
+              <Label
+                htmlFor="contract-price-supplier"
+                className="text-xs font-medium text-[var(--text-mid)]"
+              >
+                Supplier
+              </Label>
               <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-                <SelectTrigger id="supplier" className="mt-1">
+                <SelectTrigger id="contract-price-supplier" className="mt-1">
                   <option value="">All suppliers</option>
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -76,153 +108,102 @@ export function MyContractPricesPage() {
                 </SelectTrigger>
               </Select>
             </div>
-          </CardContent>
-        </Card>
-
-        {summary.length > 0 ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {summary.map((row) => (
-              <Card key={String(row.supplier_id ?? row.supplier_name)}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{String(row.supplier_name)}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-[var(--text-muted)]">
-                    {Number(row.product_count ?? 0)} product
-                    {Number(row.product_count ?? 0) === 1 ? '' : 's'} with your negotiated price
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
           </div>
-        ) : null}
+          {summary.length > 0 ? (
+            <div className="mt-4 border-t border-[var(--app-border)] pt-4">
+              <SupplierPriceFilter
+                summary={summary}
+                selectedSupplierId={supplierFilter}
+                onSelect={setSupplierFilter}
+              />
+            </div>
+          ) : null}
+        </section>
 
-        <Card>
-          <CardContent className="p-0">
-            {isError ? (
-              <div className="flex flex-col items-center gap-3 py-12 text-center px-4">
-                <AlertCircle className="h-8 w-8 text-[var(--red)]" />
-                <p className="text-sm text-[var(--text-muted)] max-w-md">
-                  {getApiErrorMessage(error, 'Unable to load your contract prices.')}
-                </p>
-                <Button variant="outline" size="sm" onClick={() => refetch()}>
-                  Try again
-                </Button>
-              </div>
-            ) : showInitialLoad ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-[var(--brand)]" />
-              </div>
-            ) : pricing.length === 0 ? (
-              <p className="text-center py-12 text-[var(--text-muted)]">
-                No active contract prices from your suppliers. Ask your suppliers to set contract
-                pricing for your account, or browse the catalog for standard prices.
-              </p>
-            ) : (
-              <>
-                <div className="divide-y md:hidden">
-                  {pricing.map((row) => (
-                    <div key={String(row.id)} className="space-y-2 p-4">
-                      <p className="text-xs text-[var(--text-muted)]">
-                        {String(row.supplier_name)}
-                      </p>
-                      <p className="font-medium">{String(row.product_name)}</p>
-                      <p className="text-xs text-[var(--text-muted)]">{row.product_sku}</p>
-                      <ContractPriceDisplay
-                        compact
-                        currentPrice={Number(row.price)}
-                        catalogPrice={row.catalog_price != null ? Number(row.catalog_price) : null}
-                        pricingSource="CONTRACT_PRICE"
-                      />
-                      <div className="flex flex-wrap gap-1">
-                        {row.agreement_type && (
-                          <Badge variant="outline" className="text-xs">
-                            {String(row.agreement_type)}
-                          </Badge>
-                        )}
-                        {row.min_order_quantity != null && (
-                          <Badge variant="outline" className="text-xs">
-                            Min {row.min_order_quantity}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-[var(--app-border)] text-left text-[var(--text-muted)]">
-                        <th className="px-4 py-3 font-medium">Supplier</th>
-                        <th className="px-4 py-3 font-medium">Product</th>
-                        <th className="px-4 py-3 font-medium">Your price</th>
-                        <th className="px-4 py-3 font-medium">Catalog price</th>
-                        <th className="px-4 py-3 font-medium">Valid</th>
-                        <th className="px-4 py-3 font-medium">Terms</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pricing.map((row) => (
-                        <tr key={String(row.id)} className="border-b border-[var(--app-border)]">
-                          <td className="px-4 py-3">{String(row.supplier_name)}</td>
-                          <td className="px-4 py-3">
-                            <div>{String(row.product_name)}</div>
-                            <div className="text-xs text-[var(--text-muted)]">
-                              {row.product_sku}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <ContractPriceDisplay
-                              compact
-                              currentPrice={Number(row.price)}
-                              catalogPrice={
-                                row.catalog_price != null ? Number(row.catalog_price) : null
-                              }
-                              pricingSource="CONTRACT_PRICE"
-                            />
-                          </td>
-                          <td className="px-4 py-3 text-[var(--text-muted)]">
-                            {row.catalog_price != null
-                              ? formatPrice(Number(row.catalog_price))
-                              : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-[var(--text-muted)]">
-                            {row.contract_start_date
-                              ? String(row.contract_start_date).slice(0, 10)
-                              : '—'}{' '}
-                            →{' '}
-                            {row.contract_end_date
-                              ? String(row.contract_end_date).slice(0, 10)
-                              : '—'}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-wrap gap-1">
-                              {row.agreement_type && (
-                                <Badge variant="outline" className="text-xs">
-                                  {String(row.agreement_type)}
-                                </Badge>
-                              )}
-                              {row.min_order_quantity != null && (
-                                <Badge variant="outline" className="text-xs">
-                                  Min {row.min_order_quantity}
-                                </Badge>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-            {isFetching && !showInitialLoad && pricing.length > 0 ? (
-              <p className="text-center text-xs text-[var(--text-muted)] py-2 border-t border-[var(--app-border)]">
-                Updating…
+        <section className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]">
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3 sm:px-5">
+            <h2 className="text-sm font-semibold text-[var(--text)]">Price list</h2>
+            {!showInitialLoad && pricing.length > 0 ? (
+              <p className="text-xs tabular-nums text-[var(--text-muted)]">
+                {pricing.length} product{pricing.length === 1 ? '' : 's'}
               </p>
             ) : null}
-          </CardContent>
-        </Card>
+          </div>
+
+          {isError ? (
+            <div className="flex flex-col items-center gap-3 px-4 py-12 text-center sm:px-5">
+              <AlertCircle className="h-8 w-8 text-[var(--red)]" aria-hidden />
+              <p className="max-w-md text-sm text-[var(--text-mid)]">
+                {getApiErrorMessage(error, 'Unable to load your contract prices.')}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                Try again
+              </Button>
+            </div>
+          ) : showInitialLoad ? (
+            <div
+              className="divide-y divide-[var(--app-border)]"
+              data-testid="contract-prices-loading"
+            >
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex gap-3 px-4 py-4 sm:px-5">
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-3 w-28" />
+                  </div>
+                  <Skeleton className="h-8 w-20" />
+                </div>
+              ))}
+            </div>
+          ) : pricing.length === 0 ? (
+            <div className="p-4 sm:p-5">
+              <EmptyState
+                icon={<ContractPricesEmptyIcon />}
+                title="No contract prices yet"
+                description="Ask your suppliers to set negotiated pricing for your account, or browse the catalog for standard prices."
+                action={
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to="/app/products">Browse products</Link>
+                  </Button>
+                }
+              />
+            </div>
+          ) : (
+            <>
+              <div className="divide-y divide-[var(--app-border)] md:hidden">
+                {pricing.map((row) => (
+                  <MyContractPriceRow key={String(row.id)} row={row} />
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[720px] text-sm" data-testid="contract-prices-table">
+                  <thead>
+                    <tr className="border-b border-[var(--app-border)] text-left text-[var(--text-mid)]">
+                      <th className="px-4 py-3 font-medium">Supplier</th>
+                      <th className="px-4 py-3 font-medium">Product</th>
+                      <th className="px-4 py-3 font-medium">Your price</th>
+                      <th className="px-4 py-3 font-medium">Catalog price</th>
+                      <th className="px-4 py-3 font-medium">Valid</th>
+                      <th className="px-4 py-3 font-medium">Terms</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pricing.map((row) => (
+                      <MyContractPriceTableRow key={String(row.id)} row={row} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {isFetching && !showInitialLoad && pricing.length > 0 ? (
+            <p className="border-t border-[var(--app-border)] py-2 text-center text-xs text-[var(--text-muted)]">
+              Updating…
+            </p>
+          ) : null}
+        </section>
       </div>
     </RequirePermission>
   )

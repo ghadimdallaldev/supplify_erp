@@ -13,6 +13,8 @@ import {
   useGetRestaurantMeQuery,
 } from '../services/api'
 import { featureEnabled } from '../lib/planLimits'
+import { AppPanel, SummaryStrip } from '../components/ui/app-panel'
+import { PageShell } from '../components/ui/page-shell'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { ReservationBoard } from '../components/reservations/ReservationBoard'
@@ -145,13 +147,13 @@ export function ReservationsPage() {
 
   return (
     <RequirePermission permission="RESERVATIONS_VIEW" title="reservations">
-      <div className="page-stack overflow-x-hidden">
+      <PageShell className="space-y-4" data-testid="reservations-page">
         <PageHeader
           title={reservationsTitle}
           description={reservationsDescription}
           actions={
             <div className="action-bar w-full sm:w-auto">
-              <div className="flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 shadow-sm sm:w-auto">
+              <div className="flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 sm:w-auto">
                 <CalendarDays className="h-4 w-4 shrink-0 text-[var(--brand-mid)]" />
                 <Input
                   type="date"
@@ -171,7 +173,7 @@ export function ReservationsPage() {
               </div>
               {branches.length > 1 ? (
                 <Select value={branchId} onValueChange={setBranchId}>
-                  <SelectTrigger className="min-w-[140px] shadow-sm" aria-label="Branch">
+                  <SelectTrigger className="min-w-[140px]" aria-label="Branch">
                     <option value="">All branches</option>
                     {branches.map((branch: { id: string; name: string }) => (
                       <option key={branch.id} value={branch.id}>
@@ -237,125 +239,90 @@ export function ReservationsPage() {
           </Card>
         ) : null}
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Card className="border-l-4 border-l-[var(--brand-mid)] shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
-                Covers today
-              </CardTitle>
-              <CardDescription className="text-2xl font-semibold text-[var(--text)]">
-                {summary.coversToday}
-              </CardDescription>
-            </CardHeader>
-          </Card>
-          <Card className="border-l-4 border-l-[var(--mint)] shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
-                Confirmed
-              </CardTitle>
-              <CardDescription className="text-2xl font-semibold text-[var(--text)]">
-                {summary.confirmed}
-              </CardDescription>
-            </CardHeader>
-          </Card>
-          <Card className="border-l-4 border-l-[var(--amber)] shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
-                Waitlist
-              </CardTitle>
-              <CardDescription className="text-2xl font-semibold text-[var(--text)]">
-                {summary.waitlisted}
-              </CardDescription>
-            </CardHeader>
-          </Card>
-          <Card className="border-l-4 border-l-[var(--brand)] shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
-                Currently seated
-              </CardTitle>
-              <CardDescription className="text-2xl font-semibold text-[var(--text)]">
-                {summary.seated}
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
+        <SummaryStrip
+          testId="reservations-summary"
+          metrics={[
+            { label: 'Covers today', value: summary.coversToday },
+            { label: 'Confirmed', value: summary.confirmed, tone: 'mint' },
+            {
+              label: 'Waitlist',
+              value: summary.waitlisted,
+              tone: summary.waitlisted ? 'amber' : 'default',
+            },
+            { label: 'Currently seated', value: summary.seated, tone: 'brand' },
+          ]}
+        />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Waitlist queue</CardTitle>
-            <CardDescription>
-              Offer status and manual promotion for guests waiting for a table
-            </CardDescription>
-            {!waitlistAutoPromoEnabled ? (
-              <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
-                Automatic waitlist offers when a table frees up are not on your plan. You can still
-                promote guests manually. Upgrade to enable auto-promotion.
-              </p>
-            ) : (
-              <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mt-2">
-                Auto-promotion is on: when a reservation is cancelled, the next waitlisted guest may
-                receive a timed table offer.
-              </p>
-            )}
-          </CardHeader>
-          <CardContent>
-            {waitlistLoading ? (
-              <div className="flex items-center gap-2 py-6 text-sm text-[var(--text-muted)]">
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                Loading waitlist…
-              </div>
-            ) : (waitlistData?.waitlist || []).length === 0 ? (
-              <EmptyState
-                title="Waitlist is empty"
-                description="Guests waiting for a table will appear here."
-                icon={<Users className="h-6 w-6" aria-hidden />}
-              />
-            ) : (
-              <div className="space-y-2">
-                {(waitlistData?.waitlist || []).map((entry: Record<string, unknown>) => (
-                  <div
-                    key={String(entry.id)}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm"
-                  >
-                    <div>
-                      <p className="font-medium">{String(entry.customer_name)}</p>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        {String(entry.party_size)} guests · #{String(entry.position ?? '—')} in
-                        queue
-                      </p>
-                      {entry.offer_status && String(entry.offer_status) !== 'none' ? (
-                        <Badge variant="outline" className="mt-1 capitalize">
-                          Offer: {String(entry.offer_status)}
-                          {entry.offer_expires_at
-                            ? ` · expires ${new Date(String(entry.offer_expires_at)).toLocaleString()}`
-                            : ''}
-                        </Badge>
-                      ) : null}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="min-h-[40px] w-full sm:w-auto"
-                      disabled={promoting || entry.offer_status === 'offered'}
-                      onClick={async () => {
-                        try {
-                          await promoteWaitlist(String(entry.id)).unwrap()
-                          toast.success('Offer sent to guest')
-                          refetchWaitlist()
-                          refetch()
-                        } catch {
-                          toast.error('Could not promote guest')
-                        }
-                      }}
-                    >
-                      Promote
-                    </Button>
+        <AppPanel
+          title="Waitlist queue"
+          description="Offer status and manual promotion for guests waiting for a table"
+        >
+          {!waitlistAutoPromoEnabled ? (
+            <p className="mb-4 rounded-xl border border-[var(--amber)]/25 bg-[var(--amber-pale)] px-3 py-2 text-xs text-[var(--text)]">
+              Automatic waitlist offers when a table frees up are not on your plan. You can still
+              promote guests manually. Upgrade to enable auto-promotion.
+            </p>
+          ) : (
+            <p className="mb-4 rounded-xl border border-[var(--mint)]/25 bg-[var(--mint-pale)]/50 px-3 py-2 text-xs text-[var(--text)]">
+              Auto-promotion is on: when a reservation is cancelled, the next waitlisted guest may
+              receive a timed table offer.
+            </p>
+          )}
+          {waitlistLoading ? (
+            <div className="flex items-center gap-2 py-6 text-sm text-[var(--text-muted)]">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              Loading waitlist…
+            </div>
+          ) : (waitlistData?.waitlist || []).length === 0 ? (
+            <EmptyState
+              title="Waitlist is empty"
+              description="Guests waiting for a table will appear here."
+              icon={<Users className="h-6 w-6" aria-hidden />}
+            />
+          ) : (
+            <ul className="-mx-4 -mb-4 divide-y divide-[var(--app-border)] sm:-mx-5 sm:-mb-5">
+              {(waitlistData?.waitlist || []).map((entry: Record<string, unknown>) => (
+                <li
+                  key={String(entry.id)}
+                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-[var(--brand-ultra)]/50 sm:px-5"
+                >
+                  <div>
+                    <p className="font-medium">{String(entry.customer_name)}</p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {String(entry.party_size)} guests · #{String(entry.position ?? '—')} in queue
+                    </p>
+                    {entry.offer_status && String(entry.offer_status) !== 'none' ? (
+                      <Badge variant="outline" className="mt-1 capitalize">
+                        Offer: {String(entry.offer_status)}
+                        {entry.offer_expires_at
+                          ? ` · expires ${new Date(String(entry.offer_expires_at)).toLocaleString()}`
+                          : ''}
+                      </Badge>
+                    ) : null}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="min-h-[40px] w-full sm:w-auto"
+                    disabled={promoting || entry.offer_status === 'offered'}
+                    onClick={async () => {
+                      try {
+                        await promoteWaitlist(String(entry.id)).unwrap()
+                        toast.success('Offer sent to guest')
+                        refetchWaitlist()
+                        refetch()
+                      } catch {
+                        toast.error('Could not promote guest')
+                      }
+                    }}
+                  >
+                    Promote
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </AppPanel>
 
         {!boardLoading ? (
           <ReservationAssignmentsSummary
@@ -480,7 +447,7 @@ export function ReservationsPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

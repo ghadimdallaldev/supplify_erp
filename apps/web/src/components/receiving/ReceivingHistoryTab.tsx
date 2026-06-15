@@ -1,9 +1,6 @@
-import { History, Star } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
-import { Badge } from '../ui/badge'
 import { EmptyState } from '../ui/empty-state'
 import { Skeleton } from '../ui/skeleton'
-import { formatPrice } from '../../utils/format'
+import { ReceivingHistoryEmptyIcon, ReceivingHistoryRow } from './ReceivingHistoryRow'
 
 type ReceivingHistoryTabProps = {
   historyLoading: boolean
@@ -13,10 +10,20 @@ type ReceivingHistoryTabProps = {
 export function ReceivingHistoryTab({ historyLoading, historyReports }: ReceivingHistoryTabProps) {
   if (historyLoading) {
     return (
-      <div className="space-y-2 py-4">
-        <Skeleton className="h-20 w-full rounded-lg" />
-        <Skeleton className="h-20 w-full rounded-lg" />
-      </div>
+      <section className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]">
+        <div
+          className="divide-y divide-[var(--app-border)]"
+          data-testid="receiving-history-loading"
+        >
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="space-y-2 px-4 py-4 sm:px-5">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-3 w-40" />
+              <Skeleton className="h-3 w-56" />
+            </div>
+          ))}
+        </div>
+      </section>
     )
   }
 
@@ -25,63 +32,27 @@ export function ReceivingHistoryTab({ historyLoading, historyReports }: Receivin
       <EmptyState
         title="No receiving history"
         description="Completed receiving reports will appear here."
-        icon={<History className="h-10 w-10" aria-hidden />}
+        icon={<ReceivingHistoryEmptyIcon />}
       />
     )
   }
 
   return (
-    <div className="grid gap-4">
-      {historyReports.map((report: any) => (
-        <Card key={report.id}>
-          <CardHeader>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <CardTitle className="flex flex-wrap items-center gap-2">
-                  Order #{report.order_id?.slice(0, 8) || 'N/A'}
-                  <Badge variant="outline">{report.supplier_name}</Badge>
-                </CardTitle>
-                <p className="text-sm text-[var(--text-muted)] mt-1">
-                  Received: {new Date(report.received_at).toLocaleString()}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                {report.quality_score && (
-                  <div className="flex items-center gap-1">
-                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <span className="text-sm font-medium">{report.quality_score}</span>
-                  </div>
-                )}
-                <Badge variant={report.status === 'ACCEPTED' ? 'default' : 'secondary'}>
-                  {report.status}
-                </Badge>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-3 text-sm xs:grid-cols-3 xs:gap-4">
-              <div>
-                <p className="text-[var(--text-muted)]">Items Ordered</p>
-                <p className="font-semibold">{report.total_items_ordered}</p>
-              </div>
-              <div>
-                <p className="text-[var(--text-muted)]">Items Received</p>
-                <p className="font-semibold">{report.total_items_received}</p>
-              </div>
-              <div>
-                <p className="text-[var(--text-muted)]">Total Cost</p>
-                <p className="font-semibold">{formatPrice(report.total_actual_cost)}</p>
-              </div>
-            </div>
-            {report.delivery_notes && (
-              <div className="mt-4 pt-4 border-t">
-                <p className="text-sm text-[var(--text-muted)] mb-2">Delivery Notes:</p>
-                <p className="text-sm">{report.delivery_notes}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+    <section
+      className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]"
+      data-testid="receiving-history-list"
+    >
+      <header className="flex items-center justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3 sm:px-5">
+        <h2 className="text-sm font-semibold text-[var(--text)]">Receiving history</h2>
+        <p className="text-xs tabular-nums text-[var(--text-muted)]">
+          {historyReports.length} report{historyReports.length === 1 ? '' : 's'}
+        </p>
+      </header>
+      <div className="divide-y divide-[var(--app-border)]">
+        {historyReports.map((report: any) => (
+          <ReceivingHistoryRow key={report.id} report={report} />
+        ))}
+      </div>
+    </section>
   )
 }

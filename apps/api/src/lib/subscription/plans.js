@@ -37,7 +37,8 @@ function getEnforcementPlanLimits(subscription, tenantType) {
 }
 
 /** Cache TTL for subscription data (seconds). Short enough to absorb burst traffic while staying fresh. */
-const SUBSCRIPTION_CACHE_TTL = 180
+/** Cache TTL for subscription row lookups (seconds). Aligns with entitlements cache to reduce cold-cache bursts. */
+const SUBSCRIPTION_CACHE_TTL = 300
 
 /** Build a consistent cache key for a tenant subscription. */
 function subscriptionCacheKey(tenantId, tenantType) {

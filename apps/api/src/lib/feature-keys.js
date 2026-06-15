@@ -52,6 +52,7 @@ export const SUPPLIER_FEATURE_KEYS = [
   'push_notifications',
   'order_amendments',
   'tenant_audit_log',
+  'supplier_growth',
 ]
 
 export const ALL_FEATURE_KEYS = [...new Set([...RESTAURANT_FEATURE_KEYS, ...SUPPLIER_FEATURE_KEYS])]
@@ -92,6 +93,7 @@ const DISPLAY_NAMES = {
   feature_flags_access: 'Feature flag admin',
   supplier_reviews: 'Supplier Reviews',
   promotions: 'Promotions & Deals',
+  supplier_growth: 'Customer growth & referrals',
   push_notifications: 'Push Notifications',
   order_amendments: 'Order Amendments',
   tenant_audit_log: 'Activity Log',

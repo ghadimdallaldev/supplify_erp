@@ -1,17 +1,22 @@
-import { FormEvent, useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { Gift, Loader2, Save, ShoppingBag, Truck, UtensilsCrossed } from 'lucide-react'
 import { PageHeader } from '../../components/ui/page-header'
+import { PageShell } from '../../components/ui/page-shell'
 import { RequirePermission } from '../../components/RequirePermission'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
-import { Switch } from '../../components/ui/switch'
-import { Skeleton } from '../../components/ui/skeleton'
 import {
   useGetConsumerLoyaltyProgramQuery,
   useUpsertConsumerLoyaltyProgramMutation,
 } from '../../services/consumerApi'
 import { toast } from 'sonner'
+import {
+  LoyaltyFormLoading,
+  LoyaltyPanel,
+  LoyaltySummaryStrip,
+  LoyaltyToggleRow,
+} from '../../components/loyalty/loyaltyShared'
 
 export function ConsumerLoyaltyPage() {
   const { data, isLoading } = useGetConsumerLoyaltyProgramQuery()
@@ -48,6 +53,15 @@ export function ConsumerLoyaltyPage() {
     })
   }, [program])
 
+  const summary = useMemo(
+    () => ({
+      earnRate: `${form.earnPointsPerCurrency} pts per $1`,
+      redeemValue: `$${form.redeemCurrencyPerPoint}/pt`,
+      minRedeem: `${form.minRedeemPoints} pts`,
+    }),
+    [form.earnPointsPerCurrency, form.redeemCurrencyPerPoint, form.minRedeemPoints]
+  )
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     try {
@@ -78,158 +92,184 @@ export function ConsumerLoyaltyPage() {
 
   return (
     <RequirePermission permission="CATALOG_VIEW">
-      <div className="space-y-6">
+      <PageShell className="space-y-6" data-testid="consumer-loyalty-page">
         <PageHeader
-          title="Diner Rewards"
-          description="Configure earn rates, redemption, welcome bonus, and fulfillment multipliers."
+          title="Diner rewards"
+          description="Configure how guests earn and redeem points across dine-in, takeaway, and delivery."
         />
 
         {isLoading ? (
-          <Skeleton className="h-96 w-full" />
+          <LoyaltyFormLoading />
         ) : (
-          <form onSubmit={handleSubmit}>
-            <Card>
-              <CardHeader>
-                <CardTitle>Program settings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <Label htmlFor="enabled">Program enabled</Label>
-                    <p className="text-sm text-muted-foreground">
-                      When off, diners cannot earn or redeem points.
-                    </p>
-                  </div>
-                  <Switch
-                    id="enabled"
-                    checked={form.enabled}
-                    onCheckedChange={(enabled) => setForm((f) => ({ ...f, enabled }))}
-                  />
-                </div>
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <LoyaltySummaryStrip
+              enabled={form.enabled}
+              programName={form.name.trim() || 'Rewards'}
+              earnRate={summary.earnRate}
+              redeemValue={summary.redeemValue}
+              minRedeem={summary.minRedeem}
+            />
 
-                <div className="grid gap-4 sm:grid-cols-2">
+            <LoyaltyPanel
+              title="Program"
+              description="Turn rewards on for your diners and name the program shown at checkout."
+            >
+              <div className="-mx-4 -mt-4 divide-y divide-[var(--app-border)] sm:-mx-5">
+                <LoyaltyToggleRow
+                  id="enabled"
+                  label="Program enabled"
+                  description="When off, diners cannot earn or redeem points."
+                  icon={Gift}
+                  checked={form.enabled}
+                  onCheckedChange={(enabled) => setForm((f) => ({ ...f, enabled }))}
+                />
+                <div className="px-4 py-4 sm:px-5">
                   <div className="space-y-1">
                     <Label htmlFor="name">Program name</Label>
                     <Input
                       id="name"
                       value={form.name}
                       onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="welcomeBonus">Welcome bonus (points)</Label>
-                    <Input
-                      id="welcomeBonus"
-                      type="number"
-                      min={0}
-                      value={form.welcomeBonusPoints}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, welcomeBonusPoints: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="earnRate">Earn points per $1 (subtotal)</Label>
-                    <Input
-                      id="earnRate"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={form.earnPointsPerCurrency}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, earnPointsPerCurrency: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="redeemRate">Redeem value per point ($)</Label>
-                    <Input
-                      id="redeemRate"
-                      type="number"
-                      min={0}
-                      step="0.001"
-                      value={form.redeemCurrencyPerPoint}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, redeemCurrencyPerPoint: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="minRedeem">Minimum redeem (points)</Label>
-                    <Input
-                      id="minRedeem"
-                      type="number"
-                      min={0}
-                      value={form.minRedeemPoints}
-                      onChange={(e) => setForm((f) => ({ ...f, minRedeemPoints: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="maxRedeem">Max redeem (% of subtotal)</Label>
-                    <Input
-                      id="maxRedeem"
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={form.maxRedeemPercent}
-                      onChange={(e) => setForm((f) => ({ ...f, maxRedeemPercent: e.target.value }))}
+                      placeholder="e.g. Table Rewards"
                     />
                   </div>
                 </div>
+              </div>
+            </LoyaltyPanel>
 
-                <div>
-                  <p className="mb-3 text-sm font-medium">Fulfillment earn multipliers</p>
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="takeawayMult">Takeaway</Label>
-                      <Input
-                        id="takeawayMult"
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={form.takeawayMultiplier}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, takeawayMultiplier: e.target.value }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="deliveryMult">Delivery</Label>
-                      <Input
-                        id="deliveryMult"
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={form.deliveryMultiplier}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, deliveryMultiplier: e.target.value }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="dineInMult">Dine-in</Label>
-                      <Input
-                        id="dineInMult"
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={form.dineInMultiplier}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, dineInMultiplier: e.target.value }))
-                        }
-                      />
-                    </div>
-                  </div>
+            <LoyaltyPanel
+              title="Earn & redeem"
+              description="Set base earn rates, redemption value, and guardrails."
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="welcomeBonus">Welcome bonus (points)</Label>
+                  <Input
+                    id="welcomeBonus"
+                    type="number"
+                    min={0}
+                    value={form.welcomeBonusPoints}
+                    onChange={(e) => setForm((f) => ({ ...f, welcomeBonusPoints: e.target.value }))}
+                  />
                 </div>
+                <div className="space-y-1">
+                  <Label htmlFor="earnRate">Earn points per $1 (subtotal)</Label>
+                  <Input
+                    id="earnRate"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.earnPointsPerCurrency}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, earnPointsPerCurrency: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="redeemRate">Redeem value per point ($)</Label>
+                  <Input
+                    id="redeemRate"
+                    type="number"
+                    min={0}
+                    step="0.001"
+                    value={form.redeemCurrencyPerPoint}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, redeemCurrencyPerPoint: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="minRedeem">Minimum redeem (points)</Label>
+                  <Input
+                    id="minRedeem"
+                    type="number"
+                    min={0}
+                    value={form.minRedeemPoints}
+                    onChange={(e) => setForm((f) => ({ ...f, minRedeemPoints: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label htmlFor="maxRedeem">Max redeem (% of subtotal)</Label>
+                  <Input
+                    id="maxRedeem"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={form.maxRedeemPercent}
+                    onChange={(e) => setForm((f) => ({ ...f, maxRedeemPercent: e.target.value }))}
+                    className="max-w-xs"
+                  />
+                </div>
+              </div>
+            </LoyaltyPanel>
 
+            <LoyaltyPanel
+              title="Fulfillment earn multipliers"
+              description="Reward dine-in visits more than takeaway or delivery, if you choose."
+              footer={
                 <Button type="submit" disabled={saving}>
-                  {saving ? 'Saving…' : 'Save program'}
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving…
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save program
+                    </>
+                  )}
                 </Button>
-              </CardContent>
-            </Card>
+              }
+            >
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-1">
+                  <Label htmlFor="takeawayMult" className="flex items-center gap-1.5">
+                    <ShoppingBag className="h-3.5 w-3.5 text-[var(--brand-mid)]" aria-hidden />
+                    Takeaway
+                  </Label>
+                  <Input
+                    id="takeawayMult"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.takeawayMultiplier}
+                    onChange={(e) => setForm((f) => ({ ...f, takeawayMultiplier: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="deliveryMult" className="flex items-center gap-1.5">
+                    <Truck className="h-3.5 w-3.5 text-[var(--brand-mid)]" aria-hidden />
+                    Delivery
+                  </Label>
+                  <Input
+                    id="deliveryMult"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.deliveryMultiplier}
+                    onChange={(e) => setForm((f) => ({ ...f, deliveryMultiplier: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="dineInMult" className="flex items-center gap-1.5">
+                    <UtensilsCrossed className="h-3.5 w-3.5 text-[var(--brand-mid)]" aria-hidden />
+                    Dine-in
+                  </Label>
+                  <Input
+                    id="dineInMult"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.dineInMultiplier}
+                    onChange={(e) => setForm((f) => ({ ...f, dineInMultiplier: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </LoyaltyPanel>
           </form>
         )}
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

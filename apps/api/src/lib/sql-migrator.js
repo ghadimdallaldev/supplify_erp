@@ -7,6 +7,32 @@ import { logger } from './logger.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const migrationsDir = join(__dirname, '..', '..', 'db', 'migrations')
 
+function splitMigrationStatements(sql) {
+  return sql
+    .split(/;\s*(?:\r?\n|$)/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0 && !part.startsWith('--'))
+}
+
+function isIdempotentCreateStatement(statement) {
+  return /^\s*CREATE\s+(TABLE|INDEX|UNIQUE\s+INDEX)\s+IF\s+NOT\s+EXISTS/i.test(statement)
+}
+
+async function runMigrationStatements(sql) {
+  const statements = splitMigrationStatements(sql)
+  for (const statement of statements) {
+    try {
+      await migrationQuery(`${statement};`)
+    } catch (error) {
+      if (error.code === '42P07' && isIdempotentCreateStatement(statement)) {
+        logger.warn({ event: 'db.migration.object_exists', statement: statement.slice(0, 120) })
+        continue
+      }
+      throw error
+    }
+  }
+}
+
 function readMigrationSql(filePath) {
   const buf = readFileSync(filePath)
   if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) {
@@ -93,19 +119,15 @@ export async function runAllSqlMigrations() {
     logger.info({ event: 'db.migration.run', file })
     const sql = readMigrationSql(join(migrationsDir, file))
     try {
-      await migrationQuery(sql)
+      await runMigrationStatements(sql)
     } catch (error) {
-      if (error.code === '42P07') {
-        logger.warn({ event: 'db.migration.exists', file })
-      } else {
-        logger.error(`SQL migration failed: ${file}`, {
-          event: 'db.migration.failed',
-          file,
-          code: error.code,
-          error: error.message,
-        })
-        throw error
-      }
+      logger.error(`SQL migration failed: ${file}`, {
+        event: 'db.migration.failed',
+        file,
+        code: error.code,
+        error: error.message,
+      })
+      throw error
     }
 
     await recordAppliedMigration(file)

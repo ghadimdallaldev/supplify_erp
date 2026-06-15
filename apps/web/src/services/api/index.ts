@@ -46,7 +46,10 @@ export type {
   ImageImportJob,
   ImageImportPreviewResponse,
   ImageImportSummary,
+  ProductImportJob,
+  ProductImportSummary,
 } from './endpoints/catalogImport'
+export { isAsyncProductImportStart, isTerminalProductImportStatus } from './endpoints/catalogImport'
 
 export const {
   useGetMeQuery,
@@ -209,6 +212,7 @@ export const {
   useGetSupplierDeliveryBoardQuery,
   usePreviewProductImportMutation,
   useExecuteProductImportMutation,
+  useGetProductImportJobQuery,
   usePresignImageImportMutation,
   usePreviewImageImportMutation,
   useStartImageImportMutation,

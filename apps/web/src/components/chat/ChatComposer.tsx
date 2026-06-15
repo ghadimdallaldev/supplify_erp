@@ -1,7 +1,6 @@
 import type { RefObject, ChangeEvent, KeyboardEvent } from 'react'
 import { FileText, Paperclip, Reply, Send, ShoppingCart, Smile, X } from 'lucide-react'
 import { Button } from '../ui/button'
-import { Input } from '../ui/input'
 import { formatPrice } from '../../utils/format'
 import { COMMON_CHAT_EMOJIS } from './constants'
 
@@ -31,7 +30,7 @@ type Props = {
   onFileSelect: (e: ChangeEvent<HTMLInputElement>) => void
   onRemoveFile: (index: number) => void
   fileInputRef: RefObject<HTMLInputElement>
-  inputRef: RefObject<HTMLInputElement>
+  inputRef: RefObject<HTMLTextAreaElement>
   userRole?: string
 }
 
@@ -64,54 +63,61 @@ export function ChatComposer({
 }: Props) {
   if (!canSend) {
     return (
-      <div className="border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        <p className="py-2 text-center text-sm text-[var(--text-muted)]">
+      <div className="shrink-0 border-t border-[var(--app-border)] bg-[var(--surface)] px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <p className="py-2 text-center text-sm text-[var(--text-mid)]">
           You have view-only access to chat. Contact an account admin to send messages.
         </p>
       </div>
     )
   }
 
+  const canSendNow =
+    (message.trim().length > 0 || selectedFiles.length > 0 || selectedOrder != null) &&
+    !isSending &&
+    !isUploading
+
   return (
-    <>
+    <div className="shrink-0 border-t border-[var(--app-border)] bg-[var(--surface)]">
       {replyingTo ? (
-        <div className="flex items-center justify-between border-t bg-[var(--brand-ultra)]/50 px-4 py-2">
-          <div className="flex items-center gap-2 text-sm">
-            <Reply className="h-4 w-4 text-[var(--text-muted)]" />
-            <span className="text-[var(--text-muted)]">Replying to:</span>
-            <span className="max-w-xs truncate">{replyingTo.content}</span>
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--app-border)] bg-[var(--brand-ultra)] px-4 py-2.5">
+          <div className="flex min-w-0 items-center gap-2 text-sm">
+            <Reply className="h-4 w-4 shrink-0 text-[var(--brand-mid)]" aria-hidden />
+            <span className="shrink-0 text-[var(--text-mid)]">Replying to</span>
+            <span className="truncate font-medium text-[var(--text)]">{replyingTo.content}</span>
           </div>
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={onClearReply}
-            className="h-6 w-6 p-0"
+            className="h-7 w-7 shrink-0 p-0"
+            aria-label="Cancel reply"
           >
             <X className="h-4 w-4" />
           </Button>
         </div>
       ) : null}
+
       {(selectedFiles.length > 0 || selectedOrder) && (
-        <div className="space-y-2 border-t bg-[var(--brand-ultra)]/30 px-4 py-3">
+        <div className="space-y-2 border-b border-[var(--app-border)] bg-[var(--brand-ultra)]/60 px-4 py-3">
           {selectedFiles.map((file, index) => (
             <div
               key={`${file.name}-${index}`}
-              className="flex items-center gap-2 rounded-lg border bg-background p-2"
+              className="flex items-center gap-2.5 rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-2"
             >
               {filePreviews[index] ? (
                 <img
                   src={filePreviews[index]}
-                  alt={file.name}
-                  className="h-12 w-12 rounded object-cover"
+                  alt=""
+                  className="h-11 w-11 rounded-md object-cover"
                 />
               ) : (
-                <div className="flex h-12 w-12 items-center justify-center rounded bg-[var(--brand-ultra)]">
-                  <FileText className="h-6 w-6 text-[var(--text-muted)]" />
+                <div className="flex h-11 w-11 items-center justify-center rounded-md bg-[var(--brand-pale)]">
+                  <FileText className="h-5 w-5 text-[var(--brand-mid)]" />
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm">{file.name}</div>
+                <div className="truncate text-sm font-medium text-[var(--text)]">{file.name}</div>
                 <div className="text-xs text-[var(--text-muted)]">
                   {(file.size / 1024).toFixed(1)} KB
                 </div>
@@ -121,16 +127,19 @@ export function ChatComposer({
                 variant="ghost"
                 size="sm"
                 onClick={() => onRemoveFile(index)}
-                className="h-6 w-6 p-0"
+                className="h-7 w-7 p-0"
+                aria-label={`Remove ${file.name}`}
               >
                 <X className="h-4 w-4" />
               </Button>
             </div>
           ))}
           {selectedOrder ? (
-            <div className="flex items-center gap-2 rounded-lg border bg-background p-2">
-              <ShoppingCart className="h-5 w-5 text-[var(--brand-mid)]" />
-              <div className="flex-1 text-sm font-medium">
+            <div className="flex items-center gap-2.5 rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-2">
+              <div className="flex h-11 w-11 items-center justify-center rounded-md bg-[var(--brand-pale)]">
+                <ShoppingCart className="h-5 w-5 text-[var(--brand-mid)]" />
+              </div>
+              <div className="min-w-0 flex-1 text-sm font-medium text-[var(--text)]">
                 Order #{selectedOrder.id.slice(0, 8)}
               </div>
               <Button
@@ -138,7 +147,8 @@ export function ChatComposer({
                 variant="ghost"
                 size="sm"
                 onClick={onClearOrder}
-                className="h-6 w-6 p-0"
+                className="h-7 w-7 p-0"
+                aria-label="Remove order attachment"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -146,16 +156,17 @@ export function ChatComposer({
           ) : null}
         </div>
       )}
-      <div className="border-t bg-gradient-to-t from-background to-background/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+
+      <div className="px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {showEmojiPicker ? (
-          <div className="emoji-picker-container mb-3 max-h-48 overflow-y-auto rounded-lg border border-[var(--app-border)] bg-background p-3 shadow-xl dark:border-[var(--app-border-mid)]">
-            <div className="grid grid-cols-8 gap-1">
+          <div className="emoji-picker-container mb-3 max-h-44 overflow-y-auto rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-2.5">
+            <div className="grid grid-cols-8 gap-0.5">
               {COMMON_CHAT_EMOJIS.map((emoji) => (
                 <button
                   key={emoji}
                   type="button"
                   onClick={() => onInsertEmoji(emoji)}
-                  className="rounded p-1 text-2xl transition-transform duration-150 ease-out [@media(hover:hover)_and_(pointer:fine)]:hover:scale-125 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[var(--brand-ultra)] erp-pressable"
+                  className="erp-pressable rounded-md p-1.5 text-xl transition-colors hover:bg-[var(--brand-ultra)]"
                 >
                   {emoji}
                 </button>
@@ -163,8 +174,9 @@ export function ChatComposer({
             </div>
           </div>
         ) : null}
-        <div className="flex items-end gap-2">
-          <div className="flex gap-1">
+
+        <div className="flex items-end gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--brand-ultra)]/50 p-1.5 focus-within:border-[var(--brand-light)] focus-within:ring-2 focus-within:ring-[var(--brand-light)]/25">
+          <div className="flex shrink-0 gap-0.5 pb-0.5 pl-0.5">
             <input
               ref={fileInputRef}
               type="file"
@@ -177,7 +189,7 @@ export function ChatComposer({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-9 w-9 p-0"
+              className="h-8 w-8 p-0 text-[var(--text-mid)] hover:text-[var(--brand-mid)]"
               onClick={() => fileInputRef.current?.click()}
               title="Attach file"
             >
@@ -187,7 +199,7 @@ export function ChatComposer({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-9 w-9 p-0"
+              className={`h-8 w-8 p-0 ${showEmojiPicker ? 'text-[var(--brand-mid)]' : 'text-[var(--text-mid)] hover:text-[var(--brand-mid)]'}`}
               onClick={onToggleEmojiPicker}
               title="Add emoji"
             >
@@ -197,7 +209,7 @@ export function ChatComposer({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-9 w-9 p-0"
+              className="h-8 w-8 p-0 text-[var(--text-mid)] hover:text-[var(--brand-mid)] disabled:opacity-40"
               onClick={onToggleOrderPicker}
               disabled={!orders.length}
               title="Attach order"
@@ -205,14 +217,18 @@ export function ChatComposer({
               <ShoppingCart className="h-4 w-4" />
             </Button>
           </div>
-          <Input
+
+          <textarea
             ref={inputRef}
             value={message}
+            rows={1}
             onChange={(e) => {
               onMessageChange(e.target.value)
               onTyping()
+              e.target.style.height = 'auto'
+              e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`
             }}
-            onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+            onKeyDown={(e: KeyboardEvent<HTMLTextAreaElement>) => {
               if (e.key === 'Enter' && !e.shiftKey && !isSending) {
                 e.preventDefault()
                 onSend()
@@ -221,40 +237,44 @@ export function ChatComposer({
             placeholder={
               replyingTo
                 ? `Reply to ${replyingTo.sender_type === String(userRole).toUpperCase() ? 'yourself' : 'message'}…`
-                : 'Type a message…'
+                : 'Write a message…'
             }
-            className="min-h-9 flex-1"
+            className="max-h-[120px] min-h-[36px] flex-1 resize-none border-0 bg-transparent py-2 text-sm leading-relaxed text-[var(--text)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-0"
             disabled={isSending || isUploading}
           />
+
           <Button
             type="button"
             onClick={onSend}
-            disabled={
-              (!message.trim() && selectedFiles.length === 0 && !selectedOrder) ||
-              isSending ||
-              isUploading
-            }
-            className="h-9 bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] px-4 text-white shadow-md hover:opacity-90"
+            disabled={!canSendNow}
+            size="sm"
+            className="erp-pressable mb-0.5 mr-0.5 h-8 shrink-0 bg-[var(--brand-mid)] px-3 hover:bg-[var(--brand)]"
           >
             <Send className="h-4 w-4" />
+            <span className="sr-only">Send</span>
           </Button>
         </div>
+
+        <p className="mt-2 hidden text-[11px] text-[var(--text-muted)] sm:block">
+          Enter to send · Shift+Enter for a new line
+        </p>
+
         {showOrderPicker && orders.length > 0 ? (
-          <div className="order-picker-container mt-2 max-h-48 overflow-y-auto rounded-lg border border-[var(--app-border)] bg-background p-3 shadow-xl dark:border-[var(--app-border-mid)]">
-            <div className="mb-2 text-xs font-medium text-[var(--text-muted)]">
-              Select an order to share:
-            </div>
-            <div className="space-y-1">
+          <div className="order-picker-container mt-2 max-h-44 overflow-y-auto rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-2">
+            <p className="mb-1.5 px-1 text-xs font-medium text-[var(--text-mid)]">Share an order</p>
+            <div className="space-y-0.5">
               {orders.slice(0, 5).map((order) => (
                 <button
                   key={order.id}
                   type="button"
                   onClick={() => onSelectOrder(order)}
-                  className="w-full rounded p-2 text-left text-sm transition-colors hover:bg-[var(--brand-ultra)]"
+                  className="w-full rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-[var(--brand-ultra)]"
                 >
-                  <div className="font-medium">Order #{order.id.slice(0, 8)}</div>
+                  <div className="font-medium text-[var(--text)]">
+                    Order #{order.id.slice(0, 8)}
+                  </div>
                   <div className="text-xs text-[var(--text-muted)]">
-                    {order.total_amount ? formatPrice(order.total_amount) : 'No amount'} •{' '}
+                    {order.total_amount ? formatPrice(order.total_amount) : 'No amount'} ·{' '}
                     {order.status}
                   </div>
                 </button>
@@ -263,6 +283,6 @@ export function ChatComposer({
           </div>
         ) : null}
       </div>
-    </>
+    </div>
   )
 }
