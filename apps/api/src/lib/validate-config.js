@@ -49,6 +49,11 @@ function validateSharedProductionRules(issues) {
       'WEB_ORIGINS uses only http:// — use https:// behind TLS when exposed to the internet'
     )
   }
+  if (!config.REDIS_URL) {
+    logger.warn(
+      'REDIS_URL is not set — API caches and Socket.IO use in-process memory only (no cross-replica sharing)'
+    )
+  }
   const emailConfigured =
     !config.EMAIL_ENABLED || config.EMAIL_LOG_ONLY || Boolean(config.SMTP_HOST && config.SMTP_PASS)
   if (config.EMAIL_ENABLED && !emailConfigured && !config.EMAIL_LOG_ONLY) {

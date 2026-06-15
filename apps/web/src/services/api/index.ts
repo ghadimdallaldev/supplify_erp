@@ -30,6 +30,8 @@ import './endpoints/push'
 import './endpoints/billing'
 import './endpoints/admin'
 import './endpoints/impersonation'
+import './endpoints/catalogImport'
+import './endpoints/growth'
 import '../staffApi'
 import '../reservationsApi'
 import '../consumerApi'
@@ -38,6 +40,13 @@ import { api as baseApi } from './base'
 
 // Endpoint modules inject into `api` at import time; loosen typing for imperative access.
 export const api = baseApi as any
+
+export { downloadImageImportReportUrl } from './endpoints/catalogImport'
+export type {
+  ImageImportJob,
+  ImageImportPreviewResponse,
+  ImageImportSummary,
+} from './endpoints/catalogImport'
 
 export const {
   useGetMeQuery,
@@ -169,6 +178,9 @@ export const {
   useDeleteExpiryLotMutation,
   useGetReorderRemindersQuery,
   useGetReorderAssistanceQuery,
+  useExplainReorderAssistanceMutation,
+  useAskReorderAssistanceMutation,
+  useApplyReorderAssistanceMutation,
   useSuppressReorderSuggestionMutation,
   useGetOrderFulfillmentIssuesQuery,
   useReportOrderShortageMutation,
@@ -197,6 +209,11 @@ export const {
   useGetSupplierDeliveryBoardQuery,
   usePreviewProductImportMutation,
   useExecuteProductImportMutation,
+  usePresignImageImportMutation,
+  usePreviewImageImportMutation,
+  useStartImageImportMutation,
+  useGetImageImportJobQuery,
+  useCancelImageImportMutation,
   useGetProductSubstitutesQuery,
   useCreateProductSubstituteMutation,
   useDeleteProductSubstituteMutation,

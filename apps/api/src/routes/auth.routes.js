@@ -23,6 +23,7 @@ import { getRolesForUser, getPermissionsForUser } from '../lib/permissions.js'
 import { getTenantProfileRow } from '../lib/tenant-profile-cache.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
+import { config } from '../config/env.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import {
   getUserLegalAcceptanceStatus,
@@ -97,6 +98,22 @@ function callbackOrigin(req) {
   return `${req.protocol}://${req.get('host')}`
 }
 
+function isAllowedWebRedirect(urlString) {
+  if (!urlString || typeof urlString !== 'string') return false
+  try {
+    const targetOrigin = new URL(urlString).origin
+    return config.WEB_ORIGINS.some((origin) => {
+      try {
+        return new URL(origin).origin === targetOrigin
+      } catch {
+        return false
+      }
+    })
+  } catch {
+    return false
+  }
+}
+
 // Generate login URL and redirect to Keycloak
 router.get('/login', async (req, res) => {
   try {
@@ -168,7 +185,7 @@ router.get('/logout', async (req, res) => {
     let redirectAfter = `${webOrigin}/login`
     if (req.query.redirect === 'register') {
       redirectAfter = `${webOrigin}/auth/register`
-    } else if (typeof req.query.redirect === 'string' && req.query.redirect.startsWith('http')) {
+    } else if (typeof req.query.redirect === 'string' && isAllowedWebRedirect(req.query.redirect)) {
       redirectAfter = req.query.redirect
     }
 

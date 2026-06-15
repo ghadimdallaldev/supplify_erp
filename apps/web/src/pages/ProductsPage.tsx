@@ -1,4 +1,4 @@
-import { Suspense, useState, useMemo } from 'react'
+import { Suspense, useState, useMemo, useEffect } from 'react'
 import {
   useGetProductsQuery,
   useGetProductCategoriesQuery,
@@ -20,10 +20,20 @@ import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
+import { EmptyState } from '../components/ui/empty-state'
 import { filterControlClass } from '../components/ui/filter-control'
 import { DataTableShell } from '../components/ui/data-table-shell'
 import { cn } from '../lib/utils'
-import { Plus, Upload, FileQuestion, Heart } from 'lucide-react'
+import {
+  Plus,
+  Upload,
+  Image,
+  FileQuestion,
+  Heart,
+  ChevronLeft,
+  ChevronRight,
+  Package,
+} from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useCartActions } from '../hooks/useCartActions'
@@ -49,8 +59,11 @@ import { SearchHistoryDropdown } from '../components/search/SearchHistoryDropdow
 import {
   LazyProductFormDialog,
   LazyProductBulkUploadDialog,
+  LazyProductImageImportDialog,
   LazyInventoryAdjustmentDialog,
 } from '../components/products/lazyProductDialogs'
+
+const PRODUCTS_PAGE_SIZE = 50
 
 export function ProductsPage() {
   const { search, setSearch, debouncedSearch } = useDebouncedSearch()
@@ -61,8 +74,10 @@ export function ProductsPage() {
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const [supplierFilter, setSupplierFilter] = useState('')
+  const [offset, setOffset] = useState(0)
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
+  const [showImageImport, setShowImageImport] = useState(false)
   const [showInventoryAdjustment, setShowInventoryAdjustment] = useState(false)
   const [selectedProductForAdjustment, setSelectedProductForAdjustment] = useState<any>(null)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
@@ -133,10 +148,11 @@ export function ProductsPage() {
       tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined,
       minPrice: minPrice ? minPrice : undefined,
       maxPrice: maxPrice ? maxPrice : undefined,
+      supplier: !isSupplier && supplierFilter ? supplierFilter : undefined,
       includeStock: true,
       favoritesOnly: isRestaurant && favoritesOnly ? true : undefined,
-      limit: 100,
-      offset: 0,
+      limit: PRODUCTS_PAGE_SIZE,
+      offset,
     }),
     [
       debouncedSearch,
@@ -147,18 +163,38 @@ export function ProductsPage() {
       maxPrice,
       isRestaurant,
       favoritesOnly,
+      isSupplier,
+      supplierFilter,
+      offset,
     ]
   )
 
-  const { data, isLoading, error } = useGetProductsQuery(queryParams)
+  useEffect(() => {
+    setOffset(0)
+  }, [
+    debouncedSearch,
+    category,
+    categoryId,
+    selectedTags,
+    minPrice,
+    maxPrice,
+    supplierFilter,
+    favoritesOnly,
+  ])
 
-  let filteredProducts = isSupplier
+  const { data, isLoading, isFetching, error, refetch } = useGetProductsQuery(queryParams)
+
+  const filteredProducts = isSupplier
     ? data?.products.filter((p) => p.supplier_email === user?.email)
     : data?.products || []
 
-  if (!isSupplier && supplierFilter) {
-    filteredProducts = filteredProducts.filter((p) => p.supplier_id === supplierFilter)
-  }
+  const pagination = data?.pagination
+  const total = pagination?.total ?? filteredProducts.length
+  const rangeStart = total === 0 ? 0 : offset + 1
+  const rangeEnd = Math.min(offset + (pagination?.limit ?? PRODUCTS_PAGE_SIZE), total)
+  const hasNextPage = offset + (pagination?.limit ?? PRODUCTS_PAGE_SIZE) < total
+  const hasPrevPage = offset > 0
+  const showInitialLoad = isLoading && !data
 
   const handleAddToCart = (product: any) => {
     addItem({ productId: product.id, product, quantity: 1 })
@@ -335,12 +371,32 @@ export function ProductsPage() {
     }
   }
 
-  if (isLoading) return <ProductsPageLoading />
+  if (showInitialLoad) return <ProductsPageLoading />
+
   if (error) {
     return (
-      <div className="text-center py-12">
-        <p className="text-[var(--red)]">Failed to load products</p>
-      </div>
+      <RequirePermission anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']} title="products">
+        <PageShell data-testid="products-page">
+          <PageHeader
+            title="Products"
+            description={
+              isSupplier
+                ? 'Manage your product catalog'
+                : 'Browse and search products from suppliers'
+            }
+          />
+          <EmptyState
+            title="Failed to load products"
+            description="Check your connection and try again."
+            icon={<Package className="h-10 w-10" aria-hidden />}
+            action={
+              <Button onClick={() => refetch()} data-testid="products-retry">
+                Retry
+              </Button>
+            }
+          />
+        </PageShell>
+      </RequirePermission>
     )
   }
 
@@ -364,6 +420,10 @@ export function ProductsPage() {
                     <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
                       <Upload className="h-4 w-4 mr-2" />
                       Bulk Upload
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowImageImport(true)}>
+                      <Image className="h-4 w-4 mr-2" />
+                      Import Product Images
                     </Button>
                   </>
                 </PermissionGate>
@@ -463,17 +523,62 @@ export function ProductsPage() {
             setMinPrice={setMinPrice}
             setMaxPrice={setMaxPrice}
           />
-          <ProductCatalogTable
-            filteredProducts={filteredProducts}
-            isSupplier={isSupplier}
-            isRestaurant={isRestaurant}
-            onAddToCart={handleAddToCart}
-            onToggleFavorite={handleToggleFavorite}
-            onAdjustStock={(product) => {
-              setSelectedProductForAdjustment(product)
-              setShowInventoryAdjustment(true)
-            }}
-          />
+          <div className="relative">
+            {isFetching && !showInitialLoad && (
+              <div
+                className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center bg-[var(--surface)]/70 pt-6"
+                aria-live="polite"
+                data-testid="products-table-fetching"
+              >
+                <p className="text-sm font-medium text-[var(--text-muted)]">Updating…</p>
+              </div>
+            )}
+            <ProductCatalogTable
+              filteredProducts={filteredProducts}
+              isSupplier={isSupplier}
+              isRestaurant={isRestaurant}
+              onAddToCart={handleAddToCart}
+              onToggleFavorite={handleToggleFavorite}
+              onAdjustStock={(product) => {
+                setSelectedProductForAdjustment(product)
+                setShowInventoryAdjustment(true)
+              }}
+            />
+          </div>
+          {total > 0 && (
+            <div
+              className="flex flex-col gap-3 border-t border-[var(--app-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              data-testid="products-pagination"
+            >
+              <p className="text-sm text-[var(--text-muted)]">
+                Showing {rangeStart}–{rangeEnd} of {total}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!hasPrevPage || isFetching}
+                  onClick={() => setOffset((prev) => Math.max(0, prev - PRODUCTS_PAGE_SIZE))}
+                  data-testid="products-prev-page"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!hasNextPage || isFetching}
+                  onClick={() => setOffset((prev) => prev + PRODUCTS_PAGE_SIZE)}
+                  data-testid="products-next-page"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </DataTableShell>
 
         <Suspense fallback={null}>
@@ -493,6 +598,12 @@ export function ProductsPage() {
               handleSubmitProduct={handleSubmitProduct}
               isCreating={isCreating}
               isUploadingImage={isUploadingImage}
+            />
+          )}
+          {showImageImport && (
+            <LazyProductImageImportDialog
+              open={showImageImport}
+              onOpenChange={setShowImageImport}
             />
           )}
           {showBulkUpload && (

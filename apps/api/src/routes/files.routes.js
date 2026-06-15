@@ -1,5 +1,6 @@
 import express from 'express'
-import { requireAuth, requireRole, resolveTenantContext } from '../lib/rbac.js'
+import { requireAuth, requireRole, resolveTenantContext, optionalAuth } from '../lib/rbac.js'
+import { verifyObjectAccess } from '../lib/object-download-auth.js'
 import { filesUploadGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -19,6 +20,7 @@ import {
   assertUploadKeyOwnedByUser,
   assertFileExtensionMatchesMime,
   MAX_UPLOAD_BYTES,
+  MAX_IMPORT_ZIP_BYTES,
 } from '../lib/sanitize-upload.js'
 import {
   createPresignedUpload,
@@ -31,7 +33,7 @@ import {
 const router = express.Router()
 
 /** Serve uploaded objects when buckets are private (Railway, R2 without public URL). */
-router.get('/object', async (req, res) => {
+router.get('/object', optionalAuth, async (req, res) => {
   setObjectCorsHeaders(req, res)
   try {
     const rawKey = req.query.key
@@ -49,6 +51,16 @@ router.get('/object', async (req, res) => {
         ok: false,
         data: null,
         error: { name: 'VALIDATION_ERROR', message: 'Invalid file key' },
+        requestId: req.requestId,
+      })
+    }
+
+    const allowed = await verifyObjectAccess(key, req)
+    if (!allowed) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Access denied' },
         requestId: req.requestId,
       })
     }
@@ -88,7 +100,7 @@ router.get('/object', async (req, res) => {
 })
 
 // Complete PUT upload using signed token from /presign (local disk or private S3 via API)
-router.put('/upload/:token', express.raw({ type: '*/*', limit: '10mb' }), async (req, res) => {
+async function handleTokenUpload(req, res) {
   setObjectCorsHeaders(req, res)
   try {
     const contentType = req.headers['content-type'] || 'application/octet-stream'
@@ -123,7 +135,16 @@ router.put('/upload/:token', express.raw({ type: '*/*', limit: '10mb' }), async 
       requestId: req.requestId,
     })
   }
-})
+}
+
+router.put('/upload/:token', express.raw({ type: '*/*', limit: '10mb' }), handleTokenUpload)
+
+/** Large import archives (ZIP) — token maxBytes enforced in completeUpload. */
+router.put(
+  '/upload-import/:token',
+  express.raw({ type: '*/*', limit: MAX_IMPORT_ZIP_BYTES }),
+  handleTokenUpload
+)
 
 // Generate presigned URL for file upload
 router.post(

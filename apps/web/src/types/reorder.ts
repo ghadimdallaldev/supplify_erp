@@ -55,4 +55,53 @@ export interface ReorderAssistanceItem {
   expiryDate?: string
   scopeType: 'product' | 'cadence' | 'supplier_product'
   scopeId: string
+  forecast?: {
+    explanation?: string
+    confidence?: number
+    forecastReorderQty?: number
+    reorderByDate?: string | null
+  }
+}
+
+export interface ReorderForecast {
+  productId: string
+  branchId?: string | null
+  productName?: string
+  productUnit?: string
+  confidence: number
+  forecastReorderQty?: number | null
+  reorderByDate?: string | null
+  explanation?: string
+  urgency?: string
+}
+
+export interface ReorderAiExplainResult {
+  summary: string
+  items: Array<{ productId: string; rationale: string }>
+  source: 'heuristic' | 'llm'
+  usedLlm: boolean
+  usageLimited?: boolean
+}
+
+export interface ReorderAiAskResult {
+  intent: string
+  matchedProducts: Array<{
+    productId: string
+    qty: number
+    confidence: number
+    productName?: string
+  }>
+  clarifyingQuestion?: string
+  source: 'heuristic' | 'llm'
+  usedLlm: boolean
+}
+
+export interface ReorderAssistanceResponse {
+  suggestions: ReorderAssistanceItem[]
+  total: number
+  smartReorder?: {
+    tier: string
+    capabilities: Record<string, boolean>
+  }
+  forecasts?: ReorderForecast[]
 }

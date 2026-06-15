@@ -56,6 +56,8 @@ import { publicRoutes } from './routes/public.routes.js'
 import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
 import { driversRoutes } from './routes/drivers.routes.js'
 import { supplierOpsRoutes } from './routes/supplier-ops.routes.js'
+import { supplierGrowthRoutes, growthPublicRoutes } from './routes/supplier-growth.routes.js'
+import { restaurantConnectionRequestRoutes } from './routes/restaurant-connection-requests.routes.js'
 import { promotionsRoutes } from './routes/promotions.routes.js'
 import { tenantAuditRoutes } from './routes/tenant-audit.routes.js'
 import { disputesRoutes } from './routes/disputes.routes.js'
@@ -400,6 +402,9 @@ app.use('/api/warehouses', warehousesRoutes)
 app.use('/api/fulfillment', fulfillmentRoutes)
 app.use('/api/drivers', driversRoutes)
 app.use('/api/supplier', supplierOpsRoutes)
+app.use('/api/supplier/growth', supplierGrowthRoutes)
+app.use('/api/growth', growthPublicRoutes)
+app.use('/api/restaurant/growth', restaurantConnectionRequestRoutes)
 
 // 404 handler
 app.use('*', (req, res) => {

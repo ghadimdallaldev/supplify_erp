@@ -51,6 +51,11 @@ export interface AdminOverview {
   }
   tenantsOverLimit?: number
   tenantsNearLimit?: number
+  aiReorder?: {
+    requests24h?: number
+    successRate?: number | null
+    aiEnabled?: boolean
+  }
 }
 
 /** Primary metric for Active Subs card (paid plans, excludes Free Trial catalog). */

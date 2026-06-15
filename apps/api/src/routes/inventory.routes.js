@@ -5,6 +5,7 @@ import {
   resolveTenantContext,
   requirePermission,
   getSupplierIdForRequest,
+  getRestaurantIdForRequest,
 } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -181,7 +182,8 @@ router.get('/product/:productId', requireAuth, async (req, res) => {
       SELECT 
         i.*, 
         p.name as product_name, 
-        p.sku, 
+        p.sku,
+        p.supplier_id,
         s.name as supplier_name,
         pis.moq,
         pis.order_multiple,
@@ -214,9 +216,64 @@ router.get('/product/:productId', requireAuth, async (req, res) => {
       })
     }
 
+    const inventory = rows[0]
+
+    if (req.userData.role === 'SUPPLIER') {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId || inventory.supplier_id !== supplierId) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Inventory not found for this product',
+          },
+          requestId: req.requestId,
+        })
+      }
+    } else if (req.userData.role === 'RESTAURANT') {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Inventory not found for this product',
+          },
+          requestId: req.requestId,
+        })
+      }
+      const { rows: connected } = await query(
+        `
+        SELECT 1
+        FROM supplier_follow sf
+        WHERE sf.supplier_id = $1
+          AND sf.restaurant_id = $2
+          AND NOT EXISTS (
+            SELECT 1 FROM supplier_blocklist sb
+            WHERE sb.supplier_id = $1 AND sb.restaurant_id = $2
+          )
+        LIMIT 1
+      `,
+        [inventory.supplier_id, restaurantId]
+      )
+      if (!connected.length) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Inventory not found for this product',
+          },
+          requestId: req.requestId,
+        })
+      }
+    }
+
     res.json({
       ok: true,
-      data: { inventory: rows[0] },
+      data: { inventory },
       error: null,
       requestId: req.requestId,
     })

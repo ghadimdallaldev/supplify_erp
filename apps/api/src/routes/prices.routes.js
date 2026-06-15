@@ -1,5 +1,10 @@
 import express from 'express'
-import { requireAuth, requireRole } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  getSupplierIdForRequest,
+  getRestaurantIdForRequest,
+} from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
@@ -27,9 +32,96 @@ const priceUpdateSchema = z.object({
 })
 
 // Get prices for a product
-router.get('/product/:productId', async (req, res) => {
+router.get('/product/:productId', requireAuth, async (req, res) => {
   try {
     const { productId } = req.params
+
+    const { rows: products } = await query(
+      `
+      SELECT p.id, p.supplier_id, s.contact_email
+      FROM product p
+      JOIN supplier s ON s.id = p.supplier_id
+      WHERE p.id = $1
+    `,
+      [productId]
+    )
+
+    if (products.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'NOT_FOUND',
+          message: 'Product not found',
+        },
+        requestId: req.requestId,
+      })
+    }
+
+    const product = products[0]
+
+    if (req.userData.role === 'SUPPLIER') {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId || product.supplier_id !== supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied. You can only view prices for your own products',
+          },
+          requestId: req.requestId,
+        })
+      }
+    } else if (req.userData.role === 'RESTAURANT') {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied',
+          },
+          requestId: req.requestId,
+        })
+      }
+      const { rows: connected } = await query(
+        `
+        SELECT 1
+        FROM supplier_follow sf
+        WHERE sf.supplier_id = $1
+          AND sf.restaurant_id = $2
+          AND NOT EXISTS (
+            SELECT 1 FROM supplier_blocklist sb
+            WHERE sb.supplier_id = $1 AND sb.restaurant_id = $2
+          )
+        LIMIT 1
+      `,
+        [product.supplier_id, restaurantId]
+      )
+      if (!connected.length) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Product not found',
+          },
+          requestId: req.requestId,
+        })
+      }
+    } else if (req.userData.role !== 'ADMIN') {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'FORBIDDEN',
+          message: 'Access denied',
+        },
+        requestId: req.requestId,
+      })
+    }
 
     const { rows } = await query(
       `

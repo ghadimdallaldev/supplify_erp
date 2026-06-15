@@ -25,6 +25,7 @@ export const RESTAURANT_FEATURE_KEYS = [
   'supplier_deals',
   'supplier_deals_redeem',
   'fulfillment_tools',
+  'ai_platform',
 ]
 
 export const SUPPLIER_FEATURE_KEYS = [
@@ -96,6 +97,7 @@ const DISPLAY_NAMES = {
   tenant_audit_log: 'Activity Log',
   waitlist_auto_promo: 'Waitlist Auto-Promotion',
   supplier_deals: 'Supplier deals',
+  ai_platform: 'AI platform (LLM reorder assistant)',
 }
 
 export function featureDisplayName(featureKey) {

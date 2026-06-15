@@ -59,6 +59,7 @@ import {
   buildTierLadderWarnings,
 } from '../../lib/plan-admin-validation.js'
 import { isLimitKeyApplicable } from '../../lib/limit-resolution.js'
+import { getCache, setCache } from '../../lib/cache.js'
 import { buildAdminOverviewMetrics } from '../../lib/admin-overview-metrics.js'
 import { buildAdminActivityFeed } from '../../lib/admin-activity-feed.js'
 import {
@@ -78,12 +79,26 @@ import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
 
 const router = Router()
 
+const ADMIN_OVERVIEW_CACHE_KEY = 'admin:overview:v1'
+const ADMIN_OVERVIEW_CACHE_TTL_SECONDS = 120
+
 // ========================================
 // OVERVIEW / DASHBOARD
 // ========================================
 router.get('/overview', async (req, res) => {
   try {
+    const cached = await getCache(ADMIN_OVERVIEW_CACHE_KEY)
+    if (cached) {
+      return res.json({
+        ok: true,
+        data: cached,
+        error: null,
+        requestId: req.requestId,
+      })
+    }
+
     const data = await buildAdminOverviewMetrics()
+    await setCache(ADMIN_OVERVIEW_CACHE_KEY, data, ADMIN_OVERVIEW_CACHE_TTL_SECONDS).catch(() => {})
 
     res.json({
       ok: true,
@@ -300,10 +315,10 @@ router.get('/activity', async (req, res) => {
 router.get('/platform-settings', requirePermission('ADMIN_ACCESS'), async (req, res) => {
   try {
     const { getPlatformSetting } = await import('../../lib/platform-settings.js')
-    const freeSandboxDays = await getPlatformSetting('free_sandbox_days', 7)
+    const freeSandboxDays = await getPlatformSetting('free_sandbox_days', 30)
     res.json({
       ok: true,
-      data: { freeSandboxDays: Number(freeSandboxDays) || 7 },
+      data: { freeSandboxDays: Number(freeSandboxDays) || 30 },
       error: null,
       requestId: req.requestId,
     })
@@ -321,13 +336,13 @@ router.get('/platform-settings', requirePermission('ADMIN_ACCESS'), async (req, 
 router.patch('/platform-settings', requirePermission('ADMIN_ACCESS'), async (req, res) => {
   try {
     const days = Number(req.body?.freeSandboxDays ?? req.body?.free_sandbox_days)
-    if (!Number.isFinite(days) || days < 3 || days > 7) {
+    if (!Number.isFinite(days) || days < 7 || days > 90) {
       return res.status(400).json({
         ok: false,
         data: null,
         error: {
           name: 'VALIDATION_ERROR',
-          message: 'freeSandboxDays must be between 3 and 7',
+          message: 'freeSandboxDays must be between 7 and 90',
         },
         requestId: req.requestId,
       })
@@ -346,6 +361,38 @@ router.patch('/platform-settings', requirePermission('ADMIN_ACCESS'), async (req
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to update platform settings' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/growth-settings', requirePermission('ADMIN_GROWTH'), async (req, res) => {
+  try {
+    const { getReferralProgramConfig } = await import('../../lib/platform-settings.js')
+    const config = await getReferralProgramConfig()
+    res.json({ ok: true, data: config, error: null, requestId: req.requestId })
+  } catch (error) {
+    logger.error('GET growth-settings error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to load growth settings' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.patch('/growth-settings', requirePermission('ADMIN_GROWTH'), async (req, res) => {
+  try {
+    const { setReferralProgramConfig } = await import('../../lib/platform-settings.js')
+    const config = await setReferralProgramConfig(req.body || {})
+    res.json({ ok: true, data: config, error: null, requestId: req.requestId })
+  } catch (error) {
+    logger.error('PATCH growth-settings error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to update growth settings' },
       requestId: req.requestId,
     })
   }

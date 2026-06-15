@@ -6,11 +6,23 @@
   "display_override": ["standalone", "browser"],
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "background_color": "#f1f5f9",
   "theme_color": "#5b21b6",
   "categories": ["business", "productivity"],
   "shortcuts": [
+    {
+      "name": "Products",
+      "short_name": "Products",
+      "description": "Browse and manage your product catalog",
+      "url": "/app/products"
+    },
+    {
+      "name": "Orders",
+      "short_name": "Orders",
+      "description": "View and manage orders",
+      "url": "/app/orders"
+    },
     {
       "name": "Staff portal",
       "short_name": "Staff",

@@ -49,3 +49,27 @@ export async function getObjectStream(fileKey) {
   }
   return provider.getObjectStream(fileKey)
 }
+
+/**
+ * Write an object directly (server-side). Used for import processing and internal copies.
+ * @param {{ fileKey: string; body: Buffer | Uint8Array | string; contentType: string }} options
+ */
+export async function putObject(options) {
+  const provider = getStorageProvider()
+  if (typeof provider.putObject !== 'function') {
+    throw new Error('Storage provider does not support putObject')
+  }
+  return provider.putObject(options)
+}
+
+/**
+ * Remove a stored object. Used for import cleanup.
+ * @param {string} fileKey
+ */
+export async function deleteObject(fileKey) {
+  const provider = getStorageProvider()
+  if (typeof provider.deleteObject !== 'function') {
+    throw new Error('Storage provider does not support deleteObject')
+  }
+  return provider.deleteObject(fileKey)
+}

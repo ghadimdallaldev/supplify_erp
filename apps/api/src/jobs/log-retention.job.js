@@ -28,6 +28,12 @@ export async function runLogRetentionJob({ dryRun = false } = {}) {
       enabled: config.ADMIN_AUDIT_LOG_RETENTION_DAYS > 0,
     },
     {
+      key: 'audit_logs',
+      sql: `DELETE FROM audit_logs WHERE created_at < NOW() - ($1::int || ' days')::interval`,
+      days: config.ADMIN_AUDIT_LOG_RETENTION_DAYS,
+      enabled: config.ADMIN_AUDIT_LOG_RETENTION_DAYS > 0,
+    },
+    {
       key: 'staff_portal_session',
       sql: `DELETE FROM staff_portal_session WHERE expires_at < NOW() - ($1::int || ' days')::interval`,
       days: config.STAFF_PORTAL_SESSION_RETENTION_DAYS,

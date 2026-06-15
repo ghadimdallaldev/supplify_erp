@@ -10,6 +10,7 @@ export interface Product {
   brand?: string
   category?: string
   image_url?: string
+  image_thumb_url?: string
   unit?: string
   created_at: string
   updated_at: string
@@ -39,6 +40,7 @@ export interface CreateProductRequest {
   brand?: string
   category?: string
   image_url?: string
+  image_thumb_url?: string
   unit?: string
   supplier_id?: string
   warehouse_id?: string
@@ -55,6 +57,7 @@ export interface UpdateProductRequest {
   brand?: string
   category?: string
   image_url?: string
+  image_thumb_url?: string
   unit?: string
 }
 

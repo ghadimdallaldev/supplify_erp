@@ -1,5 +1,8 @@
 import { query } from '../lib/db.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
+import { checkLimit } from '../lib/subscription.js'
+import { escapeCsvField } from '../lib/sanitize-upload.js'
+import { importImageFromUrl, assertSafeImageUrl } from './product-image-import.service.js'
 
 const FIELD_ALIASES = {
   sku: ['sku', 'product_sku', 'item_sku'],
@@ -9,6 +12,7 @@ const FIELD_ALIASES = {
   unit: ['unit', 'uom', 'unit_of_measure'],
   price: ['price', 'unit_price', 'sell_price'],
   stock: ['stock', 'quantity', 'qty', 'available_qty', 'inventory'],
+  image_url: ['image_url', 'image', 'photo', 'photo_url'],
 }
 
 function normalizeHeader(h) {
@@ -103,10 +107,54 @@ function applyColumnMapping(raw, mapping) {
   return mapped
 }
 
-export async function executeProductImport(supplierId, csvText, { partial = true } = {}) {
+export async function executeProductImport(supplierId, csvText, { partial = true, userId } = {}) {
   const { rows } = parseCsv(csvText)
-  const summary = { created: 0, updated: 0, skipped: 0, failed: 0 }
+  const summary = {
+    created: 0,
+    updated: 0,
+    skipped: 0,
+    failed: 0,
+    imagesImported: 0,
+    imagesFailed: 0,
+  }
   const rowErrors = []
+
+  const importableRows = []
+  for (const { rowNumber, raw } of rows) {
+    const validationError = validateProductRow(raw, rowNumber)
+    if (validationError) {
+      if (!partial) {
+        summary.failed += 1
+        rowErrors.push(validationError)
+      }
+      continue
+    }
+    importableRows.push(raw)
+  }
+
+  if (importableRows.length > 0) {
+    const skus = importableRows.map((raw) => String(raw.sku).toLowerCase())
+    const { rows: existingProducts } = await query(
+      `SELECT lower(sku) AS sku FROM product WHERE supplier_id = $1 AND lower(sku) = ANY($2::text[])`,
+      [supplierId, skus]
+    )
+    const existingSkus = new Set(existingProducts.map((row) => row.sku))
+    const newSkuCount = importableRows.filter(
+      (raw) => !existingSkus.has(String(raw.sku).toLowerCase())
+    ).length
+    const updateSkuCount = importableRows.length - newSkuCount
+
+    const limitCheck = await checkLimit(supplierId, 'SUPPLIER', 'supplier_products_skus')
+    if (!limitCheck.isUnlimited) {
+      const effectiveLimit = limitCheck.effectiveLimit ?? limitCheck.limit
+      const projected = (limitCheck.current || 0) + newSkuCount
+      if (effectiveLimit != null && (limitCheck.isOverLimit || projected > effectiveLimit)) {
+        throw new ValidationError(
+          `Product import would exceed your plan limit (${limitCheck.current}/${effectiveLimit} SKUs; ${newSkuCount} new, ${updateSkuCount} updates in file)`
+        )
+      }
+    }
+  }
 
   for (const { rowNumber, raw } of rows) {
     const validationError = validateProductRow(raw, rowNumber)
@@ -123,7 +171,10 @@ export async function executeProductImport(supplierId, csvText, { partial = true
         [supplierId, raw.sku]
       )
 
+      let productId
+
       if (existing.length) {
+        productId = existing[0].id
         await query(
           `
           UPDATE product SET
@@ -135,7 +186,7 @@ export async function executeProductImport(supplierId, csvText, { partial = true
           WHERE id = $1 AND supplier_id = $2
           `,
           [
-            existing[0].id,
+            productId,
             supplierId,
             raw.name,
             raw.description || null,
@@ -149,7 +200,7 @@ export async function executeProductImport(supplierId, csvText, { partial = true
             INSERT INTO price (product_id, amount, currency, valid_from)
             VALUES ($1, $2, 'USD', NOW())
             `,
-            [existing[0].id, parseFloat(raw.price)]
+            [productId, parseFloat(raw.price)]
           )
         }
         if (raw.stock) {
@@ -159,7 +210,7 @@ export async function executeProductImport(supplierId, csvText, { partial = true
             VALUES ($1, $2, NOW())
             ON CONFLICT (product_id) DO UPDATE SET available_qty = $2, updated_at = NOW()
             `,
-            [existing[0].id, parseFloat(raw.stock)]
+            [productId, parseFloat(raw.stock)]
           )
         }
         summary.updated += 1
@@ -179,7 +230,7 @@ export async function executeProductImport(supplierId, csvText, { partial = true
             raw.unit || 'each',
           ]
         )
-        const productId = created[0].id
+        productId = created[0].id
         if (raw.price) {
           await query(
             `INSERT INTO price (product_id, amount, currency, valid_from) VALUES ($1, $2, 'USD', NOW())`,
@@ -195,6 +246,21 @@ export async function executeProductImport(supplierId, csvText, { partial = true
           [productId, raw.stock ? parseFloat(raw.stock) : 0]
         )
         summary.created += 1
+      }
+
+      const imageUrl = raw.image_url?.trim()
+      if (imageUrl) {
+        try {
+          assertSafeImageUrl(imageUrl)
+          await importImageFromUrl({ url: imageUrl, supplierId, productId, userId })
+          summary.imagesImported += 1
+        } catch (err) {
+          summary.imagesFailed += 1
+          rowErrors.push({
+            rowNumber,
+            errors: [{ field: 'image_url', message: err.message || 'Image import failed' }],
+          })
+        }
       }
     } catch (err) {
       summary.failed += 1
@@ -214,7 +280,11 @@ export function buildErrorReportCsv(errors) {
   const lines = []
   for (const row of errors) {
     for (const e of row.errors || []) {
-      lines.push(`${row.rowNumber},${e.field},${e.message}`)
+      lines.push(
+        [escapeCsvField(row.rowNumber), escapeCsvField(e.field), escapeCsvField(e.message)].join(
+          ','
+        )
+      )
     }
   }
   return header + lines.join('\n')
