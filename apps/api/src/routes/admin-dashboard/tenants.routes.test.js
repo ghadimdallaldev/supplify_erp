@@ -176,4 +176,27 @@ describe('admin-dashboard tenants routes', () => {
     expect(res.body.data.tenants).toHaveLength(1)
     expect(res.body.data.tenants[0].id).toBe('supplier-main')
   })
+
+  it('GET /tenants/suppliers omits missing logo_url from SQL', async () => {
+    queryMock.mockImplementation((sql) => {
+      capturedSql.push(String(sql))
+      if (String(sql).includes('COUNT(*)::int AS total FROM supplier')) {
+        return Promise.resolve({ rows: [{ total: 1 }] })
+      }
+      if (String(sql).includes('FROM supplier s') && String(sql).includes('product_count')) {
+        return Promise.resolve({ rows: [{ id: 'supplier-1', name: 'Demo Supplier' }] })
+      }
+      return Promise.resolve({ rows: [] })
+    })
+
+    const res = await request(app).get('/api/admin-dashboard/tenants/suppliers?limit=50&offset=0')
+
+    expect(res.status).toBe(200)
+    const supplierSql = capturedSql.find(
+      (sql) => sql.includes('FROM supplier s') && sql.includes('product_count')
+    )
+    expect(supplierSql).toBeTruthy()
+    expect(supplierSql).not.toContain('s.logo_url')
+    expect(supplierSql).toContain('NULL::text AS logo_url')
+  })
 })

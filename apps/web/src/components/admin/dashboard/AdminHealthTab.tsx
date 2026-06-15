@@ -2,9 +2,24 @@ import { Card } from '../../ui/card'
 import { useGetAdminOverviewQuery, useGetAdminHealthQuery } from '../../../services/api'
 import { AlertCircle, CheckCircle2 } from 'lucide-react'
 import { AdminTabLoading } from './adminDashboardShared'
+import { formatAdminDateTime } from '../adminUi'
 
 export interface AdminHealthTabProps {
   active: boolean
+}
+
+function formatTenantLabel(tenantType?: string, tenantId?: string): string {
+  if (!tenantId || tenantId === '-') return '—'
+  const type = tenantType && tenantType !== '-' ? `${tenantType}:` : ''
+  const shortId = tenantId.length > 8 ? `${tenantId.slice(0, 8)}…` : tenantId
+  return `${type}${shortId}`
+}
+
+function formatUserLabel(userId?: string, role?: string): string {
+  if (!userId || userId === 'anon' || userId === '-') return '—'
+  const shortId = userId.length > 8 ? `${userId.slice(0, 8)}…` : userId
+  if (role && role !== '-') return `${role} · ${shortId}`
+  return shortId
 }
 
 export function AdminHealthTab({ active }: AdminHealthTabProps) {
@@ -190,6 +205,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                   <table className="w-full text-xs">
                     <thead>
                       <tr style={{ background: 'var(--surface-mid)' }}>
+                        <th className="text-left px-3 py-2">Time</th>
                         <th className="text-left px-3 py-2">Event</th>
                         <th className="text-left px-3 py-2">Recipient</th>
                         <th className="text-left px-3 py-2">Error</th>
@@ -198,9 +214,12 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                     <tbody className="divide-y divide-[var(--app-border)]">
                       {healthData.emailFailures.map((e, i) => (
                         <tr key={e.id || i}>
+                          <td className="px-3 py-2 text-[var(--text-muted)] whitespace-nowrap">
+                            {formatAdminDateTime(e.createdAt)}
+                          </td>
                           <td className="px-3 py-2">{e.eventType}</td>
                           <td className="px-3 py-2 font-mono">{e.recipientRedacted}</td>
-                          <td className="px-3 py-2 truncate max-w-[200px]">
+                          <td className="px-3 py-2 truncate max-w-[200px]" title={e.errorMessage}>
                             {e.errorMessage || '—'}
                           </td>
                         </tr>
@@ -220,15 +239,30 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                   : 'Health endpoint did not return data.'}
               </p>
             ) : (
-              <div className="rounded-lg overflow-hidden border border-[var(--app-border)]">
-                <table className="w-full text-xs">
+              <div className="rounded-lg overflow-x-auto border border-[var(--app-border)]">
+                <table className="w-full min-w-[960px] text-xs">
                   <thead>
                     <tr style={{ background: 'var(--surface-mid)' }}>
+                      <th className="text-left px-3 py-2 font-medium text-[var(--text-muted)] whitespace-nowrap">
+                        Time
+                      </th>
                       <th className="text-left px-3 py-2 font-medium text-[var(--text-muted)]">
-                        Type
+                        Method
+                      </th>
+                      <th className="text-left px-3 py-2 font-medium text-[var(--text-muted)]">
+                        Status
                       </th>
                       <th className="text-left px-3 py-2 font-medium text-[var(--text-muted)]">
                         Source
+                      </th>
+                      <th className="text-left px-3 py-2 font-medium text-[var(--text-muted)]">
+                        Request ID
+                      </th>
+                      <th className="text-left px-3 py-2 font-medium text-[var(--text-muted)]">
+                        User
+                      </th>
+                      <th className="text-left px-3 py-2 font-medium text-[var(--text-muted)]">
+                        Tenant
                       </th>
                       <th className="text-left px-3 py-2 font-medium text-[var(--text-muted)]">
                         Message
@@ -237,11 +271,60 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                   </thead>
                   <tbody className="divide-y divide-[var(--app-border)]">
                     {healthData.recentApiErrors.map((e, i) => (
-                      <tr key={i}>
-                        <td className="px-3 py-2 text-red-500 font-medium">{e.type}</td>
-                        <td className="px-3 py-2 text-[var(--text-muted)]">{e.source}</td>
-                        <td className="px-3 py-2 text-[var(--text)] max-w-[300px] truncate">
-                          {e.message}
+                      <tr key={e.id || i}>
+                        <td
+                          className="px-3 py-2 text-[var(--text-muted)] whitespace-nowrap"
+                          title={e.createdAt ? String(e.createdAt) : undefined}
+                        >
+                          {formatAdminDateTime(e.createdAt ?? e.created_at)}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-[var(--text-muted)]">
+                          {e.method || '—'}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {e.statusCode ? (
+                            <span className="font-mono text-red-500">{e.statusCode}</span>
+                          ) : (
+                            <span className="text-[var(--text-muted)]">{e.type || '—'}</span>
+                          )}
+                        </td>
+                        <td
+                          className="px-3 py-2 text-[var(--text-muted)] max-w-[180px] truncate"
+                          title={e.source}
+                        >
+                          {e.source || '—'}
+                        </td>
+                        <td
+                          className="px-3 py-2 font-mono text-[var(--text-muted)] max-w-[120px] truncate"
+                          title={e.requestId}
+                        >
+                          {e.requestId && e.requestId !== '-' ? e.requestId : '—'}
+                        </td>
+                        <td
+                          className="px-3 py-2 text-[var(--text-muted)] max-w-[140px] truncate"
+                          title={
+                            e.userId && e.userId !== 'anon'
+                              ? `${e.role || ''} ${e.userId}`.trim()
+                              : undefined
+                          }
+                        >
+                          {formatUserLabel(e.userId, e.role)}
+                        </td>
+                        <td
+                          className="px-3 py-2 text-[var(--text-muted)] max-w-[120px] truncate"
+                          title={
+                            e.tenantId && e.tenantId !== '-'
+                              ? `${e.tenantType || ''}:${e.tenantId}`.trim()
+                              : undefined
+                          }
+                        >
+                          {formatTenantLabel(e.tenantType, e.tenantId)}
+                        </td>
+                        <td
+                          className="px-3 py-2 text-[var(--text)] max-w-[260px] truncate"
+                          title={e.message}
+                        >
+                          {e.message || '—'}
                         </td>
                       </tr>
                     ))}
