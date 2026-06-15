@@ -1,14 +1,9 @@
-import { Suspense, useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { Suspense, useState, useMemo, useEffect, useCallback } from 'react'
 import {
   useGetProductsQuery,
   useGetProductCategoriesQuery,
   useGetProductTagsQuery,
   useCreateProductMutation,
-  usePreviewProductImportMutation,
-  useExecuteProductImportMutation,
-  useGetProductImportJobQuery,
-  isAsyncProductImportStart,
-  isTerminalProductImportStatus,
   useGeneratePresignedUrlMutation,
   useGetWarehousesQuery,
   useGetSuppliersQuery,
@@ -42,7 +37,6 @@ import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useCartActions } from '../hooks/useCartActions'
 import { toast } from 'sonner'
-import { apiUrl } from '../lib/apiBase'
 import { canUseSupplierDeals } from '../lib/planFeatureGates'
 import { PermissionGate } from '../components/PermissionGate'
 import { RequirePermission } from '../components/RequirePermission'
@@ -59,6 +53,7 @@ import {
 } from '../components/products/ProductFilters'
 import { ProductCatalogTable } from '../components/products/ProductCatalogTable'
 import { useDebouncedSearch } from '../hooks/useDebouncedSearch'
+import { useProductCatalogImport } from '../hooks/useProductCatalogImport'
 import { SearchHistoryDropdown } from '../components/search/SearchHistoryDropdown'
 import {
   LazyProductFormDialog,
@@ -104,35 +99,6 @@ export function ProductsPage() {
   const [favoriteProduct] = useFavoriteProductMutation()
   const [unfavoriteProduct] = useUnfavoriteProductMutation()
   const [generatePresignedUrl, { isLoading: isUploadingImage }] = useGeneratePresignedUrlMutation()
-  const [previewImport] = usePreviewProductImportMutation()
-  const [executeImport, { isLoading: importing }] = useExecuteProductImportMutation()
-  const [importSummary, setImportSummary] = useState<{
-    created: number
-    updated: number
-    skipped: number
-    failed: number
-  } | null>(null)
-  const [importPreviewMeta, setImportPreviewMeta] = useState<{
-    totalRows: number
-    validCount: number
-    errorCount: number
-  } | null>(null)
-  const [importErrors, setImportErrors] = useState<
-    Array<{ rowNumber: number; errors: Array<{ field: string; message: string }> }>
-  >([])
-  const [importJobId, setImportJobId] = useState<string | null>(null)
-  const importTerminalToastRef = useRef<string | null>(null)
-  const { data: importJob, isFetching: isPollingImportJob } = useGetProductImportJobQuery(
-    importJobId || '',
-    {
-      skip: !importJobId,
-      pollingInterval: importJobId ? 2000 : 0,
-      skipPollingIfUnfocused: true,
-    }
-  )
-  const importJobActive = Boolean(
-    importJobId && importJob && !isTerminalProductImportStatus(importJob.status)
-  )
 
   const isSupplier = isEffectiveSupplier
   const isRestaurant = isEffectiveRestaurant
@@ -205,6 +171,24 @@ export function ProductsPage() {
   ])
 
   const { data, isLoading, isFetching, error, refetch } = useGetProductsQuery(queryParams)
+
+  const clearBulkUpload = useCallback(() => {
+    setShowBulkUpload(false)
+    setUploadedFile(null)
+    setUploadPreview([])
+  }, [])
+
+  const {
+    importSummary,
+    importPreviewMeta,
+    importErrors,
+    importJob,
+    importJobActive,
+    importing,
+    previewImportFile,
+    downloadErrorReport,
+    submitImport,
+  } = useProductCatalogImport({ refetch, onImportSuccess: clearBulkUpload })
 
   const allProducts = data?.products ?? []
   const filteredProducts = useMemo(() => {
@@ -355,123 +339,11 @@ export function ProductsPage() {
       return
     }
     setUploadedFile(file)
-    setImportSummary(null)
-    setImportPreviewMeta(null)
-    setImportErrors([])
-    setImportJobId(null)
-    importTerminalToastRef.current = null
-    try {
-      const text = await file.text()
-      const result = await previewImport({ csv: text }).unwrap()
-      setUploadPreview(result.preview || [])
-      setImportPreviewMeta({
-        totalRows: result.totalRows ?? 0,
-        validCount: result.validCount ?? 0,
-        errorCount: result.errorCount ?? 0,
-      })
-      setImportErrors(result.errors || [])
-      if ((result.validCount ?? 0) === 0) {
-        toast.error('No valid rows to import — fix errors below')
-      } else {
-        toast.success(
-          `Preview: ${result.validCount} valid, ${result.errorCount} with issues (${result.totalRows} rows)`
-        )
-      }
-    } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to preview file')
-    }
+    await previewImportFile(file, setUploadPreview)
   }
-
-  const downloadErrorReport = async () => {
-    const errors =
-      importErrors.length > 0
-        ? importErrors
-        : (importSummary as { errors?: typeof importErrors })?.errors || []
-    if (!errors.length) {
-      toast.error('No errors to export')
-      return
-    }
-    try {
-      const res = await fetch(apiUrl('/api/supplier/products/import/error-report'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'Supplify' },
-        credentials: 'include',
-        body: JSON.stringify({ errors }),
-      })
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'import-errors.csv'
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch {
-      toast.error('Could not download error report')
-    }
-  }
-
-  const applyImportResult = useCallback(
-    (result: {
-      summary: { created: number; updated: number; skipped: number; failed: number }
-      errors?: Array<{ rowNumber: number; errors: Array<{ field: string; message: string }> }>
-    }) => {
-      const summary = result.summary
-      setImportSummary(summary)
-      if (result.errors?.length) setImportErrors(result.errors)
-      if (summary.failed > 0) {
-        toast.error(`Import finished with ${summary.failed} failed row(s). Valid rows were saved.`)
-      } else {
-        toast.success(`Import complete: ${summary.created} created, ${summary.updated} updated`)
-        setShowBulkUpload(false)
-        setUploadedFile(null)
-        setUploadPreview([])
-        setImportPreviewMeta(null)
-        setImportErrors([])
-        setImportJobId(null)
-        importTerminalToastRef.current = null
-        refetch()
-      }
-    },
-    [refetch]
-  )
-
-  useEffect(() => {
-    if (!importJob || !isTerminalProductImportStatus(importJob.status)) return
-
-    const toastKey = `${importJob.jobId}:${importJob.status}`
-    if (importTerminalToastRef.current === toastKey) return
-
-    if (importJob.status === 'completed' && importJob.result?.summary) {
-      importTerminalToastRef.current = toastKey
-      applyImportResult(importJob.result)
-      return
-    }
-
-    if (importJob.status === 'failed') {
-      importTerminalToastRef.current = toastKey
-      toast.error(importJob.errorMessage || 'Bulk upload failed')
-    }
-  }, [importJob, applyImportResult])
 
   const handleBulkSubmit = async () => {
-    if (!uploadedFile) return
-    if (importPreviewMeta && importPreviewMeta.validCount === 0) {
-      toast.error('Fix validation errors before importing')
-      return
-    }
-    try {
-      const text = await uploadedFile.text()
-      const result = await executeImport({ csv: text, partial: true }).unwrap()
-      if (isAsyncProductImportStart(result)) {
-        setImportJobId(result.jobId)
-        importTerminalToastRef.current = null
-        toast.success('Large import queued — processing in the background')
-        return
-      }
-      applyImportResult(result)
-    } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Bulk upload failed')
-    }
+    await submitImport(uploadedFile)
   }
 
   if (showInitialLoad) return <ProductsPageLoading />
@@ -727,9 +599,9 @@ export function ProductsPage() {
               handleFileUpload={handleFileUpload}
               downloadErrorReport={downloadErrorReport}
               handleBulkSubmit={handleBulkSubmit}
-              importing={importing || isPollingImportJob}
+              importing={importing}
               isCreating={isCreating}
-              importJob={importJobId ? importJob : null}
+              importJob={importJob}
               importJobActive={importJobActive}
             />
           )}
