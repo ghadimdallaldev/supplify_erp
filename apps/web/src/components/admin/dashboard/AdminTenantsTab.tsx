@@ -120,7 +120,7 @@ export function AdminTenantsTab({
           acknowledgeSuspended,
         }).unwrap()
         toast.success(`Impersonating ${tenantLabel}`)
-        window.location.href = result.redirectTo || '/app/dashboard'
+        window.location.assign(result.redirectTo || '/app/dashboard')
       } catch (err: unknown) {
         const e = err as {
           data?: {

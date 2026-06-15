@@ -26,6 +26,7 @@ import {
   getSponsorshipLimitForSupplier,
 } from '../services/supplier-sponsorship.service.js'
 import { getSupplierGrowthMetrics } from '../services/supplier-growth-metrics.service.js'
+import { getReferralProgramConfig } from '../lib/platform-settings.js'
 import { query } from '../lib/db.js'
 import { NotFoundError } from '../middlewares/errorHandler.js'
 import { requireFeature } from '../lib/subscription.js'
@@ -190,11 +191,18 @@ router.post(
 router.get('/metrics', requirePermission('GROWTH_VIEW'), async (req, res, next) => {
   try {
     const supplierId = await resolveSupplierId(req)
-    const metrics = await getSupplierGrowthMetrics(supplierId)
-    const sponsorshipLimit = await getSponsorshipLimitForSupplier(supplierId)
+    const [metrics, sponsorshipLimit, referralConfig] = await Promise.all([
+      getSupplierGrowthMetrics(supplierId),
+      getSponsorshipLimitForSupplier(supplierId),
+      getReferralProgramConfig(),
+    ])
     res.json({
       ok: true,
-      data: { ...metrics, sponsorshipLimit },
+      data: {
+        ...metrics,
+        sponsorshipLimit,
+        eligibleSponsorPlans: referralConfig.eligibleSponsorPlans ?? [],
+      },
       error: null,
       requestId: req.requestId,
     })

@@ -40,7 +40,7 @@ describe('StaffTodayTab', () => {
 
     expect(screen.getByText('Scheduled today')).toBeInTheDocument()
     expect(screen.getByText('5')).toBeInTheDocument()
-    expect(screen.getAllByText('Not available').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
     expect(screen.getByText('All clear')).toBeInTheDocument()
   })
 

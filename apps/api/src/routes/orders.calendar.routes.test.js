@@ -31,6 +31,30 @@ vi.mock('../lib/cache.js', () => ({
   setCache: (...args) => setCacheMock(...args),
 }))
 
+function mockCalendarQueries({
+  pageRows = [],
+  totalEvents = 0,
+  totalOrders = 0,
+  totalInvoices = 0,
+  orderDetails = [],
+  invoiceDetails = [],
+  hasBranchColumn = true,
+}) {
+  queryMock
+    .mockResolvedValueOnce({ rows: [{ exists: hasBranchColumn }] })
+    .mockResolvedValueOnce({ rows: pageRows })
+    .mockResolvedValueOnce({ rows: [{ count: totalEvents }] })
+    .mockResolvedValueOnce({ rows: [{ count: totalOrders }] })
+    .mockResolvedValueOnce({ rows: [{ count: totalInvoices }] })
+
+  if (orderDetails.length > 0) {
+    queryMock.mockResolvedValueOnce({ rows: orderDetails })
+  }
+  if (invoiceDetails.length > 0) {
+    queryMock.mockResolvedValueOnce({ rows: invoiceDetails })
+  }
+}
+
 describe('orders.calendar.routes', () => {
   let app
 
@@ -58,54 +82,58 @@ describe('orders.calendar.routes', () => {
     mockUser.role = 'RESTAURANT'
     getCacheMock.mockResolvedValue(null)
 
-    queryMock
-      // Query 1: Check if branch_id column exists (tenant from getRequestTenant mock)
-      .mockResolvedValueOnce({
-        rows: [{ exists: true }],
-      })
-      // Query 2: Get orders
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'order-1',
-            status: 'DELIVERED',
-            total_amount: '120.50',
-            currency: 'USD',
-            placed_at: '2025-05-01T10:00:00.000Z',
-            created_at: '2025-05-01T09:55:00.000Z',
-            updated_at: '2025-05-02T09:00:00.000Z',
-            branch_id: 'branch-1',
-            branch_name: 'Dubai Marina',
-            restaurant_id: 'restaurant-1',
-            restaurant_name: 'Golden Fork Restaurant',
-            suppliers: [{ id: 'supplier-1', name: 'Fresh Foods Co.' }],
-            categories: ['Vegetables', 'Oils'],
-          },
-        ],
-      })
-      // Query 4: Get order count
-      .mockResolvedValueOnce({
-        rows: [{ count: '1' }],
-      })
-      // Query 5: Get invoices
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'invoice-1',
-            order_id: 'order-1',
-            invoice_date: '2025-05-02',
-            due_date: '2025-05-15',
-            total_amount: '120.50',
-            currency: 'USD',
-            status: 'ISSUED',
-            supplier_id: 'supplier-1',
-            restaurant_id: 'restaurant-1',
-            created_at: '2025-05-02T12:00:00.000Z',
-            supplier_name: 'Fresh Foods Co.',
-            restaurant_name: 'Golden Fork Restaurant',
-          },
-        ],
-      })
+    mockCalendarQueries({
+      pageRows: [
+        {
+          source: 'order',
+          source_id: 'order-1',
+          event_start: '2025-05-01T10:00:00.000Z',
+          event_status: 'DELIVERED',
+        },
+        {
+          source: 'invoice',
+          source_id: 'invoice-1',
+          event_start: '2025-05-15T00:00:00.000Z',
+          event_status: 'ISSUED',
+        },
+      ],
+      totalEvents: 2,
+      totalOrders: 1,
+      totalInvoices: 1,
+      orderDetails: [
+        {
+          id: 'order-1',
+          status: 'DELIVERED',
+          total_amount: '120.50',
+          currency: 'USD',
+          placed_at: '2025-05-01T10:00:00.000Z',
+          created_at: '2025-05-01T09:55:00.000Z',
+          updated_at: '2025-05-02T09:00:00.000Z',
+          branch_id: 'branch-1',
+          branch_name: 'Dubai Marina',
+          restaurant_id: 'restaurant-1',
+          restaurant_name: 'Golden Fork Restaurant',
+          suppliers: [{ id: 'supplier-1', name: 'Fresh Foods Co.' }],
+          categories: ['Vegetables', 'Oils'],
+        },
+      ],
+      invoiceDetails: [
+        {
+          id: 'invoice-1',
+          order_id: 'order-1',
+          invoice_date: '2025-05-02',
+          due_date: '2025-05-15',
+          total_amount: '120.50',
+          currency: 'USD',
+          status: 'ISSUED',
+          supplier_id: 'supplier-1',
+          restaurant_id: 'restaurant-1',
+          created_at: '2025-05-02T12:00:00.000Z',
+          supplier_name: 'Fresh Foods Co.',
+          restaurant_name: 'Golden Fork Restaurant',
+        },
+      ],
+    })
 
     const response = await request(app).get('/api/orders/calendar').expect(200)
 
@@ -137,19 +165,16 @@ describe('orders.calendar.routes', () => {
       filters: { statuses: [], suppliers: [], branches: [], categories: [] },
     }
 
-    // Tenant from getRequestTenant mock; branch column check is first query
     queryMock.mockResolvedValueOnce({
       rows: [{ exists: true }],
     })
 
-    // Mock cache to return data
     getCacheMock.mockResolvedValue(cachedData)
 
     const response = await request(app).get('/api/orders/calendar').expect(200)
     expect(response.body.ok).toBe(true)
     expect(response.body.data).toEqual(cachedData)
     expect(setCacheMock).not.toHaveBeenCalled()
-    // With getRequestTenant mocked, only branch column check runs before cache
     expect(queryMock).toHaveBeenCalledTimes(1)
   })
 
@@ -165,54 +190,35 @@ describe('orders.calendar.routes', () => {
     mockUser.email = 'contact@freshfoods.com'
     getCacheMock.mockResolvedValue(null)
 
-    queryMock
-      // Query 1: Check if branch_id column exists (tenant from getRequestTenant mock)
-      .mockResolvedValueOnce({
-        rows: [{ exists: true }],
-      })
-      // Query 2: Get orders
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'order-2',
-            status: 'PROCESSING',
-            total_amount: '80.00',
-            currency: 'USD',
-            placed_at: '2025-05-05T08:00:00.000Z',
-            created_at: '2025-05-05T07:50:00.000Z',
-            updated_at: '2025-05-06T10:00:00.000Z',
-            branch_id: null,
-            branch_name: null,
-            restaurant_id: 'restaurant-1',
-            restaurant_name: 'Golden Fork Restaurant',
-            suppliers: [{ id: 'supplier-1', name: 'Fresh Foods Co.' }],
-            categories: ['Meat'],
-          },
-        ],
-      })
-      // Query 3: Get order count
-      .mockResolvedValueOnce({
-        rows: [{ count: '1' }],
-      })
-      // Query 4: Get invoices
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'invoice-2',
-            order_id: 'order-2',
-            invoice_date: '2025-05-06',
-            due_date: '2025-05-20',
-            total_amount: '80.00',
-            currency: 'USD',
-            status: 'ISSUED',
-            supplier_id: 'supplier-1',
-            restaurant_id: 'restaurant-1',
-            created_at: '2025-05-06T11:00:00.000Z',
-            supplier_name: 'Fresh Foods Co.',
-            restaurant_name: 'Golden Fork Restaurant',
-          },
-        ],
-      })
+    mockCalendarQueries({
+      pageRows: [
+        {
+          source: 'invoice',
+          source_id: 'invoice-2',
+          event_start: '2025-05-20T00:00:00.000Z',
+          event_status: 'ISSUED',
+        },
+      ],
+      totalEvents: 1,
+      totalOrders: 1,
+      totalInvoices: 1,
+      invoiceDetails: [
+        {
+          id: 'invoice-2',
+          order_id: 'order-2',
+          invoice_date: '2025-05-06',
+          due_date: '2025-05-20',
+          total_amount: '80.00',
+          currency: 'USD',
+          status: 'ISSUED',
+          supplier_id: 'supplier-1',
+          restaurant_id: 'restaurant-1',
+          created_at: '2025-05-06T11:00:00.000Z',
+          supplier_name: 'Fresh Foods Co.',
+          restaurant_name: 'Golden Fork Restaurant',
+        },
+      ],
+    })
 
     const response = await request(app)
       .get('/api/orders/calendar')
@@ -227,5 +233,43 @@ describe('orders.calendar.routes', () => {
       id: 'restaurant-1',
       name: 'Golden Fork Restaurant',
     })
+  })
+
+  it('uses local invoice count parameters for the standalone invoice count query', async () => {
+    const rbac = await import('../lib/rbac.js')
+    vi.mocked(rbac.getRequestTenant).mockResolvedValueOnce({
+      tenantId: 'supplier-1',
+      tenantType: 'SUPPLIER',
+      tenantName: 'Fresh Foods Co.',
+    })
+
+    mockUser.role = 'SUPPLIER'
+    getCacheMock.mockResolvedValue(null)
+
+    mockCalendarQueries({
+      pageRows: [],
+      totalEvents: 0,
+      totalOrders: 0,
+      totalInvoices: 0,
+    })
+
+    await request(app)
+      .get('/api/orders/calendar')
+      .query({
+        start: '2026-05-30T21:00:00.000Z',
+        end: '2026-07-11T21:00:00.000Z',
+        role: 'SUPPLIER',
+      })
+      .expect(200)
+
+    const invoiceCountCall = queryMock.mock.calls.find(
+      ([sql]) =>
+        String(sql).includes('FROM invoice i') &&
+        String(sql).includes('COUNT(*)::int AS count') &&
+        !String(sql).includes('UNION ALL')
+    )
+    expect(invoiceCountCall).toBeTruthy()
+    expect(invoiceCountCall[0]).toMatch(/i\.supplier_id = \$1/)
+    expect(invoiceCountCall[1]).toHaveLength(3)
   })
 })
