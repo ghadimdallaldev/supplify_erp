@@ -106,17 +106,6 @@ export function ProductsPage() {
   const [generatePresignedUrl, { isLoading: isUploadingImage }] = useGeneratePresignedUrlMutation()
   const [previewImport] = usePreviewProductImportMutation()
   const [executeImport, { isLoading: importing }] = useExecuteProductImportMutation()
-  const { data: importJob, isFetching: isPollingImportJob } = useGetProductImportJobQuery(
-    importJobId || '',
-    {
-      skip: !importJobId,
-      pollingInterval: importJobId ? 2000 : 0,
-      skipPollingIfUnfocused: true,
-    }
-  )
-  const importJobActive = Boolean(
-    importJobId && importJob && !isTerminalProductImportStatus(importJob.status)
-  )
   const [importSummary, setImportSummary] = useState<{
     created: number
     updated: number
@@ -133,6 +122,17 @@ export function ProductsPage() {
   >([])
   const [importJobId, setImportJobId] = useState<string | null>(null)
   const importTerminalToastRef = useRef<string | null>(null)
+  const { data: importJob, isFetching: isPollingImportJob } = useGetProductImportJobQuery(
+    importJobId || '',
+    {
+      skip: !importJobId,
+      pollingInterval: importJobId ? 2000 : 0,
+      skipPollingIfUnfocused: true,
+    }
+  )
+  const importJobActive = Boolean(
+    importJobId && importJob && !isTerminalProductImportStatus(importJob.status)
+  )
 
   const isSupplier = isEffectiveSupplier
   const isRestaurant = isEffectiveRestaurant

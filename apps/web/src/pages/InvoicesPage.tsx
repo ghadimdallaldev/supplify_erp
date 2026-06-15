@@ -175,6 +175,7 @@ export function InvoicesPage() {
   const stats = {
     total: invoices.length,
     unpaid: invoices.filter((i: any) => i.status !== 'PAID' && i.status !== 'VOID').length,
+    paidCount: invoices.filter((i: any) => i.status === 'PAID').length,
     overdue: invoices.filter(
       (i: any) => i.status === 'OVERDUE' || (i.days_overdue && i.days_overdue > 0)
     ).length,
