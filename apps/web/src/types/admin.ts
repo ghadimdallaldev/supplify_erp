@@ -100,6 +100,11 @@ export interface Entitlements {
   usage: Record<string, number>
   usageWindowMeta?: Record<string, { date?: string }>
   freeSandbox?: { expiresAt: string | null } | null
+  /** Resolved smart_reorder tier and capability flags (restaurant). */
+  smartReorder?: {
+    tier: string
+    capabilities: Record<string, boolean>
+  }
 }
 
 export interface AdminFeatureFlag {

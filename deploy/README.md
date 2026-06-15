@@ -22,7 +22,7 @@ Legacy: `deploy-staging.sh` remains for servers already on staging compose files
 
 Each script bootstraps Docker, creates `deploy/env/.env.<env>`, builds images, starts infra (Postgres, Redis, MinIO, Keycloak), runs migrations + tenant role backfill + **system role sync** (`sync-system-roles.mjs`) + Keycloak realm init, then starts the app behind nginx.
 
-The **migrate** service applies all pending SQL files under `apps/api/db/migrations/` (including restaurant-operations migrations **0133–0135**). Set `CRONS_ENABLED=true` in `deploy/env/.env.*` so in-process jobs (expiry + reorder reminders) run in the backend container.
+The **migrate** service applies all pending SQL files under `apps/api/db/migrations/` (including restaurant-operations migrations **0133–0135** and catalog image import **0168**). Set `CRONS_ENABLED=true` in `deploy/env/.env.*` so in-process jobs (expiry + reorder reminders) run in the backend container.
 
 ## Local full stack (developer machine)
 
@@ -55,6 +55,8 @@ Uploads use **MinIO** (S3-compatible API). A “bucket” is only a namespace on
 | `S3_PUBLIC_READ` / `MINIO_PUBLIC_READ` | When `true`, init grants public GET on bucket objects (product images)                          |
 
 Deploy and `docker compose` run `deploy/scripts/minio-init-buckets.sh`, which creates each bucket and sets **public download** so `product.image_url` works in the browser. The API also ensures buckets on startup.
+
+**Bulk image import:** Large ZIP uploads use `imports/{supplierId}/…` keys; optimized images land under `uploads/{supplierId}/products/{productId}/`. Ensure migration **`0168_catalog_image_import.sql`** has run before enabling **Import Product Images** in the app. See [bulk-product-image-import.md](../docs/features/bulk-product-image-import.md).
 
 **Add a new bucket tomorrow:**
 

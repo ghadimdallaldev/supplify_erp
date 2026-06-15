@@ -524,6 +524,11 @@ router.post(
           }
         }
 
+        const { markReorderForecastDirty } = await import(
+          '../services/reorder-forecast-cache.service.js'
+        )
+        await markReorderForecastDirty(restaurantId, { reason: 'receiving_completed' })
+
         // Update order status to RECEIVED_PARTIAL/FULL
         const nextStatus =
           totalItemsReceived < totalItemsOrdered ? 'RECEIVED_PARTIAL' : 'RECEIVED_FULL'

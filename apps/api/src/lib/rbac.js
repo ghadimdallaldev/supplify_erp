@@ -786,7 +786,7 @@ export async function ensurePrimaryContactOwnerRole(userId, email, tenantId, ten
  * Resolve tenant context and attach roles + permissions for the current user in that tenant.
  * Sets req.tenantContext = { tenantId, tenantType, tenantName, roles[], permissions[] }.
  * When admin is impersonating, context is for the impersonated tenant; permissions are still for the current user
- * (admin with no user_role in tenant gets [] and is allowed via requirePermission special-case).
+ * (admin with no user_role in tenant gets [] — must use adminContext.permissions on admin routes).
  * Use after requireAuth on restaurant/supplier routes.
  */
 export function resolveTenantContext(req, res, next) {
@@ -971,9 +971,8 @@ export async function resolveAdminContext(req, res, next) {
 
 /**
  * Require a permission in tenant or admin context. Use after resolveTenantContext or resolveAdminContext.
- * Allows access if:
- * - tenantContext.permissions or adminContext.permissions includes the key (or broader _MANAGE), or
- * - user is ADMIN on admin routes (adminContext), not when impersonating a tenant.
+ * Allows access when tenantContext.permissions or adminContext.permissions includes the key
+ * (or a broader *_MANAGE permission).
  * @param {string} permissionKey - e.g. 'ORDERS_VIEW', 'SETTINGS_MANAGE'
  */
 export function requirePermission(permissionKey) {
@@ -982,9 +981,6 @@ export function requirePermission(permissionKey) {
     const admin = req.adminContext
     const perms = tenant?.permissions ?? admin?.permissions ?? []
     if (hasPermission(perms, permissionKey)) {
-      return next()
-    }
-    if (req.userData?.role === 'ADMIN' && !isImpersonating(req) && !tenant && admin) {
       return next()
     }
     return res.status(403).json({
@@ -999,16 +995,13 @@ export function requirePermission(permissionKey) {
   }
 }
 
-/** Allow route when the user has any one of the listed permissions (or is admin). */
+/** Allow route when the user has any one of the listed permissions. */
 export function requireAnyPermission(...permissionKeys) {
   return (req, res, next) => {
     const tenant = req.tenantContext
     const admin = req.adminContext
     const perms = tenant?.permissions ?? admin?.permissions ?? []
     if (permissionKeys.some((key) => hasPermission(perms, key))) {
-      return next()
-    }
-    if (req.userData?.role === 'ADMIN' && !isImpersonating(req) && !tenant && admin) {
       return next()
     }
     return res.status(403).json({

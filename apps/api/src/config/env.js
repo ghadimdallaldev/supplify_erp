@@ -284,6 +284,15 @@ export const config = {
   STAFF_PORTAL_SESSION_RETENTION_DAYS: envInt(process.env.STAFF_PORTAL_SESSION_RETENTION_DAYS, 30),
   GPS_STALE_ALERT_LOG_RETENTION_DAYS: envInt(process.env.GPS_STALE_ALERT_LOG_RETENTION_DAYS, 30),
   EMAIL_DIGEST_LOG_RETENTION_DAYS: envInt(process.env.EMAIL_DIGEST_LOG_RETENTION_DAYS, 90),
+  AI_ENABLED: envBool(process.env.AI_ENABLED, false),
+  AI_PROVIDER: process.env.AI_PROVIDER || 'openai',
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+  AI_MODEL: process.env.AI_MODEL || 'gpt-4o-mini',
+  AI_MAX_REQUESTS_PER_TENANT_PER_DAY: envInt(process.env.AI_MAX_REQUESTS_PER_TENANT_PER_DAY, 50),
+  /** Max size for bulk product image import ZIP uploads (default 2GB). */
+  IMPORT_ZIP_MAX_BYTES: envInt(process.env.IMPORT_ZIP_MAX_BYTES, 2147483648),
+  /** Max size per image extracted during bulk product image import (default 10MB). */
+  IMPORT_IMAGE_MAX_BYTES: envInt(process.env.IMPORT_IMAGE_MAX_BYTES, 10 * 1024 * 1024),
 }
 
 if (!config.STORAGE_PUBLIC_URL) {

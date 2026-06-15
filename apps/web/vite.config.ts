@@ -18,6 +18,16 @@ export default defineConfig({
         // eagerly-loaded `vendor` chunk shared by every page.
         manualChunks: (id) => {
           if (!id.includes('node_modules')) return
+          // React core only (not react-router, lucide-react, @tanstack/react-query, etc.).
+          // Isolating it breaks the vendor ↔ ui-vendor circular chunk dependency that
+          // caused "Cannot read properties of undefined (reading 'forwardRef')".
+          if (
+            id.includes('/node_modules/react-dom/') ||
+            id.includes('/node_modules/react/') ||
+            id.includes('/node_modules/scheduler/')
+          ) {
+            return 'react-vendor'
+          }
           if (id.includes('recharts') || id.includes('/d3-') || id.includes('victory-vendor'))
             return 'charts'
           if (id.includes('@fullcalendar') || id.includes('/preact')) return 'calendar'

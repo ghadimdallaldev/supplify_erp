@@ -3,6 +3,7 @@ import path from 'node:path'
 import { createUploadToken, verifyUploadToken } from './upload-token.js'
 import { logger } from '../../lib/logger.js'
 import { MAX_UPLOAD_BYTES } from '../../lib/sanitize-upload.js'
+import { appendObjectAccessSignature } from '../../lib/object-download-auth.js'
 
 /**
  * @param {import('../../config/env.js').config} cfg
@@ -46,7 +47,8 @@ export function createLocalStorageProvider(cfg) {
       const key = String(fileKey || '').replace(/^\/+/, '')
       if (cfg.STORAGE_PUBLIC_READ === false) {
         const apiBase = String(cfg.API_PUBLIC_URL || '').replace(/\/$/, '')
-        return `${apiBase}/api/files/object?key=${encodeURIComponent(key)}`
+        const baseUrl = `${apiBase}/api/files/object?key=${encodeURIComponent(key)}`
+        return appendObjectAccessSignature(baseUrl, key)
       }
       return `${publicBase}/${key}`
     },
@@ -118,6 +120,42 @@ export function createLocalStorageProvider(cfg) {
         contentType: 'application/octet-stream',
         contentLength: data.length,
       }
+    },
+
+    /**
+     * Server-side write (import processing, internal copies).
+     * @param {{ fileKey: string; body: Buffer | Uint8Array | string; contentType: string }} opts
+     */
+    async putObject({ fileKey, body, contentType }) {
+      const safeKey = String(fileKey || '').replace(/^\/+/, '')
+      if (!safeKey || safeKey.includes('..')) {
+        throw Object.assign(new Error('Invalid file key'), { name: 'UPLOAD_KEY_INVALID' })
+      }
+      const dest = path.join(rootDir, safeKey)
+      await fs.mkdir(path.dirname(dest), { recursive: true })
+      await fs.writeFile(dest, body)
+      const bytes = Buffer.isBuffer(body) ? body.length : Buffer.byteLength(body || '')
+      logger.info('Local storage putObject', { fileKey: safeKey, contentType, bytes })
+      return { fileKey: safeKey }
+    },
+
+    /**
+     * Remove a stored object (import cleanup). Missing keys are ignored.
+     * @param {string} fileKey
+     */
+    async deleteObject(fileKey) {
+      const safeKey = String(fileKey || '').replace(/^\/+/, '')
+      if (!safeKey || safeKey.includes('..')) {
+        throw Object.assign(new Error('Invalid file key'), { name: 'UPLOAD_KEY_INVALID' })
+      }
+      const dest = path.join(rootDir, safeKey)
+      try {
+        await fs.unlink(dest)
+        logger.info('Local storage deleteObject', { fileKey: safeKey })
+      } catch (err) {
+        if (err?.code !== 'ENOENT') throw err
+      }
+      return { fileKey: safeKey }
     },
   }
 }

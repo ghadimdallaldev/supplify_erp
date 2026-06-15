@@ -3,6 +3,7 @@ import { getSupplierReceivables } from './supplier-receivables.service.js'
 import { getReorderIntelligence } from './supplier-reorder-intelligence.service.js'
 import { buildTrackingPayload } from '../lib/delivery-tracking-payload.js'
 import { isGpsTrackingEnabled } from '../lib/delivery-tracking-payload.js'
+import { getSupplierGrowthMetrics } from './supplier-growth-metrics.service.js'
 import { DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD } from '../lib/supplier-stock-status.js'
 
 const OPEN_INVOICE_STATUSES = ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE']
@@ -18,6 +19,7 @@ export async function getSupplierCommandCenter(supplierId) {
     receivables,
     reorderIntel,
     boostedDeals,
+    customerGrowth,
   ] = await Promise.all([
     countOrdersToPrepareToday(supplierId),
     countDeliveriesPendingToday(supplierId),
@@ -28,6 +30,7 @@ export async function getSupplierCommandCenter(supplierId) {
     getSupplierReceivables(supplierId),
     getReorderIntelligence(supplierId),
     getBoostedDealsSummary(supplierId),
+    getSupplierGrowthMetrics(supplierId).catch(() => null),
   ])
 
   const priorities = buildPriorities({
@@ -67,6 +70,7 @@ export async function getSupplierCommandCenter(supplierId) {
       reorderOpportunities: reorderIntel.customersAtRisk.slice(0, 5),
       lowStock: lowStock.slice(0, 5),
       boostedDeals,
+      customerGrowth,
     },
   }
 }

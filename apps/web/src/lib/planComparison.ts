@@ -14,6 +14,7 @@ export const RESTAURANT_LIMIT_KEYS = [
   'suppliers_per_restaurant',
   'restaurant_inventory_skus',
   'chats_per_day',
+  'ai_requests_per_day',
   'storage_mb',
 ] as const
 
@@ -32,6 +33,7 @@ export const RESTAURANT_FEATURE_KEYS = [
   'order_calendar',
   'reports',
   'smart_reorder',
+  'ai_platform',
   'multi_branch',
   'disputes_returns',
   'advanced_roles',
@@ -72,12 +74,14 @@ export const LIMIT_KEY_LABELS: Record<string, string> = {
   suppliers_per_restaurant: 'Suppliers',
   promotions: 'Active deals',
   deal_redemptions_per_day: 'Deal redemptions per day',
+  ai_requests_per_day: 'AI assist requests per day',
 }
 
 export const FEATURE_KEY_LABELS: Record<string, string> = {
   order_calendar: 'Order calendar',
   reports: 'Reports',
   smart_reorder: 'Smart reorder',
+  ai_platform: 'AI reorder assistant',
   multi_branch: 'Multi-branch',
   disputes_returns: 'Disputes & returns',
   advanced_roles: 'Advanced roles',
@@ -108,6 +112,25 @@ export function formatPlanFeatureCell(
       return { enabled: true, caption: 'White-label' }
     }
     return { enabled: true, caption: 'Included' }
+  }
+
+  if (featureKey === 'smart_reorder') {
+    if (rawVal === false || rawVal == null || rawVal === '' || rawVal === 'disabled') {
+      return { enabled: false }
+    }
+    if (rawVal === 'full_90day_trends' || rawVal === true) {
+      return { enabled: true, caption: '90-day forecasting' }
+    }
+    if (rawVal === 'ai_forecast_seasonality') {
+      return { enabled: true, caption: 'Seasonality + NL ask' }
+    }
+    return { enabled: true, caption: 'Included' }
+  }
+
+  if (featureKey === 'ai_platform') {
+    const enabled =
+      typeof rawVal === 'boolean' ? rawVal : rawVal !== 'false' && rawVal != null && rawVal !== ''
+    return { enabled, caption: enabled ? 'LLM assist' : undefined }
   }
 
   const enabled =

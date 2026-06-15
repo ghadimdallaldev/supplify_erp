@@ -17,6 +17,7 @@ export const RESTAURANT_LIMIT_KEYS = [
   'scheduled_quick_lists',
   'scheduled_order_grace_per_day',
   'deal_redemptions_per_day',
+  'ai_requests_per_day',
 ]
 
 export function stripHiddenEntitlementLimits(limits, usage, overrides = []) {
@@ -80,6 +81,7 @@ export const FREE_TIER_LIMIT_PATCHES = {
     scheduled_quick_lists: 1,
     scheduled_order_grace_per_day: 1,
     deal_redemptions_per_day: 1,
+    ai_requests_per_day: 0,
   },
   SUPPLIER: {
     branches: 1,

@@ -83,7 +83,7 @@ export const productsApi = api.injectEndpoints({
         url: '/api/products',
         params,
       }),
-      providesTags: ['Product'],
+      providesTags: ['Product', 'ProductList'],
     }),
     getProductCategories: builder.query<
       {
@@ -140,14 +140,52 @@ export const productsApi = api.injectEndpoints({
         method: 'POST',
         body: { productId },
       }),
-      invalidatesTags: ['Product', 'ProductFavorite'],
+      async onQueryStarted({ productId }, { dispatch, queryFulfilled, getState }) {
+        const patchResults: Array<{ undo: () => void }> = []
+        const listArgs = (api.util.selectCachedArgsForQuery as any)(getState(), 'getProducts')
+        for (const args of listArgs) {
+          patchResults.push(
+            dispatch(
+              (api.util.updateQueryData as any)('getProducts', args, (draft: ProductsResponse) => {
+                const product = draft.products?.find((entry) => entry.id === productId)
+                if (product) product.is_favorited = true
+              })
+            )
+          )
+        }
+        try {
+          await queryFulfilled
+        } catch {
+          patchResults.forEach((patch) => patch.undo())
+        }
+      },
+      invalidatesTags: ['ProductFavorite'],
     }),
     unfavoriteProduct: builder.mutation<{ productId: string; favorited: boolean }, string>({
       query: (productId) => ({
         url: `/api/products/favorites/${productId}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Product', 'ProductFavorite'],
+      async onQueryStarted(productId, { dispatch, queryFulfilled, getState }) {
+        const patchResults: Array<{ undo: () => void }> = []
+        const listArgs = (api.util.selectCachedArgsForQuery as any)(getState(), 'getProducts')
+        for (const args of listArgs) {
+          patchResults.push(
+            dispatch(
+              (api.util.updateQueryData as any)('getProducts', args, (draft: ProductsResponse) => {
+                const product = draft.products?.find((entry) => entry.id === productId)
+                if (product) product.is_favorited = false
+              })
+            )
+          )
+        }
+        try {
+          await queryFulfilled
+        } catch {
+          patchResults.forEach((patch) => patch.undo())
+        }
+      },
+      invalidatesTags: ['ProductFavorite'],
     }),
   }),
 })

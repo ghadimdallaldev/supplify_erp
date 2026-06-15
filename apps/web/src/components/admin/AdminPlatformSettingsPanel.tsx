@@ -17,7 +17,7 @@ export function AdminPlatformSettingsPanel({
 }) {
   const { data, isLoading } = useGetAdminPlatformSettingsQuery()
   const [updateSettings, { isLoading: saving }] = useUpdateAdminPlatformSettingsMutation()
-  const [days, setDays] = useState('7')
+  const [days, setDays] = useState('30')
 
   useEffect(() => {
     if (data?.freeSandboxDays != null) {
@@ -27,8 +27,8 @@ export function AdminPlatformSettingsPanel({
 
   const handleSave = async () => {
     const n = Number(days)
-    if (!Number.isFinite(n) || n < 3 || n > 7) {
-      toast.error('Enter a number between 3 and 7 days')
+    if (!Number.isFinite(n) || n < 7 || n > 90) {
+      toast.error('Enter a number between 7 and 90 days')
       return
     }
     try {
@@ -69,13 +69,15 @@ export function AdminPlatformSettingsPanel({
               <Input
                 id="freeSandboxDays"
                 type="number"
-                min={3}
-                max={7}
+                min={7}
+                max={90}
                 value={days}
                 onChange={(e) => setDays(e.target.value)}
                 className="mt-1"
               />
-              <p className="text-xs text-[var(--text-muted)] mt-1">Allowed range: 3–7 days</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">
+                Allowed range: 7–90 days (default 30)
+              </p>
             </div>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? 'Saving…' : 'Save'}

@@ -202,6 +202,7 @@ export async function completeTenantRegistration({
   legalAcceptance,
   ipAddress,
   userAgent,
+  referralToken = null,
 }) {
   const normalizedEmail = email.trim().toLowerCase()
   const type = accountType === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
@@ -306,6 +307,17 @@ export async function completeTenantRegistration({
       },
       client
     )
+
+    if (registrationResult.tenantType === 'RESTAURANT' && referralToken) {
+      const { acceptReferralOnRegistration } = await import(
+        '../services/supplier-growth-invitation.service.js'
+      )
+      await acceptReferralOnRegistration({
+        token: referralToken,
+        restaurantId: registrationResult.tenant.id,
+        client,
+      })
+    }
 
     return registrationResult
   })

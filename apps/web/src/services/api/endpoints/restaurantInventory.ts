@@ -31,6 +31,9 @@ import type {
   Attachment,
   ReorderSuggestionsResponse,
   ReorderAssistanceItem,
+  ReorderAssistanceResponse,
+  ReorderAiExplainResult,
+  ReorderAiAskResult,
   SubscriptionPlan,
   Subscription,
   Entitlements,
@@ -184,12 +187,43 @@ export const restaurantInventoryApi = api.injectEndpoints({
       query: () => '/api/restaurant-inventory/reorder-reminders',
       providesTags: ['RestaurantInventory'],
     }),
-    getReorderAssistance: builder.query<
-      { suggestions: ReorderAssistanceItem[]; total: number },
-      void
-    >({
+    getReorderAssistance: builder.query<ReorderAssistanceResponse, void>({
       query: () => '/api/restaurant-inventory/reorder-assistance',
       providesTags: ['RestaurantInventory'],
+    }),
+    explainReorderAssistance: builder.mutation<
+      ReorderAiExplainResult,
+      { branchId?: string } | void
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-inventory/reorder-assistance/explain',
+        method: 'POST',
+        body: body ?? {},
+      }),
+    }),
+    askReorderAssistance: builder.mutation<
+      ReorderAiAskResult,
+      { query: string; branchId?: string }
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-inventory/reorder-assistance/ask',
+        method: 'POST',
+        body,
+      }),
+    }),
+    applyReorderAssistance: builder.mutation<
+      { added: Array<{ productId: string; quickListId?: string; message: string }> },
+      {
+        items: Array<{ productId: string; qty: number; supplierId?: string }>
+        branchId?: string
+      }
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-inventory/reorder-assistance/apply',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['RestaurantInventory'],
     }),
     suppressReorderSuggestion: builder.mutation<
       unknown,
