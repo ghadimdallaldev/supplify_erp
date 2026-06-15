@@ -50,6 +50,18 @@ function getEnforcementPlanLimits(subscription, tenantType) {
 const SUBSCRIPTION_CACHE_TTL = 180
 /** Full entitlements payload (plan, limits, features, usage) — hot path on every app shell load. */
 const ENTITLEMENTS_CACHE_TTL = 300
+/**
+ * Stale-while-revalidate: serve cached entitlements immediately on hit; usage counts may lag
+ * until TTL expiry or explicit invalidation (plan/subscription changes). Hits younger than
+ * ENTITLEMENTS_FRESH_USAGE_SEC skip usage re-count and return the cached snapshot as-is.
+ */
+const ENTITLEMENTS_FRESH_USAGE_SEC = 60
+
+function stripEntitlementsCacheMeta(cached) {
+  if (!cached || typeof cached !== 'object') return cached
+  const { _cachedAt, ...payload } = cached
+  return payload
+}
 
 /** Build a consistent cache key for a tenant subscription. */
 function subscriptionCacheKey(tenantId, tenantType) {
@@ -714,7 +726,24 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
   const cached = await getCache(cacheKey)
   if (cached !== null) {
     noteCacheHit(req, 'entitlements')
-    return cached
+    const ageMs = cached._cachedAt ? Date.now() - cached._cachedAt : 0
+    if (ageMs < ENTITLEMENTS_FRESH_USAGE_SEC * 1000) {
+      return stripEntitlementsCacheMeta(cached)
+    }
+    try {
+      const usage = await getUsageSnapshot(tenantId, tenantType)
+      stripHiddenEntitlementLimits(cached.limits, usage)
+      const refreshed = { ...stripEntitlementsCacheMeta(cached), usage, _cachedAt: Date.now() }
+      await setCache(cacheKey, refreshed, ENTITLEMENTS_CACHE_TTL).catch(() => {})
+      return stripEntitlementsCacheMeta(refreshed)
+    } catch (err) {
+      logger.warn('Entitlements usage refresh failed, serving cached payload', {
+        tenantId,
+        tenantType,
+        error: err.message,
+      })
+      return stripEntitlementsCacheMeta(cached)
+    }
   }
   noteCacheMiss(req, 'entitlements')
 
@@ -722,7 +751,7 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
     const again = await getCache(cacheKey)
     if (again !== null) {
       noteCacheHit(req, 'entitlements')
-      return again
+      return stripEntitlementsCacheMeta(again)
     }
 
     const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
@@ -928,7 +957,8 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
       smartReorder,
     }
 
-    await setCache(cacheKey, payload, ENTITLEMENTS_CACHE_TTL).catch(() => {})
+    const cachedPayload = { ...payload, _cachedAt: Date.now() }
+    await setCache(cacheKey, cachedPayload, ENTITLEMENTS_CACHE_TTL).catch(() => {})
     return payload
   })
 }

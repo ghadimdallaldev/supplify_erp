@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
-import { Building2, Clock, MessageSquare, Pin, Plus, Store } from 'lucide-react'
+import { Building2, Clock, MessageSquare, Pin, Plus, Search, Store, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
-import { Search, X } from 'lucide-react'
+import { cn } from '../../lib/utils'
 
 type Conversation = {
   id: string
@@ -24,6 +24,18 @@ type Props = {
   formatConversationDate: (date: string) => string
   onNewMessage?: () => void
   className?: string
+}
+
+function ParticipantAvatar({ name }: { name: string }) {
+  const initial = (name.trim().charAt(0) || '?').toUpperCase()
+  return (
+    <div
+      aria-hidden
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--brand-pale)] text-sm font-semibold text-[var(--brand-mid)]"
+    >
+      {initial}
+    </div>
+  )
 }
 
 export function ChatConversationList({
@@ -51,120 +63,159 @@ export function ChatConversationList({
   })
 
   return (
-    <Card className={`flex flex-col min-h-0 ${className}`}>
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <MessageSquare className="h-5 w-5" />
-          Conversations
-        </CardTitle>
+    <Card className={cn('flex min-h-0 flex-col overflow-hidden', className)}>
+      <CardHeader className="shrink-0 space-y-3 border-b border-[var(--app-border)] pb-3">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold text-[var(--text)]">
+            <MessageSquare className="h-5 w-5 text-[var(--brand-mid)]" aria-hidden />
+            Inbox
+          </CardTitle>
+          {onNewMessage ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8"
+              onClick={onNewMessage}
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              New
+            </Button>
+          ) : null}
+        </div>
         {hasConversations ? (
-          <div className="relative mt-2">
-            <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
+              aria-hidden
+            />
             <Input
-              placeholder="Search people..."
+              placeholder="Search people…"
               value={listFilter}
               onChange={(e) => onListFilterChange(e.target.value)}
-              className="h-9 pl-8"
+              className="h-9 pl-8 pr-8"
+              aria-label="Search conversations"
             />
             {listFilter ? (
               <button
                 type="button"
                 onClick={() => onListFilterChange('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--text-muted)] hover:text-[var(--text)]"
                 aria-label="Clear search"
               >
-                <X className="h-4 w-4 text-[var(--text-muted)]" />
+                <X className="h-4 w-4" />
               </button>
             ) : null}
           </div>
         ) : null}
       </CardHeader>
-      <CardContent className="flex-1 overflow-y-auto p-0 min-h-0">
-        <div className="divide-y">
-          {sorted.length === 0 ? (
-            <div className="space-y-3 p-4 text-center text-sm text-[var(--text-muted)]">
-              <MessageSquare className="mx-auto mb-2 h-12 w-12 text-[var(--text-muted)]/50" />
-              <p className="font-medium">
-                {listFilter ? 'No matching conversations' : 'No conversations yet'}
-              </p>
-              {!listFilter && userRole === 'RESTAURANT' && (
-                <>
-                  <p className="text-xs px-2">
-                    Message a supplier to get started, or browse the directory.
-                  </p>
-                  <Button variant="outline" size="sm" className="mt-1" asChild>
-                    <Link to="/app/suppliers">
-                      <Building2 className="mr-2 h-4 w-4" />
-                      Browse suppliers
+
+      <CardContent className="min-h-0 flex-1 overflow-y-auto p-0">
+        {sorted.length === 0 ? (
+          <div className="space-y-3 px-4 py-8 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--brand-pale)] text-[var(--brand-mid)]">
+              <MessageSquare className="h-6 w-6" aria-hidden />
+            </div>
+            <p className="text-sm font-medium text-[var(--text)]">
+              {listFilter ? 'No matching conversations' : 'No conversations yet'}
+            </p>
+            {!listFilter && userRole === 'RESTAURANT' && (
+              <>
+                <p className="text-sm text-[var(--text-mid)]">
+                  Message a supplier to coordinate orders and pricing.
+                </p>
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/app/suppliers">
+                    <Building2 className="mr-2 h-4 w-4" />
+                    Browse suppliers
+                  </Link>
+                </Button>
+              </>
+            )}
+            {!listFilter && userRole === 'SUPPLIER' && (
+              <>
+                <p className="text-sm text-[var(--text-mid)]">
+                  Reach out to restaurants or start from your customer list.
+                </p>
+                {onNewMessage ? (
+                  <Button variant="outline" size="sm" onClick={onNewMessage}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    New message
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to="/app/restaurants">
+                      <Store className="mr-2 h-4 w-4" />
+                      Browse restaurants
                     </Link>
                   </Button>
-                </>
-              )}
-              {!listFilter && userRole === 'SUPPLIER' && (
-                <>
-                  <p className="text-xs px-2">
-                    Message a restaurant to get started, or browse your customer list.
-                  </p>
-                  {onNewMessage ? (
-                    <Button variant="outline" size="sm" className="mt-1" onClick={onNewMessage}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      New message
-                    </Button>
-                  ) : (
-                    <Button variant="outline" size="sm" className="mt-1" asChild>
-                      <Link to="/app/restaurants">
-                        <Store className="mr-2 h-4 w-4" />
-                        Browse restaurants
-                      </Link>
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
-          ) : (
-            sorted.map((conv) => (
-              <button
-                key={conv.id}
-                type="button"
-                onClick={() => onSelect(conv.id)}
-                className={`w-full border-l-2 p-4 text-left transition-colors hover:bg-accent ${
-                  selectedConversationId === conv.id
-                    ? 'border-l-primary bg-accent'
-                    : conv.is_pinned
-                      ? 'border-l-[var(--brand-mid)] bg-[var(--brand-ultra)]/50 dark:bg-[var(--brand)]/20'
-                      : 'border-l-transparent'
-                }`}
-              >
-                <div className="mb-1 flex items-center justify-between">
-                  <div className="flex items-center gap-2 font-medium">
-                    {conv.is_pinned ? (
-                      <Pin className="h-3 w-3 fill-current text-[var(--brand-mid)]" />
-                    ) : null}
-                    {conv.participant_name}
-                  </div>
-                  {(conv.unread_count ?? 0) > 0 ? (
-                    <span className="rounded-full bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] px-2 py-0.5 text-xs font-semibold text-white shadow-sm">
-                      {conv.unread_count}
-                    </span>
-                  ) : null}
-                </div>
-                <div className="truncate text-sm text-[var(--text-muted)]">
-                  {conv.last_message_preview || 'No messages yet'}
-                </div>
-                <div className="mt-1 text-xs text-[var(--text-muted)]">
-                  {conv.last_message_at ? (
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {formatConversationDate(conv.last_message_at)}
-                    </span>
-                  ) : (
-                    'No messages'
-                  )}
-                </div>
-              </button>
-            ))
-          )}
-        </div>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          <ul className="divide-y divide-[var(--app-border)]">
+            {sorted.map((conv) => {
+              const selected = selectedConversationId === conv.id
+              const unread = (conv.unread_count ?? 0) > 0
+              return (
+                <li key={conv.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(conv.id)}
+                    className={cn(
+                      'chat-list-item flex w-full gap-3 px-3 py-3 text-left',
+                      selected && 'bg-[var(--brand-pale)]/55',
+                      !selected && conv.is_pinned && 'bg-[var(--brand-ultra)]/80'
+                    )}
+                  >
+                    <ParticipantAvatar name={conv.participant_name || 'Chat'} />
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-0.5 flex items-start justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          {conv.is_pinned ? (
+                            <Pin
+                              className="h-3 w-3 shrink-0 fill-current text-[var(--brand-mid)]"
+                              aria-label="Pinned"
+                            />
+                          ) : null}
+                          <span
+                            className={cn(
+                              'truncate text-sm',
+                              unread
+                                ? 'font-semibold text-[var(--text)]'
+                                : 'font-medium text-[var(--text)]'
+                            )}
+                          >
+                            {conv.participant_name}
+                          </span>
+                        </div>
+                        {conv.last_message_at ? (
+                          <span className="shrink-0 text-[11px] text-[var(--text-muted)]">
+                            {formatConversationDate(conv.last_message_at)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p
+                        className={cn(
+                          'line-clamp-2 text-sm leading-snug',
+                          unread ? 'font-medium text-[var(--text-mid)]' : 'text-[var(--text-muted)]'
+                        )}
+                      >
+                        {conv.last_message_preview || 'No messages yet'}
+                      </p>
+                      {unread ? (
+                        <span className="mt-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--brand-mid)] px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white">
+                          {conv.unread_count}
+                        </span>
+                      ) : null}
+                    </div>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
       </CardContent>
     </Card>
   )

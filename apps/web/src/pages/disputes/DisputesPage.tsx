@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { AppPanel } from '../../components/ui/app-panel'
+import { PageShell } from '../../components/ui/page-shell'
 import { PageHeader } from '../../components/ui/page-header'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
@@ -203,11 +204,11 @@ export function DisputesPage() {
     return (
       <div className="space-y-4">
         <PageHeader title="Disputes" />
-        <Card>
-          <CardContent className="py-8 text-sm text-[var(--text-muted)]">
+        <AppPanel title="Disputes unavailable">
+          <p className="text-sm text-[var(--text-mid)]">
             Disputes & returns are not on your plan. Upgrade to manage delivery issues and credits.
-          </CardContent>
-        </Card>
+          </p>
+        </AppPanel>
       </div>
     )
   }
@@ -266,7 +267,7 @@ export function DisputesPage() {
       permission={isSupplier ? 'FULFILLMENT_VIEW' : 'ORDERS_VIEW'}
       title="disputes"
     >
-      <div className="page-stack">
+      <PageShell className="space-y-4" data-testid="disputes-page">
         <PageHeader
           title="Disputes"
           description={
@@ -293,158 +294,151 @@ export function DisputesPage() {
           }
         />
 
-        <Card className="overflow-visible">
-          <CardContent className="px-4 py-4 sm:px-6 sm:py-6">
-            <div className="flex w-full max-w-md flex-col gap-2">
-              <Label>Status filter</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="mt-1.5">
-                  <option value="">All</option>
-                  <option value="open">Open</option>
-                  <option value="under_review">Under review</option>
-                  <option value="resolved">Resolved</option>
-                  <option value="rejected">Rejected</option>
-                </SelectTrigger>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
+        <AppPanel title="Filter disputes">
+          <div className="flex w-full max-w-md flex-col gap-2">
+            <Label>Status filter</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="mt-1.5">
+                <option value="">All</option>
+                <option value="open">Open</option>
+                <option value="under_review">Under review</option>
+                <option value="resolved">Resolved</option>
+                <option value="rejected">Rejected</option>
+              </SelectTrigger>
+            </Select>
+          </div>
+        </AppPanel>
 
-        <Card className="overflow-visible">
-          <CardHeader className="px-4 pb-2 pt-4 sm:px-6 sm:pt-6">
-            <CardTitle>{isSupplier ? 'Incoming' : 'My disputes'}</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4 pt-0 sm:px-6 sm:pb-6">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-10 text-[var(--text-muted)]">
-                <Loader2 className="h-6 w-6 animate-spin text-[var(--brand-mid)]" />
-              </div>
-            ) : disputes.length === 0 ? (
-              <EmptyState
-                title="No disputes found"
-                description={
-                  statusFilter
-                    ? 'Try clearing the status filter to see more results.'
-                    : 'Disputes opened from receiving or order issues will appear here.'
+        <AppPanel title={isSupplier ? 'Incoming disputes' : 'My disputes'}>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-10 text-[var(--text-muted)]">
+              <Loader2 className="h-6 w-6 animate-spin text-[var(--brand-mid)]" />
+            </div>
+          ) : disputes.length === 0 ? (
+            <EmptyState
+              title="No disputes found"
+              description={
+                statusFilter
+                  ? 'Try clearing the status filter to see more results.'
+                  : 'Disputes opened from receiving or order issues will appear here.'
+              }
+              icon={<Scale className="h-6 w-6" aria-hidden />}
+            />
+          ) : (
+            <>
+              <DisputeListCards
+                disputes={disputes as DisputeRow[]}
+                isSupplier={isSupplier}
+                formatAmount={(n) => `$${formatPrice(n)}`}
+                onReview={isSupplier && canManageSupplierDisputes ? handleReview : undefined}
+                onResolve={
+                  isSupplier && canManageSupplierDisputes ? (id) => setResolveId(id) : undefined
                 }
-                icon={<Scale className="h-6 w-6" aria-hidden />}
+                onReject={
+                  isSupplier && canManageSupplierDisputes ? (id) => setRejectId(id) : undefined
+                }
               />
-            ) : (
-              <>
-                <DisputeListCards
-                  disputes={disputes as DisputeRow[]}
-                  isSupplier={isSupplier}
-                  formatAmount={(n) => `$${formatPrice(n)}`}
-                  onReview={isSupplier && canManageSupplierDisputes ? handleReview : undefined}
-                  onResolve={
-                    isSupplier && canManageSupplierDisputes ? (id) => setResolveId(id) : undefined
-                  }
-                  onReject={
-                    isSupplier && canManageSupplierDisputes ? (id) => setRejectId(id) : undefined
-                  }
-                />
-                <TableScroll aria-label="Disputes table" className="hidden md:block">
-                  <table className="w-full min-w-[720px] text-sm">
-                    <thead>
-                      <tr className="border-b bg-[var(--brand-ultra)]/40 text-left text-[var(--text-muted)]">
-                        <th className="px-4 py-3 pl-5 font-medium">Order</th>
-                        {isSupplier && <th className="px-4 py-3 font-medium">Restaurant</th>}
-                        <th className="px-4 py-3 font-medium">Type</th>
-                        <th className="px-4 py-3 font-medium">Status</th>
-                        <th className="px-4 py-3 font-medium">Amount</th>
-                        <th className="px-4 py-3 pr-5 text-right font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {disputes.map((row) => {
-                        const dispute = row as DisputeRow
-                        const orderId = dispute.orderId || dispute.order_id
-                        const disputedAmount = dispute.disputedAmount ?? dispute.disputed_amount
-                        return (
-                          <tr
-                            key={String(dispute.id)}
-                            className="border-b border-[var(--app-border)]"
-                          >
-                            <td className="px-4 py-3 pl-5">
-                              {orderId ? (
-                                <Link
-                                  to={`/app/orders/${orderId}`}
-                                  className="text-[var(--brand-mid)] hover:underline font-mono text-xs"
-                                >
-                                  {formatOrderRef(orderId)}
-                                </Link>
-                              ) : (
-                                <span className="text-[var(--text-muted)]">—</span>
-                              )}
-                            </td>
-                            {isSupplier && (
-                              <td className="px-4 py-3 text-sm">
-                                {String(dispute.restaurantName ?? dispute.restaurant_name ?? '—')}
-                              </td>
-                            )}
-                            <td className="px-4 py-3 capitalize">
+              <TableScroll aria-label="Disputes table" className="hidden md:block">
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead>
+                    <tr className="border-b bg-[var(--brand-ultra)]/40 text-left text-[var(--text-muted)]">
+                      <th className="px-4 py-3 pl-5 font-medium">Order</th>
+                      {isSupplier && <th className="px-4 py-3 font-medium">Restaurant</th>}
+                      <th className="px-4 py-3 font-medium">Type</th>
+                      <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 font-medium">Amount</th>
+                      <th className="px-4 py-3 pr-5 text-right font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {disputes.map((row) => {
+                      const dispute = row as DisputeRow
+                      const orderId = dispute.orderId || dispute.order_id
+                      const disputedAmount = dispute.disputedAmount ?? dispute.disputed_amount
+                      return (
+                        <tr
+                          key={String(dispute.id)}
+                          className="border-b border-[var(--app-border)]"
+                        >
+                          <td className="px-4 py-3 pl-5">
+                            {orderId ? (
                               <Link
-                                to={`/app/disputes/${dispute.id}`}
-                                className="text-[var(--brand-mid)] hover:underline"
+                                to={`/app/orders/${orderId}`}
+                                className="text-[var(--brand-mid)] hover:underline font-mono text-xs"
                               >
-                                {String(dispute.type || '').replace(/_/g, ' ')}
+                                {formatOrderRef(orderId)}
                               </Link>
+                            ) : (
+                              <span className="text-[var(--text-muted)]">—</span>
+                            )}
+                          </td>
+                          {isSupplier && (
+                            <td className="px-4 py-3 text-sm">
+                              {String(dispute.restaurantName ?? dispute.restaurant_name ?? '—')}
                             </td>
-                            <td className="px-4 py-3">
-                              <Badge variant={statusBadge(String(dispute.status))}>
-                                {String(dispute.status)}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-3 tabular-nums">
-                              {disputedAmount != null
-                                ? `$${formatPrice(Number(disputedAmount))}`
-                                : '—'}
-                            </td>
-                            <td className="px-4 py-3 pr-5 text-right">
-                              <div className="flex flex-wrap justify-end gap-2">
-                                {isSupplier &&
-                                  canManageSupplierDisputes &&
-                                  dispute.status === 'open' && (
+                          )}
+                          <td className="px-4 py-3 capitalize">
+                            <Link
+                              to={`/app/disputes/${dispute.id}`}
+                              className="text-[var(--brand-mid)] hover:underline"
+                            >
+                              {String(dispute.type || '').replace(/_/g, ' ')}
+                            </Link>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant={statusBadge(String(dispute.status))}>
+                              {String(dispute.status)}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 tabular-nums">
+                            {disputedAmount != null
+                              ? `$${formatPrice(Number(disputedAmount))}`
+                              : '—'}
+                          </td>
+                          <td className="px-4 py-3 pr-5 text-right">
+                            <div className="flex flex-wrap justify-end gap-2">
+                              {isSupplier &&
+                                canManageSupplierDisputes &&
+                                dispute.status === 'open' && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleReview(String(dispute.id))}
+                                  >
+                                    Review
+                                  </Button>
+                                )}
+                              {isSupplier &&
+                                canManageSupplierDisputes &&
+                                (dispute.status === 'open' ||
+                                  dispute.status === 'under_review') && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => setResolveId(String(dispute.id))}
+                                    >
+                                      Resolve
+                                    </Button>
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      onClick={() => handleReview(String(dispute.id))}
+                                      onClick={() => setRejectId(String(dispute.id))}
                                     >
-                                      Review
+                                      Reject
                                     </Button>
-                                  )}
-                                {isSupplier &&
-                                  canManageSupplierDisputes &&
-                                  (dispute.status === 'open' ||
-                                    dispute.status === 'under_review') && (
-                                    <>
-                                      <Button
-                                        size="sm"
-                                        onClick={() => setResolveId(String(dispute.id))}
-                                      >
-                                        Resolve
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setRejectId(String(dispute.id))}
-                                      >
-                                        Reject
-                                      </Button>
-                                    </>
-                                  )}
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </TableScroll>
-              </>
-            )}
-          </CardContent>
-        </Card>
+                                  </>
+                                )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </TableScroll>
+            </>
+          )}
+        </AppPanel>
 
         <Dialog
           open={showCreate}
@@ -652,7 +646,7 @@ export function DisputesPage() {
             }}
           />
         )}
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

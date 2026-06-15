@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { LayoutGrid, Map, Truck, Navigation } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
@@ -25,20 +24,23 @@ export function FulfillmentTrackingTab() {
 
   return (
     <>
-      <Card data-testid="fulfillment-tracking-tab">
-        <CardHeader>
+      <section
+        data-testid="fulfillment-tracking-tab"
+        className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]"
+      >
+        <header className="border-b border-[var(--app-border)] px-4 py-4 sm:px-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Truck className="h-5 w-5" />
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                <Truck className="h-4 w-4 text-[var(--brand-mid)]" aria-hidden />
                 Delivery Tracking
-              </CardTitle>
-              <CardDescription>
-                Active deliveries (assigned, picked up, or out for delivery · refreshes every 30s)
-              </CardDescription>
+              </h2>
+              <p className="mt-0.5 text-xs text-[var(--text-mid)]">
+                Active deliveries — refreshes every 30s
+              </p>
             </div>
             <div
-              className="flex rounded-lg border border-[var(--app-border)] p-0.5"
+              className="flex rounded-lg border border-[var(--app-border)] bg-[var(--bg)] p-0.5"
               data-testid="fulfillment-tracking-view-toggle"
             >
               <Button
@@ -65,8 +67,8 @@ export function FulfillmentTrackingTab() {
               </Button>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
+        </header>
+        <div className="p-4 sm:p-5">
           {isLoading ? (
             <div className="space-y-3" data-testid="tracking-loading">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -88,10 +90,11 @@ export function FulfillmentTrackingTab() {
             </div>
           ) : orders.length === 0 ? (
             <div
-              className="py-10 text-center text-sm text-[var(--text-muted)]"
+              className="rounded-xl border border-dashed border-[var(--app-border)] bg-[var(--brand-ultra)] py-12 text-center"
               data-testid="tracking-empty"
             >
-              No active deliveries right now.
+              <Truck className="mx-auto mb-3 h-9 w-9 text-[var(--text-muted)]" aria-hidden />
+              <p className="text-sm text-[var(--text-mid)]">No active deliveries right now.</p>
             </div>
           ) : viewMode === 'map' ? (
             <ActiveDeliveriesMap orders={orders} onSelectOrder={setTrackingOrderId} />
@@ -158,8 +161,8 @@ export function FulfillmentTrackingTab() {
               </table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       <DeliveryTrackingDrawer
         orderId={trackingOrderId}

@@ -18,6 +18,16 @@ const ALLOW_GET_PATHS = new Set([
   '/api/subscriptions/plans',
 ])
 
+/** GET paths that must stay blocked when billing locks the tenant (including read-only trial expiry). */
+const SENSITIVE_GET_PREFIXES = ['/api/reports/']
+
+function isSensitiveReadPath(path) {
+  if (SENSITIVE_GET_PREFIXES.some((prefix) => path.startsWith(prefix))) return true
+  if (path.includes('/export')) return true
+  if (/^\/api\/invoices\/[^/]+\/pdf$/.test(path)) return true
+  return false
+}
+
 function isFreeTrialExpiredLock(access) {
   if (!access?.isLocked) return false
   return (
@@ -61,8 +71,29 @@ export async function billingAccessMiddleware(req, res, next) {
     }
 
     if (req.method === 'GET' && isFreeTrialExpiredLock(access)) {
+      if (isSensitiveReadPath(path)) {
+        const billing = await getBillingStatus(tenant.tenantId, tenant.tenantType)
+        mark(req, 'billing')
+        return res.status(402).json({
+          ok: false,
+          data: { billing: { access: billing.access, amountDue: billing.amountDue } },
+          error: buildAccountLockedError(billing),
+          requestId: req.requestId,
+        })
+      }
       mark(req, 'billing')
       return next()
+    }
+
+    if (req.method === 'GET' && isSensitiveReadPath(path)) {
+      const billing = await getBillingStatus(tenant.tenantId, tenant.tenantType)
+      mark(req, 'billing')
+      return res.status(402).json({
+        ok: false,
+        data: { billing: { access: billing.access, amountDue: billing.amountDue } },
+        error: buildAccountLockedError(billing),
+        requestId: req.requestId,
+      })
     }
 
     // Slow path (locked): fetch full billing status for the response payload.

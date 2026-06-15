@@ -127,177 +127,170 @@ router.get('/audit', requireAuth, requireRole(['ADMIN']), async (req, res) => {
 })
 
 // Get dashboard statistics (role-aware; respects impersonation)
-router.get(
-  '/dashboard',
-  requireAuth,
-  requireRole(['ADMIN', 'SUPPLIER', 'RESTAURANT']),
-  async (req, res) => {
-    const userRole = req.userData.role
-    try {
-      let stats = {}
-      const tenant = await getRequestTenant(req)
+router.get('/dashboard', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  const userRole = req.userData.role
+  try {
+    let stats = {}
+    const tenant = await getRequestTenant(req)
 
-      if (tenant?.tenantType === 'SUPPLIER') {
-        const supplierId = tenant.tenantId
-        const [
-          { rows: totalProducts },
-          { rows: totalOrders },
-          { rows: pendingOrders },
-          { rows: completedOrders },
-          { rows: totalRevenue },
-          { rows: totalRestaurants },
-        ] = await Promise.all([
-          query('SELECT COUNT(*) as count FROM product WHERE supplier_id = $1', [supplierId]),
-          query('SELECT COUNT(DISTINCT order_id) as count FROM order_item WHERE supplier_id = $1', [
-            supplierId,
-          ]),
-          query(
-            `
+    if (tenant?.tenantType === 'SUPPLIER') {
+      const supplierId = tenant.tenantId
+      const [
+        { rows: totalProducts },
+        { rows: totalOrders },
+        { rows: pendingOrders },
+        { rows: completedOrders },
+        { rows: totalRevenue },
+        { rows: totalRestaurants },
+      ] = await Promise.all([
+        query('SELECT COUNT(*) as count FROM product WHERE supplier_id = $1', [supplierId]),
+        query('SELECT COUNT(DISTINCT order_id) as count FROM order_item WHERE supplier_id = $1', [
+          supplierId,
+        ]),
+        query(
+          `
           SELECT COUNT(DISTINCT oi.order_id) as count 
           FROM order_item oi 
           JOIN customer_order o ON o.id = oi.order_id 
           WHERE oi.supplier_id = $1 AND o.status IN ('PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')
         `,
-            [supplierId]
-          ),
-          query(
-            `
+          [supplierId]
+        ),
+        query(
+          `
           SELECT COUNT(DISTINCT oi.order_id) as count 
           FROM order_item oi 
           JOIN customer_order o ON o.id = oi.order_id 
           WHERE oi.supplier_id = $1 AND ${deliveredOrderStatusInSql('o.status')}
         `,
-            [supplierId]
-          ),
-          query(
-            `
+          [supplierId]
+        ),
+        query(
+          `
           SELECT COALESCE(SUM(oi.line_total), 0) as total 
           FROM order_item oi 
           JOIN customer_order o ON o.id = oi.order_id 
           WHERE oi.supplier_id = $1 AND ${deliveredOrderStatusInSql('o.status')}
         `,
-            [supplierId]
-          ),
-          query(
-            `
+          [supplierId]
+        ),
+        query(
+          `
           SELECT COUNT(DISTINCT o.restaurant_id) as count
           FROM order_item oi
           JOIN customer_order o ON o.id = oi.order_id
           WHERE oi.supplier_id = $1
         `,
-            [supplierId]
-          ),
-        ])
-        stats = {
-          totalProducts: parseInt(totalProducts[0].count),
-          totalOrders: parseInt(totalOrders[0].count),
-          pendingOrders: parseInt(pendingOrders[0].count),
-          completedOrders: parseInt(completedOrders[0].count),
-          totalRevenue: parseFloat(totalRevenue[0].total),
-          totalRestaurants: parseInt(totalRestaurants[0].count),
-        }
-      } else if (tenant?.tenantType === 'RESTAURANT') {
-        const restaurantId = tenant.tenantId
-        const [
-          { rows: totalProducts },
-          { rows: totalOrders },
-          { rows: pendingOrders },
-          { rows: completedOrders },
-          { rows: totalSpent },
-        ] = await Promise.all([
-          query('SELECT COUNT(*) as count FROM product'),
-          query('SELECT COUNT(*) as count FROM customer_order WHERE restaurant_id = $1', [
-            restaurantId,
-          ]),
-          query(
-            "SELECT COUNT(*) as count FROM customer_order WHERE restaurant_id = $1 AND status IN ('PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')",
-            [restaurantId]
-          ),
-          query(
-            `SELECT COUNT(*) as count FROM customer_order WHERE restaurant_id = $1 AND ${deliveredOrderStatusInSql()}`,
-            [restaurantId]
-          ),
-          query(
-            `SELECT COALESCE(SUM(total_amount), 0) as total FROM customer_order WHERE restaurant_id = $1 AND ${deliveredOrderStatusInSql()}`,
-            [restaurantId]
-          ),
-        ])
-        stats = {
-          totalProducts: parseInt(totalProducts[0].count),
-          totalOrders: parseInt(totalOrders[0].count),
-          pendingOrders: parseInt(pendingOrders[0].count),
-          completedOrders: parseInt(completedOrders[0].count),
-          totalSpent: parseFloat(totalSpent[0].total),
-          totalRevenue: parseFloat(totalSpent[0].total),
-        }
-      } else if (userRole === 'ADMIN') {
-        // Admin with no impersonation: platform-wide stats
-        const [
-          { rows: totalSuppliers },
-          { rows: totalRestaurants },
-          { rows: totalProducts },
-          { rows: totalOrders },
-          { rows: pendingOrders },
-          { rows: completedOrders },
-          { rows: totalRevenue },
-        ] = await Promise.all([
-          query('SELECT COUNT(*) as count FROM supplier'),
-          query('SELECT COUNT(*) as count FROM restaurant'),
-          query('SELECT COUNT(*) as count FROM product'),
-          query('SELECT COUNT(*) as count FROM customer_order'),
-          query(
-            "SELECT COUNT(*) as count FROM customer_order WHERE status IN ('PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')"
-          ),
-          query(
-            `SELECT COUNT(*) as count FROM customer_order WHERE ${deliveredOrderStatusInSql()}`
-          ),
-          query(
-            `SELECT COALESCE(SUM(total_amount), 0) as total FROM customer_order WHERE ${deliveredOrderStatusInSql()}`
-          ),
-        ])
-        stats = {
-          totalSuppliers: parseInt(totalSuppliers[0].count),
-          totalRestaurants: parseInt(totalRestaurants[0].count),
-          totalProducts: parseInt(totalProducts[0].count),
-          totalOrders: parseInt(totalOrders[0].count),
-          pendingOrders: parseInt(pendingOrders[0].count),
-          completedOrders: parseInt(completedOrders[0].count),
-          totalRevenue: parseFloat(totalRevenue[0].total),
-        }
+          [supplierId]
+        ),
+      ])
+      stats = {
+        totalProducts: parseInt(totalProducts[0].count),
+        totalOrders: parseInt(totalOrders[0].count),
+        pendingOrders: parseInt(pendingOrders[0].count),
+        completedOrders: parseInt(completedOrders[0].count),
+        totalRevenue: parseFloat(totalRevenue[0].total),
+        totalRestaurants: parseInt(totalRestaurants[0].count),
       }
-
-      logger.debug({
-        message: 'Dashboard response',
-        statsKeys: Object.keys(stats),
-        userRole,
-        impersonating: !!getEffectiveTenant(req),
-      })
-
-      res.json({
-        ok: true,
-        data: { stats },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error({
-        message: 'Get dashboard stats error',
-        error: error.message,
-        stack: error.stack,
-        userRole,
-      })
-      res.status(500).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'INTERNAL_ERROR',
-          message: 'Failed to get dashboard statistics',
-          details: error.message,
-        },
-        requestId: req.requestId,
-      })
+    } else if (tenant?.tenantType === 'RESTAURANT') {
+      const restaurantId = tenant.tenantId
+      const [
+        { rows: totalProducts },
+        { rows: totalOrders },
+        { rows: pendingOrders },
+        { rows: completedOrders },
+        { rows: totalSpent },
+      ] = await Promise.all([
+        query('SELECT COUNT(*) as count FROM product'),
+        query('SELECT COUNT(*) as count FROM customer_order WHERE restaurant_id = $1', [
+          restaurantId,
+        ]),
+        query(
+          "SELECT COUNT(*) as count FROM customer_order WHERE restaurant_id = $1 AND status IN ('PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')",
+          [restaurantId]
+        ),
+        query(
+          `SELECT COUNT(*) as count FROM customer_order WHERE restaurant_id = $1 AND ${deliveredOrderStatusInSql()}`,
+          [restaurantId]
+        ),
+        query(
+          `SELECT COALESCE(SUM(total_amount), 0) as total FROM customer_order WHERE restaurant_id = $1 AND ${deliveredOrderStatusInSql()}`,
+          [restaurantId]
+        ),
+      ])
+      stats = {
+        totalProducts: parseInt(totalProducts[0].count),
+        totalOrders: parseInt(totalOrders[0].count),
+        pendingOrders: parseInt(pendingOrders[0].count),
+        completedOrders: parseInt(completedOrders[0].count),
+        totalSpent: parseFloat(totalSpent[0].total),
+        totalRevenue: parseFloat(totalSpent[0].total),
+      }
+    } else if (userRole === 'ADMIN') {
+      // Admin with no impersonation: platform-wide stats
+      const [
+        { rows: totalSuppliers },
+        { rows: totalRestaurants },
+        { rows: totalProducts },
+        { rows: totalOrders },
+        { rows: pendingOrders },
+        { rows: completedOrders },
+        { rows: totalRevenue },
+      ] = await Promise.all([
+        query('SELECT COUNT(*) as count FROM supplier'),
+        query('SELECT COUNT(*) as count FROM restaurant'),
+        query('SELECT COUNT(*) as count FROM product'),
+        query('SELECT COUNT(*) as count FROM customer_order'),
+        query(
+          "SELECT COUNT(*) as count FROM customer_order WHERE status IN ('PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')"
+        ),
+        query(`SELECT COUNT(*) as count FROM customer_order WHERE ${deliveredOrderStatusInSql()}`),
+        query(
+          `SELECT COALESCE(SUM(total_amount), 0) as total FROM customer_order WHERE ${deliveredOrderStatusInSql()}`
+        ),
+      ])
+      stats = {
+        totalSuppliers: parseInt(totalSuppliers[0].count),
+        totalRestaurants: parseInt(totalRestaurants[0].count),
+        totalProducts: parseInt(totalProducts[0].count),
+        totalOrders: parseInt(totalOrders[0].count),
+        pendingOrders: parseInt(pendingOrders[0].count),
+        completedOrders: parseInt(completedOrders[0].count),
+        totalRevenue: parseFloat(totalRevenue[0].total),
+      }
     }
+
+    logger.debug({
+      message: 'Dashboard response',
+      statsKeys: Object.keys(stats),
+      userRole,
+      impersonating: !!getEffectiveTenant(req),
+    })
+
+    res.json({
+      ok: true,
+      data: { stats },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error({
+      message: 'Get dashboard stats error',
+      error: error.message,
+      stack: error.stack,
+      userRole,
+    })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get dashboard statistics',
+        details: error.message,
+      },
+      requestId: req.requestId,
+    })
   }
-)
+})
 
 export { router as adminRoutes }

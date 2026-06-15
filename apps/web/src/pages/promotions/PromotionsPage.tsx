@@ -1,8 +1,5 @@
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
-import { Badge } from '../../components/ui/badge'
-import { StatusBadge } from '../../components/ui/status-badge'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { PageHeader } from '../../components/ui/page-header'
@@ -28,7 +25,7 @@ import {
 import { DealAnalyticsDialog } from '../../components/deals/DealAnalyticsDialog'
 import { SubmitDealDialog } from '../../components/deals/SubmitDealDialog'
 import { DealBoostPackagePicker } from '../../components/deals/DealBoostPackagePicker'
-import { DealBoostStatus, type BoostStatus } from '../../components/deals/DealBoostStatus'
+import { DealsStatusFilter, SupplierDealRow } from '../../components/deals/SupplierDealRow'
 import {
   DealTargetingPickers,
   type DealTargetingValue,
@@ -38,7 +35,7 @@ import { RequirePermission } from '../../components/RequirePermission'
 import { FeatureLockedCard } from '../../components/FeatureLockedCard'
 import { DealsPerformanceSummary } from '../../components/promotions/DealsPerformanceSummary'
 import { useWorkspaceRole } from '../../hooks/useWorkspaceRole'
-import { Plus, BarChart3, Send } from 'lucide-react'
+import { Plus, Send } from 'lucide-react'
 import { EmptyState } from '../../components/ui/empty-state'
 import {
   COUPON_FIELD_HELPER,
@@ -47,7 +44,6 @@ import {
   SUPPLIER_CTA_TYPES,
   SUPPLIER_DEAL_TYPES,
   SUPPLIER_EMPTY_STATE,
-  formatDealStatusLabel,
   formatDealTypeLabel,
   getCtaHelperText,
   getDealTypeHelperText,
@@ -226,61 +222,52 @@ export function PromotionsPage() {
 
         {!promotionGate.canCreate && promotionGate.limit != null ? (
           <div
-            className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            className="rounded-xl border border-[var(--amber)]/25 bg-[var(--amber-pale)] px-4 py-3 text-sm text-[var(--text)]"
             role="status"
           >
             {promotionGate.message || promotionCopy.value}
           </div>
         ) : promotionGate.limit != null ? (
-          <p className="text-sm text-[var(--text-muted)]">
-            Active deals on your plan: {promotionGate.current}/{promotionGate.limit}
+          <p className="text-sm text-[var(--text-mid)]">
+            Active deals on your plan:{' '}
+            <span className="font-medium tabular-nums text-[var(--text)]">
+              {promotionGate.current}/{promotionGate.limit}
+            </span>
           </p>
         ) : null}
 
-        <Card>
-          <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <CardTitle>{copy.listTitle}</CardTitle>
-            <div className="w-full max-w-xs shrink-0">
-              <Label htmlFor="promotion-status-filter" className="text-xs text-[var(--text-muted)]">
-                Status filter
-              </Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger id="promotion-status-filter" className="mt-1.5">
-                  <option value="">All</option>
-                  <option value="draft">Draft</option>
-                  <option value="pending_approval">Pending approval</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="approved_pending_payment">Awaiting payment</option>
-                  <option value="active">Live</option>
-                  <option value="paused">Paused</option>
-                  <option value="expired">Expired</option>
-                </SelectTrigger>
-              </Select>
+        <section className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]">
+          <div className="flex flex-col gap-4 border-b border-[var(--app-border)] px-4 py-4 sm:px-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-sm font-semibold text-[var(--text)]">{copy.listTitle}</h2>
+              {!isLoading && promotions.length > 0 ? (
+                <p className="text-xs text-[var(--text-muted)] tabular-nums">
+                  {promotions.length} deal{promotions.length === 1 ? '' : 's'}
+                </p>
+              ) : null}
             </div>
-          </CardHeader>
-          <CardContent>
-            {error ? (
-              <p className="text-sm text-[var(--red)]">
-                Could not load deals. Refresh the page or check your plan permissions.
-              </p>
-            ) : isLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex flex-col gap-3 rounded-lg border border-[var(--app-border)] p-4"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-44" />
-                        <Skeleton className="h-3 w-28" />
-                      </div>
-                      <Skeleton className="h-6 w-20" />
-                    </div>
+            <DealsStatusFilter value={statusFilter} onChange={setStatusFilter} />
+          </div>
+
+          {error ? (
+            <p className="px-4 py-8 text-sm text-[var(--red)] sm:px-5">
+              Could not load deals. Refresh the page or check your plan permissions.
+            </p>
+          ) : isLoading ? (
+            <div className="divide-y divide-[var(--app-border)]">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex gap-3 px-4 py-4 sm:px-5">
+                  <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-44" />
+                    <Skeleton className="h-3 w-28" />
                   </div>
-                ))}
-              </div>
-            ) : promotions.length === 0 ? (
+                  <Skeleton className="h-8 w-24" />
+                </div>
+              ))}
+            </div>
+          ) : promotions.length === 0 ? (
+            <div className="px-4 py-8 sm:px-5">
               <EmptyState
                 title={SUPPLIER_EMPTY_STATE.title}
                 description={SUPPLIER_EMPTY_STATE.description}
@@ -293,130 +280,39 @@ export function PromotionsPage() {
                   ) : undefined
                 }
               />
-            ) : (
-              <div className="space-y-3">
-                {promotions.map((p) => {
-                  const boostStatus = (p.boost_status as BoostStatus | undefined) || null
-                  return (
-                    <div
-                      key={String(p.id)}
-                      className="flex flex-col gap-3 rounded-lg border border-[var(--app-border)] p-4"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="font-semibold">{String(p.name)}</p>
-                          <p className="text-xs text-[var(--text-muted)]">
-                            {formatDealTypeLabel(p.type)}
-                            {p.discount_value != null
-                              ? ` · ${p.discount_value}${p.type === 'percentage_discount' ? '%' : ''}`
-                              : ''}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <StatusBadge
-                            status={String(p.status)}
-                            label={formatDealStatusLabel(p.status)}
-                          />
-                          {p.is_promoted ? <Badge variant="secondary">Sponsored</Badge> : null}
-                          {p.status === 'rejected' && p.rejection_reason ? (
-                            <p className="text-xs text-[var(--red)] w-full">
-                              Rejected: {String(p.rejection_reason)}
-                            </p>
-                          ) : null}
-                          {p.boost_pricing_key &&
-                          (p.status === 'pending_approval' ||
-                            p.status === 'pending_admin_approval') ? (
-                            <p className="text-xs text-[var(--text-muted)] w-full">
-                              Boost: ${Number(p.boost_price_snapshot || 0).toFixed(0)} ·{' '}
-                              {String(p.boost_duration_days)} day(s)
-                            </p>
-                          ) : null}
-                          {p.status === 'approved_pending_payment' && (
-                            <StatusBadge
-                              status="approved_pending_payment"
-                              label="Awaiting boost payment"
-                            />
-                          )}
-                          {p.status === 'draft' && (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setSubmitDealId(String(p.id))
-                                  setSubmitDealName(String(p.name))
-                                }}
-                              >
-                                <Send className="h-3 w-3 mr-1" /> Submit with boost
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={async () => {
-                                  await deletePromotion(String(p.id)).unwrap()
-                                  toast.success('Deleted')
-                                  refetch()
-                                }}
-                              >
-                                Delete
-                              </Button>
-                            </>
-                          )}
-                          {p.status === 'active' && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={async () => {
-                                  await pausePromotion(String(p.id)).unwrap()
-                                  toast.success('Paused')
-                                  refetch()
-                                }}
-                              >
-                                Pause
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setAnalyticsId(String(p.id))}
-                              >
-                                <BarChart3 className="h-3 w-3" />
-                              </Button>
-                            </>
-                          )}
-                          {p.status === 'paused' && (
-                            <Button
-                              size="sm"
-                              onClick={async () => {
-                                await resumePromotion(String(p.id)).unwrap()
-                                toast.success('Resumed')
-                                refetch()
-                              }}
-                            >
-                              Resume
-                            </Button>
-                          )}
-                          {(p.status === 'rejected' || p.status === 'expired') && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSubmitDealId(String(p.id))
-                                setSubmitDealName(String(p.name))
-                              }}
-                            >
-                              Boost again
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                      <DealBoostStatus boost={boostStatus} />
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          ) : (
+            <div className="divide-y divide-[var(--app-border)]">
+              {promotions.map((p) => (
+                <SupplierDealRow
+                  key={String(p.id)}
+                  promotion={p}
+                  readOnly={persona.readOnly}
+                  onSubmit={(id, name) => {
+                    setSubmitDealId(id)
+                    setSubmitDealName(name)
+                  }}
+                  onDelete={async (id) => {
+                    await deletePromotion(id).unwrap()
+                    toast.success('Deleted')
+                    refetch()
+                  }}
+                  onPause={async (id) => {
+                    await pausePromotion(id).unwrap()
+                    toast.success('Paused')
+                    refetch()
+                  }}
+                  onResume={async (id) => {
+                    await resumePromotion(id).unwrap()
+                    toast.success('Resumed')
+                    refetch()
+                  }}
+                  onAnalytics={setAnalyticsId}
+                />
+              ))}
+            </div>
+          )}
+        </section>
 
         <Dialog open={showCreate} onOpenChange={setShowCreate}>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">

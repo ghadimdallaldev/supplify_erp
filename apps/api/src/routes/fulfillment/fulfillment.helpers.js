@@ -4,6 +4,7 @@ import {
   requireRole,
   resolveTenantContext,
   getRequestTenant,
+  getSupplierIdForRequest,
   requirePermission,
 } from '../../lib/rbac.js'
 import { hasPermission } from '../../lib/permissions.js'
@@ -140,10 +141,7 @@ async function resolveSupplierId(req) {
   const tenant = await getRequestTenant(req)
   if (tenant?.tenantType === 'SUPPLIER') return tenant.tenantId
   if (req.userData.role === 'SUPPLIER') {
-    const { rows } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
-      req.userData.email,
-    ])
-    return rows[0]?.id ?? null
+    return (await getSupplierIdForRequest(req)) ?? null
   }
   return null
 }

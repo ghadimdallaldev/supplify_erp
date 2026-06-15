@@ -1,5 +1,5 @@
 import type { DashboardKpiKey } from '../../lib/workspaceRoleProfile'
-import { formatCurrency } from '../../utils/format'
+import { SummaryStrip } from '../ui/app-panel'
 import { KpiCard as UiKpiCard, type KpiTone } from '../ui/kpi-card'
 
 /** Vertical rhythm between dashboard sections (KPIs, cards row, calendar). */
@@ -62,6 +62,19 @@ export interface KpiCardProps {
   meta?: string
   sparkData: number[]
   sparkColor: string
+}
+
+export function DashboardSummaryStrip({
+  metrics,
+}: {
+  metrics: Array<{
+    label: string
+    value: string | number
+    hint?: string
+    tone?: 'default' | 'mint' | 'amber' | 'brand'
+  }>
+}) {
+  return <SummaryStrip testId="dashboard-summary" metrics={metrics} />
 }
 
 export function KpiCard({ label, value, iconBg, Icon, meta, sparkData, sparkColor }: KpiCardProps) {

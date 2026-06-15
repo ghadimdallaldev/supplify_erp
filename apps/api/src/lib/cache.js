@@ -36,14 +36,33 @@ if (config.REDIS_URL) {
   )
 }
 
+/** @returns {import('ioredis').default | null} */
+export function getRedisClient() {
+  return redisClient
+}
+
 /** @returns {boolean} */
 export function isRedisCacheEnabled() {
   return redisClient != null
 }
 
+const MEMORY_CACHE_MAX_ENTRIES = 500
 const memoryCache = new Map()
+let memoryCacheEvictionLogged = false
 
 function setMemoryCache(key, value, ttlSeconds) {
+  if (memoryCache.size >= MEMORY_CACHE_MAX_ENTRIES && !memoryCache.has(key)) {
+    const oldestKey = memoryCache.keys().next().value
+    if (oldestKey !== undefined) {
+      memoryCache.delete(oldestKey)
+      if (!memoryCacheEvictionLogged) {
+        memoryCacheEvictionLogged = true
+        logger.warn(
+          'In-memory cache reached capacity; evicting oldest entries (set REDIS_URL for shared cache)'
+        )
+      }
+    }
+  }
   const expiresAt = Date.now() + ttlSeconds * 1000
   memoryCache.set(key, { value, expiresAt })
 }

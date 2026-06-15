@@ -5,6 +5,7 @@ import { useAppDispatch } from '../hooks/redux'
 import { setUser, clearUser, setLoading } from '../features/auth/authSlice'
 import { refetchAppSession, hasStaleRegistrationState } from '../lib/refetchAppSession'
 import { needsLegalReacceptance } from '../lib/legalReacceptanceGate'
+import { getRegisterCompletePath } from '../lib/referralToken'
 import { applyAdminPreferences, clearAdminPreferences } from '../lib/adminPreferences'
 import type { ReactNode } from 'react'
 
@@ -100,7 +101,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     if (!redirectedToRegister.current) {
       redirectedToRegister.current = true
-      navigate('/register/complete', { replace: true })
+      navigate(getRegisterCompletePath(), { replace: true })
     }
   }, [
     data,

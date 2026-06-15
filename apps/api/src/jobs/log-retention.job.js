@@ -51,6 +51,24 @@ export async function runLogRetentionJob({ dryRun = false } = {}) {
       days: config.EMAIL_DIGEST_LOG_RETENTION_DAYS,
       enabled: config.EMAIL_DIGEST_LOG_RETENTION_DAYS > 0,
     },
+    {
+      key: 'reorder_ai_request_log',
+      sql: `DELETE FROM reorder_ai_request_log WHERE created_at < NOW() - ($1::int || ' days')::interval`,
+      days: 90,
+      enabled: true,
+    },
+    {
+      key: 'catalog_image_import_job',
+      sql: `DELETE FROM catalog_image_import_job WHERE created_at < NOW() - ($1::int || ' days')::interval AND status IN ('completed', 'failed', 'cancelled')`,
+      days: 90,
+      enabled: true,
+    },
+    {
+      key: 'catalog_product_import_job',
+      sql: `DELETE FROM catalog_product_import_job WHERE created_at < NOW() - ($1::int || ' days')::interval AND status IN ('completed', 'failed', 'cancelled')`,
+      days: 90,
+      enabled: true,
+    },
   ]
 
   for (const task of tasks) {

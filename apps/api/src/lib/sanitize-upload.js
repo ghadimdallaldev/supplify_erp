@@ -1,4 +1,5 @@
 import path from 'node:path'
+import sharp from 'sharp'
 
 const MAX_FILENAME_LENGTH = 200
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -32,6 +33,43 @@ export function assertFileExtensionMatchesMime(fileName, mimeType) {
   const ext = path.extname(String(fileName || '')).toLowerCase()
   if (!ext || !allowed.includes(ext)) {
     throw new Error('File extension does not match content type')
+  }
+}
+
+const MIME_TO_SHARP_FORMAT = {
+  'image/jpeg': 'jpeg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+}
+
+/**
+ * Validate uploaded image bytes match declared MIME (magic-byte check via sharp).
+ * No-op for non-image content types (e.g. PDF).
+ */
+export async function assertImageUploadBytes(buffer, contentType) {
+  if (!contentType || !String(contentType).startsWith('image/')) {
+    return
+  }
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    throw Object.assign(new Error('Invalid or empty image data'), { name: 'UPLOAD_INVALID_IMAGE' })
+  }
+
+  let metadata
+  try {
+    metadata = await sharp(buffer, { failOn: 'error' }).metadata()
+  } catch {
+    throw Object.assign(new Error('Invalid image file'), { name: 'UPLOAD_INVALID_IMAGE' })
+  }
+
+  if (!metadata.width || !metadata.height) {
+    throw Object.assign(new Error('Invalid image file'), { name: 'UPLOAD_INVALID_IMAGE' })
+  }
+
+  const expectedFormat = MIME_TO_SHARP_FORMAT[contentType]
+  if (expectedFormat && metadata.format !== expectedFormat) {
+    throw Object.assign(new Error('Image content does not match declared type'), {
+      name: 'UPLOAD_INVALID_IMAGE',
+    })
   }
 }
 

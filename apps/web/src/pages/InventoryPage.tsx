@@ -20,10 +20,10 @@ import {
 } from '../services/api'
 import { RequirePermission } from '../components/RequirePermission'
 import { usePermissions } from '../hooks/usePermissions'
-import { formatNumber } from '../utils/format'
-import { KpiCard } from '../components/ui/kpi-card'
-import { PageHeader } from '../components/ui/page-header'
+import { SummaryStrip } from '../components/ui/app-panel'
 import { PageShell } from '../components/ui/page-shell'
+import { PageHeader } from '../components/ui/page-header'
+import { formatNumber } from '../utils/format'
 import { EmptyState } from '../components/ui/empty-state'
 import { StatusBadge } from '../components/ui/status-badge'
 import { Skeleton } from '../components/ui/skeleton'
@@ -194,35 +194,39 @@ export function InventoryPage() {
           }
         />
 
-        {/* KPI summary */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard label="Total Products" value={inventory.length} icon={Package} tone="brand" />
-          <KpiCard
-            label="Reserved"
-            value={formatNumber(
-              inventory.reduce(
-                (sum: number, item: any) => sum + parseFloat(item.reserved_qty || 0),
-                0
+        <SummaryStrip
+          testId="inventory-summary"
+          metrics={[
+            { label: 'Total products', value: inventory.length },
+            {
+              label: 'Reserved',
+              value: formatNumber(
+                inventory.reduce(
+                  (sum: number, item: any) => sum + parseFloat(item.reserved_qty || 0),
+                  0
+                ),
+                { maximumFractionDigits: 1 }
               ),
-              { maximumFractionDigits: 1 }
-            )}
-            icon={Warehouse}
-            tone="warning"
-          />
-          <KpiCard label="Low Stock" value={lowStockCount} icon={AlertTriangle} tone="danger" />
-          <KpiCard
-            label="Available"
-            value={formatNumber(
-              inventory.reduce(
-                (sum: number, item: any) => sum + parseFloat(item.available_qty || 0),
-                0
+              tone: 'amber',
+            },
+            {
+              label: 'Low stock',
+              value: lowStockCount,
+              tone: lowStockCount > 0 ? 'danger' : 'default',
+            },
+            {
+              label: 'Available',
+              value: formatNumber(
+                inventory.reduce(
+                  (sum: number, item: any) => sum + parseFloat(item.available_qty || 0),
+                  0
+                ),
+                { maximumFractionDigits: 1 }
               ),
-              { maximumFractionDigits: 1 }
-            )}
-            icon={TrendingUp}
-            tone="success"
-          />
-        </div>
+              tone: 'mint',
+            },
+          ]}
+        />
 
         {/* Main inventory table */}
         {!showWarehouseView && (

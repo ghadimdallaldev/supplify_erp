@@ -13,6 +13,7 @@ import { AuthGuard } from './components/AuthGuard'
 import { StaffPortalGuard } from './components/StaffPortalGuard'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
+import { RegisterPage } from './pages/RegisterPage'
 import { RegisterCompletePage } from './pages/RegisterCompletePage'
 import { LegalReacceptPage } from './pages/LegalReacceptPage'
 import { InviteAcceptPage } from './pages/InviteAcceptPage'
@@ -256,6 +257,10 @@ const router = createBrowserRouter([
   {
     path: '/auth/register',
     element: <OAuthRedirect flow="register" />,
+  },
+  {
+    path: '/register',
+    element: <RegisterPage />,
   },
   {
     path: '/reserve/confirmation',

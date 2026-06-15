@@ -20,6 +20,7 @@ import {
   isLegalAcceptanceComplete,
 } from '../components/legal/LegalAcceptancePanel'
 import { buildLegalAcceptancePayload, type LegalDocumentSlug } from '../lib/legalDocuments'
+import { clearReferralToken } from '../lib/referralToken'
 
 type AccountType = 'RESTAURANT' | 'SUPPLIER'
 
@@ -120,6 +121,7 @@ export function RegisterCompletePage() {
         referralToken,
         legalAcceptance: buildLegalAcceptancePayload(acceptedLegal),
       }).unwrap()
+      clearReferralToken()
       void refetchAppSession(dispatch)
       navigate('/app/activate', { replace: true })
     } catch (err: unknown) {
