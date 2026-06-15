@@ -102,6 +102,45 @@ async function attachBillingSubscriptionFields(rows, tenantType) {
   }
 }
 
+async function buildSupplierListSelectFields() {
+  const [hasSlug, hasContactEmail, hasPhone, hasLogoUrl, hasAccountStatus] = await Promise.all([
+    columnExists('supplier', 'slug'),
+    columnExists('supplier', 'contact_email'),
+    columnExists('supplier', 'phone'),
+    columnExists('supplier', 'logo_url'),
+    columnExists('supplier', 'account_status'),
+  ])
+
+  return {
+    slugSelect: hasSlug ? 's.slug,' : 'NULL::text AS slug,',
+    contactEmailSelect: hasContactEmail ? 's.contact_email,' : 'NULL::text AS contact_email,',
+    phoneSelect: hasPhone ? 's.phone,' : 'NULL::text AS phone,',
+    logoUrlSelect: hasLogoUrl ? 's.logo_url,' : 'NULL::text AS logo_url,',
+    accountStatusSelect: hasAccountStatus ? 's.account_status,' : 'NULL::text AS account_status,',
+  }
+}
+
+async function buildRestaurantListSelectFields() {
+  const [hasSlug, hasContactEmail, hasPhone, hasLogoUrl, hasBusinessType, hasAccountStatus] =
+    await Promise.all([
+      columnExists('restaurant', 'slug'),
+      columnExists('restaurant', 'contact_email'),
+      columnExists('restaurant', 'phone'),
+      columnExists('restaurant', 'logo_url'),
+      columnExists('restaurant', 'business_type'),
+      columnExists('restaurant', 'account_status'),
+    ])
+
+  return {
+    slugSelect: hasSlug ? 'r.slug,' : 'NULL::text AS slug,',
+    contactEmailSelect: hasContactEmail ? 'r.contact_email,' : 'NULL::text AS contact_email,',
+    phoneSelect: hasPhone ? 'r.phone,' : 'NULL::text AS phone,',
+    logoUrlSelect: hasLogoUrl ? 'r.logo_url,' : 'NULL::text AS logo_url,',
+    businessTypeSelect: hasBusinessType ? 'r.business_type,' : 'NULL::text AS business_type,',
+    accountStatusSelect: hasAccountStatus ? 'r.account_status,' : 'NULL::text AS account_status,',
+  }
+}
+
 // Get suppliers with detailed info
 router.get('/tenants/suppliers', async (req, res) => {
   try {
@@ -109,16 +148,19 @@ router.get('/tenants/suppliers', async (req, res) => {
     const { rows: countRows } = await query(`SELECT COUNT(*)::int AS total FROM supplier`)
     const total = countRows[0]?.total ?? 0
 
+    const { slugSelect, contactEmailSelect, phoneSelect, logoUrlSelect, accountStatusSelect } =
+      await buildSupplierListSelectFields()
+
     const { rows: suppliers } = await query(
       `
       SELECT 
         s.id,
         s.name,
-        s.slug,
-        s.contact_email,
-        s.phone,
-        s.logo_url,
-        s.account_status,
+        ${slugSelect}
+        ${contactEmailSelect}
+        ${phoneSelect}
+        ${logoUrlSelect}
+        ${accountStatusSelect}
         s.created_at,
         s.updated_at,
         sub.status as subscription_status,
@@ -197,17 +239,26 @@ router.get('/tenants/restaurants', async (req, res) => {
     const { rows: countRows } = await query(`SELECT COUNT(*)::int AS total FROM restaurant`)
     const total = countRows[0]?.total ?? 0
 
+    const {
+      slugSelect,
+      contactEmailSelect,
+      phoneSelect,
+      logoUrlSelect,
+      businessTypeSelect,
+      accountStatusSelect,
+    } = await buildRestaurantListSelectFields()
+
     const { rows: restaurants } = await query(
       `
       SELECT 
         r.id,
         r.name,
-        r.slug,
-        r.contact_email,
-        r.phone,
-        r.logo_url,
-        r.business_type,
-        r.account_status,
+        ${slugSelect}
+        ${contactEmailSelect}
+        ${phoneSelect}
+        ${logoUrlSelect}
+        ${businessTypeSelect}
+        ${accountStatusSelect}
         r.created_at,
         r.updated_at,
         sub.status as subscription_status,

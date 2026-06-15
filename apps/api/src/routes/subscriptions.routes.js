@@ -41,6 +41,14 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
         }
       : await getRequestTenant(req)
     if (!tenant) {
+      if (req.userData.role === 'ADMIN') {
+        return res.json({
+          ok: true,
+          data: { entitlements: null },
+          error: null,
+          requestId: req.requestId,
+        })
+      }
       return res.status(404).json({
         ok: false,
         data: null,

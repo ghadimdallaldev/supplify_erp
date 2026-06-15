@@ -175,14 +175,27 @@ router.get('/health', async (req, res) => {
 
     try {
       const { rows } = await query(
-        `SELECT type, severity, source, payload, created_at FROM system_event WHERE severity = 'error' ORDER BY created_at DESC LIMIT 50`
+        `SELECT id, type, severity, source, payload, created_at FROM system_event WHERE severity = 'error' ORDER BY created_at DESC LIMIT 50`
       )
-      recentErrors = rows.map((r) => ({
-        type: r.type,
-        source: r.source,
-        message: r.payload?.message,
-        created_at: r.created_at,
-      }))
+      recentErrors = rows.map((r) => {
+        const payload = r.payload || {}
+        return {
+          id: r.id,
+          type: r.type,
+          severity: r.severity,
+          source: r.source,
+          message: payload.message,
+          createdAt: r.created_at,
+          method: payload.method,
+          statusCode: payload.statusCode,
+          errorName: payload.errorName,
+          requestId: payload.requestId,
+          userId: payload.userId,
+          role: payload.role,
+          tenantId: payload.tenantId,
+          tenantType: payload.tenantType,
+        }
+      })
     } catch (e) {
       if (e.code !== '42P01') throw e
     }

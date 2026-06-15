@@ -30,8 +30,11 @@ function applyBrandingVars(branding: TenantBranding | null) {
 }
 
 export function TenantBrandingProvider({ children }: { children: ReactNode }) {
-  const { isEffectiveRestaurant, isEffectiveSupplier } = useImpersonation()
-  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const { isEffectiveRestaurant, isEffectiveSupplier, shouldLoadTenantEntitlements } =
+    useImpersonation()
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
+    skip: !shouldLoadTenantEntitlements,
+  })
   const brandingEnabled = canUseCustomBranding(entitlementsData?.entitlements)
 
   const tenantType = isEffectiveRestaurant
