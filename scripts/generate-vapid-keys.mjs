@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generate Web Push VAPID keys and write deploy/env/.env.vapid (gitignored).
+ * Generate Web Push VAPID keys and write docker/.env.vapid (gitignored).
  *
  * Usage:
  *   pnpm vapid:generate
@@ -13,7 +13,7 @@ import { createRequire } from 'node:module'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname, '..')
-const outFile = resolve(root, 'deploy/env/.env.vapid')
+const outFile = resolve(root, 'docker/.env.vapid')
 const require = createRequire(resolve(root, 'apps/api/package.json'))
 const webpush = require('web-push')
 
@@ -45,8 +45,7 @@ VAPID_EMAIL=${email}
   writeFileSync(outFile, body, 'utf8')
   console.log(`Wrote ${outFile}`)
   console.log('\nNext:')
-  console.log('  Local Docker/EC2: keys merge via deploy/scripts/deploy-*.sh')
-  console.log('  Railway:          railway link && pnpm railway:vapid:sync -- development')
+  console.log('  Railway: pnpm railway:vapid:sync -- development')
   console.log('\nPublic key (for verification):')
   console.log(keys.publicKey)
 }

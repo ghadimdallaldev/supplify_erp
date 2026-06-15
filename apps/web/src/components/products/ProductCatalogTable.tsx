@@ -11,6 +11,10 @@ type ProductCatalogTableProps = {
   onAdjustStock: (product: any) => void
 }
 
+const thClass =
+  'border-b border-[var(--app-border)] px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]'
+const tdClass = 'border-b border-[var(--app-border)] px-4 py-4 align-middle'
+
 export function ProductCatalogTable({
   filteredProducts,
   isSupplier,
@@ -23,7 +27,7 @@ export function ProductCatalogTable({
 
   return (
     <>
-      <div className="divide-y md:hidden">
+      <div className="divide-y divide-[var(--app-border)] md:hidden">
         {filteredProducts?.map((product) => (
           <ProductCatalogRow
             key={product.id}
@@ -37,32 +41,20 @@ export function ProductCatalogTable({
           />
         ))}
       </div>
-      <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[640px]">
-          <thead className="border-b border-[var(--app-border)] bg-[var(--bg)]">
+      <div className="hidden md:block">
+        <table className="w-full min-w-[640px] border-collapse">
+          <thead className="bg-[var(--brand-ultra)]/80">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                Product
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                Category
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                Supplier
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                Price
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                Stock
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                Actions
-              </th>
+              <th className={thClass}>Product</th>
+              <th className={thClass}>Category</th>
+              <th className={thClass}>Supplier</th>
+              <th className={thClass}>Price</th>
+              <th className={thClass}>Stock</th>
+              <th className={thClass}>Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[var(--app-border)]">
-            {filteredProducts?.map((product) => (
+          <tbody>
+            {filteredProducts?.map((product, index) => (
               <ProductCatalogRow
                 key={product.id}
                 product={product}
@@ -72,6 +64,8 @@ export function ProductCatalogTable({
                 onToggleFavorite={onToggleFavorite}
                 onAdjustStock={onAdjustStock}
                 layout="table"
+                isLastRow={index === (filteredProducts?.length ?? 0) - 1}
+                cellClassName={tdClass}
               />
             ))}
           </tbody>

@@ -8,8 +8,6 @@
     "build": "pnpm --filter @supplify/api build && pnpm --filter @supplify/web build",
     "db:migrate": "node apps/api/scripts/migrate.js",
     "db:sync-roles": "node apps/api/scripts/sync-system-roles.mjs",
-    "deploy:prod": "bash deploy/scripts/deploy-prod.sh",
-    "docker:prod:up": "docker compose --env-file deploy/env/.env.prod -f deploy/docker-compose.prod.yml up -d",
     "setup": "node scripts/ensure-pnpm.mjs && node scripts/pnpm-run.mjs install"
   },
   "engines": {

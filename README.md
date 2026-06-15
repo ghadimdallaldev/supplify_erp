@@ -6,10 +6,6 @@ Deploy-only branch — **do not develop here**. On `dev`: `node scripts/promote-
 node scripts/promote-release.mjs --tier prod
 ```
 
-## Deploy (EC2 Docker)
+## Deploy (Railway)
 
-```bash
-sudo ./deploy/scripts/deploy-prod.sh
-```
-
-Migrations run automatically during deploy. Branching guide: see `docs/BRANCHING.md` on the `dev` branch.
+Push to this branch triggers Railway deploy for the matching environment. See `docs/operations/railway-environments.md` on the `dev` branch.
