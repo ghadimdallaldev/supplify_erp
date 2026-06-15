@@ -1,21 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
-import { KpiCard } from '../components/ui/kpi-card'
 import { SettingsHubLayout } from '../components/settings/SettingsHubLayout'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
-import {
-  Building2,
-  Users,
-  CreditCard,
-  Settings,
-  FileText,
-  ShoppingCart,
-  Package,
-  DollarSign,
-  Clock,
-  Star,
-} from 'lucide-react'
+import { Activity, Bell, Building2, CreditCard, MapPin, Star, Users } from 'lucide-react'
 import { formatCurrency } from '../utils/format'
 import {
   useGetRestaurantMeQuery,
@@ -30,6 +18,7 @@ import { LazyTabMount } from '../components/LazyTabMount'
 import {
   OnboardingTabLoading,
   RESTAURANT_ONBOARDING_TABS,
+  RestaurantSettingsSummary,
 } from '../components/restaurant/onboarding/onboardingShared'
 import {
   LazyOnboardingActivityTab,
@@ -94,75 +83,57 @@ export function RestaurantOnboardingPage() {
     return <DetailPageSkeleton rows={6} />
   }
 
+  const restaurantName = restaurantData?.restaurant?.name
+
   return (
     <SettingsHubLayout
-      title="Account Setup"
-      description="Complete your business profile and preferences"
+      title="Settings"
+      description={
+        restaurantName
+          ? `Manage profile, team, branches, and plan for ${restaurantName}.`
+          : 'Manage your restaurant profile, team, branches, plan, and notifications.'
+      }
       stats={
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <KpiCard
-            label="Total Orders"
-            value={statistics.totalOrders}
-            description="All orders"
-            icon={ShoppingCart}
-            tone="brand"
-          />
-          <KpiCard
-            label="Completed Orders"
-            value={statistics.completedOrders}
-            description="Received"
-            icon={Package}
-            tone="success"
-          />
-          <KpiCard
-            label="Pending Orders"
-            value={statistics.pendingOrders}
-            description="In progress"
-            icon={Clock}
-            tone="warning"
-          />
-          <KpiCard
-            label="Total Spent"
-            value={formatCurrency(statistics.totalSpent)}
-            description="All-time"
-            icon={DollarSign}
-            tone="brand"
-          />
-        </div>
+        <RestaurantSettingsSummary
+          totalOrders={statistics.totalOrders}
+          completedOrders={statistics.completedOrders}
+          pendingOrders={statistics.pendingOrders}
+          totalSpent={formatCurrency(statistics.totalSpent)}
+        />
       }
     >
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="justify-start">
-          <TabsTrigger value="profile">
-            <Building2 className="mr-0 h-4 w-4 sm:mr-2" />
+        <TabsList className="tabs-scroll h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
+          <TabsTrigger value="profile" className="gap-1.5 text-xs sm:text-sm">
+            <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
             Profile
           </TabsTrigger>
-          <TabsTrigger value="team">
-            <Users className="mr-0 h-4 w-4 sm:mr-2" />
+          <TabsTrigger value="team" className="gap-1.5 text-xs sm:text-sm">
+            <Users className="h-3.5 w-3.5 shrink-0" aria-hidden />
             Team
           </TabsTrigger>
-          <TabsTrigger value="branches">
-            <FileText className="mr-0 h-4 w-4 sm:mr-2" />
+          <TabsTrigger value="branches" className="gap-1.5 text-xs sm:text-sm">
+            <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
             Branches
           </TabsTrigger>
-          <TabsTrigger value="subscription">
-            <CreditCard className="mr-0 h-4 w-4 sm:mr-2" />
+          <TabsTrigger value="subscription" className="gap-1.5 text-xs sm:text-sm">
+            <CreditCard className="h-3.5 w-3.5 shrink-0" aria-hidden />
             <span className="hidden sm:inline">Subscription</span>
             <span className="sm:hidden">Plan</span>
           </TabsTrigger>
-          <TabsTrigger value="notifications">
-            <Settings className="mr-0 h-4 w-4 sm:mr-2" />
+          <TabsTrigger value="notifications" className="gap-1.5 text-xs sm:text-sm">
+            <Bell className="h-3.5 w-3.5 shrink-0" aria-hidden />
             <span className="hidden sm:inline">Notifications</span>
             <span className="sm:hidden">Alerts</span>
           </TabsTrigger>
-          {isOwner && tenantAuditEnabled && (
-            <TabsTrigger value="activity">
-              <FileText className="mr-0 h-4 w-4 sm:mr-2" />
+          {isOwner && tenantAuditEnabled ? (
+            <TabsTrigger value="activity" className="gap-1.5 text-xs sm:text-sm">
+              <Activity className="h-3.5 w-3.5 shrink-0" aria-hidden />
               Activity
             </TabsTrigger>
-          )}
-          <TabsTrigger value="reviews">
-            <Star className="mr-0 h-4 w-4 sm:mr-2" />
+          ) : null}
+          <TabsTrigger value="reviews" className="gap-1.5 text-xs sm:text-sm">
+            <Star className="h-3.5 w-3.5 shrink-0" aria-hidden />
             Reviews
           </TabsTrigger>
         </TabsList>
@@ -205,7 +176,7 @@ export function RestaurantOnboardingPage() {
           </LazyTabMount>
         </TabsContent>
 
-        {isOwner && tenantAuditEnabled && (
+        {isOwner && tenantAuditEnabled ? (
           <TabsContent value="activity" className="space-y-4">
             <LazyTabMount
               tab="activity"
@@ -215,7 +186,7 @@ export function RestaurantOnboardingPage() {
               <LazyOnboardingActivityTab />
             </LazyTabMount>
           </TabsContent>
-        )}
+        ) : null}
 
         <TabsContent value="reviews" className="space-y-4">
           <LazyTabMount tab="reviews" selectedTab={activeTab} fallback={<OnboardingTabLoading />}>

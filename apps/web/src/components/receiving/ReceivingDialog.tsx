@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Star } from 'lucide-react'
-import { Card } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
@@ -67,8 +66,11 @@ export function ReceivingDialog({
 
         <div className="space-y-6">
           <div>
-            <Label>Items Received</Label>
-            <div className="space-y-3 mt-2">
+            <p className="text-sm font-semibold text-[var(--text)]">Line items</p>
+            <p className="mt-0.5 text-xs text-[var(--text-mid)]">
+              Enter received quantities and quality for each product.
+            </p>
+            <div className="mt-3 divide-y divide-[var(--app-border)] overflow-hidden rounded-xl border border-[var(--app-border)]">
               {order.items.map((item: any) => {
                 const unit = item.unit
                 const ordered = Number(item.ordered_quantity ?? 0)
@@ -80,139 +82,173 @@ export function ReceivingDialog({
                     : snapQuantityToUnit(ordered, unit)
 
                 return (
-                  <Card key={item.id} className="p-4">
-                    <div className="space-y-3">
+                  <div key={item.id} className="space-y-3 bg-[var(--surface)] p-4">
+                    <div>
+                      <p className="font-medium text-[var(--text)]">{item.product_name}</p>
+                      <p className="text-xs text-[var(--text-mid)]">SKU: {item.sku}</p>
+                      <p className="text-xs text-[var(--text-mid)]">
+                        Ordered: {ordered} {unit}
+                        {qtyRules.allowDecimals ? ` (step ${qtyRules.step})` : ' (whole units)'}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
-                        <p className="font-medium">{item.product_name}</p>
-                        <p className="text-sm text-[var(--text-muted)]">SKU: {item.sku}</p>
-                        <p className="text-sm text-[var(--text-muted)]">
-                          Ordered: {ordered} {unit}
-                          {qtyRules.allowDecimals ? ` (step ${qtyRules.step})` : ' (whole units)'}
-                        </p>
+                        <Label
+                          htmlFor={`received_${item.id}`}
+                          className="text-xs font-medium text-[var(--text-mid)]"
+                        >
+                          Received qty
+                        </Label>
+                        <Input
+                          id={`received_${item.id}`}
+                          type="number"
+                          step={qtyRules.step}
+                          min={qtyRules.min}
+                          max={ordered}
+                          inputMode={qtyRules.allowDecimals ? 'decimal' : 'numeric'}
+                          value={receivedValue}
+                          onChange={(e) => {
+                            const parsed = parseFloat(e.target.value)
+                            if (Number.isNaN(parsed)) return
+                            setFormData({
+                              ...formData,
+                              [receivedKey]: normalizeReceivedQuantity(parsed, ordered, unit),
+                            })
+                          }}
+                        />
                       </div>
-                      <div className="border-t pt-3 mt-3">
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <div>
-                            <Label htmlFor={`received_${item.id}`}>Received Qty</Label>
-                            <Input
-                              id={`received_${item.id}`}
-                              type="number"
-                              step={qtyRules.step}
-                              min={qtyRules.min}
-                              max={ordered}
-                              inputMode={qtyRules.allowDecimals ? 'decimal' : 'numeric'}
-                              value={receivedValue}
-                              onChange={(e) => {
-                                const parsed = parseFloat(e.target.value)
-                                if (Number.isNaN(parsed)) return
-                                setFormData({
-                                  ...formData,
-                                  [receivedKey]: normalizeReceivedQuantity(parsed, ordered, unit),
-                                })
-                              }}
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor={`quality_${item.id}`}>Quality Status</Label>
-                            <Select
-                              value={String(formData[`quality_${item.id}`] ?? 'ACCEPTED')}
-                              onValueChange={(value) =>
-                                setFormData({
-                                  ...formData,
-                                  [`quality_${item.id}`]: value,
-                                })
-                              }
-                            >
-                              <SelectTrigger id={`quality_${item.id}`}>
-                                <option value="ACCEPTED">Accepted</option>
-                                <option value="DAMAGED">Damaged</option>
-                                <option value="EXPIRED">Expired</option>
-                                <option value="WRONG_ITEM">Wrong Item</option>
-                                <option value="SHORT">Short</option>
-                              </SelectTrigger>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label htmlFor={`notes_${item.id}`}>Notes (Optional)</Label>
-                            <Input
-                              id={`notes_${item.id}`}
-                              onChange={(e) =>
-                                setFormData({ ...formData, [`notes_${item.id}`]: e.target.value })
-                              }
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor={`expiry_${item.id}`}>Expiry date (optional)</Label>
-                            <Input
-                              id={`expiry_${item.id}`}
-                              type="date"
-                              onChange={(e) =>
-                                setFormData({ ...formData, [`expiry_${item.id}`]: e.target.value })
-                              }
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor={`batch_${item.id}`}>Batch / lot #</Label>
-                            <Input
-                              id={`batch_${item.id}`}
-                              onChange={(e) =>
-                                setFormData({ ...formData, [`batch_${item.id}`]: e.target.value })
-                              }
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor={`storage_${item.id}`}>Storage location</Label>
-                            <Input
-                              id={`storage_${item.id}`}
-                              onChange={(e) =>
-                                setFormData({ ...formData, [`storage_${item.id}`]: e.target.value })
-                              }
-                            />
-                          </div>
-                        </div>
+                      <div>
+                        <Label
+                          htmlFor={`quality_${item.id}`}
+                          className="text-xs font-medium text-[var(--text-mid)]"
+                        >
+                          Quality status
+                        </Label>
+                        <Select
+                          value={String(formData[`quality_${item.id}`] ?? 'ACCEPTED')}
+                          onValueChange={(value) =>
+                            setFormData({
+                              ...formData,
+                              [`quality_${item.id}`]: value,
+                            })
+                          }
+                        >
+                          <SelectTrigger id={`quality_${item.id}`}>
+                            <option value="ACCEPTED">Accepted</option>
+                            <option value="DAMAGED">Damaged</option>
+                            <option value="EXPIRED">Expired</option>
+                            <option value="WRONG_ITEM">Wrong Item</option>
+                            <option value="SHORT">Short</option>
+                          </SelectTrigger>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label
+                          htmlFor={`notes_${item.id}`}
+                          className="text-xs font-medium text-[var(--text-mid)]"
+                        >
+                          Notes (optional)
+                        </Label>
+                        <Input
+                          id={`notes_${item.id}`}
+                          onChange={(e) =>
+                            setFormData({ ...formData, [`notes_${item.id}`]: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label
+                          htmlFor={`expiry_${item.id}`}
+                          className="text-xs font-medium text-[var(--text-mid)]"
+                        >
+                          Expiry date (optional)
+                        </Label>
+                        <Input
+                          id={`expiry_${item.id}`}
+                          type="date"
+                          onChange={(e) =>
+                            setFormData({ ...formData, [`expiry_${item.id}`]: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label
+                          htmlFor={`batch_${item.id}`}
+                          className="text-xs font-medium text-[var(--text-mid)]"
+                        >
+                          Batch / lot #
+                        </Label>
+                        <Input
+                          id={`batch_${item.id}`}
+                          onChange={(e) =>
+                            setFormData({ ...formData, [`batch_${item.id}`]: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label
+                          htmlFor={`storage_${item.id}`}
+                          className="text-xs font-medium text-[var(--text-mid)]"
+                        >
+                          Storage location
+                        </Label>
+                        <Input
+                          id={`storage_${item.id}`}
+                          onChange={(e) =>
+                            setFormData({ ...formData, [`storage_${item.id}`]: e.target.value })
+                          }
+                        />
                       </div>
                     </div>
-                  </Card>
+                  </div>
                 )
               })}
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="qualityScore">Overall Quality Score</Label>
-            <div className="flex items-center gap-2 mt-2">
-              {[1, 2, 3, 4, 5].map((score) => (
-                <Button
-                  key={score}
-                  type="button"
-                  variant={formData.qualityScore === score ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFormData({ ...formData, qualityScore: score })}
-                >
-                  <Star
-                    className={`h-4 w-4 ${formData.qualityScore === score ? 'fill-yellow-400' : ''}`}
-                  />
-                </Button>
-              ))}
+          <div className="rounded-xl border border-[var(--app-border)] bg-[var(--brand-ultra)]/40 p-4 space-y-4">
+            <div>
+              <Label htmlFor="qualityScore" className="text-sm font-semibold text-[var(--text)]">
+                Overall quality score
+              </Label>
+              <div className="flex items-center gap-2 mt-2">
+                {[1, 2, 3, 4, 5].map((score) => (
+                  <Button
+                    key={score}
+                    type="button"
+                    variant={formData.qualityScore === score ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setFormData({ ...formData, qualityScore: score })}
+                  >
+                    <Star
+                      className={`h-4 w-4 ${formData.qualityScore === score ? 'fill-yellow-400' : ''}`}
+                    />
+                  </Button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div>
-            <Label htmlFor="qualityNotes">Quality Notes</Label>
-            <Textarea
-              id="qualityNotes"
-              placeholder="Enter any quality observations..."
-              onChange={(e) => setFormData({ ...formData, qualityNotes: e.target.value })}
-            />
-          </div>
+            <div>
+              <Label htmlFor="qualityNotes" className="text-xs font-medium text-[var(--text-mid)]">
+                Quality notes
+              </Label>
+              <Textarea
+                id="qualityNotes"
+                placeholder="Enter any quality observations..."
+                onChange={(e) => setFormData({ ...formData, qualityNotes: e.target.value })}
+              />
+            </div>
 
-          <div>
-            <Label htmlFor="deliveryNotes">Delivery Notes</Label>
-            <Textarea
-              id="deliveryNotes"
-              placeholder="Enter delivery notes (truck number, driver, etc.)..."
-              onChange={(e) => setFormData({ ...formData, deliveryNotes: e.target.value })}
-            />
+            <div>
+              <Label htmlFor="deliveryNotes" className="text-xs font-medium text-[var(--text-mid)]">
+                Delivery notes
+              </Label>
+              <Textarea
+                id="deliveryNotes"
+                placeholder="Enter delivery notes (truck number, driver, etc.)..."
+                onChange={(e) => setFormData({ ...formData, deliveryNotes: e.target.value })}
+              />
+            </div>
           </div>
         </div>
 

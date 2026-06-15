@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom'
 import { ClipboardList } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Input } from '../ui/input'
@@ -65,15 +64,20 @@ export function FulfillmentPickListsTab() {
   }, [ordersData, search])
 
   return (
-    <Card data-testid="fulfillment-picklists-tab">
-      <CardHeader>
+    <section
+      data-testid="fulfillment-picklists-tab"
+      className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]"
+    >
+      <header className="border-b border-[var(--app-border)] px-4 py-4 sm:px-5">
         <div className={splitRowClass}>
           <div className="min-w-0">
-            <CardTitle className="flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 shrink-0" />
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+              <ClipboardList className="h-4 w-4 shrink-0 text-[var(--brand-mid)]" aria-hidden />
               Pick Lists
-            </CardTitle>
-            <CardDescription>Orders ready for warehouse picking</CardDescription>
+            </h2>
+            <p className="mt-0.5 text-xs text-[var(--text-mid)]">
+              Orders ready for warehouse picking
+            </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             {(warehousesData?.warehouses?.length ?? 0) > 0 && (
@@ -99,8 +103,8 @@ export function FulfillmentPickListsTab() {
             />
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
+      </header>
+      <div className="p-4 sm:p-5">
         {isLoading ? (
           <div className="space-y-3" data-testid="picklists-loading">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -122,19 +126,22 @@ export function FulfillmentPickListsTab() {
           </div>
         ) : pickOrders.length === 0 ? (
           <div
-            className="py-10 text-center text-sm text-[var(--text-muted)]"
+            className="rounded-xl border border-dashed border-[var(--app-border)] bg-[var(--brand-ultra)] py-12 text-center"
             data-testid="picklists-empty"
           >
-            No orders ready for picking. Orders appear here when they reach processing or shipped
-            status.
+            <ClipboardList className="mx-auto mb-3 h-9 w-9 text-[var(--text-muted)]" aria-hidden />
+            <p className="text-sm font-medium text-[var(--text)]">No orders ready for picking</p>
+            <p className="mt-1 text-xs text-[var(--text-mid)]">
+              Orders appear here when they reach processing or shipped status.
+            </p>
           </div>
         ) : (
           <>
             <div className="space-y-3 md:hidden" data-testid="picklists-cards">
               {pickOrders.map((order) => (
-                <div
+                <article
                   key={order.id}
-                  className="rounded-lg border border-[var(--app-border)] p-4 space-y-3"
+                  className="rounded-xl border border-[var(--app-border)] p-4 space-y-3"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
@@ -164,7 +171,7 @@ export function FulfillmentPickListsTab() {
                   <Button variant="outline" size="sm" className="w-full" asChild>
                     <Link to={`/app/orders/${order.id}`}>Open order</Link>
                   </Button>
-                </div>
+                </article>
               ))}
             </div>
             <div className="hidden overflow-x-auto -mx-1 px-1 md:block">
@@ -208,7 +215,7 @@ export function FulfillmentPickListsTab() {
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }

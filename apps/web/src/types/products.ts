@@ -10,11 +10,13 @@ export interface Product {
   brand?: string
   category?: string
   image_url?: string
+  image_thumb_url?: string
   unit?: string
   created_at: string
   updated_at: string
   supplier_name?: string
   supplier_slug?: string
+  supplier_email?: string
   available_qty?: number
   current_price?: number
   currency?: string
@@ -39,6 +41,7 @@ export interface CreateProductRequest {
   brand?: string
   category?: string
   image_url?: string
+  image_thumb_url?: string
   unit?: string
   supplier_id?: string
   warehouse_id?: string
@@ -55,6 +58,7 @@ export interface UpdateProductRequest {
   brand?: string
   category?: string
   image_url?: string
+  image_thumb_url?: string
   unit?: string
 }
 
@@ -67,13 +71,15 @@ export interface ProductFilters {
   favoritesOnly?: boolean
   limit?: number
   offset?: number
+  cursor?: string
 }
 
 export interface ProductsResponse {
   products: Product[]
   pagination: {
-    total: number
+    total: number | null
     limit: number
-    offset: number
+    offset: number | null
+    nextCursor?: string | null
   }
 }

@@ -1,3 +1,4 @@
+import { Filter } from 'lucide-react'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
@@ -28,13 +29,17 @@ export function FulfillmentDispatchFilters({ filters, onChange, onClear, drivers
   return (
     <div
       data-testid="fulfillment-dispatch-filters"
-      className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 sm:p-4"
+      className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4"
     >
+      <div className="mb-3 flex items-center gap-2">
+        <Filter className="h-4 w-4 text-[var(--brand-mid)]" aria-hidden />
+        <p className="text-sm font-semibold text-[var(--text)]">Filters</p>
+      </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto] lg:items-end">
         <div className="min-w-0">
           <label
             htmlFor="dispatch-filter-date"
-            className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]"
+            className="mb-1 block text-xs font-medium text-[var(--text-mid)]"
           >
             Date
           </label>
@@ -49,9 +54,7 @@ export function FulfillmentDispatchFilters({ filters, onChange, onClear, drivers
         </div>
 
         <div className="min-w-0">
-          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            Status
-          </span>
+          <span className="mb-1 block text-xs font-medium text-[var(--text-mid)]">Status</span>
           <Select value={filters.status} onValueChange={(status) => set({ status })}>
             <SelectTrigger data-testid="delivery-filter-status" className="w-full">
               <SelectValue placeholder="Status" />
@@ -67,9 +70,7 @@ export function FulfillmentDispatchFilters({ filters, onChange, onClear, drivers
         </div>
 
         <div className="min-w-0">
-          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            Driver
-          </span>
+          <span className="mb-1 block text-xs font-medium text-[var(--text-mid)]">Driver</span>
           <Select value={filters.driverId} onValueChange={(driverId) => set({ driverId })}>
             <SelectTrigger data-testid="delivery-filter-driver" className="w-full">
               <SelectValue placeholder="Driver" />
@@ -88,7 +89,7 @@ export function FulfillmentDispatchFilters({ filters, onChange, onClear, drivers
         <div className="min-w-0">
           <label
             htmlFor="dispatch-filter-area"
-            className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]"
+            className="mb-1 block text-xs font-medium text-[var(--text-mid)]"
           >
             Area
           </label>

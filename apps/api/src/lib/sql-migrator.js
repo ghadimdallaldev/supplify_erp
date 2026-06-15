@@ -7,6 +7,89 @@ import { logger } from './logger.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const migrationsDir = join(__dirname, '..', '..', 'db', 'migrations')
 
+function isCommentOnlyStatement(trimmed) {
+  return trimmed.split(/\r?\n/).every((line) => {
+    const t = line.trim()
+    return t.length === 0 || t.startsWith('--')
+  })
+}
+
+export function splitMigrationStatements(sql) {
+  const statements = []
+  let current = ''
+  let i = 0
+  /** @type {string | null} null = not inside a dollar-quoted string */
+  let dollarTag = null
+
+  while (i < sql.length) {
+    if (dollarTag === null) {
+      const dollarMatch = sql.slice(i).match(/^\$([A-Za-z0-9_]*)\$/)
+      if (dollarMatch) {
+        dollarTag = dollarMatch[1]
+        current += dollarMatch[0]
+        i += dollarMatch[0].length
+        continue
+      }
+
+      if (sql[i] === ';') {
+        const rest = sql.slice(i + 1)
+        if (/^\s*(?:\r?\n|$)/.test(rest)) {
+          const trimmed = current.trim()
+          if (trimmed.length > 0 && !isCommentOnlyStatement(trimmed)) {
+            statements.push(trimmed)
+          }
+          current = ''
+          i += 1
+          const ws = rest.match(/^\s*/)
+          if (ws) i += ws[0].length
+          continue
+        }
+      }
+
+      current += sql[i]
+      i += 1
+      continue
+    }
+
+    const close = `$${dollarTag}$`
+    if (sql.slice(i, i + close.length) === close) {
+      current += close
+      i += close.length
+      dollarTag = null
+      continue
+    }
+
+    current += sql[i]
+    i += 1
+  }
+
+  const trimmed = current.trim()
+  if (trimmed.length > 0 && !isCommentOnlyStatement(trimmed)) {
+    statements.push(trimmed)
+  }
+
+  return statements
+}
+
+function isIdempotentCreateStatement(statement) {
+  return /^\s*CREATE\s+(TABLE|INDEX|UNIQUE\s+INDEX)\s+IF\s+NOT\s+EXISTS/i.test(statement)
+}
+
+async function runMigrationStatements(sql) {
+  const statements = splitMigrationStatements(sql)
+  for (const statement of statements) {
+    try {
+      await migrationQuery(`${statement};`)
+    } catch (error) {
+      if (error.code === '42P07' && isIdempotentCreateStatement(statement)) {
+        logger.warn({ event: 'db.migration.object_exists', statement: statement.slice(0, 120) })
+        continue
+      }
+      throw error
+    }
+  }
+}
+
 function readMigrationSql(filePath) {
   const buf = readFileSync(filePath)
   if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) {
@@ -93,19 +176,15 @@ export async function runAllSqlMigrations() {
     logger.info({ event: 'db.migration.run', file })
     const sql = readMigrationSql(join(migrationsDir, file))
     try {
-      await migrationQuery(sql)
+      await runMigrationStatements(sql)
     } catch (error) {
-      if (error.code === '42P07') {
-        logger.warn({ event: 'db.migration.exists', file })
-      } else {
-        logger.error(`SQL migration failed: ${file}`, {
-          event: 'db.migration.failed',
-          file,
-          code: error.code,
-          error: error.message,
-        })
-        throw error
-      }
+      logger.error(`SQL migration failed: ${file}`, {
+        event: 'db.migration.failed',
+        file,
+        code: error.code,
+        error: error.message,
+      })
+      throw error
     }
 
     await recordAppliedMigration(file)

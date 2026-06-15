@@ -2,31 +2,8 @@ import { logger } from '../lib/logger.js'
 import { syncRequestLogContext } from '../lib/request-log-context.js'
 import { writeSystemEvent } from '../lib/systemEvent.js'
 
-// Error handling middleware
-export function errorHandler(err, req, res, next) {
-  const ids = syncRequestLogContext(req)
-  const requestId = ids.requestId || 'unknown'
-
-  writeSystemEvent({
-    type: 'api_error',
-    severity: 'error',
-    source: req.url?.split('?')[0] || 'unknown',
-    payload: { ...ids, method: req.method, message: err.message },
-  }).catch(() => {})
-
-  logger.error('Unhandled error:', {
-    error: err.message,
-    stack: err.stack,
-    ...ids,
-    url: req.url,
-    method: req.method,
-    ip: req.ip,
-  })
-
-  // Don't leak error details in production
-  const isDevelopment = process.env.NODE_ENV === 'development'
-
-  // Determine error type and status code
+/** Map thrown errors to HTTP status + error envelope (shared by handler and system_event). */
+export function resolveHttpError(err) {
   let statusCode = 500
   let errorName = 'INTERNAL_ERROR'
   let message = 'Internal server error'
@@ -56,7 +33,6 @@ export function errorHandler(err, req, res, next) {
     errorName = 'CONFLICT'
     message = 'Resource conflict'
   } else if (err.code === '23505') {
-    // PostgreSQL unique violation
     statusCode = 409
     errorName = 'CONFLICT'
     message = 'Resource already exists'
@@ -65,7 +41,6 @@ export function errorHandler(err, req, res, next) {
     errorName = 'SCHEMA_NOT_READY'
     message = 'Database schema is not up to date. Retry after the API finishes migrating.'
   } else if (err.code === '23503') {
-    // PostgreSQL foreign key violation
     statusCode = 400
     errorName = 'VALIDATION_ERROR'
     message = 'Referenced resource does not exist'
@@ -75,6 +50,39 @@ export function errorHandler(err, req, res, next) {
     message = err.errors?.map((e) => e.message).join('; ') || 'Validation failed'
   }
 
+  return { statusCode, errorName, message }
+}
+
+// Error handling middleware
+export function errorHandler(err, req, res, next) {
+  const ids = syncRequestLogContext(req)
+  const requestId = ids.requestId || 'unknown'
+  const { statusCode, errorName, message: publicMessage } = resolveHttpError(err)
+
+  writeSystemEvent({
+    type: 'api_error',
+    severity: 'error',
+    source: req.url?.split('?')[0] || 'unknown',
+    payload: {
+      ...ids,
+      method: req.method,
+      message: err.message,
+      statusCode,
+      errorName,
+    },
+  }).catch(() => {})
+
+  logger.error('Unhandled error:', {
+    error: err.message,
+    stack: err.stack,
+    ...ids,
+    url: req.url,
+    method: req.method,
+    ip: req.ip,
+  })
+
+  const isDevelopment = process.env.NODE_ENV === 'development'
+
   // Send error response only if headers haven't been sent
   if (!res.headersSent) {
     res.status(statusCode).json({
@@ -82,7 +90,7 @@ export function errorHandler(err, req, res, next) {
       data: null,
       error: {
         name: errorName,
-        message: isDevelopment ? err.message : message,
+        message: isDevelopment ? err.message : publicMessage,
         ...(isDevelopment && { stack: err.stack }),
         ...(err.details && { details: err.details }),
       },

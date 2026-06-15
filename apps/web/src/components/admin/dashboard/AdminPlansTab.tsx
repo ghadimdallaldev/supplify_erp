@@ -36,6 +36,7 @@ import {
   stringifyPlanJson,
 } from '../../../lib/adminPlanJsonParse'
 import { AdminPlatformSettingsPanel } from '../AdminPlatformSettingsPanel'
+import { AdminGrowthSettingsPanel } from '../AdminGrowthSettingsPanel'
 import { AdminSectionHeader } from '../adminUi'
 import { AdminTabLoading, dedupeAdminPlans } from './adminDashboardShared'
 
@@ -184,6 +185,9 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
           description="Platform-wide subscription settings"
         />
         <AdminPlatformSettingsPanel variant="compact" />
+        <div className="mt-4">
+          <AdminGrowthSettingsPanel />
+        </div>
       </div>
 
       <div className="flex flex-wrap justify-between items-center gap-4">
@@ -468,7 +472,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                   />
                   {editPlanModal.plan.code === 'free' ? (
                     <p className="mt-1 text-xs text-amber-800">
-                      Free Trial catalog: trial days must be between 3 and 7.
+                      Free Trial catalog: trial days must be between 7 and 90.
                     </p>
                   ) : null}
                 </div>

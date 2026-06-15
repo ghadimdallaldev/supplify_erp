@@ -777,4 +777,68 @@
       }
     }
   }
+
+  /* In-app messaging */
+  .chat-thread-scroll {
+    scroll-behavior: smooth;
+  }
+
+  .chat-bubble-out {
+    background: var(--brand-mid);
+    color: #fff;
+  }
+
+  .chat-bubble-in {
+    background: var(--surface);
+    border: 1px solid var(--app-border);
+    color: var(--text);
+  }
+
+  .chat-list-item {
+    transition:
+      background-color var(--duration-ui) var(--ease-out),
+      color var(--duration-ui) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .chat-list-item:hover {
+      background: color-mix(in srgb, var(--brand-pale) 35%, var(--surface));
+    }
+  }
+
+  .chat-typing-dot {
+    animation: chat-typing-pulse 1.2s var(--ease-out) infinite;
+  }
+
+  .chat-typing-dot:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+
+  .chat-typing-dot:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+
+  @keyframes chat-typing-pulse {
+    0%,
+    80%,
+    100% {
+      opacity: 0.35;
+      transform: scale(0.92);
+    }
+    40% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chat-typing-dot {
+      animation: none;
+      opacity: 0.7;
+    }
+
+    .chat-thread-scroll {
+      scroll-behavior: auto;
+    }
+  }
 }

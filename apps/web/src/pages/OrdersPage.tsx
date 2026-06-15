@@ -45,6 +45,8 @@ import {
   Plus,
   AlertCircle,
   Scale,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 
 /** @deprecated use filterControlClass from components/ui/filter-control */
@@ -61,6 +63,8 @@ import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { getActiveDisputeForOrder } from '../lib/disputeHelpers'
 import { isDisputeReplacementOrder } from '../lib/orderPlacement'
 
+const ORDERS_PAGE_SIZE = 20
+
 export function OrdersPage() {
   const [status, setStatus] = useState('')
   const [search, setSearch] = useState('')
@@ -69,6 +73,7 @@ export function OrdersPage() {
   const [dateTo, setDateTo] = useState('')
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('all')
+  const [offset, setOffset] = useState(0)
   const [showManualOrderDialog, setShowManualOrderDialog] = useState(false)
   const [showProductSelection, setShowProductSelection] = useState(false)
   const [selectedRestaurant, setSelectedRestaurant] = useState('')
@@ -104,14 +109,19 @@ export function OrdersPage() {
     return () => window.clearTimeout(timer)
   }, [search])
 
-  const { data, isLoading, error, refetch } = useGetOrdersQuery(
+  useEffect(() => {
+    setOffset(0)
+  }, [status, debouncedSearch, dateFrom, dateTo])
+
+  const { data, isLoading, isFetching, error, refetch } = useGetOrdersQuery(
     {
       status: status || undefined,
       q: debouncedSearch || undefined,
       from: dateFrom || undefined,
       to: dateTo || undefined,
-      limit: 100,
-      offset: 0,
+      limit: ORDERS_PAGE_SIZE,
+      offset,
+      includeItems: true,
     },
     {
       refetchOnMountOrArgChange: false,
@@ -327,6 +337,19 @@ export function OrdersPage() {
     })
   }, [data?.orders, status, activeTab])
 
+  const pagination = data?.pagination
+  const total = pagination?.total
+  const pageSize = pagination?.limit ?? ORDERS_PAGE_SIZE
+  const rangeStart = filteredOrders.length === 0 ? 0 : offset + 1
+  const rangeEnd =
+    filteredOrders.length === 0
+      ? 0
+      : total != null
+        ? Math.min(offset + pageSize, total)
+        : offset + filteredOrders.length
+  const hasNextPage = total != null ? offset + pageSize < total : filteredOrders.length === pageSize
+  const hasPrevPage = offset > 0
+
   const clearAllFilters = () => {
     setSearch('')
     setDebouncedSearch('')
@@ -334,6 +357,7 @@ export function OrdersPage() {
     setDateFrom('')
     setDateTo('')
     setActiveTab('all')
+    setOffset(0)
     setMoreFiltersOpen(false)
   }
 
@@ -819,6 +843,42 @@ export function OrdersPage() {
                 )}
               </TabsContent>
             </Tabs>
+
+            {(total != null ? total > 0 : filteredOrders.length > 0) && (
+              <div
+                className="mt-4 flex flex-col gap-3 border-t border-[var(--app-border)] pt-4 sm:flex-row sm:items-center sm:justify-between"
+                data-testid="orders-pagination"
+              >
+                <p className="text-sm text-[var(--text-muted)]">
+                  Showing {rangeStart}–{rangeEnd}
+                  {total != null ? ` of ${total}` : ''}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!hasPrevPage || isFetching}
+                    onClick={() => setOffset((prev) => Math.max(0, prev - pageSize))}
+                    data-testid="orders-prev-page"
+                  >
+                    <ChevronLeft className="mr-1 h-4 w-4" />
+                    Previous
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!hasNextPage || isFetching}
+                    onClick={() => setOffset((prev) => prev + pageSize)}
+                    data-testid="orders-next-page"
+                  >
+                    Next
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </DataTableShell>
 

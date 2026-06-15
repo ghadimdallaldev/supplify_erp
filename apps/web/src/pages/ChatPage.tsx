@@ -18,7 +18,7 @@ import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
-import { Plus } from 'lucide-react'
+import { Plus, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, isToday, isYesterday } from 'date-fns'
 import { useChatRealtime } from '../hooks/useChatRealtime'
@@ -27,6 +27,7 @@ import { ChatHeader } from '../components/chat/ChatHeader'
 import { ChatThread } from '../components/chat/ChatThread'
 import { ChatComposer } from '../components/chat/ChatComposer'
 import { NewConversationDialog } from '../components/chat/NewConversationDialog'
+import { Skeleton } from '../components/ui/skeleton'
 
 export function ChatPage() {
   const { user } = useAppSelector((state) => state.auth)
@@ -57,7 +58,7 @@ export function ChatPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null!)
   const messagesContainerRef = useRef<HTMLDivElement>(null!)
-  const inputRef = useRef<HTMLInputElement>(null!)
+  const inputRef = useRef<HTMLTextAreaElement>(null!)
   const fileInputRef = useRef<HTMLInputElement>(null!)
 
   const {
@@ -440,11 +441,16 @@ export function ChatPage() {
 
   if (conversationsLoading || isCreatingConversation) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-lg">
-          {isCreatingConversation ? 'Creating conversation…' : 'Loading conversations…'}
+      <RequirePermission permission="CHAT_VIEW" title="chat">
+        <div className="container mx-auto flex flex-col gap-4 p-4 sm:p-6">
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-4 w-72 max-w-full" />
+          <div className="flex min-h-0 gap-4 h-[calc(100dvh-11rem)] max-h-[900px]">
+            <Skeleton className="hidden h-full w-80 shrink-0 rounded-xl lg:block" />
+            <Skeleton className="h-full min-h-[320px] flex-1 rounded-xl" />
+          </div>
         </div>
-      </div>
+      </RequirePermission>
     )
   }
 
@@ -484,7 +490,7 @@ export function ChatPage() {
             />
           </div>
         ) : (
-          <div className="flex min-h-0 gap-4 lg:gap-6 h-[calc(100vh-11rem)] max-h-[900px]">
+          <div className="flex min-h-0 gap-4 lg:gap-6 h-[calc(100dvh-11rem)] max-h-[900px]">
             <div
               className={`min-h-0 w-full shrink-0 lg:block lg:w-80 ${
                 showListOnMobile ? 'block' : 'hidden'
@@ -504,7 +510,7 @@ export function ChatPage() {
             </div>
 
             <Card
-              className={`min-h-0 flex flex-1 flex-col ${
+              className={`min-h-0 flex flex-1 flex-col overflow-hidden ${
                 showThreadOnMobile || selectedConversation ? 'flex' : 'hidden lg:flex'
               }`}
             >
@@ -580,13 +586,28 @@ export function ChatPage() {
                   </CardContent>
                 </>
               ) : (
-                <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-[var(--text-muted)]">
-                  <p className="text-sm font-medium">Select a conversation</p>
-                  <p className="text-xs max-w-xs">
-                    {user?.role === 'SUPPLIER'
-                      ? 'Pick a restaurant from the list or start a new message.'
-                      : 'Choose someone from the list to view messages.'}
-                  </p>
+                <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--brand-pale)] text-[var(--brand-mid)]">
+                    <MessageSquare className="h-7 w-7" aria-hidden />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text)]">Select a conversation</p>
+                    <p className="mt-1 max-w-xs text-sm text-[var(--text-mid)]">
+                      {user?.role === 'SUPPLIER'
+                        ? 'Pick a restaurant from your inbox or start a new message.'
+                        : 'Choose a supplier from your inbox to view messages.'}
+                    </p>
+                  </div>
+                  {canStartConversation ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowNewConversation(true)}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      New message
+                    </Button>
+                  ) : null}
                 </div>
               )}
             </Card>

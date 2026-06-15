@@ -102,6 +102,45 @@ async function attachBillingSubscriptionFields(rows, tenantType) {
   }
 }
 
+async function buildSupplierListSelectFields() {
+  const [hasSlug, hasContactEmail, hasPhone, hasLogoUrl, hasAccountStatus] = await Promise.all([
+    columnExists('supplier', 'slug'),
+    columnExists('supplier', 'contact_email'),
+    columnExists('supplier', 'phone'),
+    columnExists('supplier', 'logo_url'),
+    columnExists('supplier', 'account_status'),
+  ])
+
+  return {
+    slugSelect: hasSlug ? 's.slug,' : 'NULL::text AS slug,',
+    contactEmailSelect: hasContactEmail ? 's.contact_email,' : 'NULL::text AS contact_email,',
+    phoneSelect: hasPhone ? 's.phone,' : 'NULL::text AS phone,',
+    logoUrlSelect: hasLogoUrl ? 's.logo_url,' : 'NULL::text AS logo_url,',
+    accountStatusSelect: hasAccountStatus ? 's.account_status,' : 'NULL::text AS account_status,',
+  }
+}
+
+async function buildRestaurantListSelectFields() {
+  const [hasSlug, hasContactEmail, hasPhone, hasLogoUrl, hasBusinessType, hasAccountStatus] =
+    await Promise.all([
+      columnExists('restaurant', 'slug'),
+      columnExists('restaurant', 'contact_email'),
+      columnExists('restaurant', 'phone'),
+      columnExists('restaurant', 'logo_url'),
+      columnExists('restaurant', 'business_type'),
+      columnExists('restaurant', 'account_status'),
+    ])
+
+  return {
+    slugSelect: hasSlug ? 'r.slug,' : 'NULL::text AS slug,',
+    contactEmailSelect: hasContactEmail ? 'r.contact_email,' : 'NULL::text AS contact_email,',
+    phoneSelect: hasPhone ? 'r.phone,' : 'NULL::text AS phone,',
+    logoUrlSelect: hasLogoUrl ? 'r.logo_url,' : 'NULL::text AS logo_url,',
+    businessTypeSelect: hasBusinessType ? 'r.business_type,' : 'NULL::text AS business_type,',
+    accountStatusSelect: hasAccountStatus ? 'r.account_status,' : 'NULL::text AS account_status,',
+  }
+}
+
 // Get suppliers with detailed info
 router.get('/tenants/suppliers', async (req, res) => {
   try {
@@ -109,10 +148,21 @@ router.get('/tenants/suppliers', async (req, res) => {
     const { rows: countRows } = await query(`SELECT COUNT(*)::int AS total FROM supplier`)
     const total = countRows[0]?.total ?? 0
 
+    const { slugSelect, contactEmailSelect, phoneSelect, logoUrlSelect, accountStatusSelect } =
+      await buildSupplierListSelectFields()
+
     const { rows: suppliers } = await query(
       `
       SELECT 
-        s.*,
+        s.id,
+        s.name,
+        ${slugSelect}
+        ${contactEmailSelect}
+        ${phoneSelect}
+        ${logoUrlSelect}
+        ${accountStatusSelect}
+        s.created_at,
+        s.updated_at,
         sub.status as subscription_status,
         sub.plan_name,
         sp.code as plan_code,
@@ -120,24 +170,8 @@ router.get('/tenants/suppliers', async (req, res) => {
         COALESCE(pc.product_count, 0)::int as product_count,
         COALESCE(wc.warehouse_count, 0)::int as warehouse_count,
         COALESCE(rev.total_revenue, 0)::numeric(12,2) as total_revenue,
-        (SELECT COUNT(*)::int
-         FROM promotions p
-         WHERE p.supplier_id = s.id
-           AND p.status = 'active'
-           AND COALESCE(p.payment_status, 'not_required') IN ('not_required', 'paid')
-           AND p.starts_at <= NOW()
-           AND (p.ends_at IS NULL OR p.ends_at > NOW())
-           AND (p.usage_limit IS NULL OR p.usage_count < p.usage_limit)
-        ) AS active_deals_count,
-        (
-          SELECT um.current_value::int
-          FROM usage_meter um
-          WHERE um.tenant_id = s.id
-            AND um.tenant_type = 'SUPPLIER'
-            AND um.meter_type = 'storage_mb'
-            AND um.period_start_date = '2000-01-01'
-          LIMIT 1
-        ) AS storage_mb_used
+        COALESCE(ad.active_deals_count, 0)::int AS active_deals_count,
+        COALESCE(st.storage_mb_used, 0)::int AS storage_mb_used
       FROM supplier s
       LEFT JOIN subscription sub ON sub.tenant_id = s.id AND sub.tenant_type = 'SUPPLIER' AND sub.status IN ('ACTIVE', 'TRIALING')
       LEFT JOIN subscription_plan sp ON sp.id = sub.plan_id
@@ -155,6 +189,24 @@ router.get('/tenants/suppliers', async (req, res) => {
         WHERE ${deliveredOrderStatusInSql('o.status')}
         GROUP BY oi.supplier_id
       ) rev ON rev.supplier_id = s.id
+      LEFT JOIN (
+        SELECT p.supplier_id, COUNT(*)::int AS active_deals_count
+        FROM promotions p
+        WHERE p.status = 'active'
+          AND COALESCE(p.payment_status, 'not_required') IN ('not_required', 'paid')
+          AND p.starts_at <= NOW()
+          AND (p.ends_at IS NULL OR p.ends_at > NOW())
+          AND (p.usage_limit IS NULL OR p.usage_count < p.usage_limit)
+        GROUP BY p.supplier_id
+      ) ad ON ad.supplier_id = s.id
+      LEFT JOIN (
+        SELECT um.tenant_id AS supplier_id, MAX(um.current_value)::int AS storage_mb_used
+        FROM usage_meter um
+        WHERE um.tenant_type = 'SUPPLIER'
+          AND um.meter_type = 'storage_mb'
+          AND um.period_start_date = '2000-01-01'
+        GROUP BY um.tenant_id
+      ) st ON st.supplier_id = s.id
       ORDER BY s.name
       LIMIT $1 OFFSET $2
     `,
@@ -187,10 +239,28 @@ router.get('/tenants/restaurants', async (req, res) => {
     const { rows: countRows } = await query(`SELECT COUNT(*)::int AS total FROM restaurant`)
     const total = countRows[0]?.total ?? 0
 
+    const {
+      slugSelect,
+      contactEmailSelect,
+      phoneSelect,
+      logoUrlSelect,
+      businessTypeSelect,
+      accountStatusSelect,
+    } = await buildRestaurantListSelectFields()
+
     const { rows: restaurants } = await query(
       `
       SELECT 
-        r.*,
+        r.id,
+        r.name,
+        ${slugSelect}
+        ${contactEmailSelect}
+        ${phoneSelect}
+        ${logoUrlSelect}
+        ${businessTypeSelect}
+        ${accountStatusSelect}
+        r.created_at,
+        r.updated_at,
         sub.status as subscription_status,
         sub.plan_name,
         sp.code as plan_code,
@@ -198,32 +268,10 @@ router.get('/tenants/restaurants', async (req, res) => {
         COALESCE(oc.order_count, 0)::int as order_count,
         COALESCE(oc.total_spent, 0)::numeric(12,2) as total_spent,
         COALESCE(oc.orders_last_30d, 0)::int as orders_last_30d,
-        (
-          SELECT COUNT(*)::int
-          FROM customer_order co
-          WHERE co.restaurant_id = r.id
-            AND co.status = 'PLACED'
-            AND DATE(co.placed_at) = CURRENT_DATE
-        ) AS orders_today,
-        (
-          SELECT COUNT(*)::int
-          FROM supplier_follow sf
-          WHERE sf.restaurant_id = r.id
-        ) AS connected_suppliers_count,
-        (
-          SELECT COUNT(DISTINCT ri.product_id)::int
-          FROM restaurant_inventory ri
-          WHERE ri.restaurant_id = r.id
-        ) AS inventory_skus_count,
-        (
-          SELECT um.current_value::int
-          FROM usage_meter um
-          WHERE um.tenant_id = r.id
-            AND um.tenant_type = 'RESTAURANT'
-            AND um.meter_type = 'storage_mb'
-            AND um.period_start_date = '2000-01-01'
-          LIMIT 1
-        ) AS storage_mb_used
+        COALESCE(ot.orders_today, 0)::int AS orders_today,
+        COALESCE(sf.connected_suppliers_count, 0)::int AS connected_suppliers_count,
+        COALESCE(inv.inventory_skus_count, 0)::int AS inventory_skus_count,
+        COALESCE(st.storage_mb_used, 0)::int AS storage_mb_used
       FROM restaurant r
       LEFT JOIN subscription sub ON sub.tenant_id = r.id AND sub.tenant_type = 'RESTAURANT' AND sub.status IN ('ACTIVE', 'TRIALING')
       LEFT JOIN subscription_plan sp ON sp.id = sub.plan_id
@@ -236,6 +284,31 @@ router.get('/tenants/restaurants', async (req, res) => {
         FROM customer_order
         GROUP BY restaurant_id
       ) oc ON oc.restaurant_id = r.id
+      LEFT JOIN (
+        SELECT co.restaurant_id, COUNT(*)::int AS orders_today
+        FROM customer_order co
+        WHERE co.status = 'PLACED'
+          AND DATE(co.placed_at) = CURRENT_DATE
+        GROUP BY co.restaurant_id
+      ) ot ON ot.restaurant_id = r.id
+      LEFT JOIN (
+        SELECT sf.restaurant_id, COUNT(*)::int AS connected_suppliers_count
+        FROM supplier_follow sf
+        GROUP BY sf.restaurant_id
+      ) sf ON sf.restaurant_id = r.id
+      LEFT JOIN (
+        SELECT ri.restaurant_id, COUNT(DISTINCT ri.product_id)::int AS inventory_skus_count
+        FROM restaurant_inventory ri
+        GROUP BY ri.restaurant_id
+      ) inv ON inv.restaurant_id = r.id
+      LEFT JOIN (
+        SELECT um.tenant_id AS restaurant_id, MAX(um.current_value)::int AS storage_mb_used
+        FROM usage_meter um
+        WHERE um.tenant_type = 'RESTAURANT'
+          AND um.meter_type = 'storage_mb'
+          AND um.period_start_date = '2000-01-01'
+        GROUP BY um.tenant_id
+      ) st ON st.restaurant_id = r.id
       ORDER BY r.name
       LIMIT $1 OFFSET $2
     `,

@@ -1,5 +1,12 @@
 import express from 'express'
-import { requireAuth, requireRole, resolveTenantContext } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  optionalAuth,
+  getSupplierIdForRequest,
+} from '../lib/rbac.js'
+import { verifyObjectAccess } from '../lib/object-download-auth.js'
 import { filesUploadGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -18,7 +25,9 @@ import {
   sanitizeUploadFileName,
   assertUploadKeyOwnedByUser,
   assertFileExtensionMatchesMime,
+  assertImageUploadBytes,
   MAX_UPLOAD_BYTES,
+  MAX_IMPORT_ZIP_BYTES,
 } from '../lib/sanitize-upload.js'
 import {
   createPresignedUpload,
@@ -31,7 +40,7 @@ import {
 const router = express.Router()
 
 /** Serve uploaded objects when buckets are private (Railway, R2 without public URL). */
-router.get('/object', async (req, res) => {
+router.get('/object', optionalAuth, async (req, res) => {
   setObjectCorsHeaders(req, res)
   try {
     const rawKey = req.query.key
@@ -49,6 +58,16 @@ router.get('/object', async (req, res) => {
         ok: false,
         data: null,
         error: { name: 'VALIDATION_ERROR', message: 'Invalid file key' },
+        requestId: req.requestId,
+      })
+    }
+
+    const allowed = await verifyObjectAccess(key, req)
+    if (!allowed) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Access denied' },
         requestId: req.requestId,
       })
     }
@@ -88,7 +107,7 @@ router.get('/object', async (req, res) => {
 })
 
 // Complete PUT upload using signed token from /presign (local disk or private S3 via API)
-router.put('/upload/:token', express.raw({ type: '*/*', limit: '10mb' }), async (req, res) => {
+async function handleTokenUpload(req, res) {
   setObjectCorsHeaders(req, res)
   try {
     const contentType = req.headers['content-type'] || 'application/octet-stream'
@@ -105,6 +124,7 @@ router.put('/upload/:token', express.raw({ type: '*/*', limit: '10mb' }), async 
         requestId: req.requestId,
       })
     }
+    await assertImageUploadBytes(body, contentType)
     await provider.completeUpload(req.params.token, body, contentType)
     res.status(204).end()
   } catch (error) {
@@ -112,7 +132,8 @@ router.put('/upload/:token', express.raw({ type: '*/*', limit: '10mb' }), async 
       error?.name === 'UPLOAD_TOKEN_INVALID' ||
       error?.name === 'UPLOAD_CONTENT_TYPE' ||
       error?.name === 'UPLOAD_KEY_INVALID' ||
-      error?.name === 'UPLOAD_TOO_LARGE'
+      error?.name === 'UPLOAD_TOO_LARGE' ||
+      error?.name === 'UPLOAD_INVALID_IMAGE'
     res.status(invalid ? 400 : 500).json({
       ok: false,
       data: null,
@@ -123,7 +144,16 @@ router.put('/upload/:token', express.raw({ type: '*/*', limit: '10mb' }), async 
       requestId: req.requestId,
     })
   }
-})
+}
+
+router.put('/upload/:token', express.raw({ type: '*/*', limit: '10mb' }), handleTokenUpload)
+
+/** Large import archives (ZIP) — token maxBytes enforced in completeUpload. */
+router.put(
+  '/upload-import/:token',
+  express.raw({ type: '*/*', limit: MAX_IMPORT_ZIP_BYTES }),
+  handleTokenUpload
+)
 
 // Generate presigned URL for file upload
 router.post(
@@ -304,7 +334,7 @@ router.post(
 
       const { rows: products } = await query(
         `
-        SELECT p.*, s.id as supplier_id, s.contact_email
+        SELECT p.*, s.id as supplier_id
         FROM product p
         JOIN supplier s ON s.id = p.supplier_id
         WHERE p.id = $1
@@ -324,16 +354,19 @@ router.post(
         })
       }
 
-      if (req.userData.role === 'SUPPLIER' && products[0].contact_email !== req.userData.email) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied. You can only attach files to your own products',
-          },
-          requestId: req.requestId,
-        })
+      if (req.userData.role === 'SUPPLIER') {
+        const ownSupplierId = await getSupplierIdForRequest(req)
+        if (!ownSupplierId || products[0].supplier_id !== ownSupplierId) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'FORBIDDEN',
+              message: 'Access denied. You can only attach files to your own products',
+            },
+            requestId: req.requestId,
+          })
+        }
       }
 
       const supplierId = products[0].supplier_id

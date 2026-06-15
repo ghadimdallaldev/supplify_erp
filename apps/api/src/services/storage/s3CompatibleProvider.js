@@ -5,11 +5,13 @@ import {
   PutBucketPolicyCommand,
   PutObjectCommand,
   GetObjectCommand,
+  DeleteObjectCommand,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { logger } from '../../lib/logger.js'
 import { createUploadToken, verifyUploadToken } from './upload-token.js'
 import { MAX_UPLOAD_BYTES } from '../../lib/sanitize-upload.js'
+import { appendObjectAccessSignature } from '../../lib/object-download-auth.js'
 
 function createS3Client(cfg, endpoint) {
   const forcePathStyle = cfg.STORAGE_S3_FORCE_PATH_STYLE !== false
@@ -72,7 +74,8 @@ export function createS3CompatibleProvider(cfg) {
     const key = String(fileKey || '').replace(/^\/+/, '')
     if (cfg.STORAGE_PUBLIC_READ === false) {
       const apiBase = String(cfg.API_PUBLIC_URL || '').replace(/\/$/, '')
-      return `${apiBase}/api/files/object?key=${encodeURIComponent(key)}`
+      const baseUrl = `${apiBase}/api/files/object?key=${encodeURIComponent(key)}`
+      return appendObjectAccessSignature(baseUrl, key)
     }
     const base = String(cfg.STORAGE_PUBLIC_URL || cfg.STORAGE_ENDPOINT || '').replace(/\/$/, '')
     const bucket = cfg.STORAGE_BUCKET
@@ -271,6 +274,49 @@ export function createS3CompatibleProvider(cfg) {
         contentType: response.ContentType || 'application/octet-stream',
         contentLength: response.ContentLength,
       }
+    },
+
+    /**
+     * Server-side write (import processing, internal copies).
+     * @param {{ fileKey: string; body: Buffer | Uint8Array | string; contentType: string }} opts
+     */
+    async putObject({ fileKey, body, contentType }) {
+      const safeKey = String(fileKey || '').replace(/^\/+/, '')
+      if (!safeKey || safeKey.includes('..')) {
+        throw Object.assign(new Error('Invalid file key'), { name: 'UPLOAD_KEY_INVALID' })
+      }
+      const s3 = getInternalClient()
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: cfg.STORAGE_BUCKET,
+          Key: safeKey,
+          Body: body,
+          ContentType: contentType,
+        })
+      )
+      const bytes = Buffer.isBuffer(body) ? body.length : Buffer.byteLength(body || '')
+      logger.info('S3 storage putObject', { fileKey: safeKey, contentType, bytes })
+      return { fileKey: safeKey }
+    },
+
+    /**
+     * Remove a stored object (import cleanup). S3 treats missing keys as success.
+     * @param {string} fileKey
+     */
+    async deleteObject(fileKey) {
+      const safeKey = String(fileKey || '').replace(/^\/+/, '')
+      if (!safeKey || safeKey.includes('..')) {
+        throw Object.assign(new Error('Invalid file key'), { name: 'UPLOAD_KEY_INVALID' })
+      }
+      const s3 = getInternalClient()
+      await s3.send(
+        new DeleteObjectCommand({
+          Bucket: cfg.STORAGE_BUCKET,
+          Key: safeKey,
+        })
+      )
+      logger.info('S3 storage deleteObject', { fileKey: safeKey })
+      return { fileKey: safeKey }
     },
   }
 }

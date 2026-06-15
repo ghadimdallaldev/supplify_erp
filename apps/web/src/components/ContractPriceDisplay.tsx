@@ -26,13 +26,19 @@ export function ContractPriceDisplay({
     Number(catalogPrice) > Number(currentPrice)
 
   if (currentPrice == null) {
-    return <p className="text-sm text-[var(--text-muted)]">N/A</p>
+    return <p className="text-sm text-[var(--text-mid)]">N/A</p>
   }
 
   return (
     <div className={compact ? 'space-y-0.5' : 'space-y-1'}>
       <div className="flex flex-wrap items-center gap-2">
-        <p className={compact ? 'font-semibold' : 'text-3xl font-bold text-[var(--brand-mid)]'}>
+        <p
+          className={
+            compact
+              ? 'font-semibold tabular-nums text-[var(--text)]'
+              : 'text-3xl font-bold text-[var(--brand-mid)]'
+          }
+        >
           {formatPrice(currentPrice)}
         </p>
         {isContract && (
@@ -42,7 +48,9 @@ export function ContractPriceDisplay({
         )}
       </div>
       {showStrikethrough && (
-        <p className="text-xs text-[var(--text-muted)] line-through">{formatPrice(catalogPrice)}</p>
+        <p className="text-xs text-[var(--text-mid)] line-through tabular-nums">
+          {formatPrice(catalogPrice)}
+        </p>
       )}
       {!compact && unit && (
         <p className="text-sm text-[var(--text-muted)]">

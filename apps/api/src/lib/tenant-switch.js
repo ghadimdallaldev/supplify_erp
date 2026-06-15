@@ -53,14 +53,9 @@ export async function verifyActiveTenantToken(token) {
 
 export async function userCanAccessTenant(userId, email, tenantId, tenantType) {
   const normalizedEmail = (email || '').trim().toLowerCase()
-  const table = tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'
 
-  const { rows: direct } = await query(
-    `SELECT id FROM ${table} WHERE id = $1 AND LOWER(TRIM(contact_email)) = $2`,
-    [tenantId, normalizedEmail]
-  )
-  if (direct.length) return true
-
+  // Tenant access requires invitation, workspace membership, or assigned roles — not contact_email alone.
+  // Primary contacts receive roles during registration; staff must accept an invitation token.
   const { rows: roleRows } = await query(
     `
       SELECT 1 FROM user_role

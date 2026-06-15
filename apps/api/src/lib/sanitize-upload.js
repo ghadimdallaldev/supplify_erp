@@ -1,7 +1,10 @@
 import path from 'node:path'
+import sharp from 'sharp'
 
 const MAX_FILENAME_LENGTH = 200
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+/** Default max ZIP size for bulk product image import (2GB). */
+const MAX_IMPORT_ZIP_BYTES = 2147483648
 
 /** MIME type to allowed file extensions (lowercase, with dot). */
 const MIME_TO_EXTENSIONS = {
@@ -9,6 +12,14 @@ const MIME_TO_EXTENSIONS = {
   'image/png': ['.png'],
   'image/webp': ['.webp'],
   'application/pdf': ['.pdf'],
+}
+
+/** MIME types allowed for bulk product image import archives and manifests. */
+const IMPORT_ALLOWED_MIMES = {
+  'application/zip': ['.zip'],
+  'application/x-zip-compressed': ['.zip'],
+  'text/csv': ['.csv'],
+  'application/csv': ['.csv'],
 }
 
 /**
@@ -25,7 +36,44 @@ export function assertFileExtensionMatchesMime(fileName, mimeType) {
   }
 }
 
-export { MAX_UPLOAD_BYTES }
+const MIME_TO_SHARP_FORMAT = {
+  'image/jpeg': 'jpeg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+}
+
+/**
+ * Validate uploaded image bytes match declared MIME (magic-byte check via sharp).
+ * No-op for non-image content types (e.g. PDF).
+ */
+export async function assertImageUploadBytes(buffer, contentType) {
+  if (!contentType || !String(contentType).startsWith('image/')) {
+    return
+  }
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    throw Object.assign(new Error('Invalid or empty image data'), { name: 'UPLOAD_INVALID_IMAGE' })
+  }
+
+  let metadata
+  try {
+    metadata = await sharp(buffer, { failOn: 'error' }).metadata()
+  } catch {
+    throw Object.assign(new Error('Invalid image file'), { name: 'UPLOAD_INVALID_IMAGE' })
+  }
+
+  if (!metadata.width || !metadata.height) {
+    throw Object.assign(new Error('Invalid image file'), { name: 'UPLOAD_INVALID_IMAGE' })
+  }
+
+  const expectedFormat = MIME_TO_SHARP_FORMAT[contentType]
+  if (expectedFormat && metadata.format !== expectedFormat) {
+    throw Object.assign(new Error('Image content does not match declared type'), {
+      name: 'UPLOAD_INVALID_IMAGE',
+    })
+  }
+}
+
+export { MAX_UPLOAD_BYTES, MAX_IMPORT_ZIP_BYTES, IMPORT_ALLOWED_MIMES }
 
 /**
  * Strip path segments and unsafe characters from user-supplied file names.
@@ -95,4 +143,24 @@ export function assertChatAttachmentUrl(fileUrl, userId) {
 /** Alias for staff documents and other presigned file references. */
 export function assertPresignedFileUrl(fileUrl, userId) {
   return assertChatAttachmentUrl(fileUrl, userId)
+}
+
+/**
+ * Prefix formula-trigger characters so spreadsheet apps do not execute cell content.
+ */
+export function neutralizeCsvField(value) {
+  const text = String(value ?? '')
+  if (/^[=+\-@]/.test(text)) {
+    return `'${text}`
+  }
+  return text
+}
+
+/** Escape and neutralize a CSV field for safe download. */
+export function escapeCsvField(value) {
+  const text = neutralizeCsvField(value)
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`
+  }
+  return text
 }

@@ -1,6 +1,8 @@
+import type { ReactNode } from 'react'
 import { format } from 'date-fns'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
+import { SummaryStrip } from '../ui/app-panel'
 import { cn } from '../../lib/utils'
 import type { StaffMember, StaffPtoRequest, StaffShiftSwap } from '../../types'
 
@@ -83,22 +85,66 @@ export type StaffTabKey =
 
 export function StaffTabLoading({ className }: { className?: string }) {
   return (
-    <div className={cn('space-y-6', className)} aria-busy="true" aria-label="Loading tab">
-      <div className="rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-6 shadow-sm">
-        <Skeleton className="h-6 w-40" />
-        <Skeleton className="mt-2 h-4 w-full max-w-md" />
-        <div className="mt-6 space-y-3">
-          <Skeleton className="h-14 w-full rounded-lg" />
-          <Skeleton className="h-14 w-full rounded-lg" />
-          <Skeleton className="h-14 w-full rounded-lg" />
-        </div>
+    <section
+      className={cn(
+        'overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]',
+        className
+      )}
+      aria-busy="true"
+      aria-label="Loading tab"
+    >
+      <div className="divide-y divide-[var(--app-border)]">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="space-y-2 px-4 py-4 sm:px-5">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3 w-56" />
+            <Skeleton className="h-10 w-full max-w-md" />
+          </div>
+        ))}
       </div>
-      <div className="rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-6 shadow-sm">
-        <Skeleton className="h-6 w-32" />
-        <Skeleton className="mt-4 h-32 w-full rounded-lg" />
-      </div>
-    </div>
+    </section>
   )
+}
+
+export function StaffPanel({
+  title,
+  description,
+  children,
+  footer,
+}: {
+  title: string
+  description?: string
+  children: ReactNode
+  footer?: ReactNode
+}) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]">
+      <header className="border-b border-[var(--app-border)] px-4 py-4 sm:px-5">
+        <h2 className="text-sm font-semibold text-[var(--text)]">{title}</h2>
+        {description ? (
+          <p className="mt-0.5 text-xs text-[var(--text-mid)]">{description}</p>
+        ) : null}
+      </header>
+      <div className="p-4 sm:p-5">{children}</div>
+      {footer ? (
+        <div className="border-t border-[var(--app-border)] px-4 py-3 sm:px-5">{footer}</div>
+      ) : null}
+    </section>
+  )
+}
+
+export function StaffLabourSummaryStrip({
+  metrics,
+}: {
+  metrics: Array<{
+    label: string
+    value: string | number
+    hint?: string
+    tone?: 'default' | 'mint' | 'amber' | 'danger' | 'brand'
+    onClick?: () => void
+  }>
+}) {
+  return <SummaryStrip testId="staff-labour-summary" columns={8} metrics={metrics} />
 }
 
 export function clampToISODate(date: Date) {

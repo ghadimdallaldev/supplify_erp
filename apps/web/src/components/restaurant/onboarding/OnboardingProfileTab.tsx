@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
@@ -18,7 +17,7 @@ import {
 import { RestaurantDeliveryLocationCard } from '../RestaurantDeliveryLocationCard'
 import { usePermissions } from '../../../hooks/usePermissions'
 import { normalizeAddress } from '../../../lib/address'
-import { OnboardingTabLoading } from './onboardingShared'
+import { OnboardingTabLoading, SettingsSection } from './onboardingShared'
 
 export function OnboardingProfileTab() {
   const { can } = usePermissions()
@@ -130,12 +129,26 @@ export function OnboardingProfileTab() {
         getPresignedUrl={handleGetPresignedUrl}
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Business Profile</CardTitle>
-          <CardDescription>Update your business information and contact details</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <SettingsSection
+        title="Business profile"
+        description="Update your business information and contact details."
+        footer={
+          <Button onClick={handleSaveProfile} disabled={isUpdating}>
+            {isUpdating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Save changes
+              </>
+            )}
+          </Button>
+        }
+      >
+        <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="businessName">Business Name *</Label>
@@ -325,22 +338,8 @@ export function OnboardingProfileTab() {
               }
             />
           </div>
-
-          <Button onClick={handleSaveProfile} disabled={isUpdating}>
-            {isUpdating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Save Changes
-              </>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </SettingsSection>
 
       <RestaurantDeliveryLocationCard />
     </div>

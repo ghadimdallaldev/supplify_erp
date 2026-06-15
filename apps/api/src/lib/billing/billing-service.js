@@ -371,12 +371,31 @@ export async function checkoutSubscription({
   const periodStart = new Date()
   const periodEnd = billingCycle === 'YEARLY' ? addDays(periodStart, 365) : addDays(periodStart, 30)
 
+  let chargeAmount = amount
+  let referralAttributionId = null
+  if (tenantType === 'RESTAURANT') {
+    const { applyReferralDiscountToAmount } = await import(
+      '../../services/referral-conversion.service.js'
+    )
+    const discount = await applyReferralDiscountToAmount(tenantId, amount)
+    chargeAmount = discount.amount
+    referralAttributionId = discount.attributionId
+  }
+
   return withTransaction(async (client) => {
+    if (tenantType === 'SUPPLIER') {
+      const { applyPlatformBillingCredits } = await import(
+        '../../services/referral-conversion.service.js'
+      )
+      const credit = await applyPlatformBillingCredits(tenantId, tenantType, chargeAmount, client)
+      chargeAmount = credit.amountDue
+    }
+
     const invoice = await createOpenInvoice(client, {
       subscription,
       tenantId,
       tenantType,
-      amount,
+      amount: chargeAmount,
       billingCycle,
       plan,
       periodStart,
@@ -409,6 +428,16 @@ export async function checkoutSubscription({
       periodStart,
       periodEnd,
     })
+
+    if (tenantType === 'RESTAURANT') {
+      const { markReferralDiscountUsed, processReferralConversion } = await import(
+        '../../services/referral-conversion.service.js'
+      )
+      if (referralAttributionId) {
+        await markReferralDiscountUsed(referralAttributionId, client)
+      }
+      await processReferralConversion({ restaurantId: tenantId, planCode: plan.code, client })
+    }
 
     return {
       success: true,

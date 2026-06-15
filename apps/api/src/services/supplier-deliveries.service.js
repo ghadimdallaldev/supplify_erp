@@ -20,11 +20,11 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
   ]
 
   if (date) {
-    conditions.push(`COALESCE(o.placed_at, o.created_at)::date = $${paramIdx}::date`)
+    conditions.push(`${sql.scheduledAtExpr}::date = $${paramIdx}::date`)
     params.push(date)
     paramIdx += 1
   } else {
-    conditions.push(`COALESCE(o.placed_at, o.created_at) >= NOW() - interval '14 days'`)
+    conditions.push(`${sql.scheduledAtExpr} >= NOW() - interval '14 days'`)
   }
 
   if (driverId) {
@@ -57,39 +57,16 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
     }
   }
 
-  const { rows } = await query(
-    `
-    SELECT DISTINCT ON (o.id)
-      o.id AS order_id,
-      o.status AS order_status,
-      r.name AS restaurant_name,
-      ${sql.deliveryAreaExpr} AS delivery_area,
-      da.id AS assignment_id,
-      COALESCE(da.status, 'pending') AS delivery_status,
-      d.id AS driver_id,
-      d.full_name AS driver_name,
-      ${sql.hasPodExpr} AS has_pod,
-      COALESCE(o.placed_at, o.created_at) AS scheduled_at,
-      ${sql.destinationLatitudeExpr} AS destination_latitude,
-      ${sql.destinationLongitudeExpr} AS destination_longitude,
-      ${sql.destinationLabelExpr} AS destination_label
-    FROM customer_order o
-    JOIN order_item oi ON oi.order_id = o.id
-    JOIN restaurant r ON r.id = o.restaurant_id
-    LEFT JOIN branch b ON b.id = o.branch_id
-    LEFT JOIN LATERAL (
-      SELECT da2.* FROM driver_assignments da2
-      WHERE da2.order_id = o.id AND da2.status NOT IN ('reassigned')
-      ORDER BY da2.created_at DESC LIMIT 1
-    ) da ON true
-    LEFT JOIN drivers d ON d.id = da.driver_id
-    ${sql.zoneJoinSql}
-    WHERE ${conditions.join(' AND ')}
-    ORDER BY o.id, scheduled_at DESC
-    LIMIT 500
-  `,
-    params
-  )
+  let rows
+  try {
+    rows = await queryDeliveryBoardRows(sql, conditions, params)
+  } catch (error) {
+    logger.warn('Delivery board query failed — retrying minimal board SQL', {
+      error: error.message,
+      code: error.code,
+    })
+    rows = await queryMinimalDeliveryBoardRows(conditions, params, sql.scheduledAtExpr)
+  }
 
   const driverIds = [...new Set(rows.map((r) => r.driver_id).filter(Boolean))]
   let locationMap = new Map()
@@ -101,52 +78,7 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
     }
   }
 
-  const orders = rows.map((r) => {
-    const locRow = r.driver_id ? locationMap.get(r.driver_id) : null
-    const tracking = buildTrackingPayload({
-      orderId: r.order_id,
-      locationRow: locRow
-        ? {
-            latitude: locRow.latitude,
-            longitude: locRow.longitude,
-            accuracyMeters: locRow.accuracyMeters,
-            speedMps: locRow.speedMps,
-            headingDegrees: locRow.headingDegrees,
-            recordedAt: locRow.recordedAt,
-            orderId: locRow.orderId,
-          }
-        : null,
-      allowDriverFallback: true,
-    })
-    const destLat = r.destination_latitude != null ? Number(r.destination_latitude) : null
-    const destLng = r.destination_longitude != null ? Number(r.destination_longitude) : null
-    const destinationCoordinatesAvailable =
-      destLat != null && destLng != null && Number.isFinite(destLat) && Number.isFinite(destLng)
-    const deliveryStatus = normalizeDeliveryStatus(r.delivery_status)
-    const etaAvailable =
-      destinationCoordinatesAvailable &&
-      Boolean(tracking?.hasLocation) &&
-      ['assigned', 'out_for_delivery'].includes(deliveryStatus)
-
-    return {
-      orderId: r.order_id,
-      orderStatus: r.order_status,
-      restaurantName: r.restaurant_name,
-      deliveryArea: r.delivery_area,
-      deliveryStatus,
-      driverId: r.driver_id,
-      driverName: r.driver_name,
-      hasPod: r.has_pod,
-      scheduledAt: r.scheduled_at,
-      tracking,
-      driverLastSeen: buildDriverLastSeenAlias(tracking),
-      destinationCoordinatesAvailable,
-      destinationLatitude: destinationCoordinatesAvailable ? destLat : null,
-      destinationLongitude: destinationCoordinatesAvailable ? destLng : null,
-      destinationLabel: destinationCoordinatesAvailable ? r.destination_label : null,
-      etaAvailable,
-    }
-  })
+  const orders = rows.map((r) => mapBoardRow(r, locationMap))
 
   const byArea = {}
   for (const order of orders) {
@@ -182,6 +114,116 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
       failed: orders.filter((o) => o.deliveryStatus === 'failed').length,
       rescheduled: orders.filter((o) => o.deliveryStatus === 'rescheduled').length,
     },
+  }
+}
+
+async function queryDeliveryBoardRows(sql, conditions, params) {
+  const { rows } = await query(
+    `
+    SELECT DISTINCT ON (o.id)
+      o.id AS order_id,
+      o.status AS order_status,
+      r.name AS restaurant_name,
+      ${sql.deliveryAreaExpr} AS delivery_area,
+      da.id AS assignment_id,
+      COALESCE(da.status, 'pending') AS delivery_status,
+      da.driver_id AS driver_id,
+      ${sql.driverNameExpr} AS driver_name,
+      ${sql.hasPodExpr} AS has_pod,
+      ${sql.scheduledAtExpr} AS scheduled_at,
+      ${sql.destinationLatitudeExpr} AS destination_latitude,
+      ${sql.destinationLongitudeExpr} AS destination_longitude,
+      ${sql.destinationLabelExpr} AS destination_label
+    FROM customer_order o
+    JOIN order_item oi ON oi.order_id = o.id
+    JOIN restaurant r ON r.id = o.restaurant_id
+    ${sql.branchJoinSql}
+    ${sql.driverLateralSql}
+    ${sql.zoneJoinSql}
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY o.id, scheduled_at DESC
+    LIMIT 500
+  `,
+    params
+  )
+  return rows
+}
+
+/** Last-resort board SQL — only core tables/columns guaranteed on every Supplify DB. */
+async function queryMinimalDeliveryBoardRows(conditions, params, scheduledAtExpr) {
+  const safeConditions = conditions.filter((c) => !c.includes('da.') && !c.includes('dz.'))
+  const { rows } = await query(
+    `
+    SELECT DISTINCT ON (o.id)
+      o.id AS order_id,
+      o.status AS order_status,
+      r.name AS restaurant_name,
+      'Unassigned area' AS delivery_area,
+      NULL::uuid AS assignment_id,
+      'pending' AS delivery_status,
+      NULL::uuid AS driver_id,
+      NULL::text AS driver_name,
+      FALSE AS has_pod,
+      ${scheduledAtExpr} AS scheduled_at,
+      NULL::numeric AS destination_latitude,
+      NULL::numeric AS destination_longitude,
+      r.name AS destination_label
+    FROM customer_order o
+    JOIN order_item oi ON oi.order_id = o.id
+    JOIN restaurant r ON r.id = o.restaurant_id
+    WHERE ${safeConditions.join(' AND ')}
+    ORDER BY o.id, scheduled_at DESC
+    LIMIT 500
+  `,
+    params
+  )
+  return rows
+}
+
+function mapBoardRow(r, locationMap) {
+  const locRow = r.driver_id ? locationMap.get(r.driver_id) : null
+  const tracking = buildTrackingPayload({
+    orderId: r.order_id,
+    locationRow: locRow
+      ? {
+          latitude: locRow.latitude,
+          longitude: locRow.longitude,
+          accuracyMeters: locRow.accuracyMeters,
+          speedMps: locRow.speedMps,
+          headingDegrees: locRow.headingDegrees,
+          recordedAt: locRow.recordedAt,
+          orderId: locRow.orderId,
+        }
+      : null,
+    allowDriverFallback: true,
+  })
+  const destLat = r.destination_latitude != null ? Number(r.destination_latitude) : null
+  const destLng = r.destination_longitude != null ? Number(r.destination_longitude) : null
+  const destinationCoordinatesAvailable =
+    destLat != null && destLng != null && Number.isFinite(destLat) && Number.isFinite(destLng)
+  const deliveryStatus = normalizeDeliveryStatus(r.delivery_status)
+  const etaAvailable =
+    destinationCoordinatesAvailable &&
+    Boolean(tracking?.hasLocation) &&
+    ['assigned', 'out_for_delivery'].includes(deliveryStatus)
+
+  return {
+    orderId: r.order_id,
+    orderStatus: r.order_status,
+    restaurantName: r.restaurant_name,
+    deliveryArea: r.delivery_area,
+    deliveryStatus,
+    driverId: r.driver_id,
+    driverName: r.driver_name,
+    hasPod: r.has_pod,
+    scheduledAt: r.scheduled_at,
+    tracking,
+    driverLastSeen: buildDriverLastSeenAlias(tracking),
+    destinationCoordinatesAvailable,
+    destinationLatitude: destinationCoordinatesAvailable ? destLat : null,
+    destinationLongitude: destinationCoordinatesAvailable ? destLng : null,
+    destinationLabel: destinationCoordinatesAvailable ? r.destination_label : null,
+    etaAvailable,
   }
 }
 

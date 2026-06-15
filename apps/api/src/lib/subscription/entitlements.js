@@ -32,6 +32,8 @@ import {
   buildLimitExceededPayload,
   buildFeatureNotAvailablePayload,
 } from './plans.js'
+import { resolveSmartReorderCapabilities } from '../smart-reorder-tier.js'
+import { isAiPlatformEnabledForTenant } from '../ai-platform.js'
 
 export { HIDDEN_ENTITLEMENT_LIMIT_KEYS }
 export { normalizePlanCode, formatPlanDisplayName } from '../plan-codes.js'
@@ -48,6 +50,18 @@ function getEnforcementPlanLimits(subscription, tenantType) {
 const SUBSCRIPTION_CACHE_TTL = 180
 /** Full entitlements payload (plan, limits, features, usage) — hot path on every app shell load. */
 const ENTITLEMENTS_CACHE_TTL = 300
+/**
+ * Stale-while-revalidate: serve cached entitlements immediately on hit; usage counts may lag
+ * until TTL expiry or explicit invalidation (plan/subscription changes). Hits younger than
+ * ENTITLEMENTS_FRESH_USAGE_SEC skip usage re-count and return the cached snapshot as-is.
+ */
+const ENTITLEMENTS_FRESH_USAGE_SEC = 60
+
+function stripEntitlementsCacheMeta(cached) {
+  if (!cached || typeof cached !== 'object') return cached
+  const { _cachedAt, ...payload } = cached
+  return payload
+}
 
 /** Build a consistent cache key for a tenant subscription. */
 function subscriptionCacheKey(tenantId, tenantType) {
@@ -712,7 +726,24 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
   const cached = await getCache(cacheKey)
   if (cached !== null) {
     noteCacheHit(req, 'entitlements')
-    return cached
+    const ageMs = cached._cachedAt ? Date.now() - cached._cachedAt : 0
+    if (ageMs < ENTITLEMENTS_FRESH_USAGE_SEC * 1000) {
+      return stripEntitlementsCacheMeta(cached)
+    }
+    try {
+      const usage = await getUsageSnapshot(tenantId, tenantType)
+      stripHiddenEntitlementLimits(cached.limits, usage)
+      const refreshed = { ...stripEntitlementsCacheMeta(cached), usage, _cachedAt: Date.now() }
+      await setCache(cacheKey, refreshed, ENTITLEMENTS_CACHE_TTL).catch(() => {})
+      return stripEntitlementsCacheMeta(refreshed)
+    } catch (err) {
+      logger.warn('Entitlements usage refresh failed, serving cached payload', {
+        tenantId,
+        tenantType,
+        error: err.message,
+      })
+      return stripEntitlementsCacheMeta(cached)
+    }
   }
   noteCacheMiss(req, 'entitlements')
 
@@ -720,7 +751,7 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
     const again = await getCache(cacheKey)
     if (again !== null) {
       noteCacheHit(req, 'entitlements')
-      return again
+      return stripEntitlementsCacheMeta(again)
     }
 
     const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
@@ -847,9 +878,26 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
     const usageWindowMeta = {}
     limitKeys.forEach((k) => {
       if (HIDDEN_ENTITLEMENT_LIMIT_KEYS.has(k)) return
-      if (k === 'orders_per_day' || k === 'chats_per_day')
+      if (k === 'orders_per_day' || k === 'chats_per_day' || k === 'ai_requests_per_day')
         usageWindowMeta[k] = { date: new Date().toISOString().slice(0, 10) }
     })
+
+    let smartReorder = null
+    if (tenantType === 'RESTAURANT') {
+      const smartReorderValue = features.smart_reorder ?? subscription.features?.smart_reorder
+      const caps = resolveSmartReorderCapabilities(smartReorderValue)
+      const aiPlatformFeature = Boolean(features.ai_platform)
+      const aiPlatformEnabled = await isAiPlatformEnabledForTenant(billingTenantId, tenantType)
+      smartReorder = {
+        tier: caps.tier,
+        capabilities: {
+          ...caps.capabilities,
+          llmExplain: caps.capabilities.forecast && aiPlatformFeature,
+          nlAsk: caps.capabilities.seasonality && aiPlatformFeature,
+        },
+        aiPlatformEnabled,
+      }
+    }
 
     const payload = {
       tenantType,
@@ -906,9 +954,11 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
                 : null,
             }
           : null,
+      smartReorder,
     }
 
-    await setCache(cacheKey, payload, ENTITLEMENTS_CACHE_TTL).catch(() => {})
+    const cachedPayload = { ...payload, _cachedAt: Date.now() }
+    await setCache(cacheKey, cachedPayload, ENTITLEMENTS_CACHE_TTL).catch(() => {})
     return payload
   })
 }

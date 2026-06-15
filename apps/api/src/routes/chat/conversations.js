@@ -51,12 +51,16 @@ router.use(
 
 router.get('/conversations', async (req, res) => {
   try {
-    let queryText
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '50'), 10) || 50, 1), 100)
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0)
+
+    let listQueryText
+    let countQueryText
     let queryParams
 
     const tenant = await getRequestTenant(req)
     if (tenant?.tenantType === 'SUPPLIER') {
-      queryText = `
+      listQueryText = `
         SELECT 
           c.*,
           COALESCE(cp.unread_count, 0) AS unread_count,
@@ -67,20 +71,31 @@ router.get('/conversations', async (req, res) => {
           COALESCE(cp.is_pinned, false) AS is_pinned,
           COALESCE(cp.is_archived, false) AS is_archived,
           COALESCE(r.name, s.name) as participant_name,
-          (SELECT content FROM message WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_preview
+          lm.content as last_message_preview
         FROM conversation c
         LEFT JOIN conversation_participant cp ON cp.conversation_id = c.id AND cp.participant_type = 'SUPPLIER'
         LEFT JOIN supplier s ON s.id = c.supplier_id
         LEFT JOIN restaurant r ON r.id = c.restaurant_id
+        LEFT JOIN LATERAL (
+          SELECT content FROM message WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1
+        ) lm ON true
         WHERE c.supplier_id = $1
           AND COALESCE(c.is_admin_conversation, false) = false
           AND (cp.id IS NULL OR cp.is_archived = false)
-        ORDER BY COALESCE(cp.is_pinned, false) DESC, c.last_message_at DESC NULLS LAST
-        LIMIT 200
+        ORDER BY COALESCE(cp.is_pinned, false) DESC, c.last_message_at DESC NULLS LAST, c.updated_at DESC
+        LIMIT $2 OFFSET $3
       `
-      queryParams = [tenant.tenantId]
+      countQueryText = `
+        SELECT COUNT(*)::int AS total
+        FROM conversation c
+        LEFT JOIN conversation_participant cp ON cp.conversation_id = c.id AND cp.participant_type = 'SUPPLIER'
+        WHERE c.supplier_id = $1
+          AND COALESCE(c.is_admin_conversation, false) = false
+          AND (cp.id IS NULL OR cp.is_archived = false)
+      `
+      queryParams = [tenant.tenantId, limit, offset]
     } else if (tenant?.tenantType === 'RESTAURANT') {
-      queryText = `
+      listQueryText = `
         SELECT 
           c.*,
           COALESCE(cp.unread_count, 0) AS unread_count,
@@ -91,32 +106,56 @@ router.get('/conversations', async (req, res) => {
           COALESCE(cp.is_pinned, false) AS is_pinned,
           COALESCE(cp.is_archived, false) AS is_archived,
           COALESCE(s.name, r.name) as participant_name,
-          (SELECT content FROM message WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_preview
+          lm.content as last_message_preview
         FROM conversation c
         LEFT JOIN conversation_participant cp ON cp.conversation_id = c.id AND cp.participant_type = 'RESTAURANT'
         LEFT JOIN supplier s ON s.id = c.supplier_id
         LEFT JOIN restaurant r ON r.id = c.restaurant_id
+        LEFT JOIN LATERAL (
+          SELECT content FROM message WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1
+        ) lm ON true
         WHERE c.restaurant_id = $1
           AND COALESCE(c.is_admin_conversation, false) = false
           AND (cp.id IS NULL OR cp.is_archived = false)
-        ORDER BY COALESCE(cp.is_pinned, false) DESC, c.last_message_at DESC NULLS LAST
-        LIMIT 200
+        ORDER BY COALESCE(cp.is_pinned, false) DESC, c.last_message_at DESC NULLS LAST, c.updated_at DESC
+        LIMIT $2 OFFSET $3
       `
-      queryParams = [tenant.tenantId]
+      countQueryText = `
+        SELECT COUNT(*)::int AS total
+        FROM conversation c
+        LEFT JOIN conversation_participant cp ON cp.conversation_id = c.id AND cp.participant_type = 'RESTAURANT'
+        WHERE c.restaurant_id = $1
+          AND COALESCE(c.is_admin_conversation, false) = false
+          AND (cp.id IS NULL OR cp.is_archived = false)
+      `
+      queryParams = [tenant.tenantId, limit, offset]
     } else {
       return res.json({
         ok: true,
-        data: { conversations: [] },
+        data: {
+          conversations: [],
+          pagination: { total: 0, limit, offset },
+        },
         error: null,
         requestId: req.requestId,
       })
     }
 
-    const { rows } = await query(queryText, queryParams)
+    const [{ rows }, { rows: countRows }] = await Promise.all([
+      query(listQueryText, queryParams),
+      query(countQueryText, [queryParams[0]]),
+    ])
 
     res.json({
       ok: true,
-      data: { conversations: rows },
+      data: {
+        conversations: rows,
+        pagination: {
+          total: parseInt(countRows[0]?.total ?? 0, 10),
+          limit,
+          offset,
+        },
+      },
       error: null,
       requestId: req.requestId,
     })

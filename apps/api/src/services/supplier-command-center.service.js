@@ -1,13 +1,32 @@
 import { query } from '../lib/db.js'
+import { getCache, setCache } from '../lib/cache.js'
 import { getSupplierReceivables } from './supplier-receivables.service.js'
 import { getReorderIntelligence } from './supplier-reorder-intelligence.service.js'
 import { buildTrackingPayload } from '../lib/delivery-tracking-payload.js'
 import { isGpsTrackingEnabled } from '../lib/delivery-tracking-payload.js'
+import { getSupplierGrowthMetrics } from './supplier-growth-metrics.service.js'
 import { DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD } from '../lib/supplier-stock-status.js'
 
 const OPEN_INVOICE_STATUSES = ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE']
+const COMMAND_CENTER_CACHE_TTL_SECONDS = 45
+
+function commandCenterCacheKey(supplierId) {
+  return `supplier:command-center:${supplierId}`
+}
 
 export async function getSupplierCommandCenter(supplierId) {
+  const cacheKey = commandCenterCacheKey(supplierId)
+  const cached = await getCache(cacheKey)
+  if (cached) {
+    return cached
+  }
+
+  const payload = await buildSupplierCommandCenter(supplierId)
+  await setCache(cacheKey, payload, COMMAND_CENTER_CACHE_TTL_SECONDS).catch(() => {})
+  return payload
+}
+
+async function buildSupplierCommandCenter(supplierId) {
   const [
     ordersToPrepare,
     deliveriesPending,
@@ -18,6 +37,7 @@ export async function getSupplierCommandCenter(supplierId) {
     receivables,
     reorderIntel,
     boostedDeals,
+    customerGrowth,
   ] = await Promise.all([
     countOrdersToPrepareToday(supplierId),
     countDeliveriesPendingToday(supplierId),
@@ -28,6 +48,7 @@ export async function getSupplierCommandCenter(supplierId) {
     getSupplierReceivables(supplierId),
     getReorderIntelligence(supplierId),
     getBoostedDealsSummary(supplierId),
+    getSupplierGrowthMetrics(supplierId).catch(() => null),
   ])
 
   const priorities = buildPriorities({
@@ -67,6 +88,7 @@ export async function getSupplierCommandCenter(supplierId) {
       reorderOpportunities: reorderIntel.customersAtRisk.slice(0, 5),
       lowStock: lowStock.slice(0, 5),
       boostedDeals,
+      customerGrowth,
     },
   }
 }

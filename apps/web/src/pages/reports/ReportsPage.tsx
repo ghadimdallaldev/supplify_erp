@@ -1,17 +1,10 @@
-import { useMemo, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { useState } from 'react'
+import { Navigate } from 'react-router-dom'
+import { BarChart3, Package, Store, TrendingUp } from 'lucide-react'
+import { Card, CardContent } from '../../components/ui/card'
 import { PageHeader } from '../../components/ui/page-header'
-import { Button } from '../../components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
-import { Label } from '../../components/ui/label'
-import { Input } from '../../components/ui/input'
-import { Select, SelectTrigger } from '../../components/ui/select'
-import {
-  useGetRestaurantReportQuery,
-  useGetSupplierReportQuery,
-  useGetBranchesQuery,
-  useGetEntitlementsQuery,
-} from '../../services/api'
+import { useGetBranchesQuery, useGetEntitlementsQuery } from '../../services/api'
 import { useImpersonation } from '../../hooks/useImpersonation'
 import { useWorkspaceRole } from '../../hooks/useWorkspaceRole'
 import { RequirePermission } from '../../components/RequirePermission'
@@ -20,40 +13,12 @@ import {
   RESTAURANT_REPORTS_ANY_OF,
   SUPPLIER_ANALYTICS_ANY_OF,
 } from '../../lib/workspaceRoleProfile'
-import { Navigate } from 'react-router-dom'
-import { downloadCsv, reportRowsToCsv } from '../../utils/csvExport'
-import { reportErrorMessage } from '../../lib/reportResponse'
-import { Loader2, Download, AlertCircle } from 'lucide-react'
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from 'recharts'
+import { applyReportDatePreset, ReportFiltersBar } from '../../components/reports/ReportFiltersBar'
+import { ReportPanel } from '../../components/reports/ReportPanel'
+import type { ReportDef } from '../../components/reports/reportSummary'
 
 function defaultRange() {
-  const to = new Date()
-  const from = new Date()
-  from.setDate(from.getDate() - 30)
-  return {
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
-  }
-}
-
-type ReportDef = {
-  key: string
-  label: string
-  path: string
-  chart: 'line' | 'bar'
-  xKey: string
-  yKey: string
-  columns: Array<{ key: string; label: string }>
+  return applyReportDatePreset(30)
 }
 
 const RESTAURANT_REPORTS: ReportDef[] = [
@@ -139,148 +104,10 @@ const SUPPLIER_REPORTS: ReportDef[] = [
   },
 ]
 
-function ReportPanel({
-  def,
-  isRestaurant,
-  from,
-  to,
-  branchId,
-  granularity,
-}: {
-  def: ReportDef
-  isRestaurant: boolean
-  from: string
-  to: string
-  branchId: string
-  granularity: string
-}) {
-  const restaurantQuery = useGetRestaurantReportQuery(
-    { path: def.path, from, to, branchId: branchId || undefined, granularity },
-    { skip: !isRestaurant, refetchOnMountOrArgChange: true }
-  )
-  const supplierQuery = useGetSupplierReportQuery(
-    { path: def.path, from, to, granularity },
-    { skip: isRestaurant, refetchOnMountOrArgChange: true }
-  )
-  const { data, isLoading, isFetching, isError, error, refetch } = isRestaurant
-    ? restaurantQuery
-    : supplierQuery
-  const rows = useMemo(() => data?.data ?? [], [data])
-  const showInitialLoad = isLoading && !data
-  const showRefreshing = isFetching && !isLoading && rows.length > 0
-
-  const chartData = useMemo(
-    () =>
-      rows.map((row) => ({
-        name: String(row[def.xKey] ?? '').slice(0, 12),
-        value: Number(row[def.yKey] ?? 0),
-        full: row,
-      })),
-    [rows, def.xKey, def.yKey]
-  )
-
-  const exportCsv = () => {
-    downloadCsv(
-      `${def.key}-report.csv`,
-      def.columns.map((c) => c.label),
-      reportRowsToCsv(rows, def.columns)
-    )
-  }
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle className="flex items-center gap-2">
-          {def.label}
-          {showRefreshing ? (
-            <Loader2 className="h-4 w-4 animate-spin text-[var(--text-muted)]" />
-          ) : null}
-        </CardTitle>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={exportCsv}
-          disabled={!rows.length || showInitialLoad}
-        >
-          <Download className="h-4 w-4 mr-1" />
-          CSV
-        </Button>
-      </CardHeader>
-      <CardContent>
-        {showInitialLoad ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
-          </div>
-        ) : isError ? (
-          <div className="flex flex-col items-center gap-3 py-10 text-center">
-            <AlertCircle className="h-8 w-8 text-[var(--red)]" />
-            <p className="text-sm text-[var(--text-muted)] max-w-md">{reportErrorMessage(error)}</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>
-              Try again
-            </Button>
-          </div>
-        ) : rows.length === 0 ? (
-          <p className="text-sm text-[var(--text-muted)] py-8 text-center">
-            No data for this period. Try widening the date range or placing orders in this window.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            <div className="w-full min-h-[280px]" style={{ height: 280 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                {def.chart === 'line' ? (
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Line
-                      type="monotone"
-                      dataKey="value"
-                      stroke="var(--brand)"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </LineChart>
-                ) : (
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="var(--brand-mid)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                )}
-              </ResponsiveContainer>
-            </div>
-            <div className="overflow-x-auto text-sm">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b text-left text-[var(--text-muted)]">
-                    {def.columns.map((col) => (
-                      <th key={col.key} className="py-2 pr-4">
-                        {col.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.slice(0, 20).map((row, idx) => (
-                    <tr key={idx} className="border-b border-[var(--app-border)]">
-                      {def.columns.map((col) => (
-                        <td key={col.key} className="py-2 pr-4">
-                          {String(row[col.key] ?? '—')}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
+const RESTAURANT_REPORT_ICONS: Record<string, typeof TrendingUp> = {
+  'order-volume': TrendingUp,
+  'spend-supplier': Store,
+  'top-products': Package,
 }
 
 export function ReportsPage() {
@@ -306,6 +133,12 @@ export function ReportsPage() {
     ? { anyOf: [...RESTAURANT_REPORTS_ANY_OF] }
     : { anyOf: [...SUPPLIER_ANALYTICS_ANY_OF] }
 
+  const applyPreset = (days: number) => {
+    const next = applyReportDatePreset(days)
+    setFrom(next.from)
+    setTo(next.to)
+  }
+
   if (isRestaurant && !persona.showGlobalReports) {
     return <Navigate to={persona.homePath} replace />
   }
@@ -316,7 +149,7 @@ export function ReportsPage() {
         <div className="space-y-4">
           <PageHeader title="Reports" />
           <Card>
-            <CardContent className="py-8 text-sm text-[var(--text-muted)]">
+            <CardContent className="py-8 text-sm text-[var(--text-mid)]">
               Reports are not available on your current plan. Contact support if this looks wrong.
             </CardContent>
           </Card>
@@ -327,63 +160,45 @@ export function ReportsPage() {
 
   return (
     <RequirePermission {...reportsPermissionGate} title="reports">
-      <div className="space-y-6">
+      <div className="space-y-6" data-testid="reports-page">
         <PageHeader
-          title="Reports & Analytics"
+          title={isRestaurant ? 'Purchasing reports' : 'Reports & Analytics'}
           description={
             isRestaurant
-              ? 'Restaurant purchasing and operations insights'
+              ? 'Track order volume, supplier spend, and top products across your locations.'
               : 'Supplier revenue and fulfillment insights'
           }
         />
 
-        <Card>
-          <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <Label>From</Label>
-              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-            </div>
-            <div>
-              <Label>To</Label>
-              <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-            </div>
-            <div>
-              <Label>Granularity</Label>
-              <Select value={granularity} onValueChange={setGranularity}>
-                <SelectTrigger>
-                  <option value="day">Day</option>
-                  <option value="week">Week</option>
-                  <option value="month">Month</option>
-                </SelectTrigger>
-              </Select>
-            </div>
-            {isRestaurant && branches.length > 0 ? (
-              <div>
-                <Label>Branch</Label>
-                <Select value={branchId} onValueChange={setBranchId}>
-                  <SelectTrigger>
-                    <option value="">All branches</option>
-                    {branches.map((b: { id: string; name: string }) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </SelectTrigger>
-                </Select>
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
+        <ReportFiltersBar
+          from={from}
+          to={to}
+          granularity={granularity}
+          branchId={branchId}
+          branches={branches}
+          showBranchFilter={isRestaurant && branches.length > 0}
+          onFromChange={setFrom}
+          onToChange={setTo}
+          onGranularityChange={setGranularity}
+          onBranchChange={setBranchId}
+          onPresetDays={applyPreset}
+        />
 
-        <Tabs value={activeReport} onValueChange={setActiveReport}>
-          <TabsList className="flex flex-wrap h-auto">
-            {defs.map((def) => (
-              <TabsTrigger key={def.key} value={def.key}>
-                {def.label}
-              </TabsTrigger>
-            ))}
+        <Tabs value={activeReport} onValueChange={setActiveReport} className="space-y-4">
+          <TabsList className="tabs-scroll h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
+            {defs.map((def) => {
+              const Icon = isRestaurant
+                ? (RESTAURANT_REPORT_ICONS[def.key] ?? BarChart3)
+                : BarChart3
+              return (
+                <TabsTrigger key={def.key} value={def.key} className="gap-1.5 text-xs sm:text-sm">
+                  <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  {def.label}
+                </TabsTrigger>
+              )
+            })}
           </TabsList>
-          <TabsContent value={current.key} className="mt-4">
+          <TabsContent value={current.key}>
             <ReportPanel
               key={`${current.key}-${from}-${to}-${branchId}-${granularity}`}
               def={current}

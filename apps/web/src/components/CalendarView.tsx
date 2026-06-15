@@ -135,22 +135,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
 
   const calendarEvents = useMemo(() => {
     if (!data?.events) return []
-    let source = data.events.filter((event) => Boolean(event.start))
-
-    const useCompactOrderEvents =
-      activeRole === 'SUPPLIER' && (currentView === 'dayGridMonth' || currentView === 'listWeek')
-
-    if (useCompactOrderEvents) {
-      const byOrder = new Map<string, OrdersCalendarEvent>()
-      for (const ev of source) {
-        const key = ev.orderId || ev.id
-        const prev = byOrder.get(key)
-        if (!prev || ev.type === 'PURCHASE_ORDER') {
-          byOrder.set(key, ev)
-        }
-      }
-      source = Array.from(byOrder.values())
-    }
+    const source = data.events.filter((event) => Boolean(event.start))
 
     return source.map((event) => ({
       id: event.id,
@@ -159,7 +144,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
       end: event.end ?? undefined,
       extendedProps: event,
     }))
-  }, [data?.events, activeRole, currentView])
+  }, [data?.events])
 
   const supplierLabel = activeRole === 'SUPPLIER' ? 'Restaurant' : 'Supplier'
   const totalPages = useMemo(() => {

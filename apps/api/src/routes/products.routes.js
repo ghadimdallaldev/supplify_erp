@@ -8,6 +8,7 @@ import {
   requireAnyPermission,
   getRequestTenant,
   getRestaurantIdForRequest,
+  getSupplierIdForRequest,
 } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -24,9 +25,80 @@ import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../lib/safe-update.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { enrichProductsWithResolvedPricing } from '../services/resolve-product-price.service.js'
-import { getCache, setCache } from '../lib/cache.js'
+import { getCache, setCache, deleteCache } from '../lib/cache.js'
 
 const CATALOG_META_CACHE_TTL_SECONDS = 300
+
+/** Slim product columns for list/search endpoints (avoids wide p.* scans). */
+const PRODUCT_LIST_COLUMNS = `
+  p.id,
+  p.sku,
+  p.name,
+  p.description,
+  p.category,
+  p.unit,
+  p.supplier_id,
+  p.image_url,
+  p.image_thumb_url,
+  p.tags,
+  p.created_at,
+  p.updated_at
+`
+
+function buildInventoryJoin(scopedSupplierId, supplierParamIndex) {
+  if (scopedSupplierId && supplierParamIndex != null) {
+    return `LEFT JOIN (
+        SELECT i.product_id, SUM(i.available_qty) as total_available
+        FROM inventory i
+        INNER JOIN product inv_p ON inv_p.id = i.product_id AND inv_p.supplier_id = $${supplierParamIndex}
+        GROUP BY i.product_id
+      ) inv ON inv.product_id = p.id`
+  }
+  return `LEFT JOIN (
+        SELECT product_id, SUM(available_qty) as total_available
+        FROM inventory
+        GROUP BY product_id
+      ) inv ON inv.product_id = p.id`
+}
+
+function catalogCategoriesCacheKey(supplierId) {
+  return `productCats:${supplierId ?? 'all'}`
+}
+
+function catalogTagsCacheKey(supplierId) {
+  return `productTags:${supplierId ?? 'all'}`
+}
+
+async function invalidateCatalogMetaCache(supplierId) {
+  await Promise.all([
+    deleteCache(catalogCategoriesCacheKey(supplierId)).catch(() => {}),
+    deleteCache(catalogCategoriesCacheKey(null)).catch(() => {}),
+    deleteCache(catalogTagsCacheKey(supplierId)).catch(() => {}),
+    deleteCache(catalogTagsCacheKey(null)).catch(() => {}),
+  ])
+}
+
+function encodeProductCursor(createdAt, id) {
+  const payload = `${new Date(createdAt).toISOString()},${id}`
+  return Buffer.from(payload, 'utf8').toString('base64url')
+}
+
+function decodeProductCursor(cursor) {
+  if (!cursor) return null
+  let decoded = cursor
+  try {
+    decoded = Buffer.from(cursor, 'base64url').toString('utf8')
+  } catch {
+    decoded = cursor
+  }
+  const commaIdx = decoded.lastIndexOf(',')
+  if (commaIdx <= 0) return null
+  const createdAt = decoded.slice(0, commaIdx)
+  const id = decoded.slice(commaIdx + 1)
+  const ts = new Date(createdAt)
+  if (!id || Number.isNaN(ts.getTime())) return null
+  return { createdAt: ts.toISOString(), id }
+}
 
 const router = express.Router()
 
@@ -85,6 +157,7 @@ const productCreateSchema = z.object({
   brand: z.string().max(100).optional(),
   category: z.string().max(100).optional(),
   image_url: z.string().url().optional(),
+  image_thumb_url: z.string().url().optional(),
   unit: z.string().max(20).optional(),
 })
 
@@ -130,6 +203,8 @@ const productListSchema = z.object({
     .string()
     .transform((val) => parseInt(val, 10))
     .default('0'),
+  /** Keyset cursor (base64 or "created_at,id") for large catalogs */
+  cursor: z.string().optional(),
 })
 
 // Get product categories
@@ -138,7 +213,7 @@ router.get('/categories', async (req, res) => {
     const tenant = await getRequestTenant(req)
     const supplierId = tenant?.tenantType === 'SUPPLIER' ? tenant.tenantId : null
 
-    const cacheKey = `productCats:${supplierId ?? 'all'}`
+    const cacheKey = catalogCategoriesCacheKey(supplierId)
     let categories = await getCache(cacheKey)
     if (!Array.isArray(categories)) {
       const { rows } = await query(
@@ -322,14 +397,31 @@ router.get('/', async (req, res) => {
       whereConditions.push(`inv.total_available > 0`)
     }
 
+    const cursorTuple = params.cursor ? decodeProductCursor(params.cursor) : null
+    if (params.cursor && !cursorTuple) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Invalid cursor',
+        },
+        requestId: req.requestId,
+      })
+    }
+    if (cursorTuple) {
+      whereConditions.push(
+        `(p.created_at, p.id) < ($${paramIndex}::timestamptz, $${paramIndex + 1}::uuid)`
+      )
+      queryParams.push(cursorTuple.createdAt, cursorTuple.id)
+      paramIndex += 2
+    }
+
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
     const needsInventoryJoin = Boolean(params.inStock || params.includeStock)
+    const supplierParamIndex = scopedSupplierId ? 1 : null
     const inventoryJoin = needsInventoryJoin
-      ? `LEFT JOIN (
-        SELECT product_id, SUM(available_qty) as total_available
-        FROM inventory
-        GROUP BY product_id
-      ) inv ON inv.product_id = p.id`
+      ? buildInventoryJoin(scopedSupplierId, supplierParamIndex)
       : ''
     const availableQtyExpr = needsInventoryJoin
       ? 'COALESCE(inv.total_available, 0) as available_qty'
@@ -349,12 +441,15 @@ router.get('/', async (req, res) => {
       paramIndex += 2
     }
 
+    const useKeyset = Boolean(cursorTuple)
+    const fetchLimit = useKeyset ? params.limit + 1 : params.limit
+
     const sql = `
       SELECT 
-        p.*,
+        ${PRODUCT_LIST_COLUMNS},
+        s.id as supplier_id,
         s.name as supplier_name,
         s.slug as supplier_slug,
-        s.contact_email as supplier_email,
         ${availableQtyExpr},
         ${favoritedExpr},
         pr.amount as current_price,
@@ -371,11 +466,15 @@ router.get('/', async (req, res) => {
         LIMIT 1
       ) pr ON true
       ${whereClause}
-      ORDER BY ${orderByClause}
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      ORDER BY ${orderByClause}${useKeyset ? ', p.id DESC' : ''}
+      LIMIT $${paramIndex}${useKeyset ? '' : ` OFFSET $${paramIndex + 1}`}
     `
 
-    queryParams.push(params.limit, params.offset)
+    if (useKeyset) {
+      queryParams.push(fetchLimit)
+    } else {
+      queryParams.push(params.limit, params.offset)
+    }
 
     const countSql = params.inStock
       ? `
@@ -410,10 +509,23 @@ router.get('/', async (req, res) => {
 
     const [mainResult, countResult] = await Promise.all([
       query(sql, queryParams),
-      query(countSql, countParams),
+      useKeyset ? Promise.resolve({ rows: [{ total: null }] }) : query(countSql, countParams),
     ])
     let { rows } = mainResult
     const { rows: countRows } = countResult
+
+    let nextCursor = null
+    if (useKeyset && rows.length > params.limit) {
+      const lastKept = rows[params.limit - 1]
+      nextCursor = encodeProductCursor(lastKept.created_at, lastKept.id)
+      rows = rows.slice(0, params.limit)
+    } else if (!useKeyset && rows.length > 0) {
+      const total = parseInt(countRows[0].total, 10)
+      if (params.offset + rows.length < total) {
+        const last = rows[rows.length - 1]
+        nextCursor = encodeProductCursor(last.created_at, last.id)
+      }
+    }
 
     if (tenant?.tenantType === 'RESTAURANT' && restaurantId) {
       rows = await enrichProductsWithResolvedPricing(rows, restaurantId)
@@ -424,9 +536,10 @@ router.get('/', async (req, res) => {
       data: {
         products: rows,
         pagination: {
-          total: parseInt(countRows[0].total),
+          total: useKeyset ? null : parseInt(countRows[0].total),
           limit: params.limit,
-          offset: params.offset,
+          offset: useKeyset ? null : params.offset,
+          nextCursor,
         },
       },
       error: null,
@@ -468,48 +581,72 @@ const favoriteProductSchema = z.object({
   productId: z.string().uuid(),
 })
 
+const favoriteListSchema = z.object({
+  limit: z.coerce.number().min(1).max(100).default(50),
+  offset: z.coerce.number().min(0).default(0),
+})
+
 // List favorited products (restaurant)
 router.get('/favorites', requireRole(['RESTAURANT']), async (req, res) => {
   try {
+    const params = favoriteListSchema.parse(req.query)
     const restaurantId = await getRestaurantIdForRequest(req)
     const userId = req.userData?.id
     if (!restaurantId || !userId) {
       throw new ValidationError('Restaurant context required')
     }
 
-    const { rows } = await query(
-      `
-      SELECT
-        p.*,
-        s.name AS supplier_name,
-        s.slug AS supplier_slug,
-        s.contact_email AS supplier_email,
-        pf.created_at AS favorited_at,
-        true AS is_favorited,
-        pr.amount AS current_price,
-        pr.currency
-      FROM product_favorite pf
-      JOIN product p ON p.id = pf.product_id
-      JOIN supplier s ON s.id = p.supplier_id
-      LEFT JOIN LATERAL (
-        SELECT amount, currency
-        FROM price
-        WHERE price.product_id = p.id
-          AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-        ORDER BY valid_from DESC
-        LIMIT 1
-      ) pr ON true
-      WHERE pf.restaurant_id = $1 AND pf.user_id = $2
-      ORDER BY pf.created_at DESC
-      `,
-      [restaurantId, userId]
-    )
+    const [{ rows }, { rows: countRows }] = await Promise.all([
+      query(
+        `
+        SELECT
+          p.*,
+          s.id AS supplier_id,
+          s.name AS supplier_name,
+          s.slug AS supplier_slug,
+          pf.created_at AS favorited_at,
+          true AS is_favorited,
+          pr.amount AS current_price,
+          pr.currency
+        FROM product_favorite pf
+        JOIN product p ON p.id = pf.product_id
+        JOIN supplier s ON s.id = p.supplier_id
+        LEFT JOIN LATERAL (
+          SELECT amount, currency
+          FROM price
+          WHERE price.product_id = p.id
+            AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
+          ORDER BY valid_from DESC
+          LIMIT 1
+        ) pr ON true
+        WHERE pf.restaurant_id = $1 AND pf.user_id = $2
+        ORDER BY pf.created_at DESC
+        LIMIT $3 OFFSET $4
+        `,
+        [restaurantId, userId, params.limit, params.offset]
+      ),
+      query(
+        `
+        SELECT COUNT(*)::int AS total
+        FROM product_favorite pf
+        WHERE pf.restaurant_id = $1 AND pf.user_id = $2
+        `,
+        [restaurantId, userId]
+      ),
+    ])
 
     const products = await enrichProductsWithResolvedPricing(rows, restaurantId)
 
     res.json({
       ok: true,
-      data: { products },
+      data: {
+        products,
+        pagination: {
+          total: parseInt(countRows[0].total, 10),
+          limit: params.limit,
+          offset: params.offset,
+        },
+      },
       error: null,
       requestId: req.requestId,
     })
@@ -659,9 +796,9 @@ router.get('/:id', async (req, res) => {
       `
       SELECT 
         p.*,
+        s.id as supplier_id,
         s.name as supplier_name,
         s.slug as supplier_slug,
-        s.contact_email as supplier_email,
         i.available_qty,
         pr.amount as current_price,
         pr.currency
@@ -689,13 +826,70 @@ router.get('/:id', async (req, res) => {
 
     let product = rows[0]
     const detailTenant = await getRequestTenant(req)
-    if (detailTenant?.tenantType === 'RESTAURANT') {
-      const restaurantId = await getRestaurantIdForRequest(req)
-      if (restaurantId) {
-        const [enriched] = await enrichProductsWithResolvedPricing([product], restaurantId)
-        product = enriched
+
+    if (detailTenant?.tenantType === 'SUPPLIER' || req.userData?.role === 'SUPPLIER') {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId || product.supplier_id !== supplierId) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Product not found',
+          },
+          requestId: req.requestId,
+        })
       }
+    } else if (detailTenant?.tenantType === 'RESTAURANT' || req.userData?.role === 'RESTAURANT') {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Product not found',
+          },
+          requestId: req.requestId,
+        })
+      }
+      const { rows: linked } = await query(
+        `
+        SELECT 1
+        FROM supplier_follow sf
+        WHERE sf.supplier_id = $1
+          AND sf.restaurant_id = $2
+          AND NOT EXISTS (
+            SELECT 1 FROM supplier_blocklist sb
+            WHERE sb.supplier_id = $1 AND sb.restaurant_id = $2
+          )
+        UNION
+        SELECT 1
+        FROM customer_order o
+        JOIN order_item oi ON oi.order_id = o.id
+        WHERE o.restaurant_id = $2
+          AND oi.supplier_id = $1
+        LIMIT 1
+      `,
+        [product.supplier_id, restaurantId]
+      )
+      if (!linked.length) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Product not found',
+          },
+          requestId: req.requestId,
+        })
+      }
+      const [enriched] = await enrichProductsWithResolvedPricing([product], restaurantId)
+      product = enriched
     }
+
+    delete product.supplier_email
+    delete product.contact_email
 
     res.json({
       ok: true,
@@ -726,12 +920,8 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
     let supplierId = req.body.supplier_id
 
     if (req.userData.role === 'SUPPLIER') {
-      // Find supplier by user email
-      const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
-        req.userData.email,
-      ])
-
-      if (suppliers.length === 0) {
+      supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
         return res.status(400).json({
           ok: false,
           data: null,
@@ -742,8 +932,6 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
           requestId: req.requestId,
         })
       }
-
-      supplierId = suppliers[0].id
 
       // Check plan limits for suppliers
       const limitCheck = await checkLimit(supplierId, 'SUPPLIER', 'supplier_products_skus')
@@ -860,6 +1048,8 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
         payload_json: { resource_type: 'product', sku: product.sku },
       })
 
+      await invalidateCatalogMetaCache(supplierId)
+
       res.status(201).json({
         ok: true,
         data: { product },
@@ -904,10 +1094,9 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
     const updateData = productUpdateSchema.parse(req.body)
 
     // Check if product exists and user has permission
-    const { rows: existingProducts } = await query(
-      'SELECT p.*, s.contact_email FROM product p JOIN supplier s ON s.id = p.supplier_id WHERE p.id = $1',
-      [id]
-    )
+    const { rows: existingProducts } = await query('SELECT p.* FROM product p WHERE p.id = $1', [
+      id,
+    ])
 
     if (existingProducts.length === 0) {
       throw new NotFoundError('Product not found')
@@ -916,16 +1105,19 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
     const product = existingProducts[0]
 
     // Check ownership for suppliers
-    if (req.userData.role === 'SUPPLIER' && product.contact_email !== req.userData.email) {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'FORBIDDEN',
-          message: 'Access denied. You can only update your own products',
-        },
-        requestId: req.requestId,
-      })
+    if (req.userData.role === 'SUPPLIER') {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId || product.supplier_id !== supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied. You can only update your own products',
+          },
+          requestId: req.requestId,
+        })
+      }
     }
 
     const imageSizeBytes =
@@ -999,6 +1191,7 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
         brand: 'brand',
         category: 'category',
         image_url: 'image_url',
+        image_thumb_url: 'image_thumb_url',
         unit: 'unit',
       },
       { startIndex: paramIndex }
@@ -1044,6 +1237,8 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
       target_id: rows[0].id,
       payload_json: { resource_type: 'product', changes: Object.keys(updateData) },
     })
+
+    await invalidateCatalogMetaCache(product.supplier_id)
 
     res.json({
       ok: true,

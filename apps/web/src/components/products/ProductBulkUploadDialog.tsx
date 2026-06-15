@@ -1,4 +1,4 @@
-import { Download } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { formatNumber } from '../../utils/format'
 import { downloadExampleFile } from './productsShared'
+import type { ProductImportJob } from '../../services/api/endpoints/catalogImport'
 
 type ProductBulkUploadDialogProps = {
   showBulkUpload: boolean
@@ -28,6 +29,8 @@ type ProductBulkUploadDialogProps = {
   handleBulkSubmit: () => void | Promise<void>
   importing: boolean
   isCreating: boolean
+  importJob?: ProductImportJob | null
+  importJobActive?: boolean
 }
 
 export function ProductBulkUploadDialog({
@@ -45,9 +48,27 @@ export function ProductBulkUploadDialog({
   handleBulkSubmit,
   importing,
   isCreating,
+  importJob,
+  importJobActive = false,
 }: ProductBulkUploadDialogProps) {
+  const handleOpenChange = (open: boolean) => {
+    if (!open && importJobActive) {
+      const confirmed = window.confirm(
+        'Product import is still running. Close this dialog? The import will continue in the background.'
+      )
+      if (!confirmed) return
+    }
+    setShowBulkUpload(open)
+    if (!open) {
+      setUploadedFile(null)
+      setUploadPreview([])
+    }
+  }
+
+  const importBusy = importing || importJobActive
+
   return (
-    <Dialog open={showBulkUpload} onOpenChange={setShowBulkUpload}>
+    <Dialog open={showBulkUpload} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Bulk Upload Products</DialogTitle>
@@ -68,7 +89,6 @@ export function ProductBulkUploadDialog({
                 onClick={downloadExampleFile}
                 className="flex items-center gap-2"
               >
-                <Download className="h-4 w-4" />
                 Download Example
               </Button>
             </div>
@@ -77,6 +97,7 @@ export function ProductBulkUploadDialog({
               type="file"
               accept=".csv,.xlsx,.xls"
               onChange={handleFileUpload}
+              disabled={importBusy}
               className="cursor-pointer"
             />
             <p className="text-sm text-[var(--text-muted)]">
@@ -104,7 +125,30 @@ export function ProductBulkUploadDialog({
             </div>
           )}
 
-          {uploadPreview.length > 0 && (
+          {importJobActive && importJob && (
+            <div className="space-y-3" data-testid="product-import-progress">
+              <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="font-medium capitalize text-[var(--text)]">
+                  {importJob.status}…
+                </span>
+                {importJob.rowCount != null && (
+                  <span>
+                    Processing {formatNumber(importJob.rowCount)} row
+                    {importJob.rowCount === 1 ? '' : 's'}
+                  </span>
+                )}
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-[var(--app-border)]">
+                <div className="h-full w-1/3 animate-pulse bg-[var(--brand)]" />
+              </div>
+              <p className="text-xs text-[var(--text-muted)]">
+                Large imports run in the background. You can close this dialog and return later.
+              </p>
+            </div>
+          )}
+
+          {uploadPreview.length > 0 && !importJobActive && (
             <div className="space-y-2">
               <Label>Preview</Label>
               <div className="border rounded-md overflow-x-auto max-h-48">
@@ -180,22 +224,15 @@ export function ProductBulkUploadDialog({
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setShowBulkUpload(false)
-              setUploadedFile(null)
-              setUploadPreview([])
-            }}
-          >
-            Cancel
+          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={importing}>
+            {importJobActive ? 'Close' : 'Cancel'}
           </Button>
           <Button
             onClick={handleBulkSubmit}
-            disabled={!uploadedFile || !importPreviewMeta?.validCount || importing || isCreating}
+            disabled={!uploadedFile || !importPreviewMeta?.validCount || importBusy || isCreating}
             data-testid="import-submit-btn"
           >
-            {importing ? 'Importing…' : 'Import valid rows'}
+            {importing || importJobActive ? 'Importing…' : 'Import valid rows'}
           </Button>
         </DialogFooter>
       </DialogContent>

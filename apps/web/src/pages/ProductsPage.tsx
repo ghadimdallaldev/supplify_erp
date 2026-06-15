@@ -1,11 +1,9 @@
-import { Suspense, useState, useMemo } from 'react'
+import { Suspense, useState, useMemo, useEffect, useCallback } from 'react'
 import {
   useGetProductsQuery,
   useGetProductCategoriesQuery,
   useGetProductTagsQuery,
   useCreateProductMutation,
-  usePreviewProductImportMutation,
-  useExecuteProductImportMutation,
   useGeneratePresignedUrlMutation,
   useGetWarehousesQuery,
   useGetSuppliersQuery,
@@ -20,15 +18,25 @@ import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
+import { EmptyState } from '../components/ui/empty-state'
 import { filterControlClass } from '../components/ui/filter-control'
 import { DataTableShell } from '../components/ui/data-table-shell'
 import { cn } from '../lib/utils'
-import { Plus, Upload, FileQuestion, Heart } from 'lucide-react'
+import {
+  Plus,
+  Upload,
+  Image,
+  FileQuestion,
+  Heart,
+  ChevronLeft,
+  ChevronRight,
+  Package,
+  Loader2,
+} from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useCartActions } from '../hooks/useCartActions'
 import { toast } from 'sonner'
-import { apiUrl } from '../lib/apiBase'
 import { canUseSupplierDeals } from '../lib/planFeatureGates'
 import { PermissionGate } from '../components/PermissionGate'
 import { RequirePermission } from '../components/RequirePermission'
@@ -45,12 +53,16 @@ import {
 } from '../components/products/ProductFilters'
 import { ProductCatalogTable } from '../components/products/ProductCatalogTable'
 import { useDebouncedSearch } from '../hooks/useDebouncedSearch'
+import { useProductCatalogImport } from '../hooks/useProductCatalogImport'
 import { SearchHistoryDropdown } from '../components/search/SearchHistoryDropdown'
 import {
   LazyProductFormDialog,
   LazyProductBulkUploadDialog,
+  LazyProductImageImportDialog,
   LazyInventoryAdjustmentDialog,
 } from '../components/products/lazyProductDialogs'
+
+const PRODUCTS_PAGE_SIZE = 50
 
 export function ProductsPage() {
   const { search, setSearch, debouncedSearch } = useDebouncedSearch()
@@ -61,8 +73,12 @@ export function ProductsPage() {
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const [supplierFilter, setSupplierFilter] = useState('')
+  const [offset, setOffset] = useState(0)
+  const [cursor, setCursor] = useState<string | undefined>()
+  const [cursorHistory, setCursorHistory] = useState<string[]>([])
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
+  const [showImageImport, setShowImageImport] = useState(false)
   const [showInventoryAdjustment, setShowInventoryAdjustment] = useState(false)
   const [selectedProductForAdjustment, setSelectedProductForAdjustment] = useState<any>(null)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
@@ -83,22 +99,6 @@ export function ProductsPage() {
   const [favoriteProduct] = useFavoriteProductMutation()
   const [unfavoriteProduct] = useUnfavoriteProductMutation()
   const [generatePresignedUrl, { isLoading: isUploadingImage }] = useGeneratePresignedUrlMutation()
-  const [previewImport] = usePreviewProductImportMutation()
-  const [executeImport, { isLoading: importing }] = useExecuteProductImportMutation()
-  const [importSummary, setImportSummary] = useState<{
-    created: number
-    updated: number
-    skipped: number
-    failed: number
-  } | null>(null)
-  const [importPreviewMeta, setImportPreviewMeta] = useState<{
-    totalRows: number
-    validCount: number
-    errorCount: number
-  } | null>(null)
-  const [importErrors, setImportErrors] = useState<
-    Array<{ rowNumber: number; errors: Array<{ field: string; message: string }> }>
-  >([])
 
   const isSupplier = isEffectiveSupplier
   const isRestaurant = isEffectiveRestaurant
@@ -133,10 +133,11 @@ export function ProductsPage() {
       tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined,
       minPrice: minPrice ? minPrice : undefined,
       maxPrice: maxPrice ? maxPrice : undefined,
+      supplier: !isSupplier && supplierFilter ? supplierFilter : undefined,
       includeStock: true,
       favoritesOnly: isRestaurant && favoritesOnly ? true : undefined,
-      limit: 100,
-      offset: 0,
+      limit: PRODUCTS_PAGE_SIZE,
+      ...(cursor ? { cursor } : { offset }),
     }),
     [
       debouncedSearch,
@@ -147,17 +148,100 @@ export function ProductsPage() {
       maxPrice,
       isRestaurant,
       favoritesOnly,
+      isSupplier,
+      supplierFilter,
+      offset,
+      cursor,
     ]
   )
 
-  const { data, isLoading, error } = useGetProductsQuery(queryParams)
+  useEffect(() => {
+    setOffset(0)
+    setCursor(undefined)
+    setCursorHistory([])
+  }, [
+    debouncedSearch,
+    category,
+    categoryId,
+    selectedTags,
+    minPrice,
+    maxPrice,
+    supplierFilter,
+    favoritesOnly,
+  ])
 
-  let filteredProducts = isSupplier
-    ? data?.products.filter((p) => p.supplier_email === user?.email)
-    : data?.products || []
+  const { data, isLoading, isFetching, error, refetch } = useGetProductsQuery(queryParams)
 
-  if (!isSupplier && supplierFilter) {
-    filteredProducts = filteredProducts.filter((p) => p.supplier_id === supplierFilter)
+  const clearBulkUpload = useCallback(() => {
+    setShowBulkUpload(false)
+    setUploadedFile(null)
+    setUploadPreview([])
+  }, [])
+
+  const {
+    importSummary,
+    importPreviewMeta,
+    importErrors,
+    importJob,
+    importJobActive,
+    importing,
+    previewImportFile,
+    downloadErrorReport,
+    submitImport,
+  } = useProductCatalogImport({ refetch, onImportSuccess: clearBulkUpload })
+
+  const allProducts = data?.products ?? []
+  const filteredProducts = useMemo(() => {
+    if (!isSupplier) return allProducts
+    const email = user?.email?.trim().toLowerCase()
+    if (!email) return allProducts
+    return allProducts.filter((p) => p.supplier_email?.trim().toLowerCase() === email)
+  }, [allProducts, isSupplier, user?.email])
+
+  const pagination = data?.pagination
+  const total = pagination?.total ?? null
+  const pageSize = pagination?.limit ?? PRODUCTS_PAGE_SIZE
+  const usesCursorPagination = Boolean(cursor)
+  const rangeStart =
+    filteredProducts.length === 0
+      ? 0
+      : usesCursorPagination
+        ? cursorHistory.length * pageSize + 1
+        : offset + 1
+  const rangeEnd =
+    filteredProducts.length === 0
+      ? 0
+      : usesCursorPagination
+        ? rangeStart + filteredProducts.length - 1
+        : total != null
+          ? Math.min(offset + pageSize, total)
+          : offset + filteredProducts.length
+  const hasNextPage = usesCursorPagination
+    ? Boolean(pagination?.nextCursor)
+    : total != null
+      ? offset + pageSize < total
+      : Boolean(pagination?.nextCursor)
+  const hasPrevPage = cursorHistory.length > 0 || Boolean(cursor) || offset > 0
+  const showInitialLoad = isLoading && !data
+
+  const goToNextPage = () => {
+    if (pagination?.nextCursor) {
+      setCursorHistory((prev) => [...prev, cursor ?? ''])
+      setCursor(pagination.nextCursor ?? undefined)
+      return
+    }
+    setOffset((prev) => prev + PRODUCTS_PAGE_SIZE)
+  }
+
+  const goToPrevPage = () => {
+    if (cursorHistory.length > 0) {
+      const history = [...cursorHistory]
+      const previousCursor = history.pop()
+      setCursorHistory(history)
+      setCursor(previousCursor || undefined)
+      return
+    }
+    setOffset((prev) => Math.max(0, prev - PRODUCTS_PAGE_SIZE))
   }
 
   const handleAddToCart = (product: any) => {
@@ -255,92 +339,39 @@ export function ProductsPage() {
       return
     }
     setUploadedFile(file)
-    setImportSummary(null)
-    setImportPreviewMeta(null)
-    setImportErrors([])
-    try {
-      const text = await file.text()
-      const result = await previewImport({ csv: text }).unwrap()
-      setUploadPreview(result.preview || [])
-      setImportPreviewMeta({
-        totalRows: result.totalRows ?? 0,
-        validCount: result.validCount ?? 0,
-        errorCount: result.errorCount ?? 0,
-      })
-      setImportErrors(result.errors || [])
-      if ((result.validCount ?? 0) === 0) {
-        toast.error('No valid rows to import — fix errors below')
-      } else {
-        toast.success(
-          `Preview: ${result.validCount} valid, ${result.errorCount} with issues (${result.totalRows} rows)`
-        )
-      }
-    } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to preview file')
-    }
-  }
-
-  const downloadErrorReport = async () => {
-    const errors =
-      importErrors.length > 0
-        ? importErrors
-        : (importSummary as { errors?: typeof importErrors })?.errors || []
-    if (!errors.length) {
-      toast.error('No errors to export')
-      return
-    }
-    try {
-      const res = await fetch(apiUrl('/api/supplier/products/import/error-report'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'Supplify' },
-        credentials: 'include',
-        body: JSON.stringify({ errors }),
-      })
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'import-errors.csv'
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch {
-      toast.error('Could not download error report')
-    }
+    await previewImportFile(file, setUploadPreview)
   }
 
   const handleBulkSubmit = async () => {
-    if (!uploadedFile) return
-    if (importPreviewMeta && importPreviewMeta.validCount === 0) {
-      toast.error('Fix validation errors before importing')
-      return
-    }
-    try {
-      const text = await uploadedFile.text()
-      const result = await executeImport({ csv: text, partial: true }).unwrap()
-      const summary = result.summary
-      setImportSummary(summary)
-      if (result.errors?.length) setImportErrors(result.errors)
-      if (summary.failed > 0) {
-        toast.error(`Import finished with ${summary.failed} failed row(s). Valid rows were saved.`)
-      } else {
-        toast.success(`Import complete: ${summary.created} created, ${summary.updated} updated`)
-        setShowBulkUpload(false)
-        setUploadedFile(null)
-        setUploadPreview([])
-        setImportPreviewMeta(null)
-        setImportErrors([])
-      }
-    } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Bulk upload failed')
-    }
+    await submitImport(uploadedFile)
   }
 
-  if (isLoading) return <ProductsPageLoading />
+  if (showInitialLoad) return <ProductsPageLoading />
+
   if (error) {
     return (
-      <div className="text-center py-12">
-        <p className="text-[var(--red)]">Failed to load products</p>
-      </div>
+      <RequirePermission anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']} title="products">
+        <PageShell data-testid="products-page">
+          <PageHeader
+            title="Products"
+            description={
+              isSupplier
+                ? 'Manage your product catalog'
+                : 'Browse and search products from suppliers'
+            }
+          />
+          <EmptyState
+            title="Failed to load products"
+            description="Check your connection and try again."
+            icon={<Package className="h-10 w-10" aria-hidden />}
+            action={
+              <Button onClick={() => refetch()} data-testid="products-retry">
+                Retry
+              </Button>
+            }
+          />
+        </PageShell>
+      </RequirePermission>
     )
   }
 
@@ -364,6 +395,10 @@ export function ProductsPage() {
                     <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
                       <Upload className="h-4 w-4 mr-2" />
                       Bulk Upload
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowImageImport(true)}>
+                      <Image className="h-4 w-4 mr-2" />
+                      Import Product Images
                     </Button>
                   </>
                 </PermissionGate>
@@ -463,17 +498,66 @@ export function ProductsPage() {
             setMinPrice={setMinPrice}
             setMaxPrice={setMaxPrice}
           />
-          <ProductCatalogTable
-            filteredProducts={filteredProducts}
-            isSupplier={isSupplier}
-            isRestaurant={isRestaurant}
-            onAddToCart={handleAddToCart}
-            onToggleFavorite={handleToggleFavorite}
-            onAdjustStock={(product) => {
-              setSelectedProductForAdjustment(product)
-              setShowInventoryAdjustment(true)
-            }}
-          />
+          <div className="relative">
+            {isFetching && !showInitialLoad && (
+              <div
+                className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center bg-[var(--surface)]/70 pt-6"
+                aria-live="polite"
+                data-testid="products-table-fetching"
+              >
+                <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-muted)]">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  Updating…
+                </div>
+              </div>
+            )}
+            <ProductCatalogTable
+              filteredProducts={filteredProducts}
+              isSupplier={isSupplier}
+              isRestaurant={isRestaurant}
+              onAddToCart={handleAddToCart}
+              onToggleFavorite={handleToggleFavorite}
+              onAdjustStock={(product) => {
+                setSelectedProductForAdjustment(product)
+                setShowInventoryAdjustment(true)
+              }}
+            />
+          </div>
+          {(total != null ? total > 0 : filteredProducts.length > 0) && (
+            <div
+              className="flex flex-col gap-3 border-t border-[var(--app-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              data-testid="products-pagination"
+            >
+              <p className="text-sm text-[var(--text-muted)]">
+                Showing {rangeStart}–{rangeEnd}
+                {total != null ? ` of ${total}` : ''}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!hasPrevPage || isFetching}
+                  onClick={goToPrevPage}
+                  data-testid="products-prev-page"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!hasNextPage || isFetching}
+                  onClick={goToNextPage}
+                  data-testid="products-next-page"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </DataTableShell>
 
         <Suspense fallback={null}>
@@ -495,6 +579,12 @@ export function ProductsPage() {
               isUploadingImage={isUploadingImage}
             />
           )}
+          {showImageImport && (
+            <LazyProductImageImportDialog
+              open={showImageImport}
+              onOpenChange={setShowImageImport}
+            />
+          )}
           {showBulkUpload && (
             <LazyProductBulkUploadDialog
               showBulkUpload={showBulkUpload}
@@ -511,6 +601,8 @@ export function ProductsPage() {
               handleBulkSubmit={handleBulkSubmit}
               importing={importing}
               isCreating={isCreating}
+              importJob={importJob}
+              importJobActive={importJobActive}
             />
           )}
           {showInventoryAdjustment && (

@@ -13,12 +13,14 @@ import { AuthGuard } from './components/AuthGuard'
 import { StaffPortalGuard } from './components/StaffPortalGuard'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
+import { RegisterPage } from './pages/RegisterPage'
 import { RegisterCompletePage } from './pages/RegisterCompletePage'
 import { LegalReacceptPage } from './pages/LegalReacceptPage'
 import { InviteAcceptPage } from './pages/InviteAcceptPage'
 import { BranchInviteAcceptPage } from './pages/BranchInviteAcceptPage'
 import { OAuthRedirect } from './components/OAuthRedirect'
 import { PageLoading } from './components/ui/page-loading'
+import { RequirePermission } from './components/RequirePermission'
 
 const DashboardPage = lazy(() =>
   import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage }))
@@ -86,6 +88,11 @@ const RestaurantOnboardingPage = lazy(() =>
 )
 const ReceivingPage = lazy(() =>
   import('./pages/ReceivingPage').then((m) => ({ default: m.ReceivingPage }))
+)
+const SupplierCustomerGrowthPage = lazy(() =>
+  import('./pages/SupplierCustomerGrowthPage').then((m) => ({
+    default: m.SupplierCustomerGrowthPage,
+  }))
 )
 const AdminDashboardPage = lazy(() =>
   import('./pages/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage }))
@@ -250,6 +257,10 @@ const router = createBrowserRouter([
   {
     path: '/auth/register',
     element: <OAuthRedirect flow="register" />,
+  },
+  {
+    path: '/register',
+    element: <RegisterPage />,
   },
   {
     path: '/reserve/confirmation',
@@ -512,6 +523,19 @@ const router = createBrowserRouter([
         element: (
           <LazyPage>
             <OrderDetailPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/customer-growth',
+        element: (
+          <LazyPage>
+            <RequirePermission
+              anyOf={['CATALOG_EDIT', 'ORDERS_MANAGE', 'ORDERS_VIEW']}
+              title="customer growth"
+            >
+              <SupplierCustomerGrowthPage />
+            </RequirePermission>
           </LazyPage>
         ),
       },

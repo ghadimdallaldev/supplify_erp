@@ -28,6 +28,12 @@ export async function runLogRetentionJob({ dryRun = false } = {}) {
       enabled: config.ADMIN_AUDIT_LOG_RETENTION_DAYS > 0,
     },
     {
+      key: 'audit_logs',
+      sql: `DELETE FROM audit_logs WHERE created_at < NOW() - ($1::int || ' days')::interval`,
+      days: config.ADMIN_AUDIT_LOG_RETENTION_DAYS,
+      enabled: config.ADMIN_AUDIT_LOG_RETENTION_DAYS > 0,
+    },
+    {
       key: 'staff_portal_session',
       sql: `DELETE FROM staff_portal_session WHERE expires_at < NOW() - ($1::int || ' days')::interval`,
       days: config.STAFF_PORTAL_SESSION_RETENTION_DAYS,
@@ -44,6 +50,24 @@ export async function runLogRetentionJob({ dryRun = false } = {}) {
       sql: `DELETE FROM email_digest_log WHERE digest_date < CURRENT_DATE - ($1::int || ' days')::interval`,
       days: config.EMAIL_DIGEST_LOG_RETENTION_DAYS,
       enabled: config.EMAIL_DIGEST_LOG_RETENTION_DAYS > 0,
+    },
+    {
+      key: 'reorder_ai_request_log',
+      sql: `DELETE FROM reorder_ai_request_log WHERE created_at < NOW() - ($1::int || ' days')::interval`,
+      days: 90,
+      enabled: true,
+    },
+    {
+      key: 'catalog_image_import_job',
+      sql: `DELETE FROM catalog_image_import_job WHERE created_at < NOW() - ($1::int || ' days')::interval AND status IN ('completed', 'failed', 'cancelled')`,
+      days: 90,
+      enabled: true,
+    },
+    {
+      key: 'catalog_product_import_job',
+      sql: `DELETE FROM catalog_product_import_job WHERE created_at < NOW() - ($1::int || ' days')::interval AND status IN ('completed', 'failed', 'cancelled')`,
+      days: 90,
+      enabled: true,
     },
   ]
 

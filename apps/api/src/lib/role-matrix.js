@@ -121,6 +121,8 @@ export const SUPPLIER_SYSTEM_ROLES = [
       P.CHAT_SEND,
       P.SETTINGS_VIEW,
       P.PROMOTIONS_VIEW,
+      P.GROWTH_VIEW,
+      P.CUSTOMERS_IMPORT,
     ],
   },
   {

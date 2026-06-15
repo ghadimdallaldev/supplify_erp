@@ -2,8 +2,8 @@
 -- Migration 0161 may have created delivery_zone with only branch columns when the supplier table did not exist yet.
 
 ALTER TABLE delivery_zone
-  ADD COLUMN IF NOT EXISTS supplier_id UUID REFERENCES supplier(id) ON DELETE CASCADE,
-  ADD COLUMN IF NOT EXISTS warehouse_id UUID REFERENCES warehouse(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS supplier_id UUID,
+  ADD COLUMN IF NOT EXISTS warehouse_id UUID,
   ADD COLUMN IF NOT EXISTS coverage_area_json JSONB DEFAULT '{}'::jsonb,
   ADD COLUMN IF NOT EXISTS delivery_time_days INTEGER DEFAULT 1,
   ADD COLUMN IF NOT EXISTS zone_type VARCHAR(20) DEFAULT 'polygon',

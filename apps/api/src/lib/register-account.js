@@ -202,6 +202,7 @@ export async function completeTenantRegistration({
   legalAcceptance,
   ipAddress,
   userAgent,
+  referralToken = null,
 }) {
   const normalizedEmail = email.trim().toLowerCase()
   const type = accountType === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
@@ -224,6 +225,7 @@ export async function completeTenantRegistration({
     )
   }
 
+  // Reject duplicate tenant rows for this email; linking to an existing tenant requires an invitation token.
   const tenantTable = type === 'SUPPLIER' ? 'supplier' : 'restaurant'
   const { rows: existingTenant } = await query(
     `SELECT id FROM ${tenantTable} WHERE LOWER(TRIM(contact_email)) = $1 LIMIT 1`,
@@ -306,6 +308,17 @@ export async function completeTenantRegistration({
       },
       client
     )
+
+    if (registrationResult.tenantType === 'RESTAURANT' && referralToken) {
+      const { acceptReferralOnRegistration } = await import(
+        '../services/supplier-growth-invitation.service.js'
+      )
+      await acceptReferralOnRegistration({
+        token: referralToken,
+        restaurantId: registrationResult.tenant.id,
+        client,
+      })
+    }
 
     return registrationResult
   })

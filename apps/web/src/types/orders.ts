@@ -283,6 +283,7 @@ export interface OrderFilters {
   to?: string
   limit?: number
   offset?: number
+  includeItems?: boolean
   warehouseId?: string
   warehouse_id?: string
 }

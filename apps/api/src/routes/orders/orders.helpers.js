@@ -272,6 +272,10 @@ const orderListSchema = z.object({
     .string()
     .transform((val) => Math.max(parseInt(val, 10) || 0, 0))
     .default('0'),
+  includeItems: z
+    .string()
+    .transform((val) => val !== 'false')
+    .default('true'),
 })
 
 // Helper function to create invoice from delivered order

@@ -1,4 +1,7 @@
 import express from 'express'
+import path from 'node:path'
+import { randomUUID } from 'node:crypto'
+import rateLimit from 'express-rate-limit'
 import { z } from 'zod'
 import {
   requireAuth,
@@ -15,7 +18,16 @@ import {
 } from '../lib/driver-rbac.js'
 import { requireSupplierId } from '../lib/tenant-resolve.js'
 import { requireFeature } from '../lib/subscription.js'
-import { ValidationError } from '../middlewares/errorHandler.js'
+import { config } from '../config/env.js'
+import { createRateLimitStore } from '../lib/rate-limit-store.js'
+import { writeAuditLog } from '../lib/audit.js'
+import {
+  IMPORT_ALLOWED_MIMES,
+  MAX_UPLOAD_BYTES,
+  sanitizeUploadFileName,
+} from '../lib/sanitize-upload.js'
+import { ValidationError, ConflictError } from '../middlewares/errorHandler.js'
+import { createPresignedUpload } from '../services/storage/storage.service.js'
 import { getSupplierCommandCenter } from '../services/supplier-command-center.service.js'
 import {
   getReorderIntelligence,
@@ -34,7 +46,19 @@ import {
   previewProductImport,
   executeProductImport,
   buildErrorReportCsv,
+  countProductImportRows,
+  createProductImportJob,
+  getProductImportJobStatus,
 } from '../services/product-import.service.js'
+import { startProductImportJob } from '../services/product-import-worker.js'
+import {
+  previewImageImport,
+  createImageImportJob,
+  getImageImportJob,
+  cancelImageImportJob,
+  buildImageImportFailureCsv,
+} from '../services/product-image-import.service.js'
+import { startImageImportJob } from '../services/image-import-worker.js'
 import {
   listProductSubstitutes,
   createProductSubstitute,
@@ -78,11 +102,107 @@ const amendmentsGate = requireFeature(
 
 router.use(requireAuth, resolveTenantContext, requireRole(['SUPPLIER', 'ADMIN']))
 
+const noopLimiter = (_req, _res, next) => next()
+
+function createUserKeyedLimiter({ windowMs, max, message, storePrefix = 'rl:supplier' }) {
+  if (!config.RATE_LIMIT_ENABLED) return noopLimiter
+  const store = createRateLimitStore(storePrefix)
+  return rateLimit({
+    windowMs,
+    max,
+    message,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => req.userData?.id || req.ip,
+    ...(store ? { store } : {}),
+  })
+}
+
+const productImportLimiter = createUserKeyedLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many product import requests, please try again later.',
+  storePrefix: 'rl:supplier:product-import',
+})
+
+const imageImportJobLimiter = createUserKeyedLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: 'Too many image import jobs, please try again later.',
+  storePrefix: 'rl:supplier:image-import',
+})
+
 async function resolveSupplier(req) {
   const tenant = await getRequestTenant(req)
   if (tenant?.tenantType === 'SUPPLIER') return tenant.tenantId
   return requireSupplierId(req)
 }
+
+function assertImportFileType(fileName, fileType, purpose) {
+  const allowed = IMPORT_ALLOWED_MIMES[fileType]
+  if (!allowed) {
+    throw new ValidationError('File type not allowed for import')
+  }
+  const ext = path.extname(String(fileName || '')).toLowerCase()
+  if (!ext || !allowed.includes(ext)) {
+    throw new ValidationError('File extension does not match content type')
+  }
+  const isZipMime = fileType === 'application/zip' || fileType === 'application/x-zip-compressed'
+  const isCsvMime = fileType === 'text/csv' || fileType === 'application/csv'
+  if (purpose === 'zip' && !isZipMime) {
+    throw new ValidationError('Expected ZIP file for purpose zip')
+  }
+  if (purpose === 'csv' && !isCsvMime) {
+    throw new ValidationError('Expected CSV file for purpose csv')
+  }
+}
+
+function assertImportFileKeyOwnedBySupplier(fileKey, supplierId) {
+  if (!fileKey || typeof fileKey !== 'string') {
+    throw new ValidationError('Invalid file key')
+  }
+  const normalized = fileKey.replace(/\\/g, '/').replace(/^\/+/, '')
+  if (normalized.includes('..')) {
+    throw new ValidationError('Invalid file key')
+  }
+  const expectedPrefix = `imports/${supplierId}/`
+  if (!normalized.startsWith(expectedPrefix)) {
+    throw new ValidationError('File key does not belong to this supplier')
+  }
+  return normalized
+}
+
+async function assertNoActiveImageImportJob(supplierId) {
+  const { rows } = await query(
+    `
+      SELECT id
+      FROM catalog_image_import_job
+      WHERE supplier_id = $1 AND status IN ('pending', 'processing')
+      LIMIT 1
+    `,
+    [supplierId]
+  )
+  if (rows.length) {
+    throw new ConflictError('An image import job is already in progress')
+  }
+}
+
+const imageImportMethodSchema = z.enum(['zip_sku', 'zip_mapping'])
+
+const imageImportPreviewSchema = z.object({
+  method: imageImportMethodSchema,
+  zipFileKey: z.string().min(1),
+  mappingFileKey: z.string().min(1).optional(),
+  replaceExisting: z.boolean().optional(),
+})
+
+const imageImportPresignSchema = z.object({
+  fileName: z.string().min(1),
+  fileType: z.string().min(1),
+  fileSize: z.number().int().positive().optional(),
+  purpose: z.enum(['zip', 'csv']),
+  jobId: z.string().uuid().optional(),
+})
 
 const commandCenterGate = requireAnyPermission(
   'ORDERS_MANAGE',
@@ -242,6 +362,7 @@ const importPreviewSchema = z.object({
 
 router.post(
   '/products/import/preview',
+  productImportLimiter,
   requirePermission('CATALOG_EDIT'),
   async (req, res, next) => {
     try {
@@ -255,14 +376,65 @@ router.post(
   }
 )
 
-router.post('/products/import', requirePermission('CATALOG_EDIT'), async (req, res, next) => {
+router.post(
+  '/products/import',
+  productImportLimiter,
+  requirePermission('CATALOG_EDIT'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const body = importPreviewSchema.extend({ partial: z.boolean().optional() }).parse(req.body)
+      const rowCount = countProductImportRows(body.csv)
+
+      if (rowCount > config.PRODUCT_IMPORT_ASYNC_THRESHOLD) {
+        const preview = previewProductImport(body.csv, body.columnMapping)
+        const job = await createProductImportJob({
+          supplierId,
+          userId: req.userData.id,
+          csvText: body.csv,
+          partial: body.partial !== false,
+          columnMapping: body.columnMapping,
+          preview,
+        })
+
+        startProductImportJob(job.id)
+
+        await writeAuditLog(req, {
+          action_type: 'catalog.product_import.started',
+          tenant_type: 'SUPPLIER',
+          tenant_id: supplierId,
+          target_id: job.id,
+          payload_json: {
+            resource_type: 'catalog_product_import',
+            rowCount,
+            async: true,
+          },
+        })
+
+        return res.status(202).json({
+          ok: true,
+          data: { jobId: job.id, status: 'pending' },
+          error: null,
+          requestId: req.requestId,
+        })
+      }
+
+      const result = await executeProductImport(supplierId, body.csv, {
+        partial: body.partial !== false,
+        userId: req.userData.id,
+      })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get('/products/import/:jobId', requirePermission('CATALOG_EDIT'), async (req, res, next) => {
   try {
     const supplierId = await resolveSupplier(req)
-    const body = importPreviewSchema.extend({ partial: z.boolean().optional() }).parse(req.body)
-    const result = await executeProductImport(supplierId, body.csv, {
-      partial: body.partial !== false,
-    })
-    res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    const job = await getProductImportJobStatus(req.params.jobId, supplierId)
+    res.json({ ok: true, data: job, error: null, requestId: req.requestId })
   } catch (err) {
     next(err)
   }
@@ -277,6 +449,194 @@ router.post(
     res.setHeader('Content-Type', 'text/csv')
     res.setHeader('Content-Disposition', 'attachment; filename="import-errors.csv"')
     res.send(csv)
+  }
+)
+
+router.post(
+  '/products/images/import/presign',
+  requirePermission('CATALOG_EDIT'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const body = imageImportPresignSchema.parse(req.body)
+      const safeFileName = sanitizeUploadFileName(body.fileName)
+      assertImportFileType(safeFileName, body.fileType, body.purpose)
+
+      const maxBytes = body.purpose === 'zip' ? config.IMPORT_ZIP_MAX_BYTES : MAX_UPLOAD_BYTES
+      const sizeBytes = body.fileSize ? Number(body.fileSize) : 0
+      if (sizeBytes > maxBytes) {
+        throw new ValidationError(`File size exceeds maximum of ${maxBytes} bytes`)
+      }
+
+      const jobSegment = body.jobId || randomUUID()
+      const fileKey = `imports/${supplierId}/${jobSegment}/${safeFileName}`
+      const { presignedUrl, publicUrl } = await createPresignedUpload({
+        fileKey,
+        fileSize: sizeBytes > 0 ? sizeBytes : maxBytes,
+        fileType: body.fileType,
+        userId: req.userData.id,
+      })
+
+      const uploadUrl =
+        body.purpose === 'zip' && presignedUrl.includes('/api/files/upload/')
+          ? presignedUrl.replace('/api/files/upload/', '/api/files/upload-import/')
+          : presignedUrl
+
+      res.json({
+        ok: true,
+        data: { presignedUrl: uploadUrl, fileKey, publicUrl },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/products/images/import/preview',
+  requirePermission('CATALOG_EDIT'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const body = imageImportPreviewSchema.parse(req.body)
+      assertImportFileKeyOwnedBySupplier(body.zipFileKey, supplierId)
+      if (body.mappingFileKey) {
+        assertImportFileKeyOwnedBySupplier(body.mappingFileKey, supplierId)
+      }
+
+      const data = await previewImageImport({
+        supplierId,
+        method: body.method,
+        zipFileKey: body.zipFileKey,
+        mappingFileKey: body.mappingFileKey,
+        replaceExisting: body.replaceExisting === true,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/products/images/import',
+  imageImportJobLimiter,
+  requirePermission('CATALOG_EDIT'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const body = imageImportPreviewSchema
+        .extend({
+          preview: z.record(z.unknown()).optional(),
+        })
+        .parse(req.body)
+
+      assertImportFileKeyOwnedBySupplier(body.zipFileKey, supplierId)
+      if (body.mappingFileKey) {
+        assertImportFileKeyOwnedBySupplier(body.mappingFileKey, supplierId)
+      }
+
+      await assertNoActiveImageImportJob(supplierId)
+
+      const preview =
+        body.preview ??
+        (await previewImageImport({
+          supplierId,
+          method: body.method,
+          zipFileKey: body.zipFileKey,
+          mappingFileKey: body.mappingFileKey,
+          replaceExisting: body.replaceExisting === true,
+        }))
+
+      const job = await createImageImportJob({
+        supplierId,
+        userId: req.userData.id,
+        method: body.method,
+        zipFileKey: body.zipFileKey,
+        mappingFileKey: body.mappingFileKey,
+        replaceExisting: body.replaceExisting === true,
+        preview,
+      })
+
+      startImageImportJob(job.id)
+
+      await writeAuditLog(req, {
+        action_type: 'catalog.image_import.started',
+        tenant_type: 'SUPPLIER',
+        tenant_id: supplierId,
+        target_id: job.id,
+        payload_json: {
+          resource_type: 'catalog_image_import',
+          method: body.method,
+          matched: preview.summary?.matched,
+        },
+      })
+
+      res.status(201).json({ ok: true, data: { job }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/products/images/import/:jobId',
+  requirePermission('CATALOG_EDIT'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const job = await getImageImportJob(req.params.jobId, supplierId)
+      res.json({ ok: true, data: { job }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/products/images/import/:jobId/cancel',
+  requirePermission('CATALOG_EDIT'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const job = await cancelImageImportJob(req.params.jobId, supplierId)
+
+      await writeAuditLog(req, {
+        action_type: 'catalog.image_import.cancelled',
+        tenant_type: 'SUPPLIER',
+        tenant_id: supplierId,
+        target_id: job.id,
+        payload_json: { resource_type: 'catalog_image_import' },
+      })
+
+      res.json({ ok: true, data: { job }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/products/images/import/:jobId/report',
+  requirePermission('CATALOG_EDIT'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const job = await getImageImportJob(req.params.jobId, supplierId)
+      const resultJson =
+        typeof job.result_json === 'string' ? JSON.parse(job.result_json) : job.result_json || {}
+      const csv = buildImageImportFailureCsv(resultJson.failures || [])
+      res.setHeader('Content-Type', 'text/csv')
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="image-import-failures-${req.params.jobId}.csv"`
+      )
+      res.send(csv)
+    } catch (err) {
+      next(err)
+    }
   }
 )
 

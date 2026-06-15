@@ -48,6 +48,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/app/org': 'Organization',
   '/app/inventory': 'Inventory',
   '/app/supplier-settings': 'Supplier Settings',
+  '/app/customer-growth': 'Customer Growth',
 }
 
 export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {}) {
