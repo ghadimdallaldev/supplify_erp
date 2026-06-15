@@ -24,7 +24,7 @@ export function DataTableShell({
   return (
     <div
       className={cn(
-        'rounded-xl border border-[var(--app-border)] bg-[var(--surface)] shadow-sm',
+        'overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)] shadow-sm',
         className
       )}
       data-testid={testId}
