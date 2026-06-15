@@ -7,11 +7,68 @@ import { logger } from './logger.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const migrationsDir = join(__dirname, '..', '..', 'db', 'migrations')
 
-function splitMigrationStatements(sql) {
-  return sql
-    .split(/;\s*(?:\r?\n|$)/)
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0 && !part.startsWith('--'))
+function isCommentOnlyStatement(trimmed) {
+  return trimmed.split(/\r?\n/).every((line) => {
+    const t = line.trim()
+    return t.length === 0 || t.startsWith('--')
+  })
+}
+
+export function splitMigrationStatements(sql) {
+  const statements = []
+  let current = ''
+  let i = 0
+  /** @type {string | null} null = not inside a dollar-quoted string */
+  let dollarTag = null
+
+  while (i < sql.length) {
+    if (dollarTag === null) {
+      const dollarMatch = sql.slice(i).match(/^\$([A-Za-z0-9_]*)\$/)
+      if (dollarMatch) {
+        dollarTag = dollarMatch[1]
+        current += dollarMatch[0]
+        i += dollarMatch[0].length
+        continue
+      }
+
+      if (sql[i] === ';') {
+        const rest = sql.slice(i + 1)
+        if (/^\s*(?:\r?\n|$)/.test(rest)) {
+          const trimmed = current.trim()
+          if (trimmed.length > 0 && !isCommentOnlyStatement(trimmed)) {
+            statements.push(trimmed)
+          }
+          current = ''
+          i += 1
+          const ws = rest.match(/^\s*/)
+          if (ws) i += ws[0].length
+          continue
+        }
+      }
+
+      current += sql[i]
+      i += 1
+      continue
+    }
+
+    const close = `$${dollarTag}$`
+    if (sql.slice(i, i + close.length) === close) {
+      current += close
+      i += close.length
+      dollarTag = null
+      continue
+    }
+
+    current += sql[i]
+    i += 1
+  }
+
+  const trimmed = current.trim()
+  if (trimmed.length > 0 && !isCommentOnlyStatement(trimmed)) {
+    statements.push(trimmed)
+  }
+
+  return statements
 }
 
 function isIdempotentCreateStatement(statement) {
