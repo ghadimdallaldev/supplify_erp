@@ -88,10 +88,21 @@ describe('admin.routes', () => {
     expect(res.body.data.logs).toHaveLength(1)
   })
 
-  it('GET /dashboard returns 403 for non-admin users', async () => {
+  it('GET /dashboard returns tenant stats for restaurant users', async () => {
     queryMock.mockResolvedValue({ rows: [{ count: '3' }] })
 
     const app = buildApp({ id: 'user-1', role: 'RESTAURANT', email: 'r@test.com' })
+    const res = await request(app).get('/api/admin/dashboard').expect(200)
+
+    expect(res.body.ok).toBe(true)
+    expect(res.body.data.stats).toBeDefined()
+    expect(getRequestTenant).toHaveBeenCalled()
+  })
+
+  it('GET /dashboard returns 403 for unsupported platform roles', async () => {
+    queryMock.mockResolvedValue({ rows: [{ count: '3' }] })
+
+    const app = buildApp({ id: 'user-1', role: 'CONSUMER', email: 'c@test.com' })
     await request(app).get('/api/admin/dashboard').expect(403)
     expect(getRequestTenant).not.toHaveBeenCalled()
   })
