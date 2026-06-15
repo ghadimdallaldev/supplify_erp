@@ -21,8 +21,8 @@ ENV_FILE="$REPO_ROOT/docker/.env"
 ENV_EXAMPLE="$REPO_ROOT/docker/.env.example"
 COMPOSE_FILE="$REPO_ROOT/docker-compose.yml"
 
-# shellcheck source=../deploy/scripts/_common.sh
-source "$REPO_ROOT/deploy/scripts/_common.sh"
+# shellcheck source=local-common.sh
+source "$REPO_ROOT/scripts/local-common.sh"
 
 dc() {
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"

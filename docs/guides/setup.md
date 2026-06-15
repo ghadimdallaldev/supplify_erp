@@ -121,10 +121,9 @@ supplify-v2/
 │       │   ├── services/   # RTK Query API
 │       │   └── types/      # TypeScript types
 │       └── public/         # Static assets
-├── infra/                  # Infrastructure configuration
-│   ├── db/                 # Database setup
-│   └── keycloak/          # Keycloak realm configuration
-└── infra/                 # AWS CDK (deploy dev/staging/prod)
+├── deploy/                 # Railway env templates, Keycloak realm exports
+├── docker/                 # Local Docker stack config
+├── scripts/                # Dev, promote, Railway sync scripts
 ```
 
 ## 🔐 Authentication
@@ -269,19 +268,16 @@ Do **not** use `pnpm test` or `pnpm --filter @supplify/api test` for final verif
 pnpm build
 ```
 
-### Docker Deployment
+### Railway deployment
+
+Promote and push release branches — Railway deploys automatically:
 
 ```bash
-# Build production images
-docker build -t supplify-api apps/api
-docker build -t supplify-web apps/web
-
-# One-command deploy on EC2 (or run compose after copying deploy/env/.env.prod.example)
-./deploy/scripts/deploy-prod.sh
-
-# Or manually with deploy compose
-docker compose --env-file deploy/env/.env.prod -f deploy/docker-compose.prod.yml up -d --build
+pnpm promote:preprod   # dev → preprod
+pnpm promote:prod      # preprod → prod
 ```
+
+See [railway-environments.md](../operations/railway-environments.md).
 
 ## 🤝 Contributing
 

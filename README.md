@@ -103,7 +103,7 @@ apps/
   api/          Express API, services, migrations, cron jobs, Socket.IO
   web/          React SPA, pages, RTK Query, PWA service worker
 docs/           All product, ops, QA, and feature specs (dev branch only)
-deploy/         Docker compose, EC2 scripts, Railway env templates
+deploy/         Railway env templates, Keycloak realm exports, local init scripts
 docker/         Local compose overrides, .env for infra
 scripts/        dev-native.mjs, run-local.mjs, promote-release.mjs, …
 tests/          Playwright E2E, shared test data
@@ -167,7 +167,7 @@ Spec index: [docs/features/README.md](docs/features/README.md) · master catalog
 | Env variables                  | [docs/operations/environment-variables.md](docs/operations/environment-variables.md)                              |
 | Storage & uploads              | [docs/operations/storage-uploads.md](docs/operations/storage-uploads.md)                                          |
 | Railway deploy                 | [docs/operations/railway-environments.md](docs/operations/railway-environments.md)                                |
-| Docker / EC2 deploy            | [deploy/README.md](deploy/README.md)                                                                              |
+| Deploy assets                  | [deploy/README.md](deploy/README.md)                                                                              |
 | Admin console & flags          | [docs/admin/admin-operations-console.md](docs/admin/admin-operations-console.md)                                  |
 | Mobile parity                  | [docs/mobile/MOBILE_FEATURE_PARITY.md](docs/mobile/MOBILE_FEATURE_PARITY.md)                                      |
 
@@ -229,8 +229,7 @@ pnpm local:down
 
 ```bash
 pnpm promote:preprod  # promote dev → preprod branch
-pnpm promote:prod     # promote dev → prod branch
-pnpm deploy:preprod   # legacy EC2 Docker (see deploy/README.md)
+pnpm promote:prod     # promote preprod → prod branch
 pnpm railway:keycloak:sync
 pnpm vapid:generate   # Web Push keys
 ```
@@ -247,7 +246,7 @@ pnpm qa
 
 Or minimum: `pnpm lint && pnpm test:ci && pnpm build`. Commits use **Conventional Commits** (Husky + commitlint).
 
-Hosted deploys: **Railway** — [docs/operations/railway-environments.md](docs/operations/railway-environments.md). Legacy VM Docker: [deploy/README.md](deploy/README.md).
+Hosted deploys: **Railway** — [docs/operations/railway-environments.md](docs/operations/railway-environments.md).
 
 ---
 

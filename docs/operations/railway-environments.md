@@ -1,6 +1,6 @@
 # Railway deployment — dev, preprod, and prod
 
-Supplify uses **three isolated Railway environments** inside one project. AWS CDK and GitHub Actions were removed; deploy via Railway only.
+Supplify uses **three isolated Railway environments** inside one project. Deploy via Railway only.
 
 Repo paths: API = `apps/api/`, Web = `apps/web/`. Env templates: `apps/api/.env.{dev,preprod,prod}.example` and `apps/web/.env.{dev,preprod,prod}.example`.
 

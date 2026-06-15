@@ -39,7 +39,7 @@ This document merges the **status report**, **API findings**, and **PR-sized fix
 
 **Development:** `docker compose up -d` → migrate/seed → `pnpm dev`.
 
-**Production:** Use `deploy/scripts/deploy-prod.sh` or `docker compose` with prod compose file; web behind nginx/CDN.
+**Production:** Push to the `prod` branch — Railway deploys automatically. See [railway-environments.md](./railway-environments.md).
 
 ---
 

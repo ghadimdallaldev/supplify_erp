@@ -34,7 +34,7 @@ else
   echo "Realm Supplify already exists"
 fi
 
-# EC2/dev over HTTP needs sslRequired=none; HTTPS production uses external.
+# Local/dev over HTTP needs sslRequired=none; HTTPS production uses external.
 if [[ "$PUBLIC_URL" == https://* ]]; then
   SSL_REQUIRED="external"
 elif [[ "$PUBLIC_URL" == "http://localhost" ]] || [[ "$PUBLIC_URL" == http://localhost:* ]]; then

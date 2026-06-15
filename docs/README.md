@@ -47,7 +47,7 @@ docs/
   api/                      API route index
   diagrams/                 Canonical Mermaid diagrams
   sales/                    Sales / enterprise narrative
-  archive/                  Historical audits, old plans, legacy EC2
+  archive/                  Historical audits and old plans
 ```
 
 ## Repo root

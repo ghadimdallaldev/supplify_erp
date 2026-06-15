@@ -359,7 +359,7 @@ SLOW_REQUEST_MS=800
 IDLE_PERF_LOG_MS=500
 ```
 
-Docker local: `docker-compose.yml` and `deploy/env/.env.*.example` include the same keys (`DB_KEEPALIVE_ENABLED=false` locally by default).
+Docker local: `docker-compose.yml` and `docker/.env.example` include the same keys (`DB_KEEPALIVE_ENABLED=false` locally by default).
 
 Min **1 API replica** (no scale-to-zero); API + Postgres **same region**; private `DATABASE_URL`.
 

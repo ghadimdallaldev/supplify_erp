@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Push VAPID_* from deploy/env/.env.vapid to the Railway API service.
+ * Push VAPID_* from docker/.env.vapid to the Railway API service.
  *
  * Prerequisites:
  *   npm i -g @railway/cli && railway login && railway link
@@ -74,7 +74,7 @@ function runRailway(args, inherit = false) {
 
 function main() {
   const { env, service } = parseArgs(process.argv.slice(2))
-  const vapidFile = resolve(root, 'deploy/env/.env.vapid')
+  const vapidFile = resolve(root, 'docker/.env.vapid')
   if (!existsSync(vapidFile)) {
     console.error(`Missing ${vapidFile}. Run: pnpm vapid:generate`)
     process.exit(1)

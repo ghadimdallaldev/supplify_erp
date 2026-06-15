@@ -148,7 +148,7 @@ export function ProductTagFilters({
 }: Pick<ProductFiltersProps, 'isSupplier' | 'tagsData' | 'selectedTags' | 'setSelectedTags'>) {
   if (isSupplier || !tagsData?.tags?.length) return null
   return (
-    <div className="border-b border-[var(--app-border)] px-4 py-3">
+    <div className="px-4 py-3">
       <Label className="text-sm font-medium">Filter by tags</Label>
       <div className="mt-2 flex flex-wrap gap-2">
         {tagsData.tags.map((tag) => (
@@ -193,7 +193,7 @@ export function ProductActiveFilters({
     return null
   }
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-[var(--app-border)] px-4 py-3">
+    <div className="flex flex-wrap items-center gap-2 px-4 py-3">
       <span className="text-sm text-[var(--text-muted)]">Filtered by:</span>
       {supplierFilter && (
         <Badge

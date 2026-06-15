@@ -569,20 +569,20 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled/declined), 
 
 ## 15. Integrations & infrastructure
 
-| Integration            | Use                                                                                                                                                                             |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Keycloak**           | OIDC login, roles, self-registration, SSO logout (`post.logout.redirect.uris` on `supplify-api` / `supplify-web`; seeded in `realm-export.json`, applied by `keycloak-init.sh`) |
-| **PostgreSQL**         | Primary database (~65 migrations)                                                                                                                                               |
-| **Redis**              | Order calendar cache                                                                                                                                                            |
-| **S3 / MinIO**         | Object storage for uploads                                                                                                                                                      |
-| **Resend (SMTP)**      | Transactional email                                                                                                                                                             |
-| **Web Push (VAPID)**   | Browser push notifications (`VAPID_*` env on API)                                                                                                                               |
-| **Socket.IO**          | Realtime chat + layout notifications                                                                                                                                            |
-| **Docker Compose**     | Local full stack (Postgres, Redis, Keycloak, MinIO, nginx)                                                                                                                      |
-| **AWS CDK** (`infra/`) | Cloud deployment (dev/staging/prod)                                                                                                                                             |
-| **Local CI**           | `pnpm lint`, `pnpm test:ci`, `pnpm build` before deploy                                                                                                                         |
-| **Playwright**         | E2E tests (`tests/e2e`)                                                                                                                                                         |
-| **Semantic release**   | Versioning (root config)                                                                                                                                                        |
+| Integration          | Use                                                                                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Keycloak**         | OIDC login, roles, self-registration, SSO logout (`post.logout.redirect.uris` on `supplify-api` / `supplify-web`; seeded in `realm-export.json`, applied by `keycloak-init.sh`) |
+| **PostgreSQL**       | Primary database (~65 migrations)                                                                                                                                               |
+| **Redis**            | Order calendar cache                                                                                                                                                            |
+| **S3 / MinIO**       | Object storage for uploads                                                                                                                                                      |
+| **Resend (SMTP)**    | Transactional email                                                                                                                                                             |
+| **Web Push (VAPID)** | Browser push notifications (`VAPID_*` env on API)                                                                                                                               |
+| **Socket.IO**        | Realtime chat + layout notifications                                                                                                                                            |
+| **Docker Compose**   | Local full stack (Postgres, Redis, Keycloak, MinIO, nginx)                                                                                                                      |
+| **Railway**          | Cloud deployment (dev / preprod / prod)                                                                                                                                         |
+| **Local CI**         | `pnpm lint`, `pnpm test:ci`, `pnpm build` before deploy                                                                                                                         |
+| **Playwright**       | E2E tests (`tests/e2e`)                                                                                                                                                         |
+| **Semantic release** | Versioning (root config)                                                                                                                                                        |
 
 ---
 
@@ -606,7 +606,7 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled/declined), 
 | OpenAPI generation         | `pnpm openapi:gen`                                                                                     |
 | Local dev (native)         | `pnpm dev`                                                                                             |
 | Local Docker stack         | `pnpm local:up`                                                                                        |
-| Deploy scripts             | `deploy:dev`, `deploy:staging`, `deploy:prod`                                                          |
+| Railway deploy             | `pnpm promote:preprod`, `pnpm promote:prod`                                                            |
 | Branch deploy model        | `dev` → `preprod` → `prod`                                                                             |
 | Manual QA checklist        | `docs/qa/regression-checklist.md`                                                                      |
 | Tenant audit log (detail)  | `docs/features/tenant-audit-log.md`                                                                    |

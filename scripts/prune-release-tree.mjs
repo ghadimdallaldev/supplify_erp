@@ -90,21 +90,6 @@ function patchServerJs() {
 }
 
 function pruneDeployArtifacts() {
-  if (tier === 'preprod') {
-    rm('deploy/docker-compose.dev.yml')
-    rmFile('deploy/scripts/deploy-dev.sh')
-    rmFile('deploy/scripts/deploy-prod.sh')
-    rmFile('deploy/env/.env.dev.example')
-    rmFile('deploy/env/.env.prod.example')
-  } else {
-    rm('deploy/docker-compose.dev.yml')
-    rm('deploy/docker-compose.staging.yml')
-    rmFile('deploy/scripts/deploy-dev.sh')
-    rmFile('deploy/scripts/deploy-preprod.sh')
-    rmFile('deploy/scripts/deploy-staging.sh')
-    rmFile('deploy/env/.env.dev.example')
-    rmFile('deploy/env/.env.staging.example')
-  }
   rm('docker-compose.yml')
   rm('docker')
 }
@@ -125,17 +110,6 @@ function slimPackageJson() {
       build: 'pnpm --filter @supplify/api build && pnpm --filter @supplify/web build',
       'db:migrate': 'node apps/api/scripts/migrate.js',
       'db:sync-roles': 'node apps/api/scripts/sync-system-roles.mjs',
-      ...(tier === 'preprod'
-        ? {
-            'deploy:preprod': 'bash deploy/scripts/deploy-preprod.sh',
-            'docker:preprod:up':
-              'docker compose --env-file deploy/env/.env.staging -f deploy/docker-compose.staging.yml up -d',
-          }
-        : {
-            'deploy:prod': 'bash deploy/scripts/deploy-prod.sh',
-            'docker:prod:up':
-              'docker compose --env-file deploy/env/.env.prod -f deploy/docker-compose.prod.yml up -d',
-          }),
       setup: 'node scripts/ensure-pnpm.mjs && node scripts/pnpm-run.mjs install',
     },
     engines: { node: '>=18.0.0', pnpm: '>=8.0.0' },
@@ -183,8 +157,6 @@ function slimPackageJson() {
 
 function writeReadme() {
   const envLabel = tier === 'preprod' ? 'Pre-production' : 'Production'
-  const deployCmd =
-    tier === 'preprod' ? 'sudo ./deploy/scripts/deploy-preprod.sh' : 'sudo ./deploy/scripts/deploy-prod.sh'
   fs.writeFileSync(
     path.join(ROOT, 'README.md'),
     `# Supplify (${envLabel} branch)
@@ -195,13 +167,9 @@ Deploy-only branch — **do not develop here**. On \`dev\`: \`node scripts/promo
 node scripts/promote-release.mjs --tier ${tier}
 \`\`\`
 
-## Deploy (EC2 Docker)
+## Deploy (Railway)
 
-\`\`\`bash
-${deployCmd}
-\`\`\`
-
-Migrations run automatically during deploy. Branching guide: see \`docs/BRANCHING.md\` on the \`dev\` branch.
+Push to this branch triggers Railway deploy for the matching environment. See \`docs/operations/railway-environments.md\` on the \`dev\` branch.
 `
   )
   console.log('wrote README.md')

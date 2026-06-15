@@ -31,7 +31,7 @@ docs/
   archive/
     audits/                    Historical audit reports
     old/                       Superseded plans, blueprint, merged feature docs
-    legacy-ec2/                Legacy EC2 deploy
+    old/                       Superseded plans and merged feature docs
 ```
 
 **Removed as top-level folders:** `deployment/` (→ `operations/`), `monetization/` (→ `product/`), `superpowers/` (→ `archive/old/`), `blueprint/` (→ `archive/old/blueprint/`).

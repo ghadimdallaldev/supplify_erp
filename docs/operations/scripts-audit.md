@@ -1,6 +1,6 @@
 # Scripts audit — keep / archive / delete
 
-Last updated: 2026-06-12 (cleanup applied). Covers `apps/api/scripts/` (~49 active files), repo `scripts/` (~25), and `deploy/scripts/` (~17).
+Last updated: 2026-06-15. Covers `apps/api/scripts/` (~49 active files), repo `scripts/` (~25), and `deploy/scripts/` (2 local Docker helpers).
 
 **Cleanup done:** 71 one-off scripts moved to `docs/archive/scripts/one-off/`; `generate-openapi.js` restored as discover-routes shim; `seed:tier-catalog` aligned to `.mjs`; `prune-release-tree` keeps `migrate-suppliers-to-orgs.js`; see `apps/api/scripts/README.md`.
 
@@ -170,18 +170,14 @@ Historical **monolith split** tooling — do not run on current tree:
 
 ---
 
-## `deploy/scripts/` (~17 files)
+## `deploy/scripts/` (local Docker only)
 
-### KEEP (self-hosted Docker path)
+### KEEP
 
-All scripts — used by `deploy/docker-compose.*.yml` and slim release `package.json`:
+- `keycloak-init.sh` — Keycloak realm bootstrap (root `docker-compose.yml`)
+- `minio-init-buckets.sh` — MinIO bucket init (root `docker-compose.yml`)
 
-- `deploy-*.sh`, `start.sh`, `stop.sh`, `status.sh`, `logs.sh`
-- `backup-now.sh`, `rotate-backups.sh`, `restore-*.sh`
-- `healthcheck.sh`, `keycloak-init.sh`, `minio-init-buckets.sh`
-- `_common.sh`, `common.sh`
-
-Not used on primary **Railway** deploy; still required for Docker/VM operators.
+EC2/VM deploy scripts were removed; production deploys use **Railway** (`deploy/railway/`).
 
 ---
 
@@ -203,4 +199,4 @@ Not used on primary **Railway** deploy; still required for Docker/VM operators.
 | ------------------- | ----- | ---- | ------- | ----------------- |
 | `apps/api/scripts/` | ~120  | ~45  | ~70     | 0 (archive first) |
 | `scripts/`          | 33    | 22   | 8       | 0                 |
-| `deploy/scripts/`   | 17    | 17   | 0       | 0                 |
+| `deploy/scripts/`   | 2     | 2    | 0       | 0                 |

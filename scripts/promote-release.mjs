@@ -62,7 +62,7 @@ if (current !== 'dev') {
 if (tier === 'prod') {
   console.log('\n⚠ prod promotes from preprod only (pruned UAT tree). Run preprod promote first.\n')
 }
-console.log(`\nPromoting ${source} → ${branch} (EC2 ${tier} deploy branch)\n`)
+console.log(`\nPromoting ${source} → ${branch} (Railway ${tier} deploy branch)\n`)
 
 run('git fetch origin')
 run(`git checkout ${branch}`)
@@ -102,10 +102,10 @@ const after = runCapture('git status --porcelain')
 if (!after) {
   console.log('\nNothing to commit after prune — branch already up to date.\n')
 } else {
-  run(`git commit -m "chore(release): prune ${branch} tree for EC2 deploy"`)
+  run(`git commit -m "chore(release): prune ${branch} tree for Railway deploy"`)
 }
 
 run(`git push origin ${branch}`)
 run('git checkout dev')
 
-console.log(`\n✓ ${branch} promoted and pushed. Deploy with CDK or deploy/scripts on the target host.\n`)
+console.log(`\n✓ ${branch} promoted and pushed. Railway will deploy from the ${branch} branch.\n`)

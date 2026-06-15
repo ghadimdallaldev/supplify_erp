@@ -3,7 +3,7 @@
 **Multi-environment guide (dev / preprod / prod):** [railway-environments.md](./railway-environments.md)  
 **Variable reference:** [environment-variables.md](./environment-variables.md) · [env-matrix.md](./env-matrix.md)
 
-This page is a quick single-service overview. **AWS CDK and GitHub Actions CI were removed**; use Railway for deploys.
+This page is a quick single-service overview. Deploy via **Railway** only.
 
 ## Monorepo (pnpm workspace)
 
@@ -131,7 +131,7 @@ Run once after deploy (Railway one-off command or local with production `DATABAS
 pnpm db:migrate
 ```
 
-Restaurant-operations features require migrations **0133–0137** (and any later pending files). **Email dedup** requires **0136** (`0136_email_delivery_log.sql`). Railway API services use `RUN_MIGRATIONS_ON_START=true` in `deploy/railway/<env>/api.env` so SQL runs after listen on deploy. EC2 Docker deploy scripts also run migrations via the `migrate` compose service.
+Restaurant-operations features require migrations **0133–0137** (and any later pending files). **Email dedup** requires **0136** (`0136_email_delivery_log.sql`). Railway API services use `RUN_MIGRATIONS_ON_START=true` in `deploy/railway/<env>/api.env` so SQL runs after listen on deploy.
 
 Committed Railway API defaults (`deploy/railway/<env>/api.env`, copied into the image) set `CRONS_ENABLED=true` for in-process jobs including operational reminders.
 
@@ -208,12 +208,7 @@ pnpm dev
 
 Docker Compose still runs Postgres, Redis, MinIO, and Keycloak for full local stack. MinIO uses `STORAGE_DRIVER=s3` via `.env.docker-sync`.
 
-## 7. What was removed
-
-- `infra/` AWS CDK stacks (ECS, CloudFront, RDS CDK, IAM deploy roles)
-- `.github/workflows/ci.yml` (GitHub Actions unit-test workflow)
-- Root `package.json` `cdk:*` scripts
-- `deploy/scripts/backup-now.sh` AWS CLI `s3 cp` upload (use `BACKUP_REMOTE_URL` note or your own backup)
+## 7. Pre-deploy checks
 
 Run tests locally before deploy:
 
