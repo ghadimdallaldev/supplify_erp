@@ -18,10 +18,18 @@ export function useImpersonation() {
     skip: !isPlatformAdmin,
   })
 
-  const isImpersonating = Boolean(isPlatformAdmin && impersonation?.active)
+  /** /auth/me includes tenant permissions + workspace while the impersonation cookie is active. */
+  const impersonatingFromMe = Boolean(
+    isPlatformAdmin &&
+      user?.workspace?.tenantType &&
+      Array.isArray(user.tenantPermissions) &&
+      user.tenantPermissions.length > 0
+  )
+
+  const isImpersonating = Boolean(isPlatformAdmin && (impersonation?.active || impersonatingFromMe))
   const effectiveTenantType =
-    isImpersonating && impersonation?.tenantType
-      ? (impersonation.tenantType as 'RESTAURANT' | 'SUPPLIER')
+    isImpersonating && (impersonation?.tenantType ?? user?.workspace?.tenantType)
+      ? ((impersonation?.tenantType ?? user?.workspace?.tenantType) as 'RESTAURANT' | 'SUPPLIER')
       : null
 
   /** Role for nav, pages, and feature gates — impersonated tenant type when active. */
@@ -49,7 +57,7 @@ export function useImpersonation() {
     isEffectiveSupplier,
     isEffectiveTenant,
     shouldLoadTenantEntitlements,
-    tenantId: impersonation?.tenantId ?? null,
-    tenantName: impersonation?.tenantName ?? null,
+    tenantId: impersonation?.tenantId ?? user?.workspace?.tenantId ?? null,
+    tenantName: impersonation?.tenantName ?? user?.workspace?.tenantName ?? null,
   }
 }
