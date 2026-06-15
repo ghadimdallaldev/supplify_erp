@@ -7,11 +7,22 @@ import { Select, SelectTrigger } from '../ui/select'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { Skeleton } from '../ui/skeleton'
-import { CheckCircle, AlertTriangle, Loader2, Route, PackageOpen } from 'lucide-react'
+import {
+  CheckCircle,
+  AlertTriangle,
+  Loader2,
+  Route,
+  PackageOpen,
+  Package,
+  Clock,
+  Truck,
+  CalendarClock,
+} from 'lucide-react'
 import { CreateRouteDialog } from './CreateRouteDialog'
 import { canSelectOrderForRoute } from './fulfillmentDispatchUtils'
 import { toast } from 'sonner'
 import type { DispatchOrderCard } from '../../types'
+import { KpiCard } from '../ui/kpi-card'
 import {
   useGetDriversQuery,
   useAssignDriverToOrderMutation,
@@ -267,16 +278,61 @@ export function DriverDispatchBoard({
 
         <section
           data-testid="delivery-board-stats"
-          className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-4 py-3"
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-6"
         >
-          <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-            <DispatchMetric label="Total orders" value={summary.total} emphasis />
-            <DispatchMetric label="Pending" value={summary.pending} />
-            <DispatchMetric label="Out for delivery" value={summary.outForDelivery} />
-            <DispatchMetric label="Delivered" value={summary.delivered} />
-            <DispatchMetric label="Failed" value={summary.failed} />
-            <DispatchMetric label="Rescheduled" value={summary.rescheduled} />
-          </div>
+          <KpiCard
+            label="Total orders"
+            value={summary.total}
+            icon={Package}
+            tone="brand"
+            size="sm"
+            testId="dispatch-stat-total"
+          />
+          <KpiCard
+            label="Pending"
+            value={summary.pending}
+            icon={Clock}
+            tone="warning"
+            size="sm"
+            description="Awaiting dispatch"
+            testId="dispatch-stat-pending"
+          />
+          <KpiCard
+            label="Out for delivery"
+            value={summary.outForDelivery}
+            icon={Truck}
+            tone="info"
+            size="sm"
+            description="On the road today"
+            testId="dispatch-stat-out-for-delivery"
+          />
+          <KpiCard
+            label="Delivered"
+            value={summary.delivered}
+            icon={CheckCircle}
+            tone="success"
+            size="sm"
+            description="Completed today"
+            testId="dispatch-stat-delivered"
+          />
+          <KpiCard
+            label="Failed"
+            value={summary.failed}
+            icon={AlertTriangle}
+            tone="danger"
+            size="sm"
+            description="Needs follow-up"
+            testId="dispatch-stat-failed"
+          />
+          <KpiCard
+            label="Rescheduled"
+            value={summary.rescheduled}
+            icon={CalendarClock}
+            tone="neutral"
+            size="sm"
+            description="Moved to a later run"
+            testId="dispatch-stat-rescheduled"
+          />
         </section>
 
         {isEmpty ? (
@@ -604,31 +660,6 @@ export function DriverDispatchBoard({
         />
       </div>
     </TooltipProvider>
-  )
-}
-
-function DispatchMetric({
-  label,
-  value,
-  emphasis = false,
-}: {
-  label: string
-  value: number
-  emphasis?: boolean
-}) {
-  return (
-    <div>
-      <p className="text-xs text-[var(--text-mid)]">{label}</p>
-      <p
-        className={
-          emphasis
-            ? 'mt-0.5 text-xl font-semibold tabular-nums text-[var(--text)]'
-            : 'mt-0.5 font-medium tabular-nums text-[var(--text)]'
-        }
-      >
-        {value}
-      </p>
-    </div>
   )
 }
 

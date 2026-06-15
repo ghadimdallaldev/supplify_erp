@@ -330,6 +330,12 @@ router.get('/me', requireAuth, async (req, res) => {
         } else {
           tenantRoles = ['Owner (impersonation)']
         }
+        workspace = {
+          tenantId: tenant.tenantId,
+          tenantType: tenant.tenantType,
+          tenantName: tenant.tenantName || '',
+          roleName: tenantRoles[0] || 'Owner (impersonation)',
+        }
       } else {
         const [ownerAssigned, rolesResult, permsResult, assignment, tenantProfileRow] =
           await Promise.all([

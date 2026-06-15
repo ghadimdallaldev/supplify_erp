@@ -1,5 +1,11 @@
 import { api } from '../base'
 
+/** Example CSV for supplier customer import (matches import column aliases). */
+export const CUSTOMER_IMPORT_CSV_TEMPLATE = `Restaurant Name,Contact Person,Phone,Email,Address,Area/Region,Credit Limit,Payment Terms,Sales Representative,Notes
+The Coastal Kitchen,John Smith,+1-555-0101,john@coastalkitchen.com,123 Harbor Blvd,San Diego,5000,Net 30,Alex Rivera,Preferred delivery Tue/Thu
+Green Leaf Bistro,Maria Chen,+1-555-0102,maria@greenleaf.com,45 Oak Street,Portland,2500,Net 15,Jordan Lee,
+Downtown Diner,,+1-555-0103,,789 Main Ave,Chicago,,Net 30,,Phone-only contact`
+
 export type ReferralProgramConfig = {
   firstPaidDiscountPercent: number
   supplierRewardType: 'free_month' | 'account_credit'

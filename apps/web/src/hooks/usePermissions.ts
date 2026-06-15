@@ -41,7 +41,12 @@ export function usePermissions() {
     if (!user) return false
     if (user.role === 'ADMIN') {
       if (isImpersonating) {
-        return hasPermission(user.tenantPermissions, permissionKey)
+        // Owner-level view-as: use /auth/me tenantPermissions when present; otherwise
+        // allow nav until session hydrates (matches backend impersonation access).
+        if (Array.isArray(user.tenantPermissions) && user.tenantPermissions.length > 0) {
+          return hasPermission(user.tenantPermissions, permissionKey)
+        }
+        return true
       }
       return hasPermission(
         adminPermissionsForUser(user.adminPermissions, isImpersonating),
