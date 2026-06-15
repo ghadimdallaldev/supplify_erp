@@ -23,7 +23,11 @@ vi.mock('../lib/rbac.js', () => ({
   }),
   requireRole: () => (req, res, next) => next(),
   requireOwnership: () => (req, res, next) => next(),
+  resolveTenantContext: (req, res, next) => next(),
+  resolveAdminContext: (req, res, next) => next(),
+  requirePermission: () => (req, res, next) => next(),
   getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
+  getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
   checkPermission: vi.fn().mockResolvedValue(true),
   upsertUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com' }),
   setAuthCookies: vi.fn(),
@@ -121,6 +125,53 @@ describe('Restaurants Routes', () => {
       const response = await request(app).get('/api/restaurants/restaurant-1').expect(200)
 
       expect(response.body.ok).toBe(true)
+      expect(response.body.data.restaurant.id).toBe('restaurant-1')
+    })
+
+    it('denies RESTAURANT role when tenant id does not match', async () => {
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValueOnce('restaurant-other')
+
+      db.query.mockResolvedValueOnce({
+        rows: [{ id: 'restaurant-1', name: 'Test Restaurant' }],
+      })
+
+      const localApp = express()
+      localApp.use(express.json())
+      localApp.use((req, res, next) => {
+        req.requestId = 'test-request-id'
+        req.userData = { ...mockUser, role: 'RESTAURANT' }
+        next()
+      })
+      localApp.use('/api/restaurants', restaurantsRoutes)
+      const { errorHandler } = await import('../middlewares/errorHandler.js')
+      localApp.use(errorHandler)
+
+      const response = await request(localApp).get('/api/restaurants/restaurant-1').expect(403)
+
+      expect(response.body.error.name).toBe('FORBIDDEN')
+    })
+
+    it('allows SUPPLIER when restaurant has active connection', async () => {
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'restaurant-1', name: 'Test Restaurant' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
+
+      const localApp = express()
+      localApp.use(express.json())
+      localApp.use((req, res, next) => {
+        req.requestId = 'test-request-id'
+        req.userData = { ...mockUser, role: 'SUPPLIER' }
+        next()
+      })
+      localApp.use('/api/restaurants', restaurantsRoutes)
+      const { errorHandler } = await import('../middlewares/errorHandler.js')
+      localApp.use(errorHandler)
+
+      const response = await request(localApp).get('/api/restaurants/restaurant-1').expect(200)
+
       expect(response.body.data.restaurant.id).toBe('restaurant-1')
     })
   })

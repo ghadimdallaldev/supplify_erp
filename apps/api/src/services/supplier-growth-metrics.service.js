@@ -29,10 +29,17 @@ export async function getSupplierGrowthMetrics(supplierId) {
         [supplierId]
       ),
       query(
-        `SELECT COALESCE(SUM(bi.amount), 0)::numeric AS total
+        `SELECT COALESCE(SUM(latest.amount), 0)::numeric AS total
        FROM supplier_referral_attribution ra
-       JOIN billing_invoice bi ON bi.tenant_id = ra.restaurant_id AND bi.tenant_type = 'RESTAURANT'
-         AND bi.status = 'PAID'
+       JOIN LATERAL (
+         SELECT bi.amount
+         FROM billing_invoice bi
+         WHERE bi.tenant_id = ra.restaurant_id
+           AND bi.tenant_type = 'RESTAURANT'
+           AND bi.status = 'PAID'
+         ORDER BY bi.paid_at DESC NULLS LAST, bi.created_at DESC
+         LIMIT 1
+       ) latest ON true
        WHERE ra.supplier_id = $1 AND ra.converted_at IS NOT NULL`,
         [supplierId]
       ),

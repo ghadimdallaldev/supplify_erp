@@ -6,6 +6,8 @@ type CategoryNavProps = {
   activeCategoryId?: string
   onSelect: (categoryId: string) => void
   className?: string
+  sticky?: boolean
+  ariaLabel?: string
 }
 
 export function CategoryNav({
@@ -13,6 +15,8 @@ export function CategoryNav({
   activeCategoryId,
   onSelect,
   className,
+  sticky = true,
+  ariaLabel = 'Menu categories',
 }: CategoryNavProps) {
   const navRef = useRef<HTMLDivElement>(null)
   const activeId = activeCategoryId ?? categories[0]?.id
@@ -29,14 +33,16 @@ export function CategoryNav({
     <div
       ref={navRef}
       className={cn(
-        'sticky top-[73px] z-30 -mx-4 border-b border-[var(--app-border)] bg-[var(--surface)]/95 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-[var(--surface)]/80',
+        sticky &&
+          'sticky top-[73px] z-30 bg-[var(--surface)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--surface)]/80',
+        '-mx-4 border-b border-[var(--app-border)] px-4 py-2.5',
         className
       )}
     >
       <div
         className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none"
         role="tablist"
-        aria-label="Menu categories"
+        aria-label={ariaLabel}
       >
         {categories.map((category) => {
           const active = category.id === activeId

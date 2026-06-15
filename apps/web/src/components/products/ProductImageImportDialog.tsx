@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, Download, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -144,6 +144,7 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
   const [preview, setPreview] = useState<ImageImportPreviewResponse | null>(null)
   const [jobId, setJobId] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const terminalToastShownRef = useRef<string | null>(null)
 
   const [presignImageImport] = usePresignImageImportMutation()
   const [previewImageImport, { isLoading: isPreviewing }] = usePreviewImageImportMutation()
@@ -172,9 +173,16 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
     setPreview(null)
     setJobId(null)
     setUploading(false)
+    terminalToastShownRef.current = null
   }, [])
 
   const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && isProgressPhase) {
+      const confirmed = window.confirm(
+        'Image import is still running. Close this dialog? The import will continue in the background.'
+      )
+      if (!confirmed) return
+    }
     if (!nextOpen) resetState()
     onOpenChange(nextOpen)
   }
@@ -364,7 +372,15 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
   }
 
   useEffect(() => {
+    terminalToastShownRef.current = null
+  }, [jobId])
+
+  useEffect(() => {
     if (!job || !isJobTerminal) return
+    const toastKey = `${job.id}:${job.status}`
+    if (terminalToastShownRef.current === toastKey) return
+    terminalToastShownRef.current = toastKey
+
     if (job.status === 'completed') {
       toast.success(
         `Import complete: ${job.matched} matched, ${job.failed} failed, ${job.skipped} skipped`
@@ -372,7 +388,7 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
     } else if (job.status === 'failed') {
       toast.error(job.error_message || 'Image import failed')
     }
-  }, [job?.status, job?.matched, job?.failed, job?.skipped, job?.error_message, isJobTerminal])
+  }, [job, isJobTerminal])
 
   const missingCount = useMemo(() => {
     if (!preview?.summary) return 0

@@ -4,7 +4,8 @@ import { deliveredOrderStatusInSql } from './order-statuses.js'
 
 /**
  * Composed admin activity feed from operational tables (no unified activity table).
- * Each source runs independently so one failing query does not empty the feed.
+ * Primary path: single UNION ALL query with outer ORDER BY / LIMIT / OFFSET.
+ * Falls back to per-branch queries when the unified query fails (missing tables, etc.).
  *
  * Sources: orders, tenants, subscription changes, admin audit, staff, reservations,
  * invoices, payments, quick lists, receiving, chat, promotions/deals.
@@ -302,6 +303,25 @@ const ACTIVITY_BRANCHES = [
 ]
 
 /**
+ * @param {string} branchSql
+ * @param {number} windowDaysParam
+ */
+function wrapBranchSubquery(branchSql, windowDaysParam) {
+  return `SELECT ${BRANCH_SELECT} FROM (${branchSql}) src
+    WHERE src.occurred_at >= NOW() - ($${windowDaysParam}::int * INTERVAL '1 day')`
+}
+
+/**
+ * @param {Array<{ key: string; sql: string }>} branches
+ * @param {number} windowDaysParam
+ */
+function buildUnionFeedSql(branches, windowDaysParam) {
+  return branches
+    .map((branch) => wrapBranchSubquery(branch.sql, windowDaysParam))
+    .join('\nUNION ALL\n')
+}
+
+/**
  * @param {Record<string, unknown>} row
  */
 export function normalizeActivityEvent(row) {
@@ -329,23 +349,11 @@ export function normalizeActivityEvent(row) {
 }
 
 /**
- * @param {{ limit?: number; offset?: number; type?: string | null; days?: number }} opts
+ * Legacy per-branch fetch with isolated failures (fallback path).
+ * @param {Array<{ key: string; sql: string }>} branches
+ * @param {{ lim: number; off: number; windowDays: number }} opts
  */
-export async function buildAdminActivityFeed({
-  limit = 50,
-  offset = 0,
-  type = null,
-  days = 30,
-} = {}) {
-  const lim = Math.min(Math.max(parseInt(String(limit), 10) || 50, 1), 100)
-  const off = Math.max(parseInt(String(offset), 10) || 0, 0)
-  const windowDays = Math.min(Math.max(parseInt(String(days), 10) || 30, 1), 90)
-  const typeFilter = type && type !== 'all' ? String(type) : null
-
-  const branches = typeFilter
-    ? ACTIVITY_BRANCHES.filter((b) => b.key === typeFilter)
-    : ACTIVITY_BRANCHES
-
+async function buildAdminActivityFeedLegacy(branches, { lim, off, windowDays }) {
   const perBranchCap = Math.min(Math.max(lim + off, lim) * 2, 200)
   const failedSources = []
   const allRows = []
@@ -386,5 +394,71 @@ export async function buildAdminActivityFeed({
     sources: branches.map((b) => b.key),
     failedSources,
     partial: failedSources.length > 0,
+  }
+}
+
+/**
+ * @param {{ limit?: number; offset?: number; type?: string | null; days?: number }} opts
+ */
+export async function buildAdminActivityFeed({
+  limit = 50,
+  offset = 0,
+  type = null,
+  days = 30,
+} = {}) {
+  const lim = Math.min(Math.max(parseInt(String(limit), 10) || 50, 1), 100)
+  const off = Math.max(parseInt(String(offset), 10) || 0, 0)
+  const windowDays = Math.min(Math.max(parseInt(String(days), 10) || 30, 1), 90)
+  const typeFilter = type && type !== 'all' ? String(type) : null
+
+  const branches = typeFilter
+    ? ACTIVITY_BRANCHES.filter((b) => b.key === typeFilter)
+    : ACTIVITY_BRANCHES
+
+  if (branches.length === 0) {
+    return {
+      events: [],
+      total: 0,
+      limit: lim,
+      offset: off,
+      days: windowDays,
+      sources: [],
+      failedSources: [],
+      partial: false,
+    }
+  }
+
+  const unionSql = buildUnionFeedSql(branches, 3)
+  const countUnionSql = buildUnionFeedSql(branches, 1)
+  const params = [lim, off, windowDays]
+
+  try {
+    const [dataResult, countResult] = await Promise.all([
+      query(
+        `SELECT ${BRANCH_SELECT}
+         FROM (${unionSql}) feed
+         ORDER BY feed.occurred_at DESC
+         LIMIT $1 OFFSET $2`,
+        params
+      ),
+      query(`SELECT COUNT(*)::int AS total FROM (${countUnionSql}) feed`, [windowDays]),
+    ])
+
+    return {
+      events: dataResult.rows.map(normalizeActivityEvent),
+      total: countResult.rows[0]?.total ?? dataResult.rows.length,
+      limit: lim,
+      offset: off,
+      days: windowDays,
+      sources: branches.map((b) => b.key),
+      failedSources: [],
+      partial: false,
+    }
+  } catch (error) {
+    logger.warn(
+      { code: error.code, message: error.message },
+      'unified activity feed query failed; falling back to per-branch queries'
+    )
+    return buildAdminActivityFeedLegacy(branches, { lim, off, windowDays })
   }
 }

@@ -1,6 +1,12 @@
 import express from 'express'
 import PDFDocument from 'pdfkit'
-import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  requirePermission,
+  getSupplierIdForRequest,
+} from '../lib/rbac.js'
 import { invoicesMutationGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -85,6 +91,11 @@ async function buildInvoicePdf(invoice, lineItems) {
 }
 
 // Validation schemas
+const invoiceListSchema = z.object({
+  limit: z.coerce.number().min(1).max(200).default(50),
+  offset: z.coerce.number().min(0).default(0),
+})
+
 const invoiceCreateSchema = z.object({
   restaurant_id: z.string().uuid(),
   order_id: z.string().uuid().optional(),
@@ -99,17 +110,22 @@ const invoiceCreateSchema = z.object({
 // Also allow RESTAURANT to call this endpoint safely (returns empty list)
 router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN', 'RESTAURANT']), async (req, res) => {
   try {
+    const params = invoiceListSchema.parse(req.query)
+
     // If the caller is not a supplier/admin, return empty to avoid frontend 403 noise
     if (req.userData.role && !['SUPPLIER', 'ADMIN'].includes(req.userData.role)) {
       return res.json({
         ok: true,
-        data: { invoices: [] },
+        data: {
+          invoices: [],
+          pagination: { total: 0, limit: params.limit, offset: params.offset },
+        },
         error: null,
         requestId: req.requestId,
       })
     }
 
-    let invoicesQuery = `
+    const invoiceSelect = `
       SELECT 
         i.*,
         r.name as restaurant_name,
@@ -121,17 +137,79 @@ router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN', 'RESTAURANT']), a
       LEFT JOIN restaurant r ON r.id = i.restaurant_id
       LEFT JOIN customer_order o ON o.id = i.order_id
       LEFT JOIN payment p ON p.invoice_id = i.id
-      WHERE s.contact_email = $1
-      GROUP BY i.id, r.name, o.id, o.status
-      ORDER BY i.issue_date DESC, i.invoice_number DESC
-      LIMIT 500
     `
 
-    const { rows } = await query(invoicesQuery, [req.userData.email])
+    if (req.userData.role === 'ADMIN') {
+      const countSql = `
+        SELECT COUNT(*)::int AS total
+        FROM invoice i
+      `
+      const listSql = `
+        ${invoiceSelect}
+        GROUP BY i.id, r.name, o.id, o.status
+        ORDER BY i.issue_date DESC, i.invoice_number DESC
+        LIMIT $1 OFFSET $2
+      `
+      const [{ rows }, { rows: countRows }] = await Promise.all([
+        query(listSql, [params.limit, params.offset]),
+        query(countSql),
+      ])
+      return res.json({
+        ok: true,
+        data: {
+          invoices: rows,
+          pagination: {
+            total: parseInt(countRows[0].total, 10),
+            limit: params.limit,
+            offset: params.offset,
+          },
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    }
+
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId) {
+      return res.json({
+        ok: true,
+        data: {
+          invoices: [],
+          pagination: { total: 0, limit: params.limit, offset: params.offset },
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    }
+
+    const countSql = `
+      SELECT COUNT(*)::int AS total
+      FROM invoice i
+      WHERE i.supplier_id = $1
+    `
+    const listSql = `
+      ${invoiceSelect}
+      WHERE i.supplier_id = $1
+      GROUP BY i.id, r.name, o.id, o.status
+      ORDER BY i.issue_date DESC, i.invoice_number DESC
+      LIMIT $2 OFFSET $3
+    `
+
+    const [{ rows }, { rows: countRows }] = await Promise.all([
+      query(listSql, [supplierId, params.limit, params.offset]),
+      query(countSql, [supplierId]),
+    ])
 
     res.json({
       ok: true,
-      data: { invoices: rows },
+      data: {
+        invoices: rows,
+        pagination: {
+          total: parseInt(countRows[0].total, 10),
+          limit: params.limit,
+          offset: params.offset,
+        },
+      },
       error: null,
       requestId: req.requestId,
     })
@@ -272,16 +350,12 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
   try {
     const invoiceData = invoiceCreateSchema.parse(req.body)
 
-    // Get supplier ID
-    const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
-      req.userData.email,
-    ])
+    const supplierId =
+      req.userData.role === 'ADMIN' ? req.body.supplier_id : await getSupplierIdForRequest(req)
 
-    if (suppliers.length === 0) {
+    if (!supplierId) {
       throw new ValidationError('Supplier record not found for user')
     }
-
-    const supplierId = suppliers[0].id
 
     await query('BEGIN')
 

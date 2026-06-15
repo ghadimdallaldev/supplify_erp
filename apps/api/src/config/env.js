@@ -196,6 +196,8 @@ export const config = {
   ENABLE_REQUEST_LOGGING: envBool(process.env.ENABLE_REQUEST_LOGGING, APP_ENV !== 'prod'),
   SENTRY_DSN: process.env.SENTRY_DSN || '',
   SENTRY_ENVIRONMENT: process.env.SENTRY_ENVIRONMENT || APP_ENV,
+  /** When true, first ADMIN login with no admin roles receives SUPER_ADMIN. Default false (especially in production). */
+  ALLOW_AUTO_SUPER_ADMIN: envBool(process.env.ALLOW_AUTO_SUPER_ADMIN, false),
   RATE_LIMIT_ENABLED: envBool(process.env.RATE_LIMIT_ENABLED, APP_ENV !== 'dev'),
   RATE_LIMIT_WINDOW_MS: envInt(process.env.RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
   RATE_LIMIT_MAX: envInt(process.env.RATE_LIMIT_MAX, isProductionNode ? 300 : 1000),
@@ -293,6 +295,8 @@ export const config = {
   IMPORT_ZIP_MAX_BYTES: envInt(process.env.IMPORT_ZIP_MAX_BYTES, 2147483648),
   /** Max size per image extracted during bulk product image import (default 10MB). */
   IMPORT_IMAGE_MAX_BYTES: envInt(process.env.IMPORT_IMAGE_MAX_BYTES, 10 * 1024 * 1024),
+  /** Row count above which product CSV import runs as a background job (default 200). */
+  PRODUCT_IMPORT_ASYNC_THRESHOLD: envInt(process.env.PRODUCT_IMPORT_ASYNC_THRESHOLD, 200),
 }
 
 if (!config.STORAGE_PUBLIC_URL) {

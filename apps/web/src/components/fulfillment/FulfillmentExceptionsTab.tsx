@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertCircle } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
@@ -67,22 +66,25 @@ export function FulfillmentExceptionsTab({ warehouseId }: Props) {
   }
 
   return (
-    <Card data-testid="fulfillment-exceptions-tab">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <AlertCircle className="h-5 w-5" />
+    <section
+      data-testid="fulfillment-exceptions-tab"
+      className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]"
+    >
+      <header className="border-b border-[var(--app-border)] px-4 py-4 sm:px-5">
+        <h2 className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[var(--text)]">
+          <AlertCircle className="h-4 w-4 text-[var(--brand-mid)]" aria-hidden />
           Delivery Exceptions
           {openCount > 0 && (
-            <Badge variant="destructive" className="ml-1" data-testid="exceptions-open-count">
+            <Badge variant="destructive" data-testid="exceptions-open-count">
               {openCount} open
             </Badge>
           )}
-        </CardTitle>
-        <CardDescription>
+        </h2>
+        <p className="mt-0.5 text-xs text-[var(--text-mid)]">
           Short deliveries, damages, and returns requiring attention
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+        </p>
+      </header>
+      <div className="p-4 sm:p-5">
         {isLoading ? (
           <div className="space-y-3" data-testid="exceptions-loading">
             {Array.from({ length: 2 }).map((_, i) => (
@@ -104,10 +106,11 @@ export function FulfillmentExceptionsTab({ warehouseId }: Props) {
           </div>
         ) : exceptions.length === 0 ? (
           <div
-            className="py-10 text-center text-sm text-[var(--text-muted)]"
+            className="rounded-xl border border-dashed border-[var(--app-border)] bg-[var(--brand-ultra)] py-12 text-center"
             data-testid="exceptions-empty"
           >
-            No delivery exceptions recorded.
+            <AlertCircle className="mx-auto mb-3 h-9 w-9 text-[var(--text-muted)]" aria-hidden />
+            <p className="text-sm text-[var(--text-mid)]">No delivery exceptions recorded.</p>
           </div>
         ) : (
           <div className="overflow-x-auto -mx-1 px-1">
@@ -208,7 +211,7 @@ export function FulfillmentExceptionsTab({ warehouseId }: Props) {
             </table>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }

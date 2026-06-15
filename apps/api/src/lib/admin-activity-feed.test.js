@@ -36,11 +36,28 @@ describe('admin-activity-feed', () => {
     expect(row.amount).toBe(42.5)
   })
 
-  it('buildAdminActivityFeed merges branch rows and paginates', async () => {
+  it('buildAdminActivityFeed uses UNION query and paginates', async () => {
     query.mockImplementation(async (sql) => {
-      if (sql.includes('order_placed')) {
+      if (sql.includes('UNION ALL') && sql.includes('COUNT(*)')) {
+        return { rows: [{ total: 2 }] }
+      }
+      if (sql.includes('UNION ALL')) {
         return {
           rows: [
+            {
+              id: 's1',
+              event_type: 'new_tenant',
+              title: 'New supplier: S1',
+              subtitle: 'a@b.com',
+              actor: 'S1',
+              target: null,
+              amount: null,
+              occurred_at: new Date('2026-05-28T11:00:00Z'),
+              tenant_name: 'S1',
+              tenant_type: 'SUPPLIER',
+              status_label: null,
+              link_path: null,
+            },
             {
               id: 'o1',
               event_type: 'order_placed',
@@ -58,44 +75,32 @@ describe('admin-activity-feed', () => {
           ],
         }
       }
-      if (sql.includes('new_tenant')) {
-        return {
-          rows: [
-            {
-              id: 's1',
-              event_type: 'new_tenant',
-              title: 'New supplier: S1',
-              subtitle: 'a@b.com',
-              actor: 'S1',
-              target: null,
-              amount: null,
-              occurred_at: new Date('2026-05-28T11:00:00Z'),
-              tenant_name: 'S1',
-              tenant_type: 'SUPPLIER',
-              status_label: null,
-              link_path: null,
-            },
-          ],
-        }
-      }
       return { rows: [] }
     })
 
     const result = await buildAdminActivityFeed({ limit: 10, offset: 0, days: 14 })
-    expect(result.events.length).toBeGreaterThanOrEqual(2)
+    expect(result.events).toHaveLength(2)
+    expect(result.total).toBe(2)
     expect(result.days).toBe(14)
     const sqlCalls = query.mock.calls.map((c) => c[0])
+    expect(sqlCalls.some((sql) => sql.includes('UNION ALL'))).toBe(true)
     expect(sqlCalls.some((sql) => sql.includes("INTERVAL '1 day'"))).toBe(true)
     expect(result.events[0].event_type).toBe('new_tenant')
     expect(result.sources.length).toBeGreaterThan(0)
   })
 
-  it('buildAdminActivityFeed continues when a branch fails', async () => {
+  it('buildAdminActivityFeed falls back when unified query fails', async () => {
     query.mockImplementation(async (sql) => {
-      if (sql.includes('order_placed')) {
+      if (sql.includes('ORDER BY feed.occurred_at DESC')) {
         throw Object.assign(new Error('bad enum'), { code: '22P02' })
       }
-      if (sql.includes('new_tenant')) {
+      if (sql.includes('COUNT(*)::int AS total FROM')) {
+        throw Object.assign(new Error('bad enum'), { code: '22P02' })
+      }
+      if (sql.includes("'order_placed' AS event_type")) {
+        throw Object.assign(new Error('bad enum'), { code: '22P02' })
+      }
+      if (sql.includes("'new_tenant' AS event_type")) {
         return {
           rows: [
             {

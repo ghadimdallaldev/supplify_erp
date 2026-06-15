@@ -199,6 +199,34 @@ describe('billingAccessMiddleware', () => {
     expect(res.statusCode).toBe(402)
   })
 
+  it('blocks GET on sensitive export paths when locked for expired Free Trial', async () => {
+    getRequestTenant.mockResolvedValue({ tenantId: 't1', tenantType: 'RESTAURANT' })
+    computeBillingAccessState.mockReturnValue({
+      isLocked: true,
+      freeSandboxExpired: true,
+      lockReason: 'free_sandbox_expired',
+    })
+    getBillingStatus.mockResolvedValue({
+      access: {
+        isLocked: true,
+        freeSandboxExpired: true,
+        lockReason: 'free_sandbox_expired',
+      },
+      amountDue: 0,
+    })
+    const next = vi.fn()
+    const res = mockRes()
+    const req = {
+      method: 'GET',
+      path: '/api/reports/sales',
+      userData: { role: 'RESTAURANT' },
+      requestId: 'req-trial-export',
+    }
+    await middleware(req, res, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(res.statusCode).toBe(402)
+  })
+
   it('allows subscriptions/plans GET when locked (non-trial)', async () => {
     getRequestTenant.mockResolvedValue({ tenantId: 't1', tenantType: 'RESTAURANT' })
     getBillingStatus.mockResolvedValue({

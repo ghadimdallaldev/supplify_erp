@@ -68,21 +68,42 @@ describe('Invoices Routes', () => {
 
   describe('GET /api/invoices', () => {
     it('should return list of invoices', async () => {
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'invoice-1',
-            order_id: 'order-1',
-            total_amount: 100.5,
-            status: 'PENDING',
-          },
-        ],
-      })
+      db.query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'invoice-1',
+              order_id: 'order-1',
+              total_amount: 100.5,
+              status: 'PENDING',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ total: 1 }],
+        })
 
       const response = await request(app).get('/api/invoices').expect(200)
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.invoices).toHaveLength(1)
+      expect(response.body.data.pagination).toEqual({
+        total: 1,
+        limit: 50,
+        offset: 0,
+      })
+    })
+
+    it('should honor limit and offset query params', async () => {
+      db.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ total: 25 }] })
+
+      const response = await request(app).get('/api/invoices?limit=10&offset=20').expect(200)
+
+      expect(response.body.data.pagination).toEqual({
+        total: 25,
+        limit: 10,
+        offset: 20,
+      })
     })
   })
 

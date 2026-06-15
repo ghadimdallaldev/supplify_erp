@@ -79,6 +79,10 @@ function inventoryRow(overrides = {}) {
   }
 }
 
+function mockInventoryList(db, rows, total = rows.length) {
+  db.query.mockResolvedValueOnce({ rows }).mockResolvedValueOnce({ rows: [{ total }] })
+}
+
 describe('Inventory Routes', () => {
   let app
   let db
@@ -104,18 +108,17 @@ describe('Inventory Routes', () => {
 
   describe('GET /api/inventory', () => {
     it('should return inventory list', async () => {
-      db.query.mockResolvedValueOnce({
-        rows: [inventoryRow()],
-      })
+      mockInventoryList(db, [inventoryRow()])
 
       const response = await request(app).get('/api/inventory').expect(200)
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.inventory).toHaveLength(1)
+      expect(response.body.data.pagination.total).toBe(1)
     })
 
     it('joins product_inventory_settings for low_stock_threshold', async () => {
-      db.query.mockResolvedValueOnce({ rows: [inventoryRow()] })
+      mockInventoryList(db, [inventoryRow()])
 
       await request(app).get('/api/inventory').expect(200)
 
@@ -126,19 +129,17 @@ describe('Inventory Routes', () => {
     })
 
     it('scopes supplier inventory to workspace supplier id', async () => {
-      db.query.mockResolvedValueOnce({ rows: [] })
+      mockInventoryList(db, [], 0)
 
       await request(app).get('/api/inventory').expect(200)
 
       const listSql = String(db.query.mock.calls[0][0])
       expect(listSql).toContain('WHERE p.supplier_id = $1')
-      expect(db.query.mock.calls[0][1]).toEqual(['supplier-1'])
+      expect(db.query.mock.calls[0][1]).toEqual(['supplier-1', 100, 0])
     })
 
     it('marks available_qty 0 as out of stock and not low stock', async () => {
-      db.query.mockResolvedValueOnce({
-        rows: [inventoryRow({ available_qty: 0, low_stock_threshold: 10 })],
-      })
+      mockInventoryList(db, [inventoryRow({ available_qty: 0, low_stock_threshold: 10 })])
 
       const response = await request(app).get('/api/inventory').expect(200)
       const item = response.body.data.inventory[0]
@@ -149,9 +150,7 @@ describe('Inventory Routes', () => {
     })
 
     it('marks available_qty below threshold as low stock', async () => {
-      db.query.mockResolvedValueOnce({
-        rows: [inventoryRow({ available_qty: 5, low_stock_threshold: 10 })],
-      })
+      mockInventoryList(db, [inventoryRow({ available_qty: 5, low_stock_threshold: 10 })])
 
       const response = await request(app).get('/api/inventory').expect(200)
       const item = response.body.data.inventory[0]
@@ -161,9 +160,7 @@ describe('Inventory Routes', () => {
     })
 
     it('marks available_qty equal to threshold as low stock (inclusive <=)', async () => {
-      db.query.mockResolvedValueOnce({
-        rows: [inventoryRow({ available_qty: 10, low_stock_threshold: 10 })],
-      })
+      mockInventoryList(db, [inventoryRow({ available_qty: 10, low_stock_threshold: 10 })])
 
       const response = await request(app).get('/api/inventory').expect(200)
       const item = response.body.data.inventory[0]
@@ -173,9 +170,7 @@ describe('Inventory Routes', () => {
     })
 
     it('marks available_qty above threshold as in stock', async () => {
-      db.query.mockResolvedValueOnce({
-        rows: [inventoryRow({ available_qty: 11, low_stock_threshold: 10 })],
-      })
+      mockInventoryList(db, [inventoryRow({ available_qty: 11, low_stock_threshold: 10 })])
 
       const response = await request(app).get('/api/inventory').expect(200)
       const item = response.body.data.inventory[0]
@@ -186,9 +181,7 @@ describe('Inventory Routes', () => {
     })
 
     it('falls back to default threshold when settings value is null', async () => {
-      db.query.mockResolvedValueOnce({
-        rows: [inventoryRow({ available_qty: 10, low_stock_threshold: null })],
-      })
+      mockInventoryList(db, [inventoryRow({ available_qty: 10, low_stock_threshold: null })])
 
       const response = await request(app).get('/api/inventory').expect(200)
       const item = response.body.data.inventory[0]

@@ -1,7 +1,16 @@
 import { format, isToday, isYesterday } from 'date-fns'
 import { Link } from 'react-router-dom'
-import { ChevronDown, Download, Eye, FileText, Reply, ShoppingCart } from 'lucide-react'
+import {
+  ChevronDown,
+  Download,
+  Eye,
+  FileText,
+  MessageSquare,
+  Reply,
+  ShoppingCart,
+} from 'lucide-react'
 import { Button } from '../ui/button'
+import { Skeleton } from '../ui/skeleton'
 import type { RefObject } from 'react'
 
 type MessageGroup = { date: string; messages: Record<string, unknown>[] }
@@ -22,6 +31,13 @@ type Props = {
   onScrollToBottom: () => void
 }
 
+function formatDateLabel(dateStr: string) {
+  const date = new Date(dateStr)
+  if (isToday(date)) return 'Today'
+  if (isYesterday(date)) return 'Yesterday'
+  return format(date, 'MMMM d, yyyy')
+}
+
 export function ChatThread({
   messagesLoading,
   groupedMessages,
@@ -38,81 +54,131 @@ export function ChatThread({
   const isEmpty = groupedMessages.every((g) => g.messages.length === 0)
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
-      <div ref={messagesContainerRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+    <div className="relative flex min-h-0 flex-1 flex-col bg-[var(--brand-ultra)]/40">
+      <div
+        ref={messagesContainerRef}
+        className="chat-thread-scroll min-h-0 flex-1 space-y-1 overflow-y-auto px-4 py-4 sm:px-5"
+      >
         {messagesLoading ? (
-          <div className="text-center text-[var(--text-muted)]">Loading messages...</div>
+          <div className="space-y-4 py-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
+                <Skeleton className={`h-14 rounded-2xl ${i % 2 === 0 ? 'w-[72%]' : 'w-[58%]'}`} />
+              </div>
+            ))}
+          </div>
         ) : isEmpty ? (
-          <div className="text-center text-[var(--text-muted)]">
-            {searchQuery ? 'No messages found' : 'No messages yet. Start the conversation!'}
+          <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-3 px-6 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--brand-pale)] text-[var(--brand-mid)]">
+              <MessageSquare className="h-6 w-6" aria-hidden />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-[var(--text)]">
+                {searchQuery ? 'No messages match your search' : 'Start the conversation'}
+              </p>
+              <p className="mt-1 text-sm text-[var(--text-mid)]">
+                {searchQuery
+                  ? 'Try a different keyword.'
+                  : 'Send a message, attach a file, or share an order reference.'}
+              </p>
+            </div>
           </div>
         ) : (
           <>
             {groupedMessages.map((group) => (
-              <div key={group.date}>
-                <div className="my-6 flex items-center justify-center">
-                  <div className="rounded-full border border-[var(--app-border)] bg-gradient-to-r from-[var(--brand-ultra)] to-[var(--brand-pale)] px-4 py-1.5 text-xs font-medium text-[var(--brand-mid)] shadow-sm dark:border-[var(--brand)] dark:from-[var(--brand)] dark:to-[var(--text)] dark:text-[var(--brand-light)]">
-                    {isToday(new Date(group.date))
-                      ? 'Today'
-                      : isYesterday(new Date(group.date))
-                        ? 'Yesterday'
-                        : format(new Date(group.date), 'MMMM d, yyyy')}
-                  </div>
+              <div key={group.date} className="pb-2">
+                <div className="relative my-5 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-[var(--app-border)]" aria-hidden />
+                  <span className="shrink-0 text-xs font-medium text-[var(--text-mid)]">
+                    {formatDateLabel(group.date)}
+                  </span>
+                  <div className="h-px flex-1 bg-[var(--app-border)]" aria-hidden />
                 </div>
-                {group.messages.map((msg: Record<string, unknown>) => {
+
+                {group.messages.map((msg, msgIndex) => {
                   const isMyMessage =
                     String(msg.sender_type || '') === String(userRole || '').toUpperCase()
+                  const prev = group.messages[msgIndex - 1]
+                  const next = group.messages[msgIndex + 1]
+                  const groupedWithPrev =
+                    prev != null && String(prev.sender_type) === String(msg.sender_type)
+                  const groupedWithNext =
+                    next != null && String(next.sender_type) === String(msg.sender_type)
+
+                  const bubbleRadius = isMyMessage
+                    ? groupedWithPrev && groupedWithNext
+                      ? 'rounded-2xl rounded-tr-md rounded-br-md'
+                      : groupedWithPrev
+                        ? 'rounded-2xl rounded-tr-md'
+                        : groupedWithNext
+                          ? 'rounded-2xl rounded-br-md'
+                          : 'rounded-2xl rounded-br-sm'
+                    : groupedWithPrev && groupedWithNext
+                      ? 'rounded-2xl rounded-tl-md rounded-bl-md'
+                      : groupedWithPrev
+                        ? 'rounded-2xl rounded-tl-md'
+                        : groupedWithNext
+                          ? 'rounded-2xl rounded-bl-md'
+                          : 'rounded-2xl rounded-bl-sm'
 
                   return (
                     <div
                       key={String(msg.id)}
-                      className={`mb-1 flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}
+                      className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'} ${
+                        groupedWithNext ? 'mb-0.5' : 'mb-3'
+                      }`}
                     >
                       <div
-                        className={`max-w-[85%] sm:max-w-[75%] ${isMyMessage ? 'flex flex-col items-end' : 'flex flex-col items-start'}`}
+                        className={`max-w-[88%] sm:max-w-[72%] ${
+                          isMyMessage ? 'items-end' : 'items-start'
+                        } flex flex-col`}
                       >
                         <div
-                          className={`rounded-2xl px-4 py-2.5 shadow-md transition-shadow duration-200 ease hover:shadow-lg ${
-                            isMyMessage
-                              ? 'border border-white/20 bg-gradient-to-br from-[var(--brand)] to-[var(--brand-mid)] text-white'
-                              : 'border border-[var(--app-border)] bg-gradient-to-br from-[var(--surface)] via-[var(--brand-ultra)] to-[var(--brand-ultra)] text-[var(--text)]'
-                          } ${msg.isOptimistic ? 'opacity-80' : ''}`}
+                          className={`px-3.5 py-2.5 ${bubbleRadius} ${
+                            isMyMessage ? 'chat-bubble-out' : 'chat-bubble-in'
+                          } ${msg.isOptimistic ? 'opacity-75' : ''}`}
                         >
                           {msg.reply_to && msg.reply_to_content ? (
                             <div
-                              className={`mb-1 border-b pb-1 text-xs opacity-70 ${isMyMessage ? 'border-white/20' : 'border-[var(--app-border)]'}`}
+                              className={`mb-2 rounded-lg px-2.5 py-1.5 text-xs ${
+                                isMyMessage
+                                  ? 'bg-white/15 text-white/90'
+                                  : 'border border-[var(--app-border)] bg-[var(--brand-ultra)] text-[var(--text-mid)]'
+                              }`}
                             >
-                              <div className="flex items-start gap-1">
-                                <Reply className="mt-0.5 h-3 w-3 shrink-0" />
-                                <div className="min-w-0 flex-1 truncate">
-                                  {String(msg.reply_to_content)}
-                                </div>
+                              <div className="flex items-start gap-1.5">
+                                <Reply className="mt-0.5 h-3 w-3 shrink-0 opacity-70" />
+                                <span className="line-clamp-2">{String(msg.reply_to_content)}</span>
                               </div>
                             </div>
                           ) : null}
+
                           {msg.order_id ? (
                             <div
-                              className={`mb-2 rounded-lg border-2 p-3 ${
+                              className={`mb-2 rounded-lg p-3 ${
                                 isMyMessage
-                                  ? 'border-white/20 bg-white/10'
-                                  : 'border-[var(--app-border-mid)] bg-[var(--brand-ultra)] dark:bg-[var(--text)]'
+                                  ? 'bg-white/12'
+                                  : 'border border-[var(--app-border)] bg-[var(--brand-ultra)]'
                               }`}
                             >
-                              <div className="mb-2 flex items-center gap-2">
+                              <div className="mb-1.5 flex items-center gap-2">
                                 <ShoppingCart
                                   className={`h-4 w-4 ${isMyMessage ? 'text-white' : 'text-[var(--brand-mid)]'}`}
                                 />
-                                <span className="text-sm font-semibold">Order reference</span>
+                                <span className="text-sm font-medium">Order reference</span>
                               </div>
                               <Link
                                 to={`/app/orders/${String(msg.order_id)}`}
-                                className="inline-flex items-center gap-1 text-xs underline"
+                                className={`inline-flex items-center gap-1 text-xs font-medium underline-offset-2 hover:underline ${
+                                  isMyMessage ? 'text-white/90' : 'text-[var(--brand-mid)]'
+                                }`}
                               >
                                 <Eye className="h-3 w-3" />
                                 View order
                               </Link>
                             </div>
                           ) : null}
+
                           {Array.isArray(msg.attachments) && msg.attachments.length > 0 ? (
                             <div className="mb-2 space-y-2">
                               {(msg.attachments as Record<string, unknown>[]).map((att, i) => (
@@ -129,45 +195,56 @@ export function ChatThread({
                                       <img
                                         src={String(att.fileUrl)}
                                         alt={String(att.fileName || 'Attachment')}
-                                        className="max-h-64 max-w-full cursor-pointer rounded-lg object-cover"
+                                        className="max-h-56 max-w-full cursor-pointer rounded-lg object-cover"
                                       />
                                     </a>
                                   ) : (
                                     <a
                                       href={String(att.fileUrl)}
                                       download={String(att.fileName)}
-                                      className={`flex items-center gap-2 rounded-lg border p-2 ${
+                                      className={`flex items-center gap-2 rounded-lg px-2.5 py-2 ${
                                         isMyMessage
-                                          ? 'border-white/20 bg-white/10 text-white'
-                                          : 'border-[var(--app-border-mid)] bg-[var(--brand-ultra)]'
+                                          ? 'bg-white/12 text-white'
+                                          : 'border border-[var(--app-border)] bg-[var(--brand-ultra)] text-[var(--text)]'
                                       }`}
                                     >
-                                      <FileText className="h-4 w-4" />
-                                      <span className="truncate text-sm">
+                                      <FileText className="h-4 w-4 shrink-0" />
+                                      <span className="min-w-0 truncate text-sm">
                                         {String(att.fileName)}
                                       </span>
-                                      <Download className="ml-auto h-3 w-3" />
+                                      <Download className="ml-auto h-3.5 w-3.5 shrink-0 opacity-70" />
                                     </a>
                                   )}
                                 </div>
                               ))}
                             </div>
                           ) : null}
-                          <div className="whitespace-pre-wrap break-words text-sm">
+
+                          <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
                             {String(msg.content || '')}
                           </div>
-                          <div
-                            className={`mt-1 flex items-center gap-1 text-xs ${isMyMessage ? 'text-white/70' : 'text-[var(--text-muted)]'}`}
-                          >
-                            <span>{formatMessageDate(String(msg.created_at))}</span>
-                            {isMyMessage ? <span>{msg.is_read ? '✓✓' : '✓'}</span> : null}
-                          </div>
+
+                          {!groupedWithNext ? (
+                            <div
+                              className={`mt-1.5 flex items-center gap-1.5 text-[11px] ${
+                                isMyMessage ? 'text-white/75' : 'text-[var(--text-muted)]'
+                              }`}
+                            >
+                              <span>{formatMessageDate(String(msg.created_at))}</span>
+                              {isMyMessage ? (
+                                <span aria-label={msg.is_read ? 'Read' : 'Sent'}>
+                                  {msg.is_read ? '✓✓' : '✓'}
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </div>
-                        {!isMyMessage ? (
+
+                        {!isMyMessage && !groupedWithNext ? (
                           <button
                             type="button"
                             onClick={() => onReply(msg)}
-                            className="mt-1 px-2 text-xs text-[var(--text-muted)] hover:text-foreground"
+                            className="mt-1 px-1 text-xs font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--brand-mid)]"
                           >
                             Reply
                           </button>
@@ -178,23 +255,15 @@ export function ChatThread({
                 })}
               </div>
             ))}
+
             {otherPartyTyping ? (
               <div className="mb-2 flex justify-start">
-                <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--brand-ultra)] px-4 py-2.5">
-                  <div className="flex items-center gap-1.5">
-                    <div
-                      className="h-2 w-2 animate-bounce rounded-full bg-[var(--brand)]"
-                      style={{ animationDelay: '0ms' }}
-                    />
-                    <div
-                      className="h-2 w-2 animate-bounce rounded-full bg-[var(--brand-mid)]"
-                      style={{ animationDelay: '150ms' }}
-                    />
-                    <div
-                      className="h-2 w-2 animate-bounce rounded-full bg-[var(--brand)]"
-                      style={{ animationDelay: '300ms' }}
-                    />
-                    <span className="ml-2 text-xs text-[var(--text-muted)]">typing…</span>
+                <div className="chat-bubble-in rounded-2xl rounded-bl-sm px-4 py-3">
+                  <div className="flex items-center gap-1.5" aria-live="polite">
+                    <span className="chat-typing-dot h-1.5 w-1.5 rounded-full bg-[var(--brand-mid)]" />
+                    <span className="chat-typing-dot h-1.5 w-1.5 rounded-full bg-[var(--brand-mid)]" />
+                    <span className="chat-typing-dot h-1.5 w-1.5 rounded-full bg-[var(--brand-mid)]" />
+                    <span className="ml-1.5 text-xs text-[var(--text-mid)]">typing…</span>
                   </div>
                 </div>
               </div>
@@ -203,12 +272,14 @@ export function ChatThread({
           </>
         )}
       </div>
+
       {showScrollButton ? (
         <Button
           type="button"
           onClick={onScrollToBottom}
           size="sm"
-          className="absolute bottom-4 right-4 h-10 w-10 rounded-full p-0 shadow-lg"
+          variant="secondary"
+          className="erp-pressable absolute bottom-4 right-4 h-9 w-9 rounded-full p-0"
           aria-label="Scroll to latest"
         >
           <ChevronDown className="h-4 w-4" />

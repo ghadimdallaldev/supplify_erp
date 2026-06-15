@@ -26,6 +26,7 @@ const mockPresign = vi.fn()
 const mockPreview = vi.fn()
 const mockStart = vi.fn()
 const mockCancel = vi.fn()
+let mockJobQueryData: { job: Record<string, unknown> } | undefined
 
 vi.mock('sonner', () => ({
   toast: {
@@ -41,7 +42,7 @@ vi.mock('../../services/api', async (importOriginal) => {
     usePresignImageImportMutation: () => [mockPresign, { isLoading: false }],
     usePreviewImageImportMutation: () => [mockPreview, { isLoading: false }],
     useStartImageImportMutation: () => [mockStart, { isLoading: false }],
-    useGetImageImportJobQuery: () => ({ data: undefined }),
+    useGetImageImportJobQuery: () => ({ data: mockJobQueryData }),
     useCancelImageImportMutation: () => [mockCancel, { isLoading: false }],
     downloadImageImportReportUrl: (jobId: string) =>
       `/api/supplier/products/images/import/${jobId}/report`,
@@ -52,6 +53,7 @@ describe('ProductImageImportDialog', () => {
   beforeEach(() => {
     cleanup()
     vi.clearAllMocks()
+    mockJobQueryData = undefined
     mockPresign.mockReturnValue({
       unwrap: async () => ({
         presignedUrl: 'https://upload.test/put',
@@ -60,6 +62,9 @@ describe('ProductImageImportDialog', () => {
     })
     mockPreview.mockReturnValue({
       unwrap: async () => mockPreviewData,
+    })
+    mockStart.mockReturnValue({
+      unwrap: async () => ({ job: { id: 'job-1' } }),
     })
     vi.stubGlobal(
       'fetch',
@@ -109,5 +114,46 @@ describe('ProductImageImportDialog', () => {
         replaceExisting: false,
       })
     )
+  })
+
+  it('warns before closing during an active import job', async () => {
+    mockJobQueryData = {
+      job: {
+        id: 'job-1',
+        status: 'processing',
+        total_files: 10,
+        processed: 2,
+        matched: 0,
+        failed: 0,
+        skipped: 0,
+      },
+    }
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const onOpenChange = vi.fn()
+
+    renderWithProviders(<ProductImageImportDialog open onOpenChange={onOpenChange} />)
+
+    const zipInput = screen.getByLabelText('ZIP archive')
+    const file = new File(['zip-bytes'], 'products.zip', { type: 'application/zip' })
+    fireEvent.change(zipInput, { target: { files: [file] } })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('image-import-confirm')).toBeEnabled()
+    })
+
+    fireEvent.click(screen.getByTestId('image-import-confirm'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('image-import-progress')).toBeInTheDocument()
+    })
+
+    const dialog = screen.getByTestId('image-import-dialog')
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Close' })[0]!)
+
+    expect(confirmSpy).toHaveBeenCalled()
+    expect(onOpenChange).not.toHaveBeenCalled()
+
+    confirmSpy.mockRestore()
   })
 })

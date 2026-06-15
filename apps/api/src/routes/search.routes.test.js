@@ -113,5 +113,20 @@ describe('Search Routes', () => {
       expect(response.body.data.products).toHaveLength(1)
       expect(response.body.data.suppliers).toHaveLength(1)
     })
+
+    it('uses slim product columns and aggregate supplier product counts', async () => {
+      db.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] })
+
+      await request(app).get('/api/search?q=rice').expect(200)
+
+      const productSql = String(db.query.mock.calls[0][0])
+      const supplierSql = String(db.query.mock.calls[1][0])
+      expect(productSql).not.toContain('p.*')
+      expect(productSql).toContain('p.image_thumb_url')
+      expect(supplierSql).toContain('GROUP BY supplier_id')
+      expect(supplierSql).not.toContain(
+        'SELECT COUNT(DISTINCT p.id) FROM product p WHERE p.supplier_id'
+      )
+    })
   })
 })

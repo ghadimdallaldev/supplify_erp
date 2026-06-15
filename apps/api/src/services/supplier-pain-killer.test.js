@@ -14,6 +14,20 @@ vi.mock('../lib/ensure-delivery-schema.js', () => ({
   ensureDeliverySchema: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('../lib/subscription.js', () => ({
+  checkLimit: vi.fn().mockResolvedValue({
+    isUnlimited: true,
+    current: 0,
+    isOverLimit: false,
+  }),
+}))
+
+vi.mock('../lib/cache.js', () => ({
+  getCache: vi.fn().mockResolvedValue(null),
+  setCache: vi.fn().mockResolvedValue(undefined),
+  deleteCache: vi.fn().mockResolvedValue(undefined),
+}))
+
 describe('supplier pain-killer services', () => {
   let db
 
@@ -34,6 +48,33 @@ Valid Product,SKU2,abc`
       expect(result.validCount).toBe(0)
       expect(result.errorCount).toBeGreaterThan(0)
       expect(result.preview.some((p) => p.status === 'error')).toBe(true)
+    })
+  })
+
+  describe('executeProductImport', () => {
+    it('batch-persists valid rows in a transaction', async () => {
+      const clientQuery = vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ id: 'prod-1', sku: 'sku1' }] })
+        .mockResolvedValueOnce({ rowCount: 1 })
+        .mockResolvedValueOnce({ rowCount: 1 })
+        .mockResolvedValueOnce({ rowCount: 2 })
+
+      db.withTransaction.mockImplementation(async (fn) => fn({ query: clientQuery }))
+      db.query.mockResolvedValueOnce({
+        rows: [{ id: 'prod-2', sku: 'sku2' }],
+      })
+
+      const { executeProductImport } = await import('./product-import.service.js')
+      const csv = `name,sku,price,stock
+New Product,SKU1,10,5
+Updated Product,SKU2,20,3`
+      const result = await executeProductImport('supplier-1', csv, { partial: true })
+
+      expect(result.summary.created).toBe(1)
+      expect(result.summary.updated).toBe(1)
+      expect(db.withTransaction).toHaveBeenCalledTimes(1)
+      expect(clientQuery).toHaveBeenCalledTimes(4)
     })
   })
 
@@ -107,68 +148,148 @@ Valid Product,SKU2,abc`
 
   describe('getSupplierReceivables', () => {
     it('returns unpaid and aging buckets', async () => {
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'inv1',
-            invoice_number: 'INV-1',
-            restaurant_id: 'r1',
-            restaurant_name: 'Cafe',
-            status: 'ISSUED',
-            invoice_date: '2026-01-01',
-            due_date: '2026-01-15',
-            total_amount: '100',
-            paid_amount: '0',
-            balance_due: '100',
-            is_overdue: true,
-            days_overdue: 10,
-          },
-        ],
-      })
+      const summaryRow = {
+        unpaid_count: 1,
+        unpaid_total: '100',
+        overdue_total: '100',
+        partial_count: 0,
+        aging_current: '0',
+        aging_0_7: '100',
+        aging_8_30: '0',
+        aging_31_60: '0',
+        aging_60_plus: '0',
+      }
+      const invoiceRow = {
+        id: 'inv1',
+        invoice_number: 'INV-1',
+        restaurant_id: 'r1',
+        restaurant_name: 'Cafe',
+        status: 'ISSUED',
+        invoice_date: '2026-01-01',
+        due_date: '2026-01-15',
+        total_amount: '100',
+        paid_amount: '0',
+        balance_due: '100',
+        is_overdue: true,
+        days_overdue: 10,
+      }
+      db.query
+        .mockResolvedValueOnce({ rows: [summaryRow] })
+        .mockResolvedValueOnce({ rows: [invoiceRow] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              restaurant_id: 'r1',
+              restaurant_name: 'Cafe',
+              balance_due: '100',
+              invoice_count: 1,
+              oldest_due_date: '2026-01-15',
+            },
+          ],
+        })
 
       const { getSupplierReceivables } = await import('./supplier-receivables.service.js')
       const data = await getSupplierReceivables('supplier-1')
       expect(data.summary.unpaidCount).toBe(1)
       expect(data.summary.unpaidTotal).toBe(100)
       expect(data.aging).toBeDefined()
+      expect(data.topDebtors).toHaveLength(1)
     })
   })
 
   describe('getSupplierCommandCenter', () => {
     it('returns priority KPI cards', async () => {
       const count = (n) => ({ rows: [{ count: n }] })
-      db.query
-        .mockResolvedValueOnce(count(3))
-        .mockResolvedValueOnce(count(2))
-        .mockResolvedValueOnce(count(1))
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce(count(0))
-        .mockResolvedValueOnce(count(0))
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 'inv1',
-              invoice_number: 'INV-1',
-              restaurant_id: 'r1',
-              restaurant_name: 'Cafe',
-              status: 'ISSUED',
-              invoice_date: '2026-05-01',
-              due_date: '2026-05-10',
-              total_amount: '100',
-              paid_amount: '0',
-              balance_due: '100',
-              is_overdue: false,
-              days_overdue: 0,
-            },
-          ],
-        })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ active_deals: 1, total_views: 5, total_clicks: 2 }] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce(count(0))
+      db.query.mockImplementation(async (sql) => {
+        if (/date_trunc\('day', now\(\)\)/i.test(sql) && /COUNT\(DISTINCT o\.id\)/i.test(sql)) {
+          return count(3)
+        }
+        if (
+          /driver_assignments da/i.test(sql) &&
+          /COUNT\(DISTINCT o\.id\)/i.test(sql) &&
+          !/failed_at/i.test(sql)
+        ) {
+          return count(2)
+        }
+        if (/PLACED.*PENDING_APPROVAL/i.test(sql) && /COUNT\(DISTINCT o\.id\)/i.test(sql)) {
+          return count(1)
+        }
+        if (/FROM product p/i.test(sql) && /low_stock_threshold/i.test(sql)) {
+          return { rows: [] }
+        }
+        if (/FROM disputes d/i.test(sql)) {
+          return count(0)
+        }
+        if (/FROM fulfillment_exceptions fe/i.test(sql)) {
+          return count(0)
+        }
+        if (/unpaid_count/i.test(sql)) {
+          return {
+            rows: [
+              {
+                unpaid_count: 1,
+                unpaid_total: '100',
+                overdue_total: '0',
+                partial_count: 0,
+                aging_current: '100',
+                aging_0_7: '0',
+                aging_8_30: '0',
+                aging_31_60: '0',
+                aging_60_plus: '0',
+              },
+            ],
+          }
+        }
+        if (/FROM invoice i/i.test(sql) && /balance_due/i.test(sql)) {
+          return {
+            rows: [
+              {
+                id: 'inv1',
+                invoice_number: 'INV-1',
+                restaurant_id: 'r1',
+                restaurant_name: 'Cafe',
+                status: 'ISSUED',
+                invoice_date: '2026-05-01',
+                due_date: '2026-05-10',
+                total_amount: '100',
+                paid_amount: '0',
+                balance_due: '100',
+                is_overdue: false,
+                days_overdue: 0,
+              },
+            ],
+          }
+        }
+        if (/GROUP BY i\.restaurant_id/i.test(sql)) {
+          return {
+            rows: [
+              {
+                restaurant_id: 'r1',
+                restaurant_name: 'Cafe',
+                balance_due: '100',
+                invoice_count: 1,
+                oldest_due_date: '2026-05-10',
+              },
+            ],
+          }
+        }
+        if (/WITH restaurant_orders AS/i.test(sql) || /WITH ranked AS/i.test(sql)) {
+          return { rows: [] }
+        }
+        if (/FROM deal_promotions dp/i.test(sql)) {
+          return { rows: [{ active_deals: 1, total_views: 5, total_clicks: 2 }] }
+        }
+        if (/FROM driver_assignments da/i.test(sql) && /failed_at/i.test(sql)) {
+          return count(0)
+        }
+        if (/FROM driver_assignments da/i.test(sql)) {
+          return { rows: [] }
+        }
+        if (/DISTINCT ON \(o\.id\)/i.test(sql)) {
+          return { rows: [] }
+        }
+        return { rows: [] }
+      })
 
       const { getSupplierCommandCenter } = await import('./supplier-command-center.service.js')
       const data = await getSupplierCommandCenter('supplier-1')

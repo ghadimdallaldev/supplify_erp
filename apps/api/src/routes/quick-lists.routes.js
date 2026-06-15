@@ -99,6 +99,28 @@ const addItemSchema = z.object({
   defaultUnit: z.string().optional(),
 })
 
+const quickListListSchema = z.object({
+  limit: z
+    .string()
+    .transform((val) => {
+      const n = parseInt(val, 10)
+      const parsed = Number.isFinite(n) ? n : 50
+      return Math.min(Math.max(parsed, 1), 100)
+    })
+    .default('50'),
+  offset: z
+    .string()
+    .transform((val) => {
+      const n = parseInt(val, 10)
+      return Number.isFinite(n) && n >= 0 ? n : 0
+    })
+    .default('0'),
+  includeItems: z
+    .string()
+    .transform((val) => val !== 'false')
+    .default('true'),
+})
+
 async function respondLimitExceeded(req, res, limitCheck, limitKey, restaurantId) {
   const [subscription, recommendedPlans] = await Promise.all([
     getTenantSubscription(restaurantId, 'RESTAURANT'),
@@ -143,6 +165,7 @@ router.use(
 // Get all quick lists for restaurant
 router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
+    const listParams = quickListListSchema.parse(req.query)
     const restaurantId = await getRestaurantIdForRequest(req)
     if (!restaurantId) {
       throw new ValidationError('Restaurant not found')
@@ -163,26 +186,38 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
       where += ` AND ql.branch_id = $${params.length}`
     }
 
-    const { rows } = await query(
-      `
+    const countParams = [...params]
+    params.push(listParams.limit, listParams.offset)
+
+    const [{ rows }, { rows: countRows }] = await Promise.all([
+      query(
+        `
       SELECT 
         ql.*,
-        (COUNT(qli.id))::int AS item_count
+        (SELECT COUNT(*)::int FROM quick_list_item qli WHERE qli.quick_list_id = ql.id) AS item_count
       FROM quick_list ql
-      LEFT JOIN quick_list_item qli ON qli.quick_list_id = ql.id
       WHERE ${where}
-      GROUP BY ql.id
       ORDER BY ql.created_at DESC
+      LIMIT $${params.length - 1} OFFSET $${params.length}
     `,
-      params
-    )
-
-    // Fetch items for all lists in one query (avoids N+1 per quick list).
-    const listIds = rows.map((list) => list.id)
-    let itemsByListId = new Map()
-    if (listIds.length > 0) {
-      const { rows: allItems } = await query(
+        params
+      ),
+      query(
         `
+      SELECT COUNT(*)::int AS total
+      FROM quick_list ql
+      WHERE ${where}
+    `,
+        countParams
+      ),
+    ])
+
+    let itemsByListId = new Map()
+    if (listParams.includeItems) {
+      const listIds = rows.map((list) => list.id)
+      if (listIds.length > 0) {
+        const { rows: allItems } = await query(
+          `
         SELECT 
           qli.*,
           p.name as product_name,
@@ -204,23 +239,31 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
         WHERE qli.quick_list_id = ANY($1::uuid[])
         ORDER BY qli.quick_list_id, p.name
       `,
-        [listIds]
-      )
-      for (const item of allItems) {
-        const bucket = itemsByListId.get(item.quick_list_id) || []
-        bucket.push(item)
-        itemsByListId.set(item.quick_list_id, bucket)
+          [listIds]
+        )
+        for (const item of allItems) {
+          const bucket = itemsByListId.get(item.quick_list_id) || []
+          bucket.push(item)
+          itemsByListId.set(item.quick_list_id, bucket)
+        }
       }
     }
 
     const quickListsWithItems = rows.map((list) => ({
       ...mapQuickListRow(list),
-      items: itemsByListId.get(list.id) || [],
+      ...(listParams.includeItems ? { items: itemsByListId.get(list.id) || [] } : {}),
     }))
 
     res.json({
       ok: true,
-      data: { quickLists: quickListsWithItems },
+      data: {
+        quickLists: quickListsWithItems,
+        pagination: {
+          total: parseInt(countRows[0]?.total ?? 0, 10),
+          limit: listParams.limit,
+          offset: listParams.offset,
+        },
+      },
       error: null,
       requestId: req.requestId,
     })

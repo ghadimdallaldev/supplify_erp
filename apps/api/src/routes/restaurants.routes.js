@@ -486,8 +486,66 @@ router.get('/:id', requireAuth, async (req, res) => {
 
     const restaurant = rows[0]
 
-    // Check access permissions
-    if (req.userData.role === 'RESTAURANT' && restaurant.contact_email !== req.userData.email) {
+    if (req.userData.role === 'ADMIN') {
+      // Admin may read any restaurant
+    } else if (req.userData.role === 'RESTAURANT') {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId || restaurantId !== id) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied',
+          },
+          requestId: req.requestId,
+        })
+      }
+    } else if (req.userData.role === 'SUPPLIER') {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied',
+          },
+          requestId: req.requestId,
+        })
+      }
+      const { rows: linked } = await query(
+        `
+        SELECT 1
+        FROM supplier_follow sf
+        WHERE sf.supplier_id = $1
+          AND sf.restaurant_id = $2
+          AND NOT EXISTS (
+            SELECT 1 FROM supplier_blocklist sb
+            WHERE sb.supplier_id = $1 AND sb.restaurant_id = $2
+          )
+        UNION
+        SELECT 1
+        FROM customer_order o
+        JOIN order_item oi ON oi.order_id = o.id
+        WHERE o.restaurant_id = $2
+          AND oi.supplier_id = $1
+        LIMIT 1
+      `,
+        [supplierId, id]
+      )
+      if (!linked.length) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied',
+          },
+          requestId: req.requestId,
+        })
+      }
+    } else {
       return res.status(403).json({
         ok: false,
         data: null,

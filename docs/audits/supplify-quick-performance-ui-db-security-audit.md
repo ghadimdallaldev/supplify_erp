@@ -317,18 +317,132 @@ See [`docs/operations/storage-uploads.md`](../operations/storage-uploads.md), [`
 | Preprod storage    | `STORAGE_PUBLIC_READ=false` in preprod `api.env`          |
 | Redis prod warning | `validate-config.js` warns when `REDIS_URL` unset in prod |
 
-### Deferred (needs larger refactors / manual decisions)
+### Fix Log (2026-06-15 — wave 2, parallel agents)
 
-- Batch CSV product import (temp-table upsert + background job)
-- Keyset pagination for 10k+ catalog OFFSET cost
-- Orders calendar SQL pagination refactor
-- `contact_email` → tenant ID ownership migration (8 route sites)
-- `ensureDefaultAdminRole` auto-SUPER_ADMIN removal
-- Email-only tenant binding / Keycloak role trust on mobile provision
-- Supplier mobile bottom nav, sticky cart checkout, banner consolidation
-- Growth `requireFeature` (no feature key in catalog yet)
-- `delivery_zone` polymorphic XOR constraint (0170 partial — indexes only)
-- Referral attribution partial unique + revenue metric join fix
-- Rate limits on upload/import endpoints; Redis-backed rate limiting
-- Billing lock GET exfiltration policy
-- Live Railway p95 profiling; mobile repo review
+**4 agents.** RBAC **164/164**; billing/admin **19/19**; web **6/6** on changed suites.
+
+#### Security / DB — wave 2
+
+| Item                        | Change                                                                                         |
+| --------------------------- | ---------------------------------------------------------------------------------------------- |
+| Auto SUPER_ADMIN            | Gated behind `ALLOW_AUTO_SUPER_ADMIN` (default false)                                          |
+| Static `/uploads`           | Disabled in prod unless `STORAGE_PUBLIC_READ=true`                                             |
+| Import rate limits          | Product CSV 10/15min; image job 5/hr per user                                                  |
+| Billing lock GET            | Blocks `/api/reports/*`, exports, invoice PDFs when locked                                     |
+| `contact_email` checks      | Replaced with `getSupplierIdForRequest` in products, invoices, suppliers, fulfillment          |
+| Public catalog default deny | Missing column → not public                                                                    |
+| Legacy admin dashboard      | `requireRole(['ADMIN'])` only                                                                  |
+| Email tenant binding        | Removed contact_email-only access in tenant-switch                                             |
+| Migration 0171              | delivery_zone XOR, referral/subscription partial uniques, prospect phone index, sponsorship FK |
+| Migration 0172              | `supplier_growth` feature on silver+ plans                                                     |
+| Growth `requireFeature`     | Wired on supplier-growth routes                                                                |
+
+#### Performance / API — wave 2
+
+| Item                      | Change                                             |
+| ------------------------- | -------------------------------------------------- |
+| Batch CSV import          | Transaction + unnest bulk INSERT/UPDATE            |
+| Product keyset pagination | Optional `cursor` param + `nextCursor` response    |
+| Orders calendar           | SQL LIMIT/OFFSET; no 600-row in-memory slice       |
+| Inventory list pagination | Default limit 100, max 500 + total                 |
+| Categories/tags cache     | Invalidated on product CRUD                        |
+| Admin activity cache      | Redis 90s TTL                                      |
+| Entitlements cache        | TTL 300s                                           |
+| Referral revenue JOIN     | LATERAL latest PAID invoice per tenant             |
+| Prospect CSV audit log    | `customers.import.completed` on batch finish       |
+| reorder_ai log retention  | 90-day purge in log-retention job                  |
+| sql-migrator              | No longer marks failed migrations applied on 42P07 |
+
+#### UI — wave 2
+
+| Item                            | Change                                             |
+| ------------------------------- | -------------------------------------------------- |
+| Supplier mobile bottom nav      | Products, Orders, Customer Growth                  |
+| Sticky cart checkout            | Mobile fixed bar with total + CTA                  |
+| Banner consolidation            | `LayoutTenantAlerts` — priority + "View all"       |
+| Chat viewport                   | `100dvh`                                           |
+| Products cursor pagination      | Wired when API returns `nextCursor`                |
+| Admin growth sponsorship limits | Per-tier limits in settings panel                  |
+| Referral token preservation     | `/register?ref=` → sessionStorage through Keycloak |
+
+### Fix Log (2026-06-15 — wave 3, parallel agents)
+
+**4 agents.** RBAC **164/164**; wave 3 API **27/27**; web **8/8** on changed suites.
+
+#### Infra / security — wave 3
+
+| Item                   | Change                                                                                                    |
+| ---------------------- | --------------------------------------------------------------------------------------------------------- |
+| Redis rate limiting    | `rate-limit-store.js` — INCR/EXPIRE store on shared ioredis; wired in `server.js` + supplier-ops limiters |
+| Upload magic bytes     | `assertImageUploadBytes()` in `sanitize-upload.js`; validated on upload complete                          |
+| Product PII            | Removed `supplier_email` from product list/detail/favorites; added `supplier_id`                          |
+| Admin tenant directory | Slim explicit column SELECTs; correlated counts → LEFT JOIN aggregates                                    |
+
+#### Performance / API — wave 3
+
+| Item                          | Change                                                                                                 |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Admin activity feed           | Single `UNION ALL` query + COUNT; fallback to per-branch on error                                      |
+| Supplier command center cache | Redis `supplier:command-center:{id}` TTL 45s                                                           |
+| Async product CSV import      | Migration `0173`, `product-import-worker.js`; async when rows > `PRODUCT_IMPORT_ASYNC_THRESHOLD` (200) |
+| Orders list slim payload      | `?includeItems=false` omits embedded line items (default true)                                         |
+| Invoices pagination           | `limit` (default 50, max 200) + `offset`; returns `pagination.total`                                   |
+| Favorites pagination          | `GET /api/products/favorites` limit/offset + total count                                               |
+| Receivables bounds            | Aggregate summary; invoice list + top debtors capped at 100 rows                                       |
+| platform_setting seed         | Migration `0174` — `free_sandbox_days` uses `ON CONFLICT DO NOTHING`                                   |
+
+#### UI — wave 3
+
+| Item                  | Change                                                      |
+| --------------------- | ----------------------------------------------------------- |
+| OrdersPage pagination | Server offset pagination; "Showing X–Y of Z" + prev/next    |
+| ProductCatalogTable   | Shared `ProductCatalogRow` for mobile cards + desktop table |
+
+### Fix Log (2026-06-15 — wave 4, parallel agents)
+
+**4 agents.** RBAC **164/164**; wave 4 API **43/43**; web image import **3/3**.
+
+#### Security / Ops — wave 4
+
+| Item                                | Change                                                                               |
+| ----------------------------------- | ------------------------------------------------------------------------------------ |
+| Product detail relationship check   | `GET /api/products/:id` scoped to tenant relationship before returning detail        |
+| Restaurants/:id relationship scope  | `GET /api/restaurants/:id` limited to supplier–restaurant links                      |
+| Public staff token deprecation      | Staff tokens accepted via header/body; query-string tokens deprecated with warn      |
+| REDIS_URL prod hard-fail            | `validate-config.js` exits when `REDIS_URL` unset in production                      |
+| Memory cache LRU cap                | Bounded in-memory fallback in `cache.js` (LRU max entries)                           |
+| Sponsorship subscription_change_log | Sponsorship plan changes recorded in `subscription_change_log`                       |
+| Image/product import job retention  | `preview_json` / `result_json` purged per retention policy in `log-retention.job.js` |
+
+#### Performance / API — wave 4
+
+| Item                                   | Change                                                                    |
+| -------------------------------------- | ------------------------------------------------------------------------- |
+| Quick lists pagination + includeItems  | Paginated list endpoint; `?includeItems=false` lazy-loads line items      |
+| Search slim columns                    | Explicit column list replaces `p.*` on search results                     |
+| Chat inbox pagination                  | Conversation list limit/offset (or cursor) instead of fixed 200-row fetch |
+| Products list DTO + includeStock scope | Slim list projection; stock summary scoped to supplier tenant             |
+
+#### UI — wave 4
+
+| Item                            | Change                                                                        |
+| ------------------------------- | ----------------------------------------------------------------------------- |
+| Async CSV import web polling    | Product import dialog polls async job status when row count exceeds threshold |
+| Growth plan picker              | Replaces hardcoded `planCode: 'silver'` with eligible-plan selector           |
+| ProductsPage isFetching overlay | Table overlay during refetch; no full-page skeleton on background fetch       |
+| Image import close guard        | Confirm before closing dialog while import job is active                      |
+
+### Still deferred (wave 5 + external)
+
+**Wave 5 (ops / backlog):**
+
+- Residual `contact_email` in admin display columns and legacy route SELECTs (ownership checks migrated in wave 2)
+- Materialized admin tenant metrics table (join aggregates used instead)
+- `express.static` vs signed-URL CDN model (document in storage-uploads.md)
+- Entitlements incremental usage meters (cache TTL extended only in wave 2)
+- Cron/worker split — 20+ crons in API process; dedicated worker or `CRONS_ENABLED=false` on web tier
+
+**External / manual:**
+
+- Live Railway p95 profiling
+- `supplify-mobile` repo review (sibling repo not in workspace)

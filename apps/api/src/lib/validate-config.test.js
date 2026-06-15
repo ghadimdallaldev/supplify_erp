@@ -149,11 +149,8 @@ describe('validateProductionConfig REDIS_URL', () => {
     })
   })
 
-  it('warns when REDIS_URL is missing in hosted env', async () => {
-    const { logger } = await import('./logger.js')
-    vi.mocked(logger.warn).mockClear()
+  it('rejects missing REDIS_URL in prod', async () => {
     const { validateProductionConfig } = await import('./validate-config.js')
-    expect(() => validateProductionConfig()).not.toThrow()
-    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('REDIS_URL'))
+    expect(() => validateProductionConfig()).toThrow(/REDIS_URL/)
   })
 })

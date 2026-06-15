@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { AlertCircle, ClipboardList, MapPin, Navigation, Truck, Warehouse } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   useGetFulfillmentExceptionsQuery,
@@ -54,11 +55,17 @@ export function FulfillmentPage() {
         />
 
         {multiWarehouseActive && warehouses.length > 0 && (
-          <div className="flex max-w-md flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+          <div className="flex max-w-sm items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2">
+            <Warehouse className="h-4 w-4 shrink-0 text-[var(--brand-mid)]" aria-hidden />
             <div className="min-w-0 flex-1">
-              <Label htmlFor="fulfillment-warehouse">Warehouse filter</Label>
+              <Label htmlFor="fulfillment-warehouse" className="sr-only">
+                Warehouse filter
+              </Label>
               <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>
-                <SelectTrigger id="fulfillment-warehouse" className="mt-1.5">
+                <SelectTrigger
+                  id="fulfillment-warehouse"
+                  className="h-8 border-0 bg-transparent px-0 shadow-none focus:ring-0"
+                >
                   <option value="">All warehouses</option>
                   {warehouses.map((wh: { id: string; name: string }) => (
                     <option key={wh.id} value={wh.id}>
@@ -73,26 +80,31 @@ export function FulfillmentPage() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="h-auto w-full gap-1 sm:flex sm:flex-wrap">
-            <TabsTrigger value="dispatch" className="text-xs sm:text-sm">
+            <TabsTrigger value="dispatch" className="gap-1.5 text-xs sm:text-sm">
+              <Truck className="h-3.5 w-3.5 shrink-0" aria-hidden />
               Driver Dispatch
             </TabsTrigger>
-            <TabsTrigger value="picklists" className="text-xs sm:text-sm">
+            <TabsTrigger value="picklists" className="gap-1.5 text-xs sm:text-sm">
+              <ClipboardList className="h-3.5 w-3.5 shrink-0" aria-hidden />
               Pick Lists
             </TabsTrigger>
-            <TabsTrigger value="routes" className="text-xs sm:text-sm">
+            <TabsTrigger value="routes" className="gap-1.5 text-xs sm:text-sm">
+              <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
               Routes
             </TabsTrigger>
-            <TabsTrigger value="tracking" className="text-xs sm:text-sm">
+            <TabsTrigger value="tracking" className="gap-1.5 text-xs sm:text-sm">
+              <Navigation className="h-3.5 w-3.5 shrink-0" aria-hidden />
               Delivery Tracking
             </TabsTrigger>
-            <TabsTrigger value="exceptions" className="relative text-xs sm:text-sm">
+            <TabsTrigger value="exceptions" className="relative gap-1.5 text-xs sm:text-sm">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
               Exceptions
               {(exceptionsResponse?.openCount ?? 0) > 0 && (
                 <StatusBadge
                   status="OVERDUE"
                   label={String(exceptionsResponse?.openCount)}
                   showDot={false}
-                  className="ml-1 min-h-5 min-w-[1.25rem] justify-center rounded-full px-1 py-0 text-[10px] leading-none"
+                  className="ml-0.5 min-h-5 min-w-[1.25rem] justify-center rounded-full px-1 py-0 text-[10px] leading-none"
                 />
               )}
             </TabsTrigger>

@@ -653,20 +653,6 @@ export async function getRequestTenant(req) {
         }
       }
 
-      if (!tenantResolved) {
-        const email = (req.userData.email || '').trim().toLowerCase()
-        if (email) {
-          const primary = await getPrimaryTenantForUser(email, tenantType)
-          if (primary) {
-            tenantResolved = {
-              tenantId: primary.id,
-              tenantType,
-              tenantName: primary.name || '',
-            }
-          }
-        }
-      }
-
       await setCache(processCacheKey, tenantResolved ?? 'null', TENANT_REQ_CACHE_TTL).catch(
         () => {}
       )
@@ -696,28 +682,6 @@ export async function getRequestTenant(req) {
     }
   }
 
-  const email = (req.userData.email || '').trim().toLowerCase()
-  if (!email) return finish(null)
-  if (req.userData.role === 'SUPPLIER') {
-    const primary = await getPrimaryTenantForUser(email, 'SUPPLIER')
-    if (primary) {
-      return finish({
-        tenantId: primary.id,
-        tenantType: 'SUPPLIER',
-        tenantName: primary.name || '',
-      })
-    }
-  }
-  if (req.userData.role === 'RESTAURANT') {
-    const primary = await getPrimaryTenantForUser(email, 'RESTAURANT')
-    if (primary) {
-      return finish({
-        tenantId: primary.id,
-        tenantType: 'RESTAURANT',
-        tenantName: primary.name || '',
-      })
-    }
-  }
   return finish(null)
 }
 
@@ -930,6 +894,7 @@ export function resolveTenantContext(req, res, next) {
  * Use after requireAuth and requireRole(['ADMIN']) on admin routes.
  */
 async function ensureDefaultAdminRole(userId) {
+  if (!config.ALLOW_AUTO_SUPER_ADMIN) return
   try {
     await query(
       `

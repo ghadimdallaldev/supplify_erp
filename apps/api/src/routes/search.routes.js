@@ -72,11 +72,22 @@ function resolveHistoryScope(req) {
   }
 }
 
+const SEARCH_PRODUCT_COLUMNS = `
+  p.id,
+  p.sku,
+  p.name,
+  p.category,
+  p.unit,
+  p.supplier_id,
+  p.image_url,
+  p.image_thumb_url
+`
+
 async function searchProducts(q, limit, restaurantId) {
   const { rows } = await query(
     `
     SELECT
-      p.*,
+      ${SEARCH_PRODUCT_COLUMNS},
       s.name AS supplier_name,
       s.slug AS supplier_slug,
       ts_rank(p.search_vector, plainto_tsquery('simple', $1)) AS search_rank
@@ -112,11 +123,13 @@ async function searchSuppliers(q, limit, restaurantId) {
     `
     SELECT
       s.*,
-      COALESCE(
-        (SELECT COUNT(DISTINCT p.id) FROM product p WHERE p.supplier_id = s.id),
-        0
-      ) AS product_count
+      COALESCE(pc.product_count, 0) AS product_count
     FROM supplier s
+    LEFT JOIN (
+      SELECT supplier_id, COUNT(DISTINCT id)::int AS product_count
+      FROM product
+      GROUP BY supplier_id
+    ) pc ON pc.supplier_id = s.id
     WHERE (
       LOWER(s.name) LIKE $1
       OR LOWER(COALESCE(s.contact_email, '')) LIKE $1

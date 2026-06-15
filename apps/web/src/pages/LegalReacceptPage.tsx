@@ -17,6 +17,7 @@ import { useGetMeQuery, useSubmitLegalReacceptanceMutation } from '../services/a
 import { refetchAppSession } from '../lib/refetchAppSession'
 import { useAppDispatch } from '../hooks/redux'
 import { LegalFooterLinks } from '../components/legal/LegalFooterLinks'
+import { getRegisterCompletePath } from '../lib/referralToken'
 
 export function LegalReacceptPage() {
   const navigate = useNavigate()
@@ -47,7 +48,7 @@ export function LegalReacceptPage() {
   useEffect(() => {
     if (isLoading || !user) return
     if (user.role === 'PENDING') {
-      navigate('/register/complete', { replace: true })
+      navigate(getRegisterCompletePath(), { replace: true })
       return
     }
     if (legalStatus && !legalStatus.needsReacceptance) {

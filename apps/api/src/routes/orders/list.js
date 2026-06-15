@@ -203,49 +203,52 @@ router.get('/', async (req, res) => {
       query(countSql, countParams),
     ])
 
-    // Fetch items for all orders in a single batch query.
-    const orderIds = rows.map((order) => order.id)
-    let items = []
-    if (orderIds.length > 0) {
-      try {
-        const { rows: itemsRows } = await query(
-          `
-          SELECT
-            oi.*,
-            p.name as product_name,
-            p.sku as product_sku
-          FROM order_item oi
-          JOIN product p ON p.id = oi.product_id
-          WHERE oi.order_id = ANY($1)
-        `,
-          [orderIds]
-        )
+    let ordersWithItems = rows
+    if (params.includeItems) {
+      // Fetch items for all orders in a single batch query.
+      const orderIds = rows.map((order) => order.id)
+      let items = []
+      if (orderIds.length > 0) {
+        try {
+          const { rows: itemsRows } = await query(
+            `
+            SELECT
+              oi.*,
+              p.name as product_name,
+              p.sku as product_sku
+            FROM order_item oi
+            JOIN product p ON p.id = oi.product_id
+            WHERE oi.order_id = ANY($1)
+          `,
+            [orderIds]
+          )
 
-        items = itemsRows
-      } catch (itemError) {
-        logger.error({
-          message: 'Failed to fetch order items',
-          error: itemError.message,
-          stack: itemError.stack,
-        })
-        // Continue without items if query fails
+          items = itemsRows
+        } catch (itemError) {
+          logger.error({
+            message: 'Failed to fetch order items',
+            error: itemError.message,
+            stack: itemError.stack,
+          })
+          // Continue without items if query fails
+        }
       }
+
+      // Group items by order_id
+      const itemsByOrder = {}
+      items.forEach((item) => {
+        if (!itemsByOrder[item.order_id]) {
+          itemsByOrder[item.order_id] = []
+        }
+        itemsByOrder[item.order_id].push(item)
+      })
+
+      // Attach items to each order
+      ordersWithItems = rows.map((order) => ({
+        ...order,
+        items: itemsByOrder[order.id] || [],
+      }))
     }
-
-    // Group items by order_id
-    const itemsByOrder = {}
-    items.forEach((item) => {
-      if (!itemsByOrder[item.order_id]) {
-        itemsByOrder[item.order_id] = []
-      }
-      itemsByOrder[item.order_id].push(item)
-    })
-
-    // Attach items to each order
-    const ordersWithItems = rows.map((order) => ({
-      ...order,
-      items: itemsByOrder[order.id] || [],
-    }))
 
     res.json({
       ok: true,

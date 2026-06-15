@@ -102,22 +102,36 @@ describe('Chat Routes', () => {
 
   describe('GET /api/chat/conversations', () => {
     it('should return list of conversations', async () => {
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'conv-1',
-            restaurant_id: 'restaurant-1',
-            supplier_id: 'supplier-1',
-            last_message: 'Hello',
-            last_message_at: new Date(),
-          },
-        ],
-      })
+      db.query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'conv-1',
+              restaurant_id: 'restaurant-1',
+              supplier_id: 'supplier-1',
+              last_message: 'Hello',
+              last_message_at: new Date(),
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [{ total: 1 }] })
 
       const response = await request(app).get('/api/chat/conversations').expect(200)
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.conversations).toHaveLength(1)
+      expect(response.body.data.pagination).toEqual({ total: 1, limit: 50, offset: 0 })
+    })
+
+    it('applies limit, offset, and uses LATERAL for last message preview', async () => {
+      db.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ total: 0 }] })
+
+      await request(app).get('/api/chat/conversations?limit=25&offset=10').expect(200)
+
+      const listSql = String(db.query.mock.calls[0][0])
+      expect(listSql).toContain('LEFT JOIN LATERAL')
+      expect(listSql).toContain('LIMIT $2 OFFSET $3')
+      expect(db.query.mock.calls[0][1]).toEqual(['rest-1', 25, 10])
     })
   })
 

@@ -225,24 +225,6 @@ export const financeApi = api.injectEndpoints({
       },
       providesTags: ['Fulfillment', 'SupplierOps'],
     }),
-    previewProductImport: builder.mutation<
-      any,
-      { csv: string; columnMapping?: Record<string, string> }
-    >({
-      query: (body) => ({
-        url: '/api/supplier/products/import/preview',
-        method: 'POST',
-        body,
-      }),
-    }),
-    executeProductImport: builder.mutation<any, { csv: string; partial?: boolean }>({
-      query: (body) => ({
-        url: '/api/supplier/products/import',
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: ['Product', 'Inventory'],
-    }),
     getProductSubstitutes: builder.query<any, string>({
       query: (productId) => `/api/supplier/products/${productId}/substitutes`,
       providesTags: (_r, _e, id) => [{ type: 'Product', id }],

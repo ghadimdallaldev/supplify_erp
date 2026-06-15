@@ -13,9 +13,21 @@ import { Badge } from '../components/ui/badge'
 import { EmptyState } from '../components/ui/empty-state'
 import { Skeleton } from '../components/ui/skeleton'
 import { PublicPageLayout, PublicPanel } from '../components/public/PublicPageLayout'
+import { CategoryNav } from '../components/consumer/CategoryNav'
 import { formatPrice } from '../utils/format'
+import { copyToClipboard } from '../utils/clipboard'
 import { toast } from 'sonner'
-import { Link2, Package, Search, ShoppingCart } from 'lucide-react'
+import {
+  Check,
+  ClipboardCopy,
+  Link2,
+  Lock,
+  LogIn,
+  Package,
+  Search,
+  ShoppingCart,
+  UserPlus,
+} from 'lucide-react'
 import type { PublicSupplierProduct } from '../types'
 
 function ProductCard({
@@ -24,60 +36,183 @@ function ProductCard({
   onAdd,
   onRequestQuote,
   canOrder,
+  loginHref,
 }: {
   product: PublicSupplierProduct
   showPrice: boolean
   onAdd?: (product: PublicSupplierProduct) => void
   onRequestQuote?: (product: PublicSupplierProduct) => void
   canOrder: boolean
+  loginHref: string
 }) {
+  const initial = product.name.charAt(0).toUpperCase()
+
   return (
-    <article className="consumer-menu-item flex h-full flex-col rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4">
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-base font-medium leading-snug text-[var(--text)]">{product.name}</h3>
-        {product.inStock === false ? (
-          <Badge variant="secondary">Out of stock</Badge>
-        ) : product.inStock ? (
-          <Badge variant="outline">In stock</Badge>
-        ) : null}
-      </div>
-      <p className="mt-1 text-xs text-[var(--text-muted)]">
-        {product.sku}
-        {product.unit ? ` · ${product.unit}` : ''}
-        {product.category ? ` · ${product.category}` : ''}
-      </p>
-      <div className="mt-3 flex flex-1 flex-col gap-3">
-        {product.description && (
-          <p className="line-clamp-2 text-sm text-[var(--text-muted)]">{product.description}</p>
-        )}
-        {showPrice && product.currentPrice != null && (
-          <p className="text-base font-semibold tabular-nums text-[var(--text)]">
-            {formatPrice(product.currentPrice)}
+    <article className="consumer-menu-item flex h-full flex-col overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]">
+      {product.imageUrl ? (
+        <img
+          src={product.imageUrl}
+          alt=""
+          className="aspect-[4/3] w-full object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <div
+          aria-hidden
+          className="flex aspect-[4/3] w-full items-center justify-center bg-[var(--brand-pale)] text-3xl font-semibold text-[var(--brand-mid)]"
+        >
+          {initial}
+        </div>
+      )}
+
+      <div className="flex flex-1 flex-col p-4">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-base font-medium leading-snug text-[var(--text)]">{product.name}</h3>
+          {product.inStock === false ? (
+            <Badge variant="secondary" className="shrink-0">
+              Out of stock
+            </Badge>
+          ) : product.inStock ? (
+            <Badge
+              variant="outline"
+              className="shrink-0 border-[var(--mint)]/30 text-[var(--mint)]"
+            >
+              In stock
+            </Badge>
+          ) : null}
+        </div>
+
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          {product.sku}
+          {product.unit ? ` · ${product.unit}` : ''}
+        </p>
+
+        {product.category && (
+          <p className="mt-2">
+            <span className="inline-flex rounded-full bg-[var(--brand-ultra)] px-2 py-0.5 text-xs font-medium text-[var(--text-mid)]">
+              {product.category}
+            </span>
           </p>
         )}
-        {!showPrice && (
-          <p className="text-sm text-[var(--text-muted)]">Log in to see pricing and order.</p>
-        )}
-        <div className="mt-auto flex flex-wrap gap-2 pt-1">
-          {canOrder && onAdd && product.inStock !== false && (
-            <Button size="sm" className="consumer-pressable" onClick={() => onAdd(product)}>
-              <ShoppingCart className="mr-1 h-4 w-4" />
-              Add to cart
-            </Button>
+
+        <div className="mt-3 flex flex-1 flex-col gap-3">
+          {product.description && (
+            <p className="line-clamp-2 text-sm leading-relaxed text-[var(--text-mid)]">
+              {product.description}
+            </p>
           )}
-          {canOrder && onRequestQuote && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="consumer-pressable"
-              onClick={() => onRequestQuote(product)}
+
+          {showPrice && product.currentPrice != null ? (
+            <p className="text-lg font-semibold tabular-nums text-[var(--text)]">
+              {formatPrice(product.currentPrice)}
+            </p>
+          ) : (
+            <Link
+              to={loginHref}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--brand-mid)] hover:text-[var(--brand)]"
             >
-              Request best price
-            </Button>
+              <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Sign in for pricing
+            </Link>
           )}
+
+          <div className="mt-auto flex flex-wrap gap-2 pt-1">
+            {canOrder && onAdd && product.inStock !== false && (
+              <Button size="sm" className="consumer-pressable" onClick={() => onAdd(product)}>
+                <ShoppingCart className="mr-1 h-4 w-4" />
+                Add to cart
+              </Button>
+            )}
+            {canOrder && onRequestQuote && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="consumer-pressable"
+                onClick={() => onRequestQuote(product)}
+              >
+                Request best price
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </article>
+  )
+}
+
+function CatalogStats({
+  productCount,
+  paymentTerms,
+  minimumOrderAmount,
+}: {
+  productCount: number
+  paymentTerms?: string | null
+  minimumOrderAmount?: number | null
+}) {
+  const columns =
+    1 + (paymentTerms ? 1 : 0) + (minimumOrderAmount != null && minimumOrderAmount > 0 ? 1 : 0)
+  const gridClass =
+    columns >= 3 ? 'sm:grid-cols-3' : columns === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-1'
+
+  return (
+    <dl
+      className={`mb-6 grid grid-cols-1 divide-y divide-[var(--app-border)] overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--brand-ultra)] ${gridClass} sm:divide-x sm:divide-y-0`}
+    >
+      <div className="px-4 py-3 text-center sm:text-left">
+        <dt className="text-xs font-medium text-[var(--text-muted)]">Catalog</dt>
+        <dd className="mt-1 text-sm font-semibold tabular-nums text-[var(--text)]">
+          {productCount} product{productCount === 1 ? '' : 's'}
+        </dd>
+      </div>
+      {paymentTerms && (
+        <div className="px-4 py-3 text-center sm:text-left">
+          <dt className="text-xs font-medium text-[var(--text-muted)]">Payment terms</dt>
+          <dd className="mt-1 text-sm font-semibold text-[var(--text)]">{paymentTerms}</dd>
+        </div>
+      )}
+      {minimumOrderAmount != null && minimumOrderAmount > 0 && (
+        <div className="px-4 py-3 text-center sm:text-left">
+          <dt className="text-xs font-medium text-[var(--text-muted)]">Minimum order</dt>
+          <dd className="mt-1 text-sm font-semibold tabular-nums text-[var(--text)]">
+            {formatPrice(minimumOrderAmount)}
+          </dd>
+        </div>
+      )}
+    </dl>
+  )
+}
+
+function GuestAccessPanel({ loginHref }: { loginHref: string }) {
+  return (
+    <PublicPanel className="mb-6 border-[var(--brand-light)]/25 bg-[color-mix(in_srgb,var(--brand-pale)_45%,var(--surface))]">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="font-medium text-[var(--text)]">Restaurant ordering on Supplify</p>
+          <p className="mt-1 text-sm leading-relaxed text-[var(--text-mid)]">
+            Sign in to see contract pricing, add items to your cart, and place orders with this
+            supplier.
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Button
+            asChild
+            size="sm"
+            className="consumer-pressable bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
+          >
+            <Link to={loginHref}>
+              <LogIn className="mr-1.5 h-4 w-4" />
+              Log in to order
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline" className="consumer-pressable">
+            <Link to="/register">
+              <UserPlus className="mr-1.5 h-4 w-4" />
+              Request access
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </PublicPanel>
   )
 }
 
@@ -91,6 +226,11 @@ export function PublicSupplierCatalogPage() {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
   const [page, setPage] = useState(1)
+  const [linkCopied, setLinkCopied] = useState(false)
+
+  const catalogPath =
+    typeof window !== 'undefined' ? window.location.pathname : `/supplier/${idOrSlug ?? ''}`
+  const loginHref = `/login?redirect=${encodeURIComponent(catalogPath)}`
 
   const {
     data: supplier,
@@ -129,6 +269,12 @@ export function PublicSupplierCatalogPage() {
     } as React.CSSProperties
   }, [supplier])
 
+  const categoryNavItems = useMemo(() => {
+    const list = (catalog?.categories ?? []).map((name) => ({ id: name, name }))
+    if (list.length === 0) return []
+    return [{ id: '', name: 'All' }, ...list]
+  }, [catalog?.categories])
+
   const handleAddToCart = (product: PublicSupplierProduct) => {
     if (!supplier) return
     addItem({
@@ -166,13 +312,26 @@ export function PublicSupplierCatalogPage() {
     })
   }
 
+  const handleCopyLink = async () => {
+    const url = typeof window !== 'undefined' ? window.location.href : catalogPath
+    const ok = await copyToClipboard(url)
+    if (ok) {
+      setLinkCopied(true)
+      toast.success('Catalog link copied')
+      window.setTimeout(() => setLinkCopied(false), 2000)
+    } else {
+      toast.error('Could not copy link')
+    }
+  }
+
   if (loadingSupplier) {
     return (
       <PublicPageLayout wide title="Supplier catalog">
-        <Skeleton className="mb-6 h-14 w-14 rounded-2xl" />
+        <Skeleton className="mb-6 h-16 w-full rounded-xl" />
+        <Skeleton className="mb-6 h-11 w-full rounded-lg" />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-48 w-full rounded-xl" />
+            <Skeleton key={i} className="h-64 w-full rounded-xl" />
           ))}
         </div>
       </PublicPageLayout>
@@ -204,8 +363,33 @@ export function PublicSupplierCatalogPage() {
   const displayName = supplier.brandDisplayName || supplier.name
   const products = catalog?.products ?? []
   const categories = catalog?.categories ?? []
-  const total = catalog?.pagination?.total ?? 0
+  const total = catalog?.pagination?.total ?? supplier.productCount ?? 0
   const totalPages = Math.max(1, Math.ceil(total / (catalog?.pagination?.limit || 24)))
+
+  const headerActions = !user ? (
+    <>
+      <Button
+        asChild
+        size="sm"
+        className="consumer-pressable bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
+      >
+        <Link to={loginHref}>
+          <LogIn className="mr-1.5 h-4 w-4" />
+          Log in to order
+        </Link>
+      </Button>
+      <Button asChild size="sm" variant="outline" className="consumer-pressable">
+        <Link to="/register">
+          <UserPlus className="mr-1.5 h-4 w-4" />
+          Request access
+        </Link>
+      </Button>
+    </>
+  ) : isRestaurant ? (
+    <Button asChild size="sm" variant="outline" className="consumer-pressable">
+      <Link to={`/app/suppliers/${supplier.id}`}>View in app</Link>
+    </Button>
+  ) : null
 
   return (
     <PublicPageLayout
@@ -213,61 +397,66 @@ export function PublicSupplierCatalogPage() {
       title={displayName}
       subtitle={
         supplier.paymentTerms
-          ? `Payment terms: ${supplier.paymentTerms}`
-          : 'Browse products and request pricing.'
+          ? `Wholesale catalog · ${supplier.paymentTerms}`
+          : 'Wholesale catalog · browse products and request pricing'
       }
       logoUrl={supplier.logoUrl}
       logoInitial={displayName.charAt(0).toUpperCase()}
+      headerActions={headerActions}
       className="pb-12"
       style={brandStyle}
     >
-      <div className="mb-6 flex flex-wrap gap-2">
-        {!user && (
-          <>
-            <Button
-              asChild
-              className="consumer-pressable bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
-            >
-              <Link to={`/login?redirect=${encodeURIComponent(window.location.pathname)}`}>
-                Log in to order
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="consumer-pressable">
-              <Link to="/register">Request access</Link>
-            </Button>
-          </>
-        )}
-        {isRestaurant && (
-          <Button asChild variant="outline" className="consumer-pressable">
-            <Link to={`/app/suppliers/${supplier.id}`}>View in app</Link>
-          </Button>
-        )}
-      </div>
+      <CatalogStats
+        productCount={total}
+        paymentTerms={supplier.paymentTerms}
+        minimumOrderAmount={supplier.minimumOrderAmount}
+      />
 
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
+      {!user && <GuestAccessPanel loginHref={loginHref} />}
+
+      <div className="mb-4">
+        <div className="relative">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
             aria-hidden
           />
           <Input
             className="h-11 pl-9 shadow-none"
-            placeholder="Search products…"
+            placeholder="Search by name, SKU, or category…"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value)
               setPage(1)
             }}
+            aria-label="Search products"
           />
         </div>
-        {categories.length > 0 && (
+      </div>
+
+      {categoryNavItems.length > 0 && (
+        <CategoryNav
+          className="-mx-4 mb-4 sm:-mx-6 sm:px-6"
+          sticky={false}
+          ariaLabel="Product categories"
+          categories={categoryNavItems}
+          activeCategoryId={category}
+          onSelect={(id) => {
+            setCategory(id)
+            setPage(1)
+          }}
+        />
+      )}
+
+      {categories.length > 0 && categoryNavItems.length === 0 && (
+        <div className="mb-4">
           <select
-            className="h-11 rounded-lg border border-[var(--app-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text)]"
+            className="h-11 w-full rounded-lg border border-[var(--app-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] sm:w-auto"
             value={category}
             onChange={(e) => {
               setCategory(e.target.value)
               setPage(1)
             }}
+            aria-label="Filter by category"
           >
             <option value="">All categories</option>
             {categories.map((cat) => (
@@ -276,25 +465,44 @@ export function PublicSupplierCatalogPage() {
               </option>
             ))}
           </select>
-        )}
-      </div>
+        </div>
+      )}
 
       {loadingProducts ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-48 w-full rounded-xl" />
+            <Skeleton key={i} className="h-64 w-full rounded-xl" />
           ))}
         </div>
       ) : products.length === 0 ? (
         <EmptyState
-          title="No products yet"
-          description="This supplier has not published any products to their catalog."
+          title={search || category ? 'No matching products' : 'No products yet'}
+          description={
+            search || category
+              ? 'Try a different search term or category.'
+              : 'This supplier has not published any products to their catalog.'
+          }
           icon={<Package className="h-6 w-6" />}
+          action={
+            search || category ? (
+              <Button
+                variant="outline"
+                className="consumer-pressable"
+                onClick={() => {
+                  setSearch('')
+                  setCategory('')
+                  setPage(1)
+                }}
+              >
+                Clear filters
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <>
           <p className="mb-4 text-sm text-[var(--text-muted)]">
-            {total} product{total === 1 ? '' : 's'}
+            Showing {products.length} of {total}
             {isFetching ? ' · Updating…' : ''}
           </p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -304,13 +512,14 @@ export function PublicSupplierCatalogPage() {
                 product={product}
                 showPrice={isRestaurant}
                 canOrder={isRestaurant}
+                loginHref={loginHref}
                 onAdd={handleAddToCart}
                 onRequestQuote={handleRequestQuote}
               />
             ))}
           </div>
           {totalPages > 1 && (
-            <div className="flex justify-center gap-2 pt-8">
+            <nav className="flex justify-center gap-2 pt-8" aria-label="Product catalog pagination">
               <Button
                 variant="outline"
                 size="sm"
@@ -332,24 +541,53 @@ export function PublicSupplierCatalogPage() {
               >
                 Next
               </Button>
-            </div>
+            </nav>
           )}
         </>
       )}
 
-      <PublicPanel className="mt-8 border-dashed">
+      <PublicPanel className="mt-8">
         <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-            <Link2 className="h-4 w-4 shrink-0" aria-hidden />
-            Share this catalog with your team or buyers.
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--brand-pale)] text-[var(--brand-mid)]">
+              <Link2 className="h-5 w-5" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="font-medium text-[var(--text)]">Share this catalog</p>
+              <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+                Send the link to buyers on your team so they can browse and request access.
+              </p>
+            </div>
           </div>
-          {!user && (
-            <Button asChild variant="secondary" className="consumer-pressable shrink-0">
-              <Link to={`/login?redirect=${encodeURIComponent(window.location.pathname)}`}>
-                Log in to order
-              </Link>
+          <div className="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              className="consumer-pressable flex-1 sm:flex-none"
+              onClick={() => void handleCopyLink()}
+            >
+              {linkCopied ? (
+                <>
+                  <Check className="mr-1.5 h-4 w-4 text-[var(--mint)]" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <ClipboardCopy className="mr-1.5 h-4 w-4" />
+                  Copy link
+                </>
+              )}
             </Button>
-          )}
+            {!user && (
+              <Button
+                asChild
+                size="sm"
+                className="consumer-pressable flex-1 bg-[var(--brand-mid)] hover:bg-[var(--brand)] sm:flex-none"
+              >
+                <Link to={loginHref}>Log in to order</Link>
+              </Button>
+            )}
+          </div>
         </div>
       </PublicPanel>
     </PublicPageLayout>

@@ -28,13 +28,18 @@ import {
 import { getSupplierGrowthMetrics } from '../services/supplier-growth-metrics.service.js'
 import { query } from '../lib/db.js'
 import { NotFoundError } from '../middlewares/errorHandler.js'
+import { requireFeature } from '../lib/subscription.js'
+import { writeAuditLog } from '../lib/audit.js'
 
 const router = express.Router()
 
-// Growth routes are gated by RBAC (GROWTH_VIEW, CUSTOMERS_IMPORT, CUSTOMERS_MANAGE).
-// No subscription feature key exists for supplier growth — skip requireFeature.
+const supplierGrowthGate = requireFeature(
+  'supplier_growth',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
 
-router.use(requireAuth, resolveTenantContext, requireRole(['SUPPLIER']))
+router.use(requireAuth, resolveTenantContext, requireRole(['SUPPLIER']), supplierGrowthGate)
 
 async function resolveSupplierId(req) {
   const id = await getSupplierIdForRequest(req)
@@ -65,6 +70,20 @@ router.post('/customers/import', requirePermission('CUSTOMERS_IMPORT'), async (r
     const body = importSchema.parse(req.body)
     const result = await executeCustomerImport(supplierId, body.csv, {
       userId: req.userData.id,
+    })
+    await writeAuditLog(req, {
+      action_type: 'customers.import.completed',
+      tenant_type: 'SUPPLIER',
+      tenant_id: supplierId,
+      target_id: result.batchId,
+      payload_json: {
+        resource_type: 'supplier_customer_import_batch',
+        summary: {
+          created: result.created,
+          skipped: result.skipped,
+          failed: result.failed,
+        },
+      },
     })
     res.json({ ok: true, data: result, error: null, requestId: req.requestId })
   } catch (err) {

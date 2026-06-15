@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
 import { Input } from '../../ui/input'
@@ -12,6 +11,7 @@ import {
   useCreateStaffAnnouncementMutation,
   useGetStaffAnnouncementsQuery,
 } from '../../../services/staffApi'
+import { StaffPanel } from '../staffShared'
 
 export function StaffAnnouncementsTab() {
   const [announcementForm, setAnnouncementForm] = useState({
@@ -63,15 +63,17 @@ export function StaffAnnouncementsTab() {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Announcements</CardTitle>
-          <CardDescription>
-            Keep every shift aligned with clear broadcasts and read receipts.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+    <div className="space-y-4">
+      <StaffPanel
+        title="Announcements"
+        description="Keep every shift aligned with clear broadcasts and read receipts."
+        footer={
+          <Button onClick={handleCreateAnnouncement} disabled={creatingAnnouncement}>
+            {creatingAnnouncement ? 'Publishing…' : 'Publish announcement'}
+          </Button>
+        }
+      >
+        <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label htmlFor="announcementTitle">Title</Label>
@@ -83,24 +85,15 @@ export function StaffAnnouncementsTab() {
                 }
               />
             </div>
-            <div className="flex items-end gap-2">
-              <div className="flex items-center gap-2">
-                <input
-                  id="announcementAck"
-                  type="checkbox"
-                  className="h-4 w-4 cursor-pointer rounded border-[var(--app-border-mid)]"
-                  checked={announcementForm.requireAck}
-                  onChange={(event) =>
-                    setAnnouncementForm((prev) => ({
-                      ...prev,
-                      requireAck: event.target.checked,
-                    }))
-                  }
-                />
-                <Label htmlFor="announcementAck" className="text-xs">
-                  Require acknowledgment
-                </Label>
-              </div>
+            <div>
+              <Label htmlFor="announcementRoles">Audience roles (comma separated)</Label>
+              <Input
+                id="announcementRoles"
+                value={announcementForm.roles}
+                onChange={(event) =>
+                  setAnnouncementForm((prev) => ({ ...prev, roles: event.target.value }))
+                }
+              />
             </div>
           </div>
           <div>
@@ -114,77 +107,71 @@ export function StaffAnnouncementsTab() {
               }
             />
           </div>
-          <div>
-            <Label htmlFor="announcementRoles">Audience roles (comma separated)</Label>
-            <Input
-              id="announcementRoles"
-              value={announcementForm.roles}
+          <label className="flex items-center gap-2 text-sm text-[var(--text)]">
+            <input
+              type="checkbox"
+              checked={announcementForm.requireAck}
               onChange={(event) =>
-                setAnnouncementForm((prev) => ({ ...prev, roles: event.target.value }))
+                setAnnouncementForm((prev) => ({ ...prev, requireAck: event.target.checked }))
               }
             />
+            Require acknowledgment from staff
+          </label>
+        </div>
+      </StaffPanel>
+
+      <StaffPanel title="Published" description="Recent broadcasts to your team.">
+        {announcementsLoading ? (
+          <p className="text-sm text-[var(--text-mid)]">Loading announcements…</p>
+        ) : announcements.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-[var(--app-border)] bg-[var(--brand-ultra)]/40 p-6 text-center text-sm text-[var(--text-mid)]">
+            <p>No announcements yet.</p>
           </div>
-          <div className="flex justify-end">
-            <Button onClick={handleCreateAnnouncement} disabled={creatingAnnouncement}>
-              {creatingAnnouncement ? 'Publishing…' : 'Publish announcement'}
-            </Button>
-          </div>
-          <div className="space-y-3">
-            {announcementsLoading ? (
-              <p className="text-sm text-[var(--text-muted)]">Loading announcements…</p>
-            ) : announcements.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">
-                <p>No announcements yet.</p>
-              </div>
-            ) : (
-              announcements.map((announcement) => (
-                <div
-                  key={announcement.id}
-                  className="rounded-xl border border-[var(--app-border)] bg-white p-4 shadow-sm"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--text)]">
-                        {announcement.title}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        {format(new Date(announcement.publishedAt), 'MMM d, yyyy · p')}
-                      </p>
-                    </div>
-                    <Badge className="bg-[var(--brand-pale)] text-[var(--brand-mid)]">
-                      {announcement.requireAck
-                        ? `${announcement.acknowledgmentCount} acknowledged`
-                        : 'Info'}
-                    </Badge>
-                  </div>
-                  <p className="mt-2 text-sm text-[var(--text-muted)]">{announcement.body}</p>
-                  {announcement.audience?.roles ? (
-                    <p className="mt-2 text-xs text-[var(--text-muted)]">
-                      Audience: {(announcement.audience.roles as string[]).join(', ')}
+        ) : (
+          <ul className="-mx-4 -mb-4 divide-y divide-[var(--app-border)] sm:-mx-5 sm:-mb-5">
+            {announcements.map((announcement) => (
+              <li
+                key={announcement.id}
+                className="space-y-2 px-4 py-4 transition-colors hover:bg-[var(--brand-ultra)]/50 sm:px-5"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--text)]">{announcement.title}</p>
+                    <p className="text-xs text-[var(--text-mid)]">
+                      {format(new Date(announcement.publishedAt), 'MMM d, yyyy · p')}
                     </p>
-                  ) : null}
-                  {announcement.requireAck ? (
-                    <div className="mt-3">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          const staffId = window.prompt(
-                            'Enter staff ID acknowledging this announcement:'
-                          )
-                          if (staffId) handleAckAnnouncement(announcement.id, staffId)
-                        }}
-                      >
-                        Record acknowledgment
-                      </Button>
-                    </div>
-                  ) : null}
+                  </div>
+                  <Badge className="bg-[var(--brand-pale)] text-[var(--brand-mid)]">
+                    {announcement.requireAck
+                      ? `${announcement.acknowledgmentCount} acknowledged`
+                      : 'Info'}
+                  </Badge>
                 </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                <p className="text-sm text-[var(--text-mid)]">{announcement.body}</p>
+                {announcement.audience?.roles ? (
+                  <p className="text-xs text-[var(--text-mid)]">
+                    Audience: {(announcement.audience.roles as string[]).join(', ')}
+                  </p>
+                ) : null}
+                {announcement.requireAck ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const staffId = window.prompt(
+                        'Enter staff ID acknowledging this announcement:'
+                      )
+                      if (staffId) handleAckAnnouncement(announcement.id, staffId)
+                    }}
+                  >
+                    Record acknowledgment
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </StaffPanel>
     </div>
   )
 }

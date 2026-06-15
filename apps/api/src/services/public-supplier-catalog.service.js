@@ -36,14 +36,14 @@ async function publicCatalogEnabledFilter() {
   if (await columnExists('supplier', 'public_catalog_enabled')) {
     return 'AND s.public_catalog_enabled = true'
   }
-  return ''
+  return 'AND FALSE'
 }
 
 async function publicCatalogEnabledPredicate(tableAlias = 's') {
   if (await columnExists('supplier', 'public_catalog_enabled')) {
     return `${tableAlias}.public_catalog_enabled = true`
   }
-  return 'TRUE'
+  return 'FALSE'
 }
 
 export async function resolvePublicSupplierByIdOrSlug(idOrSlug, dbQuery = query) {
@@ -113,7 +113,7 @@ export async function getPublicSupplierProfile(idOrSlug, dbQuery = query) {
     brandAccent,
     minimumOrderAmount: row.minimum_order_amount != null ? Number(row.minimum_order_amount) : null,
     paymentTerms: row.payment_terms || null,
-    publicCatalogEnabled: row.public_catalog_enabled ?? true,
+    publicCatalogEnabled: row.public_catalog_enabled === true,
   }
 }
 

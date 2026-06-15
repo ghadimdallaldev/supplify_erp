@@ -1,5 +1,11 @@
 import express from 'express'
-import { requireAuth, requireRole, resolveTenantContext, optionalAuth } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  optionalAuth,
+  getSupplierIdForRequest,
+} from '../lib/rbac.js'
 import { verifyObjectAccess } from '../lib/object-download-auth.js'
 import { filesUploadGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
@@ -19,6 +25,7 @@ import {
   sanitizeUploadFileName,
   assertUploadKeyOwnedByUser,
   assertFileExtensionMatchesMime,
+  assertImageUploadBytes,
   MAX_UPLOAD_BYTES,
   MAX_IMPORT_ZIP_BYTES,
 } from '../lib/sanitize-upload.js'
@@ -117,6 +124,7 @@ async function handleTokenUpload(req, res) {
         requestId: req.requestId,
       })
     }
+    await assertImageUploadBytes(body, contentType)
     await provider.completeUpload(req.params.token, body, contentType)
     res.status(204).end()
   } catch (error) {
@@ -124,7 +132,8 @@ async function handleTokenUpload(req, res) {
       error?.name === 'UPLOAD_TOKEN_INVALID' ||
       error?.name === 'UPLOAD_CONTENT_TYPE' ||
       error?.name === 'UPLOAD_KEY_INVALID' ||
-      error?.name === 'UPLOAD_TOO_LARGE'
+      error?.name === 'UPLOAD_TOO_LARGE' ||
+      error?.name === 'UPLOAD_INVALID_IMAGE'
     res.status(invalid ? 400 : 500).json({
       ok: false,
       data: null,
@@ -325,7 +334,7 @@ router.post(
 
       const { rows: products } = await query(
         `
-        SELECT p.*, s.id as supplier_id, s.contact_email
+        SELECT p.*, s.id as supplier_id
         FROM product p
         JOIN supplier s ON s.id = p.supplier_id
         WHERE p.id = $1
@@ -345,16 +354,19 @@ router.post(
         })
       }
 
-      if (req.userData.role === 'SUPPLIER' && products[0].contact_email !== req.userData.email) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied. You can only attach files to your own products',
-          },
-          requestId: req.requestId,
-        })
+      if (req.userData.role === 'SUPPLIER') {
+        const ownSupplierId = await getSupplierIdForRequest(req)
+        if (!ownSupplierId || products[0].supplier_id !== ownSupplierId) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'FORBIDDEN',
+              message: 'Access denied. You can only attach files to your own products',
+            },
+            requestId: req.requestId,
+          })
+        }
       }
 
       const supplierId = products[0].supplier_id

@@ -28,9 +28,15 @@ const inventoryManagementGate = requireFeature(
 
 router.use(requireAuth, resolveTenantContext, requirePermission('INVENTORY_VIEW'))
 
+const inventoryListSchema = z.object({
+  limit: z.coerce.number().min(1).max(500).default(100),
+  offset: z.coerce.number().min(0).default(0),
+})
+
 // Get all inventory for current supplier
 router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
+    const params = inventoryListSchema.parse(req.query)
     let inventoryQuery = `
       SELECT 
         i.product_id as id,
@@ -53,7 +59,15 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
       LEFT JOIN warehouse w ON w.id = i.warehouse_id
     `
 
+    const countQueryBase = `
+      SELECT COUNT(*)::int AS total
+      FROM inventory i
+      JOIN product p ON p.id = i.product_id
+      JOIN supplier s ON s.id = p.supplier_id
+    `
+
     const queryParams = []
+    let whereClause = ''
 
     // For suppliers, only show their active workspace products
     if (req.userData.role === 'SUPPLIER') {
@@ -61,19 +75,26 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
       if (!supplierId) {
         return res.json({
           ok: true,
-          data: { inventory: [] },
+          data: {
+            inventory: [],
+            pagination: { total: 0, limit: params.limit, offset: params.offset },
+          },
           error: null,
           requestId: req.requestId,
         })
       }
-      inventoryQuery += ` WHERE p.supplier_id = $1`
+      whereClause = ` WHERE p.supplier_id = $1`
       queryParams.push(supplierId)
     }
 
-    inventoryQuery += ` ORDER BY p.name`
+    inventoryQuery += `${whereClause} ORDER BY p.name LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`
+    const listParams = [...queryParams, params.limit, params.offset]
 
     logger.debug('Executing inventory query')
-    const { rows } = await query(inventoryQuery, queryParams)
+    const [{ rows }, { rows: countRows }] = await Promise.all([
+      query(inventoryQuery, listParams),
+      query(`${countQueryBase}${whereClause}`, queryParams),
+    ])
 
     // Format the data for frontend
     const formattedInventory = rows.map((row) => {
@@ -90,7 +111,14 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
 
     res.json({
       ok: true,
-      data: { inventory: formattedInventory },
+      data: {
+        inventory: formattedInventory,
+        pagination: {
+          total: countRows[0]?.total ?? 0,
+          limit: params.limit,
+          offset: params.offset,
+        },
+      },
       error: null,
       requestId: req.requestId,
     })

@@ -29,6 +29,8 @@ vi.mock('../lib/rbac.js', () => ({
   requirePermission: () => (req, res, next) => next(),
   requireAnyPermission: () => (req, res, next) => next(),
   getRequestTenant: vi.fn().mockResolvedValue(null),
+  getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
+  getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
   checkPermission: vi.fn().mockResolvedValue(true),
   upsertUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com' }),
   setAuthCookies: vi.fn(),
@@ -51,6 +53,16 @@ vi.mock('../lib/logger.js', () => ({
     warn: vi.fn(),
     debug: vi.fn(),
   },
+}))
+
+vi.mock('../lib/audit.js', () => ({
+  writeAuditLog: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('../lib/cache.js', () => ({
+  getCache: vi.fn().mockResolvedValue(null),
+  setCache: vi.fn().mockResolvedValue(undefined),
+  deleteCache: vi.fn().mockResolvedValue(undefined),
 }))
 
 // Now import routes (mocks are set up)
@@ -205,6 +217,12 @@ describe('Products Routes', () => {
     })
 
     it('should join inventory when includeStock=true', async () => {
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getRequestTenant).mockResolvedValueOnce({
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+      })
+
       db.query
         .mockResolvedValueOnce({ rows: [], rowCount: 0 })
         .mockResolvedValueOnce({ rows: [{ total: '0' }] })
@@ -212,9 +230,23 @@ describe('Products Routes', () => {
       await request(app).get('/api/products?includeStock=true').expect(200)
 
       const listSql = db.query.mock.calls[0][0]
-      expect(listSql).toContain('FROM inventory')
+      expect(listSql).toContain('FROM inventory i')
+      expect(listSql).toContain('inv_p.supplier_id = $1')
       expect(listSql).toContain('COALESCE(inv.total_available, 0) as available_qty')
       expect(listSql).not.toContain('0::int as available_qty')
+    })
+
+    it('uses explicit product list columns instead of p.*', async () => {
+      db.query
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] })
+
+      await request(app).get('/api/products').expect(200)
+
+      const listSql = String(db.query.mock.calls[0][0])
+      expect(listSql).not.toMatch(/\bp\.\*\b/)
+      expect(listSql).toContain('p.image_thumb_url')
+      expect(listSql).toContain('pr.amount as current_price')
     })
 
     it('should filter to in-stock rows when inStock=true', async () => {
@@ -249,6 +281,24 @@ describe('Products Routes', () => {
       expect(response.body.data.product.id).toBe('prod-1')
     })
 
+    it('should return 404 when supplier cannot access another suppliers product', async () => {
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getRequestTenant).mockResolvedValueOnce({
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+      })
+      vi.mocked(rbac.getSupplierIdForRequest).mockResolvedValueOnce('supplier-other')
+
+      db.query.mockResolvedValueOnce({
+        rows: [{ id: 'prod-1', sku: 'SKU001', name: 'Test Product', supplier_id: 'supplier-1' }],
+      })
+
+      const response = await request(app).get('/api/products/prod-1').expect(404)
+
+      expect(response.body.ok).toBe(false)
+      expect(response.body.error.name).toBe('NOT_FOUND')
+    })
+
     it('should return 404 for non-existent product', async () => {
       db.query.mockResolvedValueOnce({
         rows: [],
@@ -263,9 +313,7 @@ describe('Products Routes', () => {
   describe('POST /api/products', () => {
     it('should create a new product', async () => {
       __resetProductTagsColumnCache() // ensure productHasTagsColumn runs (info_schema query)
-      // Mock: supplier lookup, BEGIN, productHasTagsColumn (info_schema), INSERT product, COMMIT
       db.query
-        .mockResolvedValueOnce({ rows: [{ id: 'supplier-1' }] }) // Supplier lookup
         .mockResolvedValueOnce({}) // BEGIN
         .mockResolvedValueOnce({ rows: [] }) // productHasTagsColumn() when uncached - no tags column
         .mockResolvedValueOnce({

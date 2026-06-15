@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { MapPin } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Skeleton } from '../ui/skeleton'
@@ -29,15 +28,17 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
 
   return (
     <div className="space-y-4" data-testid="fulfillment-routes-tab">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5" />
+      <section className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]">
+        <header className="border-b border-[var(--app-border)] px-4 py-4 sm:px-5">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+            <MapPin className="h-4 w-4 text-[var(--brand-mid)]" aria-hidden />
             Delivery Routes
-          </CardTitle>
-          <CardDescription>Planned delivery runs built from Driver Dispatch</CardDescription>
-        </CardHeader>
-        <CardContent>
+          </h2>
+          <p className="mt-0.5 text-xs text-[var(--text-mid)]">
+            Planned delivery runs built from Driver Dispatch
+          </p>
+        </header>
+        <div className="p-4 sm:p-5">
           {isLoading ? (
             <div className="space-y-3" data-testid="routes-loading">
               {Array.from({ length: 2 }).map((_, i) => (
@@ -78,7 +79,7 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
                 {routes.map((route) => (
                   <article
                     key={route.id}
-                    className={`rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4 shadow-sm ${
+                    className={`rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4 ${
                       selectedId === route.id ? 'ring-2 ring-[var(--brand-mid)]/30' : ''
                     }`}
                   >
@@ -170,8 +171,8 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {selectedId && detailLoading && (
         <Skeleton className="h-48 w-full rounded-xl" data-testid="routes-detail-loading" />
