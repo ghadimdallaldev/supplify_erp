@@ -95,6 +95,9 @@ Single-tenant checklist for regression and release testing. For **routes, roles,
 
 - [ ] Sidebar matches supplier role.
 - [ ] Products CRUD/inventory as allowed.
+- [ ] **Bulk Upload** products CSV (optional `image_url` column).
+- [ ] **Import Product Images** — ZIP by SKU or ZIP + mapping CSV; preview → confirm → job progress → failure report (migration `0168`).
+- [ ] **Import Product Images** — second import while a job is running returns **409** (SUP-15f).
 - [ ] Orders lifecycle (acknowledge → ship → deliver / **decline with required reason**).
 - [ ] **Fulfillment** — dispatch board, tracking tab, command center GPS widget, **View tracking** drawer (Gold+ / `driver_management`); checklist **GPS-S01–S09**, **DRV-GPS1–3**.
 - [ ] **Driver portal** (linked driver user) — active deliveries, GPS badge, mark delivered → restaurant tracking + receiving flow.

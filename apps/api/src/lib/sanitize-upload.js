@@ -2,6 +2,8 @@ import path from 'node:path'
 
 const MAX_FILENAME_LENGTH = 200
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+/** Default max ZIP size for bulk product image import (2GB). */
+const MAX_IMPORT_ZIP_BYTES = 2147483648
 
 /** MIME type to allowed file extensions (lowercase, with dot). */
 const MIME_TO_EXTENSIONS = {
@@ -9,6 +11,14 @@ const MIME_TO_EXTENSIONS = {
   'image/png': ['.png'],
   'image/webp': ['.webp'],
   'application/pdf': ['.pdf'],
+}
+
+/** MIME types allowed for bulk product image import archives and manifests. */
+const IMPORT_ALLOWED_MIMES = {
+  'application/zip': ['.zip'],
+  'application/x-zip-compressed': ['.zip'],
+  'text/csv': ['.csv'],
+  'application/csv': ['.csv'],
 }
 
 /**
@@ -25,7 +35,7 @@ export function assertFileExtensionMatchesMime(fileName, mimeType) {
   }
 }
 
-export { MAX_UPLOAD_BYTES }
+export { MAX_UPLOAD_BYTES, MAX_IMPORT_ZIP_BYTES, IMPORT_ALLOWED_MIMES }
 
 /**
  * Strip path segments and unsafe characters from user-supplied file names.
@@ -95,4 +105,24 @@ export function assertChatAttachmentUrl(fileUrl, userId) {
 /** Alias for staff documents and other presigned file references. */
 export function assertPresignedFileUrl(fileUrl, userId) {
   return assertChatAttachmentUrl(fileUrl, userId)
+}
+
+/**
+ * Prefix formula-trigger characters so spreadsheet apps do not execute cell content.
+ */
+export function neutralizeCsvField(value) {
+  const text = String(value ?? '')
+  if (/^[=+\-@]/.test(text)) {
+    return `'${text}`
+  }
+  return text
+}
+
+/** Escape and neutralize a CSV field for safe download. */
+export function escapeCsvField(value) {
+  const text = neutralizeCsvField(value)
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`
+  }
+  return text
 }

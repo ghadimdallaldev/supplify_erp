@@ -26,14 +26,14 @@
 
 ### Products Management
 
-| Feature           | Supplier          | Restaurant       | Notes    |
-| ----------------- | ----------------- | ---------------- | -------- |
-| Create Products   | ✅ Full CRUD      | ❌ Read-only     | Expected |
-| Edit Products     | ✅ Full CRUD      | ❌ Read-only     | Expected |
-| View All Products | ✅ Can see own    | ✅ Can see all   | Expected |
-| Manage Prices     | ✅ Can set prices | ❌ Read-only     | Expected |
-| Product Images    | ✅ Can upload     | ❌ View only     | Expected |
-| Bulk Upload       | ✅ Available      | ❌ Not available | Expected |
+| Feature           | Supplier                                        | Restaurant       | Notes    |
+| ----------------- | ----------------------------------------------- | ---------------- | -------- |
+| Create Products   | ✅ Full CRUD                                    | ❌ Read-only     | Expected |
+| Edit Products     | ✅ Full CRUD                                    | ❌ Read-only     | Expected |
+| View All Products | ✅ Can see own                                  | ✅ Can see all   | Expected |
+| Manage Prices     | ✅ Can set prices                               | ❌ Read-only     | Expected |
+| Product Images    | ✅ Single upload + bulk ZIP import              | ❌ View only     | Expected |
+| Bulk Upload       | ✅ Products CSV + **Import Product Images** ZIP | ❌ Not available | Expected |
 
 ### Order Management
 

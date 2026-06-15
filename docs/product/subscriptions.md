@@ -9,12 +9,20 @@ Plans are split by **tenant type**: each of Free, Silver, Gold, and Platinum exi
 ## Free Trial (plan code `free`)
 
 - **User-facing name:** Free Trial (not “forever free”).
-- **Duration:** `subscription.free_sandbox_expires_at`; default length from `platform_setting.free_sandbox_days` (**7**, admin-configurable **3–7**).
+- **Duration:** `subscription.free_sandbox_expires_at`; default length from `platform_setting.free_sandbox_days` (**30**, admin-configurable **7–90**).
 - **During trial:** Broad sandbox features (`0112` parity with Gold feature JSON) with **low plan limits** still enforced.
 - **After expiry:** `lock_reason = 'free_sandbox_expired'` — **GET** APIs read-only; **writes 402**; billing/upgrade still available.
 - **Admin:** `POST …/extend-free-trial`, unlock extends expiry for expired trials.
 
 Details: [free-trial-expiry.md](../features/free-trial-expiry.md).
+
+## Supplier growth program (referral & sponsorship)
+
+Suppliers can import restaurant customers, send connection requests to existing tenants, invite or sponsor new restaurants, and earn rewards when referrals convert to paid plans. Referred restaurants use the same **30-day Free Trial** plus an admin-configurable **first-paid discount**.
+
+- **Spec:** [supplier-customer-growth.md](../features/supplier-customer-growth.md)
+- **Admin config:** `GET/PATCH /api/admin-dashboard/growth-settings` (`referral_program_config`)
+- **Migration:** `0169_supplier_growth_program.sql`
 
 ## Limit keys (normalized)
 
@@ -209,4 +217,5 @@ Supplier **deal promotion boosts** (paid visibility) use `promotion_pricing_conf
 - **0117** — Silver limits/features tightened (first paid tier positioning).
 - **0119** — Gold limits/features rebalanced (finite caps; feature bundle unchanged vs pre-0119 marketing).
 - **0120** — Platinum limits/features normalized (30 GB storage, unlimited meters, waste_tracking fix, legacy keys removed).
+- **0169** — Supplier customer growth (import, referrals, sponsorship, billing credits); platform `free_sandbox_days` default **30** (range **7–90**).
 - **0063 / 0064** — historical Gold/Silver limit rebalances (superseded for Silver by 0117, Gold by 0119).

@@ -130,6 +130,15 @@ pnpm --filter @supplify/web test:run -- deliveryTrackingLabels DeliveryTrackingM
 
 Manual regression: [regression-checklist.md](./regression-checklist.md) §6.6.1, §7.4.1, §7.4.2. Feature spec: [drivers-and-gps-tracking.md](../features/drivers-and-gps-tracking.md).
 
+## Bulk product image import (targeted runs)
+
+```bash
+pnpm --filter @supplify/api test:api src/services/image-optimization.service.test.js src/services/product-image-import.service.test.js src/services/image-import-worker.test.js src/services/supplier-pain-killer.test.js
+pnpm --filter @supplify/web test:run -- ProductImageImport
+```
+
+Manual regression: [regression-checklist.md](./regression-checklist.md) §7.3 **SUP-15a–f**. Feature spec: [bulk-product-image-import.md](../features/bulk-product-image-import.md). Requires migration `0168_catalog_image_import.sql`.
+
 ## Related docs
 
 - [API test suite stabilization](../API_TEST_SUITE_STABILIZATION.md) — baseline failures, fixes, risks

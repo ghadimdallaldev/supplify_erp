@@ -1,5 +1,7 @@
 # Free Trial behavior audit
 
+> **Superseded (2026-06):** Platform default trial is now **30 days** (admin range **7–90**). References to **3–7 days** in this archive are historical. See [../features/free-trial-expiry.md](../features/free-trial-expiry.md).
+
 **Status:** P0 implemented (2026-05-28)  
 **Canonical feature spec:** [../features/free-trial-expiry.md](../features/free-trial-expiry.md)
 

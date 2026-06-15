@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
-import { Package, ShoppingCart, AlertTriangle, Loader2, Warehouse } from 'lucide-react'
+import { Package, ShoppingCart, AlertTriangle, Loader2, Warehouse, Users } from 'lucide-react'
+import { useGetSupplierGrowthMetricsQuery } from '../../services/api/endpoints/growth'
 import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { Skeleton } from '../ui/skeleton'
@@ -41,6 +42,10 @@ export function DashboardWidgetGrid(props: any) {
     addItemToQuickList,
     restaurantLayout,
   } = props
+
+  const { data: growthMetrics } = useGetSupplierGrowthMetricsQuery(undefined, {
+    skip: !isSupplier,
+  })
 
   return (
     <>
@@ -606,6 +611,42 @@ export function DashboardWidgetGrid(props: any) {
                     )
                   )}
               </ul>
+            </SectionCard>
+          ) : null}
+
+          {isSupplier && growthMetrics ? (
+            <SectionCard
+              title="Customer Growth"
+              action={
+                <Link
+                  to="/app/customer-growth"
+                  style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}
+                >
+                  Manage →
+                </Link>
+              }
+            >
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-[var(--text-muted)]">Imported</span>
+                  <div className="font-semibold">{growthMetrics.importedCustomers}</div>
+                </div>
+                <div>
+                  <span className="text-[var(--text-muted)]">Converted</span>
+                  <div className="font-semibold">{growthMetrics.convertedCustomers}</div>
+                </div>
+                <div>
+                  <span className="text-[var(--text-muted)]">Invited</span>
+                  <div className="font-semibold">{growthMetrics.invitedCustomers}</div>
+                </div>
+                <div>
+                  <span className="text-[var(--text-muted)]">Rewards</span>
+                  <div className="font-semibold flex items-center gap-1">
+                    <Users className="h-3 w-3" />
+                    {growthMetrics.rewardsEarned.freeMonths} mo
+                  </div>
+                </div>
+              </div>
             </SectionCard>
           ) : null}
         </div>

@@ -78,6 +78,19 @@ See [reservations-foh.md](../features/reservations-foh.md).
 | Scheduled quick list         | Restaurant team             |
 | Post-receiving review prompt | Restaurant team             |
 
+### Supplier customer growth
+
+| Event                                      | Recipient(s)                |
+| ------------------------------------------ | --------------------------- |
+| Connection request (supplier → restaurant) | Restaurant team             |
+| Connection accepted                        | Supplier team               |
+| Referral registered                        | Restaurant team             |
+| Referral reward earned                     | Supplier team               |
+| Sponsorship gift received                  | Restaurant team             |
+| Sponsorship expired                        | Restaurant + supplier teams |
+
+See [supplier-customer-growth.md](../features/supplier-customer-growth.md).
+
 Preference toggles map to `notify_*` keys (e.g. `notify_order_new`, `notify_reservation_created`). Disabled toggles skip delivery.
 
 ---

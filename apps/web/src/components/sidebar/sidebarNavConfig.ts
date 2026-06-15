@@ -24,6 +24,7 @@ import {
   UtensilsCrossed,
   ShoppingBasket,
   Gift,
+  UserPlus,
 } from 'lucide-react'
 import type { WorkspacePersonaProfile } from '../../lib/workspaceRoleProfile'
 import {
@@ -434,6 +435,13 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
           : []),
       ].filter((item) => navItemAllowed(item, can, canAny))
       const intel: SidebarNavItem[] = [
+        {
+          name: 'Customer Growth',
+          href: '/app/customer-growth',
+          icon: UserPlus,
+          anyOf: ['CATALOG_EDIT', 'ORDERS_VIEW'],
+          testId: 'nav-customer-growth',
+        },
         ...(reportsEnabled && persona.showGlobalReports
           ? [
               {

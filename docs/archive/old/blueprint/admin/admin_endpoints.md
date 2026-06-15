@@ -1,5 +1,7 @@
 # Admin endpoints
 
+> **Archive — superseded (2026-06):** Platform Free Trial is **7–90 days** (default **30**). Growth settings: `GET/PATCH /growth-settings`. See [../../../features/free-trial-expiry.md](../../../features/free-trial-expiry.md) and [../../../features/supplier-customer-growth.md](../../../features/supplier-customer-growth.md).
+
 Base path: `/api/admin-dashboard`. All require auth + role ADMIN + ADMIN_ACCESS.
 
 | Method | Path                                                | Description                                                                                                        |

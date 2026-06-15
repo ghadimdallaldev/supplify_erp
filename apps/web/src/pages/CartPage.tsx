@@ -345,80 +345,89 @@ export function CartPage() {
                       {group.items.length} item{group.items.length !== 1 ? 's' : ''}
                     </p>
                   </div>
-                  {group.items.map((item) => (
-                    <div
-                      key={item.productId}
-                      className="flex flex-col gap-3 p-4 border rounded-lg sm:flex-row sm:items-center sm:gap-4"
-                      data-testid={`cart-item-row-${item.productId}`}
-                    >
-                      <div className="w-16 h-16 shrink-0 bg-[var(--brand-ultra)] rounded-lg flex items-center justify-center">
-                        {item.product.image_url ? (
-                          <img
-                            src={item.product.image_url}
-                            alt={item.product.name}
-                            className="w-full h-full object-cover rounded-lg"
-                          />
-                        ) : (
-                          <ShoppingCart className="h-6 w-6 text-[var(--text-muted)]" />
-                        )}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium truncate">{item.product.name}</h4>
-                        <p className="text-sm text-[var(--text-muted)]">SKU: {item.product.sku}</p>
-                        <p className="text-sm text-[var(--text-muted)]">
-                          {formatPrice(item.product.current_price)} per{' '}
-                          {item.product.unit || 'unit'}
-                          {item.product.pricing_source === 'CONTRACT_PRICE' && (
-                            <Badge variant="secondary" className="ml-2 text-xs">
-                              Your price
-                            </Badge>
+                  {group.items.map((item) => {
+                    const thumbUrl = item.product.image_thumb_url ?? item.product.image_url
+                    return (
+                      <div
+                        key={item.productId}
+                        className="flex flex-col gap-3 p-4 border rounded-lg sm:flex-row sm:items-center sm:gap-4"
+                        data-testid={`cart-item-row-${item.productId}`}
+                      >
+                        <div className="w-16 h-16 shrink-0 bg-[var(--brand-ultra)] rounded-lg flex items-center justify-center">
+                          {thumbUrl ? (
+                            <img
+                              src={thumbUrl}
+                              alt={item.product.name}
+                              className="w-full h-full object-cover rounded-lg"
+                            />
+                          ) : (
+                            <ShoppingCart className="h-6 w-6 text-[var(--text-muted)]" />
                           )}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleUpdateQuantity(item.productId, item.quantity - 1)}
-                            disabled={item.quantity <= 1}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <span className="w-8 text-center tabular-nums">{item.quantity}</span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleUpdateQuantity(item.productId, item.quantity + 1)}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
                         </div>
 
-                        <p className="font-medium tabular-nums sm:text-right">
-                          {formatPrice(
-                            (typeof item.product.current_price === 'number'
-                              ? item.product.current_price
-                              : parseFloat(String(item.product.current_price ?? '')) || 0) *
-                              item.quantity
-                          )}
-                        </p>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium truncate">{item.product.name}</h4>
+                          <p className="text-sm text-[var(--text-muted)]">
+                            SKU: {item.product.sku}
+                          </p>
+                          <p className="text-sm text-[var(--text-muted)]">
+                            {formatPrice(item.product.current_price)} per{' '}
+                            {item.product.unit || 'unit'}
+                            {item.product.pricing_source === 'CONTRACT_PRICE' && (
+                              <Badge variant="secondary" className="ml-2 text-xs">
+                                Your price
+                              </Badge>
+                            )}
+                          </p>
+                        </div>
 
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            if (item.productId) handleRemoveItem(item.productId)
-                          }}
-                          aria-label="Remove item"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                handleUpdateQuantity(item.productId, item.quantity - 1)
+                              }
+                              disabled={item.quantity <= 1}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="w-8 text-center tabular-nums">{item.quantity}</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                handleUpdateQuantity(item.productId, item.quantity + 1)
+                              }
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+
+                          <p className="font-medium tabular-nums sm:text-right">
+                            {formatPrice(
+                              (typeof item.product.current_price === 'number'
+                                ? item.product.current_price
+                                : parseFloat(String(item.product.current_price ?? '')) || 0) *
+                                item.quantity
+                            )}
+                          </p>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (item.productId) handleRemoveItem(item.productId)
+                            }}
+                            aria-label="Remove item"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </CardContent>
               </Card>
             ))}

@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js'
+import { escapeCsvField } from '../lib/sanitize-upload.js'
 
 const OPEN_STATUSES = ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE']
 
@@ -123,9 +124,16 @@ export async function exportSupplierStatementCsv(supplierId, restaurantId) {
   )
 
   const header = 'Invoice Number,Invoice Date,Due Date,Status,Total,Paid,Balance\n'
-  const lines = rows.map(
-    (r) =>
-      `${r.invoice_number},${r.invoice_date},${r.due_date},${r.status},${r.total_amount},${r.paid_amount},${r.balance_due}`
+  const lines = rows.map((r) =>
+    [
+      escapeCsvField(r.invoice_number),
+      escapeCsvField(r.invoice_date),
+      escapeCsvField(r.due_date),
+      escapeCsvField(r.status),
+      escapeCsvField(r.total_amount),
+      escapeCsvField(r.paid_amount),
+      escapeCsvField(r.balance_due),
+    ].join(',')
   )
   return header + lines.join('\n')
 }

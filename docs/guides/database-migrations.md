@@ -28,7 +28,7 @@ SQL migrations live in `apps/api/db/migrations/` and run in lexical order. Appli
 2. Run migrations (`run-migration.js`).
 3. Seed demo data: `scripts\run-local.cmd seed` (migrations + `seed.sql` + Keycloak users).
 
-All SQL files in `apps/api/db/migrations/` must complete without error on an empty database. Recent examples: `0103_reservation_availability_indexes.sql`, `0108_order_cancellation_details.sql` (`cancel_reason`, `cancelled_by` on `customer_order`).
+All SQL files in `apps/api/db/migrations/` must complete without error on an empty database. Recent examples: `0103_reservation_availability_indexes.sql`, `0108_order_cancellation_details.sql` (`cancel_reason`, `cancelled_by` on `customer_order`), `0168_catalog_image_import.sql` (`catalog_image_import_job`, `product.image_thumb_url` for bulk image import), `0169_supplier_growth_program.sql` (supplier customer import/referral/sponsorship tables, `free_sandbox_days` default 30, `referral_program_config`).
 
 ## Common issues
 

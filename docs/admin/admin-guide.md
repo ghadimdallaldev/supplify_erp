@@ -136,13 +136,15 @@ To upgrade or downgrade a tenant:
 
 ### Free Trial (plan code `free`)
 
-**Platform default length:** Admin → **Platform settings** → Free Trial length (**3–7** days, default **7**). Applies to new Free activations.
+**Platform default length:** Admin → **Platform settings** → Free Trial length (**7–90** days, default **30**). Applies to new Free activations.
+
+**Growth program:** Admin → **Plans** tab → **Growth program settings** — referral discount %, supplier reward type, sponsorship limits. See [supplier-customer-growth.md](../features/supplier-customer-growth.md).
 
 **Extend an expired trial:**
 
 1. Find tenant in **Subscriptions** with `lock_reason = free_sandbox_expired`
-2. Click **Extend trial** (or call `POST /api/admin-dashboard/subscriptions/:id/extend-free-trial` with optional `{ "days": 5 }`)
-3. Lock clears; `free_sandbox_expires_at` is set from now + days (clamped 3–7)
+2. Click **Extend trial** (or call `POST /api/admin-dashboard/subscriptions/:id/extend-free-trial` with optional `{ "days": 30 }`)
+3. Lock clears; `free_sandbox_expires_at` is set from now + days (clamped **7–90**)
 
 **Unlock** on an expired Free Trial also extends expiry so the hourly expiry job does not immediately re-lock.
 

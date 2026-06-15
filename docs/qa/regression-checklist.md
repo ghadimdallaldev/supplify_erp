@@ -378,11 +378,29 @@ WHERE id = '<subscription_id>';
 | BIL-FT-05 | `GET /api/billing/status` while locked                                    | **200**; `access.isLocked` true; `freeSandboxExpired` or `lockReason === 'free_sandbox_expired'` |       |
 | BIL-FT-06 | `POST /api/billing/checkout` (upgrade to Silver)                          | Allowed (billing exempt from lock)                                                               |       |
 | BIL-FT-07 | Settings → Subscription tab                                               | Shows **Free Trial** label; expired copy; upgrade path                                           |       |
-| BIL-FT-08 | Admin → Platform settings → set trial length **2** or **10**              | Validation error; only **3–7** accepted                                                          |       |
-| BIL-FT-09 | Admin → Platform settings → save **7** days                               | Persists; new Free activations use clamped value                                                 |       |
-| BIL-FT-10 | Admin → Subscriptions → locked free tenant → **Extend trial**             | Lock cleared; `free_sandbox_expires_at` ~7 days ahead; tenant can write again                    |       |
+| BIL-FT-08 | Admin → Platform settings → set trial length **5** or **100**             | Validation error; only **7–90** accepted                                                         |       |
+| BIL-FT-09 | Admin → Platform settings → save **30** days                              | Persists; new Free activations use clamped value                                                 |       |
+| BIL-FT-10 | Admin → Subscriptions → locked free tenant → **Extend trial**             | Lock cleared; `free_sandbox_expires_at` ~30 days ahead; tenant can write again                   |       |
 | BIL-FT-11 | Re-expire tenant; Admin → **Activate** / unlock on `free_sandbox_expired` | Unlock + trial extended (job should not re-lock immediately)                                     |       |
-| BIL-FT-12 | `POST …/extend-free-trial` with `{ "days": 5 }` (API or admin action)     | **200**; expiry ≈ now + 5 days                                                                   |       |
+| BIL-FT-12 | `POST …/extend-free-trial` with `{ "days": 30 }` (API or admin action)    | **200**; expiry ≈ now + 30 days                                                                  |       |
+
+## 4.9 Supplier customer growth
+
+> **Spec:** [supplier-customer-growth.md](../features/supplier-customer-growth.md) · **Migration:** `0169_supplier_growth_program.sql`  
+> **Prereq:** Supplier user with `CUSTOMERS_IMPORT` / `CUSTOMERS_MANAGE`; sample CSV with restaurant name + email.
+
+| ID     | Steps                                                           | Expected                                                                  | Pass? |
+| ------ | --------------------------------------------------------------- | ------------------------------------------------------------------------- | ----- |
+| GRW-01 | Supplier → `/app/customer-growth` → upload CSV → preview        | Valid/error row counts; no server error                                   |       |
+| GRW-02 | Run import                                                      | Prospects created; auto-match sets `existing_supplify` when email matches |       |
+| GRW-03 | Matched prospect → **Connect**                                  | Restaurant receives connection request notification                       |       |
+| GRW-04 | Restaurant → accept connection request                          | `supplier_follow` row; prospect `lifecycle_status = connected`            |       |
+| GRW-05 | Unmatched prospect → **Invite** (link)                          | Invite URL copied; `supplier_growth_invitation` pending                   |       |
+| GRW-06 | Open `/register?ref={token}` → complete restaurant registration | Referral attribution; 30-day Free Trial; auto-follow supplier             |       |
+| GRW-07 | Referred restaurant → first paid checkout (Silver)              | 20% discount on invoice; supplier reward granted per admin config         |       |
+| GRW-08 | Supplier → **Sponsor** prospect (Silver)                        | Respects plan yearly limit; restaurant gets 1 month paid plan             |       |
+| GRW-09 | Dashboard → Customer Growth widget                              | Shows imported / invited / converted counts                               |       |
+| GRW-10 | Admin → Plans → Growth program settings → save discount %       | `PATCH /api/admin-dashboard/growth-settings` persists                     |       |
 
 ## 4.8 Shell UI (Layout, Header, Sidebar)
 
@@ -723,14 +741,20 @@ Prereq: supplier assigned driver; active assignment; API `GPS_ALLOW_RESTAURANT_L
 
 ## 7.3 Products & pricing (`/app/products`, `/app/products/:id`)
 
-| ID     | Steps                                    | Expected                            | Pass? |
-| ------ | ---------------------------------------- | ----------------------------------- | ----- |
-| SUP-11 | Create product                           | Appears in list                     |       |
-| SUP-12 | Edit product (name, SKU, category, tags) | Saves                               |       |
-| SUP-13 | Deactivate/delete (if supported)         | Removed from catalog                |       |
-| SUP-14 | Manage **prices** per SKU                | Price rows CRUD                     |       |
-| SUP-15 | Product images/upload (files API)        | Image displays                      |       |
-| SUP-16 | Plan SKU limit                           | Block at limit with upgrade message |       |
+| ID      | Steps                                                   | Expected                                                                               | Pass? |
+| ------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----- |
+| SUP-11  | Create product                                          | Appears in list                                                                        |       |
+| SUP-12  | Edit product (name, SKU, category, tags)                | Saves                                                                                  |       |
+| SUP-13  | Deactivate/delete (if supported)                        | Removed from catalog                                                                   |       |
+| SUP-14  | Manage **prices** per SKU                               | Price rows CRUD                                                                        |       |
+| SUP-15  | Product images/upload (files API)                       | Image displays                                                                         |       |
+| SUP-15a | **Import Product Images** — ZIP by SKU (`CATALOG_EDIT`) | Preview shows matched/unmatched; confirm starts job; poll progress; thumbnails in list |       |
+| SUP-15b | **Import Product Images** — ZIP + mapping CSV           | Mapping CSV pairs SKU → filename; invalid rows in preview                              |       |
+| SUP-15c | **Import Product Images** — replace existing off        | Products with existing `image_url` skipped (`skipped` count)                           |       |
+| SUP-15d | **Bulk Upload** CSV with `image_url` column             | Remote HTTP(S) image fetched; product row succeeds even if image fails                 |       |
+| SUP-15e | Failure report after import job                         | `GET .../import/:jobId/report` CSV downloads failed rows                               |       |
+| SUP-15f | Concurrent import blocked                               | Second import while job `pending`/`processing` returns **409**                         |       |
+| SUP-16  | Plan SKU limit                                          | Block at limit with upgrade message                                                    |       |
 
 ## 7.4 Fulfillment (`/app/fulfillment`) — requires `fulfillment_tools` feature
 
@@ -889,14 +913,14 @@ Prereq: migration `0137_driver_location_tracking.sql`; API env `GPS_TRACKING_ENA
 
 ### Subscriptions tab
 
-| ID     | Steps                                                                              | Expected                                                                     | Pass? |
-| ------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----- |
-| ADM-10 | List subscriptions                                                                 | Status, plan, lock state                                                     |       |
-| ADM-11 | Change plan (upgrade/downgrade)                                                    | Preview + apply; cache invalidated; entitlements_refresh emitted             |       |
-| ADM-12 | **Activate** pending-activation subscription                                       | Tenant unlocked immediately                                                  |       |
-| ADM-13 | **Unlock** past-due locked subscription                                            | Lock cleared; tenant can log in to full app                                  |       |
-| ADM-14 | **Extend trial** on `free_sandbox_expired` subscription (or API extend-free-trial) | Lock cleared; `free_sandbox_expires_at` extended 3–7 days; see **BIL-FT-10** |       |
-| ADM-15 | After plan change: logged-in tenant receives `entitlements_refresh` event          | UI updates features without manual reload                                    |       |
+| ID     | Steps                                                                              | Expected                                                                      | Pass? |
+| ------ | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ----- |
+| ADM-10 | List subscriptions                                                                 | Status, plan, lock state                                                      |       |
+| ADM-11 | Change plan (upgrade/downgrade)                                                    | Preview + apply; cache invalidated; entitlements_refresh emitted              |       |
+| ADM-12 | **Activate** pending-activation subscription                                       | Tenant unlocked immediately                                                   |       |
+| ADM-13 | **Unlock** past-due locked subscription                                            | Lock cleared; tenant can log in to full app                                   |       |
+| ADM-14 | **Extend trial** on `free_sandbox_expired` subscription (or API extend-free-trial) | Lock cleared; `free_sandbox_expires_at` extended 7–90 days; see **BIL-FT-10** |       |
+| ADM-15 | After plan change: logged-in tenant receives `entitlements_refresh` event          | UI updates features without manual reload                                     |       |
 
 ### Plans tab
 

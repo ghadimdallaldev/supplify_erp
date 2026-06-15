@@ -14,6 +14,9 @@
  * @property {(opts: { fileKey: string; fileType: string; expiresIn?: number; userId?: string }) => Promise<PresignedUploadResult>} createPresignedUpload
  * @property {(fileKey: string) => string} buildPublicUrl
  * @property {(token: string, body: Buffer, contentType: string) => Promise<{ fileKey: string }>} [completeUpload]
+ * @property {(opts: { fileKey: string; body: Buffer | Uint8Array | string; contentType: string }) => Promise<{ fileKey: string }>} [putObject]
+ * @property {(fileKey: string) => Promise<{ fileKey: string }>} [deleteObject]
+ * @property {(fileKey: string) => Promise<{ body: unknown; contentType: string; contentLength?: number }>} [getObjectStream]
  */
 
 export {}

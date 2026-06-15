@@ -12,6 +12,9 @@ export const AUDIT_ACTION_LABELS = {
   'billing.checkout.completed': 'Checkout completed',
   'billing.pay_now.completed': 'Pay now completed',
   'billing.account.unlocked': 'Billing account unlocked',
+  'catalog.image_import.started': 'Bulk image import started',
+  'catalog.image_import.completed': 'Bulk image import completed',
+  'catalog.image_import.cancelled': 'Bulk image import cancelled',
 }
 
 export const AUDIT_RESOURCE_LABELS = {
@@ -19,6 +22,7 @@ export const AUDIT_RESOURCE_LABELS = {
   product: 'Product',
   promotion: 'Promotion',
   order_amendment: 'Order amendment',
+  catalog_image_import: 'Catalog image import',
 }
 
 function humanizeToken(value) {

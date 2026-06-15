@@ -47,8 +47,10 @@ Set secrets only in Railway — never commit real values.
 | `STORAGE_PUBLIC_READ`                                                        | API     | s3             | `true`/`false`               | `false` for Railway Buckets (use API `/api/files/object`)                         |
 | `STORAGE_S3_FORCE_PATH_STYLE`                                                | API     | s3             | `true`/`false`               | Auto `false` for Railway endpoints; `true` for MinIO                              |
 | Railway `ENDPOINT`, `BUCKET`, `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`, `REGION` | API     | bucket service | —                            | Auto-map to `STORAGE_*` when unset                                                |
+| `IMPORT_ZIP_MAX_BYTES`                                                       | API     | optional       | `2147483648` (2 GB)          | Max ZIP size for bulk product image import presign                                |
+| `IMPORT_IMAGE_MAX_BYTES`                                                     | API     | optional       | `10485760` (10 MB)           | Max size per image entry inside a ZIP or URL fetch during import                  |
 
-See [../operations/STORAGE_UPLOADS.md](../operations/STORAGE_UPLOADS.md) for where file bytes are stored, the presign → PUT flow, and Railway volume / R2 setup.
+See [../operations/storage-uploads.md](../operations/storage-uploads.md) for where file bytes are stored, the presign → PUT flow, bulk image import dual path, and Railway volume / R2 setup.
 
 | `EMAIL_ENABLED` | API | all | `true`/`false` | Master switch (default `true`) |
 | `EMAIL_LOG_ONLY` | API | dev | `true`/`false` | Log only, no network send (Railway dev default) |

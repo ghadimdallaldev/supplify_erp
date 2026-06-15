@@ -1,5 +1,7 @@
 # Admin tier editing — safety audit
 
+> **Archive note (2026-06):** Free Trial admin range is now **7–90 days** (default **30**). References to **3–7 days** below are historical. See [../../features/free-trial-expiry.md](../../features/free-trial-expiry.md).
+
 **Date:** 2026-05-28  
 **Scope:** Admin plan catalog editing (`POST/PATCH /api/admin-dashboard/plans`), plan limit overrides, subscription assignment.  
 **Out of scope (unchanged):** Tier JSON values in DB, pricing, Deals/Promotions routes, Free Trial runtime behavior.  

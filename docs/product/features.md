@@ -46,17 +46,17 @@ RBAC permissions (e.g. `RESERVATIONS_VIEW`, `STAFF_VIEW`, `INVOICES_VIEW`) furth
 
 ## Marketplace & catalog
 
-| Feature         | Web route                                  | API prefix                               | Notes                                          |
-| --------------- | ------------------------------------------ | ---------------------------------------- | ---------------------------------------------- |
-| Dashboard       | `/app/dashboard`                           | —                                        | Role-specific widgets and shortcuts            |
-| Products        | `/app/products`, `/app/products/:id`       | `/api/products`                          | Catalog browse; supplier-managed SKUs          |
-| Prices          | —                                          | `/api/prices`                            | Price lists, contract pricing                  |
-| Suppliers       | `/app/suppliers`, `/app/suppliers/:id`     | `/api/suppliers`                         | Restaurant view of linked suppliers            |
-| Restaurants     | `/app/restaurants`, `/app/restaurants/:id` | `/api/restaurants`                       | Supplier view of restaurant customers          |
-| Branches        | Settings / tenant config                   | `/api/branches`                          | Multi-branch restaurants                       |
-| Supplier org    | `/app/org`                                 | `/api/org`                               | Supplier org branches (`multi_branch`)         |
-| Warehouses      | Supplier settings → Warehouses             | `/api/warehouses`                        | CRUD, zones, inventory (`warehouses`)          |
-| Multi-warehouse | Supplier settings fulfillment toggle       | `/api/suppliers/me/fulfillment`, routing | Gold+ `multi_warehouse`; order line assignment |
+| Feature         | Web route                                  | API prefix                               | Notes                                                                                                                                                         |
+| --------------- | ------------------------------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dashboard       | `/app/dashboard`                           | —                                        | Role-specific widgets and shortcuts                                                                                                                           |
+| Products        | `/app/products`, `/app/products/:id`       | `/api/products`                          | Catalog browse; supplier CRUD; **Bulk Upload** CSV + **Import Product Images** ZIP — [bulk-product-image-import.md](../features/bulk-product-image-import.md) |
+| Prices          | —                                          | `/api/prices`                            | Price lists, contract pricing                                                                                                                                 |
+| Suppliers       | `/app/suppliers`, `/app/suppliers/:id`     | `/api/suppliers`                         | Restaurant view of linked suppliers                                                                                                                           |
+| Restaurants     | `/app/restaurants`, `/app/restaurants/:id` | `/api/restaurants`                       | Supplier view of restaurant customers                                                                                                                         |
+| Branches        | Settings / tenant config                   | `/api/branches`                          | Multi-branch restaurants                                                                                                                                      |
+| Supplier org    | `/app/org`                                 | `/api/org`                               | Supplier org branches (`multi_branch`)                                                                                                                        |
+| Warehouses      | Supplier settings → Warehouses             | `/api/warehouses`                        | CRUD, zones, inventory (`warehouses`)                                                                                                                         |
+| Multi-warehouse | Supplier settings fulfillment toggle       | `/api/suppliers/me/fulfillment`, routing | Gold+ `multi_warehouse`; order line assignment                                                                                                                |
 
 **Verify:** Log in as restaurant → Products loads; as supplier → Restaurants loads. API tests: `products.routes.test.js`, `suppliers.routes.test.js`, `restaurants.routes.test.js`.
 
@@ -108,7 +108,7 @@ Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admi
 | Supplier inventory     | `/app/inventory`               | `/api/inventory`                                                             | Stock levels, reservations                                                                                                   |
 | Supplier settings      | `/app/supplier-settings`       | `/api/suppliers`                                                             | Onboarding / profile                                                                                                         |
 
-**Verify:** Supplier login → Fulfillment → dispatch + **View tracking**; driver ping → Live badge. Restaurant → in-flight order detail → tracking panel. Tests: `delivery-tracking-payload.test.js`, `restaurant-tracking-payload.test.js`, `orders-driver-tracking.test.js`, `driver-location.service.test.js`; manual **GPS-S\***, **GPS-R\***, **DRV-GPS\***.
+**Verify:** Supplier login → Fulfillment → dispatch + **View tracking**; driver ping → Live badge. Restaurant → in-flight order detail → tracking panel. Supplier → Products → **Import Product Images** (ZIP preview/job) or **Bulk Upload** with `image_url`. Tests: `delivery-tracking-payload.test.js`, `restaurant-tracking-payload.test.js`, `orders-driver-tracking.test.js`, `driver-location.service.test.js`, `product-image-import.service.test.js`, `ProductImageImportDialog.test.tsx`; manual **GPS-S\***, **GPS-R\***, **DRV-GPS\***, **SUP-15a–f**.
 
 ## Restaurant operations
 
@@ -196,28 +196,29 @@ Tests: `notification.service.test.js`, `push.service.test.js`, `orderStatusDispl
 
 ## Admin platform
 
-| Feature             | Web route                 | API prefix                                                  | Notes                                                                                   |
-| ------------------- | ------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Admin dashboard     | `/app/admin`              | `/api/admin-dashboard`                                      | Metrics, tenants, plans                                                                 |
-| Supplier admin      | `/app/admin/suppliers`    | same                                                        | Supplier tenant management                                                              |
-| Restaurant admin    | `/app/admin/restaurants`  | same                                                        | Restaurant tenant management                                                            |
-| Feature toggles     | Admin → **Features** tab  | `/api/admin-dashboard/feature-flags`                        | Global + per-tenant overrides                                                           |
-| Limit overrides     | Admin → Usage / limits    | `/api/admin-dashboard/limit-overrides`                      | Per-tenant meter caps                                                                   |
-| Deal review         | Admin → **Deals** tab     | `/api/promotions/admin/*`                                   | Approve, reject, insights                                                               |
-| Free Trial length   | Admin → Platform settings | `GET/PATCH /api/admin-dashboard/platform-settings`          | Default **7** days; admin range **3–7**                                                 |
-| Extend Free Trial   | Admin → Subscriptions     | `POST …/subscriptions/:id/extend-free-trial`                | Extends `free_sandbox_expires_at`, unlocks                                              |
-| Impersonation       | Banner + tenant nav       | `/api/admin-dashboard/impersonate*` + `impersonation_token` | Full tenant workspace; see [admin-impersonation.md](../features/admin-impersonation.md) |
-| Legacy admin routes | —                         | `/api/admin`                                                | Internal maintenance endpoints                                                          |
+| Feature             | Web route                 | API prefix                                                  | Notes                                                                                                                            |
+| ------------------- | ------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Admin dashboard     | `/app/admin`              | `/api/admin-dashboard`                                      | Metrics, tenants, plans                                                                                                          |
+| Supplier admin      | `/app/admin/suppliers`    | same                                                        | Supplier tenant management                                                                                                       |
+| Restaurant admin    | `/app/admin/restaurants`  | same                                                        | Restaurant tenant management                                                                                                     |
+| Feature toggles     | Admin → **Features** tab  | `/api/admin-dashboard/feature-flags`                        | Global + per-tenant overrides                                                                                                    |
+| Limit overrides     | Admin → Usage / limits    | `/api/admin-dashboard/limit-overrides`                      | Per-tenant meter caps                                                                                                            |
+| Deal review         | Admin → **Deals** tab     | `/api/promotions/admin/*`                                   | Approve, reject, insights                                                                                                        |
+| Free Trial length   | Admin → Platform settings | `GET/PATCH /api/admin-dashboard/platform-settings`          | Default **30** days; admin range **7–90**                                                                                        |
+| Growth program      | Admin → Plans tab         | `GET/PATCH /api/admin-dashboard/growth-settings`            | Referral discount, supplier rewards, sponsorship limits — [supplier-customer-growth.md](../features/supplier-customer-growth.md) |
+| Extend Free Trial   | Admin → Subscriptions     | `POST …/subscriptions/:id/extend-free-trial`                | Extends `free_sandbox_expires_at`, unlocks                                                                                       |
+| Impersonation       | Banner + tenant nav       | `/api/admin-dashboard/impersonate*` + `impersonation_token` | Full tenant workspace; see [admin-impersonation.md](../features/admin-impersonation.md)                                          |
+| Legacy admin routes | —                         | `/api/admin`                                                | Internal maintenance endpoints                                                                                                   |
 
 See [admin-feature-flags.md](../admin/admin-feature-flags.md) for toggle API details. Tests: `admin-dashboard.routes.test.js`.
 
 ## Auth & files
 
-| Feature         | Web route               | API prefix   | Notes                                                                                                                   |
-| --------------- | ----------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| Login / OIDC    | `/login`, `/auth/login` | `/auth`      | Keycloak code flow, HTTP-only cookies; `redirectToAuth()` uses full-page navigation (iframe-safe for embedded previews) |
-| Session expired | `/login?expired=true`   | —            | Shown after auth timeout                                                                                                |
-| File uploads    | chat, products          | `/api/files` | MinIO-backed storage                                                                                                    |
+| Feature         | Web route               | API prefix   | Notes                                                                                                                                |
+| --------------- | ----------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Login / OIDC    | `/login`, `/auth/login` | `/auth`      | Keycloak code flow, HTTP-only cookies; `redirectToAuth()` uses full-page navigation (iframe-safe for embedded previews)              |
+| Session expired | `/login?expired=true`   | —            | Shown after auth timeout                                                                                                             |
+| File uploads    | chat, products          | `/api/files` | MinIO-backed storage; bulk image import uses `upload-import` for large ZIPs — [storage-uploads.md](../operations/storage-uploads.md) |
 
 Tests: `auth.routes.test.js`, `rbac.test.js`. Web: `apps/web/src/lib/authRedirect.ts`, `address.test.ts`.
 

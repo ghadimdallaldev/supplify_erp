@@ -19,6 +19,7 @@ import { runEmailDigestJob } from '../jobs/email-digest.job.js'
 import { runStaleGpsAlertsJob } from '../jobs/stale-gps-alerts.job.js'
 import { runLogRetentionJob } from '../jobs/log-retention.job.js'
 import { runReorderForecastJob } from '../jobs/reorder-forecast.job.js'
+import { runGrowthProgramMaintenanceJob } from '../jobs/sponsorship-expiry.job.js'
 
 /** @returns {boolean} Whether cron timers should be registered on API boot */
 export function shouldRegisterCrons(nodeEnv = config.NODE_ENV) {
@@ -200,6 +201,16 @@ export function registerCronJobs({ trackInterval }) {
         'Reorder forecast job failed:'
       ),
       label: 'Reorder forecast job started',
+    },
+    {
+      name: CRON_JOBS.GROWTH_PROGRAM_MAINTENANCE,
+      intervalMs: 60 * 60 * 1000,
+      run: wrap(
+        CRON_JOBS.GROWTH_PROGRAM_MAINTENANCE,
+        () => runGrowthProgramMaintenanceJob(),
+        'Growth program maintenance job failed:'
+      ),
+      label: 'Growth program maintenance job started',
     },
   ]
 

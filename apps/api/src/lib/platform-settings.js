@@ -1,12 +1,12 @@
 import { query } from './db.js'
 
 const DEFAULTS = {
-  free_sandbox_days: 7,
+  free_sandbox_days: 30,
 }
 
 /** Admin-configurable Free Trial length for new activations and extensions. */
-export const FREE_TRIAL_MIN_DAYS = 3
-export const FREE_TRIAL_MAX_DAYS = 7
+export const FREE_TRIAL_MIN_DAYS = 7
+export const FREE_TRIAL_MAX_DAYS = 90
 
 export function clampFreeTrialDays(days, fallback = DEFAULTS.free_sandbox_days) {
   const n = Number(days)
@@ -46,4 +46,25 @@ export async function getFreeSandboxDays() {
   const days = Number(await getPlatformSetting('free_sandbox_days', DEFAULTS.free_sandbox_days))
   if (!Number.isFinite(days)) return DEFAULTS.free_sandbox_days
   return clampFreeTrialDays(days, DEFAULTS.free_sandbox_days)
+}
+
+const DEFAULT_REFERRAL_PROGRAM_CONFIG = {
+  firstPaidDiscountPercent: 20,
+  supplierRewardType: 'free_month',
+  referralValidityDays: 90,
+  sponsorshipLimitsPerYear: { silver: 2, gold: 10, platinum: 25, enterprise: null },
+  eligibleSponsorPlans: ['silver', 'gold', 'platinum'],
+  connectionRequestExpiryDays: 30,
+}
+
+export async function getReferralProgramConfig() {
+  const raw = await getPlatformSetting('referral_program_config', DEFAULT_REFERRAL_PROGRAM_CONFIG)
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_REFERRAL_PROGRAM_CONFIG }
+  return { ...DEFAULT_REFERRAL_PROGRAM_CONFIG, ...raw }
+}
+
+export async function setReferralProgramConfig(config) {
+  const merged = { ...DEFAULT_REFERRAL_PROGRAM_CONFIG, ...config }
+  await setPlatformSetting('referral_program_config', merged)
+  return merged
 }

@@ -198,6 +198,10 @@ function normalizeIssuer(iss) {
   return iss.replace(/\/$/, '')
 }
 
+function isProductionAuthEnv() {
+  return config.APP_ENV === 'prod' || config.NODE_ENV === 'production'
+}
+
 // Verify JWT token
 export async function verifyToken(token) {
   try {
@@ -215,7 +219,17 @@ export async function verifyToken(token) {
     const expectedIssuer = normalizeIssuer(config.issuer)
     const tokenIssuer = normalizeIssuer(payload.iss)
     if (tokenIssuer && expectedIssuer && tokenIssuer !== expectedIssuer) {
+      if (isProductionAuthEnv()) {
+        throw new Error(`Token issuer mismatch. Expected: ${expectedIssuer}, Got: ${tokenIssuer}`)
+      }
       logger.warn('Issuer mismatch', { expected: expectedIssuer, token: tokenIssuer })
+    }
+
+    const tokenAud = payload.aud
+    const tokenAzp = payload.azp
+    const audList = Array.isArray(tokenAud) ? tokenAud : tokenAud ? [tokenAud] : []
+    if (isProductionAuthEnv() && !tokenAzp && audList.length === 0) {
+      throw new Error('Token missing required aud and azp claims')
     }
 
     // Use issuer from token so we match Keycloak's exact format (with or without trailing slash)
@@ -224,9 +238,6 @@ export async function verifyToken(token) {
 
     // Accept web, API, and mobile Keycloak clients (azp / aud vary by flow).
     const acceptableAudiences = [KEYCLOAK_CLIENT_ID, 'supplify-web', 'supplify-mobile']
-    const tokenAud = payload.aud
-    const tokenAzp = payload.azp
-    const audList = Array.isArray(tokenAud) ? tokenAud : tokenAud ? [tokenAud] : []
     const hasValidAud =
       audList.some((a) => acceptableAudiences.includes(a)) || acceptableAudiences.includes(tokenAzp)
 

@@ -317,7 +317,7 @@ Prior session (see `RBAC_ROLES_PERMISSIONS_AUDIT.md`): Driver role, driver-rbac 
 - [ ] **Owner:** all areas
 - [ ] **Driver:** only My Deliveries nav; board scoped; status whitelist; `/app/products` blocked
 - [ ] **Finance:** receivables; no catalog import
-- [ ] **Catalog Manager:** products/import; no invoices/settings
+- [ ] **Catalog Manager:** products/import and products/images/import; no invoices/settings
 - [ ] **Fulfillment:** fulfillment board; no billing
 - [ ] **Sales:** promotions + reorder intel; not driver assign
 - [ ] **Warehouse Manager:** warehouses + fulfillment; no billing

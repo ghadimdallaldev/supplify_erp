@@ -22,7 +22,7 @@ Base URL: `http://localhost:4000` (dev). All `/api/*` routes return JSON with sh
 | `/api/reviews`                 | `reviews.routes.js`                   | Supplier reviews (public read; authenticated write)                                                                                            |
 | `/api/reports`                 | `reports.routes.js`                   | Analytics and reports                                                                                                                          |
 | `/api/roles`                   | `tenant-roles.routes.js`              | Custom tenant roles (advanced_roles feature)                                                                                                   |
-| `/api/files`                   | `files.routes.js`                     | File upload presigns                                                                                                                           |
+| `/api/files`                   | `files.routes.js`                     | File upload presigns; `PUT /upload/:token` (10 MB); `PUT /upload-import/:token` (bulk ZIP, up to `IMPORT_ZIP_MAX_BYTES`)                       |
 | `/api/admin`                   | `admin.routes.js`                     | Platform audit and dashboard snippets                                                                                                          |
 | `/api/chat`                    | `chat.routes.js`                      | Messaging between restaurants and suppliers                                                                                                    |
 | `/api/invoices`                | `invoices.routes.js`                  | Invoices                                                                                                                                       |
@@ -50,11 +50,13 @@ Base URL: `http://localhost:4000` (dev). All `/api/*` routes return JSON with sh
 | `/api/warehouses`              | `warehouses.routes.js`                | Warehouses and stock                                                                                                                           |
 | `/api/fulfillment`             | `fulfillment.routes.js`               | Fulfillment board, routes, dispatch, exceptions                                                                                                |
 | `/api/drivers`                 | `drivers.routes.js`                   | Driver roster and assignments                                                                                                                  |
-| `/api/supplier`                | `supplier-ops.routes.js`              | Supplier ops: substitutes, reorder intelligence, featured placement helpers                                                                    |
+| `/api/supplier`                | `supplier-ops.routes.js`              | Supplier ops: command center, receivables, CSV import, **bulk image import**, substitutes, reorder intelligence                                |
 | `/api/e2e`                     | `e2e.routes.js`                       | Test-only reset/seed (requires `E2E_SECRET` header)                                                                                            |
 
 Authentication uses session cookies after Keycloak OAuth. Protected routes use `requireAuth`, tenant context, RBAC permissions, and optional `requireFeature()` plan gates.
 
 **Global billing lock:** `billingAccessMiddleware` (in `server.js`) returns **402** `ACCOUNT_LOCKED` when the tenant subscription is locked. Exemptions: `/api/billing/*`, `/api/register/*`, `/auth/*`, `/health/*`, and subscription entitlements GETs. **Free Trial expired** (`free_sandbox_expired`): tenant **GET** routes remain allowed (read-only); writes still **402**. See [free-trial-expiry.md](../features/free-trial-expiry.md).
 
-**Admin dashboard (subscription ops):** `POST /api/admin-dashboard/subscriptions/:id/unlock`, `POST …/extend-free-trial`, `GET/PATCH …/platform-settings` (`freeSandboxDays` 3–7).
+**Admin dashboard (subscription ops):** `POST /api/admin-dashboard/subscriptions/:id/unlock`, `POST …/extend-free-trial`, `GET/PATCH …/platform-settings` (`freeSandboxDays` **7–90**, default 30), `GET/PATCH …/growth-settings` (referral program config).
+
+**Supplier growth:** `/api/supplier/growth/*` (import, prospects, invite, sponsor, metrics); public `GET /api/growth/referral/:token`; restaurant `GET/POST /api/restaurant/growth/connection-requests/*`. See [supplier-customer-growth.md](../features/supplier-customer-growth.md).

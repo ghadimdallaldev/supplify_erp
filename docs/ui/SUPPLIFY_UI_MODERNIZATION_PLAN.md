@@ -201,7 +201,7 @@ These are well-built and should be **preserved without changes**:
 
 **File:** `apps/web/src/pages/ProductsPage.tsx`
 
-**Current state:** Large page with product grid/list, bulk upload, inventory adjustment. Uses `PageHeader` and `EmptyState`.
+**Current state:** Large page with product grid/list, bulk upload, **Import Product Images** (ZIP job + preview), inventory adjustment. Uses `PageHeader` and `EmptyState`.
 
 **Problems:**
 

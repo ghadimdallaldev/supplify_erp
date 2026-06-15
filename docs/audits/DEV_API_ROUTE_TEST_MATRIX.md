@@ -456,6 +456,13 @@ Total routes discovered: **505**
 | POST   | `/api/supplier/products/import`                                              | supplier-ops.routes.js              | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/supplier/products/import/error-report`                                 | supplier-ops.routes.js              | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/supplier/products/import/preview`                                      | supplier-ops.routes.js              | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/supplier/products/images/import/presign`                               | supplier-ops.routes.js              | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/supplier/products/images/import/preview`                               | supplier-ops.routes.js              | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/supplier/products/images/import`                                       | supplier-ops.routes.js              | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/supplier/products/images/import/:jobId`                                | supplier-ops.routes.js              | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/supplier/products/images/import/:jobId/cancel`                         | supplier-ops.routes.js              | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/supplier/products/images/import/:jobId/report`                         | supplier-ops.routes.js              | yes      | SAFE           | LIVE_GET      | 200      |
+| PUT    | `/api/files/upload-import/:token`                                            | files.routes.js                     | yes      | CONDITIONAL    | SKIP_MUTATION | 204      |
 | GET    | `/api/supplier/reorder-assistance`                                           | supplier-ops.routes.js              | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/supplier/reorder-cadence/at-risk`                                      | supplier-ops.routes.js              | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/supplier/reorder-intelligence`                                         | supplier-ops.routes.js              | yes      | SAFE           | LIVE_GET      | 200      |

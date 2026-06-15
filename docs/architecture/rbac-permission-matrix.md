@@ -38,6 +38,16 @@ Source of truth for default roles: `apps/api/src/lib/role-matrix.js`.
 - **Supplier:** `ORDERS_MANAGE` (maps to `orders.decline`)
 - **Not granted** to Order Fulfillment Staff, Accountant, Viewer by default
 
+### Customer growth (supplier)
+
+| Permission         | Owner | Supplier Manager | Notes                                |
+| ------------------ | ----- | ---------------- | ------------------------------------ |
+| `CUSTOMERS_IMPORT` | Yes   | Yes              | CSV import preview/execute           |
+| `CUSTOMERS_MANAGE` | Yes   | No               | Invite, sponsor, connection requests |
+| `GROWTH_VIEW`      | Yes   | Yes              | Prospects list + metrics dashboard   |
+
+See [../features/supplier-customer-growth.md](../features/supplier-customer-growth.md).
+
 ## Guards (backend)
 
 - `ensureTenantSystemRoles` — seeds + syncs permissions per tenant

@@ -114,6 +114,7 @@ Migration: `0126_rbac_driver_role_hardening.sql` adds `drivers.user_id` for link
 | `GET /api/supplier/deliveries/board`           | `FULFILLMENT_VIEW` or `DRIVER_DELIVERIES_VIEW` (driver → auto-scope to linked `drivers.user_id`) |
 | `GET /api/supplier/invoices/receivables*`      | `INVOICES_VIEW` + finance feature                                                                |
 | `POST /api/supplier/products/import*`          | `CATALOG_EDIT`                                                                                   |
+| `POST /api/supplier/products/images/import*`   | `CATALOG_EDIT` (bulk ZIP job — see [bulk-product-image-import.md](../../features/bulk-product-image-import.md)) |
 | Substitutes CRUD                               | `CATALOG_VIEW` / `CATALOG_EDIT`                                                                  |
 | Substitute propose                             | `ORDERS_MANAGE` or `CATALOG_EDIT` or `FULFILLMENT_MANAGE`                                        |
 | `PATCH /api/orders/:id/delivery-status`        | `FULFILLMENT_MANAGE` or `DRIVER_DELIVERIES_MANAGE` (driver: assigned only + status whitelist)    |

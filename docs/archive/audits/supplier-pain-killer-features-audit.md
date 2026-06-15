@@ -13,7 +13,8 @@
 | Delivery planning       | **Partial**      | **Production-ready** — board filters, `rescheduled` synced across driver services + dispatch UI |
 | Invoice / receivables   | **Partial**      | **Production-ready** — aging panel, status badges, restaurant links                             |
 | Reorder intelligence    | **Missing**      | **Production-ready** — cadence UI, review dialog, drafts never auto-sent                        |
-| Excel / catalog import  | **Partial**      | **Production-ready** — row-level preview/errors, blocks zero-valid import, error CSV            |
+| Excel / catalog import  | **Partial**      | **Production-ready** — row-level preview/errors, blocks zero-valid import, error CSV, optional `image_url` column |
+| Bulk product image import | **New (2026-06-15)** | **Production-ready** — ZIP/mapping async job, preview, progress, failure report — [bulk-product-image-import.md](../../features/bulk-product-image-import.md) |
 | Product substitutes     | **Partial**      | **Production-ready** — CRUD + order propose + amendment accept path unchanged                   |
 | Supplier command center | **Missing**      | **Production-ready** — default supplier home, quick actions, empty/error/loading states         |
 
@@ -167,15 +168,21 @@ Polish only — no new big features, no tier or deals/promotions changes.
 
 ### What was enhanced
 
-- **`POST /api/supplier/products/import/preview`** — row validation, duplicate-in-file detection, preview (up to 100 rows).
-- **`POST /api/supplier/products/import`** — server import with `created` / `updated` / `failed` summary, partial import default `true`.
-- **`POST /api/supplier/products/import/error-report`** — downloadable CSV of errors.
-- **`ProductsPage.tsx`** — uses preview + execute APIs (CSV); shows import summary.
+- **`POST /api/supplier/products/import/*`** — server CSV import with optional `image_url` (inline fetch).
+- **`POST /api/supplier/products/images/import/*`** — async ZIP import job API.
+- **`ProductsPage.tsx`** — **Bulk Upload** + **Import Product Images** dialogs.
 
 ### Remaining gaps
 
 - True `.xlsx` parsing (would need `xlsx` library or client convert-to-CSV).
 - Interactive column-mapping UI (API accepts `columnMapping` object).
+
+### Addendum (2026-06-15) — Bulk product image import
+
+- **`POST /api/supplier/products/images/import/*`** — ZIP by SKU, ZIP + mapping CSV, async job with preview/progress/failure report.
+- **`product.image_thumb_url`** + migration `0168_catalog_image_import.sql`.
+- Product CSV import optional **`image_url`** column (inline fetch, not background job).
+- Spec: [bulk-product-image-import.md](../../features/bulk-product-image-import.md).
 
 ---
 
@@ -243,6 +250,12 @@ Polish only — no new big features, no tier or deals/promotions changes.
 | POST            | `/api/supplier/products/import/preview`                           | New                   |
 | POST            | `/api/supplier/products/import`                                   | New                   |
 | POST            | `/api/supplier/products/import/error-report`                      | New                   |
+| POST            | `/api/supplier/products/images/import/presign`                    | Bulk image (2026-06)  |
+| POST            | `/api/supplier/products/images/import/preview`                    | Bulk image (2026-06)  |
+| POST            | `/api/supplier/products/images/import`                            | Bulk image (2026-06)  |
+| GET             | `/api/supplier/products/images/import/:jobId`                     | Bulk image (2026-06)  |
+| POST            | `/api/supplier/products/images/import/:jobId/cancel`              | Bulk image (2026-06)  |
+| GET             | `/api/supplier/products/images/import/:jobId/report`              | Bulk image (2026-06)  |
 | GET/POST/DELETE | `/api/supplier/products/:productId/substitutes`                   | New                   |
 | GET             | `/api/supplier/orders/:orderId/substitutions`                     | New                   |
 | POST            | `/api/supplier/orders/:orderId/substitutions/propose`             | New                   |
@@ -350,6 +363,10 @@ npx vitest run src/components/supplier/supplierPainKiller.test.tsx
 - `apps/api/src/services/supplier-reorder-intelligence.service.js`
 - `apps/api/src/services/supplier-receivables.service.js`
 - `apps/api/src/services/supplier-deliveries.service.js`
+- `apps/api/db/migrations/0168_catalog_image_import.sql` (bulk image import — 2026-06)
+- `apps/api/src/services/product-image-import.service.js`
+- `apps/api/src/services/image-import-worker.js`
+- `apps/api/src/services/image-optimization.service.js`
 - `apps/api/src/services/product-import.service.js`
 - `apps/api/src/services/product-substitutes.service.js`
 - `apps/api/src/routes/supplier-ops.routes.js`
@@ -368,6 +385,8 @@ npx vitest run src/components/supplier/supplierPainKiller.test.tsx
 - `apps/web/src/components/supplier/*.tsx`
 - `apps/web/src/components/fulfillment/DeliveryBoardFilters.tsx`
 - `apps/web/src/pages/InvoicesPage.tsx`
+- `apps/web/src/components/products/ProductImageImportDialog.tsx`
+- `apps/web/src/services/api/endpoints/catalogImport.ts`
 - `apps/web/src/pages/ProductsPage.tsx`
 - `apps/web/src/pages/ProductDetailPage.tsx`
 - `apps/web/src/pages/OrderDetailPage.tsx`

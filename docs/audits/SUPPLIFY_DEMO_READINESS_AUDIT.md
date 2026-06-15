@@ -20,11 +20,12 @@ The audit found **no demo blockers in the product**. The worst issues were: a br
 | ---------------------------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Admin: login → Platform Command Center         | READY                       | 14 tabs, lazy-loaded, per-tab queries with `skip`, loading/empty/error states throughout                                                                                                     |
 | Admin: suppliers/restaurants directories       | READY                       | `/app/admin/suppliers`, `/app/admin/restaurants` pin the Tenants tab                                                                                                                         |
-| Admin: Plans, edit Free Trial length           | READY                       | `AdminPlansTab` — trial days 3–7 validated; `PATCH /api/admin-dashboard/plans/:id`; per-subscription trial extension also exists                                                             |
+| Admin: Plans, edit Free Trial length           | READY                       | `AdminPlansTab` — trial days **7–90** validated (default **30**); `PATCH /api/admin-dashboard/plans/:id`; per-subscription trial extension also exists                                       |
+| Admin: Growth program settings                 | READY                       | `AdminGrowthSettingsPanel` — referral discount, validity, supplier reward type; `GET/PATCH /api/admin-dashboard/growth-settings`                                                             |
 | Admin: usage/quotas, limits, overrides         | READY                       | `promotions` shown as "Active deals", `deal_redemptions_per_day` as "Deal redemptions per day" (`adminLimitLabels.ts`, now unit-tested)                                                      |
 | Admin: deals & boosts review                   | READY                       | Approve/reject/pause with filters, insights KPIs, empty/loading states                                                                                                                       |
 | Supplier: login → dashboard                    | READY                       | Skeleton, error retry, empty-state CTAs                                                                                                                                                      |
-| Supplier: catalog/products                     | NEEDS POLISH                | Solid CRUD + CSV import; no delete-confirmation dialog on products                                                                                                                           |
+| Supplier: catalog/products                     | READY                       | CRUD + CSV import (`image_url` column) + **Import Product Images** (ZIP async job); migration `0168` required                                                                                |
 | Supplier: create deal, limits, boost           | READY (fixed)               | Locked state now uses `FeatureLockedCard`; limit gate `promotions` enforced FE+BE; note: new deals need admin approval before going active — pre-approve demo deals                          |
 | Supplier: orders inbox                         | READY                       | 60s polling, decline-with-reason, manual orders                                                                                                                                              |
 | Supplier: fulfillment/dispatch                 | READY                       | Dispatch board, pick lists, routes, tracking, exceptions                                                                                                                                     |
@@ -103,7 +104,9 @@ Gaps (not seeded): driver/delivery-route records, receiving line items, inventor
 - [ ] `pnpm local:infra` → `pnpm db:migrate` → `pnpm run seed:full`; verify Keycloak users created
 - [ ] Login as admin → Platform Command Center loads, Overview KPIs non-empty
 - [ ] Supplier Control Center (`/app/admin/suppliers`) and Restaurant Control Center show directories
-- [ ] Plans tab: edit Free Trial length (3–7), save, re-open
+- [ ] Plans tab: edit Free Trial length (**7–90**, default 30), save, re-open
+- [ ] Plans tab: Growth program settings — referral discount, supplier reward type
+- [ ] Supplier: `/app/customer-growth` — import CSV, invite link, metrics widget
 - [ ] Usage & Quotas: limits show "Active deals" / "Deal redemptions per day" labels
 - [ ] Login as `supplier-gold@supplify.com`: create product; create deal → **approve it as admin** → see it active
 - [ ] Try the coupon deal flow end-to-end; verify redemption counter increments (see Bugs §4.8)

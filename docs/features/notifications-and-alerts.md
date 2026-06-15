@@ -36,6 +36,19 @@ See [ordering-decline.md](./ordering-decline.md).
 
 Messages, invoices (issued/overdue), payments, inventory (low/out of stock), disputes, staff PTO/swap, scheduled quick lists, reservation staff events, post-receiving review prompts, order amendments.
 
+## Supplier customer growth
+
+| Event                         | Recipient                                              |
+| ----------------------------- | ------------------------------------------------------ |
+| `supplier_connection_request` | Restaurant team — supplier wants to connect            |
+| `connection_request_accepted` | Supplier team                                          |
+| `referral_registered`         | Restaurant team — completed signup via supplier invite |
+| `referral_reward_earned`      | Supplier team — referred restaurant converted to paid  |
+| `sponsorship_gift_received`   | Restaurant team — supplier sponsored onboarding        |
+| `sponsorship_expired`         | Restaurant + supplier teams — sponsored period ended   |
+
+See [supplier-customer-growth.md](./supplier-customer-growth.md).
+
 ## User preferences
 
 Settings → Notifications: `notify_order_new`, `notify_order_cancelled`, `notify_message_received`, `notify_reservation_created`, etc. Disabled categories skip all channels.

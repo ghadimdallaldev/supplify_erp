@@ -8,6 +8,7 @@ import {
   getSupplierIdForRequest,
   resolveTenantContext,
   requirePermission,
+  requireAnyPermission,
 } from '../../lib/rbac.js'
 import { query, withTransaction } from '../../lib/db.js'
 import { logger } from '../../lib/logger.js'
@@ -57,136 +58,140 @@ import { buildPackingSlipPdf } from './orders.helpers.js'
 
 const router = express.Router()
 
-router.post('/:id/remind', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const { id } = req.params
+router.post(
+  '/:id/remind',
+  requireAnyPermission('ORDERS_CREATE', 'ORDERS_MANAGE'),
+  requireRole(['RESTAURANT', 'ADMIN']),
+  async (req, res) => {
+    try {
+      const { id } = req.params
 
-    // Get order
-    const { rows: orders } = await query(
-      `
+      // Get order
+      const { rows: orders } = await query(
+        `
       SELECT o.*, r.name as restaurant_name
       FROM customer_order o
       JOIN restaurant r ON r.id = o.restaurant_id
       WHERE o.id = $1
     `,
-      [id]
-    )
+        [id]
+      )
 
-    if (orders.length === 0) {
-      throw new NotFoundError('Order not found')
-    }
+      if (orders.length === 0) {
+        throw new NotFoundError('Order not found')
+      }
 
-    const order = orders[0]
+      const order = orders[0]
 
-    // Verify restaurant ownership (unless admin)
-    if (req.userData.role === 'RESTAURANT') {
-      const restaurantId = await getRestaurantIdForRequest(req)
+      // Verify restaurant ownership (unless admin)
+      if (req.userData.role === 'RESTAURANT') {
+        const restaurantId = await getRestaurantIdForRequest(req)
 
-      if (!restaurantId || restaurantId !== order.restaurant_id) {
-        return res.status(403).json({
+        if (!restaurantId || restaurantId !== order.restaurant_id) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'FORBIDDEN',
+              message: 'Access denied',
+            },
+            requestId: req.requestId,
+          })
+        }
+      }
+
+      // Allow reminders for orders that are not completed/cancelled
+      if (['COMPLETED', 'CANCELLED'].includes(order.status)) {
+        return res.status(400).json({
           ok: false,
           data: null,
           error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied',
+            name: 'VALIDATION_ERROR',
+            message: `Cannot send reminder for ${order.status} orders`,
           },
           requestId: req.requestId,
         })
       }
-    }
 
-    // Allow reminders for orders that are not completed/cancelled
-    if (['COMPLETED', 'CANCELLED'].includes(order.status)) {
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'VALIDATION_ERROR',
-          message: `Cannot send reminder for ${order.status} orders`,
-        },
-        requestId: req.requestId,
-      })
-    }
-
-    // Get supplier ID from order items
-    const { rows: firstItem } = await query(
-      `
+      // Get supplier ID from order items
+      const { rows: firstItem } = await query(
+        `
       SELECT supplier_id FROM order_item WHERE order_id = $1 LIMIT 1
     `,
-      [id]
-    )
+        [id]
+      )
 
-    if (firstItem.length === 0) {
-      throw new NotFoundError('Order items not found')
-    }
+      if (firstItem.length === 0) {
+        throw new NotFoundError('Order items not found')
+      }
 
-    const supplierId = firstItem[0].supplier_id
+      const supplierId = firstItem[0].supplier_id
 
-    // Get supplier information
-    const { rows: suppliers } = await query(
-      `
+      // Get supplier information
+      const { rows: suppliers } = await query(
+        `
       SELECT s.id, s.name, s.contact_email, u.id as user_id
       FROM supplier s
       LEFT JOIN app_user u ON u.email = s.contact_email
       WHERE s.id = $1
     `,
-      [supplierId]
-    )
+        [supplierId]
+      )
 
-    if (suppliers.length === 0) {
-      throw new NotFoundError('Supplier not found')
-    }
+      if (suppliers.length === 0) {
+        throw new NotFoundError('Supplier not found')
+      }
 
-    const supplier = suppliers[0]
+      const supplier = suppliers[0]
 
-    if (!supplier.user_id) {
-      logger.warn('No user_id found for supplier', { supplier_id: supplierId })
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Supplier user account not found',
-        },
-        requestId: req.requestId,
-      })
-    }
+      if (!supplier.user_id) {
+        logger.warn('No user_id found for supplier', { supplier_id: supplierId })
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Supplier user account not found',
+          },
+          requestId: req.requestId,
+        })
+      }
 
-    // Import notification service
-    const { notifyTenantUsers } = await import('../../services/notification.service.js')
+      // Import notification service
+      const { notifyTenantUsers } = await import('../../services/notification.service.js')
 
-    // Send reminder notification
-    const reminderMessage =
-      (order.reminder_count || 0) > 0
-        ? `Friendly reminder: Order #${order.id.slice(0, 8)} from ${order.restaurant_name} is still awaiting acknowledgment. Order total: $${order.total_amount || 0}`
-        : `Reminder: You have an unacknowledged order #${order.id.slice(0, 8)} from ${order.restaurant_name} for $${order.total_amount || 0}. Please acknowledge when ready.`
+      // Send reminder notification
+      const reminderMessage =
+        (order.reminder_count || 0) > 0
+          ? `Friendly reminder: Order #${order.id.slice(0, 8)} from ${order.restaurant_name} is still awaiting acknowledgment. Order total: $${order.total_amount || 0}`
+          : `Reminder: You have an unacknowledged order #${order.id.slice(0, 8)} from ${order.restaurant_name} for $${order.total_amount || 0}. Please acknowledge when ready.`
 
-    try {
-      await notifyTenantUsers({
-        tenantId: order.supplier_id,
-        tenantType: 'SUPPLIER',
-        notificationType: 'ORDER',
-        notificationCategory: 'PLACED',
-        title: 'Order Reminder',
-        message: reminderMessage,
-        referenceId: order.id,
-        referenceType: 'ORDER',
-        metadata: {
-          order_id: order.id,
-          status: order.status,
-          reminder_count: (order.reminder_count || 0) + 1,
-          restaurant_name: order.restaurant_name,
-        },
-      })
-    } catch (notifError) {
-      logger.warn('Order reminder notification failed; proceeding anyway', {
-        error: notifError.message,
-      })
-    }
+      try {
+        await notifyTenantUsers({
+          tenantId: order.supplier_id,
+          tenantType: 'SUPPLIER',
+          notificationType: 'ORDER',
+          notificationCategory: 'PLACED',
+          title: 'Order Reminder',
+          message: reminderMessage,
+          referenceId: order.id,
+          referenceType: 'ORDER',
+          metadata: {
+            order_id: order.id,
+            status: order.status,
+            reminder_count: (order.reminder_count || 0) + 1,
+            restaurant_name: order.restaurant_name,
+          },
+        })
+      } catch (notifError) {
+        logger.warn('Order reminder notification failed; proceeding anyway', {
+          error: notifError.message,
+        })
+      }
 
-    // Update order with reminder tracking
-    const { rows: updatedOrders } = await query(
-      `
+      // Update order with reminder tracking
+      const { rows: updatedOrders } = await query(
+        `
       UPDATE customer_order
       SET last_reminder_sent_at = now(),
           reminder_count = COALESCE(reminder_count, 0) + 1,
@@ -194,38 +199,39 @@ router.post('/:id/remind', requireRole(['RESTAURANT', 'ADMIN']), async (req, res
       WHERE id = $1
       RETURNING *
     `,
-      [id]
-    )
+        [id]
+      )
 
-    logger.info('Order reminder sent', {
-      orderId: order.id,
-      supplierId,
-      reminderCount: updatedOrders[0].reminder_count,
-    })
+      logger.info('Order reminder sent', {
+        orderId: order.id,
+        supplierId,
+        reminderCount: updatedOrders[0].reminder_count,
+      })
 
-    res.json({
-      ok: true,
-      data: {
-        order: updatedOrders[0],
-        message: 'Reminder sent successfully',
-      },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Send reminder error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to send reminder',
-        details: error.message,
-      },
-      requestId: req.requestId,
-    })
+      res.json({
+        ok: true,
+        data: {
+          order: updatedOrders[0],
+          message: 'Reminder sent successfully',
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Send reminder error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to send reminder',
+          details: error.message,
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-})
+)
 
 // Get packing slip as PDF (must be before /:id/packing-slip so path matches)
 router.get(

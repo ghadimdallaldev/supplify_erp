@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
@@ -34,6 +34,8 @@ function isUnauthorized(error: unknown): boolean {
 
 export function RegisterCompletePage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const referralToken = searchParams.get('ref') || undefined
   const dispatch = useAppDispatch()
   const {
     data: user,
@@ -115,6 +117,7 @@ export function RegisterCompletePage() {
         accountType,
         businessName: businessName.trim(),
         phone: phone.trim() || undefined,
+        referralToken,
         legalAcceptance: buildLegalAcceptancePayload(acceptedLegal),
       }).unwrap()
       void refetchAppSession(dispatch)

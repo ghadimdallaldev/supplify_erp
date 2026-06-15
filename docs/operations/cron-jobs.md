@@ -31,6 +31,7 @@ Scheduled quick lists additionally use a **`quick_list_execution` ledger** (one 
 | Stale GPS alerts                      | 15 min                                          | [`stale-gps-alerts.job.js`](../../apps/api/src/jobs/stale-gps-alerts.job.js) — supplier alerts for stale active delivery GPS                                                                                                     |
 | Log retention                         | 24 h                                            | [`log-retention.job.js`](../../apps/api/src/jobs/log-retention.job.js) — purges old logs/sessions per retention env vars                                                                                                         |
 | Reorder forecast (`reorder_forecast`) | 24 h (`86400000` ms)                            | [`reorder-forecast.job.js`](../../apps/api/src/jobs/reorder-forecast.job.js) — `refreshAllDirtyForecasts()` for restaurants with `smart_reorder`; processes `reorder_forecast_dirty` queue and rows past 24h TTL (`stale_after`) |
+| Growth program maintenance            | 1 h                                             | [`sponsorship-expiry.job.js`](../../apps/api/src/jobs/sponsorship-expiry.job.js) — expire sponsorships, growth invitations, connection requests                                                                                  |
 
 ## Environment variables
 
@@ -96,6 +97,7 @@ Due dates and `preferred_time` for quick lists are still evaluated in **UTC**. R
 - Migration `0130_quick_list_execution_ledger.sql` must be applied before scheduled-order idempotency is active.
 - Migrations **0133–0135** must be applied before operational reminders (expiry lots, fulfillment issues, reorder cadence) are active.
 - Migration **0166** (`reorder_forecast`, `reorder_forecast_dirty`) must be applied before the reorder forecast cron is active.
+- Migration **0168** (`catalog_image_import_job`, `product.image_thumb_url`) must be applied before **Import Product Images** (bulk ZIP) is available — not a cron job; see [bulk-product-image-import.md](../features/bulk-product-image-import.md) and in-process worker `image-import-worker.js`.
 - Migration **0152** (`billing_trial_reminder_log`) must be applied before trial-ending-soon reminders are active.
 - Migration **0153** must be applied before email retry/digest, stale GPS dedup, restaurant timezone, and log retention jobs are active.
 - Run `pnpm db:migrate` per environment; Railway uses `RUN_MIGRATIONS_ON_START=false`.

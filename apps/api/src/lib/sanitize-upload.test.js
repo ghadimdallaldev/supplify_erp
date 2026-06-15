@@ -3,6 +3,8 @@ import {
   assertChatAttachmentUrl,
   assertFileExtensionMatchesMime,
   resolveUploadKeyFromPublicUrl,
+  neutralizeCsvField,
+  escapeCsvField,
 } from './sanitize-upload.js'
 
 describe('sanitize-upload', () => {
@@ -27,5 +29,14 @@ describe('sanitize-upload', () => {
       'user-1'
     )
     expect(key).toBe('uploads/user-1/file.pdf')
+  })
+
+  it('neutralizeCsvField prefixes formula-trigger characters', () => {
+    expect(neutralizeCsvField('=1+1')).toBe("'=1+1")
+    expect(neutralizeCsvField('-cmd')).toBe("'-cmd")
+    expect(neutralizeCsvField('@SUM(A1)')).toBe("'@SUM(A1)")
+    expect(neutralizeCsvField('normal')).toBe('normal')
+    expect(escapeCsvField('=evil')).toBe("'=evil")
+    expect(escapeCsvField('a,b')).toBe('"a,b"')
   })
 })

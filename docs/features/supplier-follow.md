@@ -54,6 +54,7 @@ Migration: `0015_restaurant_onboarding.sql` — `supplier_follow`, `supplier_blo
 
 ## See also
 
+- [supplier-customer-growth.md](./supplier-customer-growth.md) — connection requests create `supplier_follow` after restaurant accepts
 - [deals-and-promotions.md](./deals-and-promotions.md) — organic vs sponsored deal visibility
 - [supplier-reviews.md](./supplier-reviews.md) — post-delivery supplier ratings
 - [quote-requests.md](./quote-requests.md) — RFQ to multiple suppliers

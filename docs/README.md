@@ -12,6 +12,8 @@ Restaurant & F&B supplier marketplace monorepo (`apps/api`, `apps/web`).
 | Understand the product                 | [product/overview.md](./product/overview.md)                                                                                           |
 | Plans & limits                         | [product/plans-and-limits.md](./product/plans-and-limits.md)                                                                           |
 | Feature behavior                       | [features/README.md](./features/README.md)                                                                                             |
+| Bulk product image import (supplier)   | [features/bulk-product-image-import.md](./features/bulk-product-image-import.md)                                                       |
+| Supplier customer growth (referral)    | [features/supplier-customer-growth.md](./features/supplier-customer-growth.md) · migration `0169`                                      |
 | Deploy to Railway                      | [operations/deployment.md](./operations/deployment.md)                                                                                 |
 | Env variables                          | [operations/environment-variables.md](./operations/environment-variables.md)                                                           |
 | Performance / Railway latency          | [operations/railway-performance.md](./operations/railway-performance.md)                                                               |

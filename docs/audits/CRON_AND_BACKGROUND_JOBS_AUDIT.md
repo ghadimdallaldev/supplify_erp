@@ -11,7 +11,7 @@ Supplify runs **16 in-process cron jobs** inside the API server (`setInterval` +
 
 | Metric               | Value                                                                           |
 | -------------------- | ------------------------------------------------------------------------------- |
-| Registered jobs      | 16                                                                              |
+| Registered jobs      | 17                                                                              |
 | Master kill switch   | `CRONS_ENABLED` (default `true`; manual triggers bypass via `runManualCronJob`) |
 | Multi-replica safety | PG `pg_try_advisory_lock` per job + in-process guard                            |
 | Migrations           | `0152_billing_trial_reminder_log.sql`, `0153_cron_followup_infrastructure.sql`  |
@@ -32,6 +32,8 @@ Supplify runs **16 in-process cron jobs** inside the API server (`setInterval` +
 - Manual HTTP triggers use `runManualCronJob` (advisory lock + bypass `CRONS_ENABLED`)
 
 **Remaining risks:** Draft cart cleanup not implemented; supplier intelligence auto-outreach still manual-only; email retry only works when `retry_payload` was persisted (emails sent after this deploy).
+
+**Not cron (related):** Supplier **bulk product image import** uses an in-process worker (`image-import-worker.js` + `setImmediate`, Postgres advisory lock per job) — not registered in `register-cron-jobs.js`. See [bulk-product-image-import.md](../features/bulk-product-image-import.md).
 
 ---
 
@@ -77,24 +79,25 @@ flowchart TD
 
 ## 3. Job inventory
 
-| Job key                     | Handler                             | Interval         | Env flags                                                 | Risk tags                                        |
-| --------------------------- | ----------------------------------- | ---------------- | --------------------------------------------------------- | ------------------------------------------------ |
-| `scheduled_orders`          | `scheduled-orders.service.js`       | 5m dev / 1h prod | `CRONS_ENABLED`, `CRON_SCHEDULED_ORDERS_INTERVAL_MS`      | Manual HTTP bypasses lock                        |
-| `invoice_overdue`           | `invoice-overdue.job.js`            | 24h              | `CRONS_ENABLED`                                           | One-shot notify only                             |
-| `subscription_billing`      | `subscription-billing.job.js`       | 1h               | `CRONS_ENABLED`                                           | Notify outside txn (low risk)                    |
-| `waitlist_offers`           | `waitlistPromotion.js`              | 15m              | `CRONS_ENABLED`                                           | OK                                               |
-| `promotions_expiry`         | `promotions-expiry.job.js`          | 30m              | `CRONS_ENABLED`                                           | OK                                               |
-| `invitation_expiry`         | branch + restaurant invitation libs | 1h               | `CRONS_ENABLED`                                           | OK                                               |
-| `free_sandbox_expiry`       | `free-sandbox-expiry.job.js`        | 1h               | `CRONS_ENABLED`                                           | OK                                               |
-| `trial_ending_soon`         | `trial-ending-soon.job.js`          | 1h               | `CRONS_ENABLED`                                           | **NEW** — dedup via `billing_trial_reminder_log` |
-| `fulfillment_exceptions`    | `fulfillment-exceptions.job.js`     | 30m              | `CRONS_ENABLED`                                           | Batched LIMIT 200; no notifications              |
-| `delivery_rollover`         | `delivery-rollover.job.js`          | 1h               | `CRONS_ENABLED`, `DELIVERY_ROLLOVER_ENABLED`              | Disabled by default                              |
-| `operational_reminders`     | `operational-reminders.job.js`      | 24h              | `CRONS_ENABLED`, `CRON_OPERATIONAL_REMINDERS_INTERVAL_MS` | Sub-jobs below                                   |
-| `driver_location_retention` | `driver-location-retention.job.js`  | 24h              | `CRONS_ENABLED`, `GPS_LOCATION_RETENTION_DAYS`            | OK                                               |
-| `email_retry`               | `email-retry.job.js`                | 1h               | `CRONS_ENABLED`, `EMAIL_RETRY_*`                          | Requires `retry_payload` on row                  |
-| `email_digest`              | `email-digest.job.js`               | 24h              | `CRONS_ENABLED`, `notify_email_digest` pref               | Opt-in per user                                  |
-| `stale_gps_alerts`          | `stale-gps-alerts.job.js`           | 15m              | `CRONS_ENABLED`, `GPS_TRACKING_ENABLED`                   | Dedup `gps_stale_alert_log`                      |
-| `log_retention`             | `log-retention.job.js`              | 24h              | `CRONS_ENABLED`, `*_RETENTION_DAYS`                       | Skips when days=0                                |
+| Job key                      | Handler                             | Interval         | Env flags                                                 | Risk tags                                                     |
+| ---------------------------- | ----------------------------------- | ---------------- | --------------------------------------------------------- | ------------------------------------------------------------- |
+| `scheduled_orders`           | `scheduled-orders.service.js`       | 5m dev / 1h prod | `CRONS_ENABLED`, `CRON_SCHEDULED_ORDERS_INTERVAL_MS`      | Manual HTTP bypasses lock                                     |
+| `invoice_overdue`            | `invoice-overdue.job.js`            | 24h              | `CRONS_ENABLED`                                           | One-shot notify only                                          |
+| `subscription_billing`       | `subscription-billing.job.js`       | 1h               | `CRONS_ENABLED`                                           | Notify outside txn (low risk)                                 |
+| `waitlist_offers`            | `waitlistPromotion.js`              | 15m              | `CRONS_ENABLED`                                           | OK                                                            |
+| `promotions_expiry`          | `promotions-expiry.job.js`          | 30m              | `CRONS_ENABLED`                                           | OK                                                            |
+| `invitation_expiry`          | branch + restaurant invitation libs | 1h               | `CRONS_ENABLED`                                           | OK                                                            |
+| `free_sandbox_expiry`        | `free-sandbox-expiry.job.js`        | 1h               | `CRONS_ENABLED`                                           | OK                                                            |
+| `trial_ending_soon`          | `trial-ending-soon.job.js`          | 1h               | `CRONS_ENABLED`                                           | **NEW** — dedup via `billing_trial_reminder_log`              |
+| `fulfillment_exceptions`     | `fulfillment-exceptions.job.js`     | 30m              | `CRONS_ENABLED`                                           | Batched LIMIT 200; no notifications                           |
+| `delivery_rollover`          | `delivery-rollover.job.js`          | 1h               | `CRONS_ENABLED`, `DELIVERY_ROLLOVER_ENABLED`              | Disabled by default                                           |
+| `operational_reminders`      | `operational-reminders.job.js`      | 24h              | `CRONS_ENABLED`, `CRON_OPERATIONAL_REMINDERS_INTERVAL_MS` | Sub-jobs below                                                |
+| `driver_location_retention`  | `driver-location-retention.job.js`  | 24h              | `CRONS_ENABLED`, `GPS_LOCATION_RETENTION_DAYS`            | OK                                                            |
+| `email_retry`                | `email-retry.job.js`                | 1h               | `CRONS_ENABLED`, `EMAIL_RETRY_*`                          | Requires `retry_payload` on row                               |
+| `email_digest`               | `email-digest.job.js`               | 24h              | `CRONS_ENABLED`, `notify_email_digest` pref               | Opt-in per user                                               |
+| `stale_gps_alerts`           | `stale-gps-alerts.job.js`           | 15m              | `CRONS_ENABLED`, `GPS_TRACKING_ENABLED`                   | Dedup `gps_stale_alert_log`                                   |
+| `log_retention`              | `log-retention.job.js`              | 24h              | `CRONS_ENABLED`, `*_RETENTION_DAYS`                       | Skips when days=0                                             |
+| `growth_program_maintenance` | `sponsorship-expiry.job.js`         | 1h               | `CRONS_ENABLED`                                           | Sponsorship expiry; growth invite + connection request expiry |
 
 **`operational_reminders` sub-tasks:**
 

@@ -111,11 +111,24 @@ Legacy env aliases: `S3_*`, Railway `BUCKET` / `ENDPOINT`, and AWS SDK names map
 | Feature                   | Web entry                          | DB reference                  |
 | ------------------------- | ---------------------------------- | ----------------------------- |
 | Product images            | `ProductsPage`                     | Product / `attachment` tables |
+| Bulk image import (ZIP)   | `ProductImageImportDialog`         | `catalog_image_import_job`    |
 | Chat attachments          | `ChatPage`                         | `message_attachment`          |
 | Supplier/restaurant logos | `LogoUpload`, settings, onboarding | Org/tenant logo fields        |
 | Disputes                  | Dispute forms (API)                | `dispute_attachments`         |
 
 **Not** via presign: server-generated PDFs (e.g. invoices), outbound email images, static assets in the web build.
+
+### Bulk image import — dual write path
+
+ZIP-based catalog image import uses **two** storage interactions:
+
+1. **Client upload (presign)** — `POST /api/supplier/products/images/import/presign` returns a presigned PUT URL for the ZIP and optional mapping CSV. Object keys live under `imports/{supplierId}/{jobId}/{fileName}` (not the usual `uploads/{userId}/` prefix). ZIP presign allows up to `IMPORT_ZIP_MAX_BYTES` (default 2 GB); CSV uses the standard 10 MB cap. On local/private S3, large ZIP PUTs use **`PUT /api/files/upload-import/:token`** instead of `/upload/:token`.
+
+2. **Server-side `putObject`** — During job processing, the API reads each matched image from the ZIP, optimizes it, and writes main + thumbnail via [`putObject`](../../apps/api/src/services/storage/storage.service.js) to `uploads/{supplierId}/products/{productId}/main.webp` and `thumb.webp`. Storage quota is checked per image at this stage. The source ZIP is deleted with `deleteObject` when the job completes.
+
+Remote URL imports (product CSV `image_url` column) skip the import presign path; the server fetches the URL and uses the same server-side `putObject` optimization pipeline.
+
+See [bulk-product-image-import.md](../features/bulk-product-image-import.md).
 
 ## Per environment
 

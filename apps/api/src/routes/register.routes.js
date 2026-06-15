@@ -17,6 +17,7 @@ const completeSchema = z.object({
   accountType: z.enum(['RESTAURANT', 'SUPPLIER']),
   businessName: z.string().min(2).max(200),
   phone: z.string().max(30).optional(),
+  referralToken: z.string().max(200).optional(),
   legalAcceptance: legalAcceptanceSchema,
 })
 
@@ -62,6 +63,7 @@ router.post('/complete', requireAuth, async (req, res) => {
       accountType: body.accountType,
       businessName: body.businessName,
       phone: body.phone,
+      referralToken: body.referralToken,
       legalAcceptance: body.legalAcceptance,
       ipAddress: req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim(),
       userAgent: req.headers['user-agent'],

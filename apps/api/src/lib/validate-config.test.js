@@ -24,6 +24,7 @@ const mockConfig = vi.hoisted(() => ({
   SEED_DEMO_DATA: false,
   E2E_SECRET: '',
   PAYMENTS_WEBHOOK_SECRET: 'whsec_test',
+  REDIS_URL: 'redis://localhost:6379',
 }))
 
 vi.mock('../config/env.js', () => ({
@@ -118,5 +119,41 @@ describe('validateProductionConfig dev (Railway)', () => {
     })
     const { validateProductionConfig } = await import('./validate-config.js')
     expect(() => validateProductionConfig()).not.toThrow()
+  })
+})
+
+describe('validateProductionConfig REDIS_URL', () => {
+  beforeEach(() => {
+    Object.assign(mockConfig, {
+      APP_ENV: 'prod',
+      NODE_ENV: 'production',
+      SESSION_SECRET: 'a'.repeat(48),
+      IMPERSONATION_SECRET: 'b'.repeat(48),
+      KEYCLOAK_CLIENT_SECRET: 'kc-secret-32-chars-minimum-ok!!',
+      DATABASE_URL: 'postgresql://user:strongpass@db.example.com:5432/supplify',
+      DATABASE_SSL: true,
+      WEB_ORIGINS: ['https://app.example.com'],
+      PAYMENTS_MODE: 'live',
+      STORAGE_DRIVER: 's3',
+      STORAGE_ACCESS_KEY_ID: 'access-key-prod',
+      STORAGE_SECRET_ACCESS_KEY: 'secret-key-prod-32chars-min',
+      COOKIE_SECURE: true,
+      RATE_LIMIT_ENABLED: true,
+      ENABLE_DEBUG_ROUTES: false,
+      ENABLE_SEED_ROUTES: false,
+      ALLOW_DB_RESET: false,
+      SEED_DEMO_DATA: false,
+      E2E_SECRET: '',
+      PAYMENTS_WEBHOOK_SECRET: 'whsec_test',
+      REDIS_URL: '',
+    })
+  })
+
+  it('warns when REDIS_URL is missing in hosted env', async () => {
+    const { logger } = await import('./logger.js')
+    vi.mocked(logger.warn).mockClear()
+    const { validateProductionConfig } = await import('./validate-config.js')
+    expect(() => validateProductionConfig()).not.toThrow()
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('REDIS_URL'))
   })
 })

@@ -289,6 +289,10 @@ export const config = {
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
   AI_MODEL: process.env.AI_MODEL || 'gpt-4o-mini',
   AI_MAX_REQUESTS_PER_TENANT_PER_DAY: envInt(process.env.AI_MAX_REQUESTS_PER_TENANT_PER_DAY, 50),
+  /** Max size for bulk product image import ZIP uploads (default 2GB). */
+  IMPORT_ZIP_MAX_BYTES: envInt(process.env.IMPORT_ZIP_MAX_BYTES, 2147483648),
+  /** Max size per image extracted during bulk product image import (default 10MB). */
+  IMPORT_IMAGE_MAX_BYTES: envInt(process.env.IMPORT_IMAGE_MAX_BYTES, 10 * 1024 * 1024),
 }
 
 if (!config.STORAGE_PUBLIC_URL) {

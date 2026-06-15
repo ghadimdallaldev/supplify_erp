@@ -6,15 +6,15 @@ DB plan code **`free`** is marketed as **Free Trial** — a **time-limited evalu
 
 ## Product rules
 
-| Rule         | Behavior                                                                                               |
-| ------------ | ------------------------------------------------------------------------------------------------------ |
-| Trial length | **3–7 days** (platform default **7**); admin cannot set outside range for new activations / extensions |
-| Expiry field | `subscription.free_sandbox_expires_at`                                                                 |
-| Lock reason  | `lock_reason = 'free_sandbox_expired'`                                                                 |
-| After expiry | Login OK; **GET** tenant APIs OK; **POST/PUT/PATCH/DELETE** → **402**                                  |
-| Data         | No deletion on expiry                                                                                  |
-| Upgrade      | Paid checkout or admin plan change                                                                     |
-| Admin extend | `POST …/extend-free-trial`; unlock on expired trial also extends expiry                                |
+| Rule         | Behavior                                                                                                 |
+| ------------ | -------------------------------------------------------------------------------------------------------- |
+| Trial length | **7–90 days** (platform default **30**); admin cannot set outside range for new activations / extensions |
+| Expiry field | `subscription.free_sandbox_expires_at`                                                                   |
+| Lock reason  | `lock_reason = 'free_sandbox_expired'`                                                                   |
+| After expiry | Login OK; **GET** tenant APIs OK; **POST/PUT/PATCH/DELETE** → **402**                                    |
+| Data         | No deletion on expiry                                                                                    |
+| Upgrade      | Paid checkout or admin plan change                                                                       |
+| Admin extend | `POST …/extend-free-trial`; unlock on expired trial also extends expiry                                  |
 
 **Not in scope (deferred):** `0116` narrow catalog, restaurant `promotions = 0`, supplier `warehouses = 1` on production Free.
 
@@ -55,9 +55,9 @@ sequenceDiagram
 
 | Method  | Path                                                       | Body                          | Notes                                                                     |
 | ------- | ---------------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------- |
-| `GET`   | `/api/admin-dashboard/platform-settings`                   | —                             | `freeSandboxDays` (3–7)                                                   |
-| `PATCH` | `/api/admin-dashboard/platform-settings`                   | `{ freeSandboxDays }`         | Validates 3–7                                                             |
-| `POST`  | `/api/admin-dashboard/subscriptions/:id/extend-free-trial` | `{ days? }`                   | Extends + unlocks; `days` optional, 3–7                                   |
+| `GET`   | `/api/admin-dashboard/platform-settings`                   | —                             | `freeSandboxDays` (7–90, default 30)                                      |
+| `PATCH` | `/api/admin-dashboard/platform-settings`                   | `{ freeSandboxDays }`         | Validates 7–90                                                            |
+| `POST`  | `/api/admin-dashboard/subscriptions/:id/extend-free-trial` | `{ days? }`                   | Extends + unlocks; `days` optional, 7–90                                  |
 | `POST`  | `/api/admin-dashboard/subscriptions/:id/unlock`            | `{ freeTrialDays?, reason? }` | If `free` + `free_sandbox_expired`, extends trial (default platform days) |
 
 ### Background job

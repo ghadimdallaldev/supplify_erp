@@ -21,15 +21,16 @@ Concise map of restaurant-side features. Detailed specs live under [features/](.
 
 ## Core flows
 
-| Flow             | Summary                                               | Spec                                                                                                                         |
-| ---------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Place order      | Cart → supplier → acknowledgment → delivery → receive | [receiving.md](../features/receiving.md), [drivers-and-gps-tracking.md](../features/drivers-and-gps-tracking.md)             |
-| Smart reorder    | Usage-based suggestions from movement log             | [inventory-expiry-and-reorder.md](../features/inventory-expiry-and-reorder.md)                                               |
-| Waste & spoilage | Log waste; analytics on inventory                     | [waste-tracking.md](../features/waste-tracking.md)                                                                           |
-| Deals & coupons  | Discover supplier deals; redemption limits by plan    | [deals-and-promotions.md](../features/deals-and-promotions.md)                                                               |
-| Disputes         | Shortages, returns, replacement orders                | [disputes-returns.md](../features/disputes-returns.md)                                                                       |
-| Public booking   | Guest reservation & waitlist                          | [reservations-foh.md](../features/reservations-foh.md), [waitlist-auto-promotion.md](../features/waitlist-auto-promotion.md) |
-| Contract pricing | Customer-specific supplier prices                     | [contract-pricing.md](../features/contract-pricing.md)                                                                       |
+| Flow                        | Summary                                               | Spec                                                                                                                             |
+| --------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Place order                 | Cart → supplier → acknowledgment → delivery → receive | [receiving.md](../features/receiving.md), [drivers-and-gps-tracking.md](../features/drivers-and-gps-tracking.md)                 |
+| Smart reorder               | Usage-based suggestions from movement log             | [inventory-expiry-and-reorder.md](../features/inventory-expiry-and-reorder.md)                                                   |
+| Waste & spoilage            | Log waste; analytics on inventory                     | [waste-tracking.md](../features/waste-tracking.md)                                                                               |
+| Deals & coupons             | Discover supplier deals; redemption limits by plan    | [deals-and-promotions.md](../features/deals-and-promotions.md)                                                                   |
+| Disputes                    | Shortages, returns, replacement orders                | [disputes-returns.md](../features/disputes-returns.md)                                                                           |
+| Public booking              | Guest reservation & waitlist                          | [reservations-foh.md](../features/reservations-foh.md), [waitlist-auto-promotion.md](../features/waitlist-auto-promotion.md)     |
+| Contract pricing            | Customer-specific supplier prices                     | [contract-pricing.md](../features/contract-pricing.md)                                                                           |
+| Supplier connection request | Accept/decline supplier outreach from growth program  | [supplier-customer-growth.md](../features/supplier-customer-growth.md) — `GET/POST /api/restaurant/growth/connection-requests/*` |
 
 ## Plans & limits
 

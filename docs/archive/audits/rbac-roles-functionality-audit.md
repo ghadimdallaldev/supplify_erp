@@ -175,7 +175,7 @@ See also: `docs/architecture/rbac-permission-matrix.md`
 | Orders            | `/api/orders/*`                                          | `ORDERS_VIEW` + `ordersRouterMutationGuard`           |
 | Invoices          | `/api/invoices/*`, `/api/supplier/invoices/receivables*` | `INVOICES_VIEW` + mutation guards                     |
 | Inventory         | `/api/inventory/*`, restaurant inventory                 | `INVENTORY_VIEW` / `*_EDIT`                           |
-| Catalog           | `/api/products/*`, supplier import                       | `CATALOG_VIEW` / `CATALOG_EDIT`                       |
+| Catalog           | `/api/products/*`, supplier import, supplier image import | `CATALOG_VIEW` / `CATALOG_EDIT`                       |
 | Warehouses        | `/api/warehouses/*`                                      | `WAREHOUSES_VIEW` / `*_EDIT`                          |
 | Staff             | `/api/staff/*`                                           | `STAFF_VIEW` + `staffMutationGuard`                   |
 | Settings          | `/api/settings/*`, `/api/roles/*`                        | `SETTINGS_VIEW` / `SETTINGS_MANAGE`                   |
@@ -339,7 +339,7 @@ Use two suppliers and two restaurants on a plan with **`advanced_roles`** enable
 
 ### Supplier
 
-- [ ] **Custom catalog-only role:** Create role with only Catalog permissions → assign user → products/import work; `GET /api/supplier/invoices/receivables` and settings mutations return **403**.
+- [ ] **Custom catalog-only role:** Create role with only Catalog permissions → assign user → products/import and products/images/import work; `GET /api/supplier/invoices/receivables` and settings mutations return **403**.
 - [ ] **Driver:** Assign Driver + link driver profile → sidebar shows only **My Deliveries** → board shows assigned orders only → direct `GET /api/products` **403**.
 - [ ] **Finance (Accountant):** Receivables/invoices work; product import **403**; settings manage **403**.
 - [ ] **Promotions Manager:** Deals/reorder intel work; billing/settings **403**.

@@ -85,6 +85,7 @@ const productCreateSchema = z.object({
   brand: z.string().max(100).optional(),
   category: z.string().max(100).optional(),
   image_url: z.string().url().optional(),
+  image_thumb_url: z.string().url().optional(),
   unit: z.string().max(20).optional(),
 })
 
@@ -999,6 +1000,7 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
         brand: 'brand',
         category: 'category',
         image_url: 'image_url',
+        image_thumb_url: 'image_thumb_url',
         unit: 'unit',
       },
       { startIndex: paramIndex }

@@ -99,6 +99,23 @@ describe('admin.routes', () => {
     expect(getRequestTenant).toHaveBeenCalled()
   })
 
+  it('GET /dashboard returns 403 for unsupported roles', async () => {
+    const app = buildApp({ id: 'user-1', role: 'DRIVER', email: 'd@test.com' })
+    await request(app).get('/api/admin/dashboard').expect(403)
+    expect(getRequestTenant).not.toHaveBeenCalled()
+  })
+
+  it('GET /dashboard returns tenant-scoped stats for admin users (incl. impersonation)', async () => {
+    queryMock.mockResolvedValue({ rows: [{ count: '3' }] })
+
+    const app = buildApp({ id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' })
+    const res = await request(app).get('/api/admin/dashboard').expect(200)
+
+    expect(res.body.ok).toBe(true)
+    expect(res.body.data.stats).toBeDefined()
+    expect(getRequestTenant).toHaveBeenCalled()
+  })
+
   it('GET /dashboard returns platform stats for admin without impersonation', async () => {
     getRequestTenant.mockResolvedValueOnce(null)
     queryMock.mockResolvedValue({ rows: [{ count: '10' }] })

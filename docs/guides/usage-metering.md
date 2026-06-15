@@ -10,26 +10,26 @@ Supplify tracks resource usage in real-time to enforce plan limits, provide anal
 
 ### Restaurant Usage
 
-| Metric                  | Description                                                                                      | Enforcement                 |
-| ----------------------- | ------------------------------------------------------------------------------------------------ | --------------------------- |
-| **Branches**            | Number of active branches/locations                                                              | Hard cap                    |
-| **Orders Per Day**      | Orders placed today (resets daily)                                                               | Hard cap                    |
-| **Products Tracked**    | Products in restaurant inventory                                                                 | Hard cap                    |
-| **Chats Per Day**       | Messages sent today (resets daily)                                                               | Hard cap                    |
-| **Storage Used**        | Files uploaded via presign (logos, product images, chat attachments) + staff documents with size | Hard cap at plan limit (MB) |
-| **Exports Per Day**     | CSV/API exports today                                                                            | Hard cap (Gold+)            |
-| **Webhooks**            | Active webhook subscriptions                                                                     | Hard cap (Platinum)         |
-| **AI Requests Per Day** | LLM calls on Smart Reorder `explain` / `ask` (Gold 20, Platinum 100)                             | Soft at 80%; see below      |
+| Metric                  | Description                                                                                                                                                | Enforcement                 |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| **Branches**            | Number of active branches/locations                                                                                                                        | Hard cap                    |
+| **Orders Per Day**      | Orders placed today (resets daily)                                                                                                                         | Hard cap                    |
+| **Products Tracked**    | Products in restaurant inventory                                                                                                                           | Hard cap                    |
+| **Chats Per Day**       | Messages sent today (resets daily)                                                                                                                         | Hard cap                    |
+| **Storage Used**        | Files uploaded via presign (logos, product images, chat attachments) + staff documents with size; bulk image import optimized bytes via server `putObject` | Hard cap at plan limit (MB) |
+| **Exports Per Day**     | CSV/API exports today                                                                                                                                      | Hard cap (Gold+)            |
+| **Webhooks**            | Active webhook subscriptions                                                                                                                               | Hard cap (Platinum)         |
+| **AI Requests Per Day** | LLM calls on Smart Reorder `explain` / `ask` (Gold 20, Platinum 100)                                                                                       | Soft at 80%; see below      |
 
 ### Supplier Usage
 
-| Metric                | Description                                                          | Enforcement                 |
-| --------------------- | -------------------------------------------------------------------- | --------------------------- |
-| **Warehouses**        | Number of active warehouses                                          | Hard cap                    |
-| **Products**          | Products in catalog                                                  | Hard cap                    |
-| **Orders Today**      | Orders received today                                                | Hard cap                    |
-| **Picklists Per Day** | Fulfillment picklists generated                                      | Hard cap (Gold+)            |
-| **Storage Used**      | Files uploaded via presign (logos, product images, chat attachments) | Hard cap at plan limit (MB) |
+| Metric                | Description                                                                                                                            | Enforcement                 |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| **Warehouses**        | Number of active warehouses                                                                                                            | Hard cap                    |
+| **Products**          | Products in catalog                                                                                                                    | Hard cap                    |
+| **Orders Today**      | Orders received today                                                                                                                  | Hard cap                    |
+| **Picklists Per Day** | Fulfillment picklists generated                                                                                                        | Hard cap (Gold+)            |
+| **Storage Used**      | Files uploaded via presign (logos, product images, chat attachments); bulk ZIP/URL image import writes optimized main+thumb via server | Hard cap at plan limit (MB) |
 
 ---
 
@@ -42,7 +42,8 @@ Usage counters update automatically when:
 - Creating a branch or warehouse
 - Placing or receiving an order
 - Sending a chat message
-- Uploading a file (via `POST /api/files/presign` — bytes counted in MB, rounded up; storage layout in [STORAGE_UPLOADS.md](../operations/STORAGE_UPLOADS.md))
+- Uploading a file (via `POST /api/files/presign` — bytes counted in MB, rounded up; storage layout in [storage-uploads.md](../operations/storage-uploads.md))
+- Bulk product image import (ZIP job or CSV `image_url` — each optimized image counted at `putObject` time via `ensureStorageForUpload`)
 - Creating a product
 - Exporting data
 - Setting up a webhook

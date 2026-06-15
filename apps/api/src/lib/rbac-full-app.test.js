@@ -231,10 +231,19 @@ describe('impersonation policy', () => {
     expect(res.status).toHaveBeenCalledWith(403)
   })
 
-  it('admin bypass applies on admin routes without tenant context', () => {
-    const { next } = runMiddleware(requirePermission(P.ADMIN_TENANTS), {
+  it('admin without required permission is denied on admin routes without tenant context', () => {
+    const { res, next } = runMiddleware(requirePermission(P.ADMIN_TENANTS), {
       userData: { role: 'ADMIN', id: 'admin-1' },
       adminContext: { permissions: ['ADMIN_ACCESS'] },
+    })
+    expect(next).not.toHaveBeenCalled()
+    expect(res.status).toHaveBeenCalledWith(403)
+  })
+
+  it('admin passes when adminContext includes the required permission', () => {
+    const { next } = runMiddleware(requirePermission(P.ADMIN_TENANTS), {
+      userData: { role: 'ADMIN', id: 'admin-1' },
+      adminContext: { permissions: [P.ADMIN_TENANTS] },
     })
     expect(next).toHaveBeenCalled()
   })

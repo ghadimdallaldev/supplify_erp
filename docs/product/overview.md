@@ -13,12 +13,14 @@ Supplify is a restaurant–supplier marketplace: ordering, receiving, fulfillmen
 
 ## Deep dives
 
-| Audience                | Document                                                                               |
-| ----------------------- | -------------------------------------------------------------------------------------- |
-| Restaurant capabilities | [restaurant-capabilities.md](./restaurant-capabilities.md) (index; full dump archived) |
-| Supplier capabilities   | [supplier-capabilities.md](./supplier-capabilities.md) (index; full dump archived)     |
-| Finance & invoicing     | [finance-implementation.md](./finance-implementation.md)                               |
-| Notifications           | [notifications-summary.md](./notifications-summary.md)                                 |
+| Audience                 | Document                                                                                               |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ |
+| Restaurant capabilities  | [restaurant-capabilities.md](./restaurant-capabilities.md) (index; full dump archived)                 |
+| Supplier capabilities    | [supplier-capabilities.md](./supplier-capabilities.md) (index; full dump archived)                     |
+| Bulk product images      | [bulk-product-image-import.md](../features/bulk-product-image-import.md)                               |
+| Finance & invoicing      | [finance-implementation.md](./finance-implementation.md)                                               |
+| Notifications            | [notifications-summary.md](./notifications-summary.md)                                                 |
+| Supplier customer growth | [supplier-customer-growth.md](../features/supplier-customer-growth.md) (referral, sponsorship, import) |
 
 ## Feature specs
 

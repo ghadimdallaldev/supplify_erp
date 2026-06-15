@@ -50,7 +50,9 @@ Platform Command Center (header)
 
 **To:** Admin Dashboard → **Plans tab** → **Subscription Defaults** section (above plan cards)
 
-Save flow unchanged: `PATCH /api/admin-dashboard/platform-settings`, 3–7 day validation.
+Save flow unchanged: `PATCH /api/admin-dashboard/platform-settings`, **7–90** day validation (default **30**).
+
+Growth program settings (`AdminGrowthSettingsPanel` on Plans tab): `GET/PATCH /api/admin-dashboard/growth-settings` — referral discount %, validity, supplier reward type, sponsorship limits.
 
 Free Trial plan cards show a read-only `{N}d trial` badge from platform settings.
 
@@ -139,7 +141,7 @@ Platform admins see `AdminPortalNav`, Account Settings header, balanced 3-column
 - [ ] Open Supplier Admin → Directory + Usage & Quotas
 - [ ] Open Restaurant Admin → Directory + Usage & Quotas
 - [ ] Confirm usage tables, filters, status badges
-- [ ] Open Plans tab — Subscription Defaults with Free Trial (3–7 days)
+- [ ] Open Plans tab — Subscription Defaults with Free Trial (**7–90** days, default **30**) + Growth program settings
 - [ ] Open Settings as platform admin — balanced cards, portal nav
 - [ ] Confirm responsive layout, no large blank areas
 

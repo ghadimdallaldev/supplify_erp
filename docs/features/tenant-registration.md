@@ -29,20 +29,22 @@ While `pending_activation` is set (`account_locked_at` + `lock_reason` on `subsc
 | **Activate free plan** (no card) | `/app/activate` → **Activate free plan**, or upgrade modal **Activate free plan** on Free tier | `POST /api/billing/checkout` with Free `planId`, no `paymentMethodId` |
 | **Paid plan**                    | **Compare plans & pay** → payment modal                                                        | `POST /api/billing/checkout` with card / saved method                 |
 | **Admin unlock**                 | Admin console                                                                                  | `POST …/subscriptions/:id/unlock`                                     |
-| **Admin extend Free Trial**      | Admin → Subscriptions → **Extend trial** (expired trial)                                       | `POST …/extend-free-trial` (`days` 3–7)                               |
+| **Admin extend Free Trial**      | Admin → Subscriptions → **Extend trial** (expired trial)                                       | `POST …/extend-free-trial` (`days` 7–90)                              |
 
 Free checkout calls `applyFreePlan`, which clears `account_locked_at` and `lock_reason`, sets `free_sandbox_expires_at`, and records `account.activated` in `billing_event`.
 
 After trial expiry, tenants remain able to **log in and view** data; writes require upgrade or admin extend. See [free-trial-expiry.md](./free-trial-expiry.md).
 
+**Referral signup:** When a restaurant completes registration with `referralToken` (from supplier invite URL `/register?ref=…`), the system records attribution, applies the platform Free Trial, auto-follows the referring supplier, and preserves eligibility for the referral first-paid discount. See [supplier-customer-growth.md](./supplier-customer-growth.md).
+
 ## API
 
-| Method | Path                     | Auth    | Notes                                                  |
-| ------ | ------------------------ | ------- | ------------------------------------------------------ |
-| GET    | `/api/register/status`   | Session | `{ needsSetup: boolean }`                              |
-| POST   | `/api/register/complete` | Session | Body: `accountType`, `businessName`, `phone?`          |
-| GET    | `/api/billing/status`    | Tenant  | Includes `access.pendingActivation`, `access.isLocked` |
-| POST   | `/api/billing/checkout`  | Tenant  | Free plan does not require `paymentMethodId`           |
+| Method | Path                     | Auth    | Notes                                                                                   |
+| ------ | ------------------------ | ------- | --------------------------------------------------------------------------------------- |
+| GET    | `/api/register/status`   | Session | `{ needsSetup: boolean }`                                                               |
+| POST   | `/api/register/complete` | Session | Body: `accountType`, `businessName`, `phone?`, `referralToken?` (from `/register?ref=`) |
+| GET    | `/api/billing/status`    | Tenant  | Includes `access.pendingActivation`, `access.isLocked`                                  |
+| POST   | `/api/billing/checkout`  | Tenant  | Free plan does not require `paymentMethodId`                                            |
 
 Allowed while locked (activation / payment): `/api/register/*`, `/api/billing/*`, `/api/subscriptions/entitlements` (GET), auth routes.
 
@@ -60,17 +62,17 @@ Allowed while locked (activation / payment): `/api/register/*`, `/api/billing/*`
 
 ## Tests
 
-| Layer            | File                                                                |
-| ---------------- | ------------------------------------------------------------------- |
-| Unit (API)       | `apps/api/src/lib/register-account.test.js` (restaurant + supplier) |
-| Unit (API)       | `apps/api/src/routes/register.routes.test.js`                       |
-| Unit (API)       | `apps/api/src/lib/billing/billing-service.test.js` (free unlock)    |
-| Unit (API)       | `apps/api/src/routes/billing.routes.test.js`                        |
-| Unit (API)       | `apps/api/src/middlewares/billingAccess.test.js`                    |
-| Unit (API)       | `apps/api/src/lib/platform-settings.test.js` (trial days 3–7)       |
-| Unit (web)       | `apps/web/src/lib/activateFreePlan.test.ts`                         |
-| API (Playwright) | `tests/api/registration-activation.spec.ts`                         |
-| Manual QA        | `docs/qa/regression-checklist.md` — CRST-_ / CSUP-_ / **BIL-FT-\*** |
+| Layer            | File                                                                       |
+| ---------------- | -------------------------------------------------------------------------- |
+| Unit (API)       | `apps/api/src/lib/register-account.test.js` (restaurant + supplier)        |
+| Unit (API)       | `apps/api/src/routes/register.routes.test.js`                              |
+| Unit (API)       | `apps/api/src/lib/billing/billing-service.test.js` (free unlock)           |
+| Unit (API)       | `apps/api/src/routes/billing.routes.test.js`                               |
+| Unit (API)       | `apps/api/src/middlewares/billingAccess.test.js`                           |
+| Unit (API)       | `apps/api/src/lib/platform-settings.test.js` (trial days 7–90, default 30) |
+| Unit (web)       | `apps/web/src/lib/activateFreePlan.test.ts`                                |
+| API (Playwright) | `tests/api/registration-activation.spec.ts`                                |
+| Manual QA        | `docs/qa/regression-checklist.md` — CRST-_ / CSUP-_ / **BIL-FT-\***        |
 
 ## QA references
 

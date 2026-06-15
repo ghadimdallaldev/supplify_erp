@@ -229,7 +229,12 @@ function buildWarnings(ctx) {
 /**
  * Lightweight counters for admin overview (subset of operational summary).
  */
-export async function buildAdminOperationalOverviewCounters() {
+export async function buildAdminOperationalOverviewCounters({
+  aiReorderMetrics: aiReorderMetricsIn,
+} = {}) {
+  const aiReorderPromise = aiReorderMetricsIn
+    ? Promise.resolve(aiReorderMetricsIn)
+    : getAiReorderMetrics()
   const [emailStats, fulfillmentStats, gpsRows, expiryStats, aiReorderMetrics] = await Promise.all([
     safeOperationalQuery(
       'emailFailed24h',
@@ -272,7 +277,7 @@ export async function buildAdminOperationalOverviewCounters() {
        WHERE is_archived = false AND expiry_date < CURRENT_DATE`,
       [{ count: 0 }]
     ),
-    getAiReorderMetrics(),
+    aiReorderPromise,
   ])
 
   const emailRow = emailStats[0] || {}

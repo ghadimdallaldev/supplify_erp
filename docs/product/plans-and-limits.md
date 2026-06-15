@@ -14,7 +14,8 @@ Canonical subscription tiers, limit keys, and upgrade UX.
 
 ## Related features
 
-- [free-trial-expiry.md](../features/free-trial-expiry.md) — trial lock and read-only mode
+- [free-trial-expiry.md](../features/free-trial-expiry.md) — trial lock and read-only mode (**7–90** days, default **30**)
+- [supplier-customer-growth.md](../features/supplier-customer-growth.md) — referral discounts, sponsorship, supplier rewards
 - [tenant-registration.md](../features/tenant-registration.md) — signup and activation
 - [deals-and-promotions.md](../features/deals-and-promotions.md) — deal limits vs boost pricing
 

@@ -9,3 +9,6 @@ export const LazyProductBulkUploadDialog = lazy(() =>
 export const LazyInventoryAdjustmentDialog = lazy(() =>
   import('./InventoryAdjustmentDialog').then((m) => ({ default: m.InventoryAdjustmentDialog }))
 )
+export const LazyProductImageImportDialog = lazy(() =>
+  import('./ProductImageImportDialog').then((m) => ({ default: m.ProductImageImportDialog }))
+)

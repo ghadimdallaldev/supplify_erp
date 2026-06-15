@@ -170,7 +170,7 @@ export function validatePlanLimitsAndFeatures(limits, features, tenantType) {
 }
 
 /**
- * Free Trial plan trial_days must stay within platform bounds (3–7).
+ * Free Trial plan trial_days must stay within platform bounds (7–90).
  * @param {string | null | undefined} planCode
  * @param {number | undefined} trialDays
  */

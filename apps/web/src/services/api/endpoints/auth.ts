@@ -138,6 +138,7 @@ export const authApi = api.injectEndpoints({
         accountType: 'RESTAURANT' | 'SUPPLIER'
         businessName: string
         phone?: string
+        referralToken?: string
         legalAcceptance: LegalAcceptancePayload
       }
     >({

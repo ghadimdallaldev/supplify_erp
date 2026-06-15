@@ -10,5 +10,6 @@ Use on every web/API PR that touches orders, auth, fulfillment, tracking, or RBA
 - [ ] Does mobile need a screen update?
 - [ ] Were mobile tests / typecheck run when mobile-related?
 - [ ] Was `MOBILE_FEATURE_PARITY.md` updated if something is deferred?
+- [ ] Supplier bulk image import changed? → Web-only; document in parity file (see 2026-06-15 entry).
 
 Mobile repo: `../supplify-mobile`
