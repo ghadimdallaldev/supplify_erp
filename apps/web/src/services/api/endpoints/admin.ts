@@ -266,7 +266,23 @@ export const adminApi = api.injectEndpoints({
           errorMessage?: string
           createdAt: string
         }> | null
-        recentApiErrors: any[]
+        recentApiErrors: Array<{
+          id?: string
+          type?: string
+          severity?: string
+          source?: string
+          message?: string
+          createdAt?: string
+          created_at?: string
+          method?: string
+          statusCode?: number
+          errorName?: string
+          requestId?: string
+          userId?: string
+          role?: string
+          tenantId?: string
+          tenantType?: string
+        }>
         dbPool: { total: number; idle: number; waiting: number } | null
       },
       void
