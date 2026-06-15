@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { format } from 'date-fns'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
+import { SummaryStrip } from '../ui/app-panel'
 import { cn } from '../../lib/utils'
 import type { StaffMember, StaffPtoRequest, StaffShiftSwap } from '../../types'
 
@@ -132,68 +133,18 @@ export function StaffPanel({
   )
 }
 
-export function StaffSummaryMetric({
-  label,
-  value,
-  tone = 'default',
-  onClick,
-}: {
-  label: string
-  value: string | number
-  tone?: 'default' | 'mint' | 'amber'
-  onClick?: () => void
-}) {
-  const valueClass =
-    tone === 'mint'
-      ? 'text-[var(--mint)]'
-      : tone === 'amber'
-        ? 'text-[var(--amber)]'
-        : 'text-[var(--text)]'
-
-  const content = (
-    <>
-      <p className="text-xs text-[var(--text-mid)]">{label}</p>
-      <p className={cn('mt-0.5 font-medium tabular-nums', valueClass)}>{value}</p>
-    </>
-  )
-
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className="text-left transition-colors hover:text-[var(--brand-mid)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)] focus-visible:ring-offset-2"
-      >
-        {content}
-      </button>
-    )
-  }
-
-  return <div>{content}</div>
-}
-
 export function StaffLabourSummaryStrip({
   metrics,
 }: {
   metrics: Array<{
     label: string
     value: string | number
-    tone?: 'default' | 'mint' | 'amber'
+    hint?: string
+    tone?: 'default' | 'mint' | 'amber' | 'danger' | 'brand'
     onClick?: () => void
   }>
 }) {
-  return (
-    <section
-      data-testid="staff-labour-summary"
-      className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-4 py-3"
-    >
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-        {metrics.map((metric) => (
-          <StaffSummaryMetric key={metric.label} {...metric} />
-        ))}
-      </div>
-    </section>
-  )
+  return <SummaryStrip testId="staff-labour-summary" columns={8} metrics={metrics} />
 }
 
 export function clampToISODate(date: Date) {

@@ -66,37 +66,39 @@ export function SummaryMetric({
 
   const content = (
     <>
-      <p className="text-xs text-[var(--text-mid)]">{label}</p>
-      <p className={cn('mt-0.5 font-medium tabular-nums', valueClass)}>{value}</p>
-      {hint ? (
-        <p className="mt-0.5 text-[10px] text-[var(--text-mid)] line-clamp-2">{hint}</p>
-      ) : null}
+      <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-mid)]">
+        {label}
+      </p>
+      <p className={cn('mt-1 text-2xl font-semibold tabular-nums leading-none', valueClass)}>
+        {value}
+      </p>
+      {hint ? <p className="mt-1.5 text-xs text-[var(--text-mid)] line-clamp-2">{hint}</p> : null}
     </>
+  )
+
+  const shellClass = cn(
+    'min-w-0 px-4 py-3.5 sm:px-5',
+    onClick &&
+      'cursor-pointer transition-colors hover:bg-[var(--app-bg-subtle)]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand-mid)]',
+    active && 'bg-[var(--brand-ultra)]/50'
   )
 
   if (onClick) {
     return (
-      <button
-        type="button"
-        onClick={onClick}
-        className={cn(
-          'text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)] focus-visible:ring-offset-2',
-          active && 'rounded-lg bg-[var(--brand-ultra)]/60 px-2 py-1 -mx-2 -my-1',
-          !active && 'hover:text-[var(--brand-mid)]'
-        )}
-      >
+      <button type="button" onClick={onClick} className={cn(shellClass, 'w-full text-left')}>
         {content}
       </button>
     )
   }
 
-  return <div>{content}</div>
+  return <div className={shellClass}>{content}</div>
 }
 
 export function SummaryStrip({
   metrics,
   testId,
   className,
+  columns,
 }: {
   metrics: Array<{
     label: string
@@ -108,16 +110,39 @@ export function SummaryStrip({
   }>
   testId?: string
   className?: string
+  /** Override responsive column count (defaults to metric count, capped at 4 on small screens) */
+  columns?: 2 | 3 | 4 | 5 | 6 | 7 | 8
 }) {
+  const colCount = columns ?? Math.min(metrics.length, 4)
+  const gridColsClass =
+    colCount <= 2
+      ? 'grid-cols-2'
+      : colCount === 3
+        ? 'grid-cols-2 sm:grid-cols-3'
+        : colCount === 4
+          ? 'grid-cols-2 sm:grid-cols-4'
+          : colCount === 5
+            ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'
+            : colCount === 6
+              ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6'
+              : colCount === 7
+                ? 'grid-cols-2 sm:grid-cols-4 lg:grid-cols-7'
+                : 'grid-cols-2 sm:grid-cols-4 xl:grid-cols-8'
+
   return (
     <section
       data-testid={testId}
       className={cn(
-        'rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-4 py-3',
+        'overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]',
         className
       )}
     >
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+      <div
+        className={cn(
+          'grid divide-x divide-y divide-[var(--app-border)] sm:divide-y-0',
+          gridColsClass
+        )}
+      >
         {metrics.map((metric) => (
           <SummaryMetric key={metric.label} {...metric} />
         ))}

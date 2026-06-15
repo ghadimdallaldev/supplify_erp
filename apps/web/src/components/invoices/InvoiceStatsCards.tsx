@@ -5,6 +5,7 @@ type InvoiceStatsCardsProps = {
   stats: {
     total: number
     unpaid: number
+    paidCount: number
     overdue: number
     totalOutstanding: number
     totalPaid: number
@@ -55,7 +56,10 @@ export function InvoiceStatsCards({
             label: 'Total paid',
             value: formatPrice(stats.totalPaid),
             tone: 'mint',
-            hint: `${analytics.paid_count || 0} paid`,
+            hint:
+              stats.paidCount > 0
+                ? `${stats.paidCount} paid invoice${stats.paidCount === 1 ? '' : 's'}`
+                : 'No paid invoices yet',
           },
         ]}
       />
