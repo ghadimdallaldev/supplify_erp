@@ -77,7 +77,7 @@ const DISPLAY_NAMES = {
   receiving_quality: 'Receiving & quality',
   disputes_returns: 'Disputes & returns',
   finance_invoices: 'Finance & invoices',
-  quick_lists: 'Quick lists',
+  quick_lists: 'Quick lists & scheduling',
   inventory_management: 'Inventory management',
   waste_tracking: 'Waste tracking',
   advanced_roles: 'Advanced roles',
@@ -99,6 +99,7 @@ const DISPLAY_NAMES = {
   tenant_audit_log: 'Activity Log',
   waitlist_auto_promo: 'Waitlist Auto-Promotion',
   supplier_deals: 'Supplier deals',
+  supplier_deals_redeem: 'Supplier deal redemptions',
   ai_platform: 'AI platform (LLM reorder assistant)',
 }
 

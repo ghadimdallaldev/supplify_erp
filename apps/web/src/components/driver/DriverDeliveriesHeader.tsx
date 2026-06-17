@@ -1,5 +1,6 @@
-import { RefreshCw, Radio, Truck } from 'lucide-react'
+import { RefreshCw, Radio } from 'lucide-react'
 import { Button } from '../ui/button'
+import { PageHeader } from '../ui/page-header'
 import { getDriverGpsBannerLabel } from '../../lib/driverDeliveryUi'
 
 type Props = {
@@ -32,29 +33,23 @@ export function DriverDeliveriesHeader({
 
   return (
     <div className="space-y-3" data-testid="driver-deliveries-header">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-mid)]/10 text-[var(--brand-mid)]">
-              <Truck className="h-5 w-5" aria-hidden />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-[var(--text)]">Today&apos;s deliveries</h1>
-              <p className="text-sm text-[var(--text-muted)]">Tap a button when you arrive</p>
-            </div>
-          </div>
-        </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-10 w-10 shrink-0 rounded-xl"
-          onClick={onRefresh}
-          disabled={isLoading}
-          aria-label="Refresh deliveries"
-        >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-        </Button>
-      </div>
+      <PageHeader
+        title="Today's deliveries"
+        description="Tap a button when you arrive"
+        size="compact"
+        actions={
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-10 w-10 shrink-0 rounded-xl"
+            onClick={onRefresh}
+            disabled={isLoading}
+            aria-label="Refresh deliveries"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
+        }
+      />
 
       <div className="flex flex-wrap gap-2">
         <span className="inline-flex items-center rounded-full border border-[var(--app-border)] bg-[var(--surface)] px-3 py-1 text-xs font-medium text-[var(--text)]">

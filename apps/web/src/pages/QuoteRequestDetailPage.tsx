@@ -10,7 +10,8 @@ import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { EmptyState } from '../components/ui/empty-state'
 import { Skeleton } from '../components/ui/skeleton'
-import { pageHeaderRowClass } from '../components/ui/card-layout'
+import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { formatPrice } from '../utils/format'
 import { toast } from 'sonner'
 import { ArrowLeft, ShoppingCart } from 'lucide-react'
@@ -71,50 +72,55 @@ export function QuoteRequestDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <PageShell className="space-y-4" data-testid="quote-request-detail-page">
         <Skeleton className="h-10 w-72" />
         <Skeleton className="h-64 w-full rounded-xl" />
-      </div>
+      </PageShell>
     )
   }
 
   if (isError || !data) {
     return (
-      <EmptyState
-        title="Quote request not found"
-        description="This request may have been removed or you do not have access."
-        action={
-          <Button variant="outline" onClick={() => refetch()}>
-            Retry
-          </Button>
-        }
-      />
+      <PageShell data-testid="quote-request-detail-page">
+        <EmptyState
+          title="Quote request not found"
+          description="This request may have been removed or you do not have access."
+          action={
+            <Button variant="outline" onClick={() => refetch()}>
+              Retry
+            </Button>
+          }
+        />
+      </PageShell>
     )
   }
 
   const { quoteRequest, items, suppliers } = data
 
+  const headerDescription = [
+    `Created ${new Date(quoteRequest.createdAt).toLocaleString()}`,
+    quoteRequest.neededBy ? `Needed by ${quoteRequest.neededBy}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
   return (
-    <div className="space-y-6">
-      <div className={pageHeaderRowClass}>
-        <div>
-          <Button variant="ghost" size="sm" className="mb-2 -ml-2" asChild>
+    <PageShell className="space-y-6" data-testid="quote-request-detail-page">
+      <PageHeader
+        title="Compare offers"
+        description={headerDescription}
+        breadcrumb={
+          <Button variant="ghost" size="sm" className="-ml-2" asChild>
             <Link to="/app/quote-requests">
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back to quote requests
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold text-[var(--text)]">Compare offers</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
-            Created {new Date(quoteRequest.createdAt).toLocaleString()}
-            {quoteRequest.neededBy ? ` · Needed by ${quoteRequest.neededBy}` : ''}
-          </p>
-          {quoteRequest.note && (
-            <p className="text-sm text-[var(--text)] mt-2">{quoteRequest.note}</p>
-          )}
-        </div>
-        <Badge>{quoteRequest.status === 'open' ? 'Open' : quoteRequest.status}</Badge>
-      </div>
+        }
+        actions={<Badge>{quoteRequest.status === 'open' ? 'Open' : quoteRequest.status}</Badge>}
+      />
+
+      {quoteRequest.note && <p className="text-sm text-[var(--text)]">{quoteRequest.note}</p>}
 
       <Card>
         <CardHeader>
@@ -234,6 +240,6 @@ export function QuoteRequestDetailPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   )
 }

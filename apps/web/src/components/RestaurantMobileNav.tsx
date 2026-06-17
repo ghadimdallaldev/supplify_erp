@@ -76,7 +76,7 @@ export function RestaurantMobileNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--app-border)] bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--app-border)]/40 bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] lg:hidden"
       aria-label="Primary navigation"
     >
       <div className="flex items-stretch justify-around">

@@ -25,9 +25,9 @@ export function AppPanel({
       )}
     >
       <header className="border-b border-[var(--app-border)] px-4 py-4 sm:px-5">
-        <h2 className="text-sm font-semibold text-[var(--text)]">{title}</h2>
+        <h2 className="text-base font-medium text-[var(--text)]">{title}</h2>
         {description ? (
-          <p className="mt-0.5 text-xs text-[var(--text-mid)]">{description}</p>
+          <p className="mt-0.5 text-sm text-[var(--text-mid)]">{description}</p>
         ) : null}
       </header>
       <div className="p-4 sm:p-5">{children}</div>

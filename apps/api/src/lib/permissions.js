@@ -10,6 +10,11 @@ import { invalidateTenantContextCache } from './tenant-context-cache.js'
 import { PERMISSION_KEYS } from './permission-keys.js'
 import { getOrgRolePermissions } from './supplier-org.js'
 import { getRestaurantOrgRolePermissions } from './restaurant-org.js'
+import {
+  ensureTenantSystemRoles,
+  getAllPermissionsForTenantType,
+  userHasOwnerRole,
+} from './tenant-roles.js'
 
 export { PERMISSION_KEYS }
 
@@ -159,6 +164,16 @@ export async function getPermissionsForUser(userId, tenantId, tenantType) {
     return singleflight(cacheKey, async () => {
       const again = await getCache(cacheKey)
       if (Array.isArray(again)) return again
+
+      if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
+        if (await userHasOwnerRole(userId, tenantId, tenantType)) {
+          // Owner role is ALL — return the canonical list even if DB role rows lag behind new keys.
+          ensureTenantSystemRoles(tenantId, tenantType).catch(() => {})
+          const permissions = getAllPermissionsForTenantType(tenantType)
+          await setCache(cacheKey, permissions, PERMISSION_CACHE_TTL_SECONDS)
+          return permissions
+        }
+      }
 
       let named = []
       let legacy = []

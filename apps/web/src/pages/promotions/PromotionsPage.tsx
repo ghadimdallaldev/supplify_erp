@@ -3,6 +3,7 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { PageHeader } from '../../components/ui/page-header'
+import { PageShell } from '../../components/ui/page-shell'
 import { Select, SelectTrigger } from '../../components/ui/select'
 import { Skeleton } from '../../components/ui/skeleton'
 import {
@@ -115,14 +116,14 @@ export function PromotionsPage() {
 
   if (!promotionsEnabled) {
     return (
-      <div className="space-y-4">
+      <PageShell data-testid="promotions-page">
         <PageHeader title="Deals" />
         <FeatureLockedCard
           featureKey="promotions"
           featureName="Deals"
           currentPlan={entitlementsData?.entitlements?.plan?.name ?? null}
         />
-      </div>
+      </PageShell>
     )
   }
 
@@ -204,7 +205,7 @@ export function PromotionsPage() {
 
   return (
     <RequirePermission anyOf={['PROMOTIONS_VIEW', 'PROMOTIONS_MANAGE']} title="deals">
-      <div className="space-y-6">
+      <PageShell data-testid="promotions-page">
         <PageHeader
           title={copy.title}
           description={copy.subtitle}
@@ -315,7 +316,7 @@ export function PromotionsPage() {
         </section>
 
         <Dialog open={showCreate} onOpenChange={setShowCreate}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent size="md">
             <DialogHeader>
               <DialogTitle>{copy.newButton}</DialogTitle>
             </DialogHeader>
@@ -498,7 +499,7 @@ export function PromotionsPage() {
           }}
           onSuccess={() => refetch()}
         />
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

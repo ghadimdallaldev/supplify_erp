@@ -944,6 +944,9 @@ export function requirePermission(permissionKey) {
   return (req, res, next) => {
     const tenant = req.tenantContext
     const admin = req.adminContext
+    if (tenant?.roles?.includes('Owner')) {
+      return next()
+    }
     const perms = tenant?.permissions ?? admin?.permissions ?? []
     if (hasPermission(perms, permissionKey)) {
       return next()
@@ -965,6 +968,9 @@ export function requireAnyPermission(...permissionKeys) {
   return (req, res, next) => {
     const tenant = req.tenantContext
     const admin = req.adminContext
+    if (tenant?.roles?.includes('Owner')) {
+      return next()
+    }
     const perms = tenant?.permissions ?? admin?.permissions ?? []
     if (permissionKeys.some((key) => hasPermission(perms, key))) {
       return next()

@@ -10,6 +10,7 @@ import {
   legalDocumentAssetUrl,
 } from '../lib/legalDocuments'
 import { SupplifyLogo } from '../components/SupplifyLogo'
+import { PageHeader } from '../components/ui/page-header'
 
 const SLUGS = new Set(Object.keys(LEGAL_DOCUMENTS))
 
@@ -55,17 +56,20 @@ export function LegalDocumentPage() {
   if (!meta) {
     return (
       <LegalShell>
-        <div className="text-center py-16">
-          <h1 className="text-xl font-semibold text-[var(--text)]">Document not found</h1>
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
-            The legal document you requested does not exist.
-          </p>
-          <Link
-            to="/legal"
-            className="mt-6 inline-block text-sm font-medium text-[var(--brand-mid)] hover:underline"
-          >
-            View all legal documents
-          </Link>
+        <div className="py-16">
+          <PageHeader
+            title="Document not found"
+            description="The legal document you requested does not exist."
+            className="text-center sm:flex-col sm:items-center [&_p]:mx-auto"
+          />
+          <div className="mt-6 text-center">
+            <Link
+              to="/legal"
+              className="text-sm font-medium text-[var(--brand-mid)] hover:underline"
+            >
+              View all legal documents
+            </Link>
+          </div>
         </div>
       </LegalShell>
     )
@@ -73,37 +77,33 @@ export function LegalDocumentPage() {
 
   return (
     <LegalShell>
-      <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between print:hidden">
-        <div>
+      <PageHeader
+        breadcrumb={
           <Link
             to="/legal"
-            className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--brand-mid)]"
+            className="inline-flex items-center gap-1.5 hover:text-[var(--brand-mid)]"
           >
             <ArrowLeft className="h-4 w-4" />
             Legal center
           </Link>
-          <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-pale)]">
-              <FileText className="h-5 w-5 text-[var(--brand-mid)]" />
-            </span>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">{meta.title}</h1>
-              <p className="mt-1 text-sm text-[var(--text-muted)]">{meta.description}</p>
-              <p className="mt-2 text-xs text-[var(--text-muted)]">
-                Effective {LEGAL_OPERATOR.effectiveDate} · Version {LEGAL_PACK_VERSION}
-              </p>
-            </div>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--surface)] px-4 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--brand-ultra)]"
-        >
-          <Printer className="h-4 w-4" />
-          Print
-        </button>
-      </header>
+        }
+        title={meta.title}
+        description={meta.description}
+        actions={
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--surface)] px-4 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--brand-ultra)]"
+          >
+            <Printer className="h-4 w-4" />
+            Print
+          </button>
+        }
+        className="mb-2 print:hidden"
+      />
+      <p className="mb-8 text-xs text-[var(--text-muted)] print:hidden">
+        Effective {LEGAL_OPERATOR.effectiveDate} · Version {LEGAL_PACK_VERSION}
+      </p>
 
       <div className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] shadow-sm">
         <div className="border-b border-[var(--app-border)] px-6 py-4 print:hidden">
@@ -141,13 +141,11 @@ export function LegalHubPage() {
 
   return (
     <LegalShell>
-      <header className="mb-10 text-center max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold tracking-tight text-[var(--text)]">Legal center</h1>
-        <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
-          Review Supplify&apos;s terms, privacy practices, and product policies. Document pack{' '}
-          {LEGAL_PACK_VERSION}, effective {LEGAL_OPERATOR.effectiveDate}.
-        </p>
-      </header>
+      <PageHeader
+        title="Legal center"
+        description={`Review Supplify's terms, privacy practices, and product policies. Document pack ${LEGAL_PACK_VERSION}, effective ${LEGAL_OPERATOR.effectiveDate}.`}
+        className="mb-10 mx-auto max-w-2xl text-center sm:flex-col sm:items-center [&_h1]:text-3xl [&_p]:mx-auto"
+      />
 
       <div className="grid gap-8">
         {categories.map(({ key, label }) => {

@@ -136,7 +136,7 @@ function AdminChangePlanDialogContent({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Change plan — {modal.tenantName}</DialogTitle>
           <DialogDescription>

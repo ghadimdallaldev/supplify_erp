@@ -36,6 +36,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { formatPrice } from '../utils/format'
 import { splitRowClass } from '../components/ui/card-layout'
 import {
@@ -326,7 +327,7 @@ export function InvoicesPage() {
 
   return (
     <RequirePermission permission="INVOICES_VIEW" title="invoices">
-      <div className="space-y-6">
+      <PageShell data-testid="invoices-page">
         <PageHeader
           title={invoicesTitle}
           description={invoicesDescription}
@@ -422,7 +423,7 @@ export function InvoicesPage() {
             />
           )}
         </Suspense>
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

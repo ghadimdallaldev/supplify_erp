@@ -3,6 +3,7 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Select, SelectTrigger } from '../components/ui/select'
 import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { Skeleton } from '../components/ui/skeleton'
 import { EmptyState } from '../components/ui/empty-state'
 import { useGetMyContractPricingQuery, useGetSuppliersQuery } from '../services/api'
@@ -50,7 +51,7 @@ export function MyContractPricesPage() {
 
   return (
     <RequirePermission permission="CATALOG_VIEW">
-      <div className="space-y-6">
+      <PageShell maxWidth="wide" data-testid="my-contract-prices-page">
         <PageHeader
           title="My Contract Prices"
           description="Special prices negotiated with your suppliers."
@@ -204,7 +205,7 @@ export function MyContractPricesPage() {
             </p>
           ) : null}
         </section>
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

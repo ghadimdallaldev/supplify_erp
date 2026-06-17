@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { BarChart3, Package, Store, TrendingUp } from 'lucide-react'
 import { Card, CardContent } from '../../components/ui/card'
 import { PageHeader } from '../../components/ui/page-header'
+import { PageShell } from '../../components/ui/page-shell'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
 import { useGetBranchesQuery, useGetEntitlementsQuery } from '../../services/api'
 import { useImpersonation } from '../../hooks/useImpersonation'
@@ -146,21 +147,21 @@ export function ReportsPage() {
   if (!reportsEnabled) {
     return (
       <RequirePermission {...reportsPermissionGate} title="reports">
-        <div className="space-y-4">
+        <PageShell data-testid="reports-page">
           <PageHeader title="Reports" />
           <Card>
             <CardContent className="py-8 text-sm text-[var(--text-mid)]">
               Reports are not available on your current plan. Contact support if this looks wrong.
             </CardContent>
           </Card>
-        </div>
+        </PageShell>
       </RequirePermission>
     )
   }
 
   return (
     <RequirePermission {...reportsPermissionGate} title="reports">
-      <div className="space-y-6" data-testid="reports-page">
+      <PageShell data-testid="reports-page">
         <PageHeader
           title={isRestaurant ? 'Purchasing reports' : 'Reports & Analytics'}
           description={
@@ -210,7 +211,7 @@ export function ReportsPage() {
             />
           </TabsContent>
         </Tabs>
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

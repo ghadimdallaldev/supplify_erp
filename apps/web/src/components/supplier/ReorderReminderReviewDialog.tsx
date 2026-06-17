@@ -31,7 +31,7 @@ export function ReorderReminderReviewDialog({ draft, open, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg" data-testid="reorder-reminder-review-dialog">
+      <DialogContent size="md" data-testid="reorder-reminder-review-dialog">
         <DialogHeader>
           <DialogTitle>Review reminder</DialogTitle>
           <DialogDescription>

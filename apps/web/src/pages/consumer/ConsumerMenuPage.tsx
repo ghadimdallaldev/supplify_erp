@@ -15,6 +15,7 @@ import { Button } from '../../components/ui/button'
 import { Skeleton } from '../../components/ui/skeleton'
 import { toast } from 'sonner'
 import { useConsumerCart } from '../../hooks/useConsumerCart'
+import { PageShell } from '../../components/ui/page-shell'
 import { Search, CalendarClock, X } from 'lucide-react'
 import { Alert, AlertDescription } from '../../components/ui/alert'
 import { orderingStatusFromBranch } from '../../lib/consumerOrderingHours'
@@ -178,7 +179,7 @@ export function ConsumerMenuPage() {
   }
 
   return (
-    <div className="space-y-5 p-4 pb-28">
+    <PageShell className="space-y-5 p-4 pb-28">
       {orderingStatus.mode !== 'LIVE' && (
         <Alert
           className={
@@ -363,7 +364,7 @@ export function ConsumerMenuPage() {
           toast.success(`Added ${input.name}`)
         }}
       />
-    </div>
+    </PageShell>
   )
 }
 

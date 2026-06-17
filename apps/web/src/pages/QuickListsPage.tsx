@@ -507,7 +507,7 @@ export function QuickListsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-5" data-testid="quick-lists-loading">
+      <PageShell data-testid="quick-lists-loading">
         <div className="space-y-2">
           <Skeleton className="h-7 w-44" />
           <Skeleton className="h-4 w-72" />
@@ -527,7 +527,7 @@ export function QuickListsPage() {
             </div>
           ))}
         </div>
-      </div>
+      </PageShell>
     )
   }
 
@@ -535,7 +535,7 @@ export function QuickListsPage() {
 
   return (
     <RequirePermission permission="ORDERS_VIEW" title="quick lists">
-      <PageShell className="space-y-5" data-testid="quick-lists-page">
+      <PageShell data-testid="quick-lists-page">
         {!quickListCreateGate.canUse && quickListCreateGate.limit != null && (
           <LimitExceededBanner
             limitKey="quick_lists"

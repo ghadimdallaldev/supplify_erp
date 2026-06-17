@@ -89,6 +89,7 @@ export type BuildSidebarSectionsInput = {
   quickListsEnabled: boolean
   disputesEnabled: boolean
   promotionsEnabled: boolean
+  supplierGrowthEnabled: boolean
 }
 
 export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarNavSectionConfig[] {
@@ -110,6 +111,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
     quickListsEnabled,
     disputesEnabled,
     promotionsEnabled,
+    supplierGrowthEnabled,
   } = input
 
   let sections: SidebarNavSectionConfig[] = []
@@ -435,13 +437,17 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
           : []),
       ].filter((item) => navItemAllowed(item, can, canAny))
       const intel: SidebarNavItem[] = [
-        {
-          name: 'Customer Growth',
-          href: '/app/customer-growth',
-          icon: UserPlus,
-          anyOf: ['CATALOG_EDIT', 'ORDERS_VIEW'],
-          testId: 'nav-customer-growth',
-        },
+        ...(supplierGrowthEnabled
+          ? [
+              {
+                name: 'Customer Growth',
+                href: '/app/customer-growth',
+                icon: UserPlus,
+                permission: 'GROWTH_VIEW',
+                testId: 'nav-customer-growth',
+              },
+            ]
+          : []),
         ...(reportsEnabled && persona.showGlobalReports
           ? [
               {

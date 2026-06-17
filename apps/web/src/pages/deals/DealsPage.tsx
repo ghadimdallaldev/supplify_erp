@@ -4,6 +4,8 @@ import { Card, CardContent } from '../../components/ui/card'
 import { Label } from '../../components/ui/label'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/empty-state'
+import { PageHeader } from '../../components/ui/page-header'
+import { PageShell } from '../../components/ui/page-shell'
 import { Select, SelectTrigger } from '../../components/ui/select'
 import { Skeleton } from '../../components/ui/skeleton'
 import { DealCard } from '../../components/deals/DealCard'
@@ -73,8 +75,11 @@ export function DealsPage() {
 
   return (
     <RequirePermission anyOf={['ORDERS_VIEW', 'CATALOG_VIEW']} title="deals">
-      <div className="space-y-6">
-        <MotionDealsHeader />
+      <PageShell data-testid="deals-page">
+        <PageHeader
+          title="Available deals"
+          description="Supplier deals from suppliers you follow, plus sponsored placement from new suppliers"
+        />
         {!canRedeem ? (
           <div
             className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
@@ -176,22 +181,8 @@ export function DealsPage() {
             ))}
           </div>
         )}
-      </div>
+      </PageShell>
     </RequirePermission>
-  )
-}
-
-function MotionDealsHeader() {
-  return (
-    <div>
-      <h1 className="text-[21px] font-black text-[var(--text)] flex items-center gap-2">
-        <Sparkles className="h-5 w-5 text-[var(--brand)]" />
-        Available deals
-      </h1>
-      <p className="text-xs text-[var(--text-muted)] mt-1">
-        Supplier deals from suppliers you follow, plus sponsored placement from new suppliers
-      </p>
-    </div>
   )
 }
 

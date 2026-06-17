@@ -12,7 +12,14 @@ import {
 } from '../services/api'
 import { activateFreePlanFromPlans } from '../lib/activateFreePlan'
 import { toast } from 'sonner'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+} from './ui/dialog'
 import { Button } from './ui/button'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { openCheckoutPayment } from '../lib/openPaymentModal'
@@ -332,8 +339,8 @@ export function UpgradeModal() {
         if (!v) handleClose()
       }}
     >
-      <DialogContent className="flex max-h-[min(90dvh,calc(100vh-2rem))] flex-col overflow-hidden p-0 sm:max-w-5xl">
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-4 sm:px-6 sm:pt-6">
+      <DialogContent size="wide" scroll="split">
+        <DialogBody>
           <DialogHeader className="pr-8">
             <DialogTitle className="flex items-center gap-2">
               {type === 'limit' || (!isBrowseUpgrade && type === 'feature') ? (
@@ -664,7 +671,7 @@ export function UpgradeModal() {
               </p>
             )}
           </div>
-        </div>
+        </DialogBody>
 
         {/* Bottom actions — outside scroll so taps are not blocked on mobile */}
         <div className="action-bar shrink-0 flex-col border-t border-[var(--app-border)] bg-[var(--surface)] px-4 py-4 sm:flex-row sm:px-6">

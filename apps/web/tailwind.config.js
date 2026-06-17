@@ -17,6 +17,16 @@ export default {
       },
     },
     extend: {
+      maxWidth: {
+        content: 'var(--content-max)',
+        'content-wide': 'var(--content-max-wide)',
+        'content-focused': 'var(--content-max-focused)',
+        'dialog-sm': 'var(--dialog-sm)',
+        'dialog-md': 'var(--dialog-md)',
+        'dialog-lg': 'var(--dialog-lg)',
+        'dialog-xl': 'var(--dialog-xl)',
+        'dialog-wide': 'var(--dialog-wide)',
+      },
       screens: {
         xs: '375px',
       },

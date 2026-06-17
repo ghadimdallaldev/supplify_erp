@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '../components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Card, CardContent, CardHeader } from '../components/ui/card'
+import { PageHeader } from '../components/ui/page-header'
 import { Alert, AlertDescription } from '../components/ui/alert'
 import {
   Loader2,
@@ -170,15 +171,11 @@ export function LoginPage() {
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
                 <SupplifyLogo size={56} variant="mark" />
               </div>
-              <CardTitle
-                className="text-2xl text-center"
-                style={{ color: 'var(--text)', fontWeight: 900, letterSpacing: '-0.02em' }}
-              >
-                Welcome back
-              </CardTitle>
-              <CardDescription className="text-center" style={{ color: 'var(--text-muted)' }}>
-                Sign in to access your account and start managing your orders
-              </CardDescription>
+              <PageHeader
+                title="Welcome back"
+                description="Sign in to access your account and start managing your orders"
+                className="text-center sm:flex-col sm:items-center [&_p]:mx-auto"
+              />
             </CardHeader>
             <CardContent className="space-y-6">
               {inEmbeddedFrame && (

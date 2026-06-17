@@ -18,6 +18,8 @@ type AlertSlot = {
   node: ReactNode
 }
 
+const bannerStackClass = 'mx-3 flex flex-col gap-2 pt-2 sm:mx-6'
+
 type LayoutTenantAlertsProps = {
   showDealsBanner: boolean
   showBillingBanner: boolean
@@ -70,15 +72,14 @@ export function LayoutTenantAlerts(props: LayoutTenantAlertsProps) {
         id: 'limit-single',
         priority: 1,
         node: (
-          <div key="limit-single" className="mx-3 mt-4 sm:mx-6">
-            <LimitExceededBanner
-              limitKey={atLimitEntries[0].key}
-              currentUsage={atLimitEntries[0].current}
-              limitValue={atLimitEntries[0].limit}
-              currentPlan={e?.plan?.name ?? null}
-              upgradeUrl={e ? settingsFeaturesTabPath(e.tenantType) : undefined}
-            />
-          </div>
+          <LimitExceededBanner
+            key="limit-single"
+            limitKey={atLimitEntries[0].key}
+            currentUsage={atLimitEntries[0].current}
+            limitValue={atLimitEntries[0].limit}
+            currentPlan={e?.plan?.name ?? null}
+            upgradeUrl={e ? settingsFeaturesTabPath(e.tenantType) : undefined}
+          />
         ),
       })
     } else if (atLimitEntries.length > 1) {
@@ -304,10 +305,10 @@ export function LayoutTenantAlerts(props: LayoutTenantAlertsProps) {
 
   if (alerts.length === 1 || expanded) {
     return (
-      <div className="space-y-0">
+      <div className={bannerStackClass}>
         {alerts.map((alert) => alert.node)}
         {alerts.length > 1 && expanded ? (
-          <div className="mx-3 mt-2 flex justify-center sm:mx-6">
+          <div className="flex justify-center">
             <button
               type="button"
               className="inline-flex items-center gap-1 text-sm font-medium text-[var(--text-muted)] underline hover:no-underline"
@@ -323,9 +324,9 @@ export function LayoutTenantAlerts(props: LayoutTenantAlertsProps) {
   }
 
   return (
-    <>
+    <div className={bannerStackClass}>
       {alerts[0].node}
-      <div className="mx-3 mt-2 flex justify-center sm:mx-6">
+      <div className="flex justify-center">
         <button
           type="button"
           className="inline-flex items-center gap-1 rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-3 py-1.5 text-sm font-medium text-[var(--text)] hover:bg-[var(--bg)]"
@@ -336,7 +337,7 @@ export function LayoutTenantAlerts(props: LayoutTenantAlertsProps) {
           View all alerts ({alerts.length})
         </button>
       </div>
-    </>
+    </div>
   )
 }
 

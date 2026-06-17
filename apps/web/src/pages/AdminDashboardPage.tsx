@@ -1,10 +1,6 @@
-import { lazy, useEffect, useState } from 'react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
+import { lazy, useEffect, useMemo, useState } from 'react'
 import { useGetAdminPreferencesQuery } from '../services/api'
-import { AdminPortalNav } from '../components/admin/AdminPortalNav'
-import { AdminPageHeader } from '../components/admin/AdminPageHeader'
 import { PageShell } from '../components/ui/page-shell'
-import { getAdminPageHeader } from '../lib/adminPageHeaders'
 import { AdminTenantDiagnosticsDrawer } from '../components/admin/AdminTenantDiagnosticsDrawer'
 import {
   AdminResetPasswordDialog,
@@ -12,14 +8,17 @@ import {
 } from '../components/admin/AdminResetPasswordDialog'
 import { usePermissions } from '../hooks/usePermissions'
 import { useAppSelector } from '../hooks/redux'
+import { useAdminTab } from '../hooks/useAdminTab'
+import { useRegisterAdminShellNav } from '../components/admin/shell'
 import type { AdminTenantType } from '../lib/adminTenantSearch'
 import {
-  AdminTabScrollRow,
   type AdminCanTabMap,
   type AdminTabKey,
   useAdminChangePlanDialog,
 } from '../components/admin/dashboard'
 import { AdminTabMount } from '../components/admin/dashboard/AdminTabMount'
+import { resolveAdminPortal } from '../components/admin/shell/adminNavConfig'
+import { useLocation } from 'react-router-dom'
 import {
   LazyAdminActivityTab,
   LazyAdminAuditTab,
@@ -53,25 +52,30 @@ interface AdminDashboardPageProps {
 }
 
 export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPageProps) {
+  const { pathname } = useLocation()
+  const portal = resolveAdminPortal(pathname)
   const { can } = usePermissions()
   const { user } = useAppSelector((state) => state.auth)
 
-  const canAdminTab: AdminCanTabMap = {
-    overview: can('ADMIN_ACCESS'),
-    activity: can('ADMIN_ACCESS'),
-    tenants: can('ADMIN_TENANTS'),
-    users: can('ADMIN_SUPPORT'),
-    subscriptions: can('ADMIN_PLANS'),
-    plans: can('ADMIN_PLANS'),
-    finance: can('ADMIN_FINANCE'),
-    usage: can('ADMIN_PLANS'),
-    features: can('ADMIN_GROWTH'),
-    deals: can('ADMIN_GROWTH'),
-    limits: can('ADMIN_PLANS'),
-    health: can('ADMIN_ACCESS'),
-    operations: can('ADMIN_ACCESS'),
-    audit: can('ADMIN_ACCESS'),
-  }
+  const canAdminTab: AdminCanTabMap = useMemo(
+    () => ({
+      overview: can('ADMIN_ACCESS'),
+      activity: can('ADMIN_ACCESS'),
+      tenants: can('ADMIN_TENANTS'),
+      users: can('ADMIN_SUPPORT'),
+      subscriptions: can('ADMIN_PLANS'),
+      plans: can('ADMIN_PLANS'),
+      finance: can('ADMIN_FINANCE'),
+      usage: can('ADMIN_PLANS'),
+      features: can('ADMIN_GROWTH'),
+      deals: can('ADMIN_GROWTH'),
+      limits: can('ADMIN_PLANS'),
+      health: can('ADMIN_ACCESS'),
+      operations: can('ADMIN_ACCESS'),
+      audit: can('ADMIN_ACCESS'),
+    }),
+    [user?.adminPermissions, user?.role]
+  )
 
   const routePinnedTab =
     initialTab === 'suppliers' || initialTab === 'restaurants' ? 'tenants' : null
@@ -85,7 +89,14 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     initialTab ??
     'overview'
 
-  const [selectedTab, setSelectedTab] = useState(preferredTab)
+  const { selectedTab, setSelectedTab } = useAdminTab(portal, canAdminTab, preferredTab)
+
+  const shellNav = useMemo(
+    () => ({ selectedTab, setSelectedTab, canAdminTab }),
+    [selectedTab, setSelectedTab, canAdminTab]
+  )
+  useRegisterAdminShellNav(shellNav)
+
   const [operationsSubTab, setOperationsSubTab] = useState<
     'summary' | 'email' | 'inventory' | 'fulfillment' | 'gps'
   >('summary')
@@ -101,10 +112,6 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   const { openChangePlan, ChangePlanDialog } = useAdminChangePlanDialog()
 
   useEffect(() => {
-    setSelectedTab(preferredTab)
-  }, [preferredTab])
-
-  useEffect(() => {
     const allowed = canAdminTab[selectedTab as AdminTabKey]
     if (allowed === false) {
       const fallback =
@@ -113,194 +120,124 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
         ).find((tab) => canAdminTab[tab]) ?? 'overview'
       setSelectedTab(fallback)
     }
-  }, [selectedTab, user?.adminPermissions, canAdminTab])
+  }, [selectedTab, user?.adminPermissions, canAdminTab, setSelectedTab])
 
   return (
-    <div
-      className="admin-page-shell flex min-h-0 flex-1 flex-col"
-      data-testid="admin-dashboard-page"
-    >
-      <AdminPortalNav />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <PageShell maxWidth="wide" className="p-4 sm:p-6">
-          <AdminPageHeader
-            {...getAdminPageHeader(
-              initialTab === 'suppliers'
-                ? 'suppliers'
-                : initialTab === 'restaurants'
-                  ? 'restaurants'
-                  : 'platform'
-            )}
-          />
-
-          <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-            <AdminTabScrollRow className="mb-1">
-              <TabsList className="min-w-max justify-start">
-                {initialTab !== 'suppliers' && initialTab !== 'restaurants' && (
-                  <>
-                    {canAdminTab.overview && <TabsTrigger value="overview">Overview</TabsTrigger>}
-                    {canAdminTab.activity && <TabsTrigger value="activity">Activity</TabsTrigger>}
-                    {canAdminTab.tenants && <TabsTrigger value="tenants">Tenants</TabsTrigger>}
-                    {canAdminTab.users && <TabsTrigger value="users">Users</TabsTrigger>}
-                    {canAdminTab.subscriptions && (
-                      <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
-                    )}
-                    {canAdminTab.plans && <TabsTrigger value="plans">Plans</TabsTrigger>}
-                    {canAdminTab.finance && <TabsTrigger value="finance">Finance</TabsTrigger>}
-                    {canAdminTab.usage && <TabsTrigger value="usage">Usage</TabsTrigger>}
-                    {canAdminTab.features && <TabsTrigger value="features">Features</TabsTrigger>}
-                    {canAdminTab.deals && <TabsTrigger value="deals">Deals & Boosts</TabsTrigger>}
-                    {canAdminTab.limits && <TabsTrigger value="limits">Limits</TabsTrigger>}
-                    {canAdminTab.operations && (
-                      <TabsTrigger value="operations">Operations</TabsTrigger>
-                    )}
-                    {canAdminTab.health && <TabsTrigger value="health">Health</TabsTrigger>}
-                    {canAdminTab.audit && <TabsTrigger value="audit">Audit</TabsTrigger>}
-                  </>
-                )}
-
-                {(initialTab === 'suppliers' || initialTab === 'restaurants') && (
-                  <>
-                    <TabsTrigger value="tenants">Directory</TabsTrigger>
-                    <TabsTrigger value="usage">Usage & Quotas</TabsTrigger>
-                    <TabsTrigger value="audit">Audit Logs</TabsTrigger>
-                  </>
-                )}
-              </TabsList>
-            </AdminTabScrollRow>
-
-            <TabsContent value="overview" className="w-full space-y-5">
-              <AdminTabMount tab="overview" selectedTab={selectedTab}>
-                <LazyAdminOverviewTab
-                  active
-                  canAdminTab={canAdminTab}
-                  onNavigateTab={setSelectedTab}
-                  onOperationsSubTab={setOperationsSubTab}
-                />
-              </AdminTabMount>
-            </TabsContent>
-
-            <TabsContent value="plans" className="space-y-5">
-              <AdminTabMount tab="plans" selectedTab={selectedTab}>
-                <LazyAdminPlansTab active />
-              </AdminTabMount>
-            </TabsContent>
-
-            <TabsContent value="subscriptions" className="space-y-6">
-              <AdminTabMount tab="subscriptions" selectedTab={selectedTab}>
-                <LazyAdminSubscriptionsTab active onOpenChangePlan={openChangePlan} />
-              </AdminTabMount>
-            </TabsContent>
-
-            <TabsContent value="operations" className="space-y-5">
-              <AdminTabMount tab="operations" selectedTab={selectedTab}>
-                <AdminOperationsPanel
-                  initialSubTab={operationsSubTab}
-                  onNavigateDeals={() => setSelectedTab('deals')}
-                />
-              </AdminTabMount>
-            </TabsContent>
-
-            <TabsContent value="health" className="space-y-5">
-              <AdminTabMount tab="health" selectedTab={selectedTab}>
-                <LazyAdminHealthTab active />
-              </AdminTabMount>
-            </TabsContent>
-
-            <TabsContent value="finance" className="space-y-5">
-              <AdminTabMount tab="finance" selectedTab={selectedTab}>
-                <LazyAdminFinanceTab active />
-              </AdminTabMount>
-            </TabsContent>
-
-            <TabsContent value="users" className="space-y-6">
-              <AdminTabMount tab="users" selectedTab={selectedTab}>
-                <AdminUsersTab />
-              </AdminTabMount>
-            </TabsContent>
-
-            <TabsContent value="tenants" className="space-y-4">
-              <AdminTabMount tab="tenants" selectedTab={selectedTab}>
-                <LazyAdminTenantsTab
-                  active
-                  initialTab={initialTab}
-                  onOpenChangePlan={openChangePlan}
-                  onPasswordReset={setPasswordResetTarget}
-                  onTenantDiag={setTenantDiag}
-                  onNavigateTab={setSelectedTab}
-                />
-              </AdminTabMount>
-            </TabsContent>
-
-            <TabsContent value="usage" className="space-y-4">
-              <AdminTabMount tab="usage" selectedTab={selectedTab}>
-                <LazyAdminUsageTab
-                  active
-                  initialTab={initialTab}
-                  onOpenChangePlan={openChangePlan}
-                  onTenantDiag={setTenantDiag}
-                />
-              </AdminTabMount>
-            </TabsContent>
-
-            <TabsContent value="features">
-              <AdminTabMount tab="features" selectedTab={selectedTab}>
-                <LazyAdminFeaturesTab active />
-              </AdminTabMount>
-            </TabsContent>
-
-            <TabsContent value="deals">
-              <AdminTabMount tab="deals" selectedTab={selectedTab}>
-                <AdminDealsPanel />
-              </AdminTabMount>
-            </TabsContent>
-
-            <TabsContent value="limits">
-              <AdminTabMount tab="limits" selectedTab={selectedTab}>
-                <AdminLimitsTab />
-              </AdminTabMount>
-            </TabsContent>
-
-            <TabsContent value="activity">
-              <AdminTabMount tab="activity" selectedTab={selectedTab}>
-                <LazyAdminActivityTab active />
-              </AdminTabMount>
-            </TabsContent>
-
-            <TabsContent value="audit">
-              <AdminTabMount tab="audit" selectedTab={selectedTab}>
-                <LazyAdminAuditTab active />
-              </AdminTabMount>
-            </TabsContent>
-          </Tabs>
-
-          {ChangePlanDialog}
-
-          <AdminResetPasswordDialog
-            open={Boolean(passwordResetTarget)}
-            onOpenChange={(open) => !open && setPasswordResetTarget(null)}
-            target={passwordResetTarget}
-          />
-
-          {tenantDiag && (
-            <AdminTenantDiagnosticsDrawer
-              open={Boolean(tenantDiag)}
-              onOpenChange={(open) => !open && setTenantDiag(null)}
-              tenantId={tenantDiag.id}
-              tenantType={tenantDiag.tenantType}
-              tenantName={tenantDiag.name}
-              onNavigateLimits={() => {
-                setTenantDiag(null)
-                setSelectedTab('limits')
-              }}
-              onNavigateFeatures={() => {
-                setTenantDiag(null)
-                setSelectedTab('features')
-              }}
+    <div className="admin-page-shell flex min-h-0 flex-1 flex-col">
+      <PageShell
+        maxWidth="wide"
+        className="min-h-0 flex-1 px-4 py-4 sm:px-6 sm:py-5"
+        data-testid="admin-dashboard-page"
+      >
+        <div className="admin-tab-panel">
+          <AdminTabMount tab="overview" selectedTab={selectedTab}>
+            <LazyAdminOverviewTab
+              active={selectedTab === 'overview'}
+              canAdminTab={canAdminTab}
+              onNavigateTab={(tab) => setSelectedTab(tab as AdminTabKey)}
+              onOperationsSubTab={setOperationsSubTab}
             />
-          )}
-        </PageShell>
-      </div>
+          </AdminTabMount>
+
+          <AdminTabMount tab="plans" selectedTab={selectedTab}>
+            <LazyAdminPlansTab active={selectedTab === 'plans'} />
+          </AdminTabMount>
+
+          <AdminTabMount tab="subscriptions" selectedTab={selectedTab}>
+            <LazyAdminSubscriptionsTab
+              active={selectedTab === 'subscriptions'}
+              onOpenChangePlan={openChangePlan}
+            />
+          </AdminTabMount>
+
+          <AdminTabMount tab="operations" selectedTab={selectedTab}>
+            {selectedTab === 'operations' && (
+              <AdminOperationsPanel
+                initialSubTab={operationsSubTab}
+                onNavigateDeals={() => setSelectedTab('deals')}
+              />
+            )}
+          </AdminTabMount>
+
+          <AdminTabMount tab="health" selectedTab={selectedTab}>
+            <LazyAdminHealthTab active={selectedTab === 'health'} />
+          </AdminTabMount>
+
+          <AdminTabMount tab="finance" selectedTab={selectedTab}>
+            <LazyAdminFinanceTab active={selectedTab === 'finance'} />
+          </AdminTabMount>
+
+          <AdminTabMount tab="users" selectedTab={selectedTab}>
+            {selectedTab === 'users' && <AdminUsersTab />}
+          </AdminTabMount>
+
+          <AdminTabMount tab="tenants" selectedTab={selectedTab}>
+            <LazyAdminTenantsTab
+              active={selectedTab === 'tenants'}
+              initialTab={initialTab}
+              onOpenChangePlan={openChangePlan}
+              onPasswordReset={setPasswordResetTarget}
+              onTenantDiag={setTenantDiag}
+              onNavigateTab={(tab) => setSelectedTab(tab as AdminTabKey)}
+            />
+          </AdminTabMount>
+
+          <AdminTabMount tab="usage" selectedTab={selectedTab}>
+            <LazyAdminUsageTab
+              active={selectedTab === 'usage'}
+              initialTab={initialTab}
+              onOpenChangePlan={openChangePlan}
+              onTenantDiag={setTenantDiag}
+            />
+          </AdminTabMount>
+
+          <AdminTabMount tab="features" selectedTab={selectedTab}>
+            <LazyAdminFeaturesTab active={selectedTab === 'features'} />
+          </AdminTabMount>
+
+          <AdminTabMount tab="deals" selectedTab={selectedTab}>
+            {selectedTab === 'deals' && <AdminDealsPanel />}
+          </AdminTabMount>
+
+          <AdminTabMount tab="limits" selectedTab={selectedTab}>
+            {selectedTab === 'limits' && <AdminLimitsTab />}
+          </AdminTabMount>
+
+          <AdminTabMount tab="activity" selectedTab={selectedTab}>
+            <LazyAdminActivityTab active={selectedTab === 'activity'} />
+          </AdminTabMount>
+
+          <AdminTabMount tab="audit" selectedTab={selectedTab}>
+            <LazyAdminAuditTab active={selectedTab === 'audit'} />
+          </AdminTabMount>
+        </div>
+
+        {ChangePlanDialog}
+
+        <AdminResetPasswordDialog
+          open={Boolean(passwordResetTarget)}
+          onOpenChange={(open) => !open && setPasswordResetTarget(null)}
+          target={passwordResetTarget}
+        />
+
+        {tenantDiag && (
+          <AdminTenantDiagnosticsDrawer
+            open={Boolean(tenantDiag)}
+            onOpenChange={(open) => !open && setTenantDiag(null)}
+            tenantId={tenantDiag.id}
+            tenantType={tenantDiag.tenantType}
+            tenantName={tenantDiag.name}
+            onNavigateLimits={() => {
+              setTenantDiag(null)
+              setSelectedTab('limits')
+            }}
+            onNavigateFeatures={() => {
+              setTenantDiag(null)
+              setSelectedTab('features')
+            }}
+          />
+        )}
+      </PageShell>
     </div>
   )
 }

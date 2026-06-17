@@ -32,6 +32,7 @@ import { SupplierMobileNav } from './SupplierMobileNav'
 import { isBillingAlertVisible, LayoutTenantAlerts } from './LayoutTenantAlerts'
 import { useNotificationAlerts } from '../hooks/useNotificationAlerts'
 import { TooltipProvider } from './ui/tooltip'
+import { AdminShell } from './admin/shell'
 
 export function Layout() {
   const location = useLocation()
@@ -237,8 +238,10 @@ export function Layout() {
     blockedCountLast7d >= 3 &&
     planBlockNudgeMessage
 
-  const isAdminPortalRoute =
-    isPlatformAdmin && !isImpersonating && location.pathname.startsWith('/app/admin')
+  const isAdminExperience =
+    isPlatformAdmin &&
+    !isImpersonating &&
+    (location.pathname.startsWith('/app/admin') || location.pathname.startsWith('/app/settings'))
 
   return (
     <TenantBrandingProvider>
@@ -249,61 +252,51 @@ export function Layout() {
             <OfflineBanner />
             <UpgradeModal />
             <PaymentModal />
-            <div className="flex">
-              {mobileNavOpen && !isAdminPortalRoute && (
-                <button
-                  type="button"
-                  className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
-                  aria-label="Close navigation menu"
-                  onClick={() => setMobileNavOpen(false)}
-                />
-              )}
-              {!isAdminPortalRoute && (
-                <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
-              )}
-              <div className="flex min-w-0 flex-1 flex-col">
-                <Header onOpenMobileNav={() => setMobileNavOpen(true)} />
-                {showTenantBanners && (
-                  <LayoutTenantAlerts
-                    showDealsBanner={
-                      isEffectiveRestaurant && featureEnabled(e?.features?.supplier_deals)
-                    }
-                    showBillingBanner={isBillingAlertVisible(billingStatus?.access)}
-                    showExternalFeaturesBanner={externallyDisabledFeatures.length > 0}
-                    externallyDisabledFeatures={externallyDisabledFeatures}
-                    entitlements={e}
-                    atLimitEntries={atLimitEntries}
-                    showNearLimitBanner={Boolean(showNearLimitBanner)}
-                    primaryNearLimit={primaryNearLimit}
-                    showTierDisabledBanner={Boolean(showTierDisabledBanner)}
-                    planTierDisabledFeatures={planTierDisabledFeatures}
-                    showPlanBlockNudge={Boolean(showPlanBlockNudge)}
-                    planBlockNudgeMessage={planBlockNudgeMessage}
-                    onRecordConversionEvent={(payload) => {
-                      recordConversionEvent(payload).catch(() => {})
-                    }}
+            {isAdminExperience ? (
+              <AdminShell>
+                <Outlet />
+              </AdminShell>
+            ) : (
+              <div className="flex">
+                {mobileNavOpen && (
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
+                    aria-label="Close navigation menu"
+                    onClick={() => setMobileNavOpen(false)}
                   />
                 )}
-                <main
-                  className={
-                    isAdminPortalRoute
-                      ? 'flex min-h-0 flex-1 flex-col'
-                      : 'flex-1 p-3 pb-20 sm:p-4 md:p-6 lg:pb-6'
-                  }
-                >
-                  {isAdminPortalRoute ? (
-                    <div className="mx-auto flex min-h-[calc(100dvh-3.5rem)] min-w-0 w-full max-w-[1400px] flex-1 flex-col bg-[var(--surface)]">
-                      <Outlet />
-                    </div>
-                  ) : (
-                    <div className="min-h-[calc(100vh-5rem)] rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 sm:rounded-2xl sm:p-4 md:p-6">
-                      <Outlet />
-                    </div>
+                <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <Header onOpenMobileNav={() => setMobileNavOpen(true)} />
+                  {showTenantBanners && (
+                    <LayoutTenantAlerts
+                      showDealsBanner={
+                        isEffectiveRestaurant && featureEnabled(e?.features?.supplier_deals)
+                      }
+                      showBillingBanner={isBillingAlertVisible(billingStatus?.access)}
+                      showExternalFeaturesBanner={externallyDisabledFeatures.length > 0}
+                      externallyDisabledFeatures={externallyDisabledFeatures}
+                      entitlements={e}
+                      atLimitEntries={atLimitEntries}
+                      showNearLimitBanner={Boolean(showNearLimitBanner)}
+                      primaryNearLimit={primaryNearLimit}
+                      showTierDisabledBanner={Boolean(showTierDisabledBanner)}
+                      planTierDisabledFeatures={planTierDisabledFeatures}
+                      showPlanBlockNudge={Boolean(showPlanBlockNudge)}
+                      planBlockNudgeMessage={planBlockNudgeMessage}
+                      onRecordConversionEvent={(payload) => {
+                        recordConversionEvent(payload).catch(() => {})
+                      }}
+                    />
                   )}
-                </main>
+                  <main className="flex-1 p-3 pb-20 sm:p-4 md:p-6 lg:pb-6">
+                    <Outlet />
+                  </main>
+                </div>
               </div>
-            </div>
-            {!isAdminPortalRoute && (
+            )}
+            {!isAdminExperience && (
               <>
                 <RestaurantMobileNav />
                 <SupplierMobileNav />

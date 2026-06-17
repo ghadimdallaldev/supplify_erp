@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Card, CardContent } from '../components/ui/card'
 import { Alert, AlertDescription } from '../components/ui/alert'
-import { Loader2, Shield } from 'lucide-react'
+import { PageHeader } from '../components/ui/page-header'
+import { Loader2 } from 'lucide-react'
 import {
   LegalAcceptancePanel,
   isLegalAcceptanceComplete,
@@ -96,20 +97,15 @@ export function LegalReacceptPage() {
     <div className="min-h-screen bg-[var(--bg)] flex flex-col">
       <div className="flex-1 flex items-center justify-center px-4 py-10">
         <Card className="w-full max-w-2xl">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Shield className="h-5 w-5 text-[var(--brand)]" />
-              Updated legal agreements
-            </CardTitle>
-            <CardDescription>
-              Our legal documents were updated (pack {LEGAL_PACK_VERSION}
-              {legalStatus?.acceptedPackVersion
-                ? ` · you previously accepted ${legalStatus.acceptedPackVersion}`
-                : ''}
-              ). Review and accept the current agreements to continue using Supplify.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-6 pt-6">
+            <PageHeader
+              title="Updated legal agreements"
+              description={`Our legal documents were updated (pack ${LEGAL_PACK_VERSION}${
+                legalStatus?.acceptedPackVersion
+                  ? ` · you previously accepted ${legalStatus.acceptedPackVersion}`
+                  : ''
+              }). Review and accept the current agreements to continue using Supplify.`}
+            />
             {error ? (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>

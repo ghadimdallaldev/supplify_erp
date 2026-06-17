@@ -54,11 +54,7 @@ export function InfoBanner({
   const styles = toneStyles[tone]
   return (
     <div
-      className={cn(
-        'mx-3 mt-4 rounded-lg border px-4 py-3 text-sm sm:mx-6',
-        styles.container,
-        className
-      )}
+      className={cn('rounded-lg border px-4 py-3 text-sm', styles.container, className)}
       role="status"
       data-testid={testId}
     >

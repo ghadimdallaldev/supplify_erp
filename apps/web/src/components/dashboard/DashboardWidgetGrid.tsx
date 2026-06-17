@@ -2,6 +2,11 @@ import { Link } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { Package, ShoppingCart, AlertTriangle, Loader2, Warehouse, Users } from 'lucide-react'
 import { useGetSupplierGrowthMetricsQuery } from '../../services/api/endpoints/growth'
+import { useGetEntitlementsQuery } from '../../services/api'
+import { useAppSelector } from '../../hooks/redux'
+import { usePermissions } from '../../hooks/usePermissions'
+import { canUseSupplierGrowth } from '../../lib/planFeatureGates'
+import { canViewSupplierGrowth } from '../../lib/tenantRoles'
 import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { Skeleton } from '../ui/skeleton'
@@ -43,8 +48,16 @@ export function DashboardWidgetGrid(props: any) {
     restaurantLayout,
   } = props
 
+  const { can } = usePermissions()
+  const { user } = useAppSelector((state) => state.auth)
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !isSupplier })
+  const supplierGrowthEnabled =
+    isSupplier &&
+    canUseSupplierGrowth(entitlementsData?.entitlements) &&
+    canViewSupplierGrowth(user, can)
+
   const { data: growthMetrics } = useGetSupplierGrowthMetricsQuery(undefined, {
-    skip: !isSupplier,
+    skip: !supplierGrowthEnabled,
   })
 
   return (

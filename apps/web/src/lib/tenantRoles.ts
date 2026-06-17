@@ -21,3 +21,12 @@ export function isTenantOwner(user: User | null | undefined): boolean {
   }
   return false
 }
+
+/** Supplier customer growth nav/API — owners always; others need growth permissions. */
+export function canViewSupplierGrowth(
+  user: User | null | undefined,
+  can: (key: string) => boolean
+): boolean {
+  if (isTenantOwner(user)) return true
+  return can('GROWTH_VIEW') || can('CUSTOMERS_MANAGE')
+}

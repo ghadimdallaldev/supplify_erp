@@ -202,14 +202,14 @@ export function DisputesPage() {
 
   if (!disputesEnabled) {
     return (
-      <div className="space-y-4">
+      <PageShell className="space-y-4" data-testid="disputes-page">
         <PageHeader title="Disputes" />
         <AppPanel title="Disputes unavailable">
           <p className="text-sm text-[var(--text-mid)]">
             Disputes & returns are not on your plan. Upgrade to manage delivery issues and credits.
           </p>
         </AppPanel>
-      </div>
+      </PageShell>
     )
   }
 

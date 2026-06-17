@@ -54,8 +54,7 @@ export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
         data-testid="delivery-tracking-drawer"
         className={cn(
           'flex w-full flex-col gap-4 overflow-hidden',
-          sheetSide === 'bottom' && 'max-h-[92dvh] rounded-t-xl',
-          sheetSide === 'right' && 'max-h-full sm:max-w-lg'
+          sheetSide === 'bottom' && 'max-h-[92dvh] rounded-t-xl'
         )}
       >
         <SheetHeader className="shrink-0 text-left">

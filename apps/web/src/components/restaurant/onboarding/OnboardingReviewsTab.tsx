@@ -1,5 +1,5 @@
 import { useGetMyReviewsQuery } from '../../../services/api'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
+import { AppPanel } from '../../ui/app-panel'
 import { Star } from 'lucide-react'
 import { OnboardingTabLoading } from './onboardingShared'
 
@@ -12,12 +12,11 @@ export function OnboardingReviewsTab() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>My supplier reviews</CardTitle>
-          <CardDescription>Reviews you have submitted after completed orders</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <AppPanel
+        title="My supplier reviews"
+        description="Reviews you have submitted after completed orders"
+      >
+        <div className="space-y-3">
           {(myReviewsData?.reviews || []).length === 0 ? (
             <p className="text-sm text-[var(--text-muted)]">
               You have not written any reviews yet.
@@ -40,8 +39,8 @@ export function OnboardingReviewsTab() {
               </div>
             ))
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </AppPanel>
     </div>
   )
 }

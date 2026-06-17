@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
-import { Card } from '../../ui/card'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
+import { AppPanel, SummaryStrip } from '../../ui/app-panel'
+import { TableScroll } from '../../ui/table-scroll'
 import {
   useGetAdminOverviewQuery,
   useGetAdminConversionStatsQuery,
@@ -18,15 +19,23 @@ import {
   Clock,
   PauseCircle,
   XCircle,
+  Loader2,
+  ArrowRight,
 } from 'lucide-react'
-import { getPaidActiveSubscriptionCount, type AdminOverview } from '../../../lib/adminOverview'
+import {
+  deriveSystemHealth,
+  formatSystemHealthLabel,
+  getActiveSubscriptionCount,
+  getPaidActiveSubscriptionCount,
+  getTotalTenantCount,
+  type AdminOverview,
+} from '../../../lib/adminOverview'
 import { formatCurrency } from '../../../utils/format'
 import { AdminOverviewExtras } from '../AdminOverviewExtras'
-import { AdminExecutiveSummary } from '../AdminExecutiveSummary'
 import { AdminOperationsSnapshot } from '../AdminOperationsSnapshot'
 import { AdminKpiCard } from '../AdminKpiCard'
-import { AdminSectionHeader } from '../adminUi'
-import { AdminTabLoading, type AdminCanTabMap } from './adminDashboardShared'
+import { AdminErrorState, AdminLoadingSkeleton, AdminSectionHeader } from '../adminUi'
+import { type AdminCanTabMap } from './adminDashboardShared'
 
 export interface AdminOverviewTabProps {
   active: boolean
@@ -60,49 +69,139 @@ export function AdminOverviewTab({
   const { data: conversionStats } = useGetAdminConversionStatsQuery({ days: 30 }, { skip: !active })
   const { data: healthData } = useGetAdminHealthQuery(undefined, { skip: !active })
 
+  const recentErrorCount = Array.isArray(healthData?.recentApiErrors)
+    ? healthData.recentApiErrors.length
+    : 0
+
+  const systemHealth = deriveSystemHealth(overview as AdminOverview | undefined, recentErrorCount)
+
+  const subscriptionStats = useMemo(
+    () => (overview?.subscriptionStats as Record<string, number> | undefined) ?? {},
+    [overview?.subscriptionStats]
+  )
+
   if (!active) {
     return null
   }
 
   if (overviewLoading) {
-    return <AdminTabLoading />
+    return (
+      <>
+        <AdminSectionHeader
+          title="Overview"
+          description="Platform health, tenant growth, and operational metrics."
+        />
+        <AdminLoadingSkeleton rows={10} />
+      </>
+    )
   }
 
   if (overviewError) {
     return (
-      <Card className="border-red-200 bg-red-50 p-6">
-        <div className="flex flex-wrap items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-[200px]">
-            <p className="font-semibold text-red-900">Could not load dashboard metrics</p>
-            <p className="text-sm text-red-800 mt-1">
-              {(overviewQueryError as { data?: { message?: string } })?.data?.message ||
-                'The overview API request failed. Metrics are not shown as zero to avoid a misleading empty dashboard.'}
-            </p>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => refetchOverview()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Retry
-          </Button>
-        </div>
-      </Card>
+      <>
+        <AdminSectionHeader
+          title="Overview"
+          description="Platform health, tenant growth, and operational metrics."
+        />
+        <AdminErrorState
+          title="Could not load dashboard metrics"
+          message={
+            (overviewQueryError as { data?: { message?: string } })?.data?.message ||
+            'The overview API request failed. Metrics are not shown as zero to avoid a misleading empty dashboard.'
+          }
+          onRetry={() => refetchOverview()}
+        />
+      </>
     )
   }
 
+  const overviewData = overview as AdminOverview
+
   return (
     <>
-      <AdminExecutiveSummary
-        overview={overview as AdminOverview}
-        recentErrorCount={
-          Array.isArray(healthData?.recentApiErrors) ? healthData.recentApiErrors.length : 0
+      <AdminSectionHeader
+        title="Overview"
+        description="Platform health, tenant growth, and operational metrics."
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetchOverview()}
+            disabled={overviewFetching}
+          >
+            {overviewFetching ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+          </Button>
         }
       />
 
+      <div className="mb-4">
+        <SummaryStrip
+          testId="admin-overview-summary"
+          columns={6}
+          metrics={[
+            {
+              label: 'Total tenants',
+              value: getTotalTenantCount(overviewData),
+              hint: 'Suppliers + restaurants',
+              tone: 'brand',
+              onClick: canAdminTab.tenants ? () => onNavigateTab('tenants') : undefined,
+            },
+            {
+              label: 'Active subs',
+              value: getActiveSubscriptionCount(overviewData),
+              hint: 'ACTIVE + TRIALING',
+              tone: 'mint',
+              onClick: canAdminTab.subscriptions ? () => onNavigateTab('subscriptions') : undefined,
+            },
+            {
+              label: 'MRR',
+              value: formatCurrency(overviewData?.revenue?.mrr),
+              hint: `ARR ${formatCurrency(overviewData?.revenue?.arr)}`,
+              tone: 'brand',
+              onClick: canAdminTab.finance ? () => onNavigateTab('finance') : undefined,
+            },
+            {
+              label: 'Orders today',
+              value: overviewData?.orders?.today ?? 0,
+              hint: `${overviewData?.orders?.week ?? 0} this week`,
+              tone: 'default',
+            },
+            {
+              label: 'System health',
+              value: formatSystemHealthLabel(systemHealth),
+              hint:
+                recentErrorCount > 0
+                  ? `${recentErrorCount} recent error${recentErrorCount > 1 ? 's' : ''}`
+                  : 'Platform operational status',
+              tone:
+                systemHealth === 'healthy'
+                  ? 'mint'
+                  : systemHealth === 'degraded'
+                    ? 'amber'
+                    : 'danger',
+              onClick: canAdminTab.health ? () => onNavigateTab('health') : undefined,
+            },
+            {
+              label: 'Past due',
+              value: overviewData?.alerts?.pastDueSubscriptions ?? subscriptionStats.PAST_DUE ?? 0,
+              hint: 'Subscriptions needing attention',
+              tone:
+                (overviewData?.alerts?.pastDueSubscriptions ?? subscriptionStats.PAST_DUE ?? 0) > 0
+                  ? 'danger'
+                  : 'default',
+              onClick: canAdminTab.subscriptions ? () => onNavigateTab('subscriptions') : undefined,
+            },
+          ]}
+        />
+      </div>
+
       <AdminOperationsSnapshot
-        overview={overview as AdminOverview}
-        recentErrorCount={
-          Array.isArray(healthData?.recentApiErrors) ? healthData.recentApiErrors.length : 0
-        }
+        overview={overviewData}
+        recentErrorCount={recentErrorCount}
         onNavigateTab={onNavigateTab}
         onOperationsSubTab={onOperationsSubTab}
       />
@@ -116,16 +215,27 @@ export function AdminOverviewTab({
         canNavigateTab={(tab) => canAdminTab[tab as keyof AdminCanTabMap] ?? false}
       />
 
-      {/* Tenants & Revenue */}
-      <div>
-        <AdminSectionHeader title="Tenants & Revenue" />
+      <AppPanel
+        title="Tenants & Revenue"
+        description="Registered tenants and recurring revenue snapshot"
+        testId="admin-overview-tenants-revenue"
+        className="mb-4"
+        footer={
+          overviewFetching ? (
+            <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Refreshing metrics…
+            </p>
+          ) : undefined
+        }
+      >
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <AdminKpiCard
             label="Suppliers"
-            value={overview?.tenants?.totalSuppliers ?? 0}
+            value={overviewData?.tenants?.totalSuppliers ?? 0}
             description={
-              (overview?.tenants?.newSuppliers7d || 0) > 0
-                ? `+${overview?.tenants?.newSuppliers7d} new this week`
+              (overviewData?.tenants?.newSuppliers7d || 0) > 0
+                ? `+${overviewData?.tenants?.newSuppliers7d} new this week`
                 : 'No new this week'
             }
             icon={Building2}
@@ -133,10 +243,10 @@ export function AdminOverviewTab({
           />
           <AdminKpiCard
             label="Restaurants"
-            value={overview?.tenants?.totalRestaurants ?? 0}
+            value={overviewData?.tenants?.totalRestaurants ?? 0}
             description={
-              (overview?.tenants?.newRestaurants7d || 0) > 0
-                ? `+${overview?.tenants?.newRestaurants7d} new this week`
+              (overviewData?.tenants?.newRestaurants7d || 0) > 0
+                ? `+${overviewData?.tenants?.newRestaurants7d} new this week`
                 : 'No new this week'
             }
             icon={Store}
@@ -144,27 +254,40 @@ export function AdminOverviewTab({
           />
           <AdminKpiCard
             label="MRR"
-            value={formatCurrency(overview?.revenue?.mrr)}
-            description={`ARR: ${formatCurrency(overview?.revenue?.arr)}`}
+            value={formatCurrency(overviewData?.revenue?.mrr)}
+            description={`ARR: ${formatCurrency(overviewData?.revenue?.arr)}`}
             icon={DollarSign}
             tone="success"
           />
           <AdminKpiCard
             label="Active subs"
-            value={getPaidActiveSubscriptionCount(overview)}
+            value={getPaidActiveSubscriptionCount(overviewData)}
             description="Paid plans (excl. Free Trial)"
             icon={CreditCard}
             tone="brand"
           />
         </div>
-      </div>
+        {canAdminTab.finance && (
+          <div className="mt-4 flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => onNavigateTab('finance')}
+            >
+              Open finance <ArrowRight className="ml-1 h-3 w-3" />
+            </Button>
+          </div>
+        )}
+      </AppPanel>
 
-      {/* Subscription breakdown */}
-      <Card className="p-4">
-        <h3 className="text-sm font-semibold text-[var(--text)] mb-4">
-          Subscription Status Breakdown
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <AppPanel
+        title="Subscription status breakdown"
+        description="Live subscription counts by billing status"
+        testId="admin-overview-subscription-breakdown"
+        className="mb-4"
+      >
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {[
             {
               status: 'ACTIVE',
@@ -187,10 +310,13 @@ export function AdminOverviewTab({
               bg: 'var(--surface-mid)',
             },
           ].map(({ status, icon: Icon, color, bg }) => (
-            <div
+            <button
               key={status}
-              className="flex items-center gap-2 rounded-lg p-3"
+              type="button"
+              className="flex items-center gap-2 rounded-lg p-3 text-left transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-100"
               style={{ background: bg }}
+              disabled={!canAdminTab.subscriptions}
+              onClick={() => canAdminTab.subscriptions && onNavigateTab('subscriptions')}
             >
               <Icon className="h-4 w-4 flex-shrink-0" style={{ color }} />
               <div>
@@ -198,26 +324,35 @@ export function AdminOverviewTab({
                   {status}
                 </p>
                 <p className="text-xl font-black text-[var(--text)]">
-                  {String(
-                    (overview?.subscriptionStats as Record<string, number> | undefined)?.[status] ||
-                      0
-                  )}
+                  {String(subscriptionStats[status] ?? 0)}
                 </p>
               </div>
-            </div>
+            </button>
           ))}
         </div>
-      </Card>
+      </AppPanel>
 
-      {/* Conversion funnel */}
       {conversionStats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-[var(--text)]">Conversion Funnel (30d)</h3>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <AppPanel
+            title="Conversion funnel (30d)"
+            description="Upgrade path from feature blocks to completed upgrades"
+            testId="admin-overview-conversion-funnel"
+          >
+            <div className="mb-4 flex items-center justify-between">
               <Badge variant="outline" className="text-xs">
-                {conversionStats.blocksToUpgradesConversionPercent}% rate
+                {conversionStats.blocksToUpgradesConversionPercent}% conversion rate
               </Badge>
+              {canAdminTab.plans && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => onNavigateTab('plans')}
+                >
+                  Plan limits <ArrowRight className="ml-1 h-3 w-3" />
+                </Button>
+              )}
             </div>
             {(() => {
               const s30 = conversionStats.funnelDropOff?.['30d']
@@ -238,12 +373,12 @@ export function AdminOverviewTab({
                 <div className="space-y-3">
                   {funnelSteps.map(({ label, value }) => (
                     <div key={label}>
-                      <div className="flex justify-between text-xs mb-1">
+                      <div className="mb-1 flex justify-between text-xs">
                         <span className="text-[var(--text-muted)]">{label}</span>
                         <span className="font-semibold text-[var(--text)]">{value}</span>
                       </div>
                       <div
-                        className="h-1.5 rounded-full overflow-hidden"
+                        className="h-1.5 overflow-hidden rounded-full"
                         style={{ background: 'var(--app-border)' }}
                       >
                         <div
@@ -260,7 +395,7 @@ export function AdminOverviewTab({
               )
             })()}
             {(conversionStats.mostBlockedFeature || conversionStats.mostBlockedLimit) && (
-              <div className="mt-4 pt-3 border-t space-y-1">
+              <div className="mt-4 space-y-1 border-t pt-3">
                 {conversionStats.mostBlockedFeature && (
                   <p className="text-xs text-[var(--text-muted)]">
                     Top blocked feature:{' '}
@@ -279,20 +414,21 @@ export function AdminOverviewTab({
                 )}
               </div>
             )}
-          </Card>
+          </AppPanel>
 
           {conversionStats.funnelDropOff && (
-            <Card className="p-5">
-              <h3 className="text-sm font-semibold text-[var(--text)] mb-4">
-                7-day vs 30-day Comparison
-              </h3>
-              <div className="overflow-x-auto">
+            <AppPanel
+              title="7-day vs 30-day comparison"
+              description="Recent upgrade funnel momentum"
+              testId="admin-overview-funnel-comparison"
+            >
+              <TableScroll aria-label="Funnel comparison">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2 text-[var(--text-muted)] font-medium">Step</th>
-                      <th className="text-right py-2 text-[var(--text-muted)] font-medium">7d</th>
-                      <th className="text-right py-2 text-[var(--text-muted)] font-medium">30d</th>
+                    <tr className="border-b border-[var(--app-border)]">
+                      <th className="py-2 text-left font-medium text-[var(--text-muted)]">Step</th>
+                      <th className="py-2 text-right font-medium text-[var(--text-muted)]">7d</th>
+                      <th className="py-2 text-right font-medium text-[var(--text-muted)]">30d</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--app-border)]">
@@ -316,8 +452,8 @@ export function AdminOverviewTab({
                     ))}
                   </tbody>
                 </table>
-              </div>
-            </Card>
+              </TableScroll>
+            </AppPanel>
           )}
         </div>
       )}

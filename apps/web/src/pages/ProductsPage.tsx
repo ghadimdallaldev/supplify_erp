@@ -351,7 +351,7 @@ export function ProductsPage() {
   if (error) {
     return (
       <RequirePermission anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']} title="products">
-        <PageShell data-testid="products-page">
+        <PageShell maxWidth="wide" data-testid="products-page">
           <PageHeader
             title="Products"
             description={
@@ -377,7 +377,7 @@ export function ProductsPage() {
 
   return (
     <RequirePermission anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']} title="products">
-      <PageShell data-testid="products-page">
+      <PageShell maxWidth="wide" data-testid="products-page">
         <PageHeader
           title="Products"
           description={

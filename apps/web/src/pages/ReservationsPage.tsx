@@ -147,7 +147,7 @@ export function ReservationsPage() {
 
   return (
     <RequirePermission permission="RESERVATIONS_VIEW" title="reservations">
-      <PageShell className="space-y-4" data-testid="reservations-page">
+      <PageShell maxWidth="wide" className="space-y-4" data-testid="reservations-page">
         <PageHeader
           title={reservationsTitle}
           description={reservationsDescription}

@@ -17,6 +17,8 @@ import { Badge } from '../../components/ui/badge'
 import { Skeleton } from '../../components/ui/skeleton'
 import { Switch } from '../../components/ui/switch'
 import { Alert, AlertDescription } from '../../components/ui/alert'
+import { PageHeader } from '../../components/ui/page-header'
+import { PageShell } from '../../components/ui/page-shell'
 import { formatPrice } from '../../utils/format'
 import { toast } from 'sonner'
 import {
@@ -279,7 +281,7 @@ export function ConsumerCheckoutPage() {
   }
 
   return (
-    <div className="space-y-4 p-4 pb-8">
+    <PageShell className="space-y-4 p-4 pb-8">
       <Button variant="ghost" size="sm" asChild>
         <Link to={branchId ? `/order/${slug}/menu?branchId=${branchId}` : `/order/${slug}/menu`}>
           <ArrowLeft className="mr-1 h-4 w-4" />
@@ -288,10 +290,9 @@ export function ConsumerCheckoutPage() {
       </Button>
 
       <div>
-        <h1 className="text-2xl font-semibold">Checkout</h1>
-        <p className="text-muted-foreground">{restaurant?.name}</p>
+        <PageHeader title="Checkout" description={restaurant?.name} />
         {prepMinutes > 0 && (
-          <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
+          <p className="mt-1 flex items-center gap-1 text-sm text-[var(--text-muted)]">
             <Clock className="h-3.5 w-3.5" />
             Est. prep time ~{prepMinutes} min
           </p>
@@ -650,7 +651,7 @@ export function ConsumerCheckoutPage() {
           </Button>
         </form>
       )}
-    </div>
+    </PageShell>
   )
 }
 

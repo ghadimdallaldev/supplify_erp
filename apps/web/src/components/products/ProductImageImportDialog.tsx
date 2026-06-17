@@ -410,10 +410,7 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent
-        className="max-w-3xl max-h-[90vh] overflow-y-auto"
-        data-testid="image-import-dialog"
-      >
+      <DialogContent size="xl" data-testid="image-import-dialog">
         <DialogHeader>
           <DialogTitle>Import Product Images</DialogTitle>
           <DialogDescription>

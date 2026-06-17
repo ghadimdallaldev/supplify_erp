@@ -3,6 +3,8 @@ import { useGetProductQuery } from '../services/api'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
+import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { Package, ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -36,24 +38,39 @@ export function ProductDetailPage() {
 
   if (error || !data) {
     return (
-      <div className="text-center py-12">
-        <p className="text-[var(--red)]">Product not found</p>
-      </div>
+      <PageShell data-testid="product-detail-page">
+        <PageHeader
+          title="Product"
+          breadcrumb={
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/app/products">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Products
+              </Link>
+            </Button>
+          }
+        />
+        <p className="text-center text-[var(--red)]">Product not found</p>
+      </PageShell>
     )
   }
 
   const product = data.product
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center space-x-4">
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/app/products">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Products
-          </Link>
-        </Button>
-      </div>
+    <PageShell data-testid="product-detail-page">
+      <PageHeader
+        title={product.name}
+        description={product.description || undefined}
+        breadcrumb={
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/app/products">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Products
+            </Link>
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-4">
@@ -71,13 +88,9 @@ export function ProductDetailPage() {
         </div>
 
         <div className="space-y-6">
-          <div>
-            <h1 className="text-[21px] font-black text-[var(--text)]">{product.name}</h1>
-            <p className="text-[var(--text-muted)] mt-2">{product.description}</p>
-            <div className="flex items-center space-x-2 mt-4">
-              <Badge variant="secondary">{product.category}</Badge>
-              <Badge variant="outline">{product.brand}</Badge>
-            </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary">{product.category}</Badge>
+            <Badge variant="outline">{product.brand}</Badge>
           </div>
 
           <Card>
@@ -139,6 +152,6 @@ export function ProductDetailPage() {
           {isEffectiveSupplier && id && <ProductSubstitutesSection productId={id} />}
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

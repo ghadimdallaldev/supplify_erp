@@ -54,7 +54,7 @@ export function RestaurantInventoryPage() {
 
   return (
     <RequirePermission permission="INVENTORY_VIEW" title="inventory">
-      <PageShell className="space-y-6" data-testid="restaurant-inventory-page">
+      <PageShell maxWidth="wide" data-testid="restaurant-inventory-page">
         <PageHeader
           title="Inventory"
           description="Track stock levels, waste, expiry, and movement across your kitchen."
@@ -152,7 +152,7 @@ export function RestaurantInventoryPage() {
         </Tabs>
 
         <Dialog open={showAddProductDialog} onOpenChange={setShowAddProductDialog}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent size="md">
             <DialogHeader>
               <DialogTitle>Add Product to Inventory</DialogTitle>
               <DialogDescription>Manually add a product to your inventory</DialogDescription>
@@ -219,7 +219,7 @@ export function RestaurantInventoryPage() {
         </Dialog>
 
         <Dialog open={showBulkUploadDialog} onOpenChange={setShowBulkUploadDialog}>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent size="lg">
             <DialogHeader>
               <DialogTitle>Bulk Upload Inventory</DialogTitle>
               <DialogDescription>Import inventory items from a CSV or Excel file</DialogDescription>

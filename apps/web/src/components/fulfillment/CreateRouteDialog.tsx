@@ -59,7 +59,7 @@ export function CreateRouteDialog({ open, onClose, selectedOrders }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Assign to planned route</DialogTitle>
         </DialogHeader>

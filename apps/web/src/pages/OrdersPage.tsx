@@ -363,12 +363,10 @@ export function OrdersPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 p-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <Skeleton className="h-9 w-48 mb-2" />
-            <Skeleton className="h-4 w-72" />
-          </div>
+      <PageShell maxWidth="wide">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-72" />
         </div>
         <Card>
           <CardContent className="p-5 sm:p-6">
@@ -384,7 +382,7 @@ export function OrdersPage() {
             <Skeleton key={i} className="h-16 w-full rounded-lg" />
           ))}
         </div>
-      </div>
+      </PageShell>
     )
   }
 
@@ -406,7 +404,7 @@ export function OrdersPage() {
 
   return (
     <RequirePermission permission="ORDERS_VIEW" title="orders">
-      <PageShell data-testid="orders-page">
+      <PageShell data-testid="orders-page" maxWidth="wide">
         <PageHeader
           title={ordersTitle}
           description={ordersDescription}
@@ -534,7 +532,7 @@ export function OrdersPage() {
             )}
 
             <Dialog open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
-              <DialogContent className="sm:max-w-md">
+              <DialogContent size="sm">
                 <DialogHeader>
                   <DialogTitle>More filters</DialogTitle>
                   <DialogDescription>
@@ -885,7 +883,7 @@ export function OrdersPage() {
         {/* Manual Order Creation Dialog */}
         {isSupplier && (
           <Dialog open={showManualOrderDialog} onOpenChange={setShowManualOrderDialog}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent size="lg">
               <DialogHeader>
                 <DialogTitle>Create Manual Order</DialogTitle>
                 <DialogDescription>
@@ -1012,7 +1010,7 @@ export function OrdersPage() {
 
         {/* Product Selection Dialog */}
         <Dialog open={showProductSelection} onOpenChange={setShowProductSelection}>
-          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogContent size="xl">
             <DialogHeader>
               <DialogTitle>Select Products</DialogTitle>
               <DialogDescription>Search and add products to the order</DialogDescription>

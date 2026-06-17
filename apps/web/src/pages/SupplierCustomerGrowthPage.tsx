@@ -10,6 +10,7 @@ import { Select, SelectTrigger } from '../components/ui/select'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { EmptyState } from '../components/ui/empty-state'
+import { FeatureLockedCard } from '../components/FeatureLockedCard'
 import {
   useGetSupplierGrowthMetricsQuery,
   useGetSupplierProspectsQuery,
@@ -20,6 +21,11 @@ import {
   useSponsorProspectMutation,
   CUSTOMER_IMPORT_CSV_TEMPLATE,
 } from '../services/api/endpoints/growth'
+import { useGetEntitlementsQuery } from '../services/api'
+import { canUseSupplierGrowth } from '../lib/planFeatureGates'
+import { usePermissions } from '../hooks/usePermissions'
+import { canViewSupplierGrowth } from '../lib/tenantRoles'
+import { useAppSelector } from '../hooks/redux'
 import {
   lowestEligibleSponsorPlan,
   normalizeEligibleSponsorPlans,
@@ -55,18 +61,25 @@ function MetricsSkeleton() {
 }
 
 export function SupplierCustomerGrowthPage() {
+  const { user } = useAppSelector((state) => state.auth)
+  const { can } = usePermissions()
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const supplierGrowthEnabled = canUseSupplierGrowth(entitlementsData?.entitlements)
+  const canViewGrowth = canViewSupplierGrowth(user, can)
+  const skipGrowthApi = !supplierGrowthEnabled || !canViewGrowth
+
   const {
     data: metrics,
     isLoading: metricsLoading,
     isError: metricsError,
     refetch: refetchMetrics,
-  } = useGetSupplierGrowthMetricsQuery()
+  } = useGetSupplierGrowthMetricsQuery(undefined, { skip: skipGrowthApi })
   const {
     data: prospectsData,
     isLoading: prospectsLoading,
     isError: prospectsError,
     refetch: refetchProspects,
-  } = useGetSupplierProspectsQuery({ limit: 50 })
+  } = useGetSupplierProspectsQuery({ limit: 50 }, { skip: skipGrowthApi })
   const [previewImport] = usePreviewCustomerImportMutation()
   const [executeImport, { isLoading: importing }] = useExecuteCustomerImportMutation()
   const [inviteProspect] = useInviteProspectMutation()
@@ -158,8 +171,21 @@ export function SupplierCustomerGrowthPage() {
     URL.revokeObjectURL(url)
   }
 
+  if (!supplierGrowthEnabled) {
+    return (
+      <PageShell maxWidth="wide" data-testid="customer-growth-page">
+        <PageHeader title="Customer Growth" />
+        <FeatureLockedCard
+          featureKey="supplier_growth"
+          featureName="Customer growth & referrals"
+          currentPlan={entitlementsData?.entitlements?.plan?.name ?? null}
+        />
+      </PageShell>
+    )
+  }
+
   return (
-    <PageShell data-testid="customer-growth-page">
+    <PageShell maxWidth="wide" data-testid="customer-growth-page">
       <PageHeader
         title="Customer Growth"
         description="Bring your existing restaurant customers onto Supplify. Upload a customer list, see who is already on the platform, then invite new restaurants or gift them a paid plan to get them started."

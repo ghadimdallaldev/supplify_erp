@@ -368,7 +368,7 @@ export function StaffTeamTab() {
                 Add staff
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-h-[min(90dvh,100vh)] overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <DialogContent size="md" className="pb-[max(1rem,env(safe-area-inset-bottom))]">
               <DialogHeader>
                 <DialogTitle>Add staff member</DialogTitle>
                 <DialogDescription>
