@@ -157,5 +157,26 @@ export const suppliersApi = api.injectEndpoints({
         body,
       }),
     }),
+    blockSupplier: builder.mutation<{ message: string }, { id: string; reason?: string }>({
+      query: ({ id, reason }) => ({
+        url: `/api/suppliers/${id}/block`,
+        method: 'POST',
+        body: reason ? { reason } : {},
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'Supplier', id },
+        { type: 'Supplier', id: 'LIST' },
+      ],
+    }),
+    unblockSupplier: builder.mutation<{ message: string }, string>({
+      query: (id) => ({
+        url: `/api/suppliers/${id}/block`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: 'Supplier', id },
+        { type: 'Supplier', id: 'LIST' },
+      ],
+    }),
   }),
 })

@@ -128,12 +128,20 @@ export async function getSupplierReceivables(supplierId) {
   const totalOverdue = parseFloat(summaryRow.overdue_total) || 0
   const partialCount = parseInt(summaryRow.partial_count, 10) || 0
 
+  const oldestInvoiceByRestaurant = {}
+  for (const row of invoices) {
+    if (!oldestInvoiceByRestaurant[row.restaurant_id]) {
+      oldestInvoiceByRestaurant[row.restaurant_id] = row.id
+    }
+  }
+
   const topDebtors = topDebtorRows.map((row) => ({
     restaurantId: row.restaurant_id,
     restaurantName: row.restaurant_name,
     balanceDue: parseFloat(row.balance_due) || 0,
     invoiceCount: parseInt(row.invoice_count, 10) || 0,
     oldestDueDate: row.oldest_due_date,
+    oldestInvoiceId: oldestInvoiceByRestaurant[row.restaurant_id] || null,
   }))
 
   return {

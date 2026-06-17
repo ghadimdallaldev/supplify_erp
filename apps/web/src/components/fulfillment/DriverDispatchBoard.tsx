@@ -4,7 +4,6 @@ import { Badge } from '../ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Label } from '../ui/label'
 import { Select, SelectTrigger } from '../ui/select'
-import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { Skeleton } from '../ui/skeleton'
 import {
@@ -19,6 +18,7 @@ import {
   CalendarClock,
 } from 'lucide-react'
 import { CreateRouteDialog } from './CreateRouteDialog'
+import { ProofOfDeliveryDialog } from './ProofOfDeliveryDialog'
 import { canSelectOrderForRoute } from './fulfillmentDispatchUtils'
 import { toast } from 'sonner'
 import type { DispatchOrderCard } from '../../types'
@@ -28,7 +28,6 @@ import {
   useAssignDriverToOrderMutation,
   useReassignDriverOnOrderMutation,
   useUpdateOrderDeliveryStatusMutation,
-  useSubmitOrderProofOfDeliveryMutation,
   useRolloverAssignmentToTomorrowMutation,
 } from '../../services/api'
 import { usePermissions } from '../../hooks/usePermissions'
@@ -69,8 +68,6 @@ export function DriverDispatchBoard({
   const [selectedDriverId, setSelectedDriverId] = useState('')
   const [reassignOrder, setReassignOrder] = useState<DispatchOrderCard | null>(null)
   const [podOrder, setPodOrder] = useState<DispatchOrderCard | null>(null)
-  const [recipientName, setRecipientName] = useState('')
-  const [proofNotes, setProofNotes] = useState('')
   const [failOrder, setFailOrder] = useState<DispatchOrderCard | null>(null)
   const [failureReason, setFailureReason] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -81,7 +78,6 @@ export function DriverDispatchBoard({
   const [reassignDriver, { isLoading: reassigning }] = useReassignDriverOnOrderMutation()
   const [updateDeliveryStatus, { isLoading: updatingStatus }] =
     useUpdateOrderDeliveryStatusMutation()
-  const [submitPod, { isLoading: submittingPod }] = useSubmitOrderProofOfDeliveryMutation()
   const [rolloverAssignment, { isLoading: rollingOver }] = useRolloverAssignmentToTomorrowMutation()
 
   const driverLabel = (d: { full_name?: string; fullName?: string }) =>
@@ -160,42 +156,6 @@ export function DriverDispatchBoard({
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
       toast.error(msg || 'Failed to update')
-    }
-  }
-
-  const handlePodSubmit = async () => {
-    if (!podOrder) return
-    try {
-      let latitude: number | undefined
-      let longitude: number | undefined
-      if (navigator.geolocation) {
-        try {
-          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              timeout: 10_000,
-              maximumAge: 60_000,
-            })
-          })
-          latitude = pos.coords.latitude
-          longitude = pos.coords.longitude
-        } catch {
-          /* POD allowed without GPS */
-        }
-      }
-      await submitPod({
-        orderId: podOrder.id,
-        recipient_name: recipientName || undefined,
-        notes: proofNotes || undefined,
-        latitude,
-        longitude,
-      }).unwrap()
-      toast.success('Proof of delivery saved')
-      setPodOrder(null)
-      setRecipientName('')
-      setProofNotes('')
-    } catch {
-      toast.error('Failed to save proof')
     }
   }
 
@@ -594,38 +554,13 @@ export function DriverDispatchBoard({
               </DialogContent>
             </Dialog>
 
-            <Dialog open={!!podOrder} onOpenChange={(o) => !o && setPodOrder(null)}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Proof of delivery (optional)</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-3">
-                  <div>
-                    <Label>Recipient name</Label>
-                    <Input
-                      value={recipientName}
-                      onChange={(e) => setRecipientName(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label>Notes</Label>
-                    <Textarea
-                      value={proofNotes}
-                      onChange={(e) => setProofNotes(e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setPodOrder(null)}>
-                    Skip
-                  </Button>
-                  <Button onClick={handlePodSubmit} disabled={submittingPod}>
-                    Save proof
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <ProofOfDeliveryDialog
+              open={!!podOrder}
+              orderId={podOrder?.id ?? null}
+              onOpenChange={(open) => {
+                if (!open) setPodOrder(null)
+              }}
+            />
 
             <Dialog open={!!failOrder} onOpenChange={(o) => !o && setFailOrder(null)}>
               <DialogContent>

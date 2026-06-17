@@ -33,7 +33,7 @@ export function DataTableShell({
         <div className="flex flex-col gap-3 border-b border-[var(--app-border)] p-4 sm:flex-row sm:flex-wrap sm:items-end">
           {search && <div className="min-w-0 flex-1 sm:max-w-sm">{search}</div>}
           {filters && <div className="flex flex-wrap items-end gap-3">{filters}</div>}
-          {actions && <div className="flex flex-wrap items-center gap-2 sm:ml-auto">{actions}</div>}
+          {actions && <div className="flex flex-wrap items-center gap-2 sm:ms-auto">{actions}</div>}
         </div>
       )}
       <div className="overflow-x-auto">{children}</div>

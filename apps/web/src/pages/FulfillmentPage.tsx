@@ -118,7 +118,7 @@ export function FulfillmentPage() {
 
           <TabsContent value="picklists" className="mt-4 space-y-4">
             <LazyTabMount tab="picklists" selectedTab={activeTab}>
-              <LazyFulfillmentPickListsTab />
+              <LazyFulfillmentPickListsTab warehouseId={warehouseId} />
             </LazyTabMount>
           </TabsContent>
 

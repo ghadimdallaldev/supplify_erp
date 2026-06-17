@@ -36,7 +36,7 @@ import {
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { toast } from 'sonner'
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { formatPrice } from '../utils/format'
 import { usePermissions } from '../hooks/usePermissions'
 import { useImpersonation } from '../hooks/useImpersonation'
@@ -44,6 +44,7 @@ import { RequirePermission } from '../components/RequirePermission'
 
 export function CartPage() {
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const { groups, total, drafts } = useAppSelector((state) => state.cart)
   const { user } = useAppSelector((state) => state.auth)
@@ -77,6 +78,11 @@ export function CartPage() {
       }, 0)
     : 0
   const checkoutTotal = Math.max(0, total - estimatedPromoDiscount)
+  const supplierOrderCount = groups.length
+  const placeOrderLabel =
+    supplierOrderCount > 1 ? `Place ${supplierOrderCount} orders` : 'Place order'
+  const confirmOrderLabel =
+    supplierOrderCount > 1 ? `Place ${supplierOrderCount} orders` : 'Confirm order'
   const {
     updateQuantity,
     removeItem,
@@ -118,7 +124,7 @@ export function CartPage() {
     updateQuantity(productId, quantity)
     if (quantity <= 0) return
     const item = groups.flatMap((g) => g.items).find((i) => i.productId === productId)
-    if (!item?.product.supplier_id) return
+    if (!item?.product.supplier_id || item.quoteResponseItemId) return
     try {
       const result = await resolveContractPrices({
         items: [
@@ -210,8 +216,18 @@ export function CartPage() {
         }))
       )
 
+      const quoteLocks = groups
+        .flatMap((group) => group.items)
+        .filter((item) => item.quoteRequestSupplierId && item.quoteResponseItemId)
+        .map((item) => ({
+          productId: item.productId,
+          quoteRequestSupplierId: item.quoteRequestSupplierId!,
+          quoteResponseItemId: item.quoteResponseItemId!,
+        }))
+
       await createOrder({
         items,
+        quoteLocks: quoteLocks.length ? quoteLocks : undefined,
         deliveryDate: deliveryDate || undefined,
         notes: deliveryNotes || undefined,
         couponCode: canRedeemDeals ? couponCode.trim() || undefined : undefined,
@@ -222,7 +238,12 @@ export function CartPage() {
       setShowOrderDetails(false)
       setDeliveryDate('')
       setDeliveryNotes('')
-      toast.success('Order placed successfully!')
+      if (supplierOrderCount > 1) {
+        toast.success(`${supplierOrderCount} orders placed successfully!`)
+        navigate('/app/orders')
+      } else {
+        toast.success('Order placed successfully!')
+      }
     } catch (error: any) {
       // Show the actual error message from the API
       const errorMessage = error?.data?.error?.message || error?.message || 'Failed to place order'
@@ -375,11 +396,17 @@ export function CartPage() {
                           <p className="text-sm text-[var(--text-muted)]">
                             {formatPrice(item.product.current_price)} per{' '}
                             {item.product.unit || 'unit'}
-                            {item.product.pricing_source === 'CONTRACT_PRICE' && (
+                            {item.quoteResponseItemId && (
                               <Badge variant="secondary" className="ml-2 text-xs">
-                                Your price
+                                Quoted price locked
                               </Badge>
                             )}
+                            {item.product.pricing_source === 'CONTRACT_PRICE' &&
+                              !item.quoteResponseItemId && (
+                                <Badge variant="secondary" className="ml-2 text-xs">
+                                  Your price
+                                </Badge>
+                              )}
                           </p>
                         </div>
 
@@ -438,7 +465,39 @@ export function CartPage() {
           <div className="space-y-6">
             <Card>
               <CardContent className="space-y-4 pt-6">
-                <h3 className="text-base font-semibold text-[var(--text)]">Order Summary</h3>
+                <h3 className="text-base font-semibold text-[var(--text)]">
+                  {supplierOrderCount > 1 ? 'Checkout preview' : 'Order summary'}
+                </h3>
+                {supplierOrderCount > 1 && (
+                  <div
+                    className="rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)]/40 p-3 space-y-2 text-sm"
+                    data-testid="cart-multi-supplier-preview"
+                  >
+                    <p className="font-medium text-[var(--text)]">
+                      {supplierOrderCount} separate orders will be placed:
+                    </p>
+                    <ul className="space-y-1.5">
+                      {groups.map((group) => (
+                        <li
+                          key={group.supplierId}
+                          className="flex items-center justify-between gap-2 text-[var(--text-muted)]"
+                        >
+                          <span className="truncate">{group.supplierName}</span>
+                          <span className="shrink-0 tabular-nums">
+                            ${formatPrice(group.subtotal)} · {group.items.length} item
+                            {group.items.length !== 1 ? 's' : ''}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    {orderGate.limit != null && (
+                      <p className="text-xs text-[var(--text-muted)] pt-1 border-t border-[var(--app-border)]">
+                        Daily order limit uses {supplierOrderCount} of your allowance (
+                        {orderGate.current}/{orderGate.limit} used today).
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-[var(--text-muted)]">Subtotal</span>
                   <span>${formatPrice(total)}</span>
@@ -462,7 +521,7 @@ export function CartPage() {
                 </div>
                 <div className="border-t pt-4">
                   <div className="flex items-center justify-between font-semibold text-lg">
-                    <span>Total</span>
+                    <span>{supplierOrderCount > 1 ? 'Combined total' : 'Total'}</span>
                     <span>${formatPrice(checkoutTotal)}</span>
                   </div>
                 </div>
@@ -492,12 +551,12 @@ export function CartPage() {
               data-testid="cart-place-order"
             >
               {isPlacingOrder
-                ? 'Placing Order...'
+                ? 'Placing…'
                 : !canPlaceOrders
                   ? 'Cannot place orders'
                   : !orderGate.canPlace
                     ? 'Daily order limit reached'
-                    : 'Place Order'}
+                    : placeOrderLabel}
             </Button>
             {!orderGate.canPlace && (
               <Button
@@ -620,10 +679,35 @@ export function CartPage() {
         <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Order Details</DialogTitle>
-              <DialogDescription>Add delivery information and notes</DialogDescription>
+              <DialogTitle>
+                {supplierOrderCount > 1 ? 'Confirm checkout' : 'Order details'}
+              </DialogTitle>
+              <DialogDescription>
+                {supplierOrderCount > 1
+                  ? `You are placing ${supplierOrderCount} separate supplier orders in one checkout.`
+                  : 'Add delivery information and notes'}
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              {supplierOrderCount > 1 && (
+                <div
+                  className="rounded-lg border border-[var(--app-border)] p-3 space-y-2 text-sm"
+                  data-testid="cart-confirm-split-preview"
+                >
+                  {groups.map((group) => (
+                    <div key={group.supplierId} className="flex justify-between gap-2">
+                      <span className="font-medium truncate">{group.supplierName}</span>
+                      <span className="text-[var(--text-muted)] shrink-0 tabular-nums">
+                        ${formatPrice(group.subtotal)}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between gap-2 pt-2 border-t border-[var(--app-border)] font-semibold">
+                    <span>Combined total</span>
+                    <span>${formatPrice(checkoutTotal)}</span>
+                  </div>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="delivery-date">
                   <Calendar className="h-4 w-4 inline mr-2" />
@@ -655,7 +739,7 @@ export function CartPage() {
                 Cancel
               </Button>
               <Button onClick={handleConfirmOrder} disabled={isPlacingOrder}>
-                {isPlacingOrder ? 'Placing Order...' : 'Confirm Order'}
+                {isPlacingOrder ? 'Placing…' : confirmOrderLabel}
               </Button>
             </DialogFooter>
           </DialogContent>

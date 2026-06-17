@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
 import {
   useLogoutMutation,
@@ -17,41 +18,43 @@ import { useNotificationBadge } from '../hooks/useNotificationBadge'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { CommandPalette } from './search/CommandPalette'
 import { cn } from '../lib/utils'
+import { LanguageSwitcher } from './LanguageSwitcher'
 
 const PAGE_NAMES: Record<string, string> = {
-  '/app/dashboard': 'Dashboard',
-  '/app/orders': 'Orders',
-  '/app/products': 'Products',
-  '/app/fulfillment': 'Fulfillment',
-  '/app/restaurants': 'Restaurants',
-  '/app/suppliers': 'Suppliers',
-  '/app/cart': 'Cart',
-  '/app/quick-lists': 'Quick Lists',
-  '/app/reservations': 'Reservations',
-  '/app/receiving': 'Receiving',
-  '/app/staff': 'Staff',
-  '/app/restaurant-inventory': 'Inventory',
-  '/app/invoices': 'Invoices',
-  '/app/chat': 'Chat',
-  '/app/notifications': 'Notifications',
-  '/app/settings': 'Settings',
-  '/app/branches': 'Branches',
-  '/app/admin': 'Platform',
-  '/app/admin/suppliers': 'Supplier Admin',
-  '/app/admin/restaurants': 'Restaurant Admin',
-  '/app/reports': 'Reports',
-  '/app/disputes': 'Disputes',
-  '/app/deals': 'Deals',
-  '/app/promotions': 'Deals',
-  '/app/driver-deliveries': 'My Deliveries',
-  '/app/onboarding': 'Onboarding',
-  '/app/org': 'Organization',
-  '/app/inventory': 'Inventory',
-  '/app/supplier-settings': 'Supplier Settings',
-  '/app/customer-growth': 'Customer Growth',
+  '/app/dashboard': 'dashboard',
+  '/app/orders': 'orders',
+  '/app/products': 'products',
+  '/app/fulfillment': 'fulfillment',
+  '/app/restaurants': 'restaurants',
+  '/app/suppliers': 'suppliers',
+  '/app/cart': 'cart',
+  '/app/quick-lists': 'quickLists',
+  '/app/reservations': 'reservations',
+  '/app/receiving': 'receiving',
+  '/app/staff': 'staff',
+  '/app/restaurant-inventory': 'inventory',
+  '/app/invoices': 'invoices',
+  '/app/chat': 'chat',
+  '/app/notifications': 'notifications',
+  '/app/settings': 'settings',
+  '/app/branches': 'branches',
+  '/app/admin': 'platform',
+  '/app/admin/suppliers': 'supplierAdmin',
+  '/app/admin/restaurants': 'restaurantAdmin',
+  '/app/reports': 'reports',
+  '/app/disputes': 'disputes',
+  '/app/deals': 'deals',
+  '/app/promotions': 'promotions',
+  '/app/driver-deliveries': 'myDeliveries',
+  '/app/onboarding': 'onboarding',
+  '/app/org': 'organization',
+  '/app/inventory': 'inventory',
+  '/app/supplier-settings': 'supplierSettings',
+  '/app/customer-growth': 'customerGrowth',
 }
 
 export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {}) {
+  const { t } = useTranslation(['navigation', 'common'])
   const { user } = useAppSelector((state) => state.auth)
   const { isImpersonating, isPlatformAdmin, isEffectiveSupplier, shouldLoadTenantEntitlements } =
     useImpersonation()
@@ -159,10 +162,11 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
     }
   }
 
-  const pageName =
+  const pageKey =
     PAGE_NAMES[location.pathname] ??
     Object.entries(PAGE_NAMES).find(([key]) => location.pathname.startsWith(key + '/'))?.[1] ??
-    'Dashboard'
+    'dashboard'
+  const pageName = t(pageKey, { ns: 'navigation', defaultValue: pageKey })
 
   const initials = (user?.displayName || user?.email || 'U')
     .split(/[\s@]/)
@@ -182,7 +186,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         <button
           type="button"
           className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)] lg:hidden"
-          aria-label="Open navigation menu"
+          aria-label={t('openMenu', { ns: 'navigation' })}
           onClick={onOpenMobileNav}
         >
           <Menu size={18} />
@@ -192,15 +196,18 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
       {/* Breadcrumb */}
       <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
         <span className="hidden text-[13px] font-normal text-[var(--text-muted)]/80 xs:inline">
-          Supplify
+          {t('brand', { ns: 'common' })}
         </span>
-        <ChevronRight size={13} className="hidden shrink-0 text-[var(--text-muted)]/50 xs:block" />
+        <ChevronRight
+          size={13}
+          className="hidden shrink-0 text-[var(--text-muted)]/50 xs:block rtl:rotate-180"
+        />
         <span className="truncate text-[13px] font-medium text-[var(--text)]">{pageName}</span>
         {workspaceLabel && (
           <>
             <ChevronRight
               size={13}
-              className="hidden shrink-0 text-[var(--text-muted)]/50 sm:block"
+              className="hidden shrink-0 text-[var(--text-muted)]/50 sm:block rtl:rotate-180"
             />
             <span
               className="hidden max-w-[8rem] truncate text-xs font-normal text-[var(--text-muted)]/80 sm:inline md:max-w-[14rem]"
@@ -271,7 +278,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         </button>
         <button
           type="button"
-          className="hidden h-8 min-w-[140px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--app-border)]/50 bg-[var(--brand-ultra)]/30 px-2.5 text-left transition-colors hover:border-[var(--app-border)]/70 hover:bg-[var(--brand-ultra)]/50 md:flex lg:min-w-[200px]"
+          className="hidden h-8 min-w-[140px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--app-border)]/50 bg-[var(--brand-ultra)]/30 px-2.5 text-start transition-colors hover:border-[var(--app-border)]/70 hover:bg-[var(--brand-ultra)]/50 md:flex lg:min-w-[200px]"
           aria-label="Open command palette"
           onClick={openCommandPalette}
         >
@@ -313,7 +320,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
             <div
               data-testid="notifications-dropdown"
               className={cn(
-                'fixed inset-x-3 top-[calc(3.5rem+env(safe-area-inset-top))] z-50 max-h-[min(70vh,24rem)] overflow-y-auto rounded-lg border border-[var(--app-border)]/50 bg-[var(--surface)] shadow-sm transition-opacity duration-150 ease-out motion-reduce:transition-none sm:absolute sm:inset-x-auto sm:right-0 sm:top-10 sm:w-[min(100vw-1.5rem,20rem)]',
+                'fixed inset-x-3 top-[calc(3.5rem+env(safe-area-inset-top))] z-50 max-h-[min(70vh,24rem)] overflow-y-auto rounded-lg border border-[var(--app-border)]/50 bg-[var(--surface)] shadow-sm transition-opacity duration-150 ease-out motion-reduce:transition-none sm:absolute sm:inset-x-auto sm:end-0 sm:top-10 sm:w-[min(100vw-1.5rem,20rem)]',
                 notificationsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
               )}
             >
@@ -443,6 +450,8 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
             </div>
           )}
         </div>
+
+        <LanguageSwitcher compact />
 
         {/* Settings icon button */}
         <button

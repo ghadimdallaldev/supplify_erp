@@ -6,8 +6,8 @@ export const LazyFulfillmentDispatchPanel = lazy(() =>
   }))
 )
 export const LazyFulfillmentPickListsTab = lazy(() =>
-  import('../fulfillment/FulfillmentPickListsTab').then((m) => ({
-    default: m.FulfillmentPickListsTab,
+  import('./PickListsTab').then((m) => ({
+    default: m.PickListsTab,
   }))
 )
 export const LazyFulfillmentRoutesTab = lazy(() =>

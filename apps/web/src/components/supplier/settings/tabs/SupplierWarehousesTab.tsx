@@ -12,7 +12,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../../ui/dialog'
-import { Warehouse, MapPin, Loader2 } from 'lucide-react'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../../../ui/sheet'
+import { Warehouse, MapPin, Loader2, MapPinned } from 'lucide-react'
+import { WarehouseZonesPanel } from '../WarehouseZonesPanel'
 import { toast } from 'sonner'
 import { WarehouseFulfillmentSettings } from '../../../settings/WarehouseFulfillmentSettings'
 import { useAppDispatch, useAppSelector } from '../../../../hooks/redux'
@@ -37,6 +39,7 @@ export function SupplierWarehousesTab() {
   const { user } = useAppSelector((state) => state.auth)
   const { canAny } = usePermissions()
   const canWriteWarehouses = canAny('WAREHOUSES_EDIT', 'WAREHOUSES_MANAGE')
+  const canManageZones = canAny('WAREHOUSES_MANAGE')
 
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
   const entitlements = entitlementsData?.entitlements
@@ -54,6 +57,7 @@ export function SupplierWarehousesTab() {
   const canAddWarehouse = warehouseGate.canAdd
 
   const [showAddWarehouse, setShowAddWarehouse] = useState(false)
+  const [zonesWarehouse, setZonesWarehouse] = useState<{ id: string; name: string } | null>(null)
   const [warehouseForm, setWarehouseForm] = useState({
     name: '',
     code: '',
@@ -195,6 +199,14 @@ export function SupplierWarehousesTab() {
                         </div>
                       )}
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setZonesWarehouse({ id: wh.id, name: wh.name })}
+                    >
+                      <MapPinned className="h-4 w-4 mr-2" />
+                      Manage zones
+                    </Button>
                   </div>
                 </div>
               ))
@@ -202,6 +214,32 @@ export function SupplierWarehousesTab() {
           </div>
         </CardContent>
       </Card>
+
+      <Sheet
+        open={zonesWarehouse !== null}
+        onOpenChange={(open) => {
+          if (!open) setZonesWarehouse(null)
+        }}
+      >
+        <SheetContent
+          side="right"
+          className="flex w-full flex-col gap-4 overflow-hidden sm:max-w-lg"
+        >
+          <SheetHeader className="shrink-0 text-left">
+            <SheetTitle>Delivery zones</SheetTitle>
+            <SheetDescription>
+              {zonesWarehouse
+                ? `Coverage and fees for ${zonesWarehouse.name}`
+                : 'Warehouse delivery zones'}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {zonesWarehouse && (
+              <WarehouseZonesPanel warehouseId={zonesWarehouse.id} canWrite={canManageZones} />
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={showAddWarehouse} onOpenChange={setShowAddWarehouse}>
         <DialogContent size="lg">

@@ -1,0 +1,55 @@
+{
+  "actions": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "confirm": "تأكيد",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "add": "إضافة",
+    "create": "إنشاء",
+    "search": "بحث",
+    "filter": "تصفية",
+    "export": "تصدير",
+    "retry": "إعادة المحاولة",
+    "viewDetails": "عرض التفاصيل",
+    "reload": "إعادة تحميل",
+    "close": "إغلاق"
+  },
+  "loading": "جاري التحميل…",
+  "loadingPage": "جاري تحميل الصفحة…",
+  "noResults": "لا توجد نتائج",
+  "error": {
+    "title": "حدث خطأ ما",
+    "description": "حدث خطأ غير متوقع. حاول تحديث الصفحة."
+  },
+  "language": {
+    "switch": "تغيير اللغة",
+    "english": "English",
+    "arabic": "العربية"
+  },
+  "greeting": {
+    "morning": "صباح الخير",
+    "afternoon": "مساء الخير",
+    "evening": "مساء الخير"
+  },
+  "status": {
+    "active": "نشط",
+    "inactive": "غير نشط",
+    "pending": "قيد الانتظار",
+    "approved": "موافق عليه",
+    "declined": "مرفوض",
+    "paid": "مدفوع",
+    "unpaid": "غير مدفوع",
+    "delivered": "تم التسليم",
+    "cancelled": "ملغى",
+    "lowStock": "مخزون منخفض",
+    "outOfStock": "نفد المخزون",
+    "inStock": "متوفر",
+    "unknown": "غير معروف"
+  },
+  "brand": "Supplify",
+  "workspace": {
+    "supplier": "مورد",
+    "restaurant": "مطعم"
+  }
+}

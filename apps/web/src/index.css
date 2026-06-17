@@ -11,7 +11,10 @@
     .sidebar-nav-item:hover {
       background: var(--brand-ultra);
       color: var(--text-mid);
-      transform: translateX(2px);
+      margin-inline-start: 2px;
+    }
+    [dir='rtl'] .sidebar-nav-item:hover {
+      margin-inline-start: -2px;
     }
   }
   .sidebar-nav-item:focus-visible {

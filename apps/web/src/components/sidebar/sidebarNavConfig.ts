@@ -25,6 +25,7 @@ import {
   ShoppingBasket,
   Gift,
   UserPlus,
+  ClipboardList,
 } from 'lucide-react'
 import type { WorkspacePersonaProfile } from '../../lib/workspaceRoleProfile'
 import {
@@ -40,7 +41,10 @@ import {
 } from '../../lib/workspaceRoleProfile'
 
 export type SidebarNavItem = {
-  name: string
+  /** Display label for persona-driven or legacy entries */
+  name?: string
+  /** Translation key in the navigation namespace */
+  nameKey?: string
   href: string
   icon: any
   permission?: string
@@ -49,7 +53,11 @@ export type SidebarNavItem = {
   testId?: string
 }
 
-export type SidebarNavSectionConfig = { label: string; items: SidebarNavItem[] }
+export type SidebarNavSectionConfig = {
+  label?: string
+  labelKey?: string
+  items: SidebarNavItem[]
+}
 
 export function navItemAllowed(
   item: SidebarNavItem,
@@ -118,7 +126,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
   if (isRestaurant || impersonatingRestaurant) {
     const ops: SidebarNavItem[] = [
       {
-        name: 'Orders',
+        nameKey: 'orders',
         href: '/app/orders',
         icon: ShoppingCart,
         badge: 'pending' as const,
@@ -126,14 +134,14 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
         testId: 'nav-orders',
       },
       {
-        name: 'Products',
+        nameKey: 'products',
         href: '/app/products',
         icon: Package,
         permission: 'CATALOG_VIEW',
         testId: 'nav-products',
       },
       {
-        name: 'My Prices',
+        nameKey: 'myPrices',
         href: '/app/my-prices',
         icon: Percent,
         permission: 'CATALOG_VIEW',
@@ -142,7 +150,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
       ...(quickListsEnabled
         ? [
             {
-              name: 'Ordering Lists',
+              nameKey: 'orderingLists',
               href: '/app/quick-lists',
               icon: List,
               permission: 'ORDERS_VIEW',
@@ -151,21 +159,21 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
           ]
         : []),
       {
-        name: 'Cart',
+        nameKey: 'cart',
         href: '/app/cart',
         icon: ShoppingBag,
         permission: 'ORDERS_CREATE',
         testId: 'nav-cart',
       },
       {
-        name: 'Quote requests',
+        nameKey: 'quoteRequests',
         href: '/app/quote-requests',
         icon: FileQuestion,
         permission: 'ORDERS_CREATE',
         testId: 'nav-quote-requests',
       },
       {
-        name: 'Receiving',
+        nameKey: 'receiving',
         href: '/app/receiving',
         icon: PackageCheck,
         permission: 'RECEIVING_VIEW',
@@ -175,7 +183,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
 
     const intel: SidebarNavItem[] = [
       {
-        name: 'Suppliers',
+        nameKey: 'suppliers',
         href: '/app/suppliers',
         icon: Building2,
         permission: 'CATALOG_VIEW',
@@ -184,7 +192,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
       ...(reportsEnabled && restaurantReportsNavAllowed(persona, can)
         ? [
             {
-              name: 'Reports',
+              nameKey: 'reports',
               href: '/app/reports',
               icon: BarChart3,
               anyOf: [...RESTAURANT_REPORTS_ANY_OF],
@@ -195,7 +203,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
       ...(disputesEnabled
         ? [
             {
-              name: 'Disputes',
+              nameKey: 'disputes',
               href: '/app/disputes',
               icon: Scale,
               anyOf: [...RESTAURANT_DISPUTES_ANY_OF],
@@ -207,7 +215,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
       ...(supplierDealsEnabled
         ? [
             {
-              name: 'Deals',
+              nameKey: 'deals',
               href: '/app/deals',
               icon: Percent,
               permission: 'PROMOTIONS_VIEW',
@@ -218,7 +226,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
       ...(financeInvoicesEnabled
         ? [
             {
-              name: 'Invoices',
+              nameKey: 'invoices',
               href: '/app/invoices',
               icon: FileText,
               permission: 'INVOICES_VIEW',
@@ -227,7 +235,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
           ]
         : []),
       {
-        name: 'Chat',
+        nameKey: 'chat',
         href: '/app/chat',
         icon: MessageSquare,
         permission: 'CHAT_VIEW',
@@ -237,14 +245,14 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
 
     const acct: SidebarNavItem[] = [
       {
-        name: 'Inventory',
+        nameKey: 'inventory',
         href: '/app/restaurant-inventory',
         icon: Package2,
         permission: 'INVENTORY_VIEW',
         testId: 'nav-inventory',
       },
       {
-        name: 'Settings',
+        nameKey: 'settings',
         href: '/app/settings',
         icon: Settings,
         permission: 'SETTINGS_VIEW',
@@ -254,35 +262,35 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
 
     const hospitalityAddOns: SidebarNavItem[] = [
       {
-        name: 'Reservations',
+        nameKey: 'reservations',
         href: '/app/reservations',
         icon: CalendarDays,
         permission: 'RESERVATIONS_VIEW',
         testId: 'nav-reservations',
       },
       {
-        name: 'Staff',
+        nameKey: 'staff',
         href: '/app/staff',
         icon: UserCircle2,
         permission: 'STAFF_VIEW',
         testId: 'nav-staff',
       },
       {
-        name: 'Guest menu',
+        nameKey: 'guestMenu',
         href: '/app/consumer-menu',
         icon: UtensilsCrossed,
         permission: 'CATALOG_VIEW',
         testId: 'nav-consumer-menu',
       },
       {
-        name: 'Guest orders',
+        nameKey: 'guestOrders',
         href: '/app/consumer-orders',
         icon: ShoppingBasket,
         permission: 'ORDERS_VIEW',
         testId: 'nav-consumer-orders',
       },
       {
-        name: 'Guest rewards',
+        nameKey: 'guestRewards',
         href: '/app/consumer-loyalty',
         icon: Gift,
         permission: 'CATALOG_VIEW',
@@ -314,37 +322,37 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
       ...(overviewItems.length
         ? [
             {
-              label: 'OVERVIEW',
+              labelKey: 'section.overview',
               items: overviewItems.filter((item) => navItemAllowed(item, can, canAny)),
             },
           ]
         : []),
-      { label: 'OPERATIONS', items: ops },
-      ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
-      ...(acct.length ? [{ label: 'ACCOUNT', items: acct }] : []),
+      { labelKey: 'section.operations', items: ops },
+      ...(intel.length ? [{ labelKey: 'section.intelligence', items: intel }] : []),
+      ...(acct.length ? [{ labelKey: 'section.account', items: acct }] : []),
       ...(hospitalityAddOns.length
-        ? [{ label: 'HOSPITALITY ADD-ONS', items: hospitalityAddOns }]
+        ? [{ labelKey: 'section.hospitalityAddOns', items: hospitalityAddOns }]
         : []),
     ]
   } else if (hasAdminNavAccess && !isImpersonating) {
     sections = [
       {
-        label: 'ADMIN',
+        labelKey: 'section.admin',
         items: [
           {
-            name: 'Admin Dashboard',
+            nameKey: 'adminDashboard',
             href: '/app/admin',
             icon: Shield,
             testId: 'nav-admin-dashboard',
           },
           {
-            name: 'Supplier Admin',
+            nameKey: 'supplierAdmin',
             href: '/app/admin/suppliers',
             icon: Building2,
             testId: 'nav-supplier-admin',
           },
           {
-            name: 'Restaurant Admin',
+            nameKey: 'restaurantAdmin',
             href: '/app/admin/restaurants',
             icon: Users,
             testId: 'nav-restaurant-admin',
@@ -352,9 +360,9 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
         ],
       },
       {
-        label: 'ACCOUNT',
+        labelKey: 'section.account',
         items: [
-          { name: 'Settings', href: '/app/settings', icon: Settings, testId: 'nav-settings' },
+          { nameKey: 'settings', href: '/app/settings', icon: Settings, testId: 'nav-settings' },
         ],
       },
     ]
@@ -362,10 +370,10 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
     if (isDriverRole) {
       sections = [
         {
-          label: 'DELIVERIES',
+          labelKey: 'section.deliveries',
           items: [
             {
-              name: 'My Deliveries',
+              nameKey: 'myDeliveries',
               href: '/app/driver-deliveries',
               icon: Truck,
               permission: 'DRIVER_DELIVERIES_VIEW',
@@ -377,7 +385,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
     } else {
       const ops: SidebarNavItem[] = [
         {
-          name: 'Orders',
+          nameKey: 'orders',
           href: '/app/orders',
           icon: ShoppingCart,
           badge: 'pending' as const,
@@ -385,14 +393,14 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
           testId: 'nav-orders',
         },
         {
-          name: 'Products',
+          nameKey: 'products',
           href: '/app/products',
           icon: Package,
           permission: 'CATALOG_VIEW',
           testId: 'nav-products',
         },
         {
-          name: 'Contract Pricing',
+          nameKey: 'contractPricing',
           href: '/app/contract-pricing',
           icon: Percent,
           permission: 'CATALOG_VIEW',
@@ -401,23 +409,30 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
         ...(fulfillmentEnabled
           ? [
               {
-                name: 'Fulfillment',
+                nameKey: 'fulfillment',
                 href: '/app/fulfillment',
                 icon: Truck,
                 permission: 'FULFILLMENT_VIEW',
                 testId: 'nav-fulfillment',
               },
+              {
+                name: 'Run sheet',
+                href: '/app/run-sheet',
+                icon: ClipboardList,
+                anyOf: ['ORDERS_MANAGE', 'FULFILLMENT_VIEW', 'INVOICES_VIEW'],
+                testId: 'nav-run-sheet',
+              },
             ]
           : []),
         {
-          name: 'Restaurants',
+          nameKey: 'restaurants',
           href: '/app/restaurants',
           icon: Users,
           permission: 'ORDERS_VIEW',
           testId: 'nav-restaurants',
         },
         {
-          name: 'Quote inbox',
+          nameKey: 'quoteInbox',
           href: '/app/quote-requests/supplier',
           icon: FileQuestion,
           permission: 'ORDERS_VIEW',
@@ -426,7 +441,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
         ...(disputesEnabled
           ? [
               {
-                name: 'Disputes',
+                nameKey: 'disputes',
                 href: '/app/disputes',
                 icon: Scale,
                 permission: 'FULFILLMENT_VIEW',
@@ -440,7 +455,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
         ...(supplierGrowthEnabled
           ? [
               {
-                name: 'Customer Growth',
+                nameKey: 'customerGrowth',
                 href: '/app/customer-growth',
                 icon: UserPlus,
                 permission: 'GROWTH_VIEW',
@@ -451,7 +466,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
         ...(reportsEnabled && persona.showGlobalReports
           ? [
               {
-                name: 'Reports',
+                nameKey: 'reports',
                 href: '/app/reports',
                 icon: BarChart3,
                 anyOf: [...SUPPLIER_ANALYTICS_ANY_OF],
@@ -462,7 +477,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
         ...(promotionsEnabled
           ? [
               {
-                name: 'Deals',
+                nameKey: 'deals',
                 href: '/app/promotions',
                 icon: Tag,
                 permission: 'PROMOTIONS_VIEW',
@@ -473,7 +488,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
         ...(financeInvoicesEnabled
           ? [
               {
-                name: 'Invoices',
+                nameKey: 'invoices',
                 href: '/app/invoices',
                 icon: FileText,
                 permission: 'INVOICES_VIEW',
@@ -482,7 +497,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
             ]
           : []),
         {
-          name: 'Chat',
+          nameKey: 'chat',
           href: '/app/chat',
           icon: MessageSquare,
           permission: 'CHAT_VIEW',
@@ -524,18 +539,18 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
         ...(supplierOverview.length
           ? [
               {
-                label: 'OVERVIEW',
+                labelKey: 'section.overview',
                 items: supplierOverview.filter((item) => navItemAllowed(item, can, canAny)),
               },
             ]
           : []),
-        { label: 'OPERATIONS', items: ops },
-        ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
+        { labelKey: 'section.operations', items: ops },
+        ...(intel.length ? [{ labelKey: 'section.intelligence', items: intel }] : []),
         {
-          label: 'ACCOUNT',
+          labelKey: 'section.account',
           items: [
             {
-              name: 'Settings',
+              nameKey: 'settings',
               href: '/app/settings',
               icon: Settings,
               permission: 'SETTINGS_VIEW',

@@ -68,7 +68,7 @@ export function InfoBanner({
             {description ? <p className={cn('mt-1', styles.description)}>{description}</p> : null}
           </div>
         </div>
-        {action ? <div className="shrink-0 self-start sm:ml-4">{action}</div> : null}
+        {action ? <div className="shrink-0 self-start sm:ms-4">{action}</div> : null}
       </div>
     </div>
   )

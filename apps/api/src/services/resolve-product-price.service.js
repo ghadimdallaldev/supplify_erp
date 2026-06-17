@@ -59,12 +59,147 @@ function buildDefaultResolution(defaultPrice, currency = 'USD') {
     source: 'DEFAULT_PRICE',
     defaultPrice,
     contractPriceId: null,
+    quoteResponseItemId: null,
     discountPercent: null,
     validFrom: null,
     validUntil: null,
     currency,
     minOrderQuantity: null,
   }
+}
+
+function buildQuoteResolution({ unitPrice, currency, defaultPrice, quoteResponseItemId }) {
+  return {
+    unitPrice,
+    source: 'QUOTE_PRICE',
+    defaultPrice,
+    contractPriceId: null,
+    quoteResponseItemId,
+    discountPercent: null,
+    validFrom: null,
+    validUntil: null,
+    currency,
+    minOrderQuantity: null,
+  }
+}
+
+/**
+ * Resolve locked quote price for checkout when cart carries quote response item ids.
+ * @param {{
+ *   restaurantId: string,
+ *   quoteRequestSupplierId: string,
+ *   quoteResponseItemId: string,
+ *   productId?: string,
+ *   supplierId?: string,
+ * }} params
+ * @param {Function} dbQuery
+ * @returns {Promise<ReturnType<typeof buildQuoteResolution> | null>}
+ */
+export async function resolveQuotePrice(
+  { restaurantId, quoteRequestSupplierId, quoteResponseItemId, productId, supplierId },
+  dbQuery = query
+) {
+  const { rows } = await dbQuery(
+    `
+    SELECT
+      qri.id,
+      qri.unit_price,
+      qri.currency,
+      qreq.product_id,
+      p.supplier_id
+    FROM quote_response_items qri
+    JOIN quote_responses qr_resp ON qr_resp.id = qri.quote_response_id
+    JOIN quote_request_suppliers qrs ON qrs.id = qr_resp.quote_request_supplier_id
+    JOIN quote_requests qr ON qr.id = qrs.quote_request_id
+    JOIN quote_request_items qreq ON qreq.id = qri.quote_request_item_id
+    JOIN product p ON p.id = qreq.product_id
+    WHERE qri.id = $1
+      AND qrs.id = $2
+      AND qr.restaurant_id = $3
+      AND qrs.status = 'responded'
+      AND qri.is_available = true
+    `,
+    [quoteResponseItemId, quoteRequestSupplierId, restaurantId]
+  )
+
+  if (!rows.length || rows[0].unit_price == null) return null
+
+  const row = rows[0]
+  if (productId && row.product_id !== productId) return null
+  if (supplierId && row.supplier_id !== supplierId) return null
+
+  const catalog = await getDefaultCatalogPrice(row.product_id, dbQuery)
+  const defaultPrice = catalog?.amount ?? null
+  const currency = row.currency || catalog?.currency || 'USD'
+
+  return buildQuoteResolution({
+    unitPrice: Number(row.unit_price),
+    currency,
+    defaultPrice,
+    quoteResponseItemId: row.id,
+  })
+}
+
+async function resolveQuotePricesBatch({ restaurantId, quoteLocks }, dbQuery = query) {
+  if (!quoteLocks?.length) return new Map()
+
+  const qrsIds = quoteLocks.map((l) => l.quoteRequestSupplierId)
+  const qriIds = quoteLocks.map((l) => l.quoteResponseItemId)
+
+  const { rows } = await dbQuery(
+    `
+    SELECT
+      qri.id AS quote_response_item_id,
+      qri.unit_price,
+      qri.currency,
+      qreq.product_id,
+      p.supplier_id,
+      qrs.id AS quote_request_supplier_id
+    FROM unnest($1::uuid[], $2::uuid[]) AS v(qrs_id, qri_id)
+    JOIN quote_request_suppliers qrs ON qrs.id = v.qrs_id
+    JOIN quote_responses qr_resp
+      ON qr_resp.quote_request_supplier_id = qrs.id
+    JOIN quote_response_items qri
+      ON qri.id = v.qri_id AND qri.quote_response_id = qr_resp.id
+    JOIN quote_requests qr ON qr.id = qrs.quote_request_id
+    JOIN quote_request_items qreq ON qreq.id = qri.quote_request_item_id
+    JOIN product p ON p.id = qreq.product_id
+    WHERE qr.restaurant_id = $3
+      AND qrs.status = 'responded'
+      AND qri.is_available = true
+    `,
+    [qrsIds, qriIds, restaurantId]
+  )
+
+  const lockByProductId = new Map(quoteLocks.map((l) => [l.productId, l]))
+
+  const productIds = [...new Set(rows.map((r) => r.product_id))]
+  const catalogMap = await getDefaultCatalogPricesBatch(productIds, dbQuery)
+
+  const resolved = new Map()
+  for (const row of rows) {
+    const lock = lockByProductId.get(row.product_id)
+    if (!lock) continue
+    if (lock.quoteRequestSupplierId !== row.quote_request_supplier_id) continue
+    if (lock.quoteResponseItemId !== row.quote_response_item_id) continue
+    if (row.unit_price == null) continue
+
+    const catalog = catalogMap.get(row.product_id)
+    const defaultPrice = catalog?.amount ?? null
+    const currency = row.currency || catalog?.currency || 'USD'
+
+    resolved.set(
+      row.product_id,
+      buildQuoteResolution({
+        unitPrice: Number(row.unit_price),
+        currency,
+        defaultPrice,
+        quoteResponseItemId: row.quote_response_item_id,
+      })
+    )
+  }
+
+  return resolved
 }
 
 /**
@@ -120,6 +255,7 @@ export async function resolveProductPrice(
       source: 'CONTRACT_PRICE',
       defaultPrice,
       contractPriceId: contract.id,
+      quoteResponseItemId: null,
       discountPercent:
         contract.contract_discount_percentage != null
           ? Number(contract.contract_discount_percentage)
@@ -145,7 +281,7 @@ export async function resolveProductPrice(
  * @param {Function} dbQuery
  */
 export async function resolveProductPricesBatch(
-  { restaurantId, items, date = new Date(), catalogByProductId = null },
+  { restaurantId, items, date = new Date(), catalogByProductId = null, quoteLocks = null },
   dbQuery = query
 ) {
   if (!items?.length) return []
@@ -155,6 +291,10 @@ export async function resolveProductPricesBatch(
     catalogByProductId instanceof Map
       ? catalogByProductId
       : await getDefaultCatalogPricesBatch(productIds, dbQuery)
+
+  const quoteByProductId = quoteLocks?.length
+    ? await resolveQuotePricesBatch({ restaurantId, quoteLocks }, dbQuery)
+    : new Map()
 
   const asOf = toDateOnly(date)
   const dateStr = asOf.toISOString().slice(0, 10)
@@ -190,6 +330,17 @@ export async function resolveProductPricesBatch(
     const catalog = catalogMap.get(item.productId)
     const defaultPrice = catalog?.amount ?? null
     const currency = catalog?.currency ?? 'USD'
+    const quoteResolved = quoteByProductId.get(item.productId)
+
+    if (quoteResolved?.unitPrice != null) {
+      return {
+        productId: item.productId,
+        supplierId: item.supplierId,
+        quantity: qty,
+        ...quoteResolved,
+      }
+    }
+
     const key = `${item.supplierId}:${item.productId}`
     const contract = contractByKey.get(key)
 
@@ -205,6 +356,7 @@ export async function resolveProductPricesBatch(
         source: 'CONTRACT_PRICE',
         defaultPrice,
         contractPriceId: contract.id,
+        quoteResponseItemId: null,
         discountPercent:
           contract.contract_discount_percentage != null
             ? Number(contract.contract_discount_percentage)

@@ -145,6 +145,31 @@ export function isTerminalProductImportStatus(status: ProductImportJobStatus): b
   return TERMINAL_PRODUCT_IMPORT_STATUSES.has(status)
 }
 
+export type ProductImportPreviewRequest =
+  | { csv: string; columnMapping?: Record<string, string> }
+  | { file: File; columnMapping?: Record<string, string> }
+
+export type ProductImportExecuteRequest =
+  | { csv: string; partial?: boolean; columnMapping?: Record<string, string> }
+  | { file: File; partial?: boolean; columnMapping?: Record<string, string> }
+
+function buildProductImportBody(
+  body: ProductImportPreviewRequest | ProductImportExecuteRequest
+): FormData | Record<string, unknown> {
+  if ('file' in body && body.file) {
+    const formData = new FormData()
+    formData.append('file', body.file)
+    if (body.columnMapping) {
+      formData.append('columnMapping', JSON.stringify(body.columnMapping))
+    }
+    if ('partial' in body && body.partial !== undefined) {
+      formData.append('partial', String(body.partial))
+    }
+    return formData
+  }
+  return body as Record<string, unknown>
+}
+
 export const catalogImportApi = api.injectEndpoints({
   endpoints: (builder) => ({
     previewProductImport: builder.mutation<
@@ -155,22 +180,22 @@ export const catalogImportApi = api.injectEndpoints({
         errorCount: number
         errors: ProductImportRowError[]
       },
-      { csv: string; columnMapping?: Record<string, string> }
+      ProductImportPreviewRequest
     >({
       query: (body) => ({
         url: '/api/supplier/products/import/preview',
         method: 'POST',
-        body,
+        body: buildProductImportBody(body),
       }),
     }),
     executeProductImport: builder.mutation<
       ProductImportSyncResult | ProductImportAsyncStart,
-      { csv: string; partial?: boolean; columnMapping?: Record<string, string> }
+      ProductImportExecuteRequest
     >({
       query: (body) => ({
         url: '/api/supplier/products/import',
         method: 'POST',
-        body,
+        body: buildProductImportBody(body),
       }),
       invalidatesTags: ['Product', 'Inventory'],
     }),

@@ -7,6 +7,8 @@ export interface CartItem {
   quantity: number
   notes?: string
   quotedUnitPrice?: number
+  quoteRequestSupplierId?: string
+  quoteResponseItemId?: string
 }
 
 export interface CartGroup {
