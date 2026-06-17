@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useStartSupportChatMutation } from '../../services/api'
 import { Button } from '../ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
-import { MessageCircle, Loader2 } from 'lucide-react'
+import { AppPanel } from '../ui/app-panel'
+import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export function SupportContactCard() {
@@ -27,17 +27,11 @@ export function SupportContactCard() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <MessageCircle className="h-4 w-4" />
-          Contact support
-        </CardTitle>
-        <CardDescription>
-          Chat with Supplify support about billing, features, or issues
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-wrap gap-2">
+    <AppPanel
+      title="Contact support"
+      description="Chat with Supplify support about billing, features, or issues"
+    >
+      <div className="flex flex-wrap gap-2">
         {conversationId ? (
           <Button asChild>
             <Link to={`/app/chat?conversation=${conversationId}&support=1`}>Open support chat</Link>
@@ -48,7 +42,7 @@ export function SupportContactCard() {
             Start support chat
           </Button>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </AppPanel>
   )
 }

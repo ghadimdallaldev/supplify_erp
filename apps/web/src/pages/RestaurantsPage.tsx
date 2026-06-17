@@ -34,9 +34,10 @@ import {
   CardAddressBlock,
   CardFooterMeta,
   formatAddressLine,
-  pageHeaderRowClass,
 } from '../components/ui/card-layout'
+import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
+import { KpiCard } from '../components/ui/kpi-card'
 
 export function RestaurantsPage() {
   const { user } = useAppSelector((state) => state.auth)
@@ -231,10 +232,7 @@ export function RestaurantsPage() {
 
     return (
       <PageShell data-testid="restaurants-page">
-        <div>
-          <h1 className="text-[21px] font-black text-[var(--text)]">Restaurants</h1>
-          <p className="text-[var(--text-muted)] mt-2">Manage restaurants in the marketplace</p>
-        </div>
+        <PageHeader title="Restaurants" description="Manage restaurants in the marketplace" />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {restaurantsData?.restaurants.map((restaurant) => (
@@ -302,15 +300,10 @@ export function RestaurantsPage() {
 
   return (
     <PageShell data-testid="restaurants-page">
-      {/* Header */}
-      <div className={pageHeaderRowClass}>
-        <div className="min-w-0">
-          <h1 className="text-[21px] font-black text-[var(--text)]">My Restaurants</h1>
-          <p className="text-[var(--text-muted)] mt-2">
-            Restaurants that follow you or purchase from you
-          </p>
-        </div>
-        {isSupplier && (
+      <PageHeader
+        title="My Restaurants"
+        description="Restaurants that follow you or purchase from you"
+        actions={
           <div className="flex flex-wrap gap-2 shrink-0">
             <Button
               variant={viewMode === 'grid' ? 'default' : 'outline'}
@@ -331,60 +324,40 @@ export function RestaurantsPage() {
               List
             </Button>
           </div>
-        )}
-      </div>
+        }
+      />
 
       {/* Statistics Cards */}
       {isSupplier && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Total Restaurants</p>
-                  <p className="text-2xl font-bold text-[var(--text)]">{stats.total}</p>
-                </div>
-                <Building2 className="h-8 w-8 text-[var(--brand-mid)]" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Total Orders</p>
-                  <p className="text-2xl font-bold text-[var(--text)]">{stats.totalOrders}</p>
-                </div>
-                <ShoppingCart className="h-8 w-8 text-[var(--mint)]" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Total Revenue</p>
-                  <p className="text-2xl font-bold text-[var(--text)]">
-                    {formatCurrency(stats.totalRevenue, { maximumFractionDigits: 0 })}
-                  </p>
-                </div>
-                <DollarSign className="h-8 w-8 text-[var(--brand-mid)]" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Avg Order Value</p>
-                  <p className="text-2xl font-bold text-[var(--text)]">
-                    {formatCurrency(stats.avgOrderValue, { maximumFractionDigits: 0 })}
-                  </p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-[var(--amber-mid)]" />
-              </div>
-            </CardContent>
-          </Card>
+        <div className="dashboard-kpi-grid" data-testid="restaurants-stats">
+          <KpiCard
+            label="Total Restaurants"
+            value={stats.total}
+            icon={Building2}
+            tone="brand"
+            description="Following you or ordering from you"
+          />
+          <KpiCard
+            label="Total Orders"
+            value={stats.totalOrders}
+            icon={ShoppingCart}
+            tone="success"
+            description="All time across your network"
+          />
+          <KpiCard
+            label="Total Revenue"
+            value={formatCurrency(stats.totalRevenue, { maximumFractionDigits: 0 })}
+            icon={DollarSign}
+            tone="brand"
+            description="Lifetime order value"
+          />
+          <KpiCard
+            label="Avg Order Value"
+            value={formatCurrency(stats.avgOrderValue, { maximumFractionDigits: 0 })}
+            icon={TrendingUp}
+            tone="warning"
+            description="Per order average"
+          />
         </div>
       )}
 

@@ -1,19 +1,26 @@
 import type { ReactNode } from 'react'
 import { ShieldOff } from 'lucide-react'
+import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
+import { isTenantOwner } from '../lib/tenantRoles'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 
 type Props = {
   permission?: string
   anyOf?: readonly string[]
   title?: string
+  /** Allow workspace Owner / Org Owner through (e.g. before RBAC sync adds new keys). */
+  allowOwner?: boolean
   children: ReactNode
 }
 
 /** Blocks direct URL access when the user lacks view permission for a page. */
-export function RequirePermission({ permission, anyOf, title, children }: Props) {
+export function RequirePermission({ permission, anyOf, title, allowOwner, children }: Props) {
+  const { user } = useAppSelector((state) => state.auth)
   const { can, canAny } = usePermissions()
-  const allowed = anyOf?.length ? canAny(...anyOf) : permission ? can(permission) : true
+  const allowed =
+    (anyOf?.length ? canAny(...anyOf) : permission ? can(permission) : true) ||
+    (allowOwner === true && isTenantOwner(user))
 
   if (allowed) return <>{children}</>
 

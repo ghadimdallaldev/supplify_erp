@@ -13,6 +13,10 @@ import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
+import {
+  getRestaurantPayables,
+  getRestaurantStatementOpeningBalance,
+} from '../services/restaurant-payables.service.js'
 
 const router = express.Router()
 
@@ -36,6 +40,21 @@ const disputeInvoiceSchema = z.object({
   reason: z.string().min(10),
   evidence: z.string().optional(),
 })
+
+router.get(
+  '/payables',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVOICES_VIEW'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await requireRestaurantId(req)
+      const data = await getRestaurantPayables(restaurantId)
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 
 // Get all invoices for the restaurant
 router.get(
@@ -790,9 +809,12 @@ router.get(
         [restaurantId, supplierId, startDate, endDate].filter(Boolean)
       )
 
-      // Calculate summary
+      const openingBalance = startDate
+        ? await getRestaurantStatementOpeningBalance(restaurantId, supplierId, startDate)
+        : 0
+
       const summary = {
-        openingBalance: 0, // TODO: Calculate from previous period
+        openingBalance,
         totalCharges: 0,
         totalPayments: 0,
         totalAdjustments: 0,

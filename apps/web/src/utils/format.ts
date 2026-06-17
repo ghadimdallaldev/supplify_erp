@@ -3,7 +3,8 @@
  * Use these everywhere monetary or numeric values are displayed.
  */
 
-const defaultLocale = undefined // use user's locale
+import { getFormatLocale } from '../i18n/formatters'
+
 const defaultCurrency = 'USD'
 
 /** Intl requires 0 <= minimumFractionDigits <= maximumFractionDigits <= 20 */
@@ -37,7 +38,7 @@ export function formatCurrency(
     minimumFractionDigits = maximumFractionDigits
   }
   const digits = normalizeFractionDigits(minimumFractionDigits, maximumFractionDigits)
-  return new Intl.NumberFormat(defaultLocale, {
+  return new Intl.NumberFormat(getFormatLocale(), {
     style: 'currency',
     currency,
     ...digits,
@@ -54,13 +55,13 @@ export function formatNumber(
     options.minimumFractionDigits ?? 0,
     options.maximumFractionDigits ?? 2
   )
-  return new Intl.NumberFormat(defaultLocale, digits).format(num)
+  return new Intl.NumberFormat(getFormatLocale(), digits).format(num)
 }
 
 /** Format with exactly 2 decimal places (e.g. for prices in tables). */
 export function formatPrice(value: number | string | null | undefined): string {
   const num = toNumber(value)
-  return new Intl.NumberFormat(defaultLocale, {
+  return new Intl.NumberFormat(getFormatLocale(), {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(num)

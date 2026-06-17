@@ -303,29 +303,48 @@ router.get(
       const whereClause = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : ''
       const pageOffset = (params.page - 1) * params.pageSize
 
+      const buildInvoiceWhereParts = (addInvoiceParamFn) => {
+        const parts = []
+        if (effectiveRole === 'RESTAURANT') {
+          parts.push(`i.restaurant_id = ${addInvoiceParamFn(tenant.id)}`)
+        } else {
+          parts.push(`i.supplier_id = ${addInvoiceParamFn(tenant.id)}`)
+        }
+
+        if (startDate) {
+          parts.push(
+            `COALESCE(i.due_date, i.invoice_date, i.created_at) >= ${addInvoiceParamFn(startDate.toISOString())}`
+          )
+        }
+
+        if (endDate) {
+          parts.push(
+            `COALESCE(i.due_date, i.invoice_date, i.created_at) <= ${addInvoiceParamFn(endDate.toISOString())}`
+          )
+        }
+
+        return parts
+      }
+
       const invoiceParams = []
-      const invoiceWhereParts = []
-      const addInvoiceParam = (value) => {
+      const addInvoiceParamForUnion = (value) => {
         invoiceParams.push(value)
         return `$${baseParams.length + invoiceParams.length}`
       }
 
-      if (effectiveRole === 'RESTAURANT') {
-        invoiceWhereParts.push(`i.restaurant_id = ${addInvoiceParam(tenant.id)}`)
-      } else {
-        invoiceWhereParts.push(`i.supplier_id = ${addInvoiceParam(tenant.id)}`)
-      }
-
-      if (startDate) {
-        invoiceWhereParts.push(`i.due_date >= ${addInvoiceParam(startDate.toISOString())}`)
-      }
-
-      if (endDate) {
-        invoiceWhereParts.push(`i.due_date <= ${addInvoiceParam(endDate.toISOString())}`)
-      }
-
+      const invoiceWhereParts = buildInvoiceWhereParts(addInvoiceParamForUnion)
       const invoiceWhereClause = invoiceWhereParts.length
         ? `WHERE ${invoiceWhereParts.join(' AND ')}`
+        : ''
+
+      const invoiceCountParams = []
+      const addInvoiceCountParam = (value) => {
+        invoiceCountParams.push(value)
+        return `$${invoiceCountParams.length}`
+      }
+      const invoiceCountWhereParts = buildInvoiceWhereParts(addInvoiceCountParam)
+      const invoiceCountWhereClause = invoiceCountWhereParts.length
+        ? `WHERE ${invoiceCountWhereParts.join(' AND ')}`
         : ''
 
       const orderEventSql = `
@@ -392,7 +411,7 @@ router.get(
       const invoiceCountSql = `
         SELECT COUNT(*)::int AS count
         FROM invoice i
-        ${invoiceWhereClause}
+        ${invoiceCountWhereClause}
       `
 
       const [pageResult, totalEventResult, orderCountResult, invoiceCountResult] =
@@ -400,7 +419,7 @@ router.get(
           query(paginatedSql, paginationParams),
           query(countEventsSql, unionParams),
           query(orderCountSql, baseParams),
-          query(invoiceCountSql, invoiceParams),
+          query(invoiceCountSql, invoiceCountParams),
         ])
 
       const totalEvents = Number(totalEventResult.rows?.[0]?.count || 0)

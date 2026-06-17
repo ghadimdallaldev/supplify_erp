@@ -3,6 +3,7 @@ import { logger } from './logger.js'
 import { runCronJob, CRON_JOBS } from './cron-runner.js'
 import { executeScheduledOrders } from '../services/scheduled-orders.service.js'
 import { checkOverdueInvoices } from '../jobs/invoice-overdue.job.js'
+import { runCollectionsRemindersJob } from '../jobs/collections-reminders.job.js'
 import { runSubscriptionBillingJob } from '../jobs/subscription-billing.job.js'
 import { checkExpiredWaitlistOffers } from '../services/waitlistPromotion.js'
 import { runDeactivateExpiredPromotionsJob } from '../jobs/promotions-expiry.job.js'
@@ -62,6 +63,16 @@ export function registerCronJobs({ trackInterval }) {
         'Invoice overdue job failed:'
       ),
       label: 'Invoice overdue job started',
+    },
+    {
+      name: CRON_JOBS.COLLECTIONS_REMINDERS,
+      intervalMs: 24 * 60 * 60 * 1000,
+      run: wrap(
+        CRON_JOBS.COLLECTIONS_REMINDERS,
+        () => runCollectionsRemindersJob(),
+        'Collections reminders job failed:'
+      ),
+      label: 'Collections reminders job started',
     },
     {
       name: CRON_JOBS.SUBSCRIPTION_BILLING,

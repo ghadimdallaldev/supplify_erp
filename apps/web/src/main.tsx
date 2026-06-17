@@ -11,6 +11,7 @@ import 'sonner/dist/styles.css'
 import { registerServiceWorker } from './lib/registerServiceWorker'
 import { assertHostedWebConfig } from './lib/env'
 import { perfLog } from './lib/perfLog'
+import './i18n/index.ts'
 
 assertHostedWebConfig()
 registerServiceWorker()

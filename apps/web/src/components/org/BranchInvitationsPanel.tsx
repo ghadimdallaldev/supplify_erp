@@ -125,7 +125,7 @@ export function BranchInvitationsPanel({ supplierId, branchName }: Props) {
       />
 
       <Dialog open={Boolean(copyUrl)} onOpenChange={(open) => !open && setCopyUrl(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>Invitation link</DialogTitle>
           </DialogHeader>

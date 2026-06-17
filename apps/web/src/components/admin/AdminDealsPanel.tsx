@@ -13,7 +13,13 @@ import {
 } from '../../services/api'
 import { toast } from 'sonner'
 import { Loader2, Check, X, Pause, Search, RefreshCw, FilterX, ChevronRight } from 'lucide-react'
-import { AdminEmptyState, AdminLoadingState, AdminStatusBadge, formatAdminDate } from './adminUi'
+import {
+  AdminEmptyState,
+  AdminLoadingState,
+  AdminSectionHeader,
+  AdminStatusBadge,
+  formatAdminDate,
+} from './adminUi'
 import { cn } from '../../lib/utils'
 import { ADMIN_EMPTY_STATE } from '../../lib/dealDisplayLabels'
 import {
@@ -150,23 +156,20 @@ export function AdminDealsPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-[var(--text)]">Deals & Boosts</h2>
-          <p className="text-sm text-[var(--text-muted)]">
-            Review supplier deals (offers and discounts), boost purchases (paid sponsored
-            placement), and platform-wide deal insights.
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-          {isFetching ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
-          <span className="ml-2 hidden sm:inline">Refresh</span>
-        </Button>
-      </div>
+      <AdminSectionHeader
+        title="Deals & Boosts"
+        description="Review supplier deals (offers and discounts), boost purchases (paid sponsored placement), and platform-wide deal insights."
+        action={
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+            {isFetching ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            <span className="ml-2 hidden sm:inline">Refresh</span>
+          </Button>
+        }
+      />
 
       {insights && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

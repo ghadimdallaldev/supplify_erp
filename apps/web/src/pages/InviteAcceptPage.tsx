@@ -73,48 +73,48 @@ export function InviteAcceptPage() {
 
   if (!token || !type) {
     return (
-      <PageShell>
+      <InvitePageLayout>
         <p className="text-[var(--text-muted)]">Missing invitation token or type.</p>
-      </PageShell>
+      </InvitePageLayout>
     )
   }
 
   if (isLoading || sessionLoading) {
     return (
-      <PageShell>
+      <InvitePageLayout>
         <p>Validating your invitation…</p>
-      </PageShell>
+      </InvitePageLayout>
     )
   }
 
   if (isError || !invite) {
     return (
-      <PageShell>
+      <InvitePageLayout>
         <p className="text-[var(--text-muted)]">Unable to validate invitation.</p>
-      </PageShell>
+      </InvitePageLayout>
     )
   }
 
   if (!invite.valid && invite.reason === 'expired') {
     return (
-      <PageShell className="max-w-md text-center space-y-2">
+      <InvitePageLayout className="max-w-md text-center space-y-2">
         <h1 className="text-xl font-semibold">This invite link has expired.</h1>
         <p className="text-[var(--text-muted)]">
           Contact your organization admin to get a new one.
         </p>
-      </PageShell>
+      </InvitePageLayout>
     )
   }
 
   if (!invite.valid) {
     return (
-      <PageShell className="max-w-md text-center space-y-3">
+      <InvitePageLayout className="max-w-md text-center space-y-3">
         <h1 className="text-xl font-semibold">This invite link is no longer valid.</h1>
         <p className="text-[var(--text-muted)]">If you already have an account, sign in.</p>
         <Link to={loginHref} className="text-[var(--brand)] underline">
           Sign In
         </Link>
-      </PageShell>
+      </InvitePageLayout>
     )
   }
 
@@ -203,7 +203,7 @@ export function InviteAcceptPage() {
 
   if (sessionUser && !sessionExpired) {
     return (
-      <PageShell>
+      <InvitePageLayout>
         <Card>
           <h1 className="text-xl font-semibold">Accept invitation</h1>
           {emailMismatch && invite.invited_email ? (
@@ -243,12 +243,12 @@ export function InviteAcceptPage() {
             </>
           )}
         </Card>
-      </PageShell>
+      </InvitePageLayout>
     )
   }
 
   return (
-    <PageShell>
+    <InvitePageLayout>
       <Card>
         <h1 className="text-xl font-semibold">Welcome to Supplify</h1>
         <p className="text-sm text-[var(--text-muted)]">{headline}.</p>
@@ -309,11 +309,17 @@ export function InviteAcceptPage() {
           </Link>
         </p>
       </Card>
-    </PageShell>
+    </InvitePageLayout>
   )
 }
 
-function PageShell({ children, className = '' }: { children: ReactNode; className?: string }) {
+function InvitePageLayout({
+  children,
+  className = '',
+}: {
+  children: ReactNode
+  className?: string
+}) {
   return (
     <div className={`min-h-screen flex items-center justify-center p-6 ${className}`}>
       {children}

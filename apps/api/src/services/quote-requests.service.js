@@ -598,6 +598,7 @@ export async function buildCartPayloadFromResponse(
       productId: row.product_id,
       quantity,
       quotedUnitPrice,
+      quoteResponseItemId: row.id,
       product: {
         id: row.product_id,
         supplier_id: row.supplier_id,
@@ -616,9 +617,8 @@ export async function buildCartPayloadFromResponse(
 
   return {
     supplierId: qrs.supplier_id,
+    quoteRequestSupplierId: qrs.id,
     items,
-    disclaimer:
-      'Quoted prices are for reference. Checkout will resolve contract and catalog prices.',
   }
 }
 

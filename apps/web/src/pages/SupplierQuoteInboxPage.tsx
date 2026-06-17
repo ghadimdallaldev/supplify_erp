@@ -5,7 +5,8 @@ import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { EmptyState } from '../components/ui/empty-state'
 import { Skeleton } from '../components/ui/skeleton'
-import { pageHeaderRowClass } from '../components/ui/card-layout'
+import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { Inbox } from 'lucide-react'
 
 function statusLabel(status: string) {
@@ -29,15 +30,11 @@ export function SupplierQuoteInboxPage() {
   const inbox = data?.inbox ?? []
 
   return (
-    <div className="space-y-6">
-      <div className={pageHeaderRowClass}>
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--text)]">Quote request inbox</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
-            Restaurants requesting your best price and availability.
-          </p>
-        </div>
-      </div>
+    <PageShell className="space-y-6" data-testid="supplier-quote-inbox-page">
+      <PageHeader
+        title="Quote request inbox"
+        description="Restaurants requesting your best price and availability."
+      />
 
       {isLoading && (
         <div className="space-y-3">
@@ -94,6 +91,6 @@ export function SupplierQuoteInboxPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   )
 }

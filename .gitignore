@@ -115,13 +115,8 @@ playwright/.cache/
 ehthumbs.db
 Thumbs.db
 
-# Production deploy secrets and backups (do not commit)
-/deploy/env/.env
-/backups/
-deploy/env/.env
-deploy/env/.env.dev
-deploy/env/.env.preprod
-deploy/env/.env.vapid
-deploy/backups/
+# Local secrets (do not commit)
+docker/.env.vapid
+/deploy/backups/
 backups-dev/
 backups-preprod/

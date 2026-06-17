@@ -69,13 +69,13 @@ export function ProductBulkUploadDialog({
 
   return (
     <Dialog open={showBulkUpload} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Bulk Upload Products</DialogTitle>
           <DialogDescription>
-            Upload a CSV file to preview and import products. Required: Name, SKU. Optional:
-            Description, Category, Unit, Price, Stock. Duplicate SKUs in the file or existing
-            catalog update the matching product.
+            Upload a CSV or Excel file to preview and import products. Required: Name, SKU.
+            Optional: Description, Category, Unit, Price, Stock. Duplicate SKUs in the file or
+            existing catalog update the matching product.
           </DialogDescription>
         </DialogHeader>
 
@@ -101,7 +101,7 @@ export function ProductBulkUploadDialog({
               className="cursor-pointer"
             />
             <p className="text-sm text-[var(--text-muted)]">
-              CSV only for server preview (export Excel as CSV first).
+              Supported formats: CSV (.csv) and Excel (.xlsx, .xls).
             </p>
           </div>
 

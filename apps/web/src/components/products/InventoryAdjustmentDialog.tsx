@@ -57,7 +57,7 @@ export function InventoryAdjustmentDialog({
 
   return (
     <Dialog open={showInventoryAdjustment} onOpenChange={setShowInventoryAdjustment}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Adjust Stock</DialogTitle>
           <DialogDescription>

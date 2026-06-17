@@ -13,6 +13,7 @@ import { Skeleton } from '../../components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs'
 import { RequirePermission } from '../../components/RequirePermission'
 import { PageHeader } from '../../components/ui/page-header'
+import { PageShell } from '../../components/ui/page-shell'
 import { formatPrice } from '../../utils/format'
 import {
   CONSUMER_ORDER_STATUS_LABELS,
@@ -244,7 +245,7 @@ export function ConsumerOrdersPage() {
 
   return (
     <RequirePermission permission="ORDERS_VIEW">
-      <div className="space-y-6">
+      <PageShell className="space-y-6">
         <PageHeader
           title="Guest orders"
           description="Consumer orders placed through your online storefront."
@@ -357,7 +358,7 @@ export function ConsumerOrdersPage() {
             </div>
           </section>
         )}
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

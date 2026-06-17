@@ -1,0 +1,9 @@
+{
+  "language": {
+    "title": "Language",
+    "description": "Choose your preferred language for the Supplify interface.",
+    "english": "English",
+    "arabic": "العربية"
+  },
+  "comingSoon": "Coming soon"
+}

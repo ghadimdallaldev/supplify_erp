@@ -15,11 +15,9 @@ export function SectionHeader({
   return (
     <div className={cn('mb-3 flex flex-wrap items-start justify-between gap-2', className)}>
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-          {title}
-        </p>
+        <p className="text-sm font-medium text-[var(--text)]">{title}</p>
         {description ? (
-          <p className="mt-0.5 text-xs text-[var(--text-muted)]">{description}</p>
+          <p className="mt-0.5 text-sm text-[var(--text-mid)]">{description}</p>
         ) : null}
       </div>
       {action}

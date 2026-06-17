@@ -1,6 +1,6 @@
 import { query } from './db.js'
 import { logger } from './logger.js'
-import { getCache, setCache, deleteCache } from './cache.js'
+import { getCache, setCache, deleteCache, deleteCacheByPrefix } from './cache.js'
 import { singleflight } from './singleflight.js'
 import {
   ALL_FEATURE_KEYS,
@@ -186,21 +186,20 @@ export function shouldResolveFeatureAlias(featureKey, planFeatures) {
 export async function isFeatureEnabledForTenant(tenantId, tenantType, featureKey) {
   try {
     const { getTenantSubscription } = await import('./subscription.js')
+    const { resolveEffectivePlanFeatures } = await import(
+      './subscription/free-trial-plan-features.js'
+    )
     const { resolveOrgBillingTenantId } = await import('./org-billing-tenant.js')
     const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
     const subscription = await getTenantSubscription(tenantId, tenantType)
-    let result = await resolveFeatureEnabled(
-      billingTenantId,
-      tenantType,
-      featureKey,
-      subscription?.features
-    )
-    if (!result.enabled && shouldResolveFeatureAlias(featureKey, subscription?.features)) {
+    const planFeatures = await resolveEffectivePlanFeatures(subscription)
+    let result = await resolveFeatureEnabled(billingTenantId, tenantType, featureKey, planFeatures)
+    if (!result.enabled && shouldResolveFeatureAlias(featureKey, planFeatures)) {
       result = await resolveFeatureEnabled(
         billingTenantId,
         tenantType,
         FEATURE_ALIASES[featureKey],
-        subscription?.features
+        planFeatures
       )
     }
     return result.enabled
@@ -258,6 +257,7 @@ export async function setGlobalFeatureOverride(featureKey, mode) {
      RETURNING feature_key, feature_name, description, global_override, updated_at`,
     [featureKey, featureDisplayName(featureKey), globalOverride]
   )
+  await deleteCacheByPrefix('ff:').catch(() => {})
   return {
     featureKey: rows[0].feature_key,
     featureName: rows[0].feature_name,
@@ -294,8 +294,11 @@ export async function listTenantFeatureOverrides(tenantId, tenantType) {
  */
 export async function getEffectiveFeaturesForTenant(tenantId, tenantType) {
   const { getTenantSubscription } = await import('./subscription.js')
+  const { resolveEffectivePlanFeatures } = await import(
+    './subscription/free-trial-plan-features.js'
+  )
   const subscription = await getTenantSubscription(tenantId, tenantType)
-  const planFeatures = subscription?.features || {}
+  const planFeatures = await resolveEffectivePlanFeatures(subscription)
   const allowed = getAllowedFeatureKeys(tenantType)
   const overrides = await listTenantFeatureOverrides(tenantId, tenantType)
   const overrideByKey = Object.fromEntries(overrides.map((o) => [o.featureKey, o]))

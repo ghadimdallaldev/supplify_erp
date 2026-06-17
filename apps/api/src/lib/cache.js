@@ -119,6 +119,39 @@ export async function deleteCache(key) {
   memoryCache.delete(key)
 }
 
+/** Delete all cache entries whose keys start with `prefix` (global feature-flag invalidation). */
+export async function deleteCacheByPrefix(prefix) {
+  if (redisClient) {
+    try {
+      let cursor = '0'
+      do {
+        const [nextCursor, keys] = await redisClient.scan(
+          cursor,
+          'MATCH',
+          `${prefix}*`,
+          'COUNT',
+          100
+        )
+        cursor = nextCursor
+        if (keys.length > 0) {
+          await redisClient.del(...keys)
+        }
+      } while (cursor !== '0')
+      return
+    } catch (error) {
+      logger.warn('Redis prefix delete failed, falling back to memory sweep', {
+        error: error.message,
+        prefix,
+      })
+    }
+  }
+  for (const key of [...memoryCache.keys()]) {
+    if (key.startsWith(prefix)) {
+      memoryCache.delete(key)
+    }
+  }
+}
+
 export function isRedisConnected() {
   return Boolean(redisClient && redisClient.status === 'ready')
 }

@@ -1,21 +1,168 @@
-import React, { Fragment, useState } from 'react'
+import { useMemo, useState, type ComponentType } from 'react'
 import {
   Activity,
-  AlertCircle,
   CreditCard,
+  Filter,
   Loader2,
+  MessageSquare,
   Package,
+  Receipt,
   RefreshCw,
-  Shield,
+  ShoppingCart,
+  Truck,
   Users,
+  Shield,
 } from 'lucide-react'
-import { Card } from '../../ui/card'
 import { Button } from '../../ui/button'
+import { Badge } from '../../ui/badge'
 import { Select, SelectTrigger } from '../../ui/select'
+import { AppPanel } from '../../ui/app-panel'
 import { useGetAdminActivityQuery } from '../../../services/api'
 import { formatCurrency } from '../../../utils/format'
+import {
+  AdminEmptyState,
+  AdminErrorState,
+  AdminLoadingState,
+  AdminSectionHeader,
+  formatAdminDateTime,
+} from '../adminUi'
+import { cn } from '../../../lib/utils'
 
 const ACTIVITY_PAGE_SIZE = 30
+
+const ACTIVITY_TYPE_OPTIONS = [
+  { value: 'all', label: 'All events' },
+  { value: 'order_placed', label: 'Order placed' },
+  { value: 'order_confirmed', label: 'Order acknowledged' },
+  { value: 'order_completed', label: 'Order completed' },
+  { value: 'deal_activity', label: 'Deal activity' },
+  { value: 'cart_updated', label: 'Cart updated' },
+  { value: 'new_tenant', label: 'New registration' },
+  { value: 'plan_changed', label: 'Plan changed' },
+  { value: 'subscription_status', label: 'Subscription status' },
+  { value: 'staff_added', label: 'Staff added' },
+  { value: 'reservation', label: 'Reservation' },
+  { value: 'invoice_issued', label: 'Invoice issued' },
+  { value: 'payment_received', label: 'Payment received' },
+  { value: 'quick_list', label: 'Quick list' },
+  { value: 'receiving', label: 'Receiving' },
+  { value: 'chat_started', label: 'Chat started' },
+] as const
+
+type ActivityEvent = {
+  id: string
+  event_type: string
+  title: string
+  subtitle?: string
+  occurred_at: string
+  amount?: number
+}
+
+type EventVisual = {
+  icon: ComponentType<{ className?: string }>
+  badgeClass: string
+  label: string
+}
+
+const EVENT_VISUALS: Record<string, EventVisual> = {
+  order_placed: {
+    icon: Package,
+    badgeClass: 'bg-[var(--brand-pale)] text-[var(--brand)] border-[var(--brand)]/20',
+    label: 'Order',
+  },
+  order_confirmed: {
+    icon: Package,
+    badgeClass: 'bg-sky-50 text-sky-800 border-sky-200',
+    label: 'Acknowledged',
+  },
+  order_completed: {
+    icon: Truck,
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    label: 'Completed',
+  },
+  deal_activity: {
+    icon: Activity,
+    badgeClass: 'bg-violet-50 text-violet-700 border-violet-200',
+    label: 'Deal',
+  },
+  cart_updated: {
+    icon: ShoppingCart,
+    badgeClass: 'bg-slate-100 text-slate-700 border-slate-200',
+    label: 'Cart',
+  },
+  new_tenant: {
+    icon: Users,
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    label: 'Registration',
+  },
+  plan_changed: {
+    icon: CreditCard,
+    badgeClass: 'bg-violet-50 text-violet-700 border-violet-200',
+    label: 'Plan change',
+  },
+  subscription_status: {
+    icon: Shield,
+    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
+    label: 'Subscription',
+  },
+  staff_added: {
+    icon: Users,
+    badgeClass: 'bg-cyan-50 text-cyan-800 border-cyan-200',
+    label: 'Staff',
+  },
+  reservation: {
+    icon: Activity,
+    badgeClass: 'bg-pink-50 text-pink-700 border-pink-200',
+    label: 'Reservation',
+  },
+  invoice_issued: {
+    icon: Receipt,
+    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
+    label: 'Invoice',
+  },
+  payment_received: {
+    icon: CreditCard,
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    label: 'Payment',
+  },
+  quick_list: {
+    icon: Package,
+    badgeClass: 'bg-sky-50 text-sky-800 border-sky-200',
+    label: 'Quick list',
+  },
+  receiving: {
+    icon: Truck,
+    badgeClass: 'bg-teal-50 text-teal-800 border-teal-200',
+    label: 'Receiving',
+  },
+  chat_started: {
+    icon: MessageSquare,
+    badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    label: 'Chat',
+  },
+}
+
+function eventVisual(eventType: string): EventVisual {
+  return (
+    EVENT_VISUALS[eventType] ?? {
+      icon: Activity,
+      badgeClass: 'bg-[var(--app-bg-subtle)] text-[var(--text-mid)] border-[var(--app-border)]',
+      label: eventType.replace(/_/g, ' '),
+    }
+  )
+}
+
+function ActivityEventBadge({ eventType }: { eventType: string }) {
+  const cfg = eventVisual(eventType)
+  return (
+    <Badge
+      variant="outline"
+      className={cn('shrink-0 text-xs font-medium capitalize', cfg.badgeClass)}
+    >
+      {cfg.label}
+    </Badge>
+  )
+}
 
 export type AdminActivityTabProps = {
   active: boolean
@@ -28,6 +175,7 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
   const {
     data: activityData,
     isLoading: activityLoading,
+    isFetching: activityFetching,
     isError: activityError,
     error: activityQueryError,
     refetch: refetchActivity,
@@ -40,16 +188,66 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
     { skip: !active }
   )
 
+  const events = (activityData?.events ?? []) as ActivityEvent[]
+  const total = activityData?.total ?? events.length
+  const page = Math.floor(activityOffset / ACTIVITY_PAGE_SIZE) + 1
+  const pageCount = Math.max(1, Math.ceil(total / ACTIVITY_PAGE_SIZE))
+  const partial = Boolean((activityData as { partial?: boolean })?.partial)
+  const failedSources = (activityData as { failedSources?: string[] })?.failedSources
+
+  const hasActiveFilters = activityType !== 'all'
+
+  const clearFilters = () => {
+    setActivityType('all')
+    setActivityOffset(0)
+  }
+
+  const groupedByDate = useMemo(() => {
+    const groups: Array<{ dateLabel: string; events: ActivityEvent[] }> = []
+    for (const event of events) {
+      const dateLabel = new Date(event.occurred_at).toLocaleDateString(undefined, {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+      const last = groups[groups.length - 1]
+      if (last?.dateLabel === dateLabel) {
+        last.events.push(event)
+      } else {
+        groups.push({ dateLabel, events: [event] })
+      }
+    }
+    return groups
+  }, [events])
+
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-        <div>
-          <h2 className="text-lg font-bold text-[var(--text)]">Platform Activity</h2>
-          <p className="text-sm text-[var(--text-muted)]">
-            Real-time stream of orders, registrations, plan changes and more
-          </p>
+      <AdminSectionHeader
+        title="Platform activity"
+        description="Real-time stream of orders, registrations, plan changes, and billing events."
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetchActivity()}
+            disabled={activityFetching}
+          >
+            {activityFetching ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+          </Button>
+        }
+      />
+
+      <div className="mb-4 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4">
+        <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+          <Filter className="h-3.5 w-3.5" />
+          Filters
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <Select
             value={activityType}
             onValueChange={(value) => {
@@ -57,233 +255,181 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
               setActivityOffset(0)
             }}
           >
-            <SelectTrigger className="w-auto">
-              <option value="all">All events</option>
-              <option value="order_placed">Order placed</option>
-              <option value="order_confirmed">Order acknowledged</option>
-              <option value="order_completed">Order completed</option>
-              <option value="deal_activity">Deal activity</option>
-              <option value="cart_updated">Cart updated</option>
-              <option value="new_tenant">New registration</option>
-              <option value="plan_changed">Plan changed</option>
-              <option value="subscription_status">Subscription status</option>
-              <option value="staff_added">Staff added</option>
-              <option value="reservation">Reservation</option>
-              <option value="invoice_issued">Invoice issued</option>
-              <option value="payment_received">Payment received</option>
-              <option value="quick_list">Quick list</option>
-              <option value="receiving">Receiving</option>
-              <option value="chat_started">Chat started</option>
+            <SelectTrigger
+              className="h-10 w-full min-w-[200px] sm:w-auto"
+              aria-label="Filter by event type"
+            >
+              {ACTIVITY_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </SelectTrigger>
           </Select>
-          <Button variant="outline" size="sm" onClick={() => refetchActivity()}>
-            <RefreshCw className="h-4 w-4" />
-          </Button>
+
+          {hasActiveFilters && (
+            <Button type="button" variant="ghost" size="sm" className="h-10" onClick={clearFilters}>
+              Clear
+            </Button>
+          )}
         </div>
       </div>
 
-      {activityLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
-        </div>
-      ) : activityError ? (
-        <Card className="p-6 border-red-200 bg-red-50/50">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-[var(--text)]">Activity feed unavailable</p>
-              <p className="text-sm text-[var(--text-muted)] mt-1">
-                {(activityQueryError as { data?: { message?: string } })?.data?.message ||
-                  'The activity API request failed. This is not shown as an empty feed.'}
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-3"
-                onClick={() => refetchActivity()}
-              >
-                Retry
-              </Button>
-            </div>
-          </div>
-        </Card>
-      ) : !activityData?.events?.length ? (
-        <div className="text-center py-16 text-[var(--text-muted)]">
-          <Activity className="h-10 w-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm font-medium">No matching activity</p>
-          <p className="text-xs mt-1 max-w-md mx-auto">
-            {activityType !== 'all'
-              ? 'Try “All events” or another filter. The feed includes orders, registrations, plan changes, deals, boosts, reservations, and admin subscription actions when present in the database.'
-              : 'No platform events found yet. Create tenants, place orders, or change subscriptions to populate this feed.'}
-          </p>
-        </div>
-      ) : (
-        <>
-          {(activityData as { partial?: boolean; failedSources?: string[] }).partial && (
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
-              Some activity sources could not be loaded (
-              {(activityData as { failedSources?: string[] }).failedSources?.join(', ')}). Showing
-              partial results.
+      <AppPanel
+        title="Activity feed"
+        description={
+          activityLoading
+            ? 'Loading activity…'
+            : `${total} event${total === 1 ? '' : 's'}${total > 0 ? ` · page ${page} of ${pageCount}` : ''}`
+        }
+        testId="admin-activity-panel"
+        footer={
+          activityFetching && !activityLoading ? (
+            <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Updating feed…
             </p>
-          )}
-          <p className="text-xs text-[var(--text-muted)] mb-4">
-            {activityData.total ?? activityData.events.length} events in current window
-          </p>
+          ) : undefined
+        }
+      >
+        {activityLoading ? (
+          <AdminLoadingState label="Loading activity feed…" />
+        ) : activityError ? (
+          <AdminErrorState
+            title="Activity feed unavailable"
+            message={
+              (activityQueryError as { data?: { message?: string } })?.data?.message ||
+              'The activity API request failed.'
+            }
+            onRetry={() => refetchActivity()}
+          />
+        ) : events.length === 0 ? (
+          <AdminEmptyState
+            icon={<Activity className="h-8 w-8 text-[var(--text-muted)]" />}
+            title={
+              hasActiveFilters ? 'No activity matches your filter' : 'No platform activity yet'
+            }
+            description={
+              hasActiveFilters
+                ? 'Try “All events” or choose a different event type.'
+                : 'Create tenants, place orders, or change subscriptions to populate this feed.'
+            }
+            action={
+              hasActiveFilters ? (
+                <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
+                  Clear filter
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <>
+            {partial && (
+              <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Some activity sources could not be loaded
+                {failedSources?.length ? ` (${failedSources.join(', ')})` : ''}. Showing partial
+                results.
+              </p>
+            )}
 
-          <div className="relative">
-            <div
-              className="absolute left-5 top-0 bottom-0 w-px"
-              style={{ background: 'var(--app-border)' }}
-            />
+            <div className="space-y-6">
+              {groupedByDate.map((group) => (
+                <div key={group.dateLabel}>
+                  <div className="mb-3 flex items-center gap-3">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                      {group.dateLabel}
+                    </span>
+                    <div className="h-px flex-1 bg-[var(--app-border)]" />
+                  </div>
 
-            <div className="space-y-0">
-              {activityData.events.map((event: any, idx: number) => {
-                const eventConfig: Record<
-                  string,
-                  {
-                    icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>
-                    color: string
-                    bg: string
-                    label: string
-                  }
-                > = {
-                  order_placed: {
-                    icon: Package,
-                    color: 'var(--brand)',
-                    bg: 'var(--brand-ultra)',
-                    label: 'Order',
-                  },
-                  new_tenant: {
-                    icon: Users,
-                    color: 'var(--mint)',
-                    bg: 'var(--mint-pale)',
-                    label: 'New Tenant',
-                  },
-                  plan_changed: {
-                    icon: CreditCard,
-                    color: '#8b5cf6',
-                    bg: '#ede9fe',
-                    label: 'Plan Change',
-                  },
-                  subscription_status: {
-                    icon: Shield,
-                    color: '#f59e0b',
-                    bg: '#fffbeb',
-                    label: 'Subscription',
-                  },
-                }
-                const cfg = eventConfig[event.event_type] ?? {
-                  icon: Activity,
-                  color: 'var(--text-muted)',
-                  bg: 'var(--surface-mid)',
-                  label: event.event_type,
-                }
-                const Icon = cfg.icon
-                const timeStr = new Date(event.occurred_at).toLocaleDateString('en-GB', {
-                  day: 'numeric',
-                  month: 'short',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-                const prevEvent = idx > 0 ? activityData.events[idx - 1] : null
-                const showDateDivider =
-                  !prevEvent ||
-                  new Date(prevEvent.occurred_at).toDateString() !==
-                    new Date(event.occurred_at).toDateString()
+                  <ul className="divide-y divide-[var(--app-border)] rounded-lg border border-[var(--app-border)]">
+                    {group.events.map((event, idx) => {
+                      const cfg = eventVisual(event.event_type)
+                      const Icon = cfg.icon
+                      return (
+                        <li
+                          key={`${event.event_type}-${event.id}-${idx}`}
+                          className="flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-[var(--brand-ultra)]/25 sm:gap-4"
+                        >
+                          <span
+                            className={cn(
+                              'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border',
+                              cfg.badgeClass
+                            )}
+                            aria-hidden
+                          >
+                            <Icon className="h-4 w-4" />
+                          </span>
 
-                return (
-                  <Fragment key={`${event.event_type}-${event.id}-${idx}`}>
-                    {showDateDivider && (
-                      <div className="flex items-center gap-3 py-3 ml-10">
-                        <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">
-                          {new Date(event.occurred_at).toLocaleDateString('en-GB', {
-                            weekday: 'short',
-                            day: 'numeric',
-                            month: 'long',
-                          })}
-                        </span>
-                        <div className="flex-1 h-px" style={{ background: 'var(--app-border)' }} />
-                      </div>
-                    )}
-                    <div className="flex items-start gap-4 py-2.5 group">
-                      <div
-                        className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center z-10 border-2"
-                        style={{ background: cfg.bg, borderColor: cfg.color + '40' }}
-                      >
-                        <Icon className="h-4 w-4" style={{ color: cfg.color }} />
-                      </div>
-
-                      <div
-                        className="flex-1 min-w-0 pb-2.5"
-                        style={{ borderBottom: '1px solid var(--app-border)' }}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span
-                                className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
-                                style={{ background: cfg.bg, color: cfg.color }}
-                              >
-                                {cfg.label}
-                              </span>
-                              <span className="text-sm font-semibold text-[var(--text)] truncate">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <ActivityEventBadge eventType={event.event_type} />
+                              <p className="truncate text-sm font-medium text-[var(--text)]">
                                 {event.title}
-                              </span>
+                              </p>
                             </div>
                             {event.subtitle && (
-                              <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">
+                              <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">
                                 {event.subtitle}
                               </p>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 flex-shrink-0">
+
+                          <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
                             {event.amount != null && event.amount > 0 && (
-                              <span
-                                className="text-sm font-semibold"
-                                style={{ color: 'var(--mint)' }}
-                              >
+                              <span className="text-sm font-semibold tabular-nums text-[var(--mint)]">
                                 {formatCurrency(event.amount)}
                               </span>
                             )}
-                            <span className="text-xs text-[var(--text-muted)] whitespace-nowrap">
-                              {timeStr}
-                            </span>
+                            <time
+                              className="whitespace-nowrap text-xs text-[var(--text-muted)]"
+                              dateTime={event.occurred_at}
+                            >
+                              {formatAdminDateTime(event.occurred_at)}
+                            </time>
                           </div>
-                        </div>
-                      </div>
-                    </div>
-                  </Fragment>
-                )
-              })}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              ))}
             </div>
-          </div>
 
-          {(activityData.total ?? 0) > ACTIVITY_PAGE_SIZE && (
-            <div className="flex items-center justify-between mt-6">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={activityOffset === 0}
-                onClick={() => setActivityOffset(Math.max(0, activityOffset - ACTIVITY_PAGE_SIZE))}
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-[var(--text-muted)]">
-                Page {Math.floor(activityOffset / ACTIVITY_PAGE_SIZE) + 1} of{' '}
-                {Math.ceil((activityData.total ?? 0) / ACTIVITY_PAGE_SIZE)}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={activityOffset + ACTIVITY_PAGE_SIZE >= (activityData.total ?? 0)}
-                onClick={() => setActivityOffset(activityOffset + ACTIVITY_PAGE_SIZE)}
-              >
-                Next
-              </Button>
-            </div>
-          )}
-        </>
-      )}
+            {total > ACTIVITY_PAGE_SIZE && (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--app-border)] pt-4">
+                <p className="text-xs text-[var(--text-muted)]">
+                  Showing {activityOffset + 1}–
+                  {Math.min(activityOffset + ACTIVITY_PAGE_SIZE, total)} of {total}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={activityOffset === 0}
+                    onClick={() =>
+                      setActivityOffset(Math.max(0, activityOffset - ACTIVITY_PAGE_SIZE))
+                    }
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-[var(--text-muted)]">
+                    Page {page} of {pageCount}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={activityOffset + ACTIVITY_PAGE_SIZE >= total}
+                    onClick={() => setActivityOffset(activityOffset + ACTIVITY_PAGE_SIZE)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </AppPanel>
     </>
   )
 }

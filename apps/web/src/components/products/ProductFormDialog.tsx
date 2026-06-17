@@ -48,7 +48,7 @@ export function ProductFormDialog({
 }: ProductFormDialogProps) {
   return (
     <Dialog open={showAddProduct} onOpenChange={setShowAddProduct}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Add New Product</DialogTitle>
           <DialogDescription>

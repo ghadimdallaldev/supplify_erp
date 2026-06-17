@@ -7,6 +7,8 @@ import {
   useGetRestaurantsQuery,
   useFollowSupplierMutation,
   useUnfollowSupplierMutation,
+  useBlockSupplierMutation,
+  useUnblockSupplierMutation,
   useGetSupplierStatisticsQuery,
   useGetSupplierReviewsQuery,
   useGetSupplierRatingSummaryQuery,
@@ -41,12 +43,25 @@ import {
   FileText,
   Star,
   FileQuestion,
+  Ban,
 } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { formatCurrency, formatPrice } from '../utils/format'
-import { CardAddressBlock, pageHeaderRowClass } from '../components/ui/card-layout'
+import { CardAddressBlock } from '../components/ui/card-layout'
+import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog'
+import { Label } from '../components/ui/label'
+import { Textarea } from '../components/ui/textarea'
 
 export function SupplierDetailPage() {
   const { id } = useParams()
@@ -64,6 +79,10 @@ export function SupplierDetailPage() {
     useCreateConversationMutation()
   const [followSupplier, { isLoading: isFollowing }] = useFollowSupplierMutation()
   const [unfollowSupplier, { isLoading: isUnfollowing }] = useUnfollowSupplierMutation()
+  const [blockSupplier, { isLoading: isBlocking }] = useBlockSupplierMutation()
+  const [unblockSupplier, { isLoading: isUnblocking }] = useUnblockSupplierMutation()
+  const [showBlockDialog, setShowBlockDialog] = useState(false)
+  const [blockReason, setBlockReason] = useState('')
 
   // Fetch products for this supplier
   const { data: productsData, isLoading: isLoadingProducts } = useGetProductsQuery({
@@ -150,92 +169,149 @@ export function SupplierDetailPage() {
     refetch()
   }
 
+  const isBlocked = Boolean(supplier.is_blocked)
+
+  const handleBlockSupplier = async () => {
+    if (!id) return
+    try {
+      await blockSupplier({ id, reason: blockReason.trim() || undefined }).unwrap()
+      toast.success('Supplier blocked — they will no longer appear in your catalog')
+      setShowBlockDialog(false)
+      setBlockReason('')
+      refetch()
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to block supplier')
+    }
+  }
+
+  const handleUnblockSupplier = async () => {
+    if (!id) return
+    try {
+      await unblockSupplier(id).unwrap()
+      toast.success('Supplier unblocked')
+      refetch()
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to unblock supplier')
+    }
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Header with Logo */}
-      <div className={pageHeaderRowClass}>
-        <div className="flex items-center gap-4 min-w-0">
-          {supplier.logo_url ? (
-            <img
-              src={supplier.logo_url}
-              alt={supplier.name}
-              className="h-20 w-20 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement
-                target.style.display = 'none'
-                const fallback = target.nextElementSibling as HTMLDivElement
-                if (fallback) fallback.style.display = 'flex'
-              }}
-            />
-          ) : null}
-          <div
-            className={`h-20 w-20 rounded-lg bg-gradient-to-br from-[var(--brand)] to-[var(--brand-mid)] flex items-center justify-center text-white font-bold text-3xl shadow-md ${supplier.logo_url ? 'hidden' : ''}`}
-          >
-            {supplier.name.charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <h1 className="text-[21px] font-black text-[var(--text)]">{supplier.name}</h1>
-            <p className="text-[var(--text-muted)] mt-1">{supplier.slug}</p>
-            {ratingSummary?.avg_rating != null && Number(ratingSummary.avg_rating) > 0 ? (
-              <p className="flex items-center gap-1 text-sm text-amber-600 mt-1">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    className={`h-4 w-4 ${i < Math.round(Number(ratingSummary.avg_rating)) ? 'fill-amber-400' : 'text-amber-200'}`}
-                  />
-                ))}
-                <span>
-                  {Number(ratingSummary.avg_rating).toFixed(1)} (
-                  {String(ratingSummary.review_count ?? 0)} reviews)
-                </span>
-              </p>
-            ) : null}
-            {supplier.description && (
-              <p className="text-sm text-[var(--text-muted)] mt-2 max-w-2xl">
-                {supplier.description}
-              </p>
-            )}
-          </div>
+    <PageShell data-testid="supplier-detail-page">
+      <div className="flex items-start gap-4">
+        {supplier.logo_url ? (
+          <img
+            src={supplier.logo_url}
+            alt={supplier.name}
+            className="h-20 w-20 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.style.display = 'none'
+              const fallback = target.nextElementSibling as HTMLDivElement
+              if (fallback) fallback.style.display = 'flex'
+            }}
+          />
+        ) : null}
+        <div
+          className={`h-20 w-20 rounded-lg bg-gradient-to-br from-[var(--brand)] to-[var(--brand-mid)] flex items-center justify-center text-white font-bold text-3xl shadow-md ${supplier.logo_url ? 'hidden' : ''}`}
+        >
+          {supplier.name.charAt(0).toUpperCase()}
         </div>
-        <div className="flex flex-wrap gap-2 shrink-0">
-          {isRestaurant && (
-            <>
-              <Button
-                variant={supplier.is_followed ? 'default' : 'outline'}
-                className="whitespace-normal"
-                onClick={handleFollowToggle}
-                disabled={isFollowing || isUnfollowing}
-              >
-                <Heart className={`h-4 w-4 mr-2 ${supplier.is_followed ? 'fill-current' : ''}`} />
-                {supplier.is_followed ? 'Following' : 'Follow'}
-              </Button>
-              <Button
-                variant="outline"
-                className="whitespace-normal"
-                onClick={handleSendMessage}
-                disabled={isCreatingConversation}
-              >
-                <MessageSquare className="h-4 w-4 mr-2" />
-                {isCreatingConversation ? 'Opening...' : 'Message'}
-              </Button>
-              <Button variant="outline" className="whitespace-normal" asChild>
-                <Link
-                  to="/app/quote-requests/new"
-                  state={{
-                    prefill: {
-                      supplierIds: [supplier.id],
-                      items: (productsData?.products ?? []).slice(0, 5).map((p) => ({
-                        productId: p.id,
-                        quantity: 1,
-                      })),
-                    },
-                  }}
-                >
-                  <FileQuestion className="h-4 w-4 mr-2" />
-                  Request best price
-                </Link>
-              </Button>
-            </>
+        <div className="min-w-0 flex-1">
+          <PageHeader
+            title={supplier.name}
+            description={supplier.slug}
+            className="mb-0"
+            actions={
+              isRestaurant ? (
+                <div className="flex flex-wrap gap-2 shrink-0">
+                  {isBlocked ? (
+                    <>
+                      <Badge variant="destructive" className="self-center">
+                        Blocked
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        className="whitespace-normal"
+                        onClick={handleUnblockSupplier}
+                        disabled={isUnblocking}
+                        data-testid="unblock-supplier"
+                      >
+                        Unblock supplier
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant={supplier.is_followed ? 'default' : 'outline'}
+                        className="whitespace-normal"
+                        onClick={handleFollowToggle}
+                        disabled={isFollowing || isUnfollowing}
+                      >
+                        <Heart
+                          className={`h-4 w-4 mr-2 ${supplier.is_followed ? 'fill-current' : ''}`}
+                        />
+                        {supplier.is_followed ? 'Following' : 'Follow'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="whitespace-normal"
+                        onClick={handleSendMessage}
+                        disabled={isCreatingConversation}
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        {isCreatingConversation ? 'Opening...' : 'Message'}
+                      </Button>
+                      <Button variant="outline" className="whitespace-normal" asChild>
+                        <Link
+                          to="/app/quote-requests/new"
+                          state={{
+                            prefill: {
+                              supplierIds: [supplier.id],
+                              items: (productsData?.products ?? []).slice(0, 5).map((p) => ({
+                                productId: p.id,
+                                quantity: 1,
+                              })),
+                            },
+                          }}
+                        >
+                          <FileQuestion className="h-4 w-4 mr-2" />
+                          Request best price
+                        </Link>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="whitespace-normal text-[var(--red)] border-[var(--red)]/30 hover:bg-red-50"
+                        onClick={() => setShowBlockDialog(true)}
+                        disabled={isBlocking}
+                        data-testid="block-supplier"
+                      >
+                        <Ban className="h-4 w-4 mr-2" />
+                        Block
+                      </Button>
+                    </>
+                  )}
+                </div>
+              ) : undefined
+            }
+          />
+          {ratingSummary?.avg_rating != null && Number(ratingSummary.avg_rating) > 0 ? (
+            <p className="flex items-center gap-1 text-sm text-amber-600 mt-1">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star
+                  key={i}
+                  className={`h-4 w-4 ${i < Math.round(Number(ratingSummary.avg_rating)) ? 'fill-amber-400' : 'text-amber-200'}`}
+                />
+              ))}
+              <span>
+                {Number(ratingSummary.avg_rating).toFixed(1)} (
+                {String(ratingSummary.review_count ?? 0)} reviews)
+              </span>
+            </p>
+          ) : null}
+          {supplier.description && (
+            <p className="text-sm text-[var(--text-muted)] mt-2 max-w-2xl">
+              {supplier.description}
+            </p>
           )}
         </div>
       </div>
@@ -593,6 +669,41 @@ export function SupplierDetailPage() {
         </TabsContent>
       </Tabs>
 
+      <Dialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Block {supplier.name}?</DialogTitle>
+            <DialogDescription>
+              Blocked suppliers are hidden from your catalog and marketplace browse. You can unblock
+              them later from this page.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="block-reason">Reason (optional)</Label>
+            <Textarea
+              id="block-reason"
+              value={blockReason}
+              onChange={(e) => setBlockReason(e.target.value)}
+              placeholder="e.g. Quality issues, no longer ordering"
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBlockDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBlockSupplier}
+              disabled={isBlocking}
+              data-testid="confirm-block-supplier"
+            >
+              {isBlocking ? 'Blocking…' : 'Block supplier'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <SupplierReviewModal
         supplierId={id!}
         supplierName={supplier.name}
@@ -607,6 +718,6 @@ export function SupplierDetailPage() {
           refetch()
         }}
       />
-    </div>
+    </PageShell>
   )
 }

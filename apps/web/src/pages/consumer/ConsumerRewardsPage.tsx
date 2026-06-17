@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
 import { Skeleton } from '../../components/ui/skeleton'
+import { PageShell } from '../../components/ui/page-shell'
 import { ArrowLeft, Gift, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -40,7 +41,7 @@ export function ConsumerRewardsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 p-4">
+    <PageShell className="mx-auto max-w-lg space-y-4 p-4">
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="sm" asChild>
           <Link to={`/order/${slug}`}>
@@ -142,7 +143,7 @@ export function ConsumerRewardsPage() {
           </Button>
         </>
       )}
-    </div>
+    </PageShell>
   )
 }
 

@@ -19,6 +19,7 @@ import {
   buildFeatureNotAvailablePayload,
   requireFeature,
   isQuickListAutomationEnabled,
+  resolveEffectivePlanFeatures,
 } from '../lib/subscription.js'
 import { z } from 'zod'
 import { mapQuickListRow } from '../lib/quick-list-schedule.js'
@@ -829,7 +830,8 @@ router.post(
       }
 
       const subscription = await getTenantSubscription(restaurantId, 'RESTAURANT')
-      if (!isQuickListAutomationEnabled(subscription?.features?.quick_lists)) {
+      const planFeatures = await resolveEffectivePlanFeatures(subscription)
+      if (!isQuickListAutomationEnabled(planFeatures?.quick_lists)) {
         const recommendedPlans = await getRecommendedPlanNames('RESTAURANT')
         return res.status(403).json({
           ok: false,

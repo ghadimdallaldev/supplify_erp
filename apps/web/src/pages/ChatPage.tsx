@@ -18,6 +18,7 @@ import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { Plus, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, isToday, isYesterday } from 'date-fns'
@@ -442,14 +443,14 @@ export function ChatPage() {
   if (conversationsLoading || isCreatingConversation) {
     return (
       <RequirePermission permission="CHAT_VIEW" title="chat">
-        <div className="container mx-auto flex flex-col gap-4 p-4 sm:p-6">
+        <PageShell data-testid="chat-page">
           <Skeleton className="h-10 w-48" />
           <Skeleton className="h-4 w-72 max-w-full" />
           <div className="flex min-h-0 gap-4 h-[calc(100dvh-11rem)] max-h-[900px]">
             <Skeleton className="hidden h-full w-80 shrink-0 rounded-xl lg:block" />
             <Skeleton className="h-full min-h-[320px] flex-1 rounded-xl" />
           </div>
-        </div>
+        </PageShell>
       </RequirePermission>
     )
   }
@@ -469,7 +470,7 @@ export function ChatPage() {
 
   return (
     <RequirePermission permission="CHAT_VIEW" title="chat">
-      <div className="container mx-auto flex flex-col gap-4 p-4 sm:p-6">
+      <PageShell data-testid="chat-page">
         <PageHeader
           title="Messages"
           description="Chat with suppliers and restaurants in real time."
@@ -621,7 +622,7 @@ export function ChatPage() {
           onSelectParticipant={handleStartConversation}
           isCreating={isCreatingConversation}
         />
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

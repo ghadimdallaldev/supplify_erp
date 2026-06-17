@@ -15,6 +15,8 @@ type ProductCatalogRowProps = {
   onToggleFavorite?: (product: any) => void
   onAdjustStock: (product: any) => void
   layout: 'card' | 'table'
+  isLastRow?: boolean
+  cellClassName?: string
 }
 
 function ProductThumb({ product, size }: { product: any; size: 'sm' | 'md' }) {
@@ -202,6 +204,8 @@ export function ProductCatalogRow({
   onToggleFavorite,
   onAdjustStock,
   layout,
+  isLastRow = false,
+  cellClassName = 'px-4 py-4',
 }: ProductCatalogRowProps) {
   if (layout === 'card') {
     return (
@@ -238,10 +242,10 @@ export function ProductCatalogRow({
 
   return (
     <tr
-      className="transition-colors hover:bg-[var(--bg)]"
+      className="transition-colors hover:bg-[var(--brand-ultra)]/50"
       data-testid={`product-row-${product.id}`}
     >
-      <td className="px-4 py-4">
+      <td className={cn(cellClassName, isLastRow && 'border-b-0')}>
         <div className="flex items-center gap-3">
           <ProductThumb product={product} size="md" />
           <div className="min-w-0">
@@ -257,19 +261,19 @@ export function ProductCatalogRow({
           </div>
         </div>
       </td>
-      <td className="px-4 py-4">
+      <td className={cn(cellClassName, isLastRow && 'border-b-0')}>
         <CategoryBadges product={product} layout="table" isSupplier={isSupplier} />
       </td>
-      <td className="px-4 py-4">
+      <td className={cn(cellClassName, isLastRow && 'border-b-0')}>
         <p className="text-sm text-[var(--text-muted)]">{product.supplier_name || 'N/A'}</p>
       </td>
-      <td className="px-4 py-4">
+      <td className={cn(cellClassName, isLastRow && 'border-b-0')}>
         <PriceCell product={product} layout="table" />
       </td>
-      <td className="px-4 py-4">
+      <td className={cn(cellClassName, isLastRow && 'border-b-0')}>
         <StockLabel product={product} layout="table" />
       </td>
-      <td className="px-4 py-4">
+      <td className={cn(cellClassName, isLastRow && 'border-b-0')}>
         <ProductActions
           product={product}
           isSupplier={isSupplier}

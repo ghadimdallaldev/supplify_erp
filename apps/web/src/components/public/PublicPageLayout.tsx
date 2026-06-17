@@ -68,7 +68,7 @@ export function PublicPageLayout({
                     </h1>
                   )}
                   {subtitle && (
-                    <p className="mt-1 text-sm leading-relaxed text-[var(--text-mid)]">
+                    <p className="mt-2 text-base leading-relaxed text-[var(--lead-text-color)]">
                       {subtitle}
                     </p>
                   )}

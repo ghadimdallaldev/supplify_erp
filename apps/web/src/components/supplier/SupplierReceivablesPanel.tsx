@@ -1,9 +1,13 @@
 import { Link } from 'react-router-dom'
 import { useGetSupplierReceivablesQuery } from '../../services/api'
+import {
+  useSendInvoiceReminderMutation,
+  useRemindOverdueInvoicesMutation,
+} from '../../services/api/endpoints/finance'
 import { Skeleton } from '../ui/skeleton'
 import { Button } from '../ui/button'
 import { formatCurrency } from '../../utils/format'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Bell } from 'lucide-react'
 
 const AGING_LABELS: Record<string, string> = {
   current: 'Current',
@@ -23,6 +27,8 @@ function statusBadge(status: string, isOverdue: boolean) {
 
 export function SupplierReceivablesPanel() {
   const { data, isLoading, isError, refetch } = useGetSupplierReceivablesQuery()
+  const [sendReminder, { isLoading: sendingReminder }] = useSendInvoiceReminderMutation()
+  const [remindOverdue, { isLoading: remindingOverdue }] = useRemindOverdueInvoicesMutation()
 
   if (isLoading) {
     return (
@@ -52,6 +58,8 @@ export function SupplierReceivablesPanel() {
   const summary = data?.summary
   const aging = data?.aging || {}
   const invoices = data?.invoices || []
+  const topDebtors = data?.topDebtors || []
+  const overdueTotal = summary?.overdueTotal ?? 0
 
   if (!summary?.unpaidCount) {
     return (
@@ -64,8 +72,41 @@ export function SupplierReceivablesPanel() {
     )
   }
 
+  const handleDebtorReminder = async (invoiceId: string | null | undefined) => {
+    if (!invoiceId) return
+    try {
+      await sendReminder({ invoiceId }).unwrap()
+    } catch {
+      // mutation error surfaced by RTK; no extra handling needed
+    }
+  }
+
+  const handleBulkRemindOverdue = async () => {
+    try {
+      await remindOverdue().unwrap()
+    } catch {
+      // mutation error surfaced by RTK
+    }
+  }
+
   return (
     <div data-testid="supplier-receivables-panel" className="mb-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-bold text-[var(--text)]">Open receivables</h3>
+        {overdueTotal > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="receivables-bulk-remind"
+            disabled={remindingOverdue}
+            onClick={() => handleBulkRemindOverdue()}
+          >
+            <Bell className="h-3.5 w-3.5 mr-1.5" />
+            {remindingOverdue ? 'Sending…' : 'Remind overdue'}
+          </Button>
+        )}
+      </div>
+
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
         <Stat
           label="Unpaid total"
@@ -101,6 +142,54 @@ export function SupplierReceivablesPanel() {
           </span>
         ))}
       </div>
+
+      {topDebtors.length > 0 && (
+        <div
+          data-testid="receivables-top-debtors"
+          className="rounded-lg border border-[var(--app-border)] px-3 py-2"
+        >
+          <div className="text-xs font-bold text-[var(--text-muted)] mb-2">Top debtors</div>
+          <ul className="space-y-1.5">
+            {topDebtors
+              .slice(0, 5)
+              .map(
+                (debtor: {
+                  restaurantId: string
+                  restaurantName: string
+                  balanceDue: number
+                  oldestInvoiceId?: string | null
+                }) => (
+                  <li
+                    key={debtor.restaurantId}
+                    className="flex flex-wrap items-center justify-between gap-2 text-xs"
+                  >
+                    <Link
+                      to={`/app/restaurants/${debtor.restaurantId}`}
+                      className="font-medium text-[var(--text)] hover:text-[var(--brand)]"
+                    >
+                      {debtor.restaurantName}
+                      <span className="text-[var(--text-muted)] ml-1">
+                        {formatCurrency(debtor.balanceDue)}
+                      </span>
+                    </Link>
+                    {debtor.oldestInvoiceId && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-[11px] px-2"
+                        data-testid={`debtor-remind-${debtor.restaurantId}`}
+                        disabled={sendingReminder}
+                        onClick={() => handleDebtorReminder(debtor.oldestInvoiceId)}
+                      >
+                        Send reminder
+                      </Button>
+                    )}
+                  </li>
+                )
+              )}
+          </ul>
+        </div>
+      )}
 
       {invoices.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-[var(--app-border)]">

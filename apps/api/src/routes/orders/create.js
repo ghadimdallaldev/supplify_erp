@@ -19,6 +19,7 @@ import {
   getRecommendedPlanNames,
   buildLimitExceededPayload,
   isFeatureEnabled,
+  resolveEffectivePlanFeatures,
 } from '../../lib/subscription.js'
 import { z } from 'zod'
 import { notifyOrderStatusChange } from '../../services/notification.service.js'
@@ -125,9 +126,24 @@ router.post(
         restaurantId,
         items: resolveItems.filter((item) => item.supplierId),
         catalogByProductId,
+        quoteLocks: orderData.quoteLocks,
       })
       const resolvedMap = new Map(resolvedPrices.map((r) => [r.productId, r]))
       orderCreateTimings.productPriceLookupMs = elapsedMsSince(phaseStart)
+
+      if (orderData.quoteLocks?.length) {
+        const lockByProductId = new Map(orderData.quoteLocks.map((lock) => [lock.productId, lock]))
+        for (const item of orderData.items) {
+          if (!lockByProductId.has(item.productId)) continue
+          const resolved = resolvedMap.get(item.productId)
+          if (resolved?.source !== 'QUOTE_PRICE') {
+            const product = productMap.get(item.productId)
+            throw new ValidationError(
+              `Quoted price is no longer available for ${product?.sku || item.productId}. Remove the item and re-add it from your quote request.`
+            )
+          }
+        }
+      }
 
       // Validate and group items by supplier
       phaseStart = performance.now()
@@ -151,6 +167,7 @@ router.post(
           pricingSource: resolved.source,
           contractPriceId: resolved.contractPriceId,
           defaultCatalogPrice: resolved.defaultPrice,
+          quoteResponseItemId: resolved.quoteResponseItemId ?? null,
         })
       }
       orderCreateTimings.itemGroupingMs = elapsedMsSince(phaseStart)
@@ -181,12 +198,15 @@ router.post(
             'RESTAURANT',
             'orders_per_day'
           ),
-          resolveFeatureEnabled(
-            billingTenantId,
-            'RESTAURANT',
-            'supplier_deals',
-            subscription?.features
-          ),
+          (async () => {
+            const planFeatures = await resolveEffectivePlanFeatures(subscription)
+            return resolveFeatureEnabled(
+              billingTenantId,
+              'RESTAURANT',
+              'supplier_deals',
+              planFeatures
+            )
+          })(),
         ])
         dailyMeterEnforcement = enforcement
         restaurantDealsEnabled = dealsFeature.enabled

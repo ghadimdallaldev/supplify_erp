@@ -6,7 +6,8 @@ import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { EmptyState } from '../components/ui/empty-state'
 import { Skeleton } from '../components/ui/skeleton'
-import { pageHeaderRowClass } from '../components/ui/card-layout'
+import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { FileQuestion, Plus } from 'lucide-react'
 
 function statusLabel(status: string) {
@@ -28,19 +29,17 @@ export function QuoteRequestsPage() {
   const requests = data?.quoteRequests ?? []
 
   return (
-    <div className="space-y-6">
-      <div className={pageHeaderRowClass}>
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--text)]">Quote requests</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
-            Request best price from multiple suppliers and compare responses.
-          </p>
-        </div>
-        <Button onClick={() => navigate('/app/quote-requests/new')}>
-          <Plus className="h-4 w-4 mr-2" />
-          Request best price
-        </Button>
-      </div>
+    <PageShell className="space-y-6" data-testid="quote-requests-page">
+      <PageHeader
+        title="Quote requests"
+        description="Request best price from multiple suppliers and compare responses."
+        actions={
+          <Button onClick={() => navigate('/app/quote-requests/new')}>
+            <Plus className="h-4 w-4 mr-2" />
+            Request best price
+          </Button>
+        }
+      />
 
       {isLoading && (
         <div className="space-y-3">
@@ -104,6 +103,6 @@ export function QuoteRequestsPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   )
 }

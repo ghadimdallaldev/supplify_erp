@@ -1,5 +1,11 @@
 import { api } from '../base'
 
+/** Example CSV for supplier customer import (matches import column aliases). */
+export const CUSTOMER_IMPORT_CSV_TEMPLATE = `Restaurant Name,Contact Person,Phone,Email,Address,Area/Region,Credit Limit,Payment Terms,Sales Representative,Notes
+The Coastal Kitchen,John Smith,+1-555-0101,john@coastalkitchen.com,123 Harbor Blvd,San Diego,5000,Net 30,Alex Rivera,Preferred delivery Tue/Thu
+Green Leaf Bistro,Maria Chen,+1-555-0102,maria@greenleaf.com,45 Oak Street,Portland,2500,Net 15,Jordan Lee,
+Downtown Diner,,+1-555-0103,,789 Main Ave,Chicago,,Net 30,,Phone-only contact`
+
 export type ReferralProgramConfig = {
   firstPaidDiscountPercent: number
   supplierRewardType: 'free_month' | 'account_credit'
@@ -34,6 +40,16 @@ export type SupplierGrowthMetrics = {
   rewardsEarned: { freeMonths: number; accountCredit: number }
   sponsorshipLimit?: number | null
   eligibleSponsorPlans?: string[]
+}
+
+export type RestaurantConnectionRequest = {
+  id: string
+  supplier_id: string
+  supplier_name: string
+  restaurant_id: string
+  status: string
+  expires_at: string
+  created_at: string
 }
 
 export const growthApi = api.injectEndpoints({
@@ -121,6 +137,27 @@ export const growthApi = api.injectEndpoints({
       }),
       invalidatesTags: ['Admin'],
     }),
+    getRestaurantConnectionRequests: builder.query<
+      { requests: RestaurantConnectionRequest[] },
+      void
+    >({
+      query: () => '/api/restaurant/growth/connection-requests',
+      providesTags: ['Supplier'],
+    }),
+    acceptConnectionRequest: builder.mutation<unknown, string>({
+      query: (id) => ({
+        url: `/api/restaurant/growth/connection-requests/${id}/accept`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Supplier'],
+    }),
+    declineConnectionRequest: builder.mutation<unknown, string>({
+      query: (id) => ({
+        url: `/api/restaurant/growth/connection-requests/${id}/decline`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Supplier'],
+    }),
   }),
 })
 
@@ -134,4 +171,7 @@ export const {
   useSponsorProspectMutation,
   useGetAdminGrowthSettingsQuery,
   useUpdateAdminGrowthSettingsMutation,
+  useGetRestaurantConnectionRequestsQuery,
+  useAcceptConnectionRequestMutation,
+  useDeclineConnectionRequestMutation,
 } = growthApi

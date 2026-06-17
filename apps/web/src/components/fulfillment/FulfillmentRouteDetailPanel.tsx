@@ -10,6 +10,7 @@ import type { DeliveryRouteDetail, DeliveryRouteStop } from '../../types'
 import {
   useCancelFulfillmentRouteMutation,
   useReorderFulfillmentRouteStopsMutation,
+  useOptimizeFulfillmentRouteMutation,
   useSetNextFulfillmentRouteStopMutation,
   useUpdateFulfillmentRouteMutation,
   useUpdateFulfillmentRouteStopMutation,
@@ -323,6 +324,7 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
   const isDesktop = useMediaQuery('(min-width: 640px)', false)
 
   const [reorderStops, { isLoading: reordering }] = useReorderFulfillmentRouteStopsMutation()
+  const [optimizeRoute, { isLoading: optimizing }] = useOptimizeFulfillmentRouteMutation()
   const [setNextStop, { isLoading: settingNext }] = useSetNextFulfillmentRouteStopMutation()
   const [updateRoute, { isLoading: updatingRoute }] = useUpdateFulfillmentRouteMutation()
   const [updateStop, { isLoading: updatingStop }] = useUpdateFulfillmentRouteStopMutation()
@@ -353,6 +355,29 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
       toast.error(msg || 'Update failed')
+    }
+  }
+
+  const handleOptimize = async (apply: boolean) => {
+    try {
+      const result = await optimizeRoute({ routeId: route.id, apply }).unwrap()
+      const km = result.preview?.estimatedDistanceKm
+      if (apply) {
+        toast.success(
+          km != null ? `Route optimized (~${km} km estimated)` : 'Route stop order updated'
+        )
+      } else {
+        const ok = window.confirm(
+          `Optimize stop order? Estimated distance ~${km ?? '?'} km. Apply new order?`
+        )
+        if (ok) {
+          await optimizeRoute({ routeId: route.id, apply: true }).unwrap()
+          toast.success('Route optimized')
+        }
+      }
+    } catch (e: unknown) {
+      const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
+      toast.error(msg || 'Could not optimize route')
     }
   }
 
@@ -437,6 +462,19 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
         </div>
       </div>
 
+      {canManage && editable && route.stops.length >= 2 && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="min-h-[44px] w-full sm:min-h-0 sm:w-auto"
+          onClick={() => handleOptimize(false)}
+          disabled={optimizing}
+        >
+          {optimizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Optimize stop order
+        </Button>
+      )}
+
       {canManage && route.status === 'PLANNED' && (
         <div className="space-y-2">
           <Button
@@ -500,7 +538,8 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
       <Sheet open onOpenChange={(open) => !open && onClose()}>
         <SheetContent
           side="right"
-          className="flex h-full w-full flex-col gap-4 overflow-hidden sm:max-w-xl"
+          width="wide"
+          className="flex h-full flex-col gap-4 overflow-hidden"
         >
           <div
             data-testid="fulfillment-route-detail"

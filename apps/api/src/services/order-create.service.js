@@ -13,6 +13,7 @@ export async function insertOrderItemsBatch(client, orderId, supplierId, items) 
   const pricingSources = []
   const contractPriceIds = []
   const defaultCatalogPrices = []
+  const quoteResponseItemIds = []
 
   for (const item of items) {
     productIds.push(item.productId)
@@ -23,13 +24,14 @@ export async function insertOrderItemsBatch(client, orderId, supplierId, items) 
     pricingSources.push(item.pricingSource || 'DEFAULT_PRICE')
     contractPriceIds.push(item.contractPriceId || null)
     defaultCatalogPrices.push(item.defaultCatalogPrice ?? null)
+    quoteResponseItemIds.push(item.quoteResponseItemId || null)
   }
 
   const { rows } = await client.query(
     `
     INSERT INTO order_item (
       order_id, product_id, supplier_id, quantity, unit_price, line_total, notes,
-      pricing_source, contract_price_id, default_catalog_price
+      pricing_source, contract_price_id, default_catalog_price, quote_response_item_id
     )
     SELECT
       $1,
@@ -41,7 +43,8 @@ export async function insertOrderItemsBatch(client, orderId, supplierId, items) 
       v.notes,
       v.pricing_source,
       v.contract_price_id,
-      v.default_catalog_price
+      v.default_catalog_price,
+      v.quote_response_item_id
     FROM unnest(
       $3::uuid[],
       $4::numeric[],
@@ -50,7 +53,8 @@ export async function insertOrderItemsBatch(client, orderId, supplierId, items) 
       $7::text[],
       $8::text[],
       $9::uuid[],
-      $10::numeric[]
+      $10::numeric[],
+      $11::uuid[]
     ) AS v(
       product_id,
       quantity,
@@ -59,7 +63,8 @@ export async function insertOrderItemsBatch(client, orderId, supplierId, items) 
       notes,
       pricing_source,
       contract_price_id,
-      default_catalog_price
+      default_catalog_price,
+      quote_response_item_id
     )
     RETURNING *
     `,
@@ -74,6 +79,7 @@ export async function insertOrderItemsBatch(client, orderId, supplierId, items) 
       pricingSources,
       contractPriceIds,
       defaultCatalogPrices,
+      quoteResponseItemIds,
     ]
   )
 

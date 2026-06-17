@@ -18,6 +18,7 @@ import {
   normalizeReceivedQuantity,
   snapQuantityToUnit,
 } from '../../lib/quantityUnit'
+import { RestaurantConfirmPodButton } from '../fulfillment/RestaurantConfirmPodButton'
 
 export function ReceivingDialog({
   order,
@@ -55,7 +56,7 @@ export function ReceivingDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[min(90dvh,100vh)] max-w-3xl overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <DialogContent size="xl" className="pb-[max(1rem,env(safe-area-inset-bottom))]">
         <DialogHeader>
           <DialogTitle>Receive Order #{order.id.slice(0, 8)}</DialogTitle>
           <DialogDescription>
@@ -250,6 +251,10 @@ export function ReceivingDialog({
               />
             </div>
           </div>
+        </div>
+
+        <div className="pt-2">
+          <RestaurantConfirmPodButton orderId={order.id} fullWidth />
         </div>
 
         <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">

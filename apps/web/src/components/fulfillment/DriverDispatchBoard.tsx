@@ -4,20 +4,30 @@ import { Badge } from '../ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Label } from '../ui/label'
 import { Select, SelectTrigger } from '../ui/select'
-import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { Skeleton } from '../ui/skeleton'
-import { CheckCircle, AlertTriangle, Loader2, Route, PackageOpen } from 'lucide-react'
+import {
+  CheckCircle,
+  AlertTriangle,
+  Loader2,
+  Route,
+  PackageOpen,
+  Package,
+  Clock,
+  Truck,
+  CalendarClock,
+} from 'lucide-react'
 import { CreateRouteDialog } from './CreateRouteDialog'
+import { ProofOfDeliveryDialog } from './ProofOfDeliveryDialog'
 import { canSelectOrderForRoute } from './fulfillmentDispatchUtils'
 import { toast } from 'sonner'
 import type { DispatchOrderCard } from '../../types'
+import { KpiCard } from '../ui/kpi-card'
 import {
   useGetDriversQuery,
   useAssignDriverToOrderMutation,
   useReassignDriverOnOrderMutation,
   useUpdateOrderDeliveryStatusMutation,
-  useSubmitOrderProofOfDeliveryMutation,
   useRolloverAssignmentToTomorrowMutation,
 } from '../../services/api'
 import { usePermissions } from '../../hooks/usePermissions'
@@ -58,8 +68,6 @@ export function DriverDispatchBoard({
   const [selectedDriverId, setSelectedDriverId] = useState('')
   const [reassignOrder, setReassignOrder] = useState<DispatchOrderCard | null>(null)
   const [podOrder, setPodOrder] = useState<DispatchOrderCard | null>(null)
-  const [recipientName, setRecipientName] = useState('')
-  const [proofNotes, setProofNotes] = useState('')
   const [failOrder, setFailOrder] = useState<DispatchOrderCard | null>(null)
   const [failureReason, setFailureReason] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -70,7 +78,6 @@ export function DriverDispatchBoard({
   const [reassignDriver, { isLoading: reassigning }] = useReassignDriverOnOrderMutation()
   const [updateDeliveryStatus, { isLoading: updatingStatus }] =
     useUpdateOrderDeliveryStatusMutation()
-  const [submitPod, { isLoading: submittingPod }] = useSubmitOrderProofOfDeliveryMutation()
   const [rolloverAssignment, { isLoading: rollingOver }] = useRolloverAssignmentToTomorrowMutation()
 
   const driverLabel = (d: { full_name?: string; fullName?: string }) =>
@@ -149,42 +156,6 @@ export function DriverDispatchBoard({
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
       toast.error(msg || 'Failed to update')
-    }
-  }
-
-  const handlePodSubmit = async () => {
-    if (!podOrder) return
-    try {
-      let latitude: number | undefined
-      let longitude: number | undefined
-      if (navigator.geolocation) {
-        try {
-          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              timeout: 10_000,
-              maximumAge: 60_000,
-            })
-          })
-          latitude = pos.coords.latitude
-          longitude = pos.coords.longitude
-        } catch {
-          /* POD allowed without GPS */
-        }
-      }
-      await submitPod({
-        orderId: podOrder.id,
-        recipient_name: recipientName || undefined,
-        notes: proofNotes || undefined,
-        latitude,
-        longitude,
-      }).unwrap()
-      toast.success('Proof of delivery saved')
-      setPodOrder(null)
-      setRecipientName('')
-      setProofNotes('')
-    } catch {
-      toast.error('Failed to save proof')
     }
   }
 
@@ -267,16 +238,61 @@ export function DriverDispatchBoard({
 
         <section
           data-testid="delivery-board-stats"
-          className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-4 py-3"
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-6"
         >
-          <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-            <DispatchMetric label="Total orders" value={summary.total} emphasis />
-            <DispatchMetric label="Pending" value={summary.pending} />
-            <DispatchMetric label="Out for delivery" value={summary.outForDelivery} />
-            <DispatchMetric label="Delivered" value={summary.delivered} />
-            <DispatchMetric label="Failed" value={summary.failed} />
-            <DispatchMetric label="Rescheduled" value={summary.rescheduled} />
-          </div>
+          <KpiCard
+            label="Total orders"
+            value={summary.total}
+            icon={Package}
+            tone="brand"
+            size="sm"
+            testId="dispatch-stat-total"
+          />
+          <KpiCard
+            label="Pending"
+            value={summary.pending}
+            icon={Clock}
+            tone="warning"
+            size="sm"
+            description="Awaiting dispatch"
+            testId="dispatch-stat-pending"
+          />
+          <KpiCard
+            label="Out for delivery"
+            value={summary.outForDelivery}
+            icon={Truck}
+            tone="info"
+            size="sm"
+            description="On the road today"
+            testId="dispatch-stat-out-for-delivery"
+          />
+          <KpiCard
+            label="Delivered"
+            value={summary.delivered}
+            icon={CheckCircle}
+            tone="success"
+            size="sm"
+            description="Completed today"
+            testId="dispatch-stat-delivered"
+          />
+          <KpiCard
+            label="Failed"
+            value={summary.failed}
+            icon={AlertTriangle}
+            tone="danger"
+            size="sm"
+            description="Needs follow-up"
+            testId="dispatch-stat-failed"
+          />
+          <KpiCard
+            label="Rescheduled"
+            value={summary.rescheduled}
+            icon={CalendarClock}
+            tone="neutral"
+            size="sm"
+            description="Moved to a later run"
+            testId="dispatch-stat-rescheduled"
+          />
         </section>
 
         {isEmpty ? (
@@ -538,38 +554,13 @@ export function DriverDispatchBoard({
               </DialogContent>
             </Dialog>
 
-            <Dialog open={!!podOrder} onOpenChange={(o) => !o && setPodOrder(null)}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Proof of delivery (optional)</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-3">
-                  <div>
-                    <Label>Recipient name</Label>
-                    <Input
-                      value={recipientName}
-                      onChange={(e) => setRecipientName(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label>Notes</Label>
-                    <Textarea
-                      value={proofNotes}
-                      onChange={(e) => setProofNotes(e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setPodOrder(null)}>
-                    Skip
-                  </Button>
-                  <Button onClick={handlePodSubmit} disabled={submittingPod}>
-                    Save proof
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <ProofOfDeliveryDialog
+              open={!!podOrder}
+              orderId={podOrder?.id ?? null}
+              onOpenChange={(open) => {
+                if (!open) setPodOrder(null)
+              }}
+            />
 
             <Dialog open={!!failOrder} onOpenChange={(o) => !o && setFailOrder(null)}>
               <DialogContent>
@@ -604,31 +595,6 @@ export function DriverDispatchBoard({
         />
       </div>
     </TooltipProvider>
-  )
-}
-
-function DispatchMetric({
-  label,
-  value,
-  emphasis = false,
-}: {
-  label: string
-  value: number
-  emphasis?: boolean
-}) {
-  return (
-    <div>
-      <p className="text-xs text-[var(--text-mid)]">{label}</p>
-      <p
-        className={
-          emphasis
-            ? 'mt-0.5 text-xl font-semibold tabular-nums text-[var(--text)]'
-            : 'mt-0.5 font-medium tabular-nums text-[var(--text)]'
-        }
-      >
-        {value}
-      </p>
-    </div>
   )
 }
 

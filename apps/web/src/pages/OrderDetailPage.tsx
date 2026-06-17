@@ -21,6 +21,8 @@ import { RequirePermission } from '../components/RequirePermission'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
+import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { ArrowLeft, AlertCircle, Check, Star } from 'lucide-react'
 import { useImpersonation } from '../hooks/useImpersonation'
@@ -29,7 +31,6 @@ import { toast } from 'sonner'
 import { DeclineOrderDialog } from '../components/orders/DeclineOrderDialog'
 import { getOrderCancellationBanner, getOrderStatusLabel } from '../lib/orderStatusDisplay'
 import { formatOrderRef, isDisputeReplacementOrder } from '../lib/orderPlacement'
-import { pageHeaderRowClass } from '../components/ui/card-layout'
 import { LazyTabMount } from '../components/LazyTabMount'
 import {
   VALID_ORDER_TABS,
@@ -185,7 +186,7 @@ export function OrderDetailPage() {
 
   return (
     <RequirePermission permission="ORDERS_VIEW" title="order details">
-      <div className="space-y-6 p-6">
+      <PageShell>
         {cancellationBanner && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
             <strong>{cancellationBanner.title}</strong>
@@ -224,128 +225,126 @@ export function OrderDetailPage() {
           </div>
         )}
 
-        <div className={pageHeaderRowClass}>
-          <div className="flex flex-col gap-3 min-w-0 sm:flex-row sm:items-center sm:gap-4">
+        <PageHeader
+          breadcrumb={
             <Button variant="outline" size="sm" className="self-start shrink-0" asChild>
               <Link to="/app/orders">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Orders
               </Link>
             </Button>
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold truncate">
-                Order #{order.id.slice(-8).toUpperCase()}
-              </h1>
-              <p className="text-[var(--text-muted)] truncate">{order.restaurant_name}</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {isReplacementOrder && (
-              <Badge variant="secondary" className="text-sm">
-                Replacement
+          }
+          title={`Order #${order.id.slice(-8).toUpperCase()}`}
+          description={order.restaurant_name}
+          actions={
+            <>
+              {isReplacementOrder && (
+                <Badge variant="secondary" className="text-sm">
+                  Replacement
+                </Badge>
+              )}
+              <Badge variant={getOrderStatusColor(order.status)} className="text-lg px-3 py-1">
+                {statusLabel}
               </Badge>
-            )}
-            <Badge variant={getOrderStatusColor(order.status)} className="text-lg px-3 py-1">
-              {statusLabel}
-            </Badge>
-            {!isSupplier && order.status === 'PLACED' && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleSendReminder}
-                disabled={isSendingReminder}
-              >
-                <AlertCircle className="h-4 w-4 mr-2" />
-                {isSendingReminder
-                  ? 'Sending...'
-                  : order.reminder_count > 0
-                    ? `Send Reminder (${order.reminder_count})`
-                    : 'Send Reminder'}
-              </Button>
-            )}
-            {!isSupplier &&
-              canOpenDispute &&
-              disputesEnabled &&
-              isOrderEligibleForDispute(order.status) &&
-              !activeDispute && (
-                <Button size="sm" variant="outline" onClick={() => setShowOpenDispute(true)}>
-                  Open dispute
+              {!isSupplier && order.status === 'PLACED' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSendReminder}
+                  disabled={isSendingReminder}
+                >
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  {isSendingReminder
+                    ? 'Sending...'
+                    : order.reminder_count > 0
+                      ? `Send Reminder (${order.reminder_count})`
+                      : 'Send Reminder'}
                 </Button>
               )}
-            {canLeaveReview && (
-              <Button size="sm" variant="outline" onClick={() => setShowReviewModal(true)}>
-                <Star className="h-4 w-4 mr-2" />
-                Leave review
-              </Button>
-            )}
-            {isSupplier && disputesEnabled && activeDispute && (
-              <Button size="sm" variant="outline" asChild>
-                <RouterLink to="/app/disputes">Manage dispute</RouterLink>
-              </Button>
-            )}
-            {isSupplier && (
-              <div className="flex gap-2 ml-4">
-                {order.status === 'PLACED' && (
-                  <>
-                    <Button size="sm" onClick={() => handleStatusUpdate('ACKNOWLEDGED')}>
-                      Acknowledge
-                    </Button>
-                    {canDeclineOrder && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setShowDeclineDialog(true)}
-                        data-testid="order-decline"
-                      >
-                        Decline
+              {!isSupplier &&
+                canOpenDispute &&
+                disputesEnabled &&
+                isOrderEligibleForDispute(order.status) &&
+                !activeDispute && (
+                  <Button size="sm" variant="outline" onClick={() => setShowOpenDispute(true)}>
+                    Open dispute
+                  </Button>
+                )}
+              {canLeaveReview && (
+                <Button size="sm" variant="outline" onClick={() => setShowReviewModal(true)}>
+                  <Star className="h-4 w-4 mr-2" />
+                  Leave review
+                </Button>
+              )}
+              {isSupplier && disputesEnabled && activeDispute && (
+                <Button size="sm" variant="outline" asChild>
+                  <RouterLink to="/app/disputes">Manage dispute</RouterLink>
+                </Button>
+              )}
+              {isSupplier && (
+                <div className="flex gap-2 ml-4">
+                  {order.status === 'PLACED' && (
+                    <>
+                      <Button size="sm" onClick={() => handleStatusUpdate('ACKNOWLEDGED')}>
+                        Acknowledge
                       </Button>
-                    )}
-                  </>
-                )}
-                {order.status === 'ACKNOWLEDGED' && (
-                  <Button size="sm" onClick={() => handleStatusUpdate('PROCESSING')}>
-                    Start Processing
-                  </Button>
-                )}
-                {order.status === 'PROCESSING' && (
-                  <Button size="sm" onClick={() => handleStatusUpdate('SHIPPED')}>
-                    Mark as Shipped
-                  </Button>
-                )}
-                {order.status === 'SHIPPED' && !isUpdating && (
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={() => handleStatusUpdate('DELIVERED')}
-                  >
-                    Mark Delivered
-                  </Button>
-                )}
-                {(isUpdating || order.status === 'DELIVERED' || order.status === 'COMPLETED') && (
-                  <Button
-                    size="sm"
-                    variant={
-                      order.status === 'DELIVERED' || order.status === 'COMPLETED'
-                        ? 'outline'
-                        : 'default'
-                    }
-                    disabled
-                    className="cursor-not-allowed opacity-75"
-                  >
-                    {isUpdating ? (
-                      <>Updating...</>
-                    ) : (
-                      <>
-                        <Check className="h-4 w-4 mr-1" />
-                        Delivered
-                      </>
-                    )}
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+                      {canDeclineOrder && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setShowDeclineDialog(true)}
+                          data-testid="order-decline"
+                        >
+                          Decline
+                        </Button>
+                      )}
+                    </>
+                  )}
+                  {order.status === 'ACKNOWLEDGED' && (
+                    <Button size="sm" onClick={() => handleStatusUpdate('PROCESSING')}>
+                      Start Processing
+                    </Button>
+                  )}
+                  {order.status === 'PROCESSING' && (
+                    <Button size="sm" onClick={() => handleStatusUpdate('SHIPPED')}>
+                      Mark as Shipped
+                    </Button>
+                  )}
+                  {order.status === 'SHIPPED' && !isUpdating && (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => handleStatusUpdate('DELIVERED')}
+                    >
+                      Mark Delivered
+                    </Button>
+                  )}
+                  {(isUpdating || order.status === 'DELIVERED' || order.status === 'COMPLETED') && (
+                    <Button
+                      size="sm"
+                      variant={
+                        order.status === 'DELIVERED' || order.status === 'COMPLETED'
+                          ? 'outline'
+                          : 'default'
+                      }
+                      disabled
+                      className="cursor-not-allowed opacity-75"
+                    >
+                      {isUpdating ? (
+                        <>Updating...</>
+                      ) : (
+                        <>
+                          <Check className="h-4 w-4 mr-1" />
+                          Delivered
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </>
+          }
+        />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList>
@@ -470,7 +469,7 @@ export function OrderDetailPage() {
             onSuccess={() => refetchMyReviews()}
           />
         )}
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

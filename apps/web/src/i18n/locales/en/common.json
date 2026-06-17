@@ -1,0 +1,55 @@
+{
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "create": "Create",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "retry": "Retry",
+    "viewDetails": "View details",
+    "reload": "Reload",
+    "close": "Close"
+  },
+  "loading": "Loading…",
+  "loadingPage": "Loading page…",
+  "noResults": "No results",
+  "error": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred. Try refreshing the page."
+  },
+  "language": {
+    "switch": "Change language",
+    "english": "English",
+    "arabic": "العربية"
+  },
+  "greeting": {
+    "morning": "Good morning",
+    "afternoon": "Good afternoon",
+    "evening": "Good evening"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "pending": "Pending",
+    "approved": "Approved",
+    "declined": "Declined",
+    "paid": "Paid",
+    "unpaid": "Unpaid",
+    "delivered": "Delivered",
+    "cancelled": "Cancelled",
+    "lowStock": "Low stock",
+    "outOfStock": "Out of stock",
+    "inStock": "In stock",
+    "unknown": "Unknown"
+  },
+  "brand": "Supplify",
+  "workspace": {
+    "supplier": "Supplier",
+    "restaurant": "Restaurant"
+  }
+}

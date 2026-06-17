@@ -1,15 +1,11 @@
 # Supplify (Pre-production branch)
 
-Deploy-only branch ΓÇö **do not develop here**. On `dev`: `node scripts/promote-release.mjs --tier preprod`, then after UAT `--tier prod` (prod merges **preprod**, not dev).
+Deploy-only branch — **do not develop here**. On `dev`: `node scripts/promote-release.mjs --tier preprod`, then after UAT `--tier prod` (prod merges **preprod**, not dev).
 
 ```bash
 node scripts/promote-release.mjs --tier preprod
 ```
 
-## Deploy (EC2 Docker)
+## Deploy (Railway)
 
-```bash
-sudo ./deploy/scripts/deploy-preprod.sh
-```
-
-Migrations run automatically during deploy. Branching guide: see `docs/BRANCHING.md` on the `dev` branch.
+Push to this branch triggers Railway deploy for the matching environment. See `docs/operations/railway-environments.md` on the `dev` branch.

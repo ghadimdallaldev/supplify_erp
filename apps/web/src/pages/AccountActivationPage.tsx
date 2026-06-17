@@ -1,6 +1,7 @@
 import { CreditCard, Loader2, Lock, Shield } from 'lucide-react'
 import { Button } from '../components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Card, CardContent, CardHeader } from '../components/ui/card'
+import { PageHeader } from '../components/ui/page-header'
 import { useGetBillingStatusQuery, useGetSubscriptionPlansQuery } from '../services/api'
 import { useAppDispatch, useAppSelector } from '../hooks/redux'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
@@ -48,11 +49,11 @@ export function AccountActivationPage() {
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--brand-ultra)] text-[var(--brand-mid)]">
             <Lock className="h-7 w-7" aria-hidden />
           </div>
-          <CardTitle className="text-2xl">Activate your account</CardTitle>
-          <CardDescription>
-            Your {tenantLabel} workspace was created but is not active yet. Start on the free plan,
-            upgrade to a paid tier, or ask a Supplify administrator to activate you manually.
-          </CardDescription>
+          <PageHeader
+            title="Activate your account"
+            description={`Your ${tenantLabel} workspace was created but is not active yet. Start on the free plan, upgrade to a paid tier, or ask a Supplify administrator to activate you manually.`}
+            className="text-center sm:flex-col sm:items-center [&_p]:mx-auto"
+          />
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)]/50 p-4 text-sm text-[var(--text-mid)]">

@@ -495,7 +495,7 @@ export function ReorderAssistancePanel({
       </Card>
 
       <Dialog open={askOpen} onOpenChange={setAskOpen}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>Matched products</DialogTitle>
             <DialogDescription>
@@ -552,7 +552,7 @@ export function ReorderAssistancePanel({
       </Dialog>
 
       <Dialog open={explainOpen} onOpenChange={setExplainOpen}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>Why these suggestions?</DialogTitle>
             <DialogDescription>

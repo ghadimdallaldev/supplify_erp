@@ -34,6 +34,7 @@ import {
 } from './plans.js'
 import { resolveSmartReorderCapabilities } from '../smart-reorder-tier.js'
 import { isAiPlatformEnabledForTenant } from '../ai-platform.js'
+import { resolveEffectivePlanFeatures } from './free-trial-plan-features.js'
 
 export { HIDDEN_ENTITLEMENT_LIMIT_KEYS }
 export { normalizePlanCode, formatPlanDisplayName } from '../plan-codes.js'
@@ -771,6 +772,7 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
     const limitsBeforeAddons = { ...baseLimits }
     const overrides = []
 
+    const effectivePlanFeatures = await resolveEffectivePlanFeatures(subscription)
     const [resolvedByKey, { features, featureSources }, activeAddons, usage] = await Promise.all([
       resolveAllEffectiveLimits({
         tenantId: billingTenantId,
@@ -779,7 +781,7 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
         planId: subscription.plan_id,
         planLimits: subscription.limits || {},
       }),
-      resolveAllFeaturesForTenant(billingTenantId, tenantType, subscription.features),
+      resolveAllFeaturesForTenant(billingTenantId, tenantType, effectivePlanFeatures),
       getActiveTenantAddons(billingTenantId, tenantType),
       getUsageSnapshot(tenantId, tenantType),
     ])
@@ -884,7 +886,7 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
 
     let smartReorder = null
     if (tenantType === 'RESTAURANT') {
-      const smartReorderValue = features.smart_reorder ?? subscription.features?.smart_reorder
+      const smartReorderValue = features.smart_reorder ?? effectivePlanFeatures?.smart_reorder
       const caps = resolveSmartReorderCapabilities(smartReorderValue)
       const aiPlatformFeature = Boolean(features.ai_platform)
       const aiPlatformEnabled = await isAiPlatformEnabledForTenant(billingTenantId, tenantType)
@@ -923,7 +925,7 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
       },
       features,
       featureSources,
-      planFeatures: subscription.features || {},
+      planFeatures: effectivePlanFeatures,
       limits,
       baseLimits,
       limitsBeforeAddons,
@@ -1162,19 +1164,22 @@ export function requireFeature(featureKey, getTenantId, getTenantType) {
       const { resolveOrgBillingTenantId } = await import('../org-billing-tenant.js')
       const { resolveFeatureEnabled, FEATURE_ALIASES } = await import('../feature-flags.js')
       const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+      const planFeatures = subscription
+        ? await resolveEffectivePlanFeatures(subscription)
+        : undefined
       let featureResult = await resolveFeatureEnabled(
         billingTenantId,
         tenantType,
         featureKey,
-        subscription?.features
+        planFeatures
       )
       const { shouldResolveFeatureAlias } = await import('../feature-flags.js')
-      if (!featureResult.enabled && shouldResolveFeatureAlias(featureKey, subscription?.features)) {
+      if (!featureResult.enabled && shouldResolveFeatureAlias(featureKey, planFeatures)) {
         featureResult = await resolveFeatureEnabled(
           billingTenantId,
           tenantType,
           FEATURE_ALIASES[featureKey],
-          subscription?.features
+          planFeatures
         )
       }
       const isEnabled = featureResult.enabled

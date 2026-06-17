@@ -1,7 +1,8 @@
 import { Reservation, ReservationTable } from '../../types'
 import { normalizeTableId, reservationTableIds } from '../../lib/reservation-tables'
 import { Badge } from '../ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
+import { Card, CardContent } from '../ui/card'
+import { AppPanel } from '../ui/app-panel'
 
 interface ReservationAssignmentsSummaryProps {
   reservations: Reservation[]
@@ -54,15 +55,12 @@ export function ReservationAssignmentsSummary({
   }
 
   return (
-    <Card className="border border-[var(--app-border)]">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Today&apos;s table map</CardTitle>
-        <CardDescription>
-          {assigned.length} assigned · {unassigned.length} unassigned on {boardDate}. Matches what
-          should appear on the floor below.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2">
+    <AppPanel
+      title="Today's table map"
+      description={`${assigned.length} assigned · ${unassigned.length} unassigned on ${boardDate}. Matches what should appear on the floor below.`}
+      className="border border-[var(--app-border)]"
+    >
+      <div className="space-y-2">
         {assigned.map((row) => (
           <div
             key={row.id}
@@ -83,7 +81,7 @@ export function ReservationAssignmentsSummary({
             Unassigned: {unassigned.map((r) => r.name).join(', ')}
           </p>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </AppPanel>
   )
 }

@@ -334,8 +334,9 @@ export function ProductsPage() {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
-    if (!file.name.endsWith('.csv')) {
-      toast.error('Please upload a .csv file. Using Excel? Save your sheet as CSV first.')
+    const name = file.name.toLowerCase()
+    if (!name.endsWith('.csv') && !name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+      toast.error('Please upload a .csv, .xlsx, or .xls file')
       return
     }
     setUploadedFile(file)
@@ -351,7 +352,7 @@ export function ProductsPage() {
   if (error) {
     return (
       <RequirePermission anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']} title="products">
-        <PageShell data-testid="products-page">
+        <PageShell maxWidth="wide" data-testid="products-page">
           <PageHeader
             title="Products"
             description={
@@ -377,7 +378,7 @@ export function ProductsPage() {
 
   return (
     <RequirePermission anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']} title="products">
-      <PageShell data-testid="products-page">
+      <PageShell maxWidth="wide" data-testid="products-page">
         <PageHeader
           title="Products"
           description={

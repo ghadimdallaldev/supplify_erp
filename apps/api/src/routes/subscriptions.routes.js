@@ -15,6 +15,7 @@ import {
   checkLimit,
   getEntitlements,
   recommendPlan,
+  resolveEffectivePlanFeatures,
 } from '../lib/subscription.js'
 import { formatPlanDisplayName } from '../lib/plan-codes.js'
 import {
@@ -197,6 +198,7 @@ router.get('/current', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (
       })
     }
 
+    const effectiveFeatures = await resolveEffectivePlanFeatures(subscription)
     // Normalize for frontend: plan_display_name -> plan_name, ensure limits/features are objects
     const subscriptionPayload = {
       ...subscription,
@@ -206,10 +208,7 @@ router.get('/current', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (
       ),
       limits:
         subscription.limits && typeof subscription.limits === 'object' ? subscription.limits : {},
-      features:
-        subscription.features && typeof subscription.features === 'object'
-          ? subscription.features
-          : {},
+      features: effectiveFeatures && typeof effectiveFeatures === 'object' ? effectiveFeatures : {},
     }
 
     res.json({

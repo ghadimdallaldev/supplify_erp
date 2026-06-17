@@ -54,11 +54,7 @@ export function InfoBanner({
   const styles = toneStyles[tone]
   return (
     <div
-      className={cn(
-        'mx-3 mt-4 rounded-lg border px-4 py-3 text-sm sm:mx-6',
-        styles.container,
-        className
-      )}
+      className={cn('rounded-lg border px-4 py-3 text-sm', styles.container, className)}
       role="status"
       data-testid={testId}
     >
@@ -72,7 +68,7 @@ export function InfoBanner({
             {description ? <p className={cn('mt-1', styles.description)}>{description}</p> : null}
           </div>
         </div>
-        {action ? <div className="shrink-0 self-start sm:ml-4">{action}</div> : null}
+        {action ? <div className="shrink-0 self-start sm:ms-4">{action}</div> : null}
       </div>
     </div>
   )
