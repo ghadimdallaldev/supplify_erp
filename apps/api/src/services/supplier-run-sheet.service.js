@@ -1,5 +1,6 @@
 import { query } from '../lib/db.js'
 import { getDeliveryBoardSqlFragments } from '../lib/delivery-board-schema.js'
+import { logger } from '../lib/logger.js'
 import { getSupplierCommandCenter } from './supplier-command-center.service.js'
 import { getSupplierDeliveryBoard } from './supplier-deliveries.service.js'
 import { getSupplierReceivables } from './supplier-receivables.service.js'
@@ -20,22 +21,42 @@ function normalizeRunSheetDate(date) {
   return new Date().toISOString().slice(0, 10)
 }
 
-function filterReceivablesDueToday(receivables) {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+function toDateOnly(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  date.setHours(0, 0, 0, 0)
+  return date
+}
 
-  const invoices = receivables.invoices.filter((inv) => {
-    const due = new Date(inv.dueDate)
-    due.setHours(0, 0, 0, 0)
-    return due <= today
-  })
+function filterReceivablesDueToday(receivables, runDate) {
+  const targetDate = toDateOnly(`${runDate}T00:00:00`)
+  const invoicesSource = Array.isArray(receivables?.invoices) ? receivables.invoices : []
+  if (!targetDate) {
+    return {
+      summary: {
+        count: 0,
+        totalBalanceDue: 0,
+        dueTodayCount: 0,
+        overdueCount: 0,
+      },
+      invoices: [],
+    }
+  }
+
+  const invoices = invoicesSource
+    .map((inv) => {
+      const due = toDateOnly(inv.dueDate)
+      const isOverdue = due ? due < targetDate : false
+      return { ...inv, isOverdue, daysOverdue: isOverdue ? inv.daysOverdue : 0, _dueDate: due }
+    })
+    .filter((inv) => inv._dueDate && inv._dueDate <= targetDate)
 
   let dueTodayCount = 0
   let overdueCount = 0
   let totalBalanceDue = 0
 
   for (const inv of invoices) {
-    totalBalanceDue += inv.balanceDue
+    totalBalanceDue += Number(inv.balanceDue) || 0
     if (inv.isOverdue) overdueCount += 1
     else dueTodayCount += 1
   }
@@ -47,7 +68,81 @@ function filterReceivablesDueToday(receivables) {
       dueTodayCount,
       overdueCount,
     },
-    invoices,
+    invoices: invoices.map(({ _dueDate, ...inv }) => inv),
+  }
+}
+
+function emptyRunSheetCommandCenter() {
+  return {
+    kpis: {
+      ordersToPrepareToday: 0,
+      deliveriesPendingToday: 0,
+      ordersWaitingAction: 0,
+      unpaidBalance: 0,
+      overdueBalance: 0,
+      customersDueReorder: 0,
+      lowStockCount: 0,
+      openDisputes: 0,
+      fulfillmentAlerts: 0,
+    },
+    todaysPriorities: [],
+  }
+}
+
+function emptyDeliveryBoard(date) {
+  return {
+    filters: {
+      date,
+      status: null,
+      driverId: null,
+      area: null,
+    },
+    orders: [],
+    byArea: {},
+    routeSummary: [],
+    stats: {
+      total: 0,
+      pending: 0,
+      assigned: 0,
+      outForDelivery: 0,
+      delivered: 0,
+      failed: 0,
+      rescheduled: 0,
+    },
+  }
+}
+
+const emptyReceivables = {
+  summary: {
+    unpaidCount: 0,
+    unpaidTotal: 0,
+    overdueTotal: 0,
+    partialCount: 0,
+    whoOwesMeTotal: 0,
+  },
+  aging: {},
+  invoices: [],
+  topDebtors: [],
+}
+
+const emptyReorderIntelligence = {
+  dueCount: 0,
+  graceDays: 7,
+  customersAtRisk: [],
+}
+
+async function safeRunSheetSection(name, supplierId, fallback, loader) {
+  try {
+    return await loader()
+  } catch (error) {
+    logger.warn({
+      event: 'supplier.run_sheet.section_failed',
+      section: name,
+      supplierId,
+      error: error.message,
+      code: error.code,
+    })
+    return fallback
   }
 }
 
@@ -184,26 +279,38 @@ export async function getSupplierRunSheet(supplierId, { date } = {}) {
 
   const [commandCenter, deliveries, receivables, reorderIntel, ordersToPick, shortages] =
     await Promise.all([
-      getSupplierCommandCenter(supplierId),
-      getSupplierDeliveryBoard(supplierId, { date: runDate }),
-      getSupplierReceivables(supplierId),
-      getReorderIntelligence(supplierId),
-      getOrdersToPick(supplierId, runDate),
-      getShortages(supplierId),
+      safeRunSheetSection('command_center', supplierId, emptyRunSheetCommandCenter(), () =>
+        getSupplierCommandCenter(supplierId)
+      ),
+      safeRunSheetSection('deliveries', supplierId, emptyDeliveryBoard(runDate), () =>
+        getSupplierDeliveryBoard(supplierId, { date: runDate })
+      ),
+      safeRunSheetSection('receivables', supplierId, emptyReceivables, () =>
+        getSupplierReceivables(supplierId)
+      ),
+      safeRunSheetSection('reorder_intelligence', supplierId, emptyReorderIntelligence, () =>
+        getReorderIntelligence(supplierId)
+      ),
+      safeRunSheetSection('orders_to_pick', supplierId, { count: 0, orders: [] }, () =>
+        getOrdersToPick(supplierId, runDate)
+      ),
+      safeRunSheetSection('shortages', supplierId, { count: 0, preview: [] }, () =>
+        getShortages(supplierId)
+      ),
     ])
 
-  const receivablesDueToday = filterReceivablesDueToday(receivables)
+  const receivablesDueToday = filterReceivablesDueToday(receivables, runDate)
 
   return {
     date: runDate,
     summary: {
-      kpis: commandCenter.kpis,
-      todaysPriorities: commandCenter.todaysPriorities,
+      kpis: commandCenter.kpis ?? emptyRunSheetCommandCenter().kpis,
+      todaysPriorities: commandCenter.todaysPriorities ?? [],
     },
     ordersToPick,
     deliveries,
     receivablesDueToday,
-    reorderLeads: reorderIntel.customersAtRisk.slice(0, 5),
+    reorderLeads: (reorderIntel.customersAtRisk ?? []).slice(0, 5),
     shortages,
   }
 }
