@@ -11,6 +11,8 @@ import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { formatPrice } from '../../utils/format'
 import { isConsumerOrderTerminal, type ConsumerOrderLine } from '../../lib/consumerOrderTracking'
+import { PageHeader } from '../../components/ui/page-header'
+import { PageShell } from '../../components/ui/page-shell'
 import { ArrowLeft, Search } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -81,7 +83,7 @@ export function ConsumerTrackOrderPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 p-6">
+    <PageShell className="mx-auto max-w-lg space-y-4 p-6">
       <Button asChild variant="ghost" size="sm" className="-ml-2">
         <Link to={`/order/${slug}`}>
           <ArrowLeft className="mr-1 h-4 w-4" />
@@ -89,12 +91,10 @@ export function ConsumerTrackOrderPage() {
         </Link>
       </Button>
 
-      <div>
-        <h1 className="text-2xl font-semibold">Track your order</h1>
-        <p className="text-sm text-muted-foreground">
-          Enter your order number and the email or phone from checkout.
-        </p>
-      </div>
+      <PageHeader
+        title="Track your order"
+        description="Enter your order number and the email or phone from checkout."
+      />
 
       <Card>
         <CardHeader>
@@ -189,7 +189,7 @@ export function ConsumerTrackOrderPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+    </PageShell>
   )
 }
 

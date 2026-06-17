@@ -1,256 +1,320 @@
-import { Card } from '../../ui/card'
+import { AlertCircle, DollarSign, Loader2, RefreshCw, TrendingUp } from 'lucide-react'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
+import { AppPanel, SummaryStrip } from '../../ui/app-panel'
+import { TableScroll } from '../../ui/table-scroll'
 import { useGetAdminFinancialOverviewQuery } from '../../../services/api'
 import { formatPlanDisplayName } from '../../../lib/planComparison'
 import { formatCurrency } from '../../../utils/format'
-import { AlertCircle, DollarSign } from 'lucide-react'
-import { AdminTabLoading } from './adminDashboardShared'
+import {
+  AdminEmptyState,
+  AdminErrorState,
+  AdminLoadingSkeleton,
+  AdminSectionHeader,
+} from '../adminUi'
+import { cn } from '../../../lib/utils'
 
 export interface AdminFinanceTabProps {
   active: boolean
+}
+
+type RevenueByPlanRow = {
+  planCode?: string
+  planName?: string
+  tenantType?: string
+  subscriptionCount?: number
+  mrr?: number
+}
+
+type TenantRevenueRow = {
+  tenant_id?: string
+  tenant_type?: string
+  revenue?: number
+  overdue_amount?: number
+}
+
+function tenantTypeTone(type?: string): string {
+  return type === 'SUPPLIER'
+    ? 'bg-violet-50 text-violet-700 border-violet-200'
+    : 'bg-sky-50 text-sky-800 border-sky-200'
 }
 
 export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
   const {
     data: financeData,
     isLoading: financeLoading,
+    isFetching: financeFetching,
     isError: financeError,
     error: financeQueryError,
     refetch: refetchFinance,
   } = useGetAdminFinancialOverviewQuery(undefined, { skip: !active })
 
+  const revenueByPlan = (financeData?.revenueByPlan ?? []) as RevenueByPlanRow[]
+  const topTenants = (financeData?.topTenantsByRevenue ?? []) as TenantRevenueRow[]
+  const overdueTenants = (financeData?.topTenantsByOverdue ?? []) as TenantRevenueRow[]
+  const maxMrr = Math.max(...revenueByPlan.map((r) => Number(r.mrr) || 0), 1)
+
   return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-lg font-bold text-[var(--text)]">Finance Dashboard</h2>
-        <p className="text-sm text-[var(--text-muted)]">
-          GMV, recurring revenue, invoices, and top tenants
-        </p>
-      </div>
+    <>
+      <AdminSectionHeader
+        title="Finance"
+        description="GMV, recurring revenue, outstanding invoices, and top tenants by revenue."
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetchFinance()}
+            disabled={financeFetching}
+          >
+            {financeFetching ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+          </Button>
+        }
+      />
+
       {financeLoading ? (
-        <AdminTabLoading />
+        <AdminLoadingSkeleton rows={8} />
       ) : financeError ? (
-        <Card className="p-6 border-red-200 bg-red-50/50">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-[var(--text)]">Finance data unavailable</p>
-              <p className="text-sm text-[var(--text-muted)] mt-1">
-                {(financeQueryError as { data?: { message?: string } })?.data?.message ||
-                  'The finance API request failed. Figures are not shown as zero to avoid misleading data.'}
-              </p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => refetchFinance()}>
-                Retry
-              </Button>
-            </div>
-          </div>
-        </Card>
+        <AdminErrorState
+          title="Finance data unavailable"
+          message={
+            (financeQueryError as { data?: { message?: string } })?.data?.message ||
+            'The finance API request failed. Figures are not shown as zero to avoid misleading data.'
+          }
+          onRetry={() => refetchFinance()}
+        />
       ) : (
         <>
           {financeData?.mrrExcludesFreeTrial && (
-            <p className="text-xs text-[var(--text-muted)] -mt-2">
+            <p className="mb-3 text-xs text-[var(--text-muted)]">
               MRR and ARR exclude Free Trial and Enterprise plans (paid subscriptions only).
             </p>
           )}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              {
-                label: 'GMV (all time)',
-                value: financeData?.gmv ?? 0,
-                color: 'var(--brand)',
-                bg: 'var(--brand-ultra)',
-                note: 'Total invoice value',
-              },
-              {
-                label: 'MRR',
-                value: financeData?.mrr ?? 0,
-                color: 'var(--mint)',
-                bg: 'var(--mint-pale)',
-                note: `ARR: ${formatCurrency(financeData?.arr ?? 0)} · paid plans only`,
-              },
-              {
-                label: 'Outstanding',
-                value: financeData?.outstanding ?? 0,
-                color: '#f59e0b',
-                bg: '#fffbeb',
-                note: 'Awaiting payment',
-              },
-              {
-                label: 'Overdue',
-                value: financeData?.overdue ?? 0,
-                color: '#ef4444',
-                bg: '#fef2f2',
-                note: 'Past due date',
-              },
-            ].map(({ label, value, color, bg, note }) => (
-              <Card key={label} className="p-5">
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center mb-3"
-                  style={{ background: bg }}
-                >
-                  <DollarSign className="h-4 w-4" style={{ color }} />
-                </div>
-                <p className="text-xs text-[var(--text-muted)] font-medium mb-1">{label}</p>
-                <p className="text-2xl font-black" style={{ color }}>
-                  {formatCurrency(value)}
-                </p>
-                <p className="text-xs text-[var(--text-muted)] mt-1">{note}</p>
-              </Card>
-            ))}
+
+          <div className="mb-4">
+            <SummaryStrip
+              testId="admin-finance-stats"
+              metrics={[
+                {
+                  label: 'GMV (all time)',
+                  value: formatCurrency(financeData?.gmv ?? 0),
+                  hint: 'Total invoice value',
+                  tone: 'brand',
+                },
+                {
+                  label: 'MRR',
+                  value: formatCurrency(financeData?.mrr ?? 0),
+                  hint: `ARR ${formatCurrency(financeData?.arr ?? 0)} · paid plans only`,
+                  tone: 'mint',
+                },
+                {
+                  label: 'Outstanding',
+                  value: formatCurrency(financeData?.outstanding ?? 0),
+                  hint: 'Awaiting payment',
+                  tone: 'amber',
+                },
+                {
+                  label: 'Overdue',
+                  value: formatCurrency(financeData?.overdue ?? 0),
+                  hint: 'Past due date',
+                  tone: (financeData?.overdue ?? 0) > 0 ? 'danger' : 'default',
+                },
+              ]}
+            />
           </div>
 
-          <div className="grid md:grid-cols-2 gap-5">
-            <Card className="p-5">
-              <p className="text-sm font-semibold text-[var(--text)] mb-4">Revenue by Plan</p>
-              {!financeData?.revenueByPlan?.length ? (
-                <p className="text-sm text-[var(--text-muted)]">No data</p>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <AppPanel
+              title="Revenue by plan"
+              description={`${revenueByPlan.length} plan${revenueByPlan.length === 1 ? '' : 's'} with active subscriptions`}
+              testId="admin-finance-revenue-by-plan"
+              footer={
+                financeFetching ? (
+                  <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Updating…
+                  </p>
+                ) : undefined
+              }
+            >
+              {revenueByPlan.length === 0 ? (
+                <AdminEmptyState
+                  icon={<TrendingUp className="h-8 w-8 text-[var(--text-muted)]" />}
+                  title="No plan revenue yet"
+                  description="Revenue breakdown appears when tenants subscribe to paid plans."
+                />
               ) : (
-                <div className="space-y-3">
-                  {(() => {
-                    const maxMrr = Math.max(
-                      ...financeData.revenueByPlan.map((r: { mrr?: number }) => Number(r.mrr) || 0),
-                      1
-                    )
-                    return financeData.revenueByPlan.map(
-                      (
-                        r: {
-                          planCode?: string
-                          planName?: string
-                          tenantType?: string
-                          subscriptionCount?: number
-                          mrr?: number
-                        },
-                        i: number
-                      ) => (
-                        <div key={i}>
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-[var(--text)]">
-                                {formatPlanDisplayName(r.planCode, r.planName)}
-                              </span>
-                              <Badge variant="outline" className="text-xs">
-                                {r.tenantType}
-                              </Badge>
-                              <span className="text-[var(--text-muted)]">
-                                {r.subscriptionCount} subs
-                              </span>
-                            </div>
-                            <span className="font-semibold text-[var(--text)]">
-                              {formatCurrency(r.mrr ?? 0)}
-                              <span className="text-[var(--text-muted)] font-normal">/mo</span>
-                            </span>
-                          </div>
-                          <div
-                            className="h-1.5 rounded-full overflow-hidden"
-                            style={{ background: 'var(--app-border)' }}
-                          >
-                            <div
-                              className="h-1.5 rounded-full"
-                              style={{
-                                width: `${Math.min(100, Math.round((Number(r.mrr) / maxMrr) * 100))}%`,
-                                background: 'var(--brand)',
-                              }}
-                            />
-                          </div>
-                        </div>
-                      )
-                    )
-                  })()}
-                </div>
-              )}
-            </Card>
-
-            <Card className="p-5">
-              <p className="text-sm font-semibold text-[var(--text)] mb-4">
-                Top Tenants by Revenue
-              </p>
-              {!financeData?.topTenantsByRevenue?.length ? (
-                <p className="text-sm text-[var(--text-muted)]">No data</p>
-              ) : (
-                <div className="space-y-2">
-                  {financeData.topTenantsByRevenue
-                    .slice(0, 8)
-                    .map(
-                      (
-                        t: { tenant_id?: string; tenant_type?: string; revenue?: number },
-                        i: number
-                      ) => (
-                        <div
-                          key={i}
-                          className="flex items-center justify-between text-sm py-1.5 border-b border-[var(--app-border)] last:border-0"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-[var(--text-muted)] w-5">
-                              #{i + 1}
-                            </span>
-                            <span className="text-[var(--text)] truncate max-w-[160px]">
-                              {t.tenant_id?.slice(0, 8) ?? '?'}
-                            </span>
-                            <Badge variant="outline" className="text-xs">
-                              {t.tenant_type}
+                <div className="space-y-4">
+                  {revenueByPlan.map((row, i) => (
+                    <div key={`${row.planCode}-${row.tenantType}-${i}`}>
+                      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="font-medium text-[var(--text)]">
+                            {formatPlanDisplayName(row.planCode, row.planName)}
+                          </span>
+                          {row.tenantType && (
+                            <Badge
+                              variant="outline"
+                              className={cn('text-xs capitalize', tenantTypeTone(row.tenantType))}
+                            >
+                              {row.tenantType.toLowerCase()}
                             </Badge>
-                          </div>
-                          <span className="font-semibold" style={{ color: 'var(--mint)' }}>
-                            {formatCurrency(t.revenue ?? 0)}
+                          )}
+                          <span className="text-[var(--text-muted)]">
+                            {row.subscriptionCount ?? 0} subs
                           </span>
                         </div>
-                      )
-                    )}
+                        <span className="shrink-0 font-semibold tabular-nums text-[var(--text)]">
+                          {formatCurrency(row.mrr ?? 0)}
+                          <span className="font-normal text-[var(--text-muted)]">/mo</span>
+                        </span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-[var(--app-border)]">
+                        <div
+                          className="h-1.5 rounded-full bg-[var(--brand)]"
+                          style={{
+                            width: `${Math.min(100, Math.round((Number(row.mrr) / maxMrr) * 100))}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
-            </Card>
+            </AppPanel>
+
+            <AppPanel
+              title="Top tenants by revenue"
+              description={`Top ${Math.min(8, topTenants.length)} of ${topTenants.length} tenant${topTenants.length === 1 ? '' : 's'}`}
+              testId="admin-finance-top-tenants"
+            >
+              {topTenants.length === 0 ? (
+                <AdminEmptyState
+                  icon={<DollarSign className="h-8 w-8 text-[var(--text-muted)]" />}
+                  title="No tenant revenue yet"
+                  description="Invoice and payment activity will rank tenants here."
+                />
+              ) : (
+                <ul className="divide-y divide-[var(--app-border)]">
+                  {topTenants.slice(0, 8).map((tenant, i) => (
+                    <li
+                      key={`${tenant.tenant_id}-${i}`}
+                      className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="w-5 shrink-0 text-xs font-bold text-[var(--text-muted)]">
+                          #{i + 1}
+                        </span>
+                        <span
+                          className="truncate font-mono text-sm text-[var(--text)]"
+                          title={tenant.tenant_id}
+                        >
+                          {tenant.tenant_id?.slice(0, 8) ?? '?'}
+                        </span>
+                        {tenant.tenant_type && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              'shrink-0 text-xs capitalize',
+                              tenantTypeTone(tenant.tenant_type)
+                            )}
+                          >
+                            {tenant.tenant_type.toLowerCase()}
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="shrink-0 font-semibold tabular-nums text-[var(--mint)]">
+                        {formatCurrency(tenant.revenue ?? 0)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </AppPanel>
           </div>
 
-          {(financeData?.topTenantsByOverdue?.length ?? 0) > 0 && (
-            <Card className="p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <AlertCircle className="h-4 w-4 text-red-500" />
-                <p className="text-sm font-semibold text-red-700">Overdue Balances</p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr style={{ background: '#fef2f2' }}>
-                      <th className="text-left px-3 py-2 text-xs font-semibold text-red-700">
-                        Tenant
-                      </th>
-                      <th className="text-left px-3 py-2 text-xs font-semibold text-red-700">
-                        Type
-                      </th>
-                      <th className="text-right px-3 py-2 text-xs font-semibold text-red-700">
-                        Overdue Amount
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-red-100">
-                    {financeData!.topTenantsByOverdue.map(
-                      (
-                        t: { tenant_id?: string; tenant_type?: string; overdue_amount?: number },
-                        i: number
-                      ) => (
-                        <tr key={i}>
-                          <td className="px-3 py-2 font-mono text-xs text-[var(--text)]">
-                            {t.tenant_id?.slice(0, 8) ?? '?'}
+          {overdueTenants.length > 0 && (
+            <div className="mt-4">
+              <AppPanel
+                title="Overdue balances"
+                description={`${overdueTenants.length} tenant${overdueTenants.length === 1 ? '' : 's'} with past-due invoices`}
+                testId="admin-finance-overdue"
+              >
+                <TableScroll aria-label="Overdue tenant balances">
+                  <table className="w-full min-w-[480px] text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--app-border)] bg-[var(--red-pale)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--red)]">
+                        <th className="px-4 py-3">Tenant</th>
+                        <th className="hidden px-4 py-3 sm:table-cell">Type</th>
+                        <th className="px-4 py-3 text-right">Overdue</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--app-border)]">
+                      {overdueTenants.map((tenant, i) => (
+                        <tr
+                          key={`${tenant.tenant_id}-${i}`}
+                          className="transition-colors hover:bg-[var(--brand-ultra)]/35"
+                        >
+                          <td className="px-4 py-3.5">
+                            <span
+                              className="font-mono text-xs text-[var(--text)]"
+                              title={tenant.tenant_id}
+                            >
+                              {tenant.tenant_id?.slice(0, 8) ?? '?'}
+                            </span>
+                            {tenant.tenant_type && (
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  'ml-2 text-xs capitalize sm:hidden',
+                                  tenantTypeTone(tenant.tenant_type)
+                                )}
+                              >
+                                {tenant.tenant_type.toLowerCase()}
+                              </Badge>
+                            )}
                           </td>
-                          <td className="px-3 py-2">
-                            <Badge variant="outline" className="text-xs">
-                              {t.tenant_type}
-                            </Badge>
+                          <td className="hidden px-4 py-3.5 sm:table-cell">
+                            {tenant.tenant_type ? (
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  'text-xs capitalize',
+                                  tenantTypeTone(tenant.tenant_type)
+                                )}
+                              >
+                                {tenant.tenant_type.toLowerCase()}
+                              </Badge>
+                            ) : (
+                              <span className="text-[var(--text-muted)]">—</span>
+                            )}
                           </td>
-                          <td className="px-3 py-2 text-right font-semibold text-red-600">
-                            {formatCurrency(t.overdue_amount ?? 0)}
+                          <td className="px-4 py-3.5 text-right font-semibold tabular-nums text-[var(--red)]">
+                            {formatCurrency(tenant.overdue_amount ?? 0)}
                           </td>
                         </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+                      ))}
+                    </tbody>
+                  </table>
+                </TableScroll>
+              </AppPanel>
+            </div>
+          )}
+
+          {(financeData?.overdue ?? 0) > 0 && overdueTenants.length === 0 && (
+            <div className="mt-4 flex items-start gap-2 rounded-lg border border-[var(--amber-pale)] bg-[var(--amber-pale)]/40 px-3 py-2 text-xs text-[var(--amber)]">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                Platform overdue total is {formatCurrency(financeData?.overdue ?? 0)} but no
+                per-tenant breakdown is available.
+              </span>
+            </div>
           )}
         </>
       )}
-    </div>
+    </>
   )
 }

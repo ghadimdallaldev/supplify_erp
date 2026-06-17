@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Card, CardContent, CardHeader } from '../components/ui/card'
+import { PageHeader } from '../components/ui/page-header'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Alert, AlertDescription } from '../components/ui/alert'
@@ -182,11 +183,12 @@ export function RegisterCompletePage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-ultra)] via-[var(--surface)] to-[var(--brand-ultra)] p-6">
       <Card className="w-full max-w-xl border-2 shadow-xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Set up your organization</CardTitle>
-          <CardDescription>
-            Your Keycloak account is ready. Tell us how you will use Supplify.
-          </CardDescription>
+        <CardHeader className="pb-0">
+          <PageHeader
+            title="Set up your organization"
+            description="Your Keycloak account is ready. Tell us how you will use Supplify."
+            className="text-center sm:flex-col sm:items-center [&_p]:mx-auto"
+          />
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">

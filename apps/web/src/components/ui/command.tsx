@@ -23,7 +23,10 @@ Command.displayName = CommandPrimitive.displayName
 
 const CommandDialog = ({ children, ...props }: DialogProps) => (
   <Dialog {...props}>
-    <DialogContent className="erp-instant overflow-hidden p-0 shadow-2xl duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none sm:max-w-lg [&>button]:hidden">
+    <DialogContent
+      size="md"
+      className="erp-instant overflow-hidden p-0 shadow-2xl duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none [&>button]:hidden"
+    >
       <DialogTitle className="sr-only">Command palette</DialogTitle>
       <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-[var(--text-muted)] [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-4 [&_[cmdk-input-wrapper]_svg]:w-4 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-2.5 [&_[cmdk-item]_svg]:h-4 [&_[cmdk-item]_svg]:w-4">
         {children}

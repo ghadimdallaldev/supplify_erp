@@ -108,10 +108,10 @@ export function InventoryPage() {
   if (isLoading) {
     return (
       <RequirePermission permission="INVENTORY_VIEW" title="inventory">
-        <PageShell>
+        <PageShell maxWidth="wide">
           <div className="space-y-5">
             <div className="flex flex-col gap-2">
-              <Skeleton className="h-7 w-48" style={{ background: 'var(--brand-ultra)' }} />
+              <Skeleton className="h-8 w-48" style={{ background: 'var(--brand-ultra)' }} />
               <Skeleton className="h-4 w-72" style={{ background: 'var(--brand-ultra)' }} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -160,7 +160,7 @@ export function InventoryPage() {
   if (error) {
     return (
       <RequirePermission permission="INVENTORY_VIEW" title="inventory">
-        <PageShell>
+        <PageShell maxWidth="wide">
           <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
             <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500" />
             <p className="mb-1 font-semibold text-red-900">Failed to load inventory</p>
@@ -182,7 +182,7 @@ export function InventoryPage() {
 
   return (
     <RequirePermission permission="INVENTORY_VIEW" title="inventory">
-      <PageShell>
+      <PageShell maxWidth="wide">
         <PageHeader
           title="Inventory"
           description="Manage stock levels and adjustments across all warehouses"
@@ -582,7 +582,7 @@ export function InventoryPage() {
 
         {/* Inventory Settings Dialog */}
         <Dialog open={showSettings} onOpenChange={setShowSettings}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent size="lg">
             <DialogHeader>
               <DialogTitle>Inventory Settings</DialogTitle>
               <DialogDescription>

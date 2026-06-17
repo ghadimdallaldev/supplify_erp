@@ -1,7 +1,11 @@
 import { Link, useLocation } from 'react-router-dom'
 import { Package, ShoppingCart, UserPlus } from 'lucide-react'
+import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
+import { canViewSupplierGrowth } from '../lib/tenantRoles'
 import { useImpersonation } from '../hooks/useImpersonation'
+import { useGetEntitlementsQuery } from '../services/api'
+import { canUseSupplierGrowth } from '../lib/planFeatureGates'
 import { isNavItemActive } from './sidebar/sidebarNavConfig'
 import { cn } from '../lib/utils'
 
@@ -16,10 +20,17 @@ type MobileNavItem = {
 
 export function SupplierMobileNav() {
   const location = useLocation()
-  const { can, canAny } = usePermissions()
-  const { isEffectiveSupplier } = useImpersonation()
+  const { user } = useAppSelector((state) => state.auth)
+  const { can } = usePermissions()
+  const { isEffectiveSupplier, shouldLoadTenantEntitlements } = useImpersonation()
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
+    skip: !shouldLoadTenantEntitlements,
+  })
 
   if (!isEffectiveSupplier) return null
+
+  const supplierGrowthEnabled =
+    canUseSupplierGrowth(entitlementsData?.entitlements) && canViewSupplierGrowth(user, can)
 
   const items: MobileNavItem[] = [
     {
@@ -36,15 +47,18 @@ export function SupplierMobileNav() {
       permission: 'ORDERS_VIEW',
       testId: 'mobile-nav-orders',
     },
-    {
-      name: 'Growth',
-      href: '/app/customer-growth',
-      icon: UserPlus,
-      anyOf: ['CATALOG_EDIT', 'ORDERS_VIEW'],
-      testId: 'mobile-nav-customer-growth',
-    },
+    ...(supplierGrowthEnabled
+      ? [
+          {
+            name: 'Growth',
+            href: '/app/customer-growth',
+            icon: UserPlus,
+            permission: 'GROWTH_VIEW',
+            testId: 'mobile-nav-customer-growth',
+          },
+        ]
+      : []),
   ].filter((item) => {
-    if (item.anyOf?.length) return canAny(...item.anyOf)
     if (item.permission) return can(item.permission)
     return true
   })
@@ -53,7 +67,7 @@ export function SupplierMobileNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--app-border)] bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--app-border)]/40 bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] lg:hidden"
       aria-label="Primary navigation"
     >
       <div className="flex items-stretch justify-around">
@@ -66,12 +80,14 @@ export function SupplierMobileNav() {
               to={item.href}
               data-testid={item.testId}
               className={cn(
-                'flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[10px] font-medium transition-colors',
-                active ? 'text-[var(--brand)]' : 'text-[var(--text-muted)]'
+                'flex min-h-[44px] flex-1 flex-col items-center justify-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors',
+                active
+                  ? 'text-[var(--brand-mid)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-mid)]'
               )}
             >
-              <Icon className="h-5 w-5 shrink-0" aria-hidden />
-              <span className="truncate">{item.name}</span>
+              <Icon className="h-5 w-5" aria-hidden />
+              {item.name}
             </Link>
           )
         })}

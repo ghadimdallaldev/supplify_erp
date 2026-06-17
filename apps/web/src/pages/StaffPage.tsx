@@ -29,7 +29,7 @@ export function StaffPage() {
 
   return (
     <RequirePermission permission="STAFF_VIEW" title="staff management">
-      <PageShell className="space-y-6" data-testid="staff-page">
+      <PageShell data-testid="staff-page">
         <PageHeader
           title="Staff"
           description="Schedule shifts, track time, and keep your front-of-house and kitchen team aligned before service."

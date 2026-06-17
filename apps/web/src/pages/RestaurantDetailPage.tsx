@@ -23,7 +23,9 @@ import {
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { formatPrice } from '../utils/format'
-import { CardAddressBlock, pageHeaderRowClass } from '../components/ui/card-layout'
+import { CardAddressBlock } from '../components/ui/card-layout'
+import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 
 export function RestaurantDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -120,40 +122,35 @@ export function RestaurantDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className={pageHeaderRowClass}>
-        <div className="flex items-center gap-3 min-w-0 flex-wrap">
+    <PageShell data-testid="restaurant-detail-page">
+      <PageHeader
+        title={restaurant.name}
+        description={restaurant.slug}
+        breadcrumb={
           <Button variant="outline" size="sm" onClick={() => navigate('/app/restaurants')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div>
-            <h1 className="text-[21px] font-black text-[var(--text)] flex items-center space-x-2">
-              <Building2 className="h-8 w-8" />
-              <span>{restaurant.name}</span>
-              {isPinned && <Pin className="h-5 w-5 text-[var(--amber-mid)] fill-yellow-500" />}
-            </h1>
-            <p className="text-[var(--text-muted)] mt-1">{restaurant.slug}</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {user?.role === 'SUPPLIER' && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => navigate(`/app/chat?restaurant=${restaurant.id}`)}
-            >
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Message
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {user?.role === 'SUPPLIER' && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => navigate(`/app/chat?restaurant=${restaurant.id}`)}
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Message
+              </Button>
+            )}
+            <Button variant={isPinned ? 'default' : 'outline'} size="sm" onClick={handlePinToggle}>
+              <Pin className="h-4 w-4 mr-2" />
+              {isPinned ? 'Pinned' : 'Pin Restaurant'}
             </Button>
-          )}
-          <Button variant={isPinned ? 'default' : 'outline'} size="sm" onClick={handlePinToggle}>
-            <Pin className="h-4 w-4 mr-2" />
-            {isPinned ? 'Pinned' : 'Pin Restaurant'}
-          </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {/* Contact Information */}
       <Card>
@@ -318,6 +315,6 @@ export function RestaurantDetailPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   )
 }

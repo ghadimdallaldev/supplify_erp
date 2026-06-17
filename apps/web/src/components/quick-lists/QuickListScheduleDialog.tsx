@@ -39,7 +39,7 @@ export function QuickListScheduleDialog(props: any) {
 
   return (
     <Dialog open={showScheduledOrder} onOpenChange={setShowScheduledOrder}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Schedule Recurring Order</DialogTitle>
           <DialogDescription>

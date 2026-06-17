@@ -19,6 +19,7 @@ import {
   getRecommendedPlanNames,
   buildLimitExceededPayload,
   isFeatureEnabled,
+  resolveEffectivePlanFeatures,
 } from '../../lib/subscription.js'
 import { z } from 'zod'
 import { notifyOrderStatusChange } from '../../services/notification.service.js'
@@ -181,12 +182,15 @@ router.post(
             'RESTAURANT',
             'orders_per_day'
           ),
-          resolveFeatureEnabled(
-            billingTenantId,
-            'RESTAURANT',
-            'supplier_deals',
-            subscription?.features
-          ),
+          (async () => {
+            const planFeatures = await resolveEffectivePlanFeatures(subscription)
+            return resolveFeatureEnabled(
+              billingTenantId,
+              'RESTAURANT',
+              'supplier_deals',
+              planFeatures
+            )
+          })(),
         ])
         dailyMeterEnforcement = enforcement
         restaurantDealsEnabled = dealsFeature.enabled

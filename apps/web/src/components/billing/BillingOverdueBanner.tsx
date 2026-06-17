@@ -24,7 +24,7 @@ export function BillingOverdueBanner() {
 
   if (isLocked && (freeSandboxExpired || lockReason === 'free_sandbox_expired')) {
     return (
-      <div className="mx-6 mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+      <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-2">
             <Lock className="h-5 w-5 shrink-0" aria-hidden />
@@ -49,7 +49,7 @@ export function BillingOverdueBanner() {
 
   if (isLocked && pendingActivation) {
     return (
-      <div className="mx-6 mt-4 rounded-lg border border-[var(--brand-light)] bg-[var(--brand-pale)] px-4 py-3 text-sm text-[var(--text)]">
+      <div className="rounded-lg border border-[var(--brand-light)] bg-[var(--brand-pale)] px-4 py-3 text-sm text-[var(--text)]">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-2">
             <Lock className="h-5 w-5 shrink-0 text-[var(--brand-mid)]" aria-hidden />
@@ -76,7 +76,7 @@ export function BillingOverdueBanner() {
 
   if (isLocked) {
     return (
-      <div className="mx-6 mt-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-950">
+      <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-950">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-2">
             <Lock className="h-5 w-5 shrink-0" aria-hidden />
@@ -103,7 +103,7 @@ export function BillingOverdueBanner() {
 
   if (inGracePeriod) {
     return (
-      <div className="mx-6 mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+      <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-2">
             <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden />

@@ -1,26 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  AlertCircle,
-  Building2,
-  DollarSign,
-  Loader2,
-  Package,
-  TrendingUp,
-  Users,
-} from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card'
+import { Filter, Loader2, RefreshCw, X } from 'lucide-react'
 import { Button } from '../../ui/button'
+import { AppPanel, SummaryStrip } from '../../ui/app-panel'
 import {
   useGetAdminSuppliersQuery,
   useGetAdminRestaurantsQuery,
   useGetAdminPlansQuery,
   useGetAdminSubscriptionsQuery,
 } from '../../../services/api'
-import { AdminKpiCard } from '../AdminKpiCard'
 import { AdminSectionHeader } from '../adminUi'
 import { AdminTenantUsageTable } from '../AdminTenantUsageTable'
-import { resolvePlanLimitFromCatalog } from '../../../lib/adminPlanLimitLookup'
-import { formatCurrency } from '../../../utils/format'
+import { UsagePressureList } from '../UsagePressureList'
+import {
+  buildRestaurantUsageRows,
+  buildSupplierUsageRows,
+  buildUsagePressureList,
+  computeUsagePlatformStats,
+} from '../../../lib/adminTenantUsageMetrics'
+import type { UsageStatus } from '../../../lib/adminUsageStatus'
 import type { AdminTenantType } from '../../../lib/adminTenantSearch'
 import type { OpenChangePlanFn } from './AdminChangePlanDialog'
 import { ADMIN_TENANT_PAGE_SIZE, dedupeAdminPlans } from './adminDashboardShared'
@@ -42,17 +39,32 @@ export function AdminUsageTab({
   const [restaurantListOffset, setRestaurantListOffset] = useState(0)
   const [accumulatedSuppliers, setAccumulatedSuppliers] = useState<any[]>([])
   const [accumulatedRestaurants, setAccumulatedRestaurants] = useState<any[]>([])
+  const [statusFilter, setStatusFilter] = useState<UsageStatus | 'all'>('all')
+
+  const showSuppliersOnly = initialTab === 'suppliers'
+  const showRestaurantsOnly = initialTab === 'restaurants'
+  const showOverview = !showSuppliersOnly && !showRestaurantsOnly
 
   const { data: plansData } = useGetAdminPlansQuery({}, { skip: !active })
   const { data: subscriptionsData } = useGetAdminSubscriptionsQuery({}, { skip: !active })
 
-  const { data: suppliersData, isLoading: suppliersLoading } = useGetAdminSuppliersQuery(
+  const {
+    data: suppliersData,
+    isLoading: suppliersLoading,
+    isFetching: suppliersFetching,
+    refetch: refetchSuppliers,
+  } = useGetAdminSuppliersQuery(
     { limit: ADMIN_TENANT_PAGE_SIZE, offset: supplierListOffset },
-    { skip: !active }
+    { skip: !active || showRestaurantsOnly }
   )
-  const { data: restaurantsData, isLoading: restaurantsLoading } = useGetAdminRestaurantsQuery(
+  const {
+    data: restaurantsData,
+    isLoading: restaurantsLoading,
+    isFetching: restaurantsFetching,
+    refetch: refetchRestaurants,
+  } = useGetAdminRestaurantsQuery(
     { limit: ADMIN_TENANT_PAGE_SIZE, offset: restaurantListOffset },
-    { skip: !active }
+    { skip: !active || showSuppliersOnly }
   )
 
   const plans = useMemo(() => dedupeAdminPlans(plansData?.plans), [plansData?.plans])
@@ -64,12 +76,6 @@ export function AdminUsageTab({
           arr.findIndex((x) => x.tenant_id === s.tenant_id && x.tenant_type === s.tenant_type) === i
       ) ?? [],
     [subscriptionsData?.subscriptions]
-  )
-
-  const supplierProductLimit = useCallback(
-    (planCode: string | null | undefined) =>
-      resolvePlanLimitFromCatalog(plans, 'SUPPLIER', planCode, 'supplier_products_skus'),
-    [plans]
   )
 
   useEffect(() => {
@@ -99,256 +105,281 @@ export function AdminUsageTab({
   const suppliersTotal = suppliersData?.total ?? suppliersForUi?.length ?? 0
   const restaurantsTotal = restaurantsData?.total ?? restaurantsForUi?.length ?? 0
 
-  const handleChangePlan = (
-    tenantId: string,
-    name: string,
-    tenantType: 'SUPPLIER' | 'RESTAURANT'
-  ) => {
-    const sub = subscriptions.find((s) => s.tenant_id === tenantId && s.tenant_type === tenantType)
-    if (sub) {
-      onOpenChangePlan({
-        id: sub.id,
-        tenant_type: tenantType,
-        tenant_name: name,
-      })
-    }
+  const supplierRows = useMemo(
+    () => buildSupplierUsageRows(suppliersForUi ?? [], plans),
+    [suppliersForUi, plans]
+  )
+  const restaurantRows = useMemo(
+    () => buildRestaurantUsageRows(restaurantsForUi ?? [], plans),
+    [restaurantsForUi, plans]
+  )
+
+  const stats = useMemo(
+    () => computeUsagePlatformStats(supplierRows, restaurantRows, suppliersTotal, restaurantsTotal),
+    [supplierRows, restaurantRows, suppliersTotal, restaurantsTotal]
+  )
+
+  const pressureList = useMemo(
+    () => buildUsagePressureList(supplierRows, restaurantRows, 12),
+    [supplierRows, restaurantRows]
+  )
+
+  const isFetching = suppliersFetching || restaurantsFetching
+  const isLoading = suppliersLoading || restaurantsLoading
+
+  const handleRefresh = () => {
+    setSupplierListOffset(0)
+    setRestaurantListOffset(0)
+    setAccumulatedSuppliers([])
+    setAccumulatedRestaurants([])
+    refetchSuppliers()
+    refetchRestaurants()
   }
+
+  const handleChangePlan = useCallback(
+    (tenantId: string, name: string, tenantType: 'SUPPLIER' | 'RESTAURANT') => {
+      const sub = subscriptions.find(
+        (s) => s.tenant_id === tenantId && s.tenant_type === tenantType
+      )
+      if (sub) {
+        onOpenChangePlan({
+          id: sub.id,
+          tenant_type: tenantType,
+          tenant_name: name,
+        })
+      }
+    },
+    [subscriptions, onOpenChangePlan]
+  )
+
+  const headerTitle = showSuppliersOnly
+    ? 'Supplier usage & quotas'
+    : showRestaurantsOnly
+      ? 'Restaurant usage & quotas'
+      : 'Usage & quotas'
+  const headerDescription = showSuppliersOnly
+    ? 'Product, warehouse, deal, and storage usage vs plan limits for each supplier.'
+    : showRestaurantsOnly
+      ? 'Daily orders, supplier connections, inventory, and storage vs plan limits.'
+      : 'Monitor quota pressure across suppliers and restaurants — who needs an upgrade or limit review.'
+
+  const metricDimensions = showSuppliersOnly
+    ? '4 metrics per supplier (products, warehouses, deals, storage)'
+    : showRestaurantsOnly
+      ? '5 metrics per restaurant (orders today, 30d volume, suppliers, inventory, storage)'
+      : '9 metrics tracked (4 supplier + 5 restaurant dimensions)'
+
+  const filteredSuppliers =
+    statusFilter === 'all'
+      ? (suppliersForUi ?? [])
+      : (suppliersForUi ?? []).filter((s) => {
+          const row = supplierRows.find((r) => r.id === s.id)
+          return row?.status === statusFilter
+        })
+
+  const filteredRestaurants =
+    statusFilter === 'all'
+      ? (restaurantsForUi ?? [])
+      : (restaurantsForUi ?? []).filter((r) => {
+          const row = restaurantRows.find((x) => x.id === r.id)
+          return row?.status === statusFilter
+        })
 
   return (
     <div className="space-y-4">
       <AdminSectionHeader
-        title={
-          initialTab === 'suppliers'
-            ? 'Supplier Usage & Quotas'
-            : initialTab === 'restaurants'
-              ? 'Restaurant Usage & Quotas'
-              : 'Usage & Quotas'
+        title={headerTitle}
+        description={headerDescription}
+        action={
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching}>
+            {isFetching ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+          </Button>
         }
-        description="Monitor tenant resource usage against plan limits"
       />
 
-      {initialTab === 'suppliers' && (
-        <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <AdminKpiCard
-              label="Total products"
-              value={
-                suppliersForUi?.reduce(
-                  (sum, s) => sum + parseInt(String(s.product_count || 0), 10),
-                  0
-                ) ?? 0
-              }
-              icon={Package}
-              tone="brand"
-            />
-            <AdminKpiCard
-              label="Loaded suppliers"
-              value={`${suppliersForUi?.length ?? 0} / ${suppliersTotal}`}
-              description="Paginate below to load more"
-              icon={Building2}
-              tone="success"
-            />
-            <AdminKpiCard
-              label="Over limit"
-              value={
-                suppliersForUi?.filter((s) => {
-                  const limit = supplierProductLimit(s.plan_code ?? s.plan_name)
-                  if (limit == null || limit === -1) return false
-                  return parseInt(String(s.product_count || 0), 10) > limit
-                }).length ?? 0
-              }
-              icon={AlertCircle}
-              tone="danger"
-            />
-            <AdminKpiCard
-              label="Total revenue"
-              value={formatCurrency(
-                suppliersForUi?.reduce(
-                  (sum, s) => sum + parseFloat(String(s.total_revenue || 0)),
-                  0
-                )
-              )}
-              icon={DollarSign}
-              tone="neutral"
-            />
-          </div>
-          <Card className="p-4">
-            <CardHeader className="px-0 pb-3 pt-0">
-              <CardTitle className="text-sm font-semibold">Supplier usage table</CardTitle>
-            </CardHeader>
-            <CardContent className="px-0 pb-0 pt-0">
-              <AdminTenantUsageTable
-                mode="supplier"
-                suppliers={suppliersForUi ?? []}
-                plans={plans}
-                isLoading={suppliersLoading}
-                onDiagnostics={(id, name) => onTenantDiag({ id, tenantType: 'SUPPLIER', name })}
-                onChangePlan={handleChangePlan}
-              />
-              {!suppliersLoading && (suppliersForUi?.length ?? 0) < suppliersTotal && (
-                <div className="mt-3 flex justify-center">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSupplierListOffset((o) => o + ADMIN_TENANT_PAGE_SIZE)}
-                  >
-                    Load more suppliers
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </>
+      {!isLoading && (
+        <SummaryStrip
+          testId="admin-usage-stats"
+          columns={showOverview ? 6 : 5}
+          metrics={[
+            ...(showOverview
+              ? [
+                  {
+                    label: 'Loaded tenants',
+                    value: stats.loadedTotal,
+                    hint: `${stats.supplierCount} suppliers · ${stats.restaurantCount} restaurants of ${stats.platformTotal} total`,
+                  },
+                ]
+              : showSuppliersOnly
+                ? [
+                    {
+                      label: 'Suppliers loaded',
+                      value: `${stats.supplierCount} / ${suppliersTotal}`,
+                      hint: 'Paginate below for more',
+                      tone: 'brand' as const,
+                    },
+                  ]
+                : [
+                    {
+                      label: 'Restaurants loaded',
+                      value: `${stats.restaurantCount} / ${restaurantsTotal}`,
+                      hint: 'Paginate below for more',
+                      tone: 'brand' as const,
+                    },
+                  ]),
+            {
+              label: 'Needs attention',
+              value: stats.needsAttention,
+              tone: stats.needsAttention > 0 ? 'amber' : 'default',
+              hint: 'Near or over limit',
+              active: statusFilter === 'near_limit' || statusFilter === 'over_limit',
+              onClick: () =>
+                setStatusFilter((f) =>
+                  f === 'near_limit' || f === 'over_limit' ? 'all' : 'near_limit'
+                ),
+            },
+            {
+              label: 'Over limit',
+              value: stats.overLimit,
+              tone: stats.overLimit > 0 ? 'danger' : 'default',
+              hint: 'Exceeds plan quota',
+              active: statusFilter === 'over_limit',
+              onClick: () => setStatusFilter((f) => (f === 'over_limit' ? 'all' : 'over_limit')),
+            },
+            {
+              label: 'Near limit',
+              value: stats.nearLimit,
+              tone: stats.nearLimit > 0 ? 'amber' : 'default',
+              hint: '≥80% of quota',
+              active: statusFilter === 'near_limit',
+              onClick: () => setStatusFilter((f) => (f === 'near_limit' ? 'all' : 'near_limit')),
+            },
+            {
+              label: 'Healthy',
+              value: stats.healthy,
+              tone: 'mint',
+              hint: 'Under 80% utilization',
+              active: statusFilter === 'healthy',
+              onClick: () => setStatusFilter((f) => (f === 'healthy' ? 'all' : 'healthy')),
+            },
+            {
+              label: 'Metrics tracked',
+              value: showOverview ? 9 : showSuppliersOnly ? 4 : 5,
+              hint: metricDimensions,
+            },
+          ]}
+        />
       )}
 
-      {initialTab === 'restaurants' && (
-        <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-            <AdminKpiCard
-              label="30-day orders"
-              value={
-                restaurantsForUi?.reduce(
-                  (sum, r) => sum + parseInt(String(r.orders_last_30d || 0), 10),
-                  0
-                ) ?? 0
-              }
-              icon={TrendingUp}
-              tone="brand"
-            />
-            <AdminKpiCard
-              label="Loaded restaurants"
-              value={`${restaurantsForUi?.length ?? 0} / ${restaurantsTotal}`}
-              description="Paginate below to load more"
-              icon={Users}
-              tone="success"
-            />
-            <AdminKpiCard
-              label="Lifetime spend"
-              value={formatCurrency(
-                restaurantsForUi?.reduce(
-                  (sum, r) => sum + parseFloat(String(r.total_spent || 0)),
-                  0
-                )
-              )}
-              description="Loaded tenants only (lifetime delivered)"
-              icon={DollarSign}
-              tone="neutral"
-            />
-          </div>
-          <Card className="p-4">
-            <CardHeader className="px-0 pb-3 pt-0">
-              <CardTitle className="text-sm font-semibold">Restaurant usage table</CardTitle>
-            </CardHeader>
-            <CardContent className="px-0 pb-0 pt-0">
-              <AdminTenantUsageTable
-                mode="restaurant"
-                restaurants={restaurantsForUi ?? []}
-                plans={plans}
-                isLoading={restaurantsLoading}
-                onDiagnostics={(id, name) => onTenantDiag({ id, tenantType: 'RESTAURANT', name })}
-                onChangePlan={handleChangePlan}
-              />
-              {!restaurantsLoading && (restaurantsForUi?.length ?? 0) < restaurantsTotal && (
-                <div className="mt-3 flex justify-center">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setRestaurantListOffset((o) => o + ADMIN_TENANT_PAGE_SIZE)}
-                  >
-                    Load more restaurants
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </>
+      {statusFilter !== 'all' && (
+        <div className="flex items-center gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 text-sm">
+          <Filter className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+          <span>
+            Filtering loaded tenants by <strong>{statusFilter.replace(/_/g, ' ')}</strong>
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-7"
+            onClick={() => setStatusFilter('all')}
+          >
+            <X className="mr-1 h-3.5 w-3.5" />
+            Clear
+          </Button>
+        </div>
       )}
 
-      {initialTab !== 'suppliers' && initialTab !== 'restaurants' && (
-        <>
-          <Card>
-            <CardHeader>
-              <h3 className="text-xl font-bold text-[var(--text)]">Platform usage overview</h3>
-              <p className="text-sm text-[var(--text-muted)]">
-                Aggregated usage across all suppliers and restaurants. Use Supplier Admin or
-                Restaurant Admin for per-tenant detail.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-[var(--text-muted)]">Suppliers</span>
-                    <Building2 className="h-4 w-4 text-[var(--brand-mid)]" />
-                  </div>
-                  <p className="text-2xl font-bold text-[var(--text)]">
-                    {suppliersData?.suppliers?.length ?? 0}
-                  </p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">
-                    Total products:{' '}
-                    {suppliersData?.suppliers?.reduce(
-                      (sum, s) => sum + parseInt(s.product_count || 0),
-                      0
-                    ) ?? 0}
-                  </p>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-[var(--text-muted)]">Restaurants</span>
-                    <Users className="h-4 w-4 text-[var(--mint)]" />
-                  </div>
-                  <p className="text-2xl font-bold text-[var(--text)]">
-                    {restaurantsData?.restaurants?.length ?? 0}
-                  </p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">
-                    30-day orders:{' '}
-                    {restaurantsData?.restaurants?.reduce(
-                      (sum, r) => sum + parseInt(r.orders_last_30d || 0),
-                      0
-                    ) ?? 0}
-                  </p>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-[var(--text-muted)]">Suppliers over limit</span>
-                    <AlertCircle className="h-4 w-4 text-[var(--red)]" />
-                  </div>
-                  <p className="text-2xl font-bold text-[var(--text)]">
-                    {suppliersData?.suppliers?.filter((s) => {
-                      const limit = supplierProductLimit(s.plan_code ?? s.plan_name) ?? 1000
-                      if (limit === -1) return false
-                      return parseInt(s.product_count || 0) > limit
-                    }).length ?? 0}
-                  </p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">Product limit exceeded</p>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-[var(--text-muted)]">Restaurant spend (30d)</span>
-                    <DollarSign className="h-4 w-4 text-[var(--mint)]" />
-                  </div>
-                  <p className="text-2xl font-bold text-[var(--text)]">
-                    {formatCurrency(
-                      restaurantsData?.restaurants?.reduce(
-                        (sum, r) => sum + parseFloat(r.total_spent || 0),
-                        0
-                      )
-                    )}
-                  </p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">Across all restaurants</p>
-                </div>
+      {showOverview && !isLoading && (
+        <AppPanel
+          title="Tenants under pressure"
+          description={`Top ${pressureList.length} loaded tenant${pressureList.length === 1 ? '' : 's'} closest to or over plan limits`}
+          testId="admin-usage-pressure-panel"
+        >
+          <UsagePressureList
+            entries={pressureList}
+            onDiagnostics={onTenantDiag}
+            onChangePlan={handleChangePlan}
+          />
+        </AppPanel>
+      )}
+
+      {(showOverview || showSuppliersOnly) && (
+        <AppPanel
+          title={showOverview ? 'Supplier usage' : 'All suppliers'}
+          description={
+            suppliersLoading
+              ? 'Loading supplier usage…'
+              : `${filteredSuppliers.length} supplier${filteredSuppliers.length === 1 ? '' : 's'} shown · ${metricDimensions.split('(')[0].trim()}`
+          }
+          testId="admin-usage-suppliers-panel"
+          footer={
+            !suppliersLoading && (suppliersForUi?.length ?? 0) < suppliersTotal ? (
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSupplierListOffset((o) => o + ADMIN_TENANT_PAGE_SIZE)}
+                  disabled={suppliersFetching}
+                >
+                  {suppliersFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Load more suppliers ({suppliersForUi?.length ?? 0} / {suppliersTotal})
+                </Button>
               </div>
-            </CardContent>
-          </Card>
-          {(suppliersLoading || restaurantsLoading) && (
-            <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading usage data…
-            </div>
-          )}
-        </>
+            ) : undefined
+          }
+        >
+          <AdminTenantUsageTable
+            mode="supplier"
+            suppliers={filteredSuppliers}
+            plans={plans}
+            isLoading={suppliersLoading}
+            onDiagnostics={(id, name) => onTenantDiag({ id, tenantType: 'SUPPLIER', name })}
+            onChangePlan={handleChangePlan}
+          />
+        </AppPanel>
+      )}
+
+      {(showOverview || showRestaurantsOnly) && (
+        <AppPanel
+          title={showOverview ? 'Restaurant usage' : 'All restaurants'}
+          description={
+            restaurantsLoading
+              ? 'Loading restaurant usage…'
+              : `${filteredRestaurants.length} restaurant${filteredRestaurants.length === 1 ? '' : 's'} shown · orders, suppliers, inventory, storage`
+          }
+          testId="admin-usage-restaurants-panel"
+          footer={
+            !restaurantsLoading && (restaurantsForUi?.length ?? 0) < restaurantsTotal ? (
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRestaurantListOffset((o) => o + ADMIN_TENANT_PAGE_SIZE)}
+                  disabled={restaurantsFetching}
+                >
+                  {restaurantsFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Load more restaurants ({restaurantsForUi?.length ?? 0} / {restaurantsTotal})
+                </Button>
+              </div>
+            ) : undefined
+          }
+        >
+          <AdminTenantUsageTable
+            mode="restaurant"
+            restaurants={filteredRestaurants}
+            plans={plans}
+            isLoading={restaurantsLoading}
+            onDiagnostics={(id, name) => onTenantDiag({ id, tenantType: 'RESTAURANT', name })}
+            onChangePlan={handleChangePlan}
+          />
+        </AppPanel>
       )}
     </div>
   )

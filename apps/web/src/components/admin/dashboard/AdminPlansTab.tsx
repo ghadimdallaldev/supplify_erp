@@ -178,7 +178,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
   }
 
   return (
-    <div className="space-y-5">
+    <>
       <div>
         <AdminSectionHeader
           title="Subscription Defaults"
@@ -190,217 +190,225 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
         </div>
       </div>
 
-      <div className="flex flex-wrap justify-between items-center gap-4">
-        <h2 className="text-lg font-bold text-[var(--text)]">Subscription Plans</h2>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-[var(--text-muted)]">Filter:</span>
-          <Select
-            value={plansTenantFilter ?? ''}
-            onValueChange={(value) =>
-              setPlansTenantFilter(value === '' ? undefined : (value as 'RESTAURANT' | 'SUPPLIER'))
-            }
-          >
-            <SelectTrigger className="h-9 w-36">
-              <option value="">All</option>
-              <option value="RESTAURANT">Restaurant</option>
-              <option value="SUPPLIER">Supplier</option>
-            </SelectTrigger>
-          </Select>
-          <Dialog open={createPlanOpen} onOpenChange={setCreatePlanOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Plan
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Create Plan</DialogTitle>
-                <DialogDescription>
-                  Add a subscription plan for restaurants or suppliers.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div>
-                  <Label>Code (e.g. free, silver)</Label>
-                  <Input
-                    value={createPlanForm.code}
-                    onChange={(e) => setCreatePlanForm((s) => ({ ...s, code: e.target.value }))}
-                    placeholder="free"
-                  />
-                </div>
-                <div>
-                  <Label>Name</Label>
-                  <Input
-                    value={createPlanForm.name}
-                    onChange={(e) => setCreatePlanForm((s) => ({ ...s, name: e.target.value }))}
-                    placeholder="Free"
-                  />
-                </div>
-                <div>
-                  <Label>Tenant type</Label>
-                  <Select
-                    value={createPlanForm.tenantType}
-                    onValueChange={(value) =>
-                      setCreatePlanForm((s) => ({
-                        ...s,
-                        tenantType: value as 'RESTAURANT' | 'SUPPLIER',
-                      }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <option value="RESTAURANT">Restaurant</option>
-                      <option value="SUPPLIER">Supplier</option>
-                    </SelectTrigger>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Description</Label>
-                  <Input
-                    value={createPlanForm.description}
-                    onChange={(e) =>
-                      setCreatePlanForm((s) => ({ ...s, description: e.target.value }))
-                    }
-                    placeholder="Optional"
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Price / month ($)</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={createPlanForm.pricePerMonth}
-                      onChange={(e) =>
-                        setCreatePlanForm((s) => ({
-                          ...s,
-                          pricePerMonth: Number(e.target.value) || 0,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label>Price / year ($)</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={createPlanForm.pricePerYear}
-                      onChange={(e) =>
-                        setCreatePlanForm((s) => ({
-                          ...s,
-                          pricePerYear: Number(e.target.value) || 0,
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button variant="outline" onClick={() => setCreatePlanOpen(false)}>
-                    Cancel
+      <div>
+        <AdminSectionHeader
+          title="Subscription Plans"
+          action={
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-[var(--text-muted)]">Filter:</span>
+              <Select
+                value={plansTenantFilter ?? ''}
+                onValueChange={(value) =>
+                  setPlansTenantFilter(
+                    value === '' ? undefined : (value as 'RESTAURANT' | 'SUPPLIER')
+                  )
+                }
+              >
+                <SelectTrigger className="h-9 w-36">
+                  <option value="">All</option>
+                  <option value="RESTAURANT">Restaurant</option>
+                  <option value="SUPPLIER">Supplier</option>
+                </SelectTrigger>
+              </Select>
+              <Dialog open={createPlanOpen} onOpenChange={setCreatePlanOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Plan
                   </Button>
-                  <Button
-                    onClick={handleCreatePlan}
-                    disabled={!createPlanForm.code.trim() || !createPlanForm.name.trim()}
-                  >
-                    Create
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+                </DialogTrigger>
+                <DialogContent size="sm">
+                  <DialogHeader>
+                    <DialogTitle>Create Plan</DialogTitle>
+                    <DialogDescription>
+                      Add a subscription plan for restaurants or suppliers.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div>
+                      <Label>Code (e.g. free, silver)</Label>
+                      <Input
+                        value={createPlanForm.code}
+                        onChange={(e) => setCreatePlanForm((s) => ({ ...s, code: e.target.value }))}
+                        placeholder="free"
+                      />
+                    </div>
+                    <div>
+                      <Label>Name</Label>
+                      <Input
+                        value={createPlanForm.name}
+                        onChange={(e) => setCreatePlanForm((s) => ({ ...s, name: e.target.value }))}
+                        placeholder="Free"
+                      />
+                    </div>
+                    <div>
+                      <Label>Tenant type</Label>
+                      <Select
+                        value={createPlanForm.tenantType}
+                        onValueChange={(value) =>
+                          setCreatePlanForm((s) => ({
+                            ...s,
+                            tenantType: value as 'RESTAURANT' | 'SUPPLIER',
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <option value="RESTAURANT">Restaurant</option>
+                          <option value="SUPPLIER">Supplier</option>
+                        </SelectTrigger>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Description</Label>
+                      <Input
+                        value={createPlanForm.description}
+                        onChange={(e) =>
+                          setCreatePlanForm((s) => ({ ...s, description: e.target.value }))
+                        }
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Price / month ($)</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={createPlanForm.pricePerMonth}
+                          onChange={(e) =>
+                            setCreatePlanForm((s) => ({
+                              ...s,
+                              pricePerMonth: Number(e.target.value) || 0,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label>Price / year ($)</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={createPlanForm.pricePerYear}
+                          onChange={(e) =>
+                            setCreatePlanForm((s) => ({
+                              ...s,
+                              pricePerYear: Number(e.target.value) || 0,
+                            }))
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                      <Button variant="outline" onClick={() => setCreatePlanOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleCreatePlan}
+                        disabled={!createPlanForm.code.trim() || !createPlanForm.name.trim()}
+                      >
+                        Create
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          }
+        />
 
-      {plansLoading ? (
-        <AdminTabLoading />
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {plans.map((plan) => (
-            <Card key={plan.id} className="p-4 transition-shadow hover:shadow-md">
-              <div className="mb-3 flex items-start justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <h3 className="text-base font-bold text-[var(--text)]">{plan.name}</h3>
-                  <Badge variant="outline" className="text-[10px]">
-                    {plan.tenant_type === 'RESTAURANT' ? 'Restaurant' : 'Supplier'}
-                  </Badge>
-                  {plan.code?.toLowerCase() === 'free' &&
-                    platformSettings?.freeSandboxDays != null && (
-                      <Badge variant="secondary" className="text-[10px]">
-                        {platformSettings.freeSandboxDays}d trial
-                      </Badge>
-                    )}
+        {plansLoading ? (
+          <AdminTabLoading />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {plans.map((plan) => (
+              <Card key={plan.id} className="p-4 transition-shadow hover:shadow-md">
+                <div className="mb-3 flex items-start justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <h3 className="text-base font-bold text-[var(--text)]">{plan.name}</h3>
+                    <Badge variant="outline" className="text-[10px]">
+                      {plan.tenant_type === 'RESTAURANT' ? 'Restaurant' : 'Supplier'}
+                    </Badge>
+                    {plan.code?.toLowerCase() === 'free' &&
+                      platformSettings?.freeSandboxDays != null && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {platformSettings.freeSandboxDays}d trial
+                        </Badge>
+                      )}
+                  </div>
+                  <StatusBadge status={plan.is_active ? 'ACTIVE' : 'INACTIVE'} />
                 </div>
-                <StatusBadge status={plan.is_active ? 'ACTIVE' : 'INACTIVE'} />
-              </div>
-              {plan.code && getPlanSubtitle(plan.code) ? (
-                <p className="mb-2 text-xs text-[var(--text-muted)]">
-                  {getPlanSubtitle(plan.code)}
-                </p>
-              ) : null}
-              <div className="mb-3">
-                <p className="text-lg font-bold text-[var(--text)]">
-                  {formatPlanPrice(plan.price_per_month, '/mo')}
-                </p>
-                {plan.price_per_year != null && plan.price_per_year > 0 && (
-                  <p className="text-xs text-[var(--text-muted)]">
-                    {formatPlanPrice(plan.price_per_year, '/yr')}
+                {plan.code && getPlanSubtitle(plan.code) ? (
+                  <p className="mb-2 text-xs text-[var(--text-muted)]">
+                    {getPlanSubtitle(plan.code)}
+                  </p>
+                ) : null}
+                <div className="mb-3">
+                  <p className="text-lg font-bold text-[var(--text)]">
+                    {formatPlanPrice(plan.price_per_month, '/mo')}
+                  </p>
+                  {plan.price_per_year != null && plan.price_per_year > 0 && (
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {formatPlanPrice(plan.price_per_year, '/yr')}
+                    </p>
+                  )}
+                </div>
+                {plan.description && (
+                  <p className="mb-3 line-clamp-2 text-xs text-[var(--text-muted)]">
+                    {plan.description}
                   </p>
                 )}
-              </div>
-              {plan.description && (
-                <p className="mb-3 line-clamp-2 text-xs text-[var(--text-muted)]">
-                  {plan.description}
-                </p>
-              )}
-              <div className="mb-3 space-y-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                  {plan.limits ? Object.keys(plan.limits).length : 0} limits ·{' '}
-                  {plan.features ? Object.keys(plan.features).length : 0} features
-                </p>
-                {plan.limits && Object.keys(plan.limits).length > 0 ? (
-                  Object.entries(plan.limits)
-                    .slice(0, 3)
-                    .map(([key, value]) => (
-                      <div key={key} className="flex justify-between text-xs">
-                        <span className="text-[var(--text-muted)]">{getLimitLabel(key)}</span>
-                        <span
-                          className={`font-semibold ${value === -1 ? 'text-[var(--mint)]' : 'text-[var(--text)]'}`}
-                        >
-                          {value === -1 ? '∞ unlimited' : String(value)}
-                        </span>
-                      </div>
-                    ))
-                ) : (
-                  <p className="text-xs text-[var(--text-muted)]">No limits defined</p>
+                <div className="mb-3 space-y-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                    {plan.limits ? Object.keys(plan.limits).length : 0} limits ·{' '}
+                    {plan.features ? Object.keys(plan.features).length : 0} features
+                  </p>
+                  {plan.limits && Object.keys(plan.limits).length > 0 ? (
+                    Object.entries(plan.limits)
+                      .slice(0, 3)
+                      .map(([key, value]) => (
+                        <div key={key} className="flex justify-between text-xs">
+                          <span className="text-[var(--text-muted)]">{getLimitLabel(key)}</span>
+                          <span
+                            className={`font-semibold ${value === -1 ? 'text-[var(--mint)]' : 'text-[var(--text)]'}`}
+                          >
+                            {value === -1 ? '∞ unlimited' : String(value)}
+                          </span>
+                        </div>
+                      ))
+                  ) : (
+                    <p className="text-xs text-[var(--text-muted)]">No limits defined</p>
+                  )}
+                  {(plan.limits && Object.keys(plan.limits).length > 3) ||
+                  (plan.features && Object.keys(plan.features).length > 0) ? (
+                    <p className="text-[10px] text-[var(--text-muted)]">
+                      Edit plan for full details
+                    </p>
+                  ) : null}
+                </div>
+                {plan.updated_at && (
+                  <p className="text-xs text-[var(--text-muted)] mb-3">
+                    Updated {new Date(plan.updated_at).toLocaleDateString()}
+                  </p>
                 )}
-                {(plan.limits && Object.keys(plan.limits).length > 3) ||
-                (plan.features && Object.keys(plan.features).length > 0) ? (
-                  <p className="text-[10px] text-[var(--text-muted)]">Edit plan for full details</p>
-                ) : null}
-              </div>
-              {plan.updated_at && (
-                <p className="text-xs text-[var(--text-muted)] mb-3">
-                  Updated {new Date(plan.updated_at).toLocaleDateString()}
-                </p>
-              )}
-              <div className="mt-4">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full whitespace-normal"
-                  onClick={() => openEditPlanModal(plan)}
-                >
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+                <div className="mt-4">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full whitespace-normal"
+                    onClick={() => openEditPlanModal(plan)}
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
 
       <Dialog open={!!editPlanModal?.open} onOpenChange={(open) => !open && setEditPlanModal(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent size="lg">
           <DialogHeader>
             <DialogTitle>Edit Plan</DialogTitle>
             <DialogDescription>
@@ -559,6 +567,6 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }

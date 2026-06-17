@@ -500,7 +500,8 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
       <Sheet open onOpenChange={(open) => !open && onClose()}>
         <SheetContent
           side="right"
-          className="flex h-full w-full flex-col gap-4 overflow-hidden sm:max-w-xl"
+          width="wide"
+          className="flex h-full flex-col gap-4 overflow-hidden"
         >
           <div
             data-testid="fulfillment-route-detail"

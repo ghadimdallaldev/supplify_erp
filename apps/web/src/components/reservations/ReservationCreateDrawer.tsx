@@ -79,7 +79,7 @@ export function ReservationCreateDrawer({
       <DialogTrigger asChild>
         <Button>+ New reservation</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Capture reservation</DialogTitle>
           <DialogDescription>

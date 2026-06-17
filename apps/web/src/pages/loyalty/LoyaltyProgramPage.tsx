@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { PageHeader } from '../../components/ui/page-header'
+import { PageShell } from '../../components/ui/page-shell'
 import { RequirePermission } from '../../components/RequirePermission'
 
 /**
@@ -9,7 +10,7 @@ import { RequirePermission } from '../../components/RequirePermission'
 export function LoyaltyProgramPage() {
   return (
     <RequirePermission permission="CATALOG_VIEW">
-      <div className="space-y-6">
+      <PageShell maxWidth="focused" className="space-y-6" data-testid="loyalty-program-page">
         <PageHeader
           title="Loyalty Program"
           description="Reward restaurant customers with points on received orders and let them redeem at checkout."
@@ -32,7 +33,7 @@ export function LoyaltyProgramPage() {
             <code>/api/loyalty/supplier/balances</code>.
           </CardContent>
         </Card>
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

@@ -36,7 +36,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/app/notifications': 'Notifications',
   '/app/settings': 'Settings',
   '/app/branches': 'Branches',
-  '/app/admin': 'Admin Dashboard',
+  '/app/admin': 'Platform',
   '/app/admin/suppliers': 'Supplier Admin',
   '/app/admin/restaurants': 'Restaurant Admin',
   '/app/reports': 'Reports',
@@ -175,39 +175,35 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
   return (
     <header
       data-testid="header"
-      className="flex shrink-0 items-center gap-2 border-b border-[var(--app-border)] bg-[var(--surface)] px-3 py-0 sm:gap-3 sm:px-5 lg:px-6"
-      style={{
-        minHeight: 56,
-        height: 56,
-        fontFamily: "'Inter', system-ui, sans-serif",
-        paddingTop: 'env(safe-area-inset-top)',
-      }}
+      className="flex h-14 min-h-14 shrink-0 items-center gap-2 border-b border-[var(--app-border)]/40 bg-[var(--surface)] px-3 pt-[env(safe-area-inset-top)] sm:gap-3 sm:px-5 lg:px-6"
+      style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
       {onOpenMobileNav && !isAdminPortalRoute && (
         <button
           type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--app-border)] lg:hidden"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)] lg:hidden"
           aria-label="Open navigation menu"
           onClick={onOpenMobileNav}
         >
-          <Menu size={18} style={{ color: 'var(--text-muted)' }} />
+          <Menu size={18} />
         </button>
       )}
 
       {/* Breadcrumb */}
       <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
-        <span className="hidden text-[13px] font-normal text-[var(--text-muted)] xs:inline">
+        <span className="hidden text-[13px] font-normal text-[var(--text-muted)]/80 xs:inline">
           Supplify
         </span>
-        <ChevronRight size={13} className="hidden shrink-0 text-[var(--text-muted)] xs:block" />
-        <span className="truncate text-[13px] font-normal text-[var(--text-muted)]">
-          {pageName}
-        </span>
+        <ChevronRight size={13} className="hidden shrink-0 text-[var(--text-muted)]/50 xs:block" />
+        <span className="truncate text-[13px] font-medium text-[var(--text)]">{pageName}</span>
         {workspaceLabel && (
           <>
-            <ChevronRight size={13} className="hidden shrink-0 text-[var(--text-muted)] sm:block" />
+            <ChevronRight
+              size={13}
+              className="hidden shrink-0 text-[var(--text-muted)]/50 sm:block"
+            />
             <span
-              className="hidden truncate text-xs font-medium text-[var(--text-muted)] sm:inline max-w-[8rem] md:max-w-[14rem]"
+              className="hidden max-w-[8rem] truncate text-xs font-normal text-[var(--text-muted)]/80 sm:inline md:max-w-[14rem]"
               data-testid="workspace-context"
             >
               {workspaceLabel}
@@ -252,14 +248,11 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
             </Button>
             <button
               type="button"
-              className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--app-border)] sm:hidden"
+              className="relative flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)] sm:hidden"
               aria-label={hasUrgency ? 'Upgrade plan' : 'View plans'}
               onClick={handleNavUpgrade}
             >
-              <TrendingUp
-                size={16}
-                style={{ color: hasUrgency ? 'var(--brand)' : 'var(--text-muted)' }}
-              />
+              <TrendingUp size={16} className={hasUrgency ? 'text-[var(--brand)]' : undefined} />
               {hasUrgency && (
                 <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--amber-mid)]" />
               )}
@@ -270,15 +263,15 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         {/* Command palette */}
         <button
           type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] md:hidden"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)] md:hidden"
           aria-label="Open command palette"
           onClick={openCommandPalette}
         >
-          <Search size={16} style={{ color: 'var(--text-muted)' }} />
+          <Search size={16} />
         </button>
         <button
           type="button"
-          className="hidden h-[34px] min-w-[140px] cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-2.5 text-left transition-colors hover:border-[var(--app-border-mid)] md:flex lg:min-w-[200px]"
+          className="hidden h-8 min-w-[140px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--app-border)]/50 bg-[var(--brand-ultra)]/30 px-2.5 text-left transition-colors hover:border-[var(--app-border)]/70 hover:bg-[var(--brand-ultra)]/50 md:flex lg:min-w-[200px]"
           aria-label="Open command palette"
           onClick={openCommandPalette}
         >
@@ -291,10 +284,10 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
               strokeLinecap="round"
             />
           </svg>
-          <span style={{ flex: 1, fontSize: 12, color: 'var(--text-muted)' }}>
-            Search products…
+          <span className="flex-1 text-xs text-[var(--text-muted)]">
+            {isAdminPortalRoute ? 'Search admin…' : 'Search products…'}
           </span>
-          <kbd className="hidden rounded border border-[var(--app-border)] bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)] lg:inline">
+          <kbd className="hidden rounded border border-[var(--app-border)]/40 bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]/80 lg:inline">
             ⌘K
           </kbd>
         </button>
@@ -302,40 +295,17 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
 
         {/* Notification bell */}
-        <div style={{ position: 'relative' }}>
+        <div className="relative">
           <button
             type="button"
-            className="erp-pressable"
+            className="erp-pressable relative flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)]"
             aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
             aria-expanded={notificationsVisible}
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 9,
-              background: 'transparent',
-              border: '1px solid var(--app-border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              position: 'relative',
-            }}
             onClick={toggleNotifications}
           >
-            <Bell size={16} style={{ color: 'var(--text-muted)' }} />
+            <Bell size={16} />
             {unreadCount > 0 && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: 6,
-                  right: 6,
-                  width: 7,
-                  height: 7,
-                  borderRadius: '50%',
-                  background: 'var(--red)',
-                  border: '1.5px solid var(--surface)',
-                }}
-              />
+              <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full border border-[var(--surface)] bg-[var(--red)]" />
             )}
           </button>
 
@@ -343,22 +313,12 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
             <div
               data-testid="notifications-dropdown"
               className={cn(
-                'fixed inset-x-3 top-[calc(3.5rem+env(safe-area-inset-top))] z-50 max-h-[min(70vh,24rem)] overflow-y-auto rounded-xl border border-[var(--app-border)] bg-[var(--surface)] shadow-lg transition-opacity duration-150 ease-out motion-reduce:transition-none sm:absolute sm:inset-x-auto sm:right-0 sm:top-11 sm:w-[min(100vw-1.5rem,20rem)]',
+                'fixed inset-x-3 top-[calc(3.5rem+env(safe-area-inset-top))] z-50 max-h-[min(70vh,24rem)] overflow-y-auto rounded-lg border border-[var(--app-border)]/50 bg-[var(--surface)] shadow-sm transition-opacity duration-150 ease-out motion-reduce:transition-none sm:absolute sm:inset-x-auto sm:right-0 sm:top-10 sm:w-[min(100vw-1.5rem,20rem)]',
                 notificationsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
               )}
             >
-              <div
-                style={{
-                  padding: '12px 16px',
-                  borderBottom: '1px solid var(--app-border)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-                  Notifications
-                </span>
+              <div className="flex items-center justify-between border-b border-[var(--app-border)]/40 px-4 py-3">
+                <span className="text-[13px] font-semibold text-[var(--text)]">Notifications</span>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   {unreadCount > 0 && (
                     <button
@@ -487,45 +447,19 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         {/* Settings icon button */}
         <button
           type="button"
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 9,
-            background: 'transparent',
-            border: '1px solid var(--app-border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-          }}
+          className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)]"
           onClick={() => navigate('/app/settings')}
           aria-label="Settings"
           title="Settings"
         >
-          <Settings size={15} style={{ color: 'var(--text-muted)' }} />
+          <Settings size={15} />
         </button>
 
         {/* User avatar */}
         <button
           type="button"
           data-testid="logout-button"
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--brand), var(--mint-mid))',
-            border: '2px solid var(--surface)',
-            outline: '1px solid var(--app-border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 11,
-            fontWeight: 700,
-            color: '#fff',
-            cursor: 'pointer',
-            flexShrink: 0,
-            fontFamily: 'inherit',
-          }}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--brand)] to-[var(--mint-mid)] text-[11px] font-semibold text-white ring-1 ring-[var(--app-border)]/30 transition-opacity hover:opacity-90"
           title={`${user?.displayName || user?.email} — click to logout`}
           onClick={handleLogout}
         >

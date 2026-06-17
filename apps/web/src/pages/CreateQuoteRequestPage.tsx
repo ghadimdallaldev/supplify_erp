@@ -11,7 +11,8 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { EmptyState } from '../components/ui/empty-state'
-import { pageHeaderRowClass } from '../components/ui/card-layout'
+import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { toast } from 'sonner'
 import { ArrowLeft, Send } from 'lucide-react'
 import type { Product } from '../types'
@@ -118,21 +119,19 @@ export function CreateQuoteRequestPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className={pageHeaderRowClass}>
-        <div>
-          <Button variant="ghost" size="sm" className="mb-2 -ml-2" asChild>
+    <PageShell maxWidth="focused" className="space-y-6" data-testid="create-quote-request-page">
+      <PageHeader
+        title="Request best price"
+        description="Select items and suppliers. Each supplier can respond with price and availability."
+        breadcrumb={
+          <Button variant="ghost" size="sm" className="-ml-2" asChild>
             <Link to="/app/quote-requests">
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold text-[var(--text)]">Request best price</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
-            Select items and suppliers. Each supplier can respond with price and availability.
-          </p>
-        </div>
-      </div>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
@@ -277,6 +276,6 @@ export function CreateQuoteRequestPage() {
           </Card>
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

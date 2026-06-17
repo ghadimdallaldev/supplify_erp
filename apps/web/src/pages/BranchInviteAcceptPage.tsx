@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   useValidateBranchInviteQuery,
@@ -6,6 +6,7 @@ import {
   useGetInviteSessionQuery,
 } from '../services/api'
 import { Button } from '../components/ui/button'
+import { PageHeader } from '../components/ui/page-header'
 import { api } from '../services/api'
 import { useAppDispatch } from '../hooks/redux'
 import {
@@ -64,48 +65,54 @@ export function BranchInviteAcceptPage() {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
+      <InvitePageLayout>
         <p className="text-[var(--text-muted)]">Missing invitation token.</p>
-      </div>
+      </InvitePageLayout>
     )
   }
 
   if (isLoading || sessionLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
+      <InvitePageLayout>
         <p>Validating your invitation…</p>
-      </div>
+      </InvitePageLayout>
     )
   }
 
   if (isError || !invite) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
+      <InvitePageLayout>
         <p className="text-[var(--text-muted)]">Unable to validate invitation.</p>
-      </div>
+      </InvitePageLayout>
     )
   }
 
   if (!invite.valid && invite.reason === 'expired') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 max-w-md text-center space-y-2">
-        <h1 className="text-xl font-semibold">This invite link has expired.</h1>
-        <p className="text-[var(--text-muted)]">
-          Contact your organization admin to get a new one.
-        </p>
-      </div>
+      <InvitePageLayout className="max-w-md text-center space-y-2">
+        <PageHeader
+          title="This invite link has expired."
+          description="Contact your organization admin to get a new one."
+          size="compact"
+          className="text-center sm:flex-col sm:items-center [&_p]:mx-auto"
+        />
+      </InvitePageLayout>
     )
   }
 
   if (!invite.valid) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 max-w-md text-center space-y-3">
-        <h1 className="text-xl font-semibold">This invite link is no longer valid.</h1>
-        <p className="text-[var(--text-muted)]">If you already have an account, sign in.</p>
+      <InvitePageLayout className="max-w-md text-center space-y-3">
+        <PageHeader
+          title="This invite link is no longer valid."
+          description="If you already have an account, sign in."
+          size="compact"
+          className="text-center sm:flex-col sm:items-center [&_p]:mx-auto"
+        />
         <Link to={loginHref} className="text-[var(--brand)] underline">
           Sign In
         </Link>
-      </div>
+      </InvitePageLayout>
     )
   }
 
@@ -186,9 +193,9 @@ export function BranchInviteAcceptPage() {
 
   if (sessionUser && !sessionExpired) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="max-w-xl w-full space-y-4 border border-[var(--app-border)] rounded-lg p-6">
-          <h1 className="text-xl font-semibold">Accept branch invitation</h1>
+      <InvitePageLayout>
+        <Card>
+          <PageHeader title="Accept branch invitation" size="compact" />
           {emailMismatch && invite.invited_email ? (
             <InviteEmailMismatchCard
               invitedEmail={invite.invited_email}
@@ -227,15 +234,15 @@ export function BranchInviteAcceptPage() {
               </Link>
             </>
           )}
-        </div>
-      </div>
+        </Card>
+      </InvitePageLayout>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
-      <div className="max-w-xl w-full space-y-4 border border-[var(--app-border)] rounded-lg p-6">
-        <h1 className="text-xl font-semibold">Welcome to Supplify</h1>
+    <InvitePageLayout>
+      <Card>
+        <PageHeader title="Welcome to Supplify" size="compact" />
         <p className="text-sm text-[var(--text-muted)]">
           You&apos;ve been invited to join <strong>{invite.branch_name}</strong> ({invite.org_name})
           as <strong>{invite.role_name}</strong>.
@@ -296,7 +303,29 @@ export function BranchInviteAcceptPage() {
             Sign in
           </Link>
         </p>
-      </div>
+      </Card>
+    </InvitePageLayout>
+  )
+}
+
+function InvitePageLayout({
+  children,
+  className = '',
+}: {
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <div className={`min-h-screen flex items-center justify-center p-6 ${className}`}>
+      {children}
+    </div>
+  )
+}
+
+function Card({ children }: { children: ReactNode }) {
+  return (
+    <div className="max-w-xl w-full space-y-4 border border-[var(--app-border)] rounded-lg p-6">
+      {children}
     </div>
   )
 }

@@ -20,6 +20,8 @@ import {
   useGetRestaurantsQuery,
   useGetProductsQuery,
 } from '../services/api'
+import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { RequirePermission } from '../components/RequirePermission'
 import { usePermissions } from '../hooks/usePermissions'
 import { formatPrice } from '../utils/format'
@@ -162,21 +164,19 @@ export function ContractPricingPage() {
 
   return (
     <RequirePermission permission="CATALOG_VIEW">
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-[21px] font-black text-[var(--text)]">Contract Pricing</h1>
-            <p className="text-sm text-[var(--text-muted)] mt-1">
-              Set customer-specific prices per restaurant and product.
-            </p>
-          </div>
-          {canManage && (
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add contract price
-            </Button>
-          )}
-        </div>
+      <PageShell maxWidth="wide" data-testid="contract-pricing-page">
+        <PageHeader
+          title="Contract Pricing"
+          description="Set customer-specific prices per restaurant and product."
+          actions={
+            canManage ? (
+              <Button onClick={openCreate}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add contract price
+              </Button>
+            ) : undefined
+          }
+        />
 
         <Card>
           <CardHeader>
@@ -379,7 +379,7 @@ export function ContractPricingPage() {
         </p>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent size="md">
             <DialogHeader>
               <DialogTitle>{editingId ? 'Edit contract price' : 'Add contract price'}</DialogTitle>
             </DialogHeader>
@@ -508,7 +508,7 @@ export function ContractPricingPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

@@ -65,7 +65,7 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Invite someone to {branchName ?? 'this branch'}</DialogTitle>
         </DialogHeader>

@@ -10,6 +10,7 @@ import { Card, CardContent } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { EmptyState } from '../components/ui/empty-state'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -265,7 +266,7 @@ export function CartPage() {
 
   if (groups.length === 0) {
     return (
-      <div className="space-y-6">
+      <PageShell data-testid="cart-page">
         <PageHeader title={cartTitle} description="Your cart is empty" />
         <EmptyState
           title="No items in your cart"
@@ -277,13 +278,13 @@ export function CartPage() {
             </Button>
           }
         />
-      </div>
+      </PageShell>
     )
   }
 
   return (
     <RequirePermission permission="ORDERS_CREATE" title="cart">
-      <div className="space-y-6 pb-28 lg:pb-6" data-testid="cart-page">
+      <PageShell className="pb-28 lg:pb-6" data-testid="cart-page">
         <PageHeader
           title={cartTitle}
           description={cartDescription}
@@ -659,7 +660,7 @@ export function CartPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

@@ -83,15 +83,12 @@ export async function listAdminSupportConversations({ limit = 100 } = {}) {
     SELECT
       c.*,
       COALESCE(r.name, s.name) AS tenant_name,
-      COALESCE(r.contact_email, s.contact_email) AS tenant_email,
-      MAX(m.created_at) AS last_message_at
+      COALESCE(r.contact_email, s.contact_email) AS tenant_email
     FROM conversation c
     LEFT JOIN restaurant r ON c.support_tenant_type = 'RESTAURANT' AND r.id = c.support_tenant_id
     LEFT JOIN supplier s ON c.support_tenant_type = 'SUPPLIER' AND s.id = c.support_tenant_id
-    LEFT JOIN message m ON m.conversation_id = c.id
     WHERE c.is_admin_conversation = true
-    GROUP BY c.id, r.name, s.name, r.contact_email, s.contact_email
-    ORDER BY last_message_at DESC NULLS LAST
+    ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
     LIMIT $1
     `,
     [limit]

@@ -30,7 +30,7 @@ export function QuickListProductDialog(props: any) {
 
   return (
     <Dialog open={showProductDialog} onOpenChange={setShowProductDialog}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Add Products to List</DialogTitle>
           <DialogDescription>

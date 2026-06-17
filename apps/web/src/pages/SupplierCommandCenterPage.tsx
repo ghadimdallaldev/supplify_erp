@@ -37,6 +37,7 @@ import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { getCommandCenterLayout } from '../lib/workspaceRoleProfile'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { EmptyState } from '../components/ui/empty-state'
 
 const OPS_QUICK_ACTIONS = [
@@ -229,7 +230,7 @@ export function SupplierCommandCenterPage() {
   if (isLoading) {
     return (
       <RequirePermission {...gateProps}>
-        <div data-testid="supplier-command-center-page" className="page-stack" aria-busy="true">
+        <PageShell data-testid="supplier-command-center-page" aria-busy="true">
           <Skeleton className="h-9 w-72" />
           <Skeleton className="h-4 w-96 max-w-full" />
           <div className="dashboard-kpi-grid">
@@ -243,7 +244,7 @@ export function SupplierCommandCenterPage() {
             <Skeleton className="h-36 rounded-xl" />
             <Skeleton className="h-36 rounded-xl" />
           </div>
-        </div>
+        </PageShell>
       </RequirePermission>
     )
   }
@@ -272,7 +273,7 @@ export function SupplierCommandCenterPage() {
 
   return (
     <RequirePermission {...gateProps}>
-      <div data-testid="supplier-command-center-page" className="page-stack">
+      <PageShell data-testid="supplier-command-center-page">
         {persona.readOnly && (
           <p
             className="rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-3 py-2 text-xs text-[var(--text-muted)]"
@@ -706,7 +707,7 @@ export function SupplierCommandCenterPage() {
           open={!!reminderDraft}
           onClose={() => setReminderDraft(null)}
         />
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

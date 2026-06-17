@@ -57,7 +57,7 @@ export function NewConversationDialog({
         onOpenChange(next)
       }}
     >
-      <DialogContent className="max-w-lg gap-4">
+      <DialogContent size="md" className="gap-4">
         <DialogHeader>
           <DialogTitle>New message</DialogTitle>
           <DialogDescription>

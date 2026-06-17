@@ -9,6 +9,8 @@ import { RequirePermission } from '../components/RequirePermission'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { multiBranchEnabled } from '../lib/planLimits'
 import { AddBranchModal } from '../components/org/AddBranchModal'
+import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 
 export function OrgOverviewPage() {
   const { isEffectiveRestaurant, isEffectiveSupplier } = useImpersonation()
@@ -49,41 +51,38 @@ export function OrgOverviewPage() {
   if (!multiBranch) {
     return (
       <RequirePermission permission="SETTINGS_VIEW" title="organization">
-        <div className="p-6 max-w-3xl">
-          <h1 className="text-xl font-semibold mb-2">Organization</h1>
-          <p className="text-[var(--text-muted)]">
-            Multi-branch accounts are available on Gold and above. Upgrade your plan to add
-            locations.
-          </p>
-          <Link to="/app/settings?tab=subscription" className="text-sm underline mt-4 inline-block">
+        <PageShell data-testid="org-overview-page">
+          <PageHeader
+            title="Organization"
+            description="Multi-branch accounts are available on Gold and above. Upgrade your plan to add locations."
+          />
+          <Link to="/app/settings?tab=subscription" className="text-sm underline inline-block">
             View subscription
           </Link>
-        </div>
+        </PageShell>
       </RequirePermission>
     )
   }
 
   return (
     <RequirePermission permission="SETTINGS_VIEW" title="organization">
-      <div className="p-6 max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold">{data?.organization?.name ?? 'Organization'}</h1>
-            <p className="text-sm text-[var(--text-muted)]">
-              {branches.length} branch{branches.length === 1 ? '' : 'es'} · {orgRole}
-            </p>
-          </div>
-          {canManageOrg && (
-            <button
-              type="button"
-              onClick={() => setAddBranchOpen(true)}
-              className="inline-flex items-center gap-2 rounded-md bg-[var(--primary)] text-white px-3 py-2 text-sm"
-            >
-              <Plus className="h-4 w-4" />
-              Add branch account
-            </button>
-          )}
-        </div>
+      <PageShell data-testid="org-overview-page">
+        <PageHeader
+          title={data?.organization?.name ?? 'Organization'}
+          description={`${branches.length} branch${branches.length === 1 ? '' : 'es'} · ${orgRole}`}
+          actions={
+            canManageOrg ? (
+              <button
+                type="button"
+                onClick={() => setAddBranchOpen(true)}
+                className="inline-flex items-center gap-2 rounded-md bg-[var(--primary)] text-white px-3 py-2 text-sm"
+              >
+                <Plus className="h-4 w-4" />
+                Add branch account
+              </button>
+            ) : undefined
+          }
+        />
 
         {isLoading && <p className="text-sm text-[var(--text-muted)]">Loading branches…</p>}
 
@@ -148,7 +147,7 @@ export function OrgOverviewPage() {
         {canManageOrg && (
           <AddBranchModal open={addBranchOpen} onClose={() => setAddBranchOpen(false)} />
         )}
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

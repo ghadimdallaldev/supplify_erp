@@ -40,13 +40,18 @@ const sheetVariants = cva(
         top: 'inset-x-0 top-0 border-b data-[state=closed]:-translate-y-full data-[state=open]:translate-y-0',
         bottom:
           'inset-x-0 bottom-0 border-t data-[state=closed]:translate-y-full data-[state=open]:translate-y-0',
-        left: 'inset-y-0 left-0 h-full w-[min(100vw,28rem)] border-r data-[state=closed]:-translate-x-full data-[state=open]:translate-x-0',
+        left: 'inset-y-0 left-0 h-full border-r data-[state=closed]:-translate-x-full data-[state=open]:translate-x-0',
         right:
-          'inset-y-0 right-0 h-full w-[min(100vw,28rem)] border-l data-[state=closed]:translate-x-full data-[state=open]:translate-x-0',
+          'inset-y-0 right-0 h-full border-l data-[state=closed]:translate-x-full data-[state=open]:translate-x-0',
+      },
+      width: {
+        default: 'w-[min(100vw,var(--drawer-default))]',
+        wide: 'w-[min(100vw,var(--drawer-wide))]',
       },
     },
     defaultVariants: {
       side: 'right',
+      width: 'default',
     },
   }
 )
@@ -58,12 +63,12 @@ interface SheetContentProps
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   SheetContentProps
->(({ side = 'right', className, children, ...props }, ref) => (
+>(({ side = 'right', width, className, children, ...props }, ref) => (
   <SheetPortal>
     <SheetOverlay />
     <DialogPrimitive.Content
       ref={ref}
-      className={cn(sheetVariants({ side }), className)}
+      className={cn(sheetVariants({ side, width }), className)}
       {...props}
     >
       {children}

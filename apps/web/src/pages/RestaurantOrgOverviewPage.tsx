@@ -10,6 +10,8 @@ import { useImpersonation } from '../hooks/useImpersonation'
 import { multiBranchEnabled } from '../lib/planLimits'
 import { usePermissions } from '../hooks/usePermissions'
 import { RestaurantAddBranchModal } from '../components/org/RestaurantAddBranchModal'
+import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 
 export function RestaurantOrgOverviewPage() {
   const navigate = useNavigate()
@@ -40,38 +42,36 @@ export function RestaurantOrgOverviewPage() {
 
   if (!multiBranch) {
     return (
-      <div className="p-6 max-w-3xl">
-        <h1 className="text-xl font-semibold mb-2">Organization</h1>
-        <p className="text-[var(--text-muted)]">
-          Multi-branch accounts are available on Gold and above. Upgrade your plan to add locations.
-        </p>
-        <Link to="/app/settings?tab=subscription" className="text-sm underline mt-4 inline-block">
+      <PageShell data-testid="restaurant-org-overview-page">
+        <PageHeader
+          title="Organization"
+          description="Multi-branch accounts are available on Gold and above. Upgrade your plan to add locations."
+        />
+        <Link to="/app/settings?tab=subscription" className="text-sm underline inline-block">
           View subscription
         </Link>
-      </div>
+      </PageShell>
     )
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{data?.organization?.name ?? 'Organization'}</h1>
-          <p className="text-sm text-[var(--text-muted)]">
-            {branches.length} branch{branches.length === 1 ? '' : 'es'} · {orgRole}
-          </p>
-        </div>
-        {canManageOrg && (
-          <button
-            type="button"
-            onClick={() => setAddBranchOpen(true)}
-            className="inline-flex items-center gap-2 rounded-md bg-[var(--primary)] text-white px-3 py-2 text-sm"
-          >
-            <Plus className="h-4 w-4" />
-            Add Branch
-          </button>
-        )}
-      </div>
+    <PageShell data-testid="restaurant-org-overview-page">
+      <PageHeader
+        title={data?.organization?.name ?? 'Organization'}
+        description={`${branches.length} branch${branches.length === 1 ? '' : 'es'} · ${orgRole}`}
+        actions={
+          canManageOrg ? (
+            <button
+              type="button"
+              onClick={() => setAddBranchOpen(true)}
+              className="inline-flex items-center gap-2 rounded-md bg-[var(--primary)] text-white px-3 py-2 text-sm"
+            >
+              <Plus className="h-4 w-4" />
+              Add Branch
+            </button>
+          ) : undefined
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         {branches.map((branch: Record<string, unknown>) => (
@@ -98,6 +98,6 @@ export function RestaurantOrgOverviewPage() {
       {canManageOrg && (
         <RestaurantAddBranchModal open={addBranchOpen} onClose={() => setAddBranchOpen(false)} />
       )}
-    </div>
+    </PageShell>
   )
 }
