@@ -7,6 +7,7 @@ vi.mock('./cache.js', () => ({
   getCache: vi.fn().mockResolvedValue(null),
   setCache: vi.fn().mockResolvedValue(undefined),
   deleteCache: vi.fn().mockResolvedValue(undefined),
+  deleteCacheByPrefix: vi.fn().mockResolvedValue(undefined),
 }))
 
 describe('feature-flags', () => {
@@ -112,6 +113,28 @@ describe('feature-flags', () => {
         shouldResolveFeatureAlias('driver_management', { fulfillment_tools: 'warehouse_pick_pack' })
       ).toBe(true)
       expect(shouldResolveFeatureAlias('fulfillment', {})).toBe(true)
+    })
+  })
+
+  describe('setGlobalFeatureOverride', () => {
+    it('invalidates feature flag caches after global update', async () => {
+      const { setGlobalFeatureOverride } = await import('./feature-flags.js')
+      const { deleteCacheByPrefix } = await import('./cache.js')
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            feature_key: 'reports',
+            feature_name: 'Reports & analytics',
+            description: null,
+            global_override: true,
+            updated_at: new Date(),
+          },
+        ],
+      })
+
+      await setGlobalFeatureOverride('reports', 'on')
+
+      expect(deleteCacheByPrefix).toHaveBeenCalledWith('ff:')
     })
   })
 })

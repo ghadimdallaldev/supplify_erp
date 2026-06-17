@@ -20,7 +20,9 @@ import {
   canUseFinanceInvoices,
   canUseFulfillment,
   canUseQuickLists,
+  canUseSupplierGrowth,
 } from '../lib/planFeatureGates'
+import { canViewSupplierGrowth } from '../lib/tenantRoles'
 import { formatPlanDisplayName } from '../lib/planComparison'
 import { buildSidebarSections } from './sidebar/sidebarNavConfig'
 import { SidebarNavSection } from './sidebar/SidebarNavSection'
@@ -87,6 +89,8 @@ export function Sidebar({
     entitlementsData?.entitlements,
     'promotions'
   )
+  const supplierGrowthEnabled =
+    canUseSupplierGrowth(entitlementsData?.entitlements) && canViewSupplierGrowth(user, can)
   const orderUsageBadge = getOrderUsageBadge(entitlementsData?.entitlements)
 
   const sections = buildSidebarSections({
@@ -107,6 +111,7 @@ export function Sidebar({
     quickListsEnabled,
     disputesEnabled,
     promotionsEnabled,
+    supplierGrowthEnabled,
   })
 
   const initials = (user?.displayName || user?.email || 'U')
@@ -130,16 +135,14 @@ export function Sidebar({
       data-testid="sidebar"
       aria-label="Main navigation"
       className={[
-        'flex flex-col border-r border-[var(--app-border)] bg-[var(--surface)] font-sans',
+        'flex flex-col border-r border-[var(--app-border)]/40 bg-[var(--surface)] font-sans',
         'h-screen overflow-y-auto',
-        'fixed inset-y-0 left-0 z-50 w-[min(100vw-3rem,14rem)] transition-transform duration-200 lg:sticky lg:w-56 lg:translate-x-0',
+        'fixed inset-y-0 left-0 z-50 w-[min(100vw-3rem,14rem)] lg:sticky lg:w-56 lg:translate-x-0',
         mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
       ].join(' ')}
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
-      <div
-        style={{ padding: '14px 14px', borderBottom: '1px solid var(--app-border)', flexShrink: 0 }}
-      >
+      <div className="shrink-0 border-b border-[var(--app-border)]/40 px-3.5 py-3.5">
         <SupplifyLogo size={34} variant="lockup" theme="light" tagline={true} />
       </div>
 
@@ -158,20 +161,11 @@ export function Sidebar({
         ))}
       </nav>
 
-      <div className="border-t border-[var(--app-border)] p-3 lg:hidden [&>div]:max-w-none [&>div]:w-full [&_select]:max-w-none">
+      <div className="border-t border-[var(--app-border)]/40 p-3 lg:hidden [&>div]:max-w-none [&>div]:w-full [&_select]:max-w-none">
         <BranchSwitcher />
       </div>
 
-      <div
-        style={{
-          padding: '10px 14px',
-          borderTop: '1px solid var(--app-border)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          flexShrink: 0,
-        }}
-      >
+      <div className="flex shrink-0 items-center gap-2 border-t border-[var(--app-border)]/40 px-3.5 py-2.5">
         <div
           style={{
             width: 32,

@@ -11,10 +11,19 @@ vi.mock('../../services/api', () => ({
   useGetAdminActiveDeliveriesQuery: vi.fn(() => defaultSkipQuery),
   useGetAdminSuppliersQuery: vi.fn(),
   useGetAdminRestaurantsQuery: vi.fn(),
+  useGetAdminSupportConversationsQuery: vi.fn(() => defaultSkipQuery),
 }))
 
 vi.mock('./AdminTenantDiagnosticsDrawer', () => ({
   AdminTenantDiagnosticsDrawer: () => null,
+}))
+
+vi.mock('./AdminSupportChatPanel', () => ({
+  AdminSupportChatPanel: () => null,
+}))
+
+vi.mock('./AdminFeaturedPlacementsPanel', () => ({
+  AdminFeaturedPlacementsPanel: () => null,
 }))
 
 import {

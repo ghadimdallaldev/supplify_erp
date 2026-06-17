@@ -47,7 +47,6 @@ export function NewDealsBanner() {
       icon={Tag}
       title={banner.title}
       description={description}
-      className="mx-3 mb-0 sm:mx-6"
       data-testid="new-deals-banner"
       action={
         <div className="flex items-center gap-2">

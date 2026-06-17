@@ -69,7 +69,7 @@ export function ProductBulkUploadDialog({
 
   return (
     <Dialog open={showBulkUpload} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Bulk Upload Products</DialogTitle>
           <DialogDescription>

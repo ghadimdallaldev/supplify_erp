@@ -1,5 +1,6 @@
 import * as React from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { cva, type VariantProps } from 'class-variance-authority'
 import { X } from 'lucide-react'
 
 import { cn } from '../../lib/utils'
@@ -27,6 +28,41 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+const dialogContentVariants = cva(
+  [
+    'fixed left-[50%] top-[50%] z-50 w-[calc(100vw-var(--dialog-margin-x))] translate-x-[-50%] translate-y-[-50%]',
+    'max-h-[var(--dialog-max-height)] border border-[var(--app-border)] bg-[var(--surface)] text-[var(--text)] shadow-xl',
+    'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+    'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+    'data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]',
+    'data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]',
+    'data-[state=closed]:duration-150 data-[state=open]:duration-200 motion-reduce:animate-none',
+    'motion-reduce:data-[state=closed]:zoom-out-100 motion-reduce:data-[state=open]:zoom-in-100',
+    'sm:w-full sm:rounded-xl',
+  ],
+  {
+    variants: {
+      size: {
+        sm: 'max-w-[min(var(--dialog-sm),calc(100vw-2*var(--dialog-margin-x)))]',
+        md: 'max-w-[min(var(--dialog-md),calc(100vw-2*var(--dialog-margin-x)))]',
+        lg: 'max-w-[min(var(--dialog-lg),calc(100vw-2*var(--dialog-margin-x)))]',
+        xl: 'max-w-[min(var(--dialog-xl),calc(100vw-2*var(--dialog-margin-x)))]',
+        wide: 'max-w-[min(var(--dialog-wide),calc(100vw-2*var(--dialog-margin-x)))]',
+        fullscreen:
+          'max-w-[calc(100vw-2*var(--dialog-margin-x))] max-sm:inset-x-3 max-sm:bottom-3 max-sm:top-auto max-sm:max-h-[92dvh] max-sm:translate-y-0 max-sm:rounded-xl',
+      },
+      scroll: {
+        body: 'grid gap-4 overflow-y-auto p-4 sm:p-6',
+        split: 'flex flex-col overflow-hidden p-0',
+      },
+    },
+    defaultVariants: {
+      size: 'md',
+      scroll: 'body',
+    },
+  }
+)
+
 function treeHasDialogDescription(node: React.ReactNode): boolean {
   for (const child of React.Children.toArray(node)) {
     if (!React.isValidElement(child)) continue
@@ -38,10 +74,14 @@ function treeHasDialogDescription(node: React.ReactNode): boolean {
   return false
 }
 
+export interface DialogContentProps
+  extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>,
+    VariantProps<typeof dialogContentVariants> {}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, 'aria-describedby': ariaDescribedBy, ...props }, ref) => {
+  DialogContentProps
+>(({ className, children, size, scroll, 'aria-describedby': ariaDescribedBy, ...props }, ref) => {
   const hasDescription = treeHasDialogDescription(children)
   const describedByProps =
     hasDescription && ariaDescribedBy === undefined
@@ -53,15 +93,12 @@ const DialogContent = React.forwardRef<
       <DialogOverlay />
       <DialogPrimitive.Content
         ref={ref}
-        className={cn(
-          'fixed left-[50%] top-[50%] z-50 grid max-h-[min(90dvh,calc(100vh-2rem))] w-[calc(100vw-1.5rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto border border-[var(--app-border)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] data-[state=closed]:duration-150 data-[state=open]:duration-200 motion-reduce:animate-none motion-reduce:data-[state=closed]:zoom-out-100 motion-reduce:data-[state=open]:zoom-in-100 sm:w-full sm:rounded-xl sm:p-6',
-          className
-        )}
+        className={cn(dialogContentVariants({ size, scroll }), className)}
         {...props}
         {...describedByProps}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]/40 focus:ring-offset-2 focus:ring-offset-[var(--surface)] disabled:pointer-events-none data-[state=open]:bg-[var(--brand-ultra)] data-[state=open]:text-[var(--text-muted)] erp-pressable">
+        <DialogPrimitive.Close className="absolute right-4 top-4 z-10 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]/40 focus:ring-offset-2 focus:ring-offset-[var(--surface)] disabled:pointer-events-none data-[state=open]:bg-[var(--brand-ultra)] data-[state=open]:text-[var(--text-muted)] erp-pressable">
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
@@ -75,6 +112,17 @@ const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
   <div className={cn('flex flex-col space-y-1.5 text-center sm:text-left', className)} {...props} />
 )
 DialogHeader.displayName = 'DialogHeader'
+
+const DialogBody = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div
+    className={cn(
+      'min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-4 sm:px-6 sm:pt-6',
+      className
+    )}
+    {...props}
+  />
+)
+DialogBody.displayName = 'DialogBody'
 
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
@@ -122,7 +170,9 @@ export {
   DialogTrigger,
   DialogContent,
   DialogHeader,
+  DialogBody,
   DialogFooter,
   DialogTitle,
   DialogDescription,
+  dialogContentVariants,
 }

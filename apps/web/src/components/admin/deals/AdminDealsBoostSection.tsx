@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { DollarSign } from 'lucide-react'
 import { Button } from '../../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card'
 import { Input } from '../../ui/input'
@@ -9,7 +8,7 @@ import {
   useUpdateAdminPromotionPricingMutation,
 } from '../../../services/api'
 import { ADMIN_BOOST_PACKAGES_EMPTY } from '../../../lib/dealDisplayLabels'
-import { AdminEmptyState } from '../adminUi'
+import { AdminEmptyState, AdminSectionHeader } from '../adminUi'
 
 export function AdminDealsBoostSection() {
   const { data: pricingData, refetch: refetchPricing } = useGetAdminPromotionPricingQuery()
@@ -72,16 +71,10 @@ export function AdminDealsBoostSection() {
 
   return (
     <>
-      <div>
-        <h2 className="flex items-center gap-2 text-lg font-bold text-[var(--text)]">
-          <DollarSign className="h-5 w-5" />
-          Boost packages & activation
-        </h2>
-        <p className="text-sm text-[var(--text-muted)]">
-          Configure boost packages suppliers see when boosting deals for sponsored placement. Price
-          changes apply to new purchases only — existing boosts keep the amount paid at checkout.
-        </p>
-      </div>
+      <AdminSectionHeader
+        title="Boost packages & activation"
+        description="Configure boost packages suppliers see when boosting deals for sponsored placement. Price changes apply to new purchases only — existing boosts keep the amount paid at checkout."
+      />
 
       {activationPricing ? (
         <Card>

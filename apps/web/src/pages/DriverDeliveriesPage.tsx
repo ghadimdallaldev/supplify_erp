@@ -6,6 +6,7 @@ import { Card, CardContent } from '../components/ui/card'
 import { Skeleton } from '../components/ui/skeleton'
 import { EmptyState } from '../components/ui/empty-state'
 import { DriverDeliveriesHeader } from '../components/driver/DriverDeliveriesHeader'
+import { PageShell } from '../components/ui/page-shell'
 import { DriverDeliveryCard } from '../components/driver/DriverDeliveryCard'
 import { DriverRoutePanel } from '../components/driver/DriverRoutePanel'
 import { DriverStickyActionBar } from '../components/driver/DriverStickyActionBar'
@@ -246,8 +247,9 @@ export function DriverDeliveriesPage() {
 
   return (
     <RequirePermission permission="DRIVER_DELIVERIES_VIEW" title="my deliveries">
-      <div
+      <PageShell
         data-testid="driver-deliveries-page"
+        maxWidth="full"
         className="mx-auto flex max-w-lg flex-col gap-4 overflow-x-hidden p-3 pb-28 sm:p-4 sm:pb-24"
       >
         <DriverDeliveriesHeader
@@ -414,7 +416,7 @@ export function DriverDeliveriesPage() {
             disabled={updating}
           />
         ) : null}
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

@@ -530,10 +530,7 @@ const router = createBrowserRouter([
         path: 'app/customer-growth',
         element: (
           <LazyPage>
-            <RequirePermission
-              anyOf={['CATALOG_EDIT', 'ORDERS_MANAGE', 'ORDERS_VIEW']}
-              title="customer growth"
-            >
+            <RequirePermission anyOf={['GROWTH_VIEW']} allowOwner title="customer growth">
               <SupplierCustomerGrowthPage />
             </RequirePermission>
           </LazyPage>
@@ -820,10 +817,26 @@ const router = createBrowserRouter([
         ),
       },
       {
-        path: 'app/admin',
+        path: 'app/admin/restaurants/:tab',
         element: (
           <LazyPage>
-            <AdminDashboardPage />
+            <AdminDashboardPage initialTab="restaurants" />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/admin/restaurants',
+        element: (
+          <LazyPage>
+            <AdminDashboardPage initialTab="restaurants" />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/admin/suppliers/:tab',
+        element: (
+          <LazyPage>
+            <AdminDashboardPage initialTab="suppliers" />
           </LazyPage>
         ),
       },
@@ -836,10 +849,18 @@ const router = createBrowserRouter([
         ),
       },
       {
-        path: 'app/admin/restaurants',
+        path: 'app/admin/:tab',
         element: (
           <LazyPage>
-            <AdminDashboardPage initialTab="restaurants" />
+            <AdminDashboardPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/admin',
+        element: (
+          <LazyPage>
+            <AdminDashboardPage />
           </LazyPage>
         ),
       },

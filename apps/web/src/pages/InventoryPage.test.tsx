@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { InventoryPage } from './InventoryPage'
 import { renderWithProviders } from '../test/utils'
 
@@ -24,6 +24,12 @@ vi.mock('../services/api', async (importOriginal) => {
     useCreateInventoryAdjustmentMutation: () => [vi.fn(), { isLoading: false }],
   }
 })
+
+function rowScope(productName: string) {
+  const row = screen.getByText(productName).closest('tr')
+  if (!row) throw new Error(`Row not found for ${productName}`)
+  return within(row)
+}
 
 describe('InventoryPage supplier stock status', () => {
   beforeEach(() => {
@@ -53,8 +59,7 @@ describe('InventoryPage supplier stock status', () => {
     })
 
     renderWithProviders(<InventoryPage />)
-    expect(screen.getByText('Out of stock')).toBeInTheDocument()
-    expect(screen.queryByText('In stock')).not.toBeInTheDocument()
+    expect(rowScope('Empty Product').getByText('Out of stock')).toBeInTheDocument()
   })
 
   it('shows Low stock when API marks isLowStock', () => {
@@ -79,7 +84,7 @@ describe('InventoryPage supplier stock status', () => {
     })
 
     renderWithProviders(<InventoryPage />)
-    expect(screen.getByText('Low stock')).toBeInTheDocument()
+    expect(rowScope('Low Product').getByText('Low stock')).toBeInTheDocument()
   })
 
   it('shows In stock for healthy inventory', () => {
@@ -104,6 +109,6 @@ describe('InventoryPage supplier stock status', () => {
     })
 
     renderWithProviders(<InventoryPage />)
-    expect(screen.getByText('Low stock')).toBeInTheDocument()
+    expect(rowScope('Healthy Product').getByText('In stock')).toBeInTheDocument()
   })
 })

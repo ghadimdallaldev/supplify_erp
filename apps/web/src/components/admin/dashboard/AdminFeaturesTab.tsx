@@ -1,5 +1,6 @@
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useMemo } from 'react'
 import { useGetAdminRestaurantsQuery, useGetAdminSuppliersQuery } from '../../../services/api'
+import { mapAdminTenantRow } from '../../../lib/adminTenantSearch'
 import { AdminTabLoading } from './adminDashboardShared'
 
 const AdminFeatureFlagsPanel = lazy(() =>
@@ -12,31 +13,35 @@ export interface AdminFeaturesTabProps {
   active: boolean
 }
 
+const TENANT_LIST_ARGS = { limit: 100, offset: 0 }
+
 export function AdminFeaturesTab({ active }: AdminFeaturesTabProps) {
-  const { data: suppliersData } = useGetAdminSuppliersQuery(
-    { limit: 50, offset: 0 },
+  const { data: suppliersData, isLoading: suppliersLoading } = useGetAdminSuppliersQuery(
+    TENANT_LIST_ARGS,
     { skip: !active }
   )
-  const { data: restaurantsData } = useGetAdminRestaurantsQuery(
-    { limit: 50, offset: 0 },
+  const { data: restaurantsData, isLoading: restaurantsLoading } = useGetAdminRestaurantsQuery(
+    TENANT_LIST_ARGS,
     { skip: !active }
   )
+
+  const tenants = useMemo(() => {
+    const suppliers = (suppliersData?.suppliers ?? []).map((r: Record<string, unknown>) =>
+      mapAdminTenantRow(r as Parameters<typeof mapAdminTenantRow>[0], 'SUPPLIER')
+    )
+    const restaurants = (restaurantsData?.restaurants ?? []).map((r: Record<string, unknown>) =>
+      mapAdminTenantRow(r as Parameters<typeof mapAdminTenantRow>[0], 'RESTAURANT')
+    )
+    return [...suppliers, ...restaurants]
+  }, [suppliersData?.suppliers, restaurantsData?.restaurants])
 
   if (!active) return null
 
   return (
     <Suspense fallback={<AdminTabLoading />}>
       <AdminFeatureFlagsPanel
-        restaurants={(restaurantsData?.restaurants ?? []).map(
-          (r: { id: string; name: string }) => ({
-            id: r.id,
-            name: r.name,
-          })
-        )}
-        suppliers={(suppliersData?.suppliers ?? []).map((s: { id: string; name: string }) => ({
-          id: s.id,
-          name: s.name,
-        }))}
+        tenants={tenants}
+        tenantsLoading={suppliersLoading || restaurantsLoading}
       />
     </Suspense>
   )

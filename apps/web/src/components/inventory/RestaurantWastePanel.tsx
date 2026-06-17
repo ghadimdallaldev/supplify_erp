@@ -322,7 +322,7 @@ export function RestaurantWastePanel({
       </Card>
 
       <Dialog open={showLogDialog} onOpenChange={setShowLogDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent size="sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-[var(--amber-mid)]" />

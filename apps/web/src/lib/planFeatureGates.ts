@@ -30,3 +30,8 @@ export function canUseFulfillment(entitlements?: Entitlements | null): boolean {
 export function canUseQuickLists(entitlements?: Entitlements | null): boolean {
   return isEntitlementFeatureEnabled(entitlements, 'quick_lists')
 }
+
+/** Supplier customer growth (import, invite, sponsor, metrics). */
+export function canUseSupplierGrowth(entitlements?: Entitlements | null): boolean {
+  return isEntitlementFeatureEnabled(entitlements, 'supplier_growth')
+}

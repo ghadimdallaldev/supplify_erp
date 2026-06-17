@@ -6,6 +6,7 @@ import { OrderHistoryTimeline } from '../../components/consumer/OrderHistoryTime
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { Skeleton } from '../../components/ui/skeleton'
+import { PageShell } from '../../components/ui/page-shell'
 import { formatPrice } from '../../utils/format'
 import { isConsumerOrderTerminal, type ConsumerOrderLine } from '../../lib/consumerOrderTracking'
 import { CheckCircle2, Gift } from 'lucide-react'
@@ -42,11 +43,11 @@ export function ConsumerReceiptPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4 p-4">
+      <PageShell className="space-y-4 p-4">
         <Skeleton className="h-8 w-1/2" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-40 w-full" />
-      </div>
+      </PageShell>
     )
   }
 
@@ -60,15 +61,17 @@ export function ConsumerReceiptPage() {
   const showEarnBanner = delivered && pointsEarned != null && pointsEarned > 0
 
   return (
-    <div className="space-y-4 p-4 pb-8">
+    <PageShell className="space-y-4 p-4 pb-8">
       <div className="text-center">
         <CheckCircle2
           className={`mx-auto mb-2 h-10 w-10 ${delivered ? 'text-green-600' : 'text-[var(--brand-mid)]'}`}
         />
-        <h1 className="text-2xl font-semibold">
+        <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">
           {delivered ? 'Order delivered' : 'Order confirmed'}
         </h1>
-        <p className="text-muted-foreground">{order.order_number}</p>
+        <p className="mt-2 text-base leading-relaxed text-[var(--lead-text-color)]">
+          {order.order_number}
+        </p>
       </div>
 
       {showEarnBanner && (
@@ -164,7 +167,7 @@ export function ConsumerReceiptPage() {
           <Link to={`/order/${restaurantSlug}`}>Back to store</Link>
         </Button>
       </div>
-    </div>
+    </PageShell>
   )
 }
 

@@ -3,6 +3,7 @@ import {
   matchClosestSystemRole,
   resolveRolePermissionList,
   RESTAURANT_SYSTEM_ROLES,
+  SUPPLIER_SYSTEM_ROLES,
   getAllPermissionsForTenantType,
 } from './tenant-roles.js'
 
@@ -33,5 +34,13 @@ describe('tenant-roles definitions', () => {
     const perms = resolveRolePermissionList(mgr, 'RESTAURANT')
     expect(perms).toContain('ORDERS_CREATE')
     expect(perms).not.toContain('SETTINGS_MANAGE')
+  })
+
+  it('Supplier Owner ALL permissions include customer growth keys', () => {
+    const owner = SUPPLIER_SYSTEM_ROLES.find((r) => r.name === 'Owner')
+    const perms = resolveRolePermissionList(owner, 'SUPPLIER')
+    expect(perms).toContain('GROWTH_VIEW')
+    expect(perms).toContain('CUSTOMERS_IMPORT')
+    expect(perms).toContain('CUSTOMERS_MANAGE')
   })
 })

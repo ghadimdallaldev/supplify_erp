@@ -14,7 +14,7 @@ export function SettingsHubLayout({
   children: ReactNode
 }) {
   return (
-    <PageShell className="space-y-6" data-testid="restaurant-settings-page">
+    <PageShell maxWidth="focused" data-testid="restaurant-settings-page">
       <PageHeader title={title} description={description} />
       {stats}
       {children}

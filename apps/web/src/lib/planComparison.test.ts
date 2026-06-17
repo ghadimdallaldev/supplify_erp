@@ -34,6 +34,7 @@ const API_RESTAURANT_FEATURES = [
   'tenant_audit_log',
   'waitlist_auto_promo',
   'supplier_deals',
+  'ai_platform',
 ] as const
 
 const API_RESTAURANT_LIMITS = [
@@ -50,6 +51,7 @@ const API_RESTAURANT_LIMITS = [
   'scheduled_quick_lists',
   'scheduled_order_grace_per_day',
   'deal_redemptions_per_day',
+  'ai_requests_per_day',
 ] as const
 
 describe('planComparison', () => {

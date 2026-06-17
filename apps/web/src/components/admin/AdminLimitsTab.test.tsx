@@ -16,6 +16,7 @@ vi.mock('../../services/api', async (importOriginal) => {
     useGetAdminPlansQuery: vi.fn(),
     useGetAdminLimitOverridesQuery: vi.fn(),
     useGetAdminEffectiveLimitQuery: vi.fn(),
+    useGetAdminTenantEntitlementsQuery: vi.fn(),
     useUpsertAdminSubscriptionAddonMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
     useCreateAdminPlanLimitOverrideMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
     useCreateAdminTenantLimitOverrideMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
@@ -32,6 +33,7 @@ import {
   useGetAdminPlansQuery,
   useGetAdminLimitOverridesQuery,
   useGetAdminEffectiveLimitQuery,
+  useGetAdminTenantEntitlementsQuery,
 } from '../../services/api'
 
 function renderTab() {
@@ -102,6 +104,13 @@ beforeEach(() => {
   vi.mocked(useGetAdminEffectiveLimitQuery).mockReturnValue({
     data: undefined,
   } as ReturnType<typeof useGetAdminEffectiveLimitQuery>)
+
+  vi.mocked(useGetAdminTenantEntitlementsQuery).mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  } as ReturnType<typeof useGetAdminTenantEntitlementsQuery>)
 })
 
 describe('AdminLimitsTab', () => {

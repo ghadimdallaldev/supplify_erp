@@ -11,7 +11,8 @@ import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { EmptyState } from '../components/ui/empty-state'
 import { Skeleton } from '../components/ui/skeleton'
-import { pageHeaderRowClass } from '../components/ui/card-layout'
+import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { toast } from 'sonner'
 import { ArrowLeft, Send } from 'lucide-react'
 
@@ -88,46 +89,53 @@ export function SupplierQuoteResponsePage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <PageShell className="space-y-4" data-testid="supplier-quote-response-page">
         <Skeleton className="h-10 w-72" />
         <Skeleton className="h-64 w-full" />
-      </div>
+      </PageShell>
     )
   }
 
   if (isError || !data) {
     return (
-      <EmptyState
-        title="Quote request not found"
-        action={
-          <Button variant="outline" onClick={() => refetch()}>
-            Retry
-          </Button>
-        }
-      />
+      <PageShell data-testid="supplier-quote-response-page">
+        <EmptyState
+          title="Quote request not found"
+          action={
+            <Button variant="outline" onClick={() => refetch()}>
+              Retry
+            </Button>
+          }
+        />
+      </PageShell>
     )
   }
 
+  const headerDescription = [
+    data.restaurantName,
+    data.neededBy ? `Needed by ${data.neededBy}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
   return (
-    <div className="space-y-6">
-      <div className={pageHeaderRowClass}>
-        <div>
-          <Button variant="ghost" size="sm" className="mb-2 -ml-2" asChild>
+    <PageShell className="space-y-6" data-testid="supplier-quote-response-page">
+      <PageHeader
+        title="Supplier response"
+        description={headerDescription}
+        breadcrumb={
+          <Button variant="ghost" size="sm" className="-ml-2" asChild>
             <Link to="/app/quote-requests/supplier">
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back to inbox
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold text-[var(--text)]">Supplier response</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
-            {data.restaurantName}
-            {data.neededBy ? ` · Needed by ${data.neededBy}` : ''}
-          </p>
-          {data.quoteRequestNote && (
-            <p className="text-sm mt-2 text-[var(--text)]">{data.quoteRequestNote}</p>
-          )}
-        </div>
-      </div>
+        }
+      />
+
+      {data.quoteRequestNote && (
+        <p className="text-sm text-[var(--text)]">{data.quoteRequestNote}</p>
+      )}
 
       <div className="space-y-4">
         {data.items.map((item) => {
@@ -216,6 +224,6 @@ export function SupplierQuoteResponsePage() {
           </Button>
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   )
 }

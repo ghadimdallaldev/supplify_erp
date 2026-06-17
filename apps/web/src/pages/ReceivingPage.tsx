@@ -7,6 +7,7 @@ import { RequirePermission } from '../components/RequirePermission'
 import { PackageCheck, History } from 'lucide-react'
 import { Badge } from '../components/ui/badge'
 import { PageHeader } from '../components/ui/page-header'
+import { PageShell } from '../components/ui/page-shell'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   useGetPendingOrdersForReceivingQuery,
@@ -280,7 +281,7 @@ export function ReceivingPage() {
           upgradeUrl="/app/settings?tab=subscription"
         />
       ) : (
-        <div className="page-stack space-y-6 overflow-x-hidden" data-testid="receiving-page">
+        <PageShell maxWidth="wide" className="overflow-x-hidden" data-testid="receiving-page">
           <PageHeader title={receivingTitle} description={receivingDescription} />
 
           <div
@@ -365,7 +366,7 @@ export function ReceivingPage() {
               }}
             />
           )}
-        </div>
+        </PageShell>
       )}
     </RequirePermission>
   )

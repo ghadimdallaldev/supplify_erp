@@ -204,7 +204,7 @@ export function SupplierWarehousesTab() {
       </Card>
 
       <Dialog open={showAddWarehouse} onOpenChange={setShowAddWarehouse}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent size="lg">
           <DialogHeader>
             <DialogTitle>Add New Warehouse</DialogTitle>
             <DialogDescription>Create a new warehouse location for your business</DialogDescription>

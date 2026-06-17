@@ -8,6 +8,18 @@
 
 ---
 
+## Layout contract (2026-06 update)
+
+Every authenticated content page uses **`PageShell` + `PageHeader` + content**.
+
+- **Default width:** `--content-max` (1280px) via `PageShell`
+- **Wide width:** `--content-max-wide` (1440px) for data-heavy tables only (`PageShell maxWidth="wide"`)
+- **No** raw `<h1>`, ad-hoc root `max-w-*`, or root `space-y-6` / `page-stack` wrappers on pages
+- **Page summaries:** `PageHeader` description at `text-base` / `--lead-text-color`
+- **Shell:** flat `Layout` main area — no nested bordered card around `<Outlet />`
+
+---
+
 ## 1. Executive Summary
 
 Supplify has a strong functional foundation: good routing, solid data fetching, real-time entitlements, a capable admin portal, and meaningful operational features across supplier and restaurant roles.

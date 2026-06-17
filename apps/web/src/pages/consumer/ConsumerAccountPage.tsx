@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
+import { PageShell } from '../../components/ui/page-shell'
 import { toast } from 'sonner'
 import { ArrowLeft } from 'lucide-react'
 
@@ -45,7 +46,7 @@ export function ConsumerAccountPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md space-y-4 p-4">
+    <PageShell className="mx-auto max-w-md space-y-4 p-4">
       <Button variant="ghost" size="sm" asChild>
         <Link to={`/order/${slug}`}>
           <ArrowLeft className="mr-1 h-4 w-4" />
@@ -128,7 +129,7 @@ export function ConsumerAccountPage() {
           </Tabs>
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   )
 }
 

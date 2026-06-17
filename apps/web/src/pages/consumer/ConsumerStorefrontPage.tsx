@@ -7,6 +7,8 @@ import {
 } from '../../services/consumerApi'
 import { useConsumerAuth } from '../../contexts/ConsumerAuthContext'
 import { Button } from '../../components/ui/button'
+import { PageHeader } from '../../components/ui/page-header'
+import { PageShell } from '../../components/ui/page-shell'
 import { Skeleton } from '../../components/ui/skeleton'
 import { orderingStatusFromBranch } from '../../lib/consumerOrderingHours'
 import { formatPrice } from '../../utils/format'
@@ -99,13 +101,15 @@ export function ConsumerStorefrontPage() {
 
   if (!slug) {
     return (
-      <div className="p-6 text-center text-[var(--text-muted)]">Restaurant slug is required.</div>
+      <PageShell className="p-6">
+        <p className="text-center text-[var(--text-muted)]">Restaurant slug is required.</p>
+      </PageShell>
     )
   }
 
   if (isLoading) {
     return (
-      <div className="space-y-6 p-4">
+      <PageShell className="space-y-6 p-4">
         <div className="flex gap-4">
           <Skeleton className="h-16 w-16 shrink-0 rounded-2xl" />
           <div className="flex flex-1 flex-col gap-2 py-1">
@@ -120,20 +124,20 @@ export function ConsumerStorefrontPage() {
             <Skeleton key={i} className="h-36 w-32 shrink-0 rounded-xl" />
           ))}
         </div>
-      </div>
+      </PageShell>
     )
   }
 
   if (isError || !restaurant) {
     return (
-      <div className="p-6 text-center">
-        <p className="text-[var(--text-muted)]">Restaurant not found.</p>
-      </div>
+      <PageShell className="p-6">
+        <p className="text-center text-[var(--text-muted)]">Restaurant not found.</p>
+      </PageShell>
     )
   }
 
   return (
-    <div className="pb-6">
+    <PageShell maxWidth="full" className="pb-6">
       <section className="border-b border-[var(--app-border)] bg-[var(--surface)]">
         <div className="mx-auto max-w-3xl px-4 py-5">
           <div className="flex items-start gap-4">
@@ -152,9 +156,11 @@ export function ConsumerStorefrontPage() {
               </div>
             )}
             <div className="min-w-0 flex-1 pt-0.5">
-              <p className="text-sm leading-relaxed text-[var(--text-mid)]">
-                {orderingStatus.message}
-              </p>
+              <PageHeader
+                title={restaurant.name}
+                description={orderingStatus.message}
+                size="compact"
+              />
               {fulfillmentLabels.length > 0 && (
                 <p className="mt-2 text-xs text-[var(--text-muted)]">
                   {fulfillmentLabels.join(' · ')} · Cash on delivery or pickup
@@ -366,7 +372,7 @@ export function ConsumerStorefrontPage() {
           </div>
         )}
       </section>
-    </div>
+    </PageShell>
   )
 }
 

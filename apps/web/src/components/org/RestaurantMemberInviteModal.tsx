@@ -91,7 +91,7 @@ export function RestaurantMemberInviteModal({ open, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent size="md">
         {step === 1 ? (
           <>
             <DialogHeader>

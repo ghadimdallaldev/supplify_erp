@@ -21,6 +21,7 @@ import {
   AdminEmptyState,
   AdminLoadingSkeleton,
   AdminRefreshBar,
+  AdminSectionHeader,
   AdminStatusBadge,
   formatAdminDateTime,
 } from './adminUi'
@@ -110,22 +111,19 @@ export function AdminOperationsPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-[var(--text)]">Operations</h2>
-          <p className="text-sm text-[var(--text-muted)]">
-            Email, inventory expiry, reorder cadence, fulfillment issues, and GPS delivery health
-            (read-only)
-          </p>
-        </div>
-        <AdminRefreshBar
-          onRefresh={() => {
-            refetchSummary()
-            if (subTab === 'email') refetchEmail()
-          }}
-          refreshing={summaryFetching}
-        />
-      </div>
+      <AdminSectionHeader
+        title="Operations"
+        description="Email, inventory expiry, reorder cadence, fulfillment issues, and GPS delivery health (read-only)"
+        action={
+          <AdminRefreshBar
+            onRefresh={() => {
+              refetchSummary()
+              if (subTab === 'email') refetchEmail()
+            }}
+            refreshing={summaryFetching}
+          />
+        }
+      />
 
       <Card className="p-4">
         <AdminTenantPicker

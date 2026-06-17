@@ -113,7 +113,7 @@ export function AdminTenantPicker({
             )}
             <ChevronDown className="pointer-events-none absolute right-9 top-2.5 h-4 w-4 text-[var(--text-muted)]" />
           </div>
-          <p className="text-xs text-[var(--text-muted)] mt-1">
+          <p className="mt-1 text-xs text-[var(--text-mid)]">
             Pick a tenant by name — no UUID required. Add-ons bill against the org main branch when
             applicable.
           </p>
@@ -121,7 +121,7 @@ export function AdminTenantPicker({
       </div>
 
       {onOrgMainOnlyChange && (
-        <label className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+        <label className="flex items-center gap-2 text-sm text-[var(--text-mid)]">
           <input
             type="checkbox"
             checked={orgMainOnly}

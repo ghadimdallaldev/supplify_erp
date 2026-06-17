@@ -15,6 +15,7 @@ import { isEntitlementFeatureEnabled } from '../../lib/planLimits'
 import { formatPrice } from '../../utils/format'
 import { formatOrderRef } from '../../lib/orderPlacement'
 import { PageHeader } from '../../components/ui/page-header'
+import { PageShell } from '../../components/ui/page-shell'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
@@ -68,36 +69,43 @@ export function DisputeDetailPage() {
 
   if (!disputesEnabled) {
     return (
-      <div className="space-y-4">
+      <PageShell className="space-y-4" data-testid="dispute-detail-page">
         <PageHeader title="Dispute" />
         <Card>
           <CardContent className="py-8 text-sm text-[var(--text-muted)]">
             Disputes are not on your plan.
           </CardContent>
         </Card>
-      </div>
+      </PageShell>
     )
   }
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+      <PageShell data-testid="dispute-detail-page">
+        <div className="flex justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </PageShell>
     )
   }
 
   if (error || !data?.dispute) {
     return (
-      <div className="space-y-4">
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/app/disputes">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to disputes
-          </Link>
-        </Button>
+      <PageShell className="space-y-4" data-testid="dispute-detail-page">
+        <PageHeader
+          title="Dispute"
+          breadcrumb={
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/app/disputes">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to disputes
+              </Link>
+            </Button>
+          }
+        />
         <p className="text-[var(--red)]">Dispute not found or you do not have access.</p>
-      </div>
+      </PageShell>
     )
   }
 
@@ -174,17 +182,18 @@ export function DisputeDetailPage() {
       permission={isSupplier ? 'FULFILLMENT_VIEW' : 'ORDERS_VIEW'}
       title="dispute details"
     >
-      <div className="space-y-6">
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/app/disputes">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to disputes
-          </Link>
-        </Button>
-
+      <PageShell className="space-y-6" data-testid="dispute-detail-page">
         <PageHeader
           title="Dispute details"
           description={`${String(dispute.type || '').replace(/_/g, ' ')} · ${status.replace(/_/g, ' ')}`}
+          breadcrumb={
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/app/disputes">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to disputes
+              </Link>
+            </Button>
+          }
           actions={
             <div className="flex flex-wrap gap-2">
               {isSupplier && canManageSupplierDisputes && status === 'open' && (
@@ -447,7 +456,7 @@ export function DisputeDetailPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+      </PageShell>
     </RequirePermission>
   )
 }

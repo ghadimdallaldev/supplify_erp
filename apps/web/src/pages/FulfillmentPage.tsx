@@ -48,7 +48,7 @@ export function FulfillmentPage() {
 
   return (
     <RequirePermission permission="FULFILLMENT_VIEW" title="fulfillment">
-      <PageShell maxWidth="full" className="overflow-x-hidden">
+      <PageShell maxWidth="wide" className="overflow-x-hidden">
         <PageHeader
           title="Fulfillment & logistics"
           description="Pick lists, driver dispatch, routes, and delivery tracking."

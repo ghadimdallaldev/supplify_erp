@@ -38,7 +38,7 @@ export function InvoiceDetailDialog(props: any) {
 
   return (
     <Dialog open={showInvoiceDetail} onOpenChange={setShowInvoiceDetail}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent size="wide">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Invoice {selectedInvoice?.invoice_number}</span>

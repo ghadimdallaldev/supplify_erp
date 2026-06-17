@@ -34,8 +34,8 @@ import {
   CardAddressBlock,
   CardFooterMeta,
   formatAddressLine,
-  pageHeaderRowClass,
 } from '../components/ui/card-layout'
+import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { KpiCard } from '../components/ui/kpi-card'
 
@@ -232,10 +232,7 @@ export function RestaurantsPage() {
 
     return (
       <PageShell data-testid="restaurants-page">
-        <div>
-          <h1 className="text-[21px] font-black text-[var(--text)]">Restaurants</h1>
-          <p className="text-[var(--text-muted)] mt-2">Manage restaurants in the marketplace</p>
-        </div>
+        <PageHeader title="Restaurants" description="Manage restaurants in the marketplace" />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {restaurantsData?.restaurants.map((restaurant) => (
@@ -303,15 +300,10 @@ export function RestaurantsPage() {
 
   return (
     <PageShell data-testid="restaurants-page">
-      {/* Header */}
-      <div className={pageHeaderRowClass}>
-        <div className="min-w-0">
-          <h1 className="text-[21px] font-black text-[var(--text)]">My Restaurants</h1>
-          <p className="text-[var(--text-muted)] mt-2">
-            Restaurants that follow you or purchase from you
-          </p>
-        </div>
-        {isSupplier && (
+      <PageHeader
+        title="My Restaurants"
+        description="Restaurants that follow you or purchase from you"
+        actions={
           <div className="flex flex-wrap gap-2 shrink-0">
             <Button
               variant={viewMode === 'grid' ? 'default' : 'outline'}
@@ -332,8 +324,8 @@ export function RestaurantsPage() {
               List
             </Button>
           </div>
-        )}
-      </div>
+        }
+      />
 
       {/* Statistics Cards */}
       {isSupplier && (
