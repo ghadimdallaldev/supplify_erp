@@ -1,4 +1,5 @@
 import { AlertTriangle, Lock } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { useGetBillingStatusQuery } from '../../services/api'
 import { useAppDispatch } from '../../hooks/redux'
@@ -6,6 +7,7 @@ import { openOverduePayment } from '../../lib/openPaymentModal'
 import { openBrowseUpgrade } from '../../lib/openBrowseUpgrade'
 
 export function BillingOverdueBanner() {
+  const { t } = useTranslation('common')
   const dispatch = useAppDispatch()
   const { data: billing } = useGetBillingStatusQuery()
 
@@ -29,9 +31,9 @@ export function BillingOverdueBanner() {
           <div className="flex gap-2">
             <Lock className="h-5 w-5 shrink-0" aria-hidden />
             <div>
-              <p className="font-semibold">Free Trial expired</p>
+              <p className="font-semibold">{t('billingOverdue.freeTrial.title')}</p>
               <p className="mt-0.5 text-amber-900/90">
-                Your Free Trial has expired. Upgrade your plan to continue using Supplify.
+                {t('billingOverdue.freeTrial.description')}
               </p>
             </div>
           </div>
@@ -40,7 +42,7 @@ export function BillingOverdueBanner() {
             className="shrink-0"
             onClick={() => openBrowseUpgrade(dispatch, { upgradeUrl: '/app/settings?tab=plan' })}
           >
-            Choose a plan
+            {t('billingOverdue.freeTrial.cta')}
           </Button>
         </div>
       </div>
@@ -54,9 +56,9 @@ export function BillingOverdueBanner() {
           <div className="flex gap-2">
             <Lock className="h-5 w-5 shrink-0 text-[var(--brand-mid)]" aria-hidden />
             <div>
-              <p className="font-semibold">Account pending activation</p>
+              <p className="font-semibold">{t('billingOverdue.pendingActivation.title')}</p>
               <p className="mt-0.5 text-[var(--text-muted)]">
-                Complete payment for a plan or ask an administrator to activate your workspace.
+                {t('billingOverdue.pendingActivation.description')}
               </p>
             </div>
           </div>
@@ -67,7 +69,7 @@ export function BillingOverdueBanner() {
               window.location.href = '/app/activate'
             }}
           >
-            Activate account
+            {t('billingOverdue.pendingActivation.cta')}
           </Button>
         </div>
       </div>
@@ -81,10 +83,11 @@ export function BillingOverdueBanner() {
           <div className="flex gap-2">
             <Lock className="h-5 w-5 shrink-0" aria-hidden />
             <div>
-              <p className="font-semibold">Account locked — payment required</p>
+              <p className="font-semibold">{t('billingOverdue.locked.title')}</p>
               <p className="mt-0.5 text-red-900/90">
-                Your workspace is suspended after the {billing.gracePeriodDays}-day notice period.
-                Pay your balance to restore full access.
+                {t('billingOverdue.locked.description', {
+                  days: billing.gracePeriodDays ?? 0,
+                })}
               </p>
             </div>
           </div>
@@ -94,7 +97,7 @@ export function BillingOverdueBanner() {
             className="shrink-0"
             onClick={() => openOverduePayment(dispatch)}
           >
-            Pay now
+            {t('billingOverdue.locked.cta')}
           </Button>
         </div>
       </div>
@@ -108,10 +111,11 @@ export function BillingOverdueBanner() {
           <div className="flex gap-2">
             <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden />
             <div>
-              <p className="font-semibold">Subscription payment overdue</p>
+              <p className="font-semibold">{t('billingOverdue.grace.title')}</p>
               <p className="mt-0.5 text-amber-900/90">
-                Pay within <strong>{daysUntilLock ?? 0} day(s)</strong> to avoid your account being
-                locked. Automatic renewal failed or an invoice is unpaid.
+                {t('billingOverdue.grace.description', {
+                  days: daysUntilLock ?? 0,
+                })}
               </p>
             </div>
           </div>
@@ -120,7 +124,7 @@ export function BillingOverdueBanner() {
             className="shrink-0 bg-amber-700 hover:bg-amber-800 text-white"
             onClick={() => openOverduePayment(dispatch)}
           >
-            Update payment
+            {t('billingOverdue.grace.cta')}
           </Button>
         </div>
       </div>

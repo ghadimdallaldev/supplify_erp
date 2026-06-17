@@ -152,14 +152,14 @@ describe('plan-admin-validation', () => {
   })
 
   describe('validateFreePlanTrialDays', () => {
-    it('allows 3–7 for free plan', () => {
+    it('allows platform free-trial bounds for free plan', () => {
       expect(validateFreePlanTrialDays('free', 7).valid).toBe(true)
-      expect(validateFreePlanTrialDays('free', 3).valid).toBe(true)
+      expect(validateFreePlanTrialDays('free', 90).valid).toBe(true)
     })
 
     it('rejects out of range for free plan', () => {
-      expect(validateFreePlanTrialDays('free', 14).valid).toBe(false)
-      expect(validateFreePlanTrialDays('free', 1).valid).toBe(false)
+      expect(validateFreePlanTrialDays('free', 91).valid).toBe(false)
+      expect(validateFreePlanTrialDays('free', 6).valid).toBe(false)
     })
 
     it('ignores trial days for paid plans', () => {

@@ -2,6 +2,24 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { i18n, changeAppLanguage, getActiveLocale } from './index'
 import { DEFAULT_LOCALE, LOCALE_STORAGE_KEY } from './config'
 import { loadNamespace, resetNamespaceCache } from './loadNamespace'
+import enAuth from './locales/en/auth.json'
+import arAuth from './locales/ar/auth.json'
+import enCommon from './locales/en/common.json'
+import arCommon from './locales/ar/common.json'
+import enNavigation from './locales/en/navigation.json'
+import arNavigation from './locales/ar/navigation.json'
+import enSettings from './locales/en/settings.json'
+import arSettings from './locales/ar/settings.json'
+
+function flattenKeys(value: unknown, prefix = ''): string[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return prefix ? [prefix] : []
+  }
+
+  return Object.entries(value as Record<string, unknown>).flatMap(([key, child]) =>
+    flattenKeys(child, prefix ? `${prefix}.${key}` : key)
+  )
+}
 
 describe('i18n', () => {
   beforeEach(async () => {
@@ -47,9 +65,9 @@ describe('i18n', () => {
   })
 
   it('falls back to en for missing keys in the active locale', async () => {
-    i18n.addResourceBundle('en', 'common', { onlyInEnglish: 'English fallback' }, true, false)
+    i18n.addResourceBundle('en', 'testFallback', { onlyInEnglish: 'English fallback' }, true, false)
     await changeAppLanguage('ar')
-    expect(i18n.t('common:onlyInEnglish')).toBe('English fallback')
+    expect(i18n.t('testFallback:onlyInEnglish')).toBe('English fallback')
   })
 
   it('returns the key when missing in all locales', () => {
@@ -65,5 +83,18 @@ describe('i18n', () => {
     await changeAppLanguage('ar')
     await loadNamespace(i18n, 'ar', 'auth')
     expect(i18n.t('auth:welcomeBack')).toBe('مرحباً بعودتك')
+  })
+
+  it('keeps Arabic namespace keys in parity with English', () => {
+    const namespaces = [
+      ['common', enCommon, arCommon],
+      ['navigation', enNavigation, arNavigation],
+      ['auth', enAuth, arAuth],
+      ['settings', enSettings, arSettings],
+    ] as const
+
+    for (const [namespace, en, ar] of namespaces) {
+      expect(flattenKeys(ar).sort(), namespace).toEqual(flattenKeys(en).sort())
+    }
   })
 })

@@ -444,7 +444,7 @@ describe('Admin Dashboard Routes', () => {
       expect(res.body.error.message).toMatch(/confirmEnterpriseActivation/)
     })
 
-    it('rejects free trial_days outside 3–7', async () => {
+    it('rejects free trial_days outside platform bounds', async () => {
       const res = await request(app)
         .post('/api/admin-dashboard/plans')
         .send({
@@ -454,7 +454,7 @@ describe('Admin Dashboard Routes', () => {
           pricePerMonth: 0,
           limits: {},
           features: {},
-          trialDays: 30,
+          trialDays: 91,
         })
         .expect(400)
 
@@ -825,21 +825,32 @@ describe('Admin Dashboard Routes', () => {
 
   describe('GET /tenants/suppliers', () => {
     it('returns paginated suppliers with total', async () => {
-      query
-        .mockResolvedValueOnce({ rows: [{ total: 120 }] })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 's1',
-              name: 'Supplier One',
-              product_count: 3,
-              warehouse_count: 1,
-              active_deals_count: 2,
-              storage_mb_used: 120,
-            },
-          ],
-        })
-        .mockResolvedValue({ rows: [{ code: 'gold' }] })
+      query.mockImplementation(async (sql) => {
+        if (typeof sql === 'string' && sql.includes('information_schema.columns')) {
+          return { rows: [] }
+        }
+        if (
+          typeof sql === 'string' &&
+          sql.includes('SELECT COUNT(*)::int AS total FROM supplier')
+        ) {
+          return { rows: [{ total: 120 }] }
+        }
+        if (typeof sql === 'string' && sql.includes('FROM supplier s')) {
+          return {
+            rows: [
+              {
+                id: 's1',
+                name: 'Supplier One',
+                product_count: 3,
+                warehouse_count: 1,
+                active_deals_count: 2,
+                storage_mb_used: 120,
+              },
+            ],
+          }
+        }
+        return { rows: [] }
+      })
 
       const res = await request(app)
         .get('/api/admin-dashboard/tenants/suppliers?limit=50&offset=0')
@@ -857,22 +868,33 @@ describe('Admin Dashboard Routes', () => {
 
   describe('GET /tenants/restaurants', () => {
     it('returns restaurant usage fields when present', async () => {
-      query
-        .mockResolvedValueOnce({ rows: [{ total: 40 }] })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 'r1',
-              name: 'Cafe One',
-              orders_last_30d: 51,
-              orders_today: 2,
-              connected_suppliers_count: 6,
-              inventory_skus_count: 240,
-              storage_mb_used: null,
-            },
-          ],
-        })
-        .mockResolvedValue({ rows: [{ code: 'silver' }] })
+      query.mockImplementation(async (sql) => {
+        if (typeof sql === 'string' && sql.includes('information_schema.columns')) {
+          return { rows: [] }
+        }
+        if (
+          typeof sql === 'string' &&
+          sql.includes('SELECT COUNT(*)::int AS total FROM restaurant')
+        ) {
+          return { rows: [{ total: 40 }] }
+        }
+        if (typeof sql === 'string' && sql.includes('FROM restaurant r')) {
+          return {
+            rows: [
+              {
+                id: 'r1',
+                name: 'Cafe One',
+                orders_last_30d: 51,
+                orders_today: 2,
+                connected_suppliers_count: 6,
+                inventory_skus_count: 240,
+                storage_mb_used: null,
+              },
+            ],
+          }
+        }
+        return { rows: [] }
+      })
 
       const res = await request(app)
         .get('/api/admin-dashboard/tenants/restaurants?limit=50&offset=0')
@@ -918,7 +940,7 @@ describe('Admin Dashboard Routes', () => {
       expect(res.body.data.events[0].event_type).toBe('order_placed')
       expect(res.body.data.total).toBe(1)
       expect(mockBuildAdminActivityFeed).toHaveBeenCalledWith(
-        expect.objectContaining({ limit: '30', offset: 0, days: undefined })
+        expect.objectContaining({ limit: 30, offset: 0, days: 30, type: null })
       )
     })
 
@@ -936,9 +958,7 @@ describe('Admin Dashboard Routes', () => {
 
       await request(app).get('/api/admin-dashboard/activity?days=7').expect(200)
 
-      expect(mockBuildAdminActivityFeed).toHaveBeenCalledWith(
-        expect.objectContaining({ days: '7' })
-      )
+      expect(mockBuildAdminActivityFeed).toHaveBeenCalledWith(expect.objectContaining({ days: 7 }))
     })
   })
 

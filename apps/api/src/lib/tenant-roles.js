@@ -266,14 +266,14 @@ export async function assignTenantUserRole({
 
 export async function userHasOwnerRole(userId, tenantId, tenantType) {
   const { rows } = await query(
-    `SELECT 1
+    `SELECT TRUE AS is_owner
      FROM tenant_user_roles tur
      JOIN tenant_roles tr ON tr.id = tur.role_id
      WHERE tur.user_id = $1 AND tur.tenant_id = $2 AND tur.tenant_type = $3
        AND tr.name = 'Owner'`,
     [userId, tenantId, tenantType]
   )
-  return rows.length > 0
+  return rows.some((row) => row.is_owner === true)
 }
 
 export async function assignOwnerRoleForUser(

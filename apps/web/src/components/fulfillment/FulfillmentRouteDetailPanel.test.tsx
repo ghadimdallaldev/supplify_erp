@@ -15,6 +15,7 @@ const mutate = vi.fn(() => ({ unwrap: () => Promise.resolve({}) }))
 
 vi.mock('../../services/api', () => ({
   useReorderFulfillmentRouteStopsMutation: () => [mutate, { isLoading: false }],
+  useOptimizeFulfillmentRouteMutation: () => [mutate, { isLoading: false }],
   useSetNextFulfillmentRouteStopMutation: () => [mutate, { isLoading: false }],
   useUpdateFulfillmentRouteMutation: () => [mutate, { isLoading: false }],
   useUpdateFulfillmentRouteStopMutation: () => [mutate, { isLoading: false }],

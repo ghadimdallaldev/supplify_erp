@@ -42,12 +42,14 @@ const mockCheckLimit = vi.fn()
 const mockIsFeatureEnabled = vi.fn()
 const mockGetEntitlements = vi.fn()
 const mockRecommendPlan = vi.fn()
+const mockResolveEffectivePlanFeatures = vi.fn((subscription) => subscription?.features || {})
 vi.mock('../lib/subscription.js', () => ({
   getTenantSubscription: (...args) => mockGetTenantSubscription(...args),
   checkLimit: (...args) => mockCheckLimit(...args),
   isFeatureEnabled: (...args) => mockIsFeatureEnabled(...args),
   getEntitlements: (...args) => mockGetEntitlements(...args),
   recommendPlan: (...args) => mockRecommendPlan(...args),
+  resolveEffectivePlanFeatures: (...args) => mockResolveEffectivePlanFeatures(...args),
   RESTAURANT_LIMIT_KEYS: [
     'branches',
     'users',
@@ -105,6 +107,10 @@ describe('Subscriptions Routes', () => {
     mockIsFeatureEnabled.mockReset()
     mockGetEntitlements.mockReset()
     mockRecommendPlan.mockReset()
+    mockResolveEffectivePlanFeatures.mockReset()
+    mockResolveEffectivePlanFeatures.mockImplementation(
+      (subscription) => subscription?.features || {}
+    )
     mockRecordConversionEvent.mockReset()
 
     app = express()

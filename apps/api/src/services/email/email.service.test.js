@@ -89,6 +89,7 @@ describe('email.service', () => {
   it('duplicate event_key does not send twice', async () => {
     queryMock
       .mockResolvedValueOnce({ rows: [{ id: 'log-1' }] }) // claim first send
+      .mockResolvedValueOnce({ rows: [] }) // persist retry payload
       .mockResolvedValueOnce({ rows: [] }) // finalize first send
       .mockResolvedValueOnce({ rows: [] }) // claim duplicate
     vi.resetModules()

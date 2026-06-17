@@ -161,4 +161,65 @@ describe('supplier-run-sheet.service', () => {
     const result = await getSupplierRunSheet('supplier-1')
     expect(result.date).toBe(new Date().toISOString().slice(0, 10))
   })
+
+  it('returns a degraded run sheet when optional sections fail', async () => {
+    vi.doMock('./supplier-command-center.service.js', () => ({
+      getSupplierCommandCenter: vi.fn(async () => {
+        throw new Error('missing optional command center table')
+      }),
+    }))
+    vi.doMock('./supplier-deliveries.service.js', () => ({
+      getSupplierDeliveryBoard: vi.fn(async () => {
+        throw new Error('missing optional delivery table')
+      }),
+    }))
+    vi.doMock('./supplier-receivables.service.js', () => ({
+      getSupplierReceivables: vi.fn(async () => ({
+        invoices: [
+          {
+            id: 'inv-run-date',
+            dueDate: '2026-06-17',
+            balanceDue: '75',
+            isOverdue: false,
+          },
+          {
+            id: 'inv-future',
+            dueDate: '2026-06-18',
+            balanceDue: '25',
+            isOverdue: false,
+          },
+        ],
+      })),
+    }))
+    vi.doMock('./supplier-reorder-intelligence.service.js', () => ({
+      getReorderIntelligence: vi.fn(async () => {
+        throw new Error('missing optional reorder table')
+      }),
+    }))
+    vi.doMock('../lib/delivery-board-schema.js', () => ({
+      getDeliveryBoardSqlFragments: vi.fn(async () => ({
+        scheduledAtExpr: 'o.created_at',
+      })),
+    }))
+    vi.doMock('../lib/logger.js', () => ({
+      logger: { warn: vi.fn() },
+    }))
+    vi.doMock('../lib/db.js', () => ({
+      query: vi.fn(async () => {
+        throw new Error('missing optional fulfillment issue table')
+      }),
+    }))
+
+    const { getSupplierRunSheet } = await import('./supplier-run-sheet.service.js')
+    const result = await getSupplierRunSheet('supplier-1', { date: '2026-06-17' })
+
+    expect(result.date).toBe('2026-06-17')
+    expect(result.summary.kpis.ordersToPrepareToday).toBe(0)
+    expect(result.deliveries.orders).toEqual([])
+    expect(result.ordersToPick.count).toBe(0)
+    expect(result.shortages.preview).toEqual([])
+    expect(result.reorderLeads).toEqual([])
+    expect(result.receivablesDueToday.summary.count).toBe(1)
+    expect(result.receivablesDueToday.summary.totalBalanceDue).toBe(75)
+  })
 })

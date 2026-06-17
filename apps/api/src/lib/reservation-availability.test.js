@@ -12,6 +12,7 @@ import {
 
 describe('reservation-availability', () => {
   const calendarDate = '2026-06-15'
+  const testNow = new Date(2026, 5, 14, 12, 0, 0)
   const tables = [
     { capacity: 10, is_active: true },
     { capacity: 14, is_active: true },
@@ -27,6 +28,7 @@ describe('reservation-availability', () => {
       openingHour: 13,
       closingHour: 15,
       slotIntervalMinutes: 30,
+      now: testNow,
     })
     expect(cap).toBe(24)
     expect(slots.length).toBeGreaterThan(0)
@@ -51,6 +53,7 @@ describe('reservation-availability', () => {
       openingHour: 13,
       closingHour: 15,
       slotIntervalMinutes: 30,
+      now: testNow,
     })
     const onePm = slots.find((s) => new Date(s.startTime).getHours() === 13)
     expect(onePm?.seatsLeft).toBe(22)
@@ -74,6 +77,7 @@ describe('reservation-availability', () => {
       openingHour: 13,
       closingHour: 15,
       slotIntervalMinutes: 30,
+      now: testNow,
     })
     const onePm = slots.find((s) => new Date(s.startTime).getHours() === 13)
     expect(onePm?.seatsLeft).toBe(2)
@@ -93,6 +97,7 @@ describe('reservation-availability', () => {
       openingHour: 13,
       closingHour: 15,
       slotIntervalMinutes: 30,
+      now: testNow,
     })
     const full = slotsParty22.find((s) => new Date(s.startTime).getHours() === 13)
     expect(full?.isAvailable).toBe(false)
@@ -114,6 +119,7 @@ describe('reservation-availability', () => {
         openingHour: 13,
         closingHour: 14,
         slotIntervalMinutes: 30,
+        now: testNow,
       })
       expect(slots[0].seatsLeft).toBe(24)
     }
@@ -143,6 +149,7 @@ describe('reservation-availability', () => {
       openingHour: 13,
       closingHour: 16,
       slotIntervalMinutes: 30,
+      now: testNow,
     })
     const onePm = slots.find((s) => new Date(s.startTime).getHours() === 13)
     const threePm = slots.find((s) => new Date(s.startTime).getHours() === 15)
@@ -163,6 +170,7 @@ describe('reservation-availability', () => {
       partySize: 2,
       openingHour: 13,
       closingHour: 14,
+      now: testNow,
     })
     expect(cap).toBe(0)
   })

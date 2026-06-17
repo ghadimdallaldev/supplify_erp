@@ -49,6 +49,7 @@ vi.mock('../lib/subscription.js', () => ({
   incrementDailyUsageMeterInTransaction: vi.fn().mockResolvedValue({ allowed: true }),
   incrementUsage: vi.fn().mockResolvedValue(true),
   isFeatureEnabled: vi.fn().mockResolvedValue(false),
+  resolveEffectivePlanFeatures: vi.fn().mockResolvedValue({}),
   requireFeature: () => (req, res, next) => next(),
   getTenantSubscription: vi.fn().mockResolvedValue({ plan_name: 'gold', features: {} }),
   getRecommendedPlanNames: vi.fn().mockResolvedValue([]),

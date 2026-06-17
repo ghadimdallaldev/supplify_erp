@@ -49,6 +49,7 @@ describe('permissions resolution', () => {
 
   it('resolves permissions from tenant role', async () => {
     queryMock
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce(mockNoRestaurantOrg())
       .mockResolvedValueOnce({
         rows: [{ permission: 'ORDERS_VIEW' }, { permission: 'ORDERS_CREATE' }],
@@ -64,6 +65,7 @@ describe('permissions resolution', () => {
 
   it('merges legacy permissions when no tenant_user_roles assignment', async () => {
     queryMock
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce(mockNoRestaurantOrg())
       .mockResolvedValueOnce({ rows: [{ permission: 'ORDERS_VIEW' }] })
       .mockResolvedValueOnce({ rows: [{ code: 'SETTINGS_VIEW' }] })
@@ -76,6 +78,7 @@ describe('permissions resolution', () => {
 
   it('does not merge legacy permissions when tenant_user_roles assignment exists', async () => {
     queryMock
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce(mockNoRestaurantOrg())
       .mockResolvedValueOnce({ rows: [{ permission: 'ORDERS_VIEW' }] })
       .mockResolvedValueOnce({ rows: [{ code: 'SETTINGS_VIEW' }, { code: 'ORDERS_CREATE' }] })
@@ -214,6 +217,7 @@ describe('permissions resolution', () => {
 
   it('denies supplier access when no org or branch roles', async () => {
     queryMock
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ organization_id: 'org-1' }] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })

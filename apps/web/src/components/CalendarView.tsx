@@ -5,6 +5,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import listPlugin from '@fullcalendar/list'
 import { format } from 'date-fns'
+import { useNavigate } from 'react-router-dom'
 import {
   CalendarDays,
   Filter,
@@ -15,7 +16,6 @@ import {
   Lock,
   TrendingUp,
 } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet'
@@ -60,6 +60,7 @@ const DEFAULT_PAGE_SIZE = 60
 
 export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarViewProps) {
   const dispatch = useAppDispatch()
+  const navigate = useNavigate()
   const { data: entitlementsData, isLoading: entitlementsLoading } = useGetEntitlementsQuery()
   const entitlements = entitlementsData?.entitlements
   const hasOrderCalendar = isEntitlementFeatureEnabled(entitlements, 'order_calendar')
@@ -153,6 +154,8 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
   }, [data?.pagination?.total])
 
   const filtersDisabled = !data?.filters
+  const createOrderPath = activeRole === 'SUPPLIER' ? '/app/orders' : '/app/cart'
+  const createOrderLabel = activeRole === 'SUPPLIER' ? 'Create Manual Order' : 'Create Order'
 
   const handleViewChange = useCallback(
     (nextView: CalendarViewType) => {
@@ -307,6 +310,10 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
     [setActiveRole]
   )
 
+  const handleCreateOrder = useCallback(() => {
+    navigate(createOrderPath)
+  }, [createOrderPath, navigate])
+
   return (
     <div className="rounded-3xl border border-[var(--app-border)] bg-[var(--surface)] p-6 shadow-sm">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -350,11 +357,11 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
           </div>
           {isAdmin && (
             <Button
-              onClick={() => toast('Event creation is coming soon!')}
+              onClick={handleCreateOrder}
               className="bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90"
               size="sm"
             >
-              + Add Event
+              + {createOrderLabel}
             </Button>
           )}
         </div>

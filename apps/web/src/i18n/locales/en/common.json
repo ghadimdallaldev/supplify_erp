@@ -15,8 +15,8 @@
     "reload": "Reload",
     "close": "Close"
   },
-  "loading": "Loading…",
-  "loadingPage": "Loading page…",
+  "loading": "Loading...",
+  "loadingPage": "Loading page...",
   "noResults": "No results",
   "error": {
     "title": "Something went wrong",
