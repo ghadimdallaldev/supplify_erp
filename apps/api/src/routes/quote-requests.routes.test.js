@@ -53,8 +53,8 @@ vi.mock('../services/quote-requests.service.js', () => ({
   submitQuoteResponse: vi.fn().mockResolvedValue({ id: 'qrs-1', status: 'responded' }),
   buildCartPayloadFromResponse: vi.fn().mockResolvedValue({
     supplierId: 'supplier-1',
-    items: [{ productId: 'p-1', quantity: 2, quotedUnitPrice: 5 }],
-    disclaimer: 'Checkout resolves prices',
+    quoteRequestSupplierId: 'qrs-1',
+    items: [{ productId: 'p-1', quantity: 2, quotedUnitPrice: 5, quoteResponseItemId: 'qri-1' }],
   }),
   assertRestaurantOwnsQuoteRequest: vi.fn().mockResolvedValue({ id: 'qr-1' }),
 }))

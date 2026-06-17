@@ -334,8 +334,9 @@ export function ProductsPage() {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
-    if (!file.name.endsWith('.csv')) {
-      toast.error('Please upload a .csv file. Using Excel? Save your sheet as CSV first.')
+    const name = file.name.toLowerCase()
+    if (!name.endsWith('.csv') && !name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+      toast.error('Please upload a .csv, .xlsx, or .xls file')
       return
     }
     setUploadedFile(file)

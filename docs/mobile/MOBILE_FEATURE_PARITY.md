@@ -26,3 +26,33 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 - **Reason**: CRM-style bulk import, invite link sharing, and admin growth configuration are web-first supplier acquisition workflows. Mobile can consume metrics API later.
 - **Migration**: Run `0169_supplier_growth_program.sql` before using customer growth features.
 - **Platform trial**: Free trial default raised to **30 days** platform-wide (admin range 7–90).
+
+## 2026-06-17 — Supplier Ops Wave 2 (web-first)
+
+- **Run sheet**: `/app/run-sheet` — daily ops brief (pick queue, deliveries, receivables, shortages). API `GET /api/supplier/run-sheet`.
+- **Pick lists / waves**: Fulfillment → Pick lists tab; API `/api/fulfillment/waves/*`.
+- **Collections reminders**: Receivables panel + cron `collections-reminders`; migration `0176_invoice_reminder_log.sql`.
+- **POD photo + signature**: `ProofOfDeliveryDialog`, presign upload, restaurant confirm.
+- **Excel import**: `.xlsx` on product bulk upload (server-side SheetJS).
+- **Warehouse delivery zones**: Settings → Warehouses → Manage zones.
+- **Quote price lock**: `QUOTE_PRICE` on checkout from RFQ compare; migration `0178_quote_price_lock.sql`.
+- **Accounting export**: Supplier invoice/payment CSV + QuickBooks from `/api/supplier/invoices/export*`.
+- **Route optimization**: `POST /api/fulfillment/routes/:id/optimize` (nearest-neighbor; Mapbox optional later).
+
+**Mobile**: Run sheet, pick lists, POD capture, and route optimize are **high priority** for `supplify-mobile` driver/warehouse flows. Excel import and zones remain web-first.
+
+**Migrations**: `0176`–`0179` before deployed use.
+
+## 2026-06-17 — Arabic localization (web-only)
+
+- **Scope**: English + Arabic UI via i18next on web — language switcher in header, RTL `dir` on `<html>`, eager `common`/`navigation` bundles, lazy `auth`/`settings`, locale persistence in `localStorage` (`supplify.locale`), Arabic-aware `Intl` formatting for dates/currency/numbers.
+- **Docs**: [ARABIC_LOCALIZATION_I18N.md](../features/ARABIC_LOCALIZATION_I18N.md)
+
+## 2026-06-17 — Restaurant payables, relationship UX, multi-supplier checkout (web-first)
+
+- **Payables panel**: `GET /api/restaurant-finance/payables` + `RestaurantPayablesPanel` on restaurant Invoices (mirror supplier receivables).
+- **Connection requests**: Restaurant inbox on `/app/suppliers` — `GET/POST /api/restaurant/growth/connection-requests/*`.
+- **Block supplier**: `POST/DELETE /api/suppliers/:id/block` on supplier detail; `is_blocked` on supplier profile.
+- **Multi-supplier cart preview**: Checkout shows N orders before confirm (backend already split per supplier).
+- **Quote price lock hardening**: Checkout rejects stale quote locks with clear validation error.
+- **Reason**: Accountant/purchaser workflows and supplier relationship management are web cockpit features. Mobile can consume payables API and connection-request endpoints in a later restaurant finance pass.

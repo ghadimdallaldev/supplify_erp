@@ -63,8 +63,21 @@ Order creation (`POST /api/orders`, supplier manual create) calls `assignWarehou
 ## Frontend
 
 - **Settings → Warehouses**: gated by `entitlements.features.warehouses` (`useGetEntitlementsQuery`).
+- **Warehouse delivery zones**: **Settings → Warehouses → Manage zones** — `WarehouseZonesPanel` (radius, postal codes, min order, delivery fee). Uses `listZones` / `createZone` / `updateZone` / `deleteZone` RTK endpoints.
 - Multi-warehouse toggle: gated by `multi_warehouse` plan flag; calls fulfillment API.
 - **Order detail**: shows per-item warehouse badges when `multiLocationFulfillment` is true.
+- **Fulfillment → Pick lists**: `PickListsTab` on `/app/fulfillment` — generate waves, view pick lists, complete picking. API: `/api/fulfillment/waves/*` (`fulfillment/waves.js`, `pick-lists.service.js`). Migration `0177_pick_lists_hardening.sql` adds `order_item_id` on `pick_list_item`.
+
+## Pick lists and waves
+
+| Method | Path                                          | Permission           | Description                       |
+| ------ | --------------------------------------------- | -------------------- | --------------------------------- |
+| POST   | `/api/fulfillment/waves/generate`             | `FULFILLMENT_MANAGE` | Create delivery wave + pick lists |
+| GET    | `/api/fulfillment/waves`                      | `FULFILLMENT_VIEW`   | List waves for supplier           |
+| GET    | `/api/fulfillment/waves/:id`                  | `FULFILLMENT_VIEW`   | Wave detail + pick lists          |
+| POST   | `/api/fulfillment/waves/:id/complete-picking` | `FULFILLMENT_MANAGE` | Mark wave picking complete        |
+
+Service: `pick-lists.service.js`
 
 ## Simulation
 

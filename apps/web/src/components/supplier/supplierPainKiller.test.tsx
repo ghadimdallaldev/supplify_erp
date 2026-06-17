@@ -29,6 +29,15 @@ vi.mock('../../services/api', async (importOriginal) => {
   }
 })
 
+vi.mock('../../services/api/endpoints/finance', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../services/api/endpoints/finance')>()
+  return {
+    ...actual,
+    useSendInvoiceReminderMutation: () => [vi.fn(), { isLoading: false }],
+    useRemindOverdueInvoicesMutation: () => [vi.fn(), { isLoading: false }],
+  }
+})
+
 describe('supplier pain-killer UI', () => {
   beforeEach(() => {
     vi.clearAllMocks()

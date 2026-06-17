@@ -39,17 +39,61 @@ Open statuses: `ISSUED`, `PARTIALLY_PAID`, `OVERDUE`.
 
 Service: `supplier-receivables.service.js`
 
-## Product import (CSV)
+### Collections reminders
 
-Bulk catalog upload with preview and partial-import support. Optional **`image_url`** column downloads remote images during import (same optimization pipeline as bulk image import).
+Automated and manual invoice payment reminders with deduplication via `invoice_reminder_log` (migration `0176`).
 
-| Method | Path                            | Permission     | Description                                             |
-| ------ | ------------------------------- | -------------- | ------------------------------------------------------- |
-| POST   | `/products/import/preview`      | `CATALOG_EDIT` | Parse CSV, return column mapping + validation preview   |
-| POST   | `/products/import`              | `CATALOG_EDIT` | Execute import (`partial` default true — skip bad rows) |
-| POST   | `/products/import/error-report` | `CATALOG_EDIT` | Download CSV of row errors                              |
+| Method | Path                                 | Gate                                 | Description                           |
+| ------ | ------------------------------------ | ------------------------------------ | ------------------------------------- |
+| POST   | `/invoices/:invoiceId/send-reminder` | `INVOICES_VIEW` + `finance_invoices` | Manual reminder for one invoice       |
+| POST   | `/invoices/remind-overdue`           | `INVOICES_VIEW` + `finance_invoices` | Bulk remind all overdue open invoices |
 
-**CSV columns:** `name`, `sku` (required); optional `description`, `category`, `unit`, `price`, `stock`, **`image_url`** (aliases: `image`, `photo`, `photo_url`).
+**Cron:** `collections-reminders` job — daily (`CRON_JOBS.COLLECTIONS_REMINDERS`, 24 h). Registered in `register-cron-jobs.js`.
+
+**Web:** `SupplierReceivablesPanel` — per-invoice and bulk overdue remind actions.
+
+Service: `collections-reminders.service.js`
+
+### Accounting export
+
+CSV exports for supplier AR and bookkeeping integrations.
+
+| Method | Path                                | Gate                                 | Description             |
+| ------ | ----------------------------------- | ------------------------------------ | ----------------------- |
+| GET    | `/invoices/export.csv`              | `INVOICES_VIEW` + `finance_invoices` | Invoice lines CSV       |
+| GET    | `/invoices/export/quickbooks.csv`   | `INVOICES_VIEW` + `finance_invoices` | QuickBooks-style export |
+| GET    | `/payments/export.csv`              | `INVOICES_VIEW` + `finance_invoices` | Payment records CSV     |
+| GET    | `/invoices/receivables/summary.csv` | `INVOICES_VIEW` + `finance_invoices` | AR aging summary CSV    |
+
+**Web:** Export dropdown on `/app/invoices` (supplier tenants).
+
+Service: `supplier-accounting-export.service.js`
+
+## Run sheet (daily ops brief)
+
+Single-page **morning brief** for suppliers: orders to pick, deliveries, receivables due today, reorder leads, and shortage preview.
+
+| Method | Path         | Gate                | Description                                              |
+| ------ | ------------ | ------------------- | -------------------------------------------------------- |
+| GET    | `/run-sheet` | `commandCenterGate` | KPIs + pick queue + deliveries + receivables + shortages |
+
+**Query:** `?date=YYYY-MM-DD` (defaults to today in supplier timezone).
+
+**Web:** `/app/run-sheet` — `SupplierRunSheetPage`; linked from command center and sidebar.
+
+Service: `supplier-run-sheet.service.js`
+
+## Product import (CSV / Excel)
+
+Bulk catalog upload with preview and partial-import support. Accepts **`.csv`** and **`.xlsx`** (SheetJS). Optional **`image_url`** column downloads remote images during import (same optimization pipeline as bulk image import).
+
+| Method | Path                            | Permission     | Description                                                |
+| ------ | ------------------------------- | -------------- | ---------------------------------------------------------- |
+| POST   | `/products/import/preview`      | `CATALOG_EDIT` | Parse CSV/XLSX, return column mapping + validation preview |
+| POST   | `/products/import`              | `CATALOG_EDIT` | Execute import (`partial` default true — skip bad rows)    |
+| POST   | `/products/import/error-report` | `CATALOG_EDIT` | Download CSV of row errors                                 |
+
+**Columns:** `name`, `sku` (required); optional `description`, `category`, `unit`, `price`, `stock`, **`image_url`** (aliases: `image`, `photo`, `photo_url`).
 
 **Execute summary fields:** `created`, `updated`, `failed`, `skipped`, plus `imagesImported` / `imagesFailed` when `image_url` column is used.
 
@@ -94,15 +138,18 @@ Full spec: [supplier-customer-growth.md](./supplier-customer-growth.md) · Migra
 
 ## Other supplier-ops endpoints
 
-| Area                 | Path prefix                             | Feature gate       | Notes                                                                                                                       |
-| -------------------- | --------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| Reorder intelligence | `/reorder-intelligence`                 | `smart_reorder`    | At-risk customers, reminder drafts                                                                                          |
-| Reorder assistance   | `/reorder-assistance`                   | `smart_reorder`    | Follow-up draft messages                                                                                                    |
-| Delivery board       | `/deliveries/board`                     | `fulfillment`      | Date/status/driver/area filters; driver-scoped when driver-only RBAC; zone join via `delivery-zone-join` + migration `0165` |
-| Product substitutes  | `/products/:productId/substitutes`      | —                  | CRUD substitute products                                                                                                    |
-| Order substitutions  | `/orders/:orderId/substitutions/*`      | `order_amendments` | Propose/accept/reject item swaps                                                                                            |
-| Fulfillment issues   | `/orders/:orderId/fulfillment-issues/*` | —                  | Shortage, substitution, open-chat                                                                                           |
-| At-risk cadence      | `/reorder-cadence/at-risk`              | `smart_reorder`    | Customers overdue for reorder                                                                                               |
+| Area                  | Path prefix                             | Feature gate        | Notes                                                                                                                       |
+| --------------------- | --------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Run sheet             | `/run-sheet`                            | command center gate | Daily ops brief — see above                                                                                                 |
+| Accounting export     | `/invoices/export*`                     | `finance_invoices`  | CSV + QuickBooks — see above                                                                                                |
+| Collections reminders | `/invoices/*remind*`                    | `finance_invoices`  | Manual + cron — see above                                                                                                   |
+| Reorder intelligence  | `/reorder-intelligence`                 | `smart_reorder`     | At-risk customers, reminder drafts                                                                                          |
+| Reorder assistance    | `/reorder-assistance`                   | `smart_reorder`     | Follow-up draft messages                                                                                                    |
+| Delivery board        | `/deliveries/board`                     | `fulfillment`       | Date/status/driver/area filters; driver-scoped when driver-only RBAC; zone join via `delivery-zone-join` + migration `0165` |
+| Product substitutes   | `/products/:productId/substitutes`      | —                   | CRUD substitute products                                                                                                    |
+| Order substitutions   | `/orders/:orderId/substitutions/*`      | `order_amendments`  | Propose/accept/reject item swaps                                                                                            |
+| Fulfillment issues    | `/orders/:orderId/fulfillment-issues/*` | —                   | Shortage, substitution, open-chat                                                                                           |
+| At-risk cadence       | `/reorder-cadence/at-risk`              | `smart_reorder`     | Customers overdue for reorder                                                                                               |
 
 ## RBAC & plan gates
 
@@ -116,6 +163,10 @@ Full spec: [supplier-customer-growth.md](./supplier-customer-growth.md) · Migra
 | File                                                                 | Covers                                                               |
 | -------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | `apps/web/src/components/supplier/supplierPainKiller.test.tsx`       | Receivables empty state, command center mock                         |
+| `apps/api/src/services/supplier-run-sheet.service.test.js`           | Run sheet aggregation                                                |
+| `apps/api/src/services/collections-reminders.service.test.js`        | Reminder dedup + bulk send                                           |
+| `apps/api/src/services/supplier-accounting-export.service.test.js`   | CSV / QuickBooks export                                              |
+| `apps/api/src/services/product-import.service.test.js`               | CSV + XLSX parse                                                     |
 | `apps/api/src/services/product-image-import.service.test.js`         | SKU/mapping match logic, CSV parse                                   |
 | `apps/api/src/services/image-import-worker.test.js`                  | Background job dispatch                                              |
 | `apps/api/src/services/image-optimization.service.test.js`           | Format validation, optimization                                      |

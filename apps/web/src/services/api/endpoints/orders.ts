@@ -57,6 +57,7 @@ import type {
   StaffTimeEntry,
   PublicReservationDetails,
   DispatchOrderCard,
+  ProofOfDelivery,
   DeliveryRouteSummary,
   DeliveryRouteDetail,
   OrderTrackingResponse,
@@ -352,6 +353,7 @@ export const ordersApi = api.injectEndpoints({
         recipient_name?: string
         notes?: string
         file_key?: string
+        signature_file_key?: string
         latitude?: number
         longitude?: number
       }
@@ -362,6 +364,32 @@ export const ordersApi = api.injectEndpoints({
         body,
       }),
       invalidatesTags: ['Fulfillment', 'Order'],
+    }),
+    presignOrderProofOfDelivery: builder.mutation<
+      PresignedUrlResponse & { url?: string; publicUrl?: string },
+      { orderId: string; fileName: string; fileType: string; fileSize?: number }
+    >({
+      query: ({ orderId, fileName, fileType, fileSize }) => ({
+        url: `/api/orders/${orderId}/proof-of-delivery/presign`,
+        method: 'POST',
+        body: { fileName, fileType, fileSize },
+      }),
+    }),
+    getOrderProofOfDelivery: builder.query<{ proof: ProofOfDelivery | null }, string>({
+      query: (orderId) => `/api/orders/${orderId}/proof-of-delivery`,
+      providesTags: (_r, _e, orderId) => [{ type: 'Order', id: `${orderId}-pod` }],
+    }),
+    confirmOrderProofOfDelivery: builder.mutation<{ proof: ProofOfDelivery }, string>({
+      query: (orderId) => ({
+        url: `/api/orders/${orderId}/proof-of-delivery/confirm`,
+        method: 'POST',
+      }),
+      invalidatesTags: (_r, _e, orderId) => [
+        'Fulfillment',
+        'Order',
+        { type: 'Order', id: orderId },
+        { type: 'Order', id: `${orderId}-pod` },
+      ],
     }),
     resolveFulfillmentException: builder.mutation<
       { exception: unknown },
@@ -457,6 +485,26 @@ export const ordersApi = api.injectEndpoints({
       }),
       invalidatesTags: ['Fulfillment', 'Order'],
     }),
+    optimizeFulfillmentRoute: builder.mutation<
+      {
+        preview: {
+          routeId: string
+          method: string
+          proposedStopIds: string[]
+          estimatedDistanceKm: number
+          stopCount: number
+        }
+        route: DeliveryRouteDetail | null
+      },
+      { routeId: string; apply?: boolean }
+    >({
+      query: ({ routeId, apply }) => ({
+        url: `/api/fulfillment/routes/${routeId}/optimize`,
+        method: 'POST',
+        body: { apply: apply === true },
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
     setNextFulfillmentRouteStop: builder.mutation<
       { route: DeliveryRouteDetail },
       { routeId: string; orderId: string }
@@ -546,6 +594,105 @@ export const ordersApi = api.injectEndpoints({
         body: notify_restaurant ? { notify_restaurant: true } : {},
       }),
       invalidatesTags: ['Fulfillment', 'Order'],
+    }),
+    getPickWaves: builder.query<
+      {
+        waves: Array<{
+          id: string
+          waveNumber: string
+          scheduledDate: string
+          status: string
+          pickListCount: number
+          orderCount: number
+          itemCount: number
+          itemsPicked: number
+          createdAt: string
+        }>
+      },
+      { date?: string } | void
+    >({
+      query: (arg) => {
+        const date = arg && typeof arg === 'object' ? arg.date : undefined
+        const qs = date ? `?date=${encodeURIComponent(date)}` : ''
+        return `/api/fulfillment/waves${qs}`
+      },
+      providesTags: ['Fulfillment'],
+    }),
+    getPickWave: builder.query<
+      {
+        wave: {
+          id: string
+          waveNumber: string
+          scheduledDate: string
+          status: string
+          pickListCount: number
+          orderCount: number
+          itemCount: number
+          itemsPicked: number
+          createdAt: string
+          pickLists: Array<{
+            id: string
+            orderId: string
+            orderLabel: string | null
+            restaurantName: string
+            warehouseId: string | null
+            warehouseName: string | null
+            status: string
+            pickedAt: string | null
+            itemCount: number
+            itemsPicked: number
+            items: Array<{
+              id: string
+              productId: string
+              productName: string
+              productSku: string | null
+              orderItemId: string | null
+              quantityOrdered: number
+              quantityPicked: number | null
+              locationCode: string | null
+              notes: string | null
+            }>
+          }>
+        }
+      },
+      string
+    >({
+      query: (id) => `/api/fulfillment/waves/${id}`,
+      providesTags: ['Fulfillment'],
+    }),
+    generatePickWave: builder.mutation<
+      { wave: Record<string, unknown> },
+      { date?: string; warehouseId?: string; orderIds?: string[] } | void
+    >({
+      query: (body) => ({
+        url: '/api/fulfillment/waves/generate',
+        method: 'POST',
+        body: body ?? {},
+      }),
+      invalidatesTags: ['Fulfillment'],
+    }),
+    updatePickListItem: builder.mutation<
+      { item: Record<string, unknown> },
+      {
+        pickListId: string
+        itemId: string
+        quantityPicked?: number
+        notes?: string | null
+      }
+    >({
+      query: ({ pickListId, itemId, quantityPicked, notes }) => ({
+        url: `/api/fulfillment/pick-lists/${pickListId}/items/${itemId}`,
+        method: 'PATCH',
+        body: { quantityPicked, notes },
+      }),
+      invalidatesTags: ['Fulfillment'],
+    }),
+    completePickWave: builder.mutation<{ wave: Record<string, unknown> }, string>({
+      query: (waveId) => ({
+        url: `/api/fulfillment/waves/${waveId}/complete-picking`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Fulfillment'],
     }),
     sendDriverLocation: builder.mutation<
       {

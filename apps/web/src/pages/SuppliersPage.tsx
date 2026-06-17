@@ -46,6 +46,7 @@ import {
 import { EmptyState } from '../components/ui/empty-state'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
+import { ConnectionRequestsPanel } from '../components/supplier/ConnectionRequestsPanel'
 import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { cn } from '../lib/utils'
 
@@ -279,6 +280,8 @@ export function SuppliersPage() {
           ) : undefined
         }
       />
+
+      {isRestaurant && <ConnectionRequestsPanel />}
 
       {isRestaurant && (
         <>

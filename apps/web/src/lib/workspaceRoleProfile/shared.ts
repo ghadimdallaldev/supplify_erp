@@ -120,9 +120,9 @@ export const GENERIC_PROFILE: WorkspacePersonaProfile = {
 
 /** Puts the role's primary nav link at the top of the sidebar (first thing visible). */
 export function reorderNavSectionsForPrimaryFocus<T extends { href: string }>(
-  sections: Array<{ label: string; items: T[] }>,
+  sections: Array<{ label?: string; labelKey?: string; items: T[] }>,
   primaryHref: string
-): Array<{ label: string; items: T[] }> {
+): Array<{ label?: string; labelKey?: string; items: T[] }> {
   let primary: T | null = null
   const rest = sections
     .map((section) => ({
@@ -139,7 +139,9 @@ export function reorderNavSectionsForPrimaryFocus<T extends { href: string }>(
 
   if (!primary) return sections
 
-  const overviewIdx = rest.findIndex((s) => s.label === 'OVERVIEW')
+  const overviewIdx = rest.findIndex(
+    (s) => s.label === 'OVERVIEW' || s.labelKey === 'section.overview'
+  )
   if (overviewIdx >= 0) {
     const overview = rest[overviewIdx]
     rest[overviewIdx] = {
@@ -149,5 +151,5 @@ export function reorderNavSectionsForPrimaryFocus<T extends { href: string }>(
     return rest
   }
 
-  return [{ label: 'OVERVIEW', items: [primary] }, ...rest]
+  return [{ labelKey: 'section.overview', items: [primary] }, ...rest]
 }

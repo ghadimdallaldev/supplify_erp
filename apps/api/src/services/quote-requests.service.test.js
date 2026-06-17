@@ -205,6 +205,7 @@ describe('quote-requests.service', () => {
       .mockResolvedValueOnce({
         rows: [
           {
+            id: 'qri-1',
             product_id: 'product-1',
             requested_quantity: 5,
             quantity: 5,
@@ -229,6 +230,8 @@ describe('quote-requests.service', () => {
 
     expect(payload.items).toHaveLength(1)
     expect(payload.items[0].quotedUnitPrice).toBe(9.99)
-    expect(payload.disclaimer).toContain('Checkout')
+    expect(payload.items[0].quoteResponseItemId).toBe('qri-1')
+    expect(payload.quoteRequestSupplierId).toBe('qrs-1')
+    expect(payload.disclaimer).toBeUndefined()
   })
 })

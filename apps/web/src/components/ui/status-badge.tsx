@@ -1,4 +1,8 @@
+import { useTranslation } from 'react-i18next'
+
 export type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'muted'
+
+type TranslateFn = (key: string, options?: { defaultValue?: string }) => string
 
 const STATUS_TONE_MAP: Record<string, StatusTone> = {
   ACTIVE: 'success',
@@ -72,6 +76,36 @@ const TONE_DOT_CLASSES: Record<StatusTone, string> = {
   muted: 'bg-[var(--app-border-mid)]',
 }
 
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  ACTIVE: 'active',
+  active: 'active',
+  healthy: 'active',
+  HEALTHY: 'active',
+  INACTIVE: 'inactive',
+  inactive: 'inactive',
+  PAUSED: 'inactive',
+  paused: 'inactive',
+  PENDING: 'pending',
+  pending: 'pending',
+  pending_approval: 'pending',
+  pending_admin_approval: 'pending',
+  approved_pending_payment: 'pending',
+  APPROVED: 'approved',
+  approved: 'approved',
+  DECLINED: 'declined',
+  declined: 'declined',
+  rejected: 'declined',
+  REJECTED: 'declined',
+  PAID: 'paid',
+  paid: 'paid',
+  DELIVERED: 'delivered',
+  CANCELLED: 'cancelled',
+  cancelled: 'cancelled',
+  LOW_STOCK: 'lowStock',
+  OUT_OF_STOCK: 'outOfStock',
+  IN_STOCK: 'inStock',
+}
+
 export function formatStatusLabel(status: string): string {
   return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
@@ -98,6 +132,52 @@ export function getStatusTone(status: string): StatusTone {
   return 'neutral'
 }
 
+export function getTranslatedStatusLabel(status: string, t: TranslateFn): string {
+  const key = status?.trim() || ''
+  const labelKey = STATUS_LABEL_KEYS[key]
+  if (labelKey) {
+    return t(`status.${labelKey}`, { defaultValue: formatStatusLabel(status) })
+  }
+  if (key.includes('pending')) {
+    return t('status.pending', { defaultValue: formatStatusLabel(status) })
+  }
+  if (
+    key.includes('fail') ||
+    key.includes('reject') ||
+    key.includes('declin') ||
+    key.includes('past')
+  ) {
+    return t('status.declined', { defaultValue: formatStatusLabel(status) })
+  }
+  if (
+    key.includes('active') ||
+    key.includes('paid') ||
+    key.includes('approve') ||
+    key.includes('received')
+  ) {
+    return t('status.active', { defaultValue: formatStatusLabel(status) })
+  }
+  if (key.includes('cancel')) {
+    return t('status.cancelled', { defaultValue: formatStatusLabel(status) })
+  }
+  if (key.includes('deliver')) {
+    return t('status.delivered', { defaultValue: formatStatusLabel(status) })
+  }
+  if (key.includes('low') && key.includes('stock')) {
+    return t('status.lowStock', { defaultValue: formatStatusLabel(status) })
+  }
+  if (key.includes('out') && key.includes('stock')) {
+    return t('status.outOfStock', { defaultValue: formatStatusLabel(status) })
+  }
+  if (key.includes('in') && key.includes('stock')) {
+    return t('status.inStock', { defaultValue: formatStatusLabel(status) })
+  }
+  if (!key) {
+    return t('status.unknown', { defaultValue: 'Unknown' })
+  }
+  return formatStatusLabel(status)
+}
+
 export function StatusBadge({
   status,
   className = '',
@@ -109,11 +189,13 @@ export function StatusBadge({
   label?: string
   showDot?: boolean
 }) {
+  const { t } = useTranslation('common')
   const tone = getStatusTone(status)
+  const displayLabel = label ?? getTranslatedStatusLabel(status, t)
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-semibold ${TONE_CLASSES[tone]} ${className}`}
-      title={label ?? formatStatusLabel(status)}
+      title={displayLabel}
     >
       {showDot && (
         <span
@@ -121,7 +203,7 @@ export function StatusBadge({
           className={`h-1.5 w-1.5 shrink-0 rounded-full ${TONE_DOT_CLASSES[tone]}`}
         />
       )}
-      {label ?? formatStatusLabel(status || 'unknown')}
+      {displayLabel}
     </span>
   )
 }

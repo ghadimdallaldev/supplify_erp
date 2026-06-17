@@ -1,0 +1,64 @@
+@import url('handbook-print.css'); /* embedded at build time with base styles */
+
+/* Customer leave-behind: slightly larger type, section emphasis */
+html {
+  font-size: 11.5pt;
+}
+
+.cover-page {
+  min-height: 250mm;
+}
+
+.cover-page h1 {
+  font-size: 2.8rem;
+}
+
+.section-lead {
+  font-size: 1.05rem;
+  color: var(--muted);
+  margin: 0.5rem 0 1.25rem;
+  line-height: 1.5;
+}
+
+h2 {
+  page-break-before: auto;
+  margin-top: 1.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+h2:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+/* Major narrative sections start fresh page */
+main.content > h2:nth-of-type(n + 2) {
+  page-break-before: always;
+  break-before: page;
+}
+
+blockquote {
+  font-size: 1.05rem;
+  font-style: italic;
+  background: #f5efe6;
+  border-left: 4px solid var(--caramel);
+}
+
+table th {
+  background: var(--caramel);
+  color: #fff;
+}
+
+a[href^='http']::after {
+  content: none;
+}
+
+.customer-footer-note {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 2px solid var(--caramel-light);
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+}

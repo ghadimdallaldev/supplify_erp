@@ -454,12 +454,17 @@ async function handleGetSupplierById(req, res) {
           SELECT 1 FROM supplier_follow sf
           WHERE sf.supplier_id = s.id 
             AND sf.restaurant_id = $2
-        ) as is_followed
+        ) as is_followed,
+        EXISTS (
+          SELECT 1 FROM supplier_blocklist sb
+          WHERE sb.supplier_id = s.id
+            AND sb.restaurant_id = $2
+        ) as is_blocked
       `
       const result = await query(sql + ' FROM supplier s WHERE s.id = $1', [id, restaurantId])
       rows = result.rows
     } else {
-      sql += `, false as is_followed`
+      sql += `, false as is_followed, false as is_blocked`
       const result = await query(sql + ' FROM supplier s WHERE s.id = $1', [id])
       rows = result.rows
     }

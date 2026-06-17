@@ -140,6 +140,76 @@ describe('resolve-product-price.service', () => {
     expect(String(queryMock.mock.calls[0][0])).toContain('restaurant_pricing')
   })
 
+  it('resolves quote price when quoteLocks are provided', async () => {
+    const { resolveQuotePrice, resolveProductPricesBatch } = await import(
+      './resolve-product-price.service.js'
+    )
+    const quoteResponseItemId = '66666666-6666-4666-8666-666666666666'
+    const quoteRequestSupplierId = '77777777-7777-4777-8777-777777777777'
+
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: quoteResponseItemId,
+            unit_price: '11.50',
+            currency: 'USD',
+            product_id: PRODUCT_ID,
+            supplier_id: SUPPLIER_ID,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ amount: '20.00', currency: 'USD' }] })
+
+    const quoteResult = await resolveQuotePrice({
+      restaurantId: RESTAURANT_ID,
+      quoteRequestSupplierId,
+      quoteResponseItemId,
+      productId: PRODUCT_ID,
+      supplierId: SUPPLIER_ID,
+    })
+
+    expect(quoteResult?.source).toBe('QUOTE_PRICE')
+    expect(quoteResult?.unitPrice).toBe(11.5)
+    expect(quoteResult?.defaultPrice).toBe(20)
+    expect(quoteResult?.quoteResponseItemId).toBe(quoteResponseItemId)
+
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            quote_response_item_id: quoteResponseItemId,
+            unit_price: '11.50',
+            currency: 'USD',
+            product_id: PRODUCT_ID,
+            supplier_id: SUPPLIER_ID,
+            quote_request_supplier_id: quoteRequestSupplierId,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ product_id: PRODUCT_ID, amount: '20', currency: 'USD' }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const batchResults = await resolveProductPricesBatch({
+      restaurantId: RESTAURANT_ID,
+      items: [{ productId: PRODUCT_ID, supplierId: SUPPLIER_ID, quantity: 2 }],
+      catalogByProductId: new Map([[PRODUCT_ID, { amount: 20, currency: 'USD' }]]),
+      quoteLocks: [
+        {
+          productId: PRODUCT_ID,
+          quoteRequestSupplierId,
+          quoteResponseItemId,
+        },
+      ],
+    })
+
+    expect(batchResults[0].source).toBe('QUOTE_PRICE')
+    expect(batchResults[0].unitPrice).toBe(11.5)
+    expect(batchResults[0].quoteResponseItemId).toBe(quoteResponseItemId)
+  })
+
   it('enriches products with resolved pricing fields', async () => {
     const { enrichProductsWithResolvedPricing } = await import('./resolve-product-price.service.js')
 

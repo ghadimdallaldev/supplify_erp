@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader } from '../components/ui/card'
 import { PageHeader } from '../components/ui/page-header'
@@ -17,8 +18,10 @@ import {
 import { SupplifyLogo } from '../components/SupplifyLogo'
 import { redirectToAuth, redirectToLogout, isEmbeddedFrame } from '../lib/authRedirect'
 import { LegalFooterLinks } from '../components/legal/LegalFooterLinks'
+import { ensureNamespace } from '../i18n'
 
 export function LoginPage() {
+  const { t } = useTranslation('auth')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [inviteRegistered, setInviteRegistered] = useState(false)
@@ -29,19 +32,21 @@ export function LoginPage() {
   }, [])
 
   useEffect(() => {
+    void ensureNamespace('auth')
+  }, [])
+
+  useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const errorParam = urlParams.get('error')
     const expiredParam = urlParams.get('expired')
     if (urlParams.get('registered') === '1') {
       setInviteRegistered(true)
     } else if (expiredParam === 'true') {
-      setError('Your session expired. Please sign in again.')
+      setError(t('sessionExpired'))
     } else if (errorParam) {
-      setError(
-        'Authentication failed. If you were signed in as a demo user, sign out first and try again.'
-      )
+      setError(t('authFailed'))
     }
-  }, [])
+  }, [t])
 
   const handleLogin = () => {
     if (inEmbeddedFrame) return
@@ -94,11 +99,11 @@ export function LoginPage() {
               lineHeight: 1.1,
             }}
           >
-            Connect.
+            {t('taglineLine1')}
             <br />
-            Order.
+            {t('taglineLine2')}
             <br />
-            Grow.
+            {t('taglineLine3')}
           </h2>
           <p
             style={{
@@ -172,7 +177,7 @@ export function LoginPage() {
                 <SupplifyLogo size={56} variant="mark" />
               </div>
               <PageHeader
-                title="Welcome back"
+                title={t('welcomeBack')}
                 description="Sign in to access your account and start managing your orders"
                 className="text-center sm:flex-col sm:items-center [&_p]:mx-auto"
               />
@@ -199,8 +204,7 @@ export function LoginPage() {
               {inviteRegistered && (
                 <Alert className="border-emerald-200 bg-emerald-50 content-reveal">
                   <AlertDescription className="text-emerald-900">
-                    Your account was created. Sign in with the email and password you set on the
-                    invitation page.
+                    {t('inviteRegistered')}
                   </AlertDescription>
                 </Alert>
               )}
@@ -227,7 +231,7 @@ export function LoginPage() {
                 ) : (
                   <>
                     <LogIn className="mr-2 h-5 w-5" />
-                    Sign in with Keycloak
+                    {t('signIn')}
                   </>
                 )}
               </Button>
@@ -240,7 +244,7 @@ export function LoginPage() {
                   disabled={isLoading}
                   className="font-medium text-[var(--brand-mid)] hover:underline"
                 >
-                  Create account
+                  {t('createAccount')}
                 </button>
               </p>
 

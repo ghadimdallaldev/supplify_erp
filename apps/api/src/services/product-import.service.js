@@ -1,3 +1,5 @@
+import path from 'node:path'
+import * as XLSX from 'xlsx'
 import { query, withTransaction } from '../lib/db.js'
 import { ValidationError, NotFoundError, ConflictError } from '../middlewares/errorHandler.js'
 import { checkLimit } from '../lib/subscription.js'
@@ -41,6 +43,13 @@ function mapRow(headers, values) {
   return mapped
 }
 
+function cellToString(value) {
+  if (value === undefined || value === null) return ''
+  if (typeof value === 'string') return value.trim()
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return String(value).trim()
+}
+
 function parseCsv(text) {
   const lines = text.split(/\r?\n/).filter((l) => l.trim())
   if (lines.length < 2) {
@@ -52,6 +61,53 @@ function parseCsv(text) {
     return { rowNumber: index + 2, raw: mapRow(headers, values) }
   })
   return { headers, rows }
+}
+
+function parseXlsxBuffer(buffer) {
+  const workbook = XLSX.read(buffer, { type: 'buffer' })
+  const sheetName = workbook.SheetNames[0]
+  if (!sheetName) {
+    throw new ValidationError('Spreadsheet has no sheets')
+  }
+  const sheet = workbook.Sheets[sheetName]
+  const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+  if (data.length < 2) {
+    throw new ValidationError('Spreadsheet must include a header row and at least one data row')
+  }
+  const headers = data[0].map(cellToString)
+  const rows = data
+    .slice(1)
+    .filter((row) => row.some((cell) => cellToString(cell) !== ''))
+    .map((row, index) => {
+      const values = headers.map((_, i) => cellToString(row[i]))
+      return { rowNumber: index + 2, raw: mapRow(headers, values) }
+    })
+  return { headers, rows }
+}
+
+export function parseSpreadsheetBuffer(buffer, filename = 'import.csv') {
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    throw new ValidationError('Import file is empty or invalid')
+  }
+  const ext = path.extname(String(filename || '')).toLowerCase()
+  if (ext === '.xlsx' || ext === '.xls') {
+    return parseXlsxBuffer(buffer)
+  }
+  if (ext === '.csv' || ext === '') {
+    return parseCsv(buffer.toString('utf8'))
+  }
+  throw new ValidationError('Unsupported import file type. Use .csv, .xlsx, or .xls')
+}
+
+export function parseImportFile(buffer, filename) {
+  return parseSpreadsheetBuffer(buffer, filename)
+}
+
+function resolveParsedImport(input, filename) {
+  if (typeof input === 'string') {
+    return parseCsv(input)
+  }
+  return parseImportFile(input, filename || 'import.csv')
 }
 
 function validateProductRow(mapped, rowNumber) {
@@ -73,8 +129,8 @@ function parseOptionalNumber(value) {
   return Number.isFinite(n) ? n : null
 }
 
-export function previewProductImport(csvText, columnMapping = null) {
-  const { headers, rows } = parseCsv(csvText)
+export function previewProductImport(fileInput, columnMapping = null, filename = null) {
+  const { headers, rows } = resolveParsedImport(fileInput, filename)
   const preview = []
   const errors = []
   const skuSet = new Set()
@@ -238,8 +294,12 @@ async function batchPersistProducts(supplierId, importableRows, existingBySku) {
   return { creates, updates, skuToProductId }
 }
 
-export async function executeProductImport(supplierId, csvText, { partial = true, userId } = {}) {
-  const { rows } = parseCsv(csvText)
+export async function executeProductImport(
+  supplierId,
+  fileInput,
+  { partial = true, userId, filename = null } = {}
+) {
+  const { rows } = resolveParsedImport(fileInput, filename)
   const summary = {
     created: 0,
     updated: 0,
@@ -342,27 +402,45 @@ export function buildErrorReportCsv(errors) {
   return header + lines.join('\n')
 }
 
-export function countProductImportRows(csvText) {
-  const lines = String(csvText || '')
-    .split(/\r?\n/)
-    .filter((l) => l.trim())
-  return Math.max(0, lines.length - 1)
+export function countProductImportRows(fileInput, filename = null) {
+  if (typeof fileInput === 'string') {
+    const lines = String(fileInput || '')
+      .split(/\r?\n/)
+      .filter((l) => l.trim())
+    return Math.max(0, lines.length - 1)
+  }
+  return resolveParsedImport(fileInput, filename).rows.length
 }
 
 export async function createProductImportJob({
   supplierId,
   userId,
-  csvText,
+  csvText = null,
+  fileBuffer = null,
+  filename = null,
   partial = true,
   columnMapping = null,
   preview = null,
 }) {
   const previewJson = {
-    csv: csvText,
     partial,
     columnMapping,
     preview,
-    rowCount: preview?.totalRows ?? countProductImportRows(csvText),
+    filename,
+    rowCount:
+      preview?.totalRows ??
+      (csvText != null
+        ? countProductImportRows(csvText)
+        : countProductImportRows(fileBuffer, filename)),
+  }
+  if (csvText != null) {
+    previewJson.csv = csvText
+  } else if (fileBuffer != null) {
+    previewJson.fileBuffer = Buffer.isBuffer(fileBuffer)
+      ? fileBuffer.toString('base64')
+      : fileBuffer
+  } else {
+    throw new ValidationError('Import job requires file content')
   }
 
   try {
@@ -457,16 +535,23 @@ export async function processProductImportJob(jobId) {
 
   const payload =
     typeof job.preview_json === 'string' ? JSON.parse(job.preview_json) : job.preview_json || {}
-  const { csv, partial = true } = payload
+  const { csv, fileBuffer, filename, partial = true } = payload
 
   try {
-    if (!csv) {
-      throw new ValidationError('Import job missing CSV payload')
+    let fileInput
+    let importFilename = filename
+    if (fileBuffer) {
+      fileInput = Buffer.from(fileBuffer, 'base64')
+    } else if (csv) {
+      fileInput = csv
+    } else {
+      throw new ValidationError('Import job missing file payload')
     }
 
-    const result = await executeProductImport(job.supplier_id, csv, {
+    const result = await executeProductImport(job.supplier_id, fileInput, {
       partial,
       userId: job.created_by,
+      filename: importFilename,
     })
 
     await updateProductImportJob(jobId, {

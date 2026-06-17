@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 type Props = {
   children: ReactNode
@@ -7,6 +8,27 @@ type Props = {
 
 type State = {
   hasError: boolean
+}
+
+function DefaultErrorFallback() {
+  const { t } = useTranslation('common')
+
+  return (
+    <div
+      className="flex min-h-[40vh] flex-col items-center justify-center gap-4 p-8 text-center"
+      role="alert"
+    >
+      <h2 className="text-lg font-semibold">{t('error.title')}</h2>
+      <p className="max-w-md text-sm text-[var(--text-muted)]">{t('error.description')}</p>
+      <button
+        type="button"
+        className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm text-white"
+        onClick={() => window.location.reload()}
+      >
+        {t('actions.reload')}
+      </button>
+    </div>
+  )
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -23,24 +45,7 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback
-      return (
-        <div
-          className="flex min-h-[40vh] flex-col items-center justify-center gap-4 p-8 text-center"
-          role="alert"
-        >
-          <h2 className="text-lg font-semibold">Something went wrong</h2>
-          <p className="max-w-md text-sm text-[var(--text-muted)]">
-            An unexpected error occurred. Try refreshing the page.
-          </p>
-          <button
-            type="button"
-            className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm text-white"
-            onClick={() => window.location.reload()}
-          >
-            Reload
-          </button>
-        </div>
-      )
+      return <DefaultErrorFallback />
     }
     return this.props.children
   }

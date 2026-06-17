@@ -4,6 +4,7 @@ import { fulfillmentFeature, requireFulfillmentAccess } from './fulfillment.help
 import boardRouter from './board.js'
 import exceptionsRouter from './exceptions.js'
 import routesRouter from './routes.js'
+import wavesRouter from './waves.js'
 
 const router = express.Router()
 
@@ -18,5 +19,6 @@ router.use(
 router.use(boardRouter)
 router.use(exceptionsRouter)
 router.use(routesRouter)
+router.use(wavesRouter)
 
 export { router as fulfillmentRoutes }

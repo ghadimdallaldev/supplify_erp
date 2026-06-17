@@ -6,6 +6,7 @@ import { config } from '../config/env.js'
 export const CRON_JOBS = {
   SCHEDULED_ORDERS: 'scheduled_orders',
   INVOICE_OVERDUE: 'invoice_overdue',
+  COLLECTIONS_REMINDERS: 'collections_reminders',
   SUBSCRIPTION_BILLING: 'subscription_billing',
   WAITLIST_OFFERS: 'waitlist_offers',
   PROMOTIONS_EXPIRY: 'promotions_expiry',

@@ -272,7 +272,7 @@ API blocks `PAYMENTS_MODE=mock` when `APP_ENV=prod` or `preprod`.
 - [ ] `REDIS_URL` set on API (Redis plugin per environment); `/health` shows `redis.connected: true`
 - [ ] `GET /health` returns `{ status, service, env }` without secrets
 - [ ] Frontend build with prod `VITE_*` vars
-- [ ] Migrations applied (`pnpm db:migrate`); incl. **0133–0135** for restaurant operations; **`0144`**, **`0145`** for plan catalog audit; **`0161`–`0165`** for B2C consumer ordering + unified `delivery_zone` (June 2026)
+- [ ] Migrations applied (`pnpm db:migrate`); incl. **0133–0135** for restaurant operations; **`0144`**, **`0145`** for plan catalog audit; **`0161`–`0165`** for B2C consumer ordering + unified `delivery_zone` (June 2026); **`0176`–`0179`** for supplier ops wave 2 (collections reminders, pick lists, quote price lock, POD media)
 - [ ] Web + API legal pack version aligned (`2026-06-09`); re-acceptance smoke tested on one stale user
 - [ ] `CRONS_ENABLED=true` on API (operational reminders job; default 24 h interval)
 - [ ] Admin created securely

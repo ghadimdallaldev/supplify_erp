@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogContent,
@@ -14,8 +15,8 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   variant = 'default',
   loading = false,
   onConfirm,
@@ -32,6 +33,8 @@ export function ConfirmDialog({
   onConfirm: () => void | Promise<void>
   children?: ReactNode
 }) {
+  const { t } = useTranslation('common')
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="sm">
@@ -48,7 +51,7 @@ export function ConfirmDialog({
             onClick={() => onOpenChange(false)}
             disabled={loading}
           >
-            {cancelLabel}
+            {cancelLabel ?? t('actions.cancel')}
           </Button>
           <Button
             type="button"
@@ -57,7 +60,7 @@ export function ConfirmDialog({
             onClick={() => void onConfirm()}
             disabled={loading}
           >
-            {confirmLabel}
+            {confirmLabel ?? t('actions.confirm')}
           </Button>
         </DialogFooter>
       </DialogContent>

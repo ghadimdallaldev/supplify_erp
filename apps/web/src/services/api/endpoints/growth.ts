@@ -42,6 +42,16 @@ export type SupplierGrowthMetrics = {
   eligibleSponsorPlans?: string[]
 }
 
+export type RestaurantConnectionRequest = {
+  id: string
+  supplier_id: string
+  supplier_name: string
+  restaurant_id: string
+  status: string
+  expires_at: string
+  created_at: string
+}
+
 export const growthApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getSupplierGrowthMetrics: builder.query<SupplierGrowthMetrics, void>({
@@ -127,6 +137,27 @@ export const growthApi = api.injectEndpoints({
       }),
       invalidatesTags: ['Admin'],
     }),
+    getRestaurantConnectionRequests: builder.query<
+      { requests: RestaurantConnectionRequest[] },
+      void
+    >({
+      query: () => '/api/restaurant/growth/connection-requests',
+      providesTags: ['Supplier'],
+    }),
+    acceptConnectionRequest: builder.mutation<unknown, string>({
+      query: (id) => ({
+        url: `/api/restaurant/growth/connection-requests/${id}/accept`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Supplier'],
+    }),
+    declineConnectionRequest: builder.mutation<unknown, string>({
+      query: (id) => ({
+        url: `/api/restaurant/growth/connection-requests/${id}/decline`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Supplier'],
+    }),
   }),
 })
 
@@ -140,4 +171,7 @@ export const {
   useSponsorProspectMutation,
   useGetAdminGrowthSettingsQuery,
   useUpdateAdminGrowthSettingsMutation,
+  useGetRestaurantConnectionRequestsQuery,
+  useAcceptConnectionRequestMutation,
+  useDeclineConnectionRequestMutation,
 } = growthApi

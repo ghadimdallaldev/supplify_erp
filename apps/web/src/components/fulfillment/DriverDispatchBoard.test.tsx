@@ -22,6 +22,7 @@ vi.mock('../../services/api', () => ({
   useAssignDriverToOrderMutation: () => [vi.fn(), { isLoading: false }],
   useReassignDriverOnOrderMutation: () => [vi.fn(), { isLoading: false }],
   useUpdateOrderDeliveryStatusMutation: () => [vi.fn(), { isLoading: false }],
+  usePresignOrderProofOfDeliveryMutation: () => [vi.fn(), { isLoading: false }],
   useSubmitOrderProofOfDeliveryMutation: () => [vi.fn(), { isLoading: false }],
   useCreateFulfillmentRouteMutation: () => [vi.fn(), { isLoading: false }],
   useRolloverAssignmentToTomorrowMutation: () => [vi.fn(), { isLoading: false }],

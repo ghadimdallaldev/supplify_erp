@@ -25,6 +25,7 @@ vi.mock('./cron-runner.js', () => ({
   CRON_JOBS: {
     SCHEDULED_ORDERS: 'scheduled_orders',
     INVOICE_OVERDUE: 'invoice_overdue',
+    COLLECTIONS_REMINDERS: 'collections_reminders',
     SUBSCRIPTION_BILLING: 'subscription_billing',
     WAITLIST_OFFERS: 'waitlist_offers',
     PROMOTIONS_EXPIRY: 'promotions_expiry',
@@ -51,6 +52,9 @@ vi.mock('../services/scheduled-orders.service.js', () => ({
 }))
 vi.mock('../jobs/invoice-overdue.job.js', () => ({
   checkOverdueInvoices: vi.fn().mockResolvedValue({}),
+}))
+vi.mock('../jobs/collections-reminders.job.js', () => ({
+  runCollectionsRemindersJob: vi.fn().mockResolvedValue({}),
 }))
 vi.mock('../jobs/subscription-billing.job.js', () => ({
   runSubscriptionBillingJob: vi.fn().mockResolvedValue({}),
@@ -91,6 +95,12 @@ vi.mock('../jobs/stale-gps-alerts.job.js', () => ({
 vi.mock('../jobs/log-retention.job.js', () => ({
   runLogRetentionJob: vi.fn().mockResolvedValue({}),
 }))
+vi.mock('../jobs/reorder-forecast.job.js', () => ({
+  runReorderForecastJob: vi.fn().mockResolvedValue({}),
+}))
+vi.mock('../jobs/sponsorship-expiry.job.js', () => ({
+  runGrowthProgramMaintenanceJob: vi.fn().mockResolvedValue({}),
+}))
 vi.mock('./branch-invitations.js', () => ({
   expireOldBranchInvitations: vi.fn().mockResolvedValue(0),
 }))
@@ -103,11 +113,11 @@ describe('registerCronJobs', () => {
     vi.clearAllMocks()
   })
 
-  it('registers 17 cron jobs in non-test environments', async () => {
+  it('registers 19 cron jobs in non-test environments', async () => {
     const { registerCronJobs } = await import('./register-cron-jobs.js')
     const result = registerCronJobs({ trackInterval })
-    expect(result).toEqual({ registered: 17, skipped: false })
-    expect(trackInterval).toHaveBeenCalledTimes(17)
+    expect(result).toEqual({ registered: 19, skipped: false })
+    expect(trackInterval).toHaveBeenCalledTimes(19)
   })
 })
 

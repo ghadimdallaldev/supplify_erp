@@ -147,9 +147,9 @@ Mapping from ops language: CONFIRMED/ACCEPTED → `ACKNOWLEDGED`; PREPARING → 
 
 ---
 
-## Manual route stop ordering
+## Manual and automatic route stop ordering
 
-Drivers and suppliers can **manually order delivery stops** on a route. There is no automatic route optimization yet — stop order is whatever the driver or supplier sets.
+Drivers and suppliers can **manually order delivery stops** on a route. Suppliers can also **optimize stop order** from the depot using nearest-neighbor heuristics (coordinates required on stops).
 
 ### Data model
 
@@ -167,28 +167,35 @@ Completed or failed stops stay fixed; active stops can be reordered.
 
 ### APIs
 
-| Method | Path                                        | Body / notes                                      |
-| ------ | ------------------------------------------- | ------------------------------------------------- |
-| GET    | `/api/fulfillment/routes/today`             | Alias of `/routes/active` — driver’s route today  |
-| GET    | `/api/fulfillment/routes/active`            | `IN_PROGRESS` or today’s `PLANNED` route          |
-| POST   | `/api/fulfillment/routes/:id/stops/reorder` | `{ stop_ids: uuid[] }` — full list (legacy)       |
-| PATCH  | `/api/fulfillment/routes/:id/stops/reorder` | `{ stops: [{ orderId, stopSequence }] }`          |
-| PATCH  | `/api/fulfillment/routes/:id/next-stop`     | `{ orderId }` — move one stop to next active slot |
+| Method | Path                                        | Body / notes                                                            |
+| ------ | ------------------------------------------- | ----------------------------------------------------------------------- |
+| GET    | `/api/fulfillment/routes/today`             | Alias of `/routes/active` — driver’s route today                        |
+| GET    | `/api/fulfillment/routes/active`            | `IN_PROGRESS` or today’s `PLANNED` route                                |
+| POST   | `/api/fulfillment/routes/:id/stops/reorder` | `{ stop_ids: uuid[] }` — full list (legacy)                             |
+| PATCH  | `/api/fulfillment/routes/:id/stops/reorder` | `{ stops: [{ orderId, stopSequence }] }`                                |
+| PATCH  | `/api/fulfillment/routes/:id/next-stop`     | `{ orderId }` — move one stop to next active slot                       |
+| POST   | `/api/fulfillment/routes/:id/optimize`      | `{ apply?: boolean }` — nearest-neighbor from depot; preview or persist |
 
 Stop payloads include `sequenceNumber`, `isNext`, `isCompleted`, `orderNumber`, and `destinationCoordinatesAvailable`.
 
 ### Frontend
 
 - **Driver portal** (`DriverDeliveriesPage` / `DriverRoutePanel`): “Today’s deliveries”, next-stop card, move up/down, set as next.
-- **Supplier fulfillment** (`FulfillmentRouteDetailPanel`): ordered stop list, badges (Next delivery, Completed, On the way, Waiting), reorder controls.
+- **Supplier fulfillment** (`FulfillmentRouteDetailPanel`): ordered stop list, badges (Next delivery, Completed, On the way, Waiting), reorder controls, **Optimize stop order** button.
 
 ### ETA
 
-When an order is on an active route, ETA uses the manual stop order — see [delivery-eta-and-live-tracking.md](./delivery-eta-and-live-tracking.md). Restaurants see `stopsBefore` and friendly copy only (no route IDs or internal route details).
+When an order is on an active route, ETA uses the stop order — see [delivery-eta-and-live-tracking.md](./delivery-eta-and-live-tracking.md). Restaurants see `stopsBefore` and friendly copy only (no route IDs or internal route details).
+
+### Route optimization (v1)
+
+`POST /api/fulfillment/routes/:id/optimize` reorders **PLANNED** stops with coordinates using nearest-neighbor from the route depot. `apply: true` persists `sequence_number` updates.
+
+Service: `route-optimization.service.js`. **Mapbox/Google Directions** (traffic, time windows) is optional future work behind env flags.
 
 ### Future
 
-Automatic route optimization (Mapbox/Google Directions, traffic, etc.) can be added later without changing the stop-order model.
+Automatic route optimization (Mapbox/Google Directions, traffic, etc.) can extend the v1 nearest-neighbor endpoint without changing the stop-order model.
 
 ---
 

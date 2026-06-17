@@ -41,6 +41,7 @@ import { PageShell } from '../components/ui/page-shell'
 import { EmptyState } from '../components/ui/empty-state'
 
 const OPS_QUICK_ACTIONS = [
+  { label: 'Run sheet', href: '/app/run-sheet', icon: ClipboardList, testId: 'qa-run-sheet' },
   { label: 'Deliveries', href: '/app/fulfillment', icon: Truck, testId: 'qa-deliveries' },
   { label: 'Receivables', href: '/app/invoices', icon: DollarSign, testId: 'qa-invoices' },
   { label: 'Reorder', href: '#reorder', icon: Users, testId: 'qa-reorder' },

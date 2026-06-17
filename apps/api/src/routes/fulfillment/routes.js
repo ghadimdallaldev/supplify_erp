@@ -39,6 +39,7 @@ import {
 } from '../../lib/delivery-tracking-payload.js'
 import { rolloverAssignmentToNextDay } from '../../services/delivery-rollover.service.js'
 import { invalidateUserAuthCaches } from '../../lib/access-cache.js'
+import { optimizeDeliveryRoute } from '../../services/route-optimization.service.js'
 
 import {
   resolveRouteReorderAccess,
@@ -350,6 +351,34 @@ router.delete('/routes/:id', requirePermission('FULFILLMENT_MANAGE'), async (req
     next(err)
   }
 })
+
+router.post(
+  '/routes/:id/optimize',
+  requirePermission('FULFILLMENT_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
+      }
+      const apply = req.body?.apply === true || req.query.apply === 'true'
+      const result = await optimizeDeliveryRoute(supplierId, req.params.id, { apply })
+      res.json({
+        ok: true,
+        data: { preview: result.preview, route: result.route },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 
 router.post('/routes/:id/stops/reorder', async (req, res, next) => {
   try {

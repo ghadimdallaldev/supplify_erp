@@ -63,6 +63,11 @@ const SupplierCommandCenterPage = lazy(() =>
     default: m.SupplierCommandCenterPage,
   }))
 )
+const SupplierRunSheetPage = lazy(() =>
+  import('./pages/SupplierRunSheetPage').then((m) => ({
+    default: m.SupplierRunSheetPage,
+  }))
+)
 const DriverDeliveriesPage = lazy(() =>
   import('./pages/DriverDeliveriesPage').then((m) => ({
     default: m.DriverDeliveriesPage,
@@ -475,6 +480,14 @@ const router = createBrowserRouter([
         element: (
           <LazyPage>
             <SupplierCommandCenterPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/run-sheet',
+        element: (
+          <LazyPage>
+            <SupplierRunSheetPage />
           </LazyPage>
         ),
       },

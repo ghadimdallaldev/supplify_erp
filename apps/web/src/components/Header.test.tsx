@@ -48,5 +48,6 @@ describe('Header', () => {
     renderWithProviders(<Header />)
     expect(screen.getByTestId('header')).toBeInTheDocument()
     expect(screen.getByTestId('logout-button')).toBeInTheDocument()
+    expect(screen.getByTestId('language-switcher')).toBeInTheDocument()
   })
 })

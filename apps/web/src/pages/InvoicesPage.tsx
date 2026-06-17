@@ -56,6 +56,7 @@ import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { canUseFinanceInvoices } from '../lib/planFeatureGates'
 import { Link } from 'react-router-dom'
 import { SupplierReceivablesPanel } from '../components/supplier/SupplierReceivablesPanel'
+import { RestaurantPayablesPanel } from '../components/restaurant/RestaurantPayablesPanel'
 import { InvoiceCreditNotesCard } from '../components/invoices/InvoiceCreditNotesCard'
 import { InvoiceStatsCards } from '../components/invoices/InvoiceStatsCards'
 import { InvoiceListPanel } from '../components/invoices/InvoiceListPanel'
@@ -64,6 +65,13 @@ import {
   LazyInvoicePaymentDialog,
 } from '../components/invoices/lazyInvoiceDialogs'
 import { apiUrl } from '../lib/apiBase'
+import { applyReportDatePreset } from '../components/reports/ReportFiltersBar'
+
+type SupplierExportType = 'standard' | 'quickbooks' | 'payments'
+
+function defaultExportRange() {
+  return applyReportDatePreset(30)
+}
 
 export function InvoicesPage() {
   const [search, setSearch] = useState('')
@@ -75,6 +83,9 @@ export function InvoicesPage() {
   const [paymentMode, setPaymentMode] = useState<'full' | 'partial' | 'credit'>('full')
   const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null)
   const [exportingCsv, setExportingCsv] = useState(false)
+  const [exportFrom, setExportFrom] = useState(() => defaultExportRange().from)
+  const [exportTo, setExportTo] = useState(() => defaultExportRange().to)
+  const [supplierExportType, setSupplierExportType] = useState<SupplierExportType>('standard')
 
   // Payment form state
   const [paymentAmount, setPaymentAmount] = useState<number>(0)
@@ -291,19 +302,35 @@ export function InvoicesPage() {
         URL.revokeObjectURL(url)
         toast.success('Invoices exported')
       } else {
-        const header = 'Invoice Number,Date,Due Date,Status,Total,Restaurant\n'
-        const lines = (invoicesData?.invoices ?? []).map(
-          (inv: any) =>
-            `"${inv.invoice_number || inv.id}","${inv.invoice_date || ''}","${inv.due_date || ''}","${inv.status}",${inv.total_amount},"${String(inv.restaurant_name || '').replace(/"/g, '""')}"`
-        )
-        const blob = new Blob([header + lines.join('\n')], { type: 'text/csv' })
+        const params = new URLSearchParams()
+        params.set('from', exportFrom)
+        params.set('to', exportTo)
+        if (supplierExportType === 'standard' && statusFilter !== 'ALL') {
+          params.set('status', statusFilter)
+        }
+        const qs = params.toString()
+        const exportPath =
+          supplierExportType === 'quickbooks'
+            ? '/api/supplier/invoices/export/quickbooks.csv'
+            : supplierExportType === 'payments'
+              ? '/api/supplier/payments/export.csv'
+              : '/api/supplier/invoices/export.csv'
+        const res = await fetch(apiUrl(`${exportPath}?${qs}`), { credentials: 'include' })
+        if (!res.ok) throw new Error('Export failed')
+        const blob = await res.blob()
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `invoices-${new Date().toISOString().slice(0, 10)}.csv`
+        const prefix =
+          supplierExportType === 'quickbooks'
+            ? 'invoices-quickbooks'
+            : supplierExportType === 'payments'
+              ? 'payments'
+              : 'invoices'
+        a.download = `${prefix}-${new Date().toISOString().slice(0, 10)}.csv`
         a.click()
         URL.revokeObjectURL(url)
-        toast.success('Invoices exported')
+        toast.success('Export downloaded')
       }
     } catch {
       toast.error('Could not export invoices')
@@ -332,18 +359,71 @@ export function InvoicesPage() {
           title={invoicesTitle}
           description={invoicesDescription}
           actions={
-            <Button variant="outline" onClick={handleExportCsv} disabled={exportingCsv}>
-              {exportingCsv ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4 mr-2" />
-              )}
-              Export CSV
-            </Button>
+            isRestaurant ? (
+              <Button variant="outline" onClick={handleExportCsv} disabled={exportingCsv}>
+                {exportingCsv ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                Export CSV
+              </Button>
+            ) : (
+              <div className="flex flex-wrap items-end gap-2">
+                <div>
+                  <Label htmlFor="export-from" className="text-xs text-[var(--text-mid)]">
+                    From
+                  </Label>
+                  <Input
+                    id="export-from"
+                    type="date"
+                    className="mt-1 w-[140px]"
+                    value={exportFrom}
+                    onChange={(e) => setExportFrom(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="export-to" className="text-xs text-[var(--text-mid)]">
+                    To
+                  </Label>
+                  <Input
+                    id="export-to"
+                    type="date"
+                    className="mt-1 w-[140px]"
+                    value={exportTo}
+                    onChange={(e) => setExportTo(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="export-type" className="text-xs text-[var(--text-mid)]">
+                    Export
+                  </Label>
+                  <Select
+                    value={supplierExportType}
+                    onValueChange={(v) => setSupplierExportType(v as SupplierExportType)}
+                  >
+                    <SelectTrigger id="export-type" className="mt-1 w-[160px]">
+                      <option value="standard">Standard CSV</option>
+                      <option value="quickbooks">QuickBooks</option>
+                      <option value="payments">Payments</option>
+                    </SelectTrigger>
+                  </Select>
+                </div>
+                <Button variant="outline" onClick={handleExportCsv} disabled={exportingCsv}>
+                  {exportingCsv ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  Export
+                </Button>
+              </div>
+            )
           }
         />
 
         {!isRestaurant && financeInvoicesEnabled && <SupplierReceivablesPanel />}
+        {isRestaurant && financeInvoicesEnabled && <RestaurantPayablesPanel />}
 
         {disputesEnabled && tenantCreditNotes.length > 0 && (
           <InvoiceCreditNotesCard

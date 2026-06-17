@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Supplify — Customer Overview</title>
+  <style>/* Supplify Customer Presentation — premium print layout */
+
+@page {
+  size: A4;
+  margin: 14mm 12mm 18mm 12mm;
+}
+
+:root {
+  --cream: #faf7f2;
+  --cream-dark: #f0e8dc;
+  --caramel: #8b6914;
+  --caramel-mid: #a68428;
+  --caramel-light: #c4a574;
+  --caramel-pale: #e8dcc8;
+  --ink: #1a1a1a;
+  --ink-soft: #3d3d3d;
+  --muted: #5c5348;
+  --border: #e0d4c4;
+  --green: #2d6a4f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 10.75pt;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  color: var(--ink);
+  background: var(--cream);
+  line-height: 1.5;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ─── Cover ─── */
+.cover-premium {
+  position: relative;
+  min-height: 277mm;
+  page-break-after: always;
+  overflow: hidden;
+  background: linear-gradient(145deg, #faf7f2 0%, #f0e8dc 45%, #e8dcc8 100%);
+}
+
+.cover-bg-shape {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.35;
+}
+
+.cover-bg-shape-1 {
+  width: 420px;
+  height: 420px;
+  background: var(--caramel-light);
+  top: -120px;
+  right: -80px;
+}
+
+.cover-bg-shape-2 {
+  width: 280px;
+  height: 280px;
+  background: var(--caramel);
+  bottom: 40px;
+  left: -60px;
+  opacity: 0.12;
+}
+
+.cover-bg-shape-3 {
+  width: 160px;
+  height: 160px;
+  border: 3px solid var(--caramel);
+  top: 45%;
+  right: 12%;
+  opacity: 0.2;
+  background: transparent;
+}
+
+.cover-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 277mm;
+  padding: 2.5rem;
+  text-align: center;
+}
+
+.cover-logo .logo-svg {
+  width: 72px;
+  height: 72px;
+  margin-bottom: 1.25rem;
+  filter: drop-shadow(0 4px 12px rgba(139, 105, 20, 0.25));
+}
+
+.logo-fallback {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  background: var(--caramel);
+  color: #fff;
+  font: bold 2rem Georgia, serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.25rem;
+}
+
+.cover-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 3.5rem;
+  font-weight: 700;
+  color: var(--caramel);
+  margin: 0 0 0.35rem;
+  letter-spacing: 0.04em;
+}
+
+.cover-tagline {
+  font-size: 1.35rem;
+  color: var(--ink-soft);
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.cover-subtitle {
+  font-size: 1rem;
+  color: var(--muted);
+  max-width: 26rem;
+  margin: 0 auto 1.75rem;
+  line-height: 1.55;
+}
+
+.cover-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.cover-pills span {
+  background: #fff;
+  border: 1px solid var(--caramel-light);
+  color: var(--caramel);
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.cover-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+/* ─── Stats strip ─── */
+.stats-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  page-break-after: always;
+  background: var(--caramel);
+  color: #fff;
+  min-height: 45mm;
+}
+
+.stat-item {
+  padding: 1.25rem 1rem;
+  text-align: center;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.stat-item:last-child {
+  border-right: none;
+}
+
+.stat-num {
+  font-family: Georgia, serif;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 0.35rem;
+}
+
+.stat-label {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  opacity: 0.92;
+}
+
+/* ─── TOC ─── */
+.toc-premium {
+  page-break-after: always;
+  padding: 2rem 2.5rem;
+  background: #fff;
+  border-bottom: 4px solid var(--caramel-pale);
+}
+
+.toc-premium h2 {
+  font-family: Georgia, serif;
+  color: var(--caramel);
+  font-size: 1.5rem;
+  margin: 0 0 1rem;
+  border: none;
+}
+
+.toc-premium ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  columns: 2;
+  column-gap: 2rem;
+}
+
+.toc-premium li {
+  margin: 0.3rem 0;
+  font-size: 0.88rem;
+  break-inside: avoid;
+}
+
+.toc-premium a {
+  color: var(--ink-soft);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--caramel-light);
+}
+
+/* ─── Body content ─── */
+.content-premium {
+  padding: 0 0.25rem;
+}
+
+.content-premium > h2 {
+  font-family: Georgia, serif;
+  font-size: 1.55rem;
+  color: var(--caramel);
+  margin: 0;
+  padding: 1.5rem 1.25rem 0.75rem;
+  page-break-before: always;
+  break-before: page;
+  border-top: 6px solid var(--caramel);
+  background: linear-gradient(180deg, var(--cream-dark) 0%, var(--cream) 100%);
+}
+
+.content-premium > h2:first-child {
+  page-break-before: auto;
+}
+
+.content-premium h3 {
+  font-size: 1.05rem;
+  color: var(--caramel-mid);
+  margin: 1.1rem 0 0.5rem;
+  padding: 0 1.25rem;
+}
+
+.content-premium p,
+.content-premium ul,
+.content-premium ol,
+.content-premium table,
+.content-premium blockquote,
+.content-premium .mermaid,
+.content-premium .pillar-grid {
+  margin-left: 1.25rem;
+  margin-right: 1.25rem;
+}
+
+.content-premium p {
+  margin-top: 0.5rem;
+  margin-bottom: 0.65rem;
+  color: var(--ink-soft);
+}
+
+.content-premium ul,
+.content-premium ol {
+  padding-left: 1.35rem;
+  margin-bottom: 0.85rem;
+}
+
+.content-premium li {
+  margin: 0.25rem 0;
+}
+
+.content-premium strong {
+  color: var(--ink);
+}
+
+blockquote {
+  margin: 1rem 1.25rem;
+  padding: 1rem 1.25rem;
+  background: #fff;
+  border-left: 4px solid var(--caramel);
+  border-radius: 0 8px 8px 0;
+  font-family: Georgia, serif;
+  font-size: 1.1rem;
+  font-style: italic;
+  color: var(--ink-soft);
+  box-shadow: 0 2px 8px rgba(139, 105, 20, 0.08);
+}
+
+blockquote strong {
+  font-style: normal;
+  color: var(--caramel);
+}
+
+table {
+  width: calc(100% - 2.5rem);
+  border-collapse: collapse;
+  margin: 0.75rem 1.25rem 1.25rem;
+  font-size: 0.82rem;
+  page-break-inside: avoid;
+  break-inside: avoid-page;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+th {
+  background: var(--caramel);
+  color: #fff;
+  font-weight: 600;
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+}
+
+td {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+tr:nth-child(even) td {
+  background: #fffdf9;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+.mermaid {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 1.25rem;
+  page-break-inside: avoid;
+  text-align: center;
+}
+
+hr {
+  border: none;
+  height: 1px;
+  background: var(--border);
+  margin: 1.5rem 1.25rem;
+}
+
+.pillar-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin: 1rem 1.25rem 1.25rem;
+  page-break-inside: avoid;
+}
+
+.pillar-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  border-top: 3px solid var(--caramel);
+}
+
+.pillar-card h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.9rem;
+  color: var(--caramel);
+}
+
+.pillar-card p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.pull-quote {
+  text-align: center;
+  font-family: Georgia, serif;
+  font-size: 1.25rem;
+  color: var(--caramel);
+  margin: 1.25rem;
+  padding: 1rem;
+  font-weight: 600;
+}
+
+/* ─── Closing CTA ─── */
+.closing-cta {
+  page-break-before: always;
+  background: linear-gradient(160deg, var(--caramel) 0%, #6b5210 100%);
+  color: #fff;
+  padding: 2.5rem 2rem;
+  text-align: center;
+  min-height: 80mm;
+}
+
+.closing-cta h2 {
+  font-family: Georgia, serif;
+  font-size: 1.75rem;
+  margin: 0 0 0.75rem;
+  color: #fff;
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.closing-cta p {
+  max-width: 28rem;
+  margin: 0 auto 1.5rem;
+  opacity: 0.95;
+  font-size: 0.95rem;
+}
+
+.cta-steps {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.cta-steps div {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  font-size: 0.85rem;
+  min-width: 7rem;
+}
+
+.cta-steps strong {
+  display: block;
+  font-size: 1.25rem;
+  margin-bottom: 0.2rem;
+}
+
+.closing-foot {
+  font-size: 0.7rem;
+  opacity: 0.75;
+  margin: 0;
+}
+
+a[href^='http']::after {
+  content: none;
+}
+
+code {
+  font-size: 0.85em;
+  background: var(--cream-dark);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+}
+
+pre {
+  display: none;
+}
+
+.mermaid-fallback {
+  font-family: monospace;
+  font-size: 0.7rem;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+</style>
+</head>
+<body>
+  <section class="cover-premium">
+    <div class="cover-bg-shape cover-bg-shape-1"></div>
+    <div class="cover-bg-shape cover-bg-shape-2"></div>
+    <div class="cover-bg-shape cover-bg-shape-3"></div>
+    <div class="cover-inner">
+      <div class="cover-logo"><svg class="logo-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#8B6914"/>
+      <stop offset="100%" stop-color="#6B5210"/>
+    </linearGradient>
+  </defs>
+  <rect width="80" height="80" rx="20" fill="url(#g)"/>
+  <polygon points="40,9 67,24.5 67,55.5 40,71 13,55.5 13,24.5" stroke="white" stroke-width="2.5" fill="none"/>
+  <polygon points="40,20 57,30 57,50 40,60 23,50 23,30" stroke="white" stroke-width="1.5" fill="none" opacity="0.45"/>
+  <circle cx="40" cy="40" r="4" fill="white" opacity="0.85"/>
+</svg>
+</div>
+      <h1 class="cover-title">Supplify</h1>
+      <p class="cover-tagline">One platform from order to invoice.</p>
+      <p class="cover-subtitle">The connected operating system for restaurants and food suppliers.</p>
+      <div class="cover-pills">
+        <span>Ordering</span><span>Fulfillment</span><span>Receiving</span><span>Finance</span>
+      </div>
+      <p class="cover-meta">Customer overview · 2026-06-17</p>
+    </div>
+  </section>
+
+  <section class="stats-strip">
+    <div class="stat-item">
+      <div class="stat-num">One</div>
+      <div class="stat-label">shared record from cart to payment</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">2</div>
+      <div class="stat-label">sides connected — restaurant &amp; supplier</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">6</div>
+      <div class="stat-label">steps in the order journey</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">4</div>
+      <div class="stat-label">plans that scale with you</div>
+    </div>
+  </section>
+
+  <nav class="toc-premium"><h2>What’s inside</h2><ul><li style=""><a href="#supplify-customer-overview">Supplify — Customer Overview</a></li>
+<li style="padding-left:1rem;"><a href="#the-idea">The idea</a></li>
+<li style="padding-left:1rem;"><a href="#why-the-status-quo-fails">Why the status quo fails</a></li>
+<li style="padding-left:1rem;"><a href="#everyone-in-the-ecosystem-connected">Everyone in the ecosystem — connected</a></li>
+<li style="padding-left:1rem;"><a href="#restaurants-order-with-confidence">Restaurants — order with confidence</a></li>
+<li style="padding-left:2rem;"><a href="#discover-purchase">Discover &amp; purchase</a></li>
+<li style="padding-left:2rem;"><a href="#track-receive">Track &amp; receive</a></li>
+<li style="padding-left:2rem;"><a href="#run-the-operation">Run the operation</a></li>
+<li style="padding-left:1rem;"><a href="#suppliers-fulfill-without-friction">Suppliers — fulfill without friction</a></li>
+<li style="padding-left:2rem;"><a href="#win-retain-customers">Win &amp; retain customers</a></li>
+<li style="padding-left:2rem;"><a href="#operate-at-scale">Operate at scale</a></li>
+<li style="padding-left:2rem;"><a href="#get-paid-with-clarity">Get paid with clarity</a></li>
+<li style="padding-left:1rem;"><a href="#how-an-order-flows-both-sides-same-truth">How an order flows — both sides, same truth</a></li>
+<li style="padding-left:1rem;"><a href="#everything-you-need-one-platform">Everything you need — one platform</a></li>
+<li style="padding-left:1rem;"><a href="#plans-that-grow-with-your-business">Plans that grow with your business</a></li>
+<li style="padding-left:1rem;"><a href="#built-for-trust">Built for trust</a></li>
+<li style="padding-left:1rem;"><a href="#go-live-in-weeks-not-months">Go live in weeks — not months</a></li>
+<li style="padding-left:1rem;"><a href="#why-teams-choose-supplify">Why teams choose Supplify</a></li>
+<li style="padding-left:1rem;"><a href="#your-next-step">Your next step</a></li></ul></nav>
+
+  <main class="content-premium"><h2 class="part-title">Supplify — Customer Overview</h2>
+<p><strong>For:</strong> Restaurant owners, supplier leadership, and operations teams<br><strong>Purpose:</strong> Understand what Supplify delivers — and why teams choose it over fragmented tools.</p>
+<hr>
+<h2>The idea</h2>
+<p>Food service runs on relationships — but relationships break down when <strong>orders, deliveries, and invoices live in different places</strong>.</p>
+<p>Supplify is the <strong>connected platform</strong> where restaurants and suppliers work from the <strong>same facts</strong>: what was ordered, what was shipped, what arrived, and what is owed.</p>
+<blockquote>
+<p><strong>Supplify in one line:</strong> <em>From catalog to cash — one reliable flow for restaurants and their suppliers.</em></p>
+</blockquote>
+<div class="pillar-grid">
+<div class="pillar-card"><h4>For restaurants</h4><p>Order from every connected supplier, track delivery, receive fairly, and reconcile invoices without spreadsheet chaos.</p></div>
+<div class="pillar-card"><h4>For suppliers</h4><p>Centralize orders, run fulfillment and drivers, grow your customer base, and get paid with full context.</p></div>
+<div class="pillar-card"><h4>For operations</h4><p>Warehouses, dispatch boards, proof of delivery, and inventory — built for how F&amp;B actually works.</p></div>
+<div class="pillar-card"><h4>For growth</h4><p>Deals, public catalogs, quote requests, and referrals — turn relationships into repeatable revenue.</p></div>
+</div>
+
+<hr>
+<h2>Why the status quo fails</h2>
+<table>
+<thead>
+<tr>
+<th>Today’s pain</th>
+<th>The cost to your business</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Orders by phone and text</strong></td>
+<td>No shared record — disputes become “he said / she said”</td>
+</tr>
+<tr>
+<td><strong>Delivery is a black box</strong></td>
+<td>Kitchens can’t plan; suppliers get blamed unfairly</td>
+</tr>
+<tr>
+<td><strong>Receiving is rushed</strong></td>
+<td>Shortages found days later, when resolution is harder</td>
+</tr>
+<tr>
+<td><strong>Invoices don’t match delivery</strong></td>
+<td>Finance loses hours reconciling every week</td>
+</tr>
+<tr>
+<td><strong>Many suppliers, many systems</strong></td>
+<td>Staff re-learn a different process for each partner</td>
+</tr>
+</tbody></table>
+<p class="pull-quote">Supplify replaces fragmentation with one auditable thread — from the first click to the final payment.</p>
+
+<hr>
+<h2>Everyone in the ecosystem — connected</h2>
+<div class="mermaid">
+flowchart TB
+  subgraph restaurant [Restaurant]
+    RO[Owner / Manager]
+    B[Purchasing]
+    R[Receiving]
+  end
+
+<p>  subgraph platform [Supplify Platform]
+    OH[Order hub]
+    F[Fulfillment]
+    INV[Invoices]
+  end</p>
+<p>  subgraph supplier [Supplier]
+    S[Sales and catalog]
+    W[Warehouse]
+    D[Drivers]
+  end</p>
+<p>  B --&gt;|Browse and order| OH
+  OH --&gt; S
+  W --&gt; F
+  F --&gt; D
+  D --&gt;|Deliver| R
+  R --&gt;|Receive| INV</p>
+</div>
+
+
+<table>
+<thead>
+<tr>
+<th>Who</th>
+<th>What they gain</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Restaurant owners &amp; managers</strong></td>
+<td>Visibility across suppliers, spend, and operations</td>
+</tr>
+<tr>
+<td><strong>Purchasing staff</strong></td>
+<td>One place to order — quick lists, deals, chat</td>
+</tr>
+<tr>
+<td><strong>Receiving teams</strong></td>
+<td>Structured receiving with quality notes and disputes</td>
+</tr>
+<tr>
+<td><strong>Supplier sales</strong></td>
+<td>Digital catalog, promotions, and customer growth tools</td>
+</tr>
+<tr>
+<td><strong>Warehouse &amp; dispatch</strong></td>
+<td>Board, routes, drivers, proof of delivery</td>
+</tr>
+<tr>
+<td><strong>Drivers</strong></td>
+<td>Focused mobile-friendly delivery workspace</td>
+</tr>
+<tr>
+<td><strong>Finance (both sides)</strong></td>
+<td>Invoices tied to real orders and receiving reports</td>
+</tr>
+<tr>
+<td><strong>Guests</strong> <em>(optional)</em></td>
+<td>Public reservations and consumer ordering</td>
+</tr>
+</tbody></table>
+<p>Each person sees <strong>only what their role requires</strong> — secure, simple, accountable.</p>
+<hr>
+<h2>Restaurants — order with confidence</h2>
+<h3>Discover &amp; purchase</h3>
+<ul>
+<li>Browse <strong>connected supplier catalogs</strong> in one workspace  </li>
+<li>Build a cart across <strong>multiple suppliers</strong> in a single session  </li>
+<li>Save <strong>quick lists</strong> for weekly staples; schedule automatic reorders  </li>
+<li>Apply <strong>deals and promotions</strong> at checkout</li>
+</ul>
+<h3>Track &amp; receive</h3>
+<ul>
+<li><strong>Live order status</strong> — placed, confirmed, shipped, delivered  </li>
+<li>Optional <strong>GPS tracking</strong> when your supplier dispatches drivers  </li>
+<li><strong>Receiving workflow</strong> at the door — quantities, quality, photos  </li>
+<li>Fair <strong>disputes and credit notes</strong> when something isn’t right</li>
+</ul>
+<h3>Run the operation</h3>
+<ul>
+<li><strong>Inventory</strong> with expiry awareness for critical SKUs  </li>
+<li><strong>Reorder assistance</strong> as your plan scales (patterns → forecasts)  </li>
+<li><strong>Invoices and payments</strong> linked to what you actually received  </li>
+<li><strong>Reservations</strong> and <strong>staff tools</strong> for front-of-house teams</li>
+</ul>
+<hr>
+<h2>Suppliers — fulfill without friction</h2>
+<h3>Win &amp; retain customers</h3>
+<ul>
+<li>Rich <strong>product catalog</strong> with images and bulk import  </li>
+<li><strong>Public mini-store</strong> so new restaurants can discover you  </li>
+<li><strong>Promotions and deals</strong> your buyers will actually see  </li>
+<li><strong>Growth program</strong> — import prospects, referrals, sponsorships</li>
+</ul>
+<h3>Operate at scale</h3>
+<ul>
+<li>Central <strong>order inbox</strong> — accept, decline, or amend with reasons  </li>
+<li><strong>Calendar</strong> of upcoming deliveries  </li>
+<li><strong>Warehouse stock</strong> and multi-location fulfillment  </li>
+<li><strong>Dispatch board</strong> — assign drivers, plan routes, capture proof of delivery</li>
+</ul>
+<h3>Get paid with clarity</h3>
+<ul>
+<li><strong>Invoices from fulfilled orders</strong> — less manual billing  </li>
+<li>Payment recording and <strong>receivables</strong> visibility  </li>
+<li><strong>Chat</strong> next to orders — resolve questions in context</li>
+</ul>
+<hr>
+<h2>How an order flows — both sides, same truth</h2>
+<div class="mermaid">
+stateDiagram-v2
+  direction LR
+  [*] --> Placed: Restaurant orders
+  Placed --> Confirmed: Supplier accepts
+  Confirmed --> Shipped: Picked & dispatched
+  Shipped --> Delivered: Driver completes
+  Delivered --> Received: Restaurant confirms
+  Received --> Invoiced: Invoice issued
+  Invoiced --> Paid: Payment recorded
+  Paid --> [*]
+</div>
+
+
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Restaurant sees</th>
+<th>Supplier sees</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>1 · Order</strong></td>
+<td>Catalog, cart, confirmation</td>
+<td>Instant notification</td>
+</tr>
+<tr>
+<td><strong>2 · Confirm</strong></td>
+<td>Acceptance or proposed changes</td>
+<td>Accept, decline, or amend</td>
+</tr>
+<tr>
+<td><strong>3 · Fulfill</strong></td>
+<td>Status updates</td>
+<td>Pick, pack, assign driver</td>
+</tr>
+<tr>
+<td><strong>4 · Deliver</strong></td>
+<td>Optional live tracking</td>
+<td>Driver status &amp; proof</td>
+</tr>
+<tr>
+<td><strong>5 · Receive</strong></td>
+<td>Receiving report</td>
+<td>Full delivery record</td>
+</tr>
+<tr>
+<td><strong>6 · Invoice</strong></td>
+<td>Invoice to review &amp; pay</td>
+<td>Receivable recorded</td>
+</tr>
+</tbody></table>
+<p><strong>When things change</strong> — shortages, substitutions, quality issues — amendments and disputes stay <strong>on the same order thread</strong>. No lost emails. No mystery.</p>
+<hr>
+<h2>Everything you need — one platform</h2>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th align="center">Restaurant</th>
+<th align="center">Supplier</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Catalog &amp; search</td>
+<td align="center">✓</td>
+<td align="center">✓ Manage</td>
+</tr>
+<tr>
+<td>Multi-supplier ordering</td>
+<td align="center">✓</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td>Quick lists &amp; scheduling</td>
+<td align="center">✓</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td>In-context chat</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td>Fulfillment &amp; dispatch</td>
+<td align="center">—</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td>Driver delivery &amp; tracking</td>
+<td align="center">View</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td>Receiving &amp; quality</td>
+<td align="center">✓</td>
+<td align="center">View</td>
+</tr>
+<tr>
+<td>Disputes &amp; credit notes</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td>Invoices &amp; payments</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td>Inventory &amp; expiry</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td>Promotions &amp; deals</td>
+<td align="center">Redeem</td>
+<td align="center">Create</td>
+</tr>
+<tr>
+<td>Reservations</td>
+<td align="center">✓</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td>Staff &amp; scheduling</td>
+<td align="center">✓</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td>Reports &amp; insights</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td>Team roles &amp; permissions</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+</tbody></table>
+<p><em>Available capabilities depend on your subscription plan.</em></p>
+<hr>
+<h2>Plans that grow with your business</h2>
+<p>Start with a <strong>Free Trial</strong> to validate fit with your real suppliers and workflows. Scale into paid tiers as volume, users, and locations grow.</p>
+<table>
+<thead>
+<tr>
+<th>Plan</th>
+<th>Ideal for</th>
+<th>What you unlock</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Free Trial</strong></td>
+<td>Evaluation</td>
+<td>Core ordering, receiving, and collaboration — time-limited</td>
+</tr>
+<tr>
+<td><strong>Silver</strong></td>
+<td>Single location getting serious</td>
+<td>Higher limits, reports, calendar, warehouses</td>
+</tr>
+<tr>
+<td><strong>Gold</strong></td>
+<td>Daily multi-supplier operations</td>
+<td>Drivers, smart reorder, branches, advanced team roles</td>
+</tr>
+<tr>
+<td><strong>Platinum</strong></td>
+<td>Multi-site &amp; data-led teams</td>
+<td>AI-assisted reorder, deepest analytics, highest limits</td>
+</tr>
+</tbody></table>
+<p><strong>Restaurants and suppliers</strong> each choose the tier that matches their side of the relationship. Your Supplify contact will recommend a starting point based on branches, users, and order volume.</p>
+<hr>
+<h2>Built for trust</h2>
+<table>
+<thead>
+<tr>
+<th>Commitment</th>
+<th>What it means for you</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Secure access</strong></td>
+<td>Modern sign-in; each organization has its own isolated workspace</td>
+</tr>
+<tr>
+<td><strong>Role-based permissions</strong></td>
+<td>Owners, managers, purchasers, drivers, and accountants see only what they need</td>
+</tr>
+<tr>
+<td><strong>Complete audit trail</strong></td>
+<td>Orders, status changes, receiving, and invoices are recorded</td>
+</tr>
+<tr>
+<td><strong>Reliable infrastructure</strong></td>
+<td>Cloud-hosted, designed for uptime and secure file handling</td>
+</tr>
+<tr>
+<td><strong>Fair dispute resolution</strong></td>
+<td>Evidence stays attached to the order — not buried in chat</td>
+</tr>
+</tbody></table>
+<p>Your operational and financial data deserves the same rigor you bring to the kitchen and the warehouse.</p>
+<hr>
+<h2>Go live in weeks — not months</h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Week 1 · Setup</strong></td>
+<td>Account, profile, team invites, plan selection</td>
+</tr>
+<tr>
+<td><strong>Week 2 · Connect</strong></td>
+<td>Link trading partners; publish or browse catalogs; test order</td>
+</tr>
+<tr>
+<td><strong>Week 3 · Operate</strong></td>
+<td>Real orders through delivery, receiving, and invoicing</td>
+</tr>
+</tbody></table>
+<p>Most teams run production workflows within <strong>two to three weeks</strong>. Your Supplify onboarding lead provides checklists, training, and go-live support.</p>
+<hr>
+<h2>Why teams choose Supplify</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>One platform</strong></td>
+<td>Replace phone orders, spreadsheets, and disconnected tools</td>
+</tr>
+<tr>
+<td><strong>Shared truth</strong></td>
+<td>Restaurant and supplier always see the same order state</td>
+</tr>
+<tr>
+<td><strong>Faster resolution</strong></td>
+<td>Amendments and disputes with full context</td>
+</tr>
+<tr>
+<td><strong>Built for F&amp;B</strong></td>
+<td>Not generic ERP — reservations, expiry, supplier relationships</td>
+</tr>
+<tr>
+<td><strong>Scales with you</strong></td>
+<td>From single location to multi-branch networks</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Your next step</h2>
+<ol>
+<li><strong>Book a demo</strong> — We walk through <em>your</em> scenario: restaurant, supplier, or both.  </li>
+<li><strong>Start a Free Trial</strong> — Place real orders with your trading partners.  </li>
+<li><strong>Go live</strong> — We support onboarding, training, and success reviews.</li>
+</ol>
+<p><strong>Speak with your Supplify representative</strong> for pricing, trial access, and a rollout plan tailored to your operation.</p>
+<hr>
+<p><em>Supplify · Restaurant &amp; F&amp;B supplier marketplace · Ordering · Receiving · Fulfillment · Finance</em></p>
+</main>
+
+  <section class="closing-cta">
+    <h2>Ready to see Supplify in action?</h2>
+    <p>Book a tailored demo with your Supplify representative — restaurant, supplier, or full marketplace scenario.</p>
+    <div class="cta-steps">
+      <div><strong>1</strong> Discovery call</div>
+      <div><strong>2</strong> Live walkthrough</div>
+      <div><strong>3</strong> Free trial &amp; go-live plan</div>
+    </div>
+    <p class="closing-foot">© Supplify · Restaurant &amp; F&amp;B supplier marketplace</p>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (typeof mermaid === 'undefined') return;
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'base',
+        themeVariables: {
+          primaryColor: '#F0E8DC',
+          primaryTextColor: '#1A1A1A',
+          primaryBorderColor: '#8B6914',
+          lineColor: '#8B6914',
+          secondaryColor: '#FAF7F2',
+          tertiaryColor: '#E8DCC8',
+          fontFamily: 'Segoe UI, Arial, sans-serif',
+        },
+        securityLevel: 'loose',
+      });
+      try { await mermaid.run({ querySelector: '.mermaid' }); }
+      catch (e) { document.querySelectorAll('.mermaid').forEach(el => el.classList.add('mermaid-fallback')); }
+    });
+  </script>
+</body>
+</html>
