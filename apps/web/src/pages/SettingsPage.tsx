@@ -1,10 +1,21 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Switch } from '../components/ui/switch'
 import { Badge } from '../components/ui/badge'
 import { AppPanel } from '../components/ui/app-panel'
-import { User, Mail, Shield, Bell, Loader2, Save, LogIn, ExternalLink } from 'lucide-react'
+import {
+  User,
+  Mail,
+  Shield,
+  Bell,
+  Loader2,
+  Save,
+  LogIn,
+  ExternalLink,
+  Languages,
+} from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { useImpersonation } from '../hooks/useImpersonation'
@@ -21,6 +32,8 @@ import { PageShell } from '../components/ui/page-shell'
 import { AdminLoadingState } from '../components/admin/adminUi'
 import { cn } from '../lib/utils'
 import type { User as AuthUser } from '../types/auth'
+import { LanguageSwitcher } from '../components/LanguageSwitcher'
+import { ensureNamespace } from '../i18n'
 
 const DEFAULT_NOTIFICATION_PREFS = {
   emailEnabled: true,
@@ -87,6 +100,25 @@ const ADMIN_PREFS = [
   { label: 'Compact mode', description: 'Denser admin layout' },
   { label: 'Theme preference', description: 'Light or dark admin theme' },
 ]
+
+function LanguageSettingsCard() {
+  const { t } = useTranslation('settings')
+
+  return (
+    <Card className="md:col-span-2 xl:col-span-3">
+      <CardHeader className="px-4 py-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Languages className="h-4 w-4" />
+          {t('language.title')}
+        </CardTitle>
+        <CardDescription className="text-xs">{t('language.description')}</CardDescription>
+      </CardHeader>
+      <CardContent className="px-4 pb-4 pt-0">
+        <LanguageSwitcher />
+      </CardContent>
+    </Card>
+  )
+}
 
 function SettingsField({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -165,6 +197,8 @@ function AdminSettingsContent({
 
   return (
     <div className="space-y-4" data-testid="admin-settings-content">
+      <LanguageSettingsCard />
+
       <div className="grid gap-4 lg:grid-cols-2">
         <AppPanel
           title="Profile"
@@ -342,6 +376,10 @@ export function SettingsPage() {
     useUpdateNotificationPreferencesMutation()
 
   useEffect(() => {
+    void ensureNamespace('settings')
+  }, [])
+
+  useEffect(() => {
     const prefs = notificationPrefsData?.preferences
     if (prefs) {
       setNotificationPrefs((previous) => ({
@@ -431,6 +469,8 @@ export function SettingsPage() {
         </>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <LanguageSettingsCard />
+
           <Card>
             <CardHeader className="px-4 py-3">
               <CardTitle className="flex items-center gap-2 text-base">

@@ -18,6 +18,7 @@ import {
   normalizeReceivedQuantity,
   snapQuantityToUnit,
 } from '../../lib/quantityUnit'
+import { RestaurantConfirmPodButton } from '../fulfillment/RestaurantConfirmPodButton'
 
 export function ReceivingDialog({
   order,
@@ -250,6 +251,10 @@ export function ReceivingDialog({
               />
             </div>
           </div>
+        </div>
+
+        <div className="pt-2">
+          <RestaurantConfirmPodButton orderId={order.id} fullWidth />
         </div>
 
         <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">

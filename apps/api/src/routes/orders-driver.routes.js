@@ -33,6 +33,13 @@ import {
 import { ValidationError, ForbiddenError, NotFoundError } from '../middlewares/errorHandler.js'
 import { hasPermission } from '../lib/permissions.js'
 import { PERMISSION_KEYS as P } from '../lib/permission-keys.js'
+import { meterStorageFromRequest } from '../lib/storage-upload.js'
+import {
+  sanitizeUploadFileName,
+  assertFileExtensionMatchesMime,
+  MAX_UPLOAD_BYTES,
+} from '../lib/sanitize-upload.js'
+import { createPresignedUpload } from '../services/storage/storage.service.js'
 
 const router = express.Router({ mergeParams: true })
 
@@ -74,11 +81,18 @@ const reassignSchema = z.object({
 })
 const podSchema = z.object({
   file_key: z.string().optional().nullable(),
+  signature_file_key: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   recipient_name: z.string().optional().nullable(),
   driver_assignment_id: z.string().uuid().optional().nullable(),
   latitude: z.number().optional().nullable(),
   longitude: z.number().optional().nullable(),
+})
+
+const podPresignSchema = z.object({
+  fileName: z.string().min(1),
+  fileType: z.string().min(1),
+  fileSize: z.number().optional().nullable(),
 })
 
 const locationSchema = z.object({
@@ -270,6 +284,115 @@ router.post(
 )
 
 router.post(
+  '/:id/proof-of-delivery/presign',
+  ...supplierFulfillmentGate,
+  requireAnyPermission('FULFILLMENT_MANAGE', 'DRIVER_DELIVERIES_MANAGE'),
+  async (req, res) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
+      }
+      const perms = req.tenantContext?.permissions ?? []
+      if (isDriverOnlyPermissions(perms)) {
+        await assertDriverAssignmentAccess({
+          userId: req.userData.id,
+          supplierId,
+          orderId: req.params.id,
+          permissions: perms,
+        })
+      }
+      const body = podPresignSchema.parse(req.body)
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+      if (!allowedTypes.includes(body.fileType)) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: 'File type not allowed' },
+          requestId: req.requestId,
+        })
+      }
+      const sizeBytes = body.fileSize ? Number(body.fileSize) : 0
+      if (sizeBytes > MAX_UPLOAD_BYTES) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: 'File size too large (max 10MB)' },
+          requestId: req.requestId,
+        })
+      }
+      let safeFileName
+      try {
+        safeFileName = sanitizeUploadFileName(body.fileName)
+        assertFileExtensionMatchesMime(safeFileName, body.fileType)
+      } catch (err) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: err?.message || 'Invalid file name' },
+          requestId: req.requestId,
+        })
+      }
+      const storageMeter = await meterStorageFromRequest(req, sizeBytes)
+      if (!storageMeter.ok) {
+        return res.status(storageMeter.status).json({
+          ok: false,
+          data: null,
+          error: storageMeter.error,
+          requestId: req.requestId,
+        })
+      }
+      const fileKey = `uploads/${req.userData.id}/pod/${req.params.id}/${Date.now()}-${safeFileName}`
+      const { presignedUrl, publicUrl, bucket } = await createPresignedUpload({
+        fileKey,
+        fileSize: sizeBytes > 0 ? sizeBytes : MAX_UPLOAD_BYTES,
+        fileType: body.fileType,
+        userId: req.userData.id,
+      })
+      res.json({
+        ok: true,
+        data: {
+          presignedUrl,
+          url: presignedUrl,
+          publicUrl,
+          fileKey,
+          fileName: body.fileName,
+          fileType: body.fileType,
+          bucket,
+          storageMetered: sizeBytes > 0,
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      if (error instanceof ValidationError || error.name === 'ZodError') {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: error.message || 'Invalid request',
+          },
+          requestId: req.requestId,
+        })
+      }
+      logger.error('POD presign error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to generate upload URL' },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
+
+router.post(
   '/:id/proof-of-delivery',
   ...supplierFulfillmentGate,
   requireAnyPermission('FULFILLMENT_MANAGE', 'DRIVER_DELIVERIES_MANAGE'),
@@ -298,6 +421,7 @@ router.post(
         orderId: req.params.id,
         supplierId,
         fileKey: body.file_key,
+        signatureFileKey: body.signature_file_key,
         notes: body.notes,
         recipientName: body.recipient_name,
         driverAssignmentId: body.driver_assignment_id,
@@ -323,12 +447,11 @@ router.post(
   }
 )
 
-router.get(
-  '/:id/proof-of-delivery',
-  ...supplierFulfillmentGate,
-  requireAnyPermission('FULFILLMENT_VIEW', 'DRIVER_DELIVERIES_VIEW'),
-  async (req, res) => {
-    try {
+router.get('/:id/proof-of-delivery', requireAuth, resolveTenantContext, async (req, res) => {
+  try {
+    const tenant = await getRequestTenant(req)
+    let proof = null
+    if (tenant?.tenantType === 'SUPPLIER') {
       const supplierId = await resolveSupplierId(req)
       if (!supplierId) {
         return res.status(403).json({
@@ -339,6 +462,16 @@ router.get(
         })
       }
       const perms = req.tenantContext?.permissions ?? []
+      const canView =
+        hasPermission(perms, P.FULFILLMENT_VIEW) || hasPermission(perms, P.DRIVER_DELIVERIES_VIEW)
+      if (!canView) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Permission denied' },
+          requestId: req.requestId,
+        })
+      }
       if (isDriverOnlyPermissions(perms)) {
         await assertDriverAssignmentAccess({
           userId: req.userData.id,
@@ -347,24 +480,41 @@ router.get(
           permissions: perms,
         })
       }
-      const proof = await getProofOfDelivery(req.params.id, supplierId)
-      res.json({
-        ok: true,
-        data: { proof },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Get POD error:', error)
-      res.status(500).json({
+      proof = await getProofOfDelivery(req.params.id, supplierId)
+    } else if (tenant?.tenantType === 'RESTAURANT') {
+      proof = await getProofOfDelivery(req.params.id, null, tenant.tenantId)
+    } else {
+      return res.status(403).json({
         ok: false,
         data: null,
-        error: { name: 'INTERNAL_ERROR', message: 'Failed to get proof of delivery' },
+        error: { name: 'FORBIDDEN', message: 'Access denied' },
         requestId: req.requestId,
       })
     }
+    res.json({
+      ok: true,
+      data: { proof },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Get POD error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get proof of delivery' },
+      requestId: req.requestId,
+    })
   }
-)
+})
 
 router.post(
   '/:id/location',

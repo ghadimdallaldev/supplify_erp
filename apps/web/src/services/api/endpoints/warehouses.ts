@@ -144,5 +144,83 @@ export const warehousesApi = api.injectEndpoints({
     >({
       query: (orderId) => `/api/orders/${orderId}/warehouses`,
     }),
+    listZones: builder.query<{ zones: WarehouseDeliveryZone[] }, string>({
+      query: (warehouseId) => `/api/warehouses/${warehouseId}/zones`,
+      providesTags: (result, error, warehouseId) => [
+        { type: 'Inventory', id: `warehouse-zones-${warehouseId}` },
+      ],
+    }),
+    createZone: builder.mutation<
+      { zone: WarehouseDeliveryZone },
+      { warehouseId: string; body: WarehouseZoneInput }
+    >({
+      query: ({ warehouseId, body }) => ({
+        url: `/api/warehouses/${warehouseId}/zones`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (result, error, { warehouseId }) => [
+        { type: 'Inventory', id: `warehouse-zones-${warehouseId}` },
+      ],
+    }),
+    updateZone: builder.mutation<
+      { zone: WarehouseDeliveryZone },
+      { warehouseId: string; zoneId: string; body: Partial<WarehouseZoneInput> }
+    >({
+      query: ({ warehouseId, zoneId, body }) => ({
+        url: `/api/warehouses/${warehouseId}/zones/${zoneId}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: (result, error, { warehouseId }) => [
+        { type: 'Inventory', id: `warehouse-zones-${warehouseId}` },
+      ],
+    }),
+    deleteZone: builder.mutation<{ deleted: boolean }, { warehouseId: string; zoneId: string }>({
+      query: ({ warehouseId, zoneId }) => ({
+        url: `/api/warehouses/${warehouseId}/zones/${zoneId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (result, error, { warehouseId }) => [
+        { type: 'Inventory', id: `warehouse-zones-${warehouseId}` },
+      ],
+    }),
   }),
 })
+
+export type WarehouseDeliveryZone = {
+  id: string
+  warehouse_id: string
+  supplier_id: string
+  name: string
+  zone_type: 'polygon' | 'radius' | 'postal_codes'
+  geometry?: unknown
+  postal_codes?: string[] | null
+  radius_km?: number | string | null
+  center_lat?: number | string | null
+  center_lng?: number | string | null
+  min_order_amount: number | string
+  delivery_fee: number | string
+  estimated_delivery_hours?: number | null
+  is_active?: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export type WarehouseZoneInput = {
+  name: string
+  zone_type?: 'polygon' | 'radius' | 'postal_codes'
+  postal_codes?: string[]
+  min_order_amount?: number
+  delivery_fee?: number
+  radius_km?: number
+  center_lat?: number
+  center_lng?: number
+}
+
+export const {
+  useListZonesQuery,
+  useCreateZoneMutation,
+  useUpdateZoneMutation,
+  useDeleteZoneMutation,
+} = warehousesApi

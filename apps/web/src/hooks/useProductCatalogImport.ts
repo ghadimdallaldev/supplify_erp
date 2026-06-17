@@ -24,6 +24,11 @@ type UseProductCatalogImportOptions = {
   onImportSuccess: () => void
 }
 
+function isSpreadsheetUpload(file: File): boolean {
+  const name = file.name.toLowerCase()
+  return name.endsWith('.xlsx') || name.endsWith('.xls')
+}
+
 export function useProductCatalogImport({
   refetch,
   onImportSuccess,
@@ -96,8 +101,9 @@ export function useProductCatalogImport({
     async (file: File, onPreview: (rows: unknown[]) => void) => {
       resetImportTracking()
       try {
-        const text = await file.text()
-        const result = await previewImport({ csv: text }).unwrap()
+        const result = isSpreadsheetUpload(file)
+          ? await previewImport({ file }).unwrap()
+          : await previewImport({ csv: await file.text() }).unwrap()
         onPreview(result.preview || [])
         setImportPreviewMeta({
           totalRows: result.totalRows ?? 0,
@@ -159,8 +165,9 @@ export function useProductCatalogImport({
         return
       }
       try {
-        const text = await uploadedFile.text()
-        const result = await executeImport({ csv: text, partial: true }).unwrap()
+        const result = isSpreadsheetUpload(uploadedFile)
+          ? await executeImport({ file: uploadedFile, partial: true }).unwrap()
+          : await executeImport({ csv: await uploadedFile.text(), partial: true }).unwrap()
         if (isAsyncProductImportStart(result)) {
           setImportJobId(result.jobId)
           importTerminalToastRef.current = null

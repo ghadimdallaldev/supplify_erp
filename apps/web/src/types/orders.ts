@@ -39,6 +39,11 @@ export interface CreateOrderRequest {
   status?: 'DRAFT' | 'PLACED'
   promotionId?: string
   couponCode?: string
+  quoteLocks?: Array<{
+    productId: string
+    quoteRequestSupplierId: string
+    quoteResponseItemId: string
+  }>
 }
 
 export interface CreateManualOrderRequest {
@@ -185,6 +190,23 @@ export interface DeliveryTrackingInfo {
     recordedAt: string
   } | null
   lastUpdatedLabel?: string | null
+}
+
+export interface ProofOfDelivery {
+  id: string
+  order_id: string
+  recipient_name?: string | null
+  notes?: string | null
+  file_key?: string | null
+  signature_file_key?: string | null
+  delivery_photo_url?: string | null
+  signature_image_url?: string | null
+  delivery_gps_lat?: number | null
+  delivery_gps_lng?: number | null
+  delivery_timestamp?: string
+  confirmed_at?: string | null
+  confirmed_by?: string | null
+  driver_assignment_id?: string | null
 }
 
 export interface DispatchOrderCard {

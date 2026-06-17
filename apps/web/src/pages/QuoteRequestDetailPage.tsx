@@ -49,16 +49,15 @@ export function QuoteRequestDetailPage() {
           productId: line.productId,
           quantity: line.quantity,
           quotedUnitPrice: line.quotedUnitPrice ?? undefined,
+          quoteRequestSupplierId: payload.quoteRequestSupplierId,
+          quoteResponseItemId: line.quoteResponseItemId,
           product: {
             ...line.product,
             current_price: line.quotedUnitPrice ?? line.product.current_price,
           },
         })
       }
-      toast.success('Added to cart — review prices at checkout')
-      if (payload.disclaimer) {
-        toast(payload.disclaimer, { icon: 'ℹ️', duration: 5000 })
-      }
+      toast.success('Added to cart')
       navigate('/app/cart')
     } catch (err: any) {
       toast.error(err?.data?.error?.message || 'Could not add to cart')

@@ -364,13 +364,14 @@ export interface SupplierQuoteRequestDetail {
 
 export interface QuoteCartPayload {
   supplierId: string
+  quoteRequestSupplierId: string
   items: Array<{
     productId: string
     quantity: number
     quotedUnitPrice?: number | null
+    quoteResponseItemId: string
     product: Product
   }>
-  disclaimer: string
 }
 
 export interface PublicAvailabilitySlot {

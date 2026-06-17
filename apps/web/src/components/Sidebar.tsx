@@ -135,10 +135,11 @@ export function Sidebar({
       data-testid="sidebar"
       aria-label="Main navigation"
       className={[
-        'flex flex-col border-r border-[var(--app-border)]/40 bg-[var(--surface)] font-sans',
+        'flex flex-col border-e border-[var(--app-border)]/40 bg-[var(--surface)] font-sans',
         'h-screen overflow-y-auto',
-        'fixed inset-y-0 left-0 z-50 w-[min(100vw-3rem,14rem)] lg:sticky lg:w-56 lg:translate-x-0',
-        mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+        'fixed inset-y-0 start-0 z-50 w-[min(100vw-3rem,14rem)] lg:sticky lg:w-56 lg:translate-x-0',
+        'transition-transform duration-200',
+        mobileOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full lg:translate-x-0',
       ].join(' ')}
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
@@ -152,7 +153,7 @@ export function Sidebar({
       >
         {sections.map((section) => (
           <SidebarNavSection
-            key={section.label}
+            key={section.labelKey ?? section.label ?? section.items[0]?.href}
             section={section}
             pathname={location.pathname}
             badges={badgeContext}

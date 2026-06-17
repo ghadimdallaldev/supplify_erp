@@ -1,5 +1,6 @@
 import { query, withTransaction } from '../lib/db.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
+import { buildObjectPublicUrl } from './storage/storage.service.js'
 import { createFulfillmentException } from '../lib/fulfillment-exceptions.js'
 import { syncWarehouseFulfillmentOnOrderStatus } from './warehouseInventory.js'
 import { notifyOrderStatusChange, notifyDriverDeliveryMilestone } from './notification.service.js'
@@ -22,6 +23,15 @@ export async function assertSupplierOwnsOrder(supplierId, orderId) {
      WHERE o.id = $2
      LIMIT 1`,
     [supplierId, orderId]
+  )
+  if (!rows.length) throw new NotFoundError('Order not found')
+  return rows[0]
+}
+
+export async function assertRestaurantOwnsOrder(restaurantId, orderId) {
+  const { rows } = await query(
+    `SELECT id FROM customer_order WHERE id = $1 AND restaurant_id = $2 LIMIT 1`,
+    [orderId, restaurantId]
   )
   if (!rows.length) throw new NotFoundError('Order not found')
   return rows[0]
@@ -327,6 +337,7 @@ export async function submitProofOfDelivery({
   orderId,
   supplierId,
   fileKey,
+  signatureFileKey,
   notes,
   recipientName,
   driverAssignmentId,
@@ -354,20 +365,29 @@ export async function submitProofOfDelivery({
 
   const gpsLat = latitude != null && Number.isFinite(Number(latitude)) ? Number(latitude) : null
   const gpsLng = longitude != null && Number.isFinite(Number(longitude)) ? Number(longitude) : null
+  const photoKey = fileKey ?? null
+  const signatureKey = signatureFileKey ?? null
+  const deliveryPhotoUrl = photoKey ? buildObjectPublicUrl(photoKey) : null
+  const signatureImageUrl = signatureKey ? buildObjectPublicUrl(signatureKey) : null
 
   const { rows } = await query(
     `INSERT INTO proof_of_delivery (
        order_id, driver_assignment_id, delivery_date, delivered_by,
-       recipient_name, file_key, notes, delivery_timestamp,
+       recipient_name, file_key, signature_file_key,
+       delivery_photo_url, signature_image_url,
+       notes, delivery_timestamp,
        delivery_gps_lat, delivery_gps_lng
-     ) VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, $6, now(), $7, $8)
+     ) VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, $6, $7, $8, $9, now(), $10, $11)
      RETURNING *`,
     [
       orderId,
       assignment?.id ?? null,
       userId ?? null,
       recipientName ?? null,
-      fileKey ?? null,
+      photoKey,
+      signatureKey,
+      deliveryPhotoUrl,
+      signatureImageUrl,
       notes ?? null,
       gpsLat,
       gpsLng,
@@ -389,9 +409,11 @@ export async function confirmProofOfDelivery(orderId, restaurantId, userId) {
   return rows[0]
 }
 
-export async function getProofOfDelivery(orderId, supplierId = null) {
+export async function getProofOfDelivery(orderId, supplierId = null, restaurantId = null) {
   if (supplierId) {
     await assertSupplierOwnsOrder(supplierId, orderId)
+  } else if (restaurantId) {
+    await assertRestaurantOwnsOrder(restaurantId, orderId)
   }
   const { rows } = await query(
     `SELECT * FROM proof_of_delivery WHERE order_id = $1 ORDER BY delivery_timestamp DESC LIMIT 1`,

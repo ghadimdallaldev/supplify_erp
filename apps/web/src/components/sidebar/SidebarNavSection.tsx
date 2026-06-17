@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { prefetchRouteChunk } from '../../lib/routeChunkPrefetch'
 import { cn } from '../../lib/utils'
 import type { SidebarNavItem, SidebarNavSectionConfig } from './sidebarNavConfig'
@@ -19,30 +20,43 @@ type SidebarNavSectionProps = {
   onNavigate?: () => void
 }
 
+function resolveNavItemLabel(item: SidebarNavItem, t: (key: string) => string): string {
+  if (item.nameKey) return t(item.nameKey)
+  return item.name ?? ''
+}
+
+function resolveSectionLabel(section: SidebarNavSectionConfig, t: (key: string) => string): string {
+  if (section.labelKey) return t(section.labelKey)
+  return section.label ?? ''
+}
+
 export function SidebarNavSection({
   section,
   pathname,
   badges,
   onNavigate,
 }: SidebarNavSectionProps) {
+  const { t } = useTranslation('navigation')
+  const sectionLabel = resolveSectionLabel(section, t)
   const { pendingOrders, unreadCount, activeDisputeCount, orderUsageBadge, showOrderUsageOnCart } =
     badges
 
   return (
     <div className="mb-1.5">
       <div className="section-label px-1.5 pb-0.5 pt-2 text-[var(--sidebar-section)]">
-        {section.label}
+        {sectionLabel}
       </div>
       {section.items.map((item) => (
         <SidebarNavLink
-          key={item.name}
+          key={item.testId ?? item.href}
           item={item}
+          label={resolveNavItemLabel(item, t)}
           isActive={isNavItemActive(pathname, item.href)}
           pendingOrders={pendingOrders}
           unreadCount={unreadCount}
           activeDisputeCount={activeDisputeCount}
           orderUsageBadge={orderUsageBadge}
-          showOrderUsage={item.name === 'Cart' && showOrderUsageOnCart}
+          showOrderUsage={item.testId === 'nav-cart' && showOrderUsageOnCart}
           onNavigate={onNavigate}
         />
       ))}
@@ -52,6 +66,7 @@ export function SidebarNavSection({
 
 function SidebarNavLink({
   item,
+  label,
   isActive,
   pendingOrders,
   unreadCount,
@@ -61,6 +76,7 @@ function SidebarNavLink({
   onNavigate,
 }: {
   item: SidebarNavItem
+  label: string
   isActive: boolean
   pendingOrders: number
   unreadCount: number
@@ -80,7 +96,7 @@ function SidebarNavLink({
       onMouseEnter={() => prefetchRouteChunk(item.href)}
       onFocus={() => prefetchRouteChunk(item.href)}
       onClick={() => onNavigate?.()}
-      data-testid={item.testId || `nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
+      data-testid={item.testId || `nav-${label.toLowerCase().replace(/\s+/g, '-')}`}
       className={cn(
         'sidebar-nav-item relative mb-px flex h-[34px] items-center gap-2 rounded-md px-2 text-[13px] no-underline',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30 focus-visible:ring-offset-1',
@@ -92,7 +108,7 @@ function SidebarNavLink({
       {isActive && (
         <span
           aria-hidden
-          className="absolute left-0 top-1/2 h-[18px] w-px -translate-y-1/2 rounded-r bg-[var(--mint-mid)]"
+          className="absolute start-0 top-1/2 h-[18px] w-px -translate-y-1/2 rounded-e bg-[var(--mint-mid)]"
         />
       )}
       <span
@@ -107,7 +123,7 @@ function SidebarNavLink({
           aria-hidden
         />
       </span>
-      <span className="min-w-0 flex-1 truncate">{item.name}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
       {showPendingBadge && <NavCountBadge count={pendingOrders} variant="amber" />}
       {showDisputesBadge && (
         <NavCountBadge count={activeDisputeCount} variant="amber" title="Active disputes" />

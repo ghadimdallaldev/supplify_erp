@@ -157,6 +157,10 @@ export const financeApi = api.injectEndpoints({
       query: () => '/api/restaurant-finance/overdue',
       providesTags: ['RestaurantFinance'],
     }),
+    getRestaurantPayables: builder.query<any, void>({
+      query: () => '/api/restaurant-finance/payables',
+      providesTags: ['RestaurantFinance'],
+    }),
 
     // Supplier invoices
     getSupplierInvoices: builder.query<any, any>({
@@ -305,5 +309,33 @@ export const financeApi = api.injectEndpoints({
       query: () => '/api/supplier/reorder-cadence/at-risk',
       providesTags: ['Order'],
     }),
+    sendInvoiceReminder: builder.mutation<
+      {
+        sent: boolean
+        skipped?: boolean
+        reason?: string
+        invoiceId: string
+        reminderKind: string
+      },
+      { invoiceId: string }
+    >({
+      query: ({ invoiceId }) => ({
+        url: `/api/supplier/invoices/${invoiceId}/send-reminder`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['SupplierOps'],
+    }),
+    remindOverdueInvoices: builder.mutation<
+      { sent: number; skipped: number; errors: number; invoiceIds: string[] },
+      void
+    >({
+      query: () => ({
+        url: '/api/supplier/invoices/remind-overdue',
+        method: 'POST',
+      }),
+      invalidatesTags: ['SupplierOps'],
+    }),
   }),
 })
+
+export const { useSendInvoiceReminderMutation, useRemindOverdueInvoicesMutation } = financeApi

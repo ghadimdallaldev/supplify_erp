@@ -17,6 +17,7 @@ import {
   DeliveryTrackingEtaSection,
   getDestinationLabelText,
 } from '../maps/DeliveryTrackingEtaSection'
+import { RestaurantConfirmPodButton } from '../fulfillment/RestaurantConfirmPodButton'
 import { isRestaurantOrderTracking } from '../../types'
 
 type Props = {
@@ -144,6 +145,10 @@ export function RestaurantOrderTrackingPanel({ orderId, orderStatus }: Props) {
               Receive order
             </Link>
           </Button>
+        )}
+
+        {data?.delivery?.status === 'delivered' && (
+          <RestaurantConfirmPodButton orderId={orderId} fullWidth />
         )}
       </CardContent>
     </Card>

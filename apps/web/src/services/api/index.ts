@@ -32,6 +32,7 @@ import './endpoints/admin'
 import './endpoints/impersonation'
 import './endpoints/catalogImport'
 import './endpoints/growth'
+import './endpoints/runSheet'
 import '../staffApi'
 import '../reservationsApi'
 import '../consumerApi'
@@ -88,6 +89,7 @@ export const {
   useUpdateFulfillmentRouteMutation,
   useCancelFulfillmentRouteMutation,
   useReorderFulfillmentRouteStopsMutation,
+  useOptimizeFulfillmentRouteMutation,
   useSetNextFulfillmentRouteStopMutation,
   useUpdateFulfillmentRouteStopMutation,
   useGetFulfillmentExceptionsQuery,
@@ -101,9 +103,17 @@ export const {
   useReassignDriverOnOrderMutation,
   useUpdateOrderDeliveryStatusMutation,
   useRolloverAssignmentToTomorrowMutation,
+  useGetPickWavesQuery,
+  useGetPickWaveQuery,
+  useGeneratePickWaveMutation,
+  useUpdatePickListItemMutation,
+  useCompletePickWaveMutation,
   useSendDriverLocationMutation,
   useGetOrderTrackingQuery,
   useSubmitOrderProofOfDeliveryMutation,
+  usePresignOrderProofOfDeliveryMutation,
+  useGetOrderProofOfDeliveryQuery,
+  useConfirmOrderProofOfDeliveryMutation,
   useResolveFulfillmentExceptionMutation,
   useIgnoreFulfillmentExceptionMutation,
   useGetSuppliersQuery,
@@ -111,6 +121,8 @@ export const {
   useGetSupplierStatisticsQuery,
   useFollowSupplierMutation,
   useUnfollowSupplierMutation,
+  useBlockSupplierMutation,
+  useUnblockSupplierMutation,
   useGetSupplierMeQuery,
   useUpdateSupplierMutation,
   useUploadSupplierLogoMutation,
@@ -203,9 +215,13 @@ export const {
   useGetSupplierStatementQuery,
   useGetRestaurantExpensesQuery,
   useGetOverdueInvoicesQuery,
+  useGetRestaurantPayablesQuery,
   useGetSupplierInvoicesQuery,
   useGetSupplierReceivablesQuery,
+  useSendInvoiceReminderMutation,
+  useRemindOverdueInvoicesMutation,
   useGetSupplierCommandCenterQuery,
+  useGetSupplierRunSheetQuery,
   useGetSupplierReorderIntelligenceQuery,
   useGetSupplierReorderAssistanceQuery,
   useCreateReorderReminderDraftMutation,
@@ -437,4 +453,7 @@ export const {
   useGetTenantFeatureOverridesQuery,
   useSetTenantFeatureOverrideMutation,
   useClearTenantFeatureOverrideMutation,
+  useGetRestaurantConnectionRequestsQuery,
+  useAcceptConnectionRequestMutation,
+  useDeclineConnectionRequestMutation,
 } = api as any

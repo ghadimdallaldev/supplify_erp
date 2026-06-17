@@ -195,6 +195,15 @@ const orderCreateSchema = z.object({
       })
     )
     .optional(),
+  quoteLocks: z
+    .array(
+      z.object({
+        productId: z.string().uuid(),
+        quoteRequestSupplierId: z.string().uuid(),
+        quoteResponseItemId: z.string().uuid(),
+      })
+    )
+    .optional(),
   status: z
     .enum([
       'DRAFT',

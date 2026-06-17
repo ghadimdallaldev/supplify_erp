@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { LayoutDashboard, ShoppingCart, Package, ShoppingBag, MessageSquare } from 'lucide-react'
 import { usePermissions } from '../hooks/usePermissions'
 import { useImpersonation } from '../hooks/useImpersonation'
@@ -6,7 +7,7 @@ import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { cn } from '../lib/utils'
 
 type MobileNavItem = {
-  name: string
+  nameKey: string
   href: string
   icon: typeof LayoutDashboard
   permission?: string
@@ -21,6 +22,7 @@ function isActive(pathname: string, href: string) {
 }
 
 export function RestaurantMobileNav() {
+  const { t } = useTranslation('navigation')
   const location = useLocation()
   const { can } = usePermissions()
   const { isEffectiveRestaurant } = useImpersonation()
@@ -36,35 +38,35 @@ export function RestaurantMobileNav() {
 
   const items: MobileNavItem[] = [
     {
-      name: 'Home',
+      nameKey: 'home',
       href: homeHref,
       icon: LayoutDashboard,
       permission: 'ORDERS_VIEW',
       testId: 'mobile-nav-home',
     },
     {
-      name: 'Orders',
+      nameKey: 'orders',
       href: '/app/orders',
       icon: ShoppingCart,
       permission: 'ORDERS_VIEW',
       testId: 'mobile-nav-orders',
     },
     {
-      name: 'Cart',
+      nameKey: 'cart',
       href: '/app/cart',
       icon: ShoppingBag,
       permission: 'ORDERS_CREATE',
       testId: 'mobile-nav-cart',
     },
     {
-      name: 'Products',
+      nameKey: 'products',
       href: '/app/products',
       icon: Package,
       permission: 'CATALOG_VIEW',
       testId: 'mobile-nav-products',
     },
     {
-      name: 'Chat',
+      nameKey: 'chat',
       href: '/app/chat',
       icon: MessageSquare,
       permission: 'CHAT_VIEW',
@@ -94,7 +96,7 @@ export function RestaurantMobileNav() {
               )}
             >
               <Icon className="h-5 w-5 shrink-0" aria-hidden />
-              <span className="truncate">{item.name}</span>
+              <span className="truncate">{t(item.nameKey)}</span>
             </Link>
           )
         })}

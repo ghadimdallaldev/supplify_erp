@@ -30,6 +30,8 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { formatDate } from '../i18n/formatters'
 import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
@@ -60,6 +62,7 @@ const CalendarView = lazy(() =>
 )
 
 export function DashboardPage() {
+  const { t } = useTranslation('common')
   const { user } = useAppSelector((state) => state.auth)
   const {
     isImpersonating,
@@ -138,8 +141,9 @@ export function DashboardPage() {
 
   const now = new Date()
   const hour = now.getHours()
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
-  const formattedDate = now.toLocaleDateString('en-US', {
+  const greeting =
+    hour < 12 ? t('greeting.morning') : hour < 17 ? t('greeting.afternoon') : t('greeting.evening')
+  const formattedDate = formatDate(now, {
     weekday: 'long',
     month: 'long',
     day: 'numeric',

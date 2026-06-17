@@ -2,6 +2,7 @@ import express from 'express'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import rateLimit from 'express-rate-limit'
+import multer from 'multer'
 import { z } from 'zod'
 import {
   requireAuth,
@@ -29,6 +30,7 @@ import {
 import { ValidationError, ConflictError } from '../middlewares/errorHandler.js'
 import { createPresignedUpload } from '../services/storage/storage.service.js'
 import { getSupplierCommandCenter } from '../services/supplier-command-center.service.js'
+import { getSupplierRunSheet } from '../services/supplier-run-sheet.service.js'
 import {
   getReorderIntelligence,
   createReorderReminderDraft,
@@ -41,6 +43,13 @@ import {
   getSupplierReceivables,
   exportSupplierStatementCsv,
 } from '../services/supplier-receivables.service.js'
+import {
+  exportInvoicesCsv,
+  exportInvoicesQuickBooksCsv,
+  exportPaymentsCsv,
+  exportArSummaryCsv,
+  parseExportDateRange,
+} from '../services/supplier-accounting-export.service.js'
 import { getSupplierDeliveryBoard } from '../services/supplier-deliveries.service.js'
 import {
   previewProductImport,
@@ -79,6 +88,10 @@ import {
 } from '../services/order-fulfillment-issues.service.js'
 import { listSupplierAtRisk } from '../services/reorder-cadence.service.js'
 import { query } from '../lib/db.js'
+import {
+  sendInvoiceReminder,
+  sendBulkOverdueReminders,
+} from '../services/collections-reminders.service.js'
 
 const router = express.Router()
 
@@ -222,6 +235,25 @@ router.get('/command-center', commandCenterGate, async (req, res, next) => {
   }
 })
 
+const runSheetDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD')
+  .optional()
+
+router.get('/run-sheet', commandCenterGate, async (req, res, next) => {
+  try {
+    const supplierId = await resolveSupplier(req)
+    const parsedDate = runSheetDateSchema.safeParse(req.query.date)
+    if (req.query.date && !parsedDate.success) {
+      throw new ValidationError(parsedDate.error.issues[0]?.message || 'Invalid date')
+    }
+    const data = await getSupplierRunSheet(supplierId, { date: parsedDate.data })
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
 const smartReorderGate = requireFeature(
   'smart_reorder',
   (req) => req.tenantContext?.tenantId,
@@ -355,20 +387,242 @@ router.get(
   }
 )
 
+function sendAccountingCsv(res, filenamePrefix, csv) {
+  const date = new Date().toISOString().slice(0, 10)
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename="${filenamePrefix}-${date}.csv"`)
+  res.send(csv)
+}
+
+router.get(
+  '/invoices/export.csv',
+  requirePermission('INVOICES_VIEW'),
+  financeGate,
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const { from, to } = parseExportDateRange(req.query)
+      const status = req.query.status || undefined
+      const csv = await exportInvoicesCsv(supplierId, { from, to, status })
+      sendAccountingCsv(res, 'invoices', csv)
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/invoices/export/quickbooks.csv',
+  requirePermission('INVOICES_VIEW'),
+  financeGate,
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const { from, to } = parseExportDateRange(req.query)
+      const csv = await exportInvoicesQuickBooksCsv(supplierId, { from, to })
+      sendAccountingCsv(res, 'invoices-quickbooks', csv)
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/payments/export.csv',
+  requirePermission('INVOICES_VIEW'),
+  financeGate,
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const { from, to } = parseExportDateRange(req.query)
+      const csv = await exportPaymentsCsv(supplierId, { from, to })
+      sendAccountingCsv(res, 'payments', csv)
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/accounting/summary.csv',
+  requirePermission('INVOICES_VIEW'),
+  financeGate,
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const csv = await exportArSummaryCsv(supplierId)
+      sendAccountingCsv(res, 'ar-summary', csv)
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/invoices/remind-overdue',
+  requirePermission('INVOICES_MANAGE'),
+  financeGate,
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const result = await sendBulkOverdueReminders(supplierId, req.userData?.id)
+      await writeAuditLog(req, {
+        action_type: 'invoice.bulk_reminder_sent',
+        tenant_type: 'SUPPLIER',
+        tenant_id: supplierId,
+        target_id: supplierId,
+        payload_json: {
+          resource_type: 'SUPPLIER',
+          ...result,
+        },
+      })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/invoices/:invoiceId/send-reminder',
+  requirePermission('INVOICES_MANAGE'),
+  financeGate,
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const result = await sendInvoiceReminder(req.params.invoiceId, supplierId, {
+        kind: 'manual',
+        userId: req.userData?.id,
+      })
+      await writeAuditLog(req, {
+        action_type: 'invoice.reminder_sent',
+        tenant_type: 'SUPPLIER',
+        tenant_id: supplierId,
+        target_id: req.params.invoiceId,
+        payload_json: {
+          resource_type: 'INVOICE',
+          reminderKind: 'manual',
+          sent: result.sent,
+          skipped: result.skipped,
+        },
+      })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
 const importPreviewSchema = z.object({
   csv: z.string().min(1),
   columnMapping: z.record(z.string()).optional(),
 })
 
+const PRODUCT_IMPORT_EXTENSIONS = new Set(['.csv', '.xlsx', '.xls'])
+
+const productImportUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_UPLOAD_BYTES },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(String(file.originalname || '')).toLowerCase()
+    if (PRODUCT_IMPORT_EXTENSIONS.has(ext)) {
+      cb(null, true)
+      return
+    }
+    cb(new ValidationError('Only .csv, .xlsx, and .xls files are allowed'))
+  },
+}).single('file')
+
+function optionalProductImportUpload(req, res, next) {
+  const contentType = String(req.headers['content-type'] || '')
+  if (contentType.includes('multipart/form-data')) {
+    productImportUpload(req, res, (err) => {
+      if (err) return next(err)
+      next()
+    })
+    return
+  }
+  next()
+}
+
+function parseColumnMappingField(value) {
+  if (!value) return undefined
+  if (typeof value === 'object') return value
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value)
+    } catch {
+      throw new ValidationError('columnMapping must be valid JSON')
+    }
+  }
+  return undefined
+}
+
+function optionalRawImportBody(req, res, next) {
+  const contentType = String(req.headers['content-type'] || '')
+  if (contentType.includes('multipart/form-data') || contentType.includes('application/json')) {
+    return next()
+  }
+  return express.raw({
+    type: [
+      'application/octet-stream',
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ],
+    limit: MAX_UPLOAD_BYTES,
+  })(req, res, next)
+}
+
+function resolveProductImportPayload(req) {
+  if (req.file?.buffer) {
+    const filename = sanitizeUploadFileName(req.file.originalname)
+    const ext = path.extname(filename).toLowerCase()
+    if (!PRODUCT_IMPORT_EXTENSIONS.has(ext)) {
+      throw new ValidationError('Only .csv, .xlsx, and .xls files are allowed')
+    }
+    return {
+      buffer: req.file.buffer,
+      filename,
+      columnMapping: parseColumnMappingField(req.body?.columnMapping),
+      partial: req.body?.partial !== 'false' && req.body?.partial !== false,
+    }
+  }
+
+  const rawBody = req.body
+  if (Buffer.isBuffer(rawBody) && rawBody.length > 0) {
+    const rawFilename = req.headers['x-import-filename'] || req.headers['x-filename']
+    const filename = rawFilename ? sanitizeUploadFileName(rawFilename) : 'import.csv'
+    return {
+      buffer: rawBody,
+      filename,
+      columnMapping: parseColumnMappingField(req.headers['x-column-mapping']),
+      partial: req.headers['x-import-partial'] !== 'false',
+    }
+  }
+
+  const body = importPreviewSchema.extend({ partial: z.boolean().optional() }).parse(req.body)
+  return {
+    csvText: body.csv,
+    columnMapping: body.columnMapping,
+    partial: body.partial !== false,
+  }
+}
+
 router.post(
   '/products/import/preview',
   productImportLimiter,
   requirePermission('CATALOG_EDIT'),
+  optionalProductImportUpload,
+  optionalRawImportBody,
   async (req, res, next) => {
     try {
       await resolveSupplier(req)
-      const body = importPreviewSchema.parse(req.body)
-      const data = previewProductImport(body.csv, body.columnMapping)
+      const payload = resolveProductImportPayload(req)
+      const data =
+        payload.buffer != null
+          ? previewProductImport(payload.buffer, payload.columnMapping, payload.filename)
+          : previewProductImport(payload.csvText, payload.columnMapping)
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)
@@ -380,20 +634,30 @@ router.post(
   '/products/import',
   productImportLimiter,
   requirePermission('CATALOG_EDIT'),
+  optionalProductImportUpload,
+  optionalRawImportBody,
   async (req, res, next) => {
     try {
       const supplierId = await resolveSupplier(req)
-      const body = importPreviewSchema.extend({ partial: z.boolean().optional() }).parse(req.body)
-      const rowCount = countProductImportRows(body.csv)
+      const payload = resolveProductImportPayload(req)
+      const rowCount =
+        payload.buffer != null
+          ? countProductImportRows(payload.buffer, payload.filename)
+          : countProductImportRows(payload.csvText)
 
       if (rowCount > config.PRODUCT_IMPORT_ASYNC_THRESHOLD) {
-        const preview = previewProductImport(body.csv, body.columnMapping)
+        const preview =
+          payload.buffer != null
+            ? previewProductImport(payload.buffer, payload.columnMapping, payload.filename)
+            : previewProductImport(payload.csvText, payload.columnMapping)
         const job = await createProductImportJob({
           supplierId,
           userId: req.userData.id,
-          csvText: body.csv,
-          partial: body.partial !== false,
-          columnMapping: body.columnMapping,
+          csvText: payload.csvText,
+          fileBuffer: payload.buffer,
+          filename: payload.filename,
+          partial: payload.partial !== false,
+          columnMapping: payload.columnMapping,
           preview,
         })
 
@@ -419,10 +683,17 @@ router.post(
         })
       }
 
-      const result = await executeProductImport(supplierId, body.csv, {
-        partial: body.partial !== false,
-        userId: req.userData.id,
-      })
+      const result =
+        payload.buffer != null
+          ? await executeProductImport(supplierId, payload.buffer, {
+              partial: payload.partial !== false,
+              userId: req.userData.id,
+              filename: payload.filename,
+            })
+          : await executeProductImport(supplierId, payload.csvText, {
+              partial: payload.partial !== false,
+              userId: req.userData.id,
+            })
       res.json({ ok: true, data: result, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)
