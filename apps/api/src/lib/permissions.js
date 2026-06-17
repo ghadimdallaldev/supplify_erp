@@ -233,10 +233,12 @@ export async function getPermissionsForUser(userId, tenantId, tenantType) {
 
       const assignmentPromise =
         tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER'
-          ? query(
-              `SELECT 1 FROM tenant_user_roles WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = $3 LIMIT 1`,
-              [userId, tenantId, tenantType]
-            ).then(({ rows }) => rows.length > 0)
+          ? Promise.resolve(
+              query(
+                `SELECT 1 FROM tenant_user_roles WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = $3 LIMIT 1`,
+                [userId, tenantId, tenantType]
+              )
+            ).then((result) => (Array.isArray(result?.rows) ? result.rows.length > 0 : false))
           : Promise.resolve(false)
 
       const [orgResult, namedResult, legacyResult, assigned] = await Promise.all([

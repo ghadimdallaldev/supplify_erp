@@ -99,6 +99,7 @@ export function emitNotificationNew(notification) {
 
 export async function initializeSocket(server) {
   io = new Server(server, {
+    maxHttpBufferSize: 1_000_000,
     cors: {
       origin: config.WEB_ORIGINS,
       methods: ['GET', 'POST'],
@@ -171,6 +172,7 @@ export async function initializeSocket(server) {
         if (!data || typeof data !== 'object') return
         const { conversationId, content } = data
         const senderId = socket.data.userId
+        if (typeof content !== 'string' || content.length > 5000) return
 
         logger.info('New message received via socket', {
           socketId: socket.id,

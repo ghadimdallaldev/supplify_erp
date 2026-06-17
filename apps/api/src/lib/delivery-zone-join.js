@@ -6,15 +6,23 @@ let cachedDeliveryZoneJoinMode = null
 async function resolveDeliveryZoneJoinMode() {
   if (cachedDeliveryZoneJoinMode) return cachedDeliveryZoneJoinMode
 
-  const { rows } = await query(
-    `
-    SELECT column_name
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'delivery_zone'
-      AND column_name IN ('warehouse_id', 'branch_id', 'supplier_id')
-    `
-  )
+  let rows = []
+  try {
+    const result = await query(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'delivery_zone'
+        AND column_name IN ('warehouse_id', 'branch_id', 'supplier_id')
+      `
+    )
+    rows = Array.isArray(result?.rows) ? result.rows : []
+  } catch {
+    cachedDeliveryZoneJoinMode = 'none'
+    return cachedDeliveryZoneJoinMode
+  }
+
   const columns = new Set(rows.map((row) => row.column_name))
 
   if (columns.has('warehouse_id')) {
