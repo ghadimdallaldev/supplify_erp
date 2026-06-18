@@ -79,6 +79,43 @@ import {
 import { normalizeReportResponse } from '../../../lib/reportResponse'
 import { resolveUpgradeUrl } from '../../../lib/externallyControlledFeatures'
 
+export const INVENTORY_IMPORT_CSV_TEMPLATE = `sku,quantity,reason
+RICE-5KG,25,Opening stock count
+OIL-1L,12,
+TOMATO-CRATE,8,Delivery from morning run`
+
+export type RestaurantInventoryImportPreviewRow = {
+  rowNumber: number
+  status: 'valid' | 'error'
+  mapped: Record<string, unknown>
+  errors: Array<{ field: string; message: string }>
+  isNewSku?: boolean
+}
+
+export type RestaurantInventoryImportLimitWarning = {
+  meter: string
+  current: number
+  limit: number
+  newSkusInFile: number
+  projected: number
+}
+
+export type RestaurantInventoryImportPreview = {
+  headers: string[]
+  preview: RestaurantInventoryImportPreviewRow[]
+  totalRows: number
+  validCount: number
+  errorCount: number
+  newSkuCount: number
+  limitWarning: RestaurantInventoryImportLimitWarning | null
+  errors: Array<{ rowNumber: number; errors: Array<{ field: string; message: string }> }>
+}
+
+export type RestaurantInventoryImportResult = {
+  summary: { added: number; updated: number; failed: number }
+  errors: Array<{ rowNumber: number; errors: Array<{ field: string; message: string }> }>
+}
+
 export const restaurantInventoryApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getRestaurantInventory: builder.query<any, void>({
@@ -236,6 +273,24 @@ export const restaurantInventoryApi = api.injectEndpoints({
     >({
       query: (body) => ({
         url: '/api/restaurant-inventory/reorder-assistance/suppress',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['RestaurantInventory'],
+    }),
+    previewRestaurantInventoryImport: builder.mutation<
+      RestaurantInventoryImportPreview,
+      { csv: string }
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-inventory/import/preview',
+        method: 'POST',
+        body,
+      }),
+    }),
+    importRestaurantInventory: builder.mutation<RestaurantInventoryImportResult, { csv: string }>({
+      query: (body) => ({
+        url: '/api/restaurant-inventory/import',
         method: 'POST',
         body,
       }),

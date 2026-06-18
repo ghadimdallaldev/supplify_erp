@@ -51,5 +51,27 @@
   "workspace": {
     "supplier": "Supplier",
     "restaurant": "Restaurant"
+  },
+  "billingOverdue": {
+    "freeTrial": {
+      "title": "Free Trial expired",
+      "description": "Your Free Trial has expired. Upgrade your plan to continue using Supplify.",
+      "cta": "Choose a plan"
+    },
+    "pendingActivation": {
+      "title": "Account pending activation",
+      "description": "Your account is not activated yet. Complete payment for a plan or ask an administrator to activate your account.",
+      "cta": "Activate account"
+    },
+    "locked": {
+      "title": "Account locked — payment required",
+      "description": "Pay your balance to restore full access.",
+      "cta": "Pay now"
+    },
+    "grace": {
+      "title": "Payment overdue",
+      "description": "Your subscription payment is overdue. Pay within {{days}} day(s) to avoid account lock.",
+      "cta": "Pay now"
+    }
   }
 }

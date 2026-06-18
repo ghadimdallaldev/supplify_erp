@@ -5,5 +5,132 @@
     "english": "English",
     "arabic": "العربية"
   },
-  "comingSoon": "قريباً"
+  "comingSoon": "قريباً",
+  "page": {
+    "title": "الإعدادات",
+    "subtitle": "إدارة حسابك وتفضيلاتك"
+  },
+  "profile": {
+    "title": "معلومات الملف الشخصي",
+    "description": "تفاصيل حسابك ودورك",
+    "displayName": "اسم العرض",
+    "email": "البريد الإلكتروني",
+    "role": "الدور",
+    "memberSince": "عضو منذ",
+    "notAvailable": "غير متوفر",
+    "empty": "—"
+  },
+  "security": {
+    "title": "الأمان",
+    "description": "إعدادات أمان الحساب",
+    "keycloakManaged": "حسابك مؤمّن عبر مصادقة Keycloak.",
+    "changePassword": "تغيير كلمة المرور",
+    "adminDescription": "تتم إدارة المصادقة عبر Keycloak.",
+    "portalHint": "يتم التعامل مع تغيير كلمة المرور وإعدادات المصادقة متعددة العوامل في بوابة مزود الهوية.",
+    "manageInKeycloak": "إدارة الحساب في Keycloak"
+  },
+  "notifications": {
+    "title": "الإشعارات",
+    "description": "تكوين تفضيلات الإشعارات",
+    "adminDescription": "اختر كيفية تلقي تنبيهات المنصة والتحديثات التشغيلية.",
+    "loading": "جاري تحميل تفضيلات الإشعارات…",
+    "save": "حفظ التفضيلات",
+    "saveAdmin": "حفظ التفضيلات",
+    "saving": "جاري الحفظ…",
+    "saved": "تم حفظ تفضيلات الإشعارات!",
+    "saveFailed": "فشل حفظ تفضيلات الإشعارات",
+    "fields": {
+      "emailEnabled": {
+        "label": "إشعارات البريد الإلكتروني",
+        "description": "تلقي التحديثات المهمة عبر البريد الإلكتروني."
+      },
+      "whatsappEnabled": {
+        "label": "إشعارات واتساب",
+        "description": "تلقي التنبيهات المهمة على واتساب عند تسجيل رقم هاتفك."
+      },
+      "inAppEnabled": {
+        "label": "إشعارات داخل التطبيق",
+        "description": "عرض التنبيهات داخل Supplify."
+      },
+      "notifyOrderNew": {
+        "label": "تحديثات الطلبات",
+        "description": "تلقي إشعار عند وصول طلبات جديدة."
+      },
+      "notifyMessageReceived": {
+        "label": "تنبيهات الرسائل",
+        "description": "تلقي إشعار عند وصول رسائل محادثة جديدة."
+      },
+      "notifyLowStock": {
+        "label": "تحذيرات انخفاض المخزون",
+        "description": "ابق على اطلاع بالأصناف التي أوشكت على النفاد."
+      }
+    },
+    "comingSoon": {
+      "systemAlerts": {
+        "label": "تنبيهات النظام",
+        "description": "إشعارات صحة المنصة الحرجة"
+      },
+      "billingAlerts": {
+        "label": "تنبيهات الفوترة",
+        "description": "إشعارات الاشتراك والفواتير"
+      },
+      "productUpdates": {
+        "label": "تحديثات المنتج",
+        "description": "إعلانات الميزات الجديدة"
+      }
+    }
+  },
+  "admin": {
+    "profile": {
+      "title": "الملف الشخصي",
+      "description": "تفاصيل حساب مسؤول المنصة.",
+      "displayName": "اسم العرض",
+      "email": "البريد الإلكتروني",
+      "role": "الدور",
+      "memberSince": "عضو منذ"
+    },
+    "preferences": {
+      "title": "تفضيلات المسؤول",
+      "description": "تخصيص مساحة عمل وحدة تحكم مسؤول المنصة.",
+      "landingPage": {
+        "label": "صفحة الهبوط الافتراضية للمسؤول",
+        "description": "اختر التبويب الذي يُفتح أولاً"
+      },
+      "compactMode": {
+        "label": "الوضع المضغوط",
+        "description": "تخطيط مسؤول أكثر كثافة"
+      },
+      "theme": {
+        "label": "تفضيل السمة",
+        "description": "سمة المسؤول الفاتحة أو الداكنة"
+      }
+    },
+    "session": {
+      "title": "الجلسة",
+      "description": "حالة تسجيل الدخول الحالية ومزود المصادقة.",
+      "provider": "المزود",
+      "role": "الدور",
+      "accountStatus": "حالة الحساب",
+      "active": "نشط"
+    },
+    "support": {
+      "title": "الدعم",
+      "description": "تواصل مع فريق Supplify للمساعدة في إدارة المنصة.",
+      "hint": "هل تحتاج مساعدة في المستأجرين أو الفوترة أو إعداد المنصة؟ فريق الدعم جاهز للمساعدة.",
+      "contact": "تواصل مع الدعم"
+    }
+  },
+  "session": {
+    "title": "الجلسة / معلومات تسجيل الدخول",
+    "authenticatedVia": "تمت المصادقة عبر Keycloak",
+    "role": "الدور",
+    "account": "الحساب",
+    "active": "نشط"
+  },
+  "support": {
+    "title": "الدعم",
+    "hint": "هل تحتاج مساعدة؟ تواصل مع فريق الدعم.",
+    "contact": "تواصل مع الدعم"
+  },
+  "roleUnknown": "غير معروف"
 }

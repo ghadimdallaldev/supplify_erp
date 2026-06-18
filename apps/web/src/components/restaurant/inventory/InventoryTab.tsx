@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
@@ -37,7 +38,12 @@ import {
   useGetRestaurantInventoryHistoryQuery,
   useAddRestaurantInventoryMutation,
   useAdjustRestaurantInventoryMutation,
+  useGetProductsQuery,
+  useGetEntitlementsQuery,
 } from '../../../services/api'
+import { getPlanLimitGate } from '../../../lib/planLimits'
+import { LimitExceededBanner } from '../../LimitExceededBanner'
+import { InventoryBulkImportPanel } from './InventoryBulkImportPanel'
 import { toast } from 'sonner'
 import { EmptyState } from '../../ui/empty-state'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select'
@@ -50,13 +56,31 @@ import {
   summaryCardClass,
   type SortOption,
 } from './inventoryShared'
+import { ensureNamespace } from '../../../i18n'
 
 export interface InventoryTabProps {
   wasteTrackingEnabled: boolean
   onNavigateToWaste: (productId: string) => void
+  showAddDialog?: boolean
+  onShowAddDialogChange?: (open: boolean) => void
+  showBulkDialog?: boolean
+  onShowBulkDialogChange?: (open: boolean) => void
 }
 
-export function InventoryTab({ wasteTrackingEnabled, onNavigateToWaste }: InventoryTabProps) {
+export function InventoryTab({
+  wasteTrackingEnabled,
+  onNavigateToWaste,
+  showAddDialog = false,
+  onShowAddDialogChange,
+  showBulkDialog = false,
+  onShowBulkDialogChange,
+}: InventoryTabProps) {
+  const { t } = useTranslation('inventory')
+
+  useEffect(() => {
+    void ensureNamespace('inventory')
+  }, [])
+
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [supplierFilter, setSupplierFilter] = useState('ALL')
@@ -68,23 +92,125 @@ export function InventoryTab({ wasteTrackingEnabled, onNavigateToWaste }: Invent
   const [adjustReason, setAdjustReason] = useState('')
   const [adjustType, setAdjustType] = useState<'ADD' | 'SUBTRACT'>('SUBTRACT')
   const [pinnedItems, setPinnedItems] = useState<Set<string>>(new Set())
+  const [productSearch, setProductSearch] = useState('')
+  const [selectedProductId, setSelectedProductId] = useState('')
+  const [addQuantity, setAddQuantity] = useState('')
+  const [addReason, setAddReason] = useState('')
 
-  const { data, isLoading, error } = useGetRestaurantInventoryQuery()
+  const { data, isLoading, error, refetch } = useGetRestaurantInventoryQuery()
   const { data: historyData } = useGetRestaurantInventoryHistoryQuery({ limit: 50 })
-  const [addInventory] = useAddRestaurantInventoryMutation()
+  const { data: productsData } = useGetProductsQuery({ limit: 1000 })
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const [addInventory, { isLoading: isAddingInventory }] = useAddRestaurantInventoryMutation()
   const [adjustInventory] = useAdjustRestaurantInventoryMutation()
 
   const inventory = data?.inventory || []
   const history = historyData?.history || []
+  const trackedProductIds = useMemo(
+    () => new Set(inventory.map((item: { product_id: string }) => item.product_id)),
+    [inventory]
+  )
+
+  const catalogProducts = useMemo(() => {
+    const seen = new Set<string>()
+    return (productsData?.products ?? []).filter((product: { id?: string }) => {
+      const id = String(product?.id ?? '')
+      if (!id || seen.has(id)) return false
+      seen.add(id)
+      return true
+    })
+  }, [productsData?.products])
+
+  const filteredProducts = useMemo(
+    () =>
+      catalogProducts.filter(
+        (product: { name: string; sku?: string }) =>
+          product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+          product.sku?.toLowerCase().includes(productSearch.toLowerCase())
+      ),
+    [catalogProducts, productSearch]
+  )
+
+  const selectedProduct = catalogProducts.find(
+    (product: { id: string }) => product.id === selectedProductId
+  )
+  const isNewSkuAdd = selectedProductId ? !trackedProductIds.has(selectedProductId) : false
+  const inventorySkuGate = useMemo(
+    () =>
+      getPlanLimitGate(
+        entitlementsData?.entitlements,
+        'restaurant_inventory_skus',
+        isNewSkuAdd ? 1 : 0
+      ),
+    [entitlementsData?.entitlements, isNewSkuAdd]
+  )
+
+  const resetAddProductForm = () => {
+    setSelectedProductId('')
+    setAddQuantity('')
+    setAddReason('')
+    setProductSearch('')
+  }
+
+  const closeAddDialog = () => {
+    onShowAddDialogChange?.(false)
+    resetAddProductForm()
+  }
+
+  const handleAddProduct = async () => {
+    if (!selectedProductId || !addQuantity) {
+      toast.error(t('addDialog.selectProductAndQuantity'))
+      return
+    }
+
+    const quantity = parseFloat(addQuantity)
+    if (Number.isNaN(quantity) || quantity <= 0) {
+      toast.error(t('toasts.quantityPositive'))
+      return
+    }
+
+    if (isNewSkuAdd && !inventorySkuGate.canUse) {
+      toast.error(inventorySkuGate.message)
+      return
+    }
+
+    try {
+      await addInventory({
+        productId: selectedProductId,
+        quantity,
+        reason: addReason.trim() || undefined,
+      }).unwrap()
+      toast.success(t('addDialog.addedSuccess'))
+      closeAddDialog()
+    } catch (error: unknown) {
+      const err = error as { data?: { error?: { name?: string; message?: string } } }
+      const errorMessage = err?.data?.error?.message || t('addDialog.addFailed')
+      if (err?.data?.error?.name === 'LIMIT_EXCEEDED') {
+        toast.error(errorMessage, { duration: 6000 })
+      } else {
+        toast.error(errorMessage)
+      }
+    }
+  }
+
+  const handleInventoryLimitError = (error: unknown, fallback: string) => {
+    const err = error as { data?: { error?: { name?: string; message?: string } } }
+    const errorMessage = err?.data?.error?.message || fallback
+    if (err?.data?.error?.name === 'LIMIT_EXCEEDED') {
+      toast.error(errorMessage, { duration: 6000 })
+    } else {
+      toast.error(errorMessage)
+    }
+  }
 
   const handlePinToggle = (productId: string) => {
     const newPinned = new Set(pinnedItems)
     if (newPinned.has(productId)) {
       newPinned.delete(productId)
-      toast.success('Item unpinned')
+      toast.success(t('toasts.itemUnpinned'))
     } else {
       newPinned.add(productId)
-      toast.success('Item pinned to top')
+      toast.success(t('toasts.itemPinned'))
     }
     setPinnedItems(newPinned)
   }
@@ -99,13 +225,13 @@ export function InventoryTab({ wasteTrackingEnabled, onNavigateToWaste }: Invent
 
   const handleAdjustInventory = async () => {
     if (!adjustingItem || !adjustQuantity) {
-      toast.error('Please enter a quantity')
+      toast.error(t('toasts.enterQuantity'))
       return
     }
 
     const quantity = parseFloat(adjustQuantity)
     if (isNaN(quantity) || quantity <= 0) {
-      toast.error('Quantity must be a positive number')
+      toast.error(t('toasts.quantityPositive'))
       return
     }
 
@@ -116,23 +242,23 @@ export function InventoryTab({ wasteTrackingEnabled, onNavigateToWaste }: Invent
           quantity,
           reason: adjustReason || undefined,
         }).unwrap()
-        toast.success('Inventory added successfully')
+        toast.success(t('toasts.addedSuccess'))
       } else {
         await adjustInventory({
           productId: adjustingItem.product_id,
           adjustmentType: 'COUNT_CORRECTION',
           quantity,
-          reason: adjustReason || 'Manual adjustment',
+          reason: adjustReason || t('adjustDialog.manualAdjustment'),
         }).unwrap()
-        toast.success('Inventory adjusted successfully')
+        toast.success(t('toasts.adjustedSuccess'))
       }
 
       setShowAdjustDialog(false)
       setAdjustingItem(null)
       setAdjustQuantity('')
       setAdjustReason('')
-    } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to adjust inventory')
+    } catch (error: unknown) {
+      handleInventoryLimitError(error, t('toasts.adjustFailed'))
     }
   }
 
@@ -163,25 +289,7 @@ export function InventoryTab({ wasteTrackingEnabled, onNavigateToWaste }: Invent
     a.download = `inventory-${new Date().toISOString().split('T')[0]}.csv`
     a.click()
     window.URL.revokeObjectURL(url)
-    toast.success('Inventory exported to CSV')
-  }
-
-  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const text = e.target?.result as string
-      const lines = text.split('\n')
-      const data = lines
-        .slice(1)
-        .map((line) => line.split(',').map((cell) => cell.replace(/^"|"$/g, '')))
-
-      toast.success(`Processing ${data.length} inventory items from CSV...`)
-      console.log('CSV data:', data)
-    }
-    reader.readAsText(file)
+    toast.success(t('toasts.exportedCsv'))
   }
 
   const uniqueSuppliers = Array.from(
@@ -612,15 +720,10 @@ export function InventoryTab({ wasteTrackingEnabled, onNavigateToWaste }: Invent
                 <Download className="h-4 w-4 mr-2" />
                 Export CSV
               </Button>
-              <label>
-                <Button variant="outline" size="sm" asChild>
-                  <span>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Import CSV
-                  </span>
-                </Button>
-                <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
-              </label>
+              <Button variant="outline" size="sm" onClick={() => onShowBulkDialogChange?.(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Import CSV
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -823,7 +926,7 @@ export function InventoryTab({ wasteTrackingEnabled, onNavigateToWaste }: Invent
                                   size="sm"
                                   className="text-xs"
                                   onClick={() => {
-                                    toast.success('Adding to cart...', {
+                                    toast.success(t('toasts.addingToCart'), {
                                       duration: 2000,
                                     })
                                     // TODO: Navigate to products page with search pre-filled
@@ -902,37 +1005,42 @@ export function InventoryTab({ wasteTrackingEnabled, onNavigateToWaste }: Invent
       <Dialog open={showAdjustDialog} onOpenChange={setShowAdjustDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{adjustType === 'ADD' ? 'Add Inventory' : 'Reduce Inventory'}</DialogTitle>
+            <DialogTitle>
+              {adjustType === 'ADD' ? t('adjustDialog.addTitle') : t('adjustDialog.reduceTitle')}
+            </DialogTitle>
             <DialogDescription>
               {adjustType === 'ADD'
-                ? `Add ${adjustingItem?.product_name} to your inventory`
-                : `Adjust inventory for ${adjustingItem?.product_name}`}
+                ? t('adjustDialog.addDescription', { product: adjustingItem?.product_name })
+                : t('adjustDialog.reduceDescription', { product: adjustingItem?.product_name })}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="quantity">Quantity *</Label>
+              <Label htmlFor="quantity">{t('adjustDialog.quantityRequired')}</Label>
               <Input
                 id="quantity"
                 type="number"
                 step="0.01"
                 min="0"
-                placeholder="Enter quantity"
+                placeholder={t('adjustDialog.quantityPlaceholder')}
                 value={adjustQuantity}
                 onChange={(e) => setAdjustQuantity(e.target.value)}
               />
               <p className="text-sm text-[var(--text-muted)]">
-                Current quantity: {adjustingItem?.quantity} {adjustingItem?.product_unit}
+                {t('adjustDialog.currentQuantity', {
+                  quantity: adjustingItem?.quantity,
+                  unit: adjustingItem?.product_unit,
+                })}
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="reason">Reason</Label>
+              <Label htmlFor="reason">{t('adjustDialog.reason')}</Label>
               <Textarea
                 id="reason"
                 rows={3}
-                placeholder="Optional: reason for this adjustment..."
+                placeholder={t('adjustDialog.reasonPlaceholder')}
                 value={adjustReason}
                 onChange={(e) => setAdjustReason(e.target.value)}
               />
@@ -941,12 +1049,153 @@ export function InventoryTab({ wasteTrackingEnabled, onNavigateToWaste }: Invent
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAdjustDialog(false)}>
-              Cancel
+              {t('common:actions.cancel')}
             </Button>
             <Button onClick={handleAdjustInventory}>
-              {adjustType === 'ADD' ? 'Add Inventory' : 'Reduce Inventory'}
+              {adjustType === 'ADD' ? t('adjustDialog.addAction') : t('adjustDialog.reduceAction')}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showAddDialog}
+        onOpenChange={(open) => {
+          if (!open) closeAddDialog()
+          else onShowAddDialogChange?.(true)
+        }}
+      >
+        <DialogContent size="lg">
+          <DialogHeader>
+            <DialogTitle>{t('addDialog.title')}</DialogTitle>
+            <DialogDescription>{t('addDialog.description')}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {isNewSkuAdd && !inventorySkuGate.canUse && inventorySkuGate.limit != null ? (
+              <LimitExceededBanner
+                limitKey="restaurant_inventory_skus"
+                currentUsage={inventorySkuGate.current}
+                limitValue={inventorySkuGate.limit}
+                currentPlan={entitlementsData?.entitlements?.plan?.name}
+              />
+            ) : null}
+
+            <div className="space-y-2">
+              <Label htmlFor="inventory-add-product-search">{t('addDialog.searchProducts')}</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+                <Input
+                  id="inventory-add-product-search"
+                  placeholder={t('addDialog.searchPlaceholder')}
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="max-h-48 overflow-y-auto rounded-md border border-[var(--app-border)] divide-y">
+                {filteredProducts.length === 0 ? (
+                  <p className="p-4 text-center text-sm text-[var(--text-muted)]">
+                    {t('addDialog.noProductsFound')}
+                  </p>
+                ) : (
+                  filteredProducts.map((product: any) => {
+                    const isSelected = selectedProductId === product.id
+                    const alreadyTracked = trackedProductIds.has(product.id)
+                    return (
+                      <button
+                        key={product.id}
+                        type="button"
+                        onClick={() => setSelectedProductId(product.id)}
+                        className={`flex w-full items-start justify-between gap-3 p-3 text-left hover:bg-[var(--brand-ultra)] ${
+                          isSelected ? 'bg-[var(--brand-ultra)]' : ''
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium text-[var(--text)]">{product.name}</p>
+                          <p className="text-sm text-[var(--text-muted)]">{product.sku}</p>
+                        </div>
+                        <Badge
+                          variant={alreadyTracked ? 'secondary' : 'outline'}
+                          className="shrink-0"
+                        >
+                          {alreadyTracked ? t('addDialog.inInventory') : t('addDialog.newSku')}
+                        </Badge>
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+              {selectedProduct ? (
+                <p className="text-sm text-[var(--text-muted)]">
+                  {t('addDialog.selected', { name: selectedProduct.name })}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="inventory-add-quantity">{t('addDialog.initialQuantity')} *</Label>
+              <Input
+                id="inventory-add-quantity"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder={t('addDialog.quantityPlaceholder')}
+                value={addQuantity}
+                onChange={(e) => setAddQuantity(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="inventory-add-reason">{t('addDialog.reason')}</Label>
+              <Textarea
+                id="inventory-add-reason"
+                rows={2}
+                placeholder={t('addDialog.reasonOptional')}
+                value={addReason}
+                onChange={(e) => setAddReason(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeAddDialog}>
+              {t('common:actions.cancel')}
+            </Button>
+            <Button
+              onClick={handleAddProduct}
+              disabled={
+                !selectedProductId ||
+                !addQuantity ||
+                isAddingInventory ||
+                (isNewSkuAdd && !inventorySkuGate.canUse)
+              }
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              {isAddingInventory ? t('addDialog.adding') : t('addDialog.addProduct')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showBulkDialog}
+        onOpenChange={(open) => {
+          onShowBulkDialogChange?.(open)
+        }}
+      >
+        <DialogContent size="xl">
+          <DialogHeader>
+            <DialogTitle>{t('bulkImport.title')}</DialogTitle>
+            <DialogDescription>{t('bulkImport.description')}</DialogDescription>
+          </DialogHeader>
+          <InventoryBulkImportPanel
+            embedded
+            onImported={() => {
+              refetch()
+              onShowBulkDialogChange?.(false)
+            }}
+          />
         </DialogContent>
       </Dialog>
     </div>

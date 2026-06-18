@@ -52,54 +52,26 @@ const DEFAULT_NOTIFICATION_PREFS = {
 
 type NotificationPrefs = { [K in keyof typeof DEFAULT_NOTIFICATION_PREFS]: boolean }
 
-const NOTIFICATION_FIELDS: Array<{
-  key: keyof typeof DEFAULT_NOTIFICATION_PREFS
-  label: string
-  description: string
-}> = [
-  {
-    key: 'emailEnabled',
-    label: 'Email notifications',
-    description: 'Receive important updates via email.',
-  },
-  {
-    key: 'whatsappEnabled',
-    label: 'WhatsApp notifications',
-    description: 'Get important alerts on WhatsApp when your phone is on file.',
-  },
-  {
-    key: 'inAppEnabled',
-    label: 'In-app notifications',
-    description: 'Show alerts inside Supplify.',
-  },
-  {
-    key: 'notifyOrderNew',
-    label: 'Order updates',
-    description: 'Be notified when new orders arrive.',
-  },
-  {
-    key: 'notifyMessageReceived',
-    label: 'Message alerts',
-    description: 'Receive pings when you get new chat messages.',
-  },
-  {
-    key: 'notifyLowStock',
-    label: 'Low stock warnings',
-    description: 'Stay informed about items running low.',
-  },
+const NOTIFICATION_FIELD_KEYS: Array<keyof typeof DEFAULT_NOTIFICATION_PREFS> = [
+  'emailEnabled',
+  'whatsappEnabled',
+  'inAppEnabled',
+  'notifyOrderNew',
+  'notifyMessageReceived',
+  'notifyLowStock',
 ]
 
-const ADMIN_COMING_SOON_PREFS = [
-  { label: 'System alerts', description: 'Critical platform health notifications' },
-  { label: 'Billing alerts', description: 'Subscription and invoice notifications' },
-  { label: 'Product updates', description: 'New feature announcements' },
-]
+const ADMIN_COMING_SOON_PREF_KEYS = [
+  'notifications.comingSoon.systemAlerts',
+  'notifications.comingSoon.billingAlerts',
+  'notifications.comingSoon.productUpdates',
+] as const
 
-const ADMIN_PREFS = [
-  { label: 'Default admin landing page', description: 'Choose which tab opens first' },
-  { label: 'Compact mode', description: 'Denser admin layout' },
-  { label: 'Theme preference', description: 'Light or dark admin theme' },
-]
+const ADMIN_PREF_KEYS = [
+  'admin.preferences.landingPage',
+  'admin.preferences.compactMode',
+  'admin.preferences.theme',
+] as const
 
 function LanguageSettingsCard() {
   const { t } = useTranslation('settings')
@@ -146,6 +118,8 @@ function SettingsToggleRow({
   disabled?: boolean
   comingSoon?: boolean
 }) {
+  const { t } = useTranslation('settings')
+
   return (
     <div
       className={cn(
@@ -160,7 +134,7 @@ function SettingsToggleRow({
           <p className="text-sm font-medium text-[var(--text)]">{label}</p>
           {comingSoon && (
             <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-              Coming soon
+              {t('comingSoon')}
             </Badge>
           )}
         </div>
@@ -193,7 +167,8 @@ function AdminSettingsContent({
   onToggleNotification: (key: keyof typeof DEFAULT_NOTIFICATION_PREFS) => void
   onSaveNotifications: () => void
 }) {
-  const roleLabel = user?.role?.replace(/_/g, ' ').toLowerCase() ?? 'unknown'
+  const { t } = useTranslation('settings')
+  const roleLabel = user?.role?.replace(/_/g, ' ').toLowerCase() ?? t('roleUnknown')
 
   return (
     <div className="space-y-4" data-testid="admin-settings-content">
@@ -201,30 +176,38 @@ function AdminSettingsContent({
 
       <div className="grid gap-4 lg:grid-cols-2">
         <AppPanel
-          title="Profile"
-          description="Your platform admin account details."
+          title={t('admin.profile.title')}
+          description={t('admin.profile.description')}
           testId="admin-settings-profile"
         >
           <div className="grid gap-3 sm:grid-cols-2">
-            <SettingsField label="Display name" value={user?.displayName || '—'} />
-            <SettingsField label="Email" value={user?.email || '—'} />
-            <SettingsField label="Role" value={<span className="capitalize">{roleLabel}</span>} />
             <SettingsField
-              label="Member since"
-              value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}
+              label={t('admin.profile.displayName')}
+              value={user?.displayName || t('profile.empty')}
+            />
+            <SettingsField
+              label={t('admin.profile.email')}
+              value={user?.email || t('profile.empty')}
+            />
+            <SettingsField
+              label={t('admin.profile.role')}
+              value={<span className="capitalize">{roleLabel}</span>}
+            />
+            <SettingsField
+              label={t('admin.profile.memberSince')}
+              value={
+                user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : t('profile.empty')
+              }
             />
           </div>
         </AppPanel>
 
         <AppPanel
-          title="Security"
-          description="Authentication is managed through Keycloak."
+          title={t('security.title')}
+          description={t('security.adminDescription')}
           testId="admin-settings-security"
         >
-          <p className="mb-4 text-sm text-[var(--text-mid)]">
-            Password changes and multi-factor settings are handled in your identity provider account
-            portal.
-          </p>
+          <p className="mb-4 text-sm text-[var(--text-mid)]">{t('security.portalHint')}</p>
           <Button
             variant="outline"
             size="sm"
@@ -233,15 +216,15 @@ function AdminSettingsContent({
               window.open(`${keycloakUrl}/realms/${keycloakRealm}/account`, '_blank')
             }}
           >
-            Manage account in Keycloak
+            {t('security.manageInKeycloak')}
             <ExternalLink className="h-3.5 w-3.5" />
           </Button>
         </AppPanel>
       </div>
 
       <AppPanel
-        title="Notifications"
-        description="Choose how you receive platform alerts and operational updates."
+        title={t('notifications.title')}
+        description={t('notifications.adminDescription')}
         testId="admin-settings-notifications"
         footer={
           !isLoadingNotificationPrefs ? (
@@ -254,12 +237,12 @@ function AdminSettingsContent({
               {isSavingNotificationPrefs ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving…
+                  {t('notifications.saving')}
                 </>
               ) : (
                 <>
                   <Save className="h-4 w-4" />
-                  Save preferences
+                  {t('notifications.saveAdmin')}
                 </>
               )}
             </Button>
@@ -267,24 +250,24 @@ function AdminSettingsContent({
         }
       >
         {isLoadingNotificationPrefs ? (
-          <AdminLoadingState label="Loading notification preferences…" />
+          <AdminLoadingState label={t('notifications.loading')} />
         ) : (
           <div className="grid gap-2 lg:grid-cols-2">
-            {NOTIFICATION_FIELDS.map(({ key, label, description }) => (
+            {NOTIFICATION_FIELD_KEYS.map((key) => (
               <SettingsToggleRow
                 key={key}
-                label={label}
-                description={description}
+                label={t(`notifications.fields.${key}.label`)}
+                description={t(`notifications.fields.${key}.description`)}
                 checked={notificationPrefs[key]}
                 onCheckedChange={() => onToggleNotification(key)}
                 disabled={!canEditSettings}
               />
             ))}
-            {ADMIN_COMING_SOON_PREFS.map(({ label, description }) => (
+            {ADMIN_COMING_SOON_PREF_KEYS.map((prefKey) => (
               <SettingsToggleRow
-                key={label}
-                label={label}
-                description={description}
+                key={prefKey}
+                label={t(`${prefKey}.label`)}
+                description={t(`${prefKey}.description`)}
                 checked={false}
                 comingSoon
               />
@@ -295,44 +278,49 @@ function AdminSettingsContent({
 
       <div className="grid gap-4 lg:grid-cols-2">
         <AppPanel
-          title="Admin preferences"
-          description="Workspace customization for the platform admin console."
+          title={t('admin.preferences.title')}
+          description={t('admin.preferences.description')}
           testId="admin-settings-preferences"
         >
           <div className="space-y-2">
-            {ADMIN_PREFS.map(({ label, description }) => (
+            {ADMIN_PREF_KEYS.map((prefKey) => (
               <div
-                key={label}
+                key={prefKey}
                 className="rounded-lg border border-dashed border-[var(--app-border)] p-3"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-medium text-[var(--text)]">{label}</p>
+                  <p className="text-sm font-medium text-[var(--text)]">{t(`${prefKey}.label`)}</p>
                   <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                    Coming soon
+                    {t('comingSoon')}
                   </Badge>
                 </div>
-                <p className="mt-0.5 text-xs text-[var(--text-muted)]">{description}</p>
+                <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                  {t(`${prefKey}.description`)}
+                </p>
               </div>
             ))}
           </div>
         </AppPanel>
 
         <AppPanel
-          title="Session"
-          description="Current sign-in status and authentication provider."
+          title={t('admin.session.title')}
+          description={t('admin.session.description')}
           testId="admin-settings-session"
         >
           <div className="space-y-3">
-            <SettingsField label="Provider" value="Keycloak" />
-            <SettingsField label="Role" value={<span className="capitalize">{roleLabel}</span>} />
+            <SettingsField label={t('admin.session.provider')} value="Keycloak" />
             <SettingsField
-              label="Account status"
+              label={t('admin.session.role')}
+              value={<span className="capitalize">{roleLabel}</span>}
+            />
+            <SettingsField
+              label={t('admin.session.accountStatus')}
               value={
                 <Badge
                   variant="outline"
                   className="border-emerald-200 bg-emerald-50 text-emerald-700"
                 >
-                  Active
+                  {t('admin.session.active')}
                 </Badge>
               }
             />
@@ -341,16 +329,14 @@ function AdminSettingsContent({
       </div>
 
       <AppPanel
-        title="Support"
-        description="Reach the Supplify team for platform admin assistance."
+        title={t('admin.support.title')}
+        description={t('admin.support.description')}
         testId="admin-settings-support"
       >
-        <p className="mb-4 text-sm text-[var(--text-mid)]">
-          Need help with tenants, billing, or platform configuration? Our support team can assist.
-        </p>
+        <p className="mb-4 text-sm text-[var(--text-mid)]">{t('admin.support.hint')}</p>
         <Button variant="outline" size="sm" className="inline-flex items-center gap-2">
           <Mail className="h-4 w-4" />
-          Contact support
+          {t('admin.support.contact')}
         </Button>
       </AppPanel>
     </div>
@@ -358,6 +344,7 @@ function AdminSettingsContent({
 }
 
 export function SettingsPage() {
+  const { t } = useTranslation('settings')
   const { user } = useAppSelector((state) => state.auth)
   const { isEffectiveSupplier, isEffectiveRestaurant, isPlatformAdmin, isImpersonating } =
     useImpersonation()
@@ -410,9 +397,9 @@ export function SettingsPage() {
     try {
       await updateNotificationPreferences(notificationPrefs).unwrap()
       await refetchNotificationPrefs()
-      toast.success('Notification preferences saved!')
+      toast.success(t('notifications.saved'))
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to save notification preferences')
+      toast.error(error?.data?.error?.message || t('notifications.saveFailed'))
     }
   }
 
@@ -454,7 +441,7 @@ export function SettingsPage() {
     )
   }
 
-  const header = { title: 'Settings', subtitle: 'Manage your account and preferences' }
+  const header = { title: t('page.title'), subtitle: t('page.subtitle') }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -475,26 +462,34 @@ export function SettingsPage() {
             <CardHeader className="px-4 py-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <User className="h-4 w-4" />
-                Profile Information
+                {t('profile.title')}
               </CardTitle>
-              <CardDescription className="text-xs">Your account details and role</CardDescription>
+              <CardDescription className="text-xs">{t('profile.description')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 px-4 pb-4 pt-0 text-sm">
               <div>
-                <p className="text-xs font-medium text-[var(--text-mid)]">Display Name</p>
+                <p className="text-xs font-medium text-[var(--text-mid)]">
+                  {t('profile.displayName')}
+                </p>
                 <p>{user?.displayName}</p>
               </div>
               <div>
-                <p className="text-xs font-medium text-[var(--text-mid)]">Email</p>
+                <p className="text-xs font-medium text-[var(--text-mid)]">{t('profile.email')}</p>
                 <p>{user?.email}</p>
               </div>
               <div>
-                <p className="text-xs font-medium text-[var(--text-mid)]">Role</p>
+                <p className="text-xs font-medium text-[var(--text-mid)]">{t('profile.role')}</p>
                 <p className="capitalize">{user?.role?.toLowerCase()}</p>
               </div>
               <div>
-                <p className="text-xs font-medium text-[var(--text-mid)]">Member Since</p>
-                <p>{user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</p>
+                <p className="text-xs font-medium text-[var(--text-mid)]">
+                  {t('profile.memberSince')}
+                </p>
+                <p>
+                  {user?.createdAt
+                    ? new Date(user.createdAt).toLocaleDateString()
+                    : t('profile.notAvailable')}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -503,14 +498,12 @@ export function SettingsPage() {
             <CardHeader className="px-4 py-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Shield className="h-4 w-4" />
-                Security
+                {t('security.title')}
               </CardTitle>
-              <CardDescription className="text-xs">Account security settings</CardDescription>
+              <CardDescription className="text-xs">{t('security.description')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 px-4 pb-4 pt-0">
-              <p className="text-sm text-[var(--text-muted)]">
-                Your account is secured through Keycloak authentication.
-              </p>
+              <p className="text-sm text-[var(--text-muted)]">{t('security.keycloakManaged')}</p>
               <Button
                 variant="outline"
                 size="sm"
@@ -518,7 +511,7 @@ export function SettingsPage() {
                   window.open(`${keycloakUrl}/realms/${keycloakRealm}/account`, '_blank')
                 }}
               >
-                Change Password
+                {t('security.changePassword')}
               </Button>
             </CardContent>
           </Card>
@@ -527,34 +520,38 @@ export function SettingsPage() {
             <CardHeader className="px-4 py-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Bell className="h-4 w-4" />
-                Notifications
+                {t('notifications.title')}
               </CardTitle>
               <CardDescription className="text-xs">
-                Configure notification preferences
+                {t('notifications.description')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 px-4 pb-4 pt-0">
               {isLoadingNotificationPrefs ? (
                 <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading notification preferences…
+                  {t('notifications.loading')}
                 </div>
               ) : (
                 <>
                   <div className="space-y-2">
-                    {NOTIFICATION_FIELDS.map(({ key, label, description }) => (
+                    {NOTIFICATION_FIELD_KEYS.map((key) => (
                       <div
                         key={key}
                         className="flex items-start justify-between gap-3 rounded-lg border border-[var(--app-border)] p-3"
                       >
                         <div>
-                          <p className="text-sm font-medium text-[var(--text)]">{label}</p>
-                          <p className="mt-0.5 text-xs text-[var(--text-muted)]">{description}</p>
+                          <p className="text-sm font-medium text-[var(--text)]">
+                            {t(`notifications.fields.${key}.label`)}
+                          </p>
+                          <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                            {t(`notifications.fields.${key}.description`)}
+                          </p>
                         </div>
                         <Switch
                           checked={notificationPrefs[key]}
                           onCheckedChange={() => handleToggleNotification(key)}
-                          aria-label={label}
+                          aria-label={t(`notifications.fields.${key}.label`)}
                           disabled={!canEditSettings}
                         />
                       </div>
@@ -569,12 +566,12 @@ export function SettingsPage() {
                     {isSavingNotificationPrefs ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Saving…
+                        {t('notifications.saving')}
                       </>
                     ) : (
                       <>
                         <Save className="h-4 w-4" />
-                        Save Preferences
+                        {t('notifications.save')}
                       </>
                     )}
                   </Button>
@@ -587,18 +584,22 @@ export function SettingsPage() {
             <CardHeader className="px-4 py-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <LogIn className="h-4 w-4" />
-                Session / Login Info
+                {t('session.title')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 px-4 pb-4 pt-0 text-sm">
-              <p className="text-[var(--text-muted)]">Authenticated through Keycloak</p>
+              <p className="text-[var(--text-muted)]">{t('session.authenticatedVia')}</p>
               <p>
-                <span className="text-xs font-medium text-[var(--text-mid)]">Role: </span>
+                <span className="text-xs font-medium text-[var(--text-mid)]">
+                  {t('session.role')}:{' '}
+                </span>
                 <span className="capitalize">{user?.role?.toLowerCase()}</span>
               </p>
               <p>
-                <span className="text-xs font-medium text-[var(--text-mid)]">Account: </span>
-                Active
+                <span className="text-xs font-medium text-[var(--text-mid)]">
+                  {t('session.account')}:{' '}
+                </span>
+                {t('session.active')}
               </p>
             </CardContent>
           </Card>
@@ -607,15 +608,13 @@ export function SettingsPage() {
             <CardHeader className="px-4 py-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Mail className="h-4 w-4" />
-                Support
+                {t('support.title')}
               </CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4 pt-0">
-              <p className="mb-3 text-sm text-[var(--text-muted)]">
-                Need help? Contact our support team.
-              </p>
+              <p className="mb-3 text-sm text-[var(--text-muted)]">{t('support.hint')}</p>
               <Button variant="outline" size="sm">
-                Contact Support
+                {t('support.contact')}
               </Button>
             </CardContent>
           </Card>
