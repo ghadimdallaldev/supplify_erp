@@ -193,3 +193,49 @@ Known unfinished markers from the audit:
 3. Reduce lint backlog, starting with generated/split admin-dashboard modules and web endpoint type barrels.
 4. Continue Arabic migration by moving hardcoded UI strings into namespaces feature by feature.
 5. Add a Playwright smoke pass for supplier run-sheet, delivery routes, restaurant reservations, hospitality add-ons, RBAC navigation, and Arabic layout.
+
+## Remediation pass (parallel agents)
+
+**2026-06-18 follow-up.** Up to 16 parallel agents (Wave 0 scaffold → Wave 1 security/features/i18n → Wave 2 integration/docs). Addresses audit blockers: `xlsx`, axios/socket advisories, five “coming soon” flows, and Arabic namespaces for touched features.
+
+### Security and dependencies
+
+| Item                  | Change                                                                                                                                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| SheetJS CE 0.20.3     | Vendored at `vendor/sheetjs/xlsx-0.20.3.tgz`; `apps/api/package.json` pins `file:../../vendor/sheetjs/xlsx-0.20.3.tgz` (replaces npm `0.18.5`). See `vendor/sheetjs/README.md`.                                          |
+| Import hardening      | `product-import.service.js`: OOXML ZIP magic check, max buffer/rows/cols/sheets, parse timeout, formula rejection, single-sheet enforcement. Regression tests in `product-import.service.test.js`.                       |
+| axios                 | `apps/api` → `^1.16.0` (patched advisory line).                                                                                                                                                                          |
+| socket.io             | API + web → `^4.8.3` / `socket.io-client@^4.8.3`.                                                                                                                                                                        |
+| ws / qs / transitives | Root `pnpm.overrides`: `ws>=8.21.0`, `qs>=6.14.2`, `socket.io-parser>=4.2.6`, `path-to-regexp>=0.1.13`, `glob>=10.5.0`, `minimatch>=9.0.7`, `picomatch>=2.3.2`, `lodash>=4.18.0`, `fast-uri>=3.1.2`, `form-data>=4.0.6`. |
+| `audit:prod`          | Root script `pnpm audit --prod --audit-level high`; wired into `qa`.                                                                                                                                                     |
+
+**Note:** Run `pnpm install` to refresh the lockfile so audit reflects vendored `xlsx` and upgraded direct deps. Express/path-to-regexp and build-tool transitive advisories remain out of scope for this pass.
+
+### Completed “coming soon” features
+
+| Feature                   | Change                                                                                                                                                    |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Restaurant inventory add  | Manual add dialog wired in `InventoryTab.tsx` (`useAddRestaurantInventoryMutation`).                                                                      |
+| Restaurant inventory bulk | CSV preview/import API (`restaurant-inventory-import.service.js`, `/import/preview`, `/import`); `InventoryBulkImportPanel` on restaurant inventory page. |
+| Consumer menu gating      | `ConsumerMenuPage` ordering-hours modes (LIVE / PREORDER_ONLY / CLOSED) via `orderingStatusFromBranch`; unavailable items skipped.                        |
+| Calendar scheduled orders | `CalendarView` date-select CTA → `/app/cart?scheduledAt=…`; `CartPage` reads `scheduledAt` query param.                                                   |
+| Supplier loyalty page     | `/app/loyalty` — full `LoyaltyProgramPage` (program form + balances table), sidebar nav, RTK slice in `services/api/endpoints/loyalty.ts`.                |
+
+### Arabic i18n
+
+- Lazy namespaces added: `inventory`, `consumer`, `loyalty`, `calendar` (`apps/web/src/i18n/config.ts`).
+- en/ar JSON under `apps/web/src/i18n/locales/{en,ar}/`.
+- `i18n.test.ts` extended with namespace key parity for all lazy namespaces.
+
+### Verification commands run
+
+| Check                                                   | Result                                                                                                                                                                                 |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm install` + `pnpm audit --prod --audit-level high` | Passed: 0 high (9 moderate/low); additional root overrides for `socket.io-parser`, `path-to-regexp`, `glob`, `minimatch`, `picomatch`, `lodash`, `fast-uri`, `form-data`, `ws>=8.21.0` |
+| `pnpm test:ci`                                          | Passed                                                                                                                                                                                 |
+| `pnpm typecheck`                                        | Passed                                                                                                                                                                                 |
+| `pnpm build`                                            | Passed                                                                                                                                                                                 |
+| Focused API import tests                                | Passed: 16 tests                                                                                                                                                                       |
+| Focused web i18n + calendar tests                       | Passed: 16 tests                                                                                                                                                                       |
+
+**Still open from original audit:** `pnpm lint`, `verify:tier-matrix`, full `test:ci` gate, Playwright smoke, and hardcoded English outside new namespaces.

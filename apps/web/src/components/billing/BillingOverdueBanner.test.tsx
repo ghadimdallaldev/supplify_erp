@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
+import { I18nextProvider } from 'react-i18next'
 import { BillingOverdueBanner } from './BillingOverdueBanner'
+import { testI18n, resetTestI18n } from '../../test/i18n'
 
 const useGetBillingStatusQuery = vi.fn()
 
@@ -20,9 +22,18 @@ vi.mock('../../lib/openBrowseUpgrade', () => ({
   openBrowseUpgrade: vi.fn(),
 }))
 
+function renderBanner() {
+  return render(
+    <I18nextProvider i18n={testI18n}>
+      <BillingOverdueBanner />
+    </I18nextProvider>
+  )
+}
+
 describe('BillingOverdueBanner', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     useGetBillingStatusQuery.mockReset()
+    await resetTestI18n()
   })
 
   afterEach(() => {
@@ -42,7 +53,7 @@ describe('BillingOverdueBanner', () => {
       },
     })
 
-    render(<BillingOverdueBanner />)
+    renderBanner()
 
     expect(screen.getByText('Free Trial expired')).toBeInTheDocument()
     expect(screen.getByText(/Your Free Trial has expired/i)).toBeInTheDocument()
@@ -61,7 +72,7 @@ describe('BillingOverdueBanner', () => {
       },
     })
 
-    render(<BillingOverdueBanner />)
+    renderBanner()
 
     expect(screen.getByText('Account pending activation')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Activate account/i })).toBeInTheDocument()
@@ -82,7 +93,7 @@ describe('BillingOverdueBanner', () => {
       },
     })
 
-    render(<BillingOverdueBanner />)
+    renderBanner()
 
     expect(screen.getByText('Account locked — payment required')).toBeInTheDocument()
     expect(screen.getByText(/Pay your balance to restore full access/i)).toBeInTheDocument()
@@ -99,7 +110,7 @@ describe('BillingOverdueBanner', () => {
       },
     })
 
-    const { container } = render(<BillingOverdueBanner />)
+    const { container } = renderBanner()
     expect(container).toBeEmptyDOMElement()
   })
 })

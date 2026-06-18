@@ -1,0 +1,32 @@
+{
+  "title": "Order Calendar",
+  "subtitle": {
+    "restaurant": "Visualize orders, deliveries, and payments for your branches",
+    "supplier": "Visualize orders, deliveries, and payments across your restaurant partners"
+  },
+  "views": {
+    "month": "Month",
+    "week": "Week",
+    "day": "Day",
+    "agenda": "Agenda"
+  },
+  "cta": {
+    "createOrder": "Create Order",
+    "createManualOrder": "Create Manual Order"
+  },
+  "eventSheet": {
+    "orderTitle": "Order #{{id}}",
+    "total": "Total",
+    "counterpart": "Counterpart",
+    "branch": "Branch",
+    "scheduled": "Scheduled",
+    "ends": "Ends",
+    "categories": "Categories",
+    "restaurantContacts": "Restaurant contacts",
+    "suppliersOnOrder": "Suppliers on this order",
+    "tipTitle": "Tip",
+    "tipBody": "Track delivery progress and payment deadlines in one place. Filters stay in sync across all views for faster follow-ups.",
+    "viewOrder": "View order"
+  },
+  "defaultOrderTitle": "Order"
+}

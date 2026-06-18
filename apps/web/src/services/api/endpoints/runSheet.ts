@@ -68,6 +68,14 @@ export type SupplierRunSheetShortagePreview = {
   productName: string
 }
 
+export type SupplierRunSheetRouteSummary = {
+  area: string
+  orderCount: number
+  pending?: number
+  outForDelivery?: number
+  delivered?: number
+}
+
 export type SupplierRunSheetResponse = {
   date: string
   summary: {
@@ -82,7 +90,7 @@ export type SupplierRunSheetResponse = {
     filters: Record<string, unknown>
     orders: unknown[]
     byArea?: Record<string, unknown[]>
-    routeSummary?: unknown[]
+    routeSummary?: SupplierRunSheetRouteSummary[]
     stats: Record<string, number>
   }
   receivablesDueToday: {

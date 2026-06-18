@@ -10,6 +10,14 @@ import enNavigation from './locales/en/navigation.json'
 import arNavigation from './locales/ar/navigation.json'
 import enSettings from './locales/en/settings.json'
 import arSettings from './locales/ar/settings.json'
+import enInventory from './locales/en/inventory.json'
+import arInventory from './locales/ar/inventory.json'
+import enConsumer from './locales/en/consumer.json'
+import arConsumer from './locales/ar/consumer.json'
+import enLoyalty from './locales/en/loyalty.json'
+import arLoyalty from './locales/ar/loyalty.json'
+import enCalendar from './locales/en/calendar.json'
+import arCalendar from './locales/ar/calendar.json'
 
 function flattenKeys(value: unknown, prefix = ''): string[] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -74,6 +82,11 @@ describe('i18n', () => {
     expect(i18n.t('common:totally.missing.key')).toBe('totally.missing.key')
   })
 
+  it('resolves billingOverdue copy in common namespace', () => {
+    expect(i18n.t('billingOverdue.freeTrial.title')).toBe('Free Trial expired')
+    expect(i18n.t('billingOverdue.locked.title')).toBe('Account locked — payment required')
+  })
+
   it("loadNamespace('auth') loads auth strings", async () => {
     resetNamespaceCache()
     await loadNamespace(i18n, 'en', 'auth')
@@ -91,6 +104,10 @@ describe('i18n', () => {
       ['navigation', enNavigation, arNavigation],
       ['auth', enAuth, arAuth],
       ['settings', enSettings, arSettings],
+      ['inventory', enInventory, arInventory],
+      ['consumer', enConsumer, arConsumer],
+      ['loyalty', enLoyalty, arLoyalty],
+      ['calendar', enCalendar, arCalendar],
     ] as const
 
     for (const [namespace, en, ar] of namespaces) {

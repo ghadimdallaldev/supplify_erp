@@ -56,3 +56,13 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 - **Multi-supplier cart preview**: Checkout shows N orders before confirm (backend already split per supplier).
 - **Quote price lock hardening**: Checkout rejects stale quote locks with clear validation error.
 - **Reason**: Accountant/purchaser workflows and supplier relationship management are web cockpit features. Mobile can consume payables API and connection-request endpoints in a later restaurant finance pass.
+
+## 2026-06-18 — Restaurant inventory bulk import (web-only)
+
+- **Scope**: Restaurant CSV bulk stock import on `/app/restaurant-inventory` — template download, preview, confirm. API `POST /api/restaurant-inventory/import/preview` and `/import` (`restaurant-inventory-import.service.js`).
+- **Reason**: Multi-step CSV preview/validation and desktop file workflows match the web cockpit. Mobile v1 has no equivalent bulk-import UI; restaurants can adjust stock on web or use per-line add/adjust flows on mobile when parity is added.
+
+## 2026-06-18 — Supplier B2B loyalty program page (web-only)
+
+- **Scope**: Supplier loyalty configuration stub at `/app/loyalty` (`LoyaltyProgramPage`); APIs at `/api/loyalty/supplier/program` and balance endpoints. RTK types in `apps/web/src/services/api/endpoints/loyalty.ts`.
+- **Reason**: B2B loyalty program setup and balance review are supplier catalog/CRM cockpit workflows (web-first). Consumer-facing loyalty remains separate (`/app/consumer-loyalty`). Mobile can adopt supplier loyalty APIs in a later supplier CRM pass.

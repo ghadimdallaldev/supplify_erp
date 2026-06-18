@@ -3,10 +3,18 @@ import * as XLSX from 'xlsx'
 import { query, withTransaction } from '../lib/db.js'
 import { ValidationError, NotFoundError, ConflictError } from '../middlewares/errorHandler.js'
 import { checkLimit } from '../lib/subscription.js'
-import { escapeCsvField } from '../lib/sanitize-upload.js'
+import { escapeCsvField, MAX_UPLOAD_BYTES } from '../lib/sanitize-upload.js'
 import { logger } from '../lib/logger.js'
 import { writeSystemAuditLog } from '../lib/audit.js'
 import { importImageFromUrl, assertSafeImageUrl } from './product-image-import.service.js'
+
+export const XLSX_MAX_BUFFER_BYTES = MAX_UPLOAD_BYTES
+export const XLSX_MAX_SHEETS = 1
+export const XLSX_MAX_ROWS = 5000
+export const XLSX_MAX_COLS = 50
+export const XLSX_PARSE_TIMEOUT_MS = 10_000
+
+const OOXML_ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04])
 
 const FIELD_ALIASES = {
   sku: ['sku', 'product_sku', 'item_sku'],
@@ -63,22 +71,83 @@ function parseCsv(text) {
   return { headers, rows }
 }
 
+function isOoxmlZip(buffer) {
+  return (
+    buffer.length >= OOXML_ZIP_MAGIC.length &&
+    buffer.subarray(0, OOXML_ZIP_MAGIC.length).equals(OOXML_ZIP_MAGIC)
+  )
+}
+
+function assertNoFormulasInWorkbook(workbook) {
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName]
+    if (!sheet) continue
+    for (const key of Object.keys(sheet)) {
+      if (key.startsWith('!')) continue
+      const cell = sheet[key]
+      if (cell?.f != null || cell?.t === 'f') {
+        throw new ValidationError('Spreadsheet formulas are not allowed')
+      }
+    }
+  }
+}
+
 function parseXlsxBuffer(buffer) {
-  const workbook = XLSX.read(buffer, { type: 'buffer' })
-  const sheetName = workbook.SheetNames[0]
-  if (!sheetName) {
+  if (buffer.length > XLSX_MAX_BUFFER_BYTES) {
+    throw new ValidationError(`Spreadsheet exceeds maximum size of ${XLSX_MAX_BUFFER_BYTES} bytes`)
+  }
+  if (!isOoxmlZip(buffer)) {
+    throw new ValidationError('Invalid .xlsx file: expected OOXML (ZIP) format')
+  }
+
+  const startedAt = Date.now()
+  let formulaScan
+  try {
+    formulaScan = XLSX.read(buffer, { type: 'buffer', cellFormula: true, sheetStubs: true })
+  } catch (err) {
+    throw new ValidationError(err.message || 'Failed to parse spreadsheet')
+  }
+  assertNoFormulasInWorkbook(formulaScan)
+
+  let workbook
+  try {
+    workbook = XLSX.read(buffer, { type: 'buffer', cellFormula: false, sheetStubs: false })
+  } catch (err) {
+    throw new ValidationError(err.message || 'Failed to parse spreadsheet')
+  }
+  if (Date.now() - startedAt > XLSX_PARSE_TIMEOUT_MS) {
+    throw new ValidationError('Spreadsheet parsing timed out')
+  }
+
+  if (workbook.SheetNames.length === 0) {
     throw new ValidationError('Spreadsheet has no sheets')
   }
+  if (workbook.SheetNames.length > XLSX_MAX_SHEETS) {
+    throw new ValidationError(`Spreadsheet may contain at most ${XLSX_MAX_SHEETS} sheet`)
+  }
+
+  const sheetName = workbook.SheetNames[0]
   const sheet = workbook.Sheets[sheetName]
   const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
   if (data.length < 2) {
     throw new ValidationError('Spreadsheet must include a header row and at least one data row')
   }
+  if (data.length - 1 > XLSX_MAX_ROWS) {
+    throw new ValidationError(`Spreadsheet exceeds maximum of ${XLSX_MAX_ROWS} data rows`)
+  }
+
   const headers = data[0].map(cellToString)
+  if (headers.length > XLSX_MAX_COLS) {
+    throw new ValidationError(`Spreadsheet exceeds maximum of ${XLSX_MAX_COLS} columns`)
+  }
+
   const rows = data
     .slice(1)
     .filter((row) => row.some((cell) => cellToString(cell) !== ''))
     .map((row, index) => {
+      if (row.length > XLSX_MAX_COLS) {
+        throw new ValidationError(`Spreadsheet exceeds maximum of ${XLSX_MAX_COLS} columns`)
+      }
       const values = headers.map((_, i) => cellToString(row[i]))
       return { rowNumber: index + 2, raw: mapRow(headers, values) }
     })
@@ -90,13 +159,16 @@ export function parseSpreadsheetBuffer(buffer, filename = 'import.csv') {
     throw new ValidationError('Import file is empty or invalid')
   }
   const ext = path.extname(String(filename || '')).toLowerCase()
-  if (ext === '.xlsx' || ext === '.xls') {
+  if (ext === '.xls') {
+    throw new ValidationError('Legacy .xls format is not supported. Use .xlsx or .csv')
+  }
+  if (ext === '.xlsx') {
     return parseXlsxBuffer(buffer)
   }
   if (ext === '.csv' || ext === '') {
     return parseCsv(buffer.toString('utf8'))
   }
-  throw new ValidationError('Unsupported import file type. Use .csv, .xlsx, or .xls')
+  throw new ValidationError('Unsupported import file type. Use .csv or .xlsx')
 }
 
 export function parseImportFile(buffer, filename) {

@@ -518,7 +518,7 @@ const importPreviewSchema = z.object({
   columnMapping: z.record(z.string()).optional(),
 })
 
-const PRODUCT_IMPORT_EXTENSIONS = new Set(['.csv', '.xlsx', '.xls'])
+const PRODUCT_IMPORT_EXTENSIONS = new Set(['.csv', '.xlsx'])
 
 const productImportUpload = multer({
   storage: multer.memoryStorage(),
@@ -529,7 +529,7 @@ const productImportUpload = multer({
       cb(null, true)
       return
     }
-    cb(new ValidationError('Only .csv, .xlsx, and .xls files are allowed'))
+    cb(new ValidationError('Only .csv and .xlsx files are allowed'))
   },
 }).single('file')
 
@@ -579,7 +579,7 @@ function resolveProductImportPayload(req) {
     const filename = sanitizeUploadFileName(req.file.originalname)
     const ext = path.extname(filename).toLowerCase()
     if (!PRODUCT_IMPORT_EXTENSIONS.has(ext)) {
-      throw new ValidationError('Only .csv, .xlsx, and .xls files are allowed')
+      throw new ValidationError('Only .csv and .xlsx files are allowed')
     }
     return {
       buffer: req.file.buffer,

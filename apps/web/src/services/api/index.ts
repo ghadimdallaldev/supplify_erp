@@ -32,6 +32,7 @@ import './endpoints/admin'
 import './endpoints/impersonation'
 import './endpoints/catalogImport'
 import './endpoints/growth'
+import './endpoints/loyalty'
 import './endpoints/runSheet'
 import '../staffApi'
 import '../reservationsApi'
@@ -43,6 +44,11 @@ import { api as baseApi } from './base'
 export const api = baseApi as any
 
 export { downloadImageImportReportUrl } from './endpoints/catalogImport'
+export { INVENTORY_IMPORT_CSV_TEMPLATE } from './endpoints/restaurantInventory'
+export type {
+  RestaurantInventoryImportPreview,
+  RestaurantInventoryImportResult,
+} from './endpoints/restaurantInventory'
 export type {
   ImageImportJob,
   ImageImportPreviewResponse,
@@ -197,6 +203,8 @@ export const {
   useAskReorderAssistanceMutation,
   useApplyReorderAssistanceMutation,
   useSuppressReorderSuggestionMutation,
+  usePreviewRestaurantInventoryImportMutation,
+  useImportRestaurantInventoryMutation,
   useGetOrderFulfillmentIssuesQuery,
   useReportOrderShortageMutation,
   useSuggestOrderSubstitutionIssueMutation,
@@ -456,4 +464,8 @@ export const {
   useGetRestaurantConnectionRequestsQuery,
   useAcceptConnectionRequestMutation,
   useDeclineConnectionRequestMutation,
+  useGetSupplierLoyaltyProgramQuery,
+  useUpsertSupplierLoyaltyProgramMutation,
+  useGetSupplierLoyaltyBalancesQuery,
+  useGetSupplierLoyaltyLedgerQuery,
 } = api as any
