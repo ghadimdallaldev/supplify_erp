@@ -31,7 +31,11 @@ export const RESTAURANT_PROFILES = {
     homePath: '/app/dashboard',
     primaryNavHref: '/app/dashboard',
     overviewNav: null,
-    analyticsNav: { label: 'Restaurant dashboard', href: '/app/dashboard' },
+    analyticsNav: {
+      label: 'Restaurant dashboard',
+      labelKey: 'restaurantDashboard',
+      href: '/app/dashboard',
+    },
     showGlobalReports: true,
     commandCenterMode: null,
     dashboard: {
@@ -65,7 +69,11 @@ export const RESTAURANT_PROFILES = {
     homePath: '/app/orders',
     primaryNavHref: '/app/orders',
     overviewNav: null,
-    analyticsNav: { label: 'Operations dashboard', href: '/app/dashboard' },
+    analyticsNav: {
+      label: 'Operations dashboard',
+      labelKey: 'operationsDashboard',
+      href: '/app/dashboard',
+    },
     showGlobalReports: true,
     commandCenterMode: null,
     dashboard: {
@@ -102,7 +110,11 @@ export const RESTAURANT_PROFILES = {
     homePath: '/app/cart',
     primaryNavHref: '/app/cart',
     overviewNav: null,
-    analyticsNav: { label: 'Ordering dashboard', href: '/app/dashboard' },
+    analyticsNav: {
+      label: 'Ordering dashboard',
+      labelKey: 'orderingDashboard',
+      href: '/app/dashboard',
+    },
     showGlobalReports: false,
     commandCenterMode: null,
     dashboard: {
@@ -130,7 +142,12 @@ export const RESTAURANT_PROFILES = {
     id: 'restaurant_receiving',
     homePath: '/app/receiving',
     primaryNavHref: '/app/receiving',
-    overviewNav: { label: 'Receiving desk', href: '/app/receiving', gate: 'command_center' },
+    overviewNav: {
+      label: 'Receiving desk',
+      labelKey: 'receivingDesk',
+      href: '/app/receiving',
+      gate: 'command_center',
+    },
     analyticsNav: null,
     showGlobalReports: false,
     commandCenterMode: null,
@@ -155,7 +172,11 @@ export const RESTAURANT_PROFILES = {
     homePath: '/app/invoices',
     primaryNavHref: '/app/invoices',
     overviewNav: null,
-    analyticsNav: { label: 'Finance dashboard', href: '/app/dashboard' },
+    analyticsNav: {
+      label: 'Finance dashboard',
+      labelKey: 'financeDashboard',
+      href: '/app/dashboard',
+    },
     showGlobalReports: true,
     commandCenterMode: null,
     dashboard: {
@@ -184,7 +205,12 @@ export const RESTAURANT_PROFILES = {
     id: 'restaurant_foh',
     homePath: '/app/reservations',
     primaryNavHref: '/app/reservations',
-    overviewNav: { label: 'Host desk', href: '/app/reservations', gate: 'command_center' },
+    overviewNav: {
+      label: 'Host desk',
+      labelKey: 'hostDesk',
+      href: '/app/reservations',
+      gate: 'command_center',
+    },
     analyticsNav: null,
     showGlobalReports: false,
     commandCenterMode: null,
@@ -205,7 +231,11 @@ export const RESTAURANT_PROFILES = {
     homePath: '/app/dashboard',
     primaryNavHref: '/app/dashboard',
     overviewNav: null,
-    analyticsNav: { label: 'Workspace overview', href: '/app/dashboard' },
+    analyticsNav: {
+      label: 'Workspace overview',
+      labelKey: 'workspaceOverview',
+      href: '/app/dashboard',
+    },
     showGlobalReports: true,
     commandCenterMode: null,
     dashboard: {

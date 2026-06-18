@@ -1,0 +1,32 @@
+{
+  "title": "تقويم الطلبات",
+  "subtitle": {
+    "restaurant": "تصوّر الطلبات والتسليمات والمدفوعات لفروعك",
+    "supplier": "تصوّر الطلبات والتسليمات والمدفوعات عبر شركاء المطاعم"
+  },
+  "views": {
+    "month": "شهر",
+    "week": "أسبوع",
+    "day": "يوم",
+    "agenda": "جدول الأعمال"
+  },
+  "cta": {
+    "createOrder": "إنشاء طلب",
+    "createManualOrder": "إنشاء طلب يدوي"
+  },
+  "eventSheet": {
+    "orderTitle": "طلب #{{id}}",
+    "total": "الإجمالي",
+    "counterpart": "الطرف المقابل",
+    "branch": "الفرع",
+    "scheduled": "مجدول",
+    "ends": "ينتهي",
+    "categories": "الفئات",
+    "restaurantContacts": "جهات اتصال المطعم",
+    "suppliersOnOrder": "الموردون في هذا الطلب",
+    "tipTitle": "نصيحة",
+    "tipBody": "تتبع تقدم التسليم ومواعيد الدفع في مكان واحد. تبقى الفلاتر متزامنة عبر جميع العروض لمتابعة أسرع.",
+    "viewOrder": "عرض الطلب"
+  },
+  "defaultOrderTitle": "طلب"
+}

@@ -13,7 +13,14 @@ export const LOCALE_STORAGE_KEY = 'supplify.locale'
 export const DEFAULT_LOCALE = 'en'
 
 export const EAGER_NAMESPACES = ['common', 'navigation'] as const
-export const LAZY_NAMESPACES = ['auth', 'settings'] as const
+export const LAZY_NAMESPACES = [
+  'auth',
+  'settings',
+  'inventory',
+  'consumer',
+  'loyalty',
+  'calendar',
+] as const
 
 export type I18nNamespace = (typeof EAGER_NAMESPACES)[number] | (typeof LAZY_NAMESPACES)[number]
 

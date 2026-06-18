@@ -54,8 +54,13 @@ export type WorkspacePersonaProfile = {
   homePath: string
   /** Sidebar item shown first (main daily focus for this role). */
   primaryNavHref: string
-  overviewNav: { label: string; href: string; gate: 'promotions' | 'command_center' } | null
-  analyticsNav: { label: string; href: string } | null
+  overviewNav: {
+    label: string
+    labelKey: string
+    href: string
+    gate: 'promotions' | 'command_center'
+  } | null
+  analyticsNav: { label: string; labelKey: string; href: string } | null
   showGlobalReports: boolean
   commandCenterMode: CommandCenterMode | null
   dashboard: {
@@ -103,8 +108,13 @@ export const GENERIC_PROFILE: WorkspacePersonaProfile = {
   id: 'generic',
   homePath: '/app/dashboard',
   primaryNavHref: '/app/dashboard',
-  overviewNav: { label: 'Dashboard', href: '/app/dashboard', gate: 'command_center' },
-  analyticsNav: { label: 'Dashboard', href: '/app/dashboard' },
+  overviewNav: {
+    label: 'Dashboard',
+    labelKey: 'dashboard',
+    href: '/app/dashboard',
+    gate: 'command_center',
+  },
+  analyticsNav: { label: 'Dashboard', labelKey: 'dashboard', href: '/app/dashboard' },
   showGlobalReports: true,
   commandCenterMode: 'full',
   dashboard: {

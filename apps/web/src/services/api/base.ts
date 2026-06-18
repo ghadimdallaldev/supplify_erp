@@ -224,6 +224,7 @@ export const api = createApi({
     'ConsumerFulfillment',
     'ConsumerAuth',
     'ConsumerLoyaltyProgram',
+    'SupplierLoyaltyProgram',
     'SupplierGrowth',
   ],
   keepUnusedDataFor: 120,

@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '../ui/dialog'
 import { formatPrice } from '../../utils/format'
-import type { ConsumerMenuItem } from '../../services/consumerApi'
+import type { ConsumerMenuItem, ConsumerOrderingMode } from '../../services/consumerApi'
 import type { AddCartLineInput } from '../../hooks/useConsumerCart'
 import { cn } from '../../lib/utils'
 
@@ -21,13 +21,20 @@ type OrderSheetProps = {
   onOpenChange: (open: boolean) => void
   item: ConsumerMenuItem | null
   onAdd: (input: AddCartLineInput) => void
+  orderingMode?: ConsumerOrderingMode
 }
 
 function effectiveMin(group: NonNullable<ConsumerMenuItem['modifierGroups']>[number]) {
   return group.is_required ? Math.max(1, group.min_selections) : group.min_selections
 }
 
-export function OrderSheet({ open, onOpenChange, item, onAdd }: OrderSheetProps) {
+export function OrderSheet({
+  open,
+  onOpenChange,
+  item,
+  onAdd,
+  orderingMode = 'LIVE',
+}: OrderSheetProps) {
   const [selectedByGroup, setSelectedByGroup] = useState<Record<string, string[]>>({})
   const [notes, setNotes] = useState('')
   const [quantity, setQuantity] = useState(1)
@@ -131,6 +138,10 @@ export function OrderSheet({ open, onOpenChange, item, onAdd }: OrderSheetProps)
 
   if (!item) return null
 
+  const orderingClosed = orderingMode === 'CLOSED'
+  const isItemUnavailable = 'is_available' in item && item.is_available === false
+  const canAdd = !orderingClosed && !isItemUnavailable
+  const addButtonLabel = orderingMode === 'PREORDER_ONLY' ? 'Preorder' : 'Add to cart'
   const hasModifiers = (item.modifierGroups?.length ?? 0) > 0
   const imageUrl = item.image_url
 
@@ -254,8 +265,13 @@ export function OrderSheet({ open, onOpenChange, item, onAdd }: OrderSheetProps)
               type="button"
               className="consumer-pressable w-full bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
               onClick={handleAdd}
+              disabled={!canAdd}
             >
-              Add to cart · {formatPrice(lineTotal)}
+              {isItemUnavailable
+                ? 'Sold out'
+                : orderingClosed
+                  ? 'Ordering closed'
+                  : `${addButtonLabel} · ${formatPrice(lineTotal)}`}
             </Button>
           </DialogFooter>
         </div>

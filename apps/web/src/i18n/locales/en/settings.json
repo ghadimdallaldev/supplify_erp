@@ -5,5 +5,132 @@
     "english": "English",
     "arabic": "العربية"
   },
-  "comingSoon": "Coming soon"
+  "comingSoon": "Coming soon",
+  "page": {
+    "title": "Settings",
+    "subtitle": "Manage your account and preferences"
+  },
+  "profile": {
+    "title": "Profile Information",
+    "description": "Your account details and role",
+    "displayName": "Display Name",
+    "email": "Email",
+    "role": "Role",
+    "memberSince": "Member Since",
+    "notAvailable": "N/A",
+    "empty": "—"
+  },
+  "security": {
+    "title": "Security",
+    "description": "Account security settings",
+    "keycloakManaged": "Your account is secured through Keycloak authentication.",
+    "changePassword": "Change Password",
+    "adminDescription": "Authentication is managed through Keycloak.",
+    "portalHint": "Password changes and multi-factor settings are handled in your identity provider account portal.",
+    "manageInKeycloak": "Manage account in Keycloak"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "description": "Configure notification preferences",
+    "adminDescription": "Choose how you receive platform alerts and operational updates.",
+    "loading": "Loading notification preferences…",
+    "save": "Save Preferences",
+    "saveAdmin": "Save preferences",
+    "saving": "Saving…",
+    "saved": "Notification preferences saved!",
+    "saveFailed": "Failed to save notification preferences",
+    "fields": {
+      "emailEnabled": {
+        "label": "Email notifications",
+        "description": "Receive important updates via email."
+      },
+      "whatsappEnabled": {
+        "label": "WhatsApp notifications",
+        "description": "Get important alerts on WhatsApp when your phone is on file."
+      },
+      "inAppEnabled": {
+        "label": "In-app notifications",
+        "description": "Show alerts inside Supplify."
+      },
+      "notifyOrderNew": {
+        "label": "Order updates",
+        "description": "Be notified when new orders arrive."
+      },
+      "notifyMessageReceived": {
+        "label": "Message alerts",
+        "description": "Receive pings when you get new chat messages."
+      },
+      "notifyLowStock": {
+        "label": "Low stock warnings",
+        "description": "Stay informed about items running low."
+      }
+    },
+    "comingSoon": {
+      "systemAlerts": {
+        "label": "System alerts",
+        "description": "Critical platform health notifications"
+      },
+      "billingAlerts": {
+        "label": "Billing alerts",
+        "description": "Subscription and invoice notifications"
+      },
+      "productUpdates": {
+        "label": "Product updates",
+        "description": "New feature announcements"
+      }
+    }
+  },
+  "admin": {
+    "profile": {
+      "title": "Profile",
+      "description": "Your platform admin account details.",
+      "displayName": "Display name",
+      "email": "Email",
+      "role": "Role",
+      "memberSince": "Member since"
+    },
+    "preferences": {
+      "title": "Admin preferences",
+      "description": "Workspace customization for the platform admin console.",
+      "landingPage": {
+        "label": "Default admin landing page",
+        "description": "Choose which tab opens first"
+      },
+      "compactMode": {
+        "label": "Compact mode",
+        "description": "Denser admin layout"
+      },
+      "theme": {
+        "label": "Theme preference",
+        "description": "Light or dark admin theme"
+      }
+    },
+    "session": {
+      "title": "Session",
+      "description": "Current sign-in status and authentication provider.",
+      "provider": "Provider",
+      "role": "Role",
+      "accountStatus": "Account status",
+      "active": "Active"
+    },
+    "support": {
+      "title": "Support",
+      "description": "Reach the Supplify team for platform admin assistance.",
+      "hint": "Need help with tenants, billing, or platform configuration? Our support team can assist.",
+      "contact": "Contact support"
+    }
+  },
+  "session": {
+    "title": "Session / Login Info",
+    "authenticatedVia": "Authenticated through Keycloak",
+    "role": "Role",
+    "account": "Account",
+    "active": "Active"
+  },
+  "support": {
+    "title": "Support",
+    "hint": "Need help? Contact our support team.",
+    "contact": "Contact Support"
+  },
+  "roleUnknown": "unknown"
 }

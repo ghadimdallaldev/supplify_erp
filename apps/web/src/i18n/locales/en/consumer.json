@@ -1,0 +1,40 @@
+{
+  "ordering": {
+    "live": "Open for orders until {{end}}.",
+    "preorderOnly": "Preorders only until {{start}}. Schedule for {{start}} or later.",
+    "closed": "Ordering closed. Live orders resume at {{start}}.",
+    "midnight": "midnight"
+  },
+  "menu": {
+    "slugRequired": "Restaurant slug is required.",
+    "searchPlaceholder": "Search menu…",
+    "searchAria": "Search menu",
+    "clearSearch": "Clear search",
+    "clearSearchAction": "Clear search",
+    "itemCount_one": "{{count}} item",
+    "itemCount_other": "{{count}} items",
+    "categoryCount": "{{count}} categories",
+    "fallbackNotice": "Showing the full menu — this location may use a shared menu across branches.",
+    "loadError": "Unable to load menu. Try again later.",
+    "noItemsInCategory": "No items in this category.",
+    "empty": {
+      "noMatches": "No matches",
+      "comingSoon": "Menu coming soon",
+      "noMatchesDescription": "Nothing matched “{{query}}”. Try another dish or clear your search.",
+      "unpublished": "This restaurant has not published a menu yet.",
+      "ownerHint": "Restaurant owners: add items in Menu admin, or run",
+      "seedScript": "seed-b2c-demo.mjs",
+      "ownerHintSuffix": "on the API server.",
+      "tryAnotherLocation": "Try another location"
+    },
+    "cartEmpty": "Your cart is empty",
+    "addedToCart": "Added {{name}}",
+    "preorderedToCart": "Preordered {{name}}"
+  },
+  "menuItem": {
+    "soldOut": "Sold out",
+    "customize": "Customize",
+    "addAria": "Add {{name}}",
+    "preorder": "Preorder"
+  }
+}

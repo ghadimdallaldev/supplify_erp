@@ -78,7 +78,14 @@ applyHtmlAttributes(initialLocale)
 
 i18n.on('languageChanged', (lng) => {
   applyHtmlAttributes(lng.split('-')[0])
-  void loadNamespaces(i18n, lng.split('-')[0], ['auth', 'settings'])
+  void loadNamespaces(i18n, lng.split('-')[0], [
+    'auth',
+    'settings',
+    'inventory',
+    'consumer',
+    'loyalty',
+    'calendar',
+  ])
 })
 
 export { i18n, loadNamespaces }

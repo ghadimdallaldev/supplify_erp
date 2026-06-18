@@ -7,6 +7,7 @@ type FloatingCartBarProps = {
   cartTotal: number
   onOpenCart: () => void
   onCheckout: () => void
+  checkoutDisabled?: boolean
 }
 
 export function FloatingCartBar({
@@ -14,6 +15,7 @@ export function FloatingCartBar({
   cartTotal,
   onOpenCart,
   onCheckout,
+  checkoutDisabled = false,
 }: FloatingCartBarProps) {
   if (!cartCount) return null
 
@@ -34,6 +36,7 @@ export function FloatingCartBar({
         </button>
         <Button
           onClick={onCheckout}
+          disabled={checkoutDisabled}
           className="consumer-pressable shrink-0 bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
         >
           <ShoppingCart className="mr-2 h-4 w-4" />
