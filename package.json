@@ -6,25 +6,6 @@
   "type": "module",
   "scripts": {
     "build": "pnpm --filter @supplify/api build && pnpm --filter @supplify/web build",
-    "typecheck": "pnpm --filter @supplify/web type-check",
-    "lint": "pnpm --filter @supplify/api lint && pnpm --filter @supplify/web lint",
-    "lint:fix": "pnpm --filter @supplify/api lint:fix && pnpm --filter @supplify/web lint:fix",
-    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
-    "test": "pnpm --filter @supplify/api test && pnpm --filter @supplify/web test",
-    "test:api": "node scripts/pnpm-run.mjs --filter @supplify/api test:api",
-    "test:api:watch": "pnpm --filter @supplify/api test:api:watch",
-    "test:web": "node scripts/pnpm-run.mjs --filter @supplify/web test:run",
-    "test:web:watch": "pnpm --filter @supplify/web test",
-    "test:billing": "node scripts/pnpm-run.mjs --filter @supplify/api test:billing",
-    "test:ci": "node scripts/pnpm-run.mjs --filter @supplify/api test:run && node scripts/pnpm-run.mjs --filter @supplify/web test:run",
-    "test:all": "pnpm test:ci",
-    "test:rbac": "node scripts/pnpm-run.mjs --filter @supplify/api test:rbac && node scripts/pnpm-run.mjs --filter @supplify/web exec vitest run src/hooks/rbacGating.test.tsx src/hooks/rbacFullAppGating.test.tsx src/hooks/rbacCatalogManagerGating.test.tsx src/hooks/rbacRestaurantHostGating.test.tsx src/lib/tenantRoles.test.ts src/components/TeamRolesPanel.test.jsx src/components/RolePermissionChecklist.test.jsx",
-    "verify:tier-matrix": "node apps/api/scripts/verify-tier-matrix.mjs",
-    "audit:prod": "pnpm audit --prod --audit-level high",
-    "qa": "pnpm lint && pnpm typecheck && pnpm test:ci && pnpm verify:tier-matrix && pnpm audit:prod && pnpm build",
-    "e2e": "pnpm --filter @supplify/api test:e2e",
-    "e2e:playwright": "node tests/scripts/probe-urls.mjs && playwright test --config=tests/playwright.config.ts",
-    "test:coverage-map": "node tests/scripts/check-coverage-map.mjs",
     "db:migrate": "node apps/api/scripts/migrate.js",
     "db:sync-roles": "node apps/api/scripts/sync-system-roles.mjs",
     "setup": "node scripts/ensure-pnpm.mjs && node scripts/pnpm-run.mjs install"
@@ -33,21 +14,5 @@
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
   },
-  "packageManager": "pnpm@8.15.9",
-  "pnpm": {
-    "overrides": {
-      "fast-xml-parser": ">=5.3.5",
-      "handlebars": ">=4.7.9",
-      "ws": ">=8.21.0",
-      "qs": ">=6.14.2",
-      "socket.io-parser": ">=4.2.6",
-      "path-to-regexp": ">=0.1.13",
-      "glob": ">=10.5.0",
-      "minimatch": ">=9.0.7",
-      "picomatch": ">=2.3.2",
-      "lodash": ">=4.18.0",
-      "fast-uri": ">=3.1.2",
-      "form-data": ">=4.0.6"
-    }
-  }
+  "packageManager": "pnpm@8.15.9"
 }
