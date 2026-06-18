@@ -1,0 +1,39 @@
+{
+  "page": {
+    "title": "Loyalty Program",
+    "description": "Reward restaurant customers with points on received orders and let them redeem at checkout.",
+    "defaultProgramName": "Partner rewards"
+  },
+  "summary": {
+    "earnRate": "{{points}} pts per $1",
+    "redeemValue": "${{value}}/pt",
+    "minRedeem": "{{points}} pts"
+  },
+  "programSettings": {
+    "title": "Program settings",
+    "description": "Configure earn rate, redeem value, minimum redemption, and per-order caps for restaurant partners.",
+    "save": "Save program",
+    "enabledLabel": "Program enabled",
+    "enabledDescription": "Turn on B2B loyalty points for restaurants ordering from your catalog.",
+    "nameLabel": "Program name",
+    "earnLabel": "Points earned per $1 spent",
+    "redeemLabel": "Redeem value per point ($)",
+    "minRedeemLabel": "Minimum redeem points",
+    "maxRedeemLabel": "Max redeem percent per order"
+  },
+  "balances": {
+    "title": "Restaurant balances",
+    "description": "Points earned and redeemed by each restaurant partner.",
+    "empty": "No restaurant balances yet. Points appear after restaurants earn or redeem on orders.",
+    "columns": {
+      "restaurant": "Restaurant",
+      "balance": "Balance",
+      "earned": "Lifetime earned",
+      "redeemed": "Lifetime redeemed"
+    }
+  },
+  "toast": {
+    "saved": "Loyalty program saved",
+    "saveFailed": "Unable to save program"
+  }
+}

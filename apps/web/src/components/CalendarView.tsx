@@ -5,6 +5,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import listPlugin from '@fullcalendar/list'
 import { format } from 'date-fns'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   CalendarDays,
   Filter,
@@ -15,12 +16,14 @@ import {
   Lock,
   TrendingUp,
 } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet'
 import { Select, SelectTrigger, SelectItem } from './ui/select'
 import { useOrdersCalendar, OrdersCalendarFetchError } from '../hooks/useOrdersCalendar'
+import { usePermissions } from '../hooks/usePermissions'
+import { useTranslation } from 'react-i18next'
+import { ensureNamespace } from '../i18n'
 import { useGetEntitlementsQuery } from '../services/api'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { useAppDispatch } from '../hooks/redux'
@@ -49,17 +52,25 @@ const statusDotMap: Record<string, string> = {
   cancelled: 'bg-[var(--red)] shadow-[var(--red)]/40',
 }
 
-const viewOptions: Array<{ label: string; value: CalendarViewType }> = [
-  { label: 'Month', value: 'dayGridMonth' },
-  { label: 'Week', value: 'timeGridWeek' },
-  { label: 'Day', value: 'timeGridDay' },
-  { label: 'Agenda', value: 'listWeek' },
+const viewOptionKeys: Array<{ labelKey: string; value: CalendarViewType }> = [
+  { labelKey: 'views.month', value: 'dayGridMonth' },
+  { labelKey: 'views.week', value: 'timeGridWeek' },
+  { labelKey: 'views.day', value: 'timeGridDay' },
+  { labelKey: 'views.agenda', value: 'listWeek' },
 ]
 
 const DEFAULT_PAGE_SIZE = 60
 
 export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarViewProps) {
+  const { t } = useTranslation('calendar')
   const dispatch = useAppDispatch()
+  const navigate = useNavigate()
+  const { can } = usePermissions()
+  const canCreateOrders = can('ORDERS_CREATE')
+
+  useEffect(() => {
+    void ensureNamespace('calendar')
+  }, [])
   const { data: entitlementsData, isLoading: entitlementsLoading } = useGetEntitlementsQuery()
   const entitlements = entitlementsData?.entitlements
   const hasOrderCalendar = isEntitlementFeatureEnabled(entitlements, 'order_calendar')
@@ -139,12 +150,12 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
 
     return source.map((event) => ({
       id: event.id,
-      title: event.counterpartName ?? 'Order',
+      title: event.counterpartName ?? t('defaultOrderTitle'),
       start: event.start,
       end: event.end ?? undefined,
       extendedProps: event,
     }))
-  }, [data?.events])
+  }, [data?.events, t])
 
   const supplierLabel = activeRole === 'SUPPLIER' ? 'Restaurant' : 'Supplier'
   const totalPages = useMemo(() => {
@@ -153,6 +164,9 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
   }, [data?.pagination?.total])
 
   const filtersDisabled = !data?.filters
+  const createOrderPath = activeRole === 'SUPPLIER' ? '/app/orders' : '/app/cart'
+  const createOrderLabel =
+    activeRole === 'SUPPLIER' ? t('cta.createManualOrder') : t('cta.createOrder')
 
   const handleViewChange = useCallback(
     (nextView: CalendarViewType) => {
@@ -307,6 +321,19 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
     [setActiveRole]
   )
 
+  const handleCreateOrder = useCallback(() => {
+    navigate(createOrderPath)
+  }, [createOrderPath, navigate])
+
+  const handleDateClick = useCallback(
+    (info: { date: Date }) => {
+      if (!canCreateOrders) return
+      const scheduledAt = encodeURIComponent(info.date.toISOString())
+      navigate(`${createOrderPath}?scheduledAt=${scheduledAt}`)
+    },
+    [canCreateOrders, createOrderPath, navigate]
+  )
+
   return (
     <div className="rounded-3xl border border-[var(--app-border)] bg-[var(--surface)] p-6 shadow-sm">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -314,12 +341,9 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
           <div className="flex items-center gap-3 text-[var(--text)]">
             <span className="text-3xl leading-none">📅</span>
             <div>
-              <h2 className="text-xl font-semibold">Order Calendar</h2>
+              <h2 className="text-xl font-semibold">{t('title')}</h2>
               <p className="text-sm text-[var(--text-muted)]">
-                Visualize orders, deliveries, and payments{' '}
-                {activeRole === 'RESTAURANT'
-                  ? 'for your branches'
-                  : 'across your restaurant partners'}
+                {activeRole === 'RESTAURANT' ? t('subtitle.restaurant') : t('subtitle.supplier')}
               </p>
             </div>
           </div>
@@ -337,24 +361,24 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             </Select>
           )}
           <div className="flex items-center gap-2">
-            {viewOptions.map((option) => (
+            {viewOptionKeys.map((option) => (
               <Button
                 key={option.value}
                 variant={currentView === option.value ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => handleViewChange(option.value)}
               >
-                {option.label}
+                {t(option.labelKey)}
               </Button>
             ))}
           </div>
-          {isAdmin && (
+          {canCreateOrders && (
             <Button
-              onClick={() => toast('Event creation is coming soon!')}
+              onClick={handleCreateOrder}
               className="bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90"
               size="sm"
             >
-              + Add Event
+              + {createOrderLabel}
             </Button>
           )}
         </div>
@@ -510,6 +534,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             events={calendarEvents}
             eventContent={renderEventContent}
             eventClick={handleEventClick}
+            dateClick={canCreateOrders ? handleDateClick : undefined}
             datesSet={handleDatesSet}
             height="auto"
             weekends
@@ -585,7 +610,9 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
                   {selectedEvent.type?.replace(/_/g, ' ')}
                 </SheetDescription>
                 <SheetTitle className="text-xl">
-                  Order #{selectedEvent.orderId?.slice(0, 8) ?? selectedEvent.id}
+                  {t('eventSheet.orderTitle', {
+                    id: selectedEvent.orderId?.slice(0, 8) ?? selectedEvent.id,
+                  })}
                 </SheetTitle>
                 {selectedEvent.status && (
                   <Badge className="mt-2 w-fit" variant="secondary">
@@ -596,7 +623,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
 
               <div className="mt-6 space-y-4 text-sm text-[var(--text-muted)]">
                 <div className="flex items-center justify-between text-base font-semibold text-[var(--text)]">
-                  <span>Total</span>
+                  <span>{t('eventSheet.total')}</span>
                   <span>
                     {new Intl.NumberFormat('en-US', {
                       style: 'currency',
@@ -607,24 +634,32 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
                 </div>
                 <div className="grid gap-2">
                   <div className="flex justify-between">
-                    <span className="font-medium text-[var(--text-muted)]">Counterpart</span>
+                    <span className="font-medium text-[var(--text-muted)]">
+                      {t('eventSheet.counterpart')}
+                    </span>
                     <span className="text-[var(--text)]">{selectedEvent.counterpartName}</span>
                   </div>
                   {selectedEvent.branchName && (
                     <div className="flex justify-between">
-                      <span className="font-medium text-[var(--text-muted)]">Branch</span>
+                      <span className="font-medium text-[var(--text-muted)]">
+                        {t('eventSheet.branch')}
+                      </span>
                       <span className="text-[var(--text)]">{selectedEvent.branchName}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="font-medium text-[var(--text-muted)]">Scheduled</span>
+                    <span className="font-medium text-[var(--text-muted)]">
+                      {t('eventSheet.scheduled')}
+                    </span>
                     <span className="text-[var(--text)]">
                       {selectedEvent.start ? format(new Date(selectedEvent.start), 'PPp') : '—'}
                     </span>
                   </div>
                   {selectedEvent.end && (
                     <div className="flex justify-between">
-                      <span className="font-medium text-[var(--text-muted)]">Ends</span>
+                      <span className="font-medium text-[var(--text-muted)]">
+                        {t('eventSheet.ends')}
+                      </span>
                       <span className="text-[var(--text)]">
                         {format(new Date(selectedEvent.end), 'PPp')}
                       </span>
@@ -634,7 +669,9 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
 
                 {selectedEvent.categories?.length ? (
                   <div>
-                    <p className="font-medium text-[var(--text-muted)]">Categories</p>
+                    <p className="font-medium text-[var(--text-muted)]">
+                      {t('eventSheet.categories')}
+                    </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {selectedEvent.categories.map((category) => (
                         <Badge key={category} variant="outline">
@@ -649,8 +686,8 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
                   <div>
                     <p className="font-medium text-[var(--text-muted)]">
                       {activeRole === 'SUPPLIER'
-                        ? 'Restaurant contacts'
-                        : 'Suppliers on this order'}
+                        ? t('eventSheet.restaurantContacts')
+                        : t('eventSheet.suppliersOnOrder')}
                     </p>
                     <ul className="mt-2 space-y-1 text-[var(--text)]">
                       {selectedEvent.supplierList.map((supplier) => (
@@ -662,12 +699,19 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
                   </div>
                 ) : null}
 
+                {selectedEvent.orderId ? (
+                  <Button asChild variant="default" className="w-full">
+                    <Link to={`/app/orders/${selectedEvent.orderId}`}>
+                      {t('eventSheet.viewOrder')}
+                    </Link>
+                  </Button>
+                ) : null}
+
                 <div className="rounded-xl bg-[var(--brand-ultra)] p-4 text-xs text-[var(--text-muted)]">
-                  <p className="font-semibold text-[var(--text-muted)]">Tip</p>
-                  <p>
-                    Track delivery progress and payment deadlines in one place. Filters stay in sync
-                    across all views for faster follow-ups.
+                  <p className="font-semibold text-[var(--text-muted)]">
+                    {t('eventSheet.tipTitle')}
                   </p>
+                  <p>{t('eventSheet.tipBody')}</p>
                 </div>
               </div>
             </>

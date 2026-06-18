@@ -48,6 +48,11 @@ import {
   hasSmartReorderCapability,
 } from '../lib/smart-reorder-tier.js'
 import { explainReorderSuggestions, parseReorderIntent } from '../services/reorder-ai.service.js'
+import {
+  previewRestaurantInventoryImport,
+  executeRestaurantInventoryImport,
+} from '../services/restaurant-inventory-import.service.js'
+import { writeAuditLog } from '../lib/audit.js'
 
 const router = express.Router()
 
@@ -85,6 +90,10 @@ const adjustInventorySchema = z.object({
 const updateInventorySchema = z.object({
   quantity: z.number().min(0).optional(),
   lowStockThreshold: z.number().positive().optional(),
+})
+
+const inventoryImportSchema = z.object({
+  csv: z.string().min(1),
 })
 
 // Get restaurant inventory with products
@@ -553,6 +562,95 @@ router.post(
           name: 'INTERNAL_ERROR',
           message: 'Failed to add inventory',
           details: error.message,
+        },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
+
+router.post(
+  '/import/preview',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_EDIT'),
+  async (req, res) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        throw new ValidationError('Restaurant not found')
+      }
+      const body = inventoryImportSchema.parse(req.body)
+      const preview = await previewRestaurantInventoryImport(restaurantId, body.csv)
+      res.json({
+        ok: true,
+        data: preview,
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error({
+        message: 'Restaurant inventory import preview error',
+        error: error.message,
+        stack: error.stack,
+      })
+      const status =
+        error.name === 'VALIDATION_ERROR' || error.name === 'ValidationError' ? 400 : 500
+      res.status(status).json({
+        ok: false,
+        data: null,
+        error: {
+          name: error.name || 'INVENTORY_IMPORT_PREVIEW_ERROR',
+          message: error.message || 'Failed to preview inventory import',
+        },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
+
+router.post(
+  '/import',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_EDIT'),
+  async (req, res) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        throw new ValidationError('Restaurant not found')
+      }
+      const body = inventoryImportSchema.parse(req.body)
+      const result = await executeRestaurantInventoryImport(restaurantId, body.csv)
+      await writeAuditLog(req, {
+        action_type: 'inventory.import.completed',
+        tenant_type: 'RESTAURANT',
+        tenant_id: restaurantId,
+        payload_json: {
+          resource_type: 'restaurant_inventory_import',
+          summary: result.summary,
+        },
+      })
+      res.json({
+        ok: true,
+        data: result,
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error({
+        message: 'Restaurant inventory import error',
+        error: error.message,
+        stack: error.stack,
+      })
+      const status =
+        error.name === 'VALIDATION_ERROR' || error.name === 'ValidationError' ? 400 : 500
+      res.status(status).json({
+        ok: false,
+        data: null,
+        error: {
+          name: error.name || 'INVENTORY_IMPORT_ERROR',
+          message: error.message || 'Failed to import inventory',
         },
         requestId: req.requestId,
       })

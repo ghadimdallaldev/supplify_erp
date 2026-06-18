@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   useGetPublicConsumerMenuQuery,
@@ -18,13 +19,53 @@ import { useConsumerCart } from '../../hooks/useConsumerCart'
 import { PageShell } from '../../components/ui/page-shell'
 import { Search, CalendarClock, X } from 'lucide-react'
 import { Alert, AlertDescription } from '../../components/ui/alert'
-import { orderingStatusFromBranch } from '../../lib/consumerOrderingHours'
+import { orderingStatusFromBranch, formatMinutesToTime } from '../../lib/consumerOrderingHours'
+import type { ConsumerOrderingStatus } from '../../services/consumerApi'
+import { ensureNamespace } from '../../i18n'
+
+function parseTimeToMinutes(timeStr?: string | null): number | null {
+  if (!timeStr) return null
+  const normalized = timeStr.trim()
+  if (normalized === '24:00') return 1440
+  const match = normalized.match(/^(\d{1,2}):(\d{2})$/)
+  if (!match) return null
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null
+  return hours * 60 + minutes
+}
+
+function localizedOrderingMessage(
+  status: ConsumerOrderingStatus,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
+  const startLabel = formatMinutesToTime(parseTimeToMinutes(status.liveOrderStart) ?? 12 * 60)
+  const endIsMidnight = status.liveOrderEnd === '00:00' || status.liveOrderEnd === '24:00'
+  const endLabel = endIsMidnight ? t('ordering.midnight') : status.liveOrderEnd
+
+  switch (status.mode) {
+    case 'LIVE':
+      return t('ordering.live', { end: endLabel })
+    case 'PREORDER_ONLY':
+      return t('ordering.preorderOnly', { start: startLabel })
+    case 'CLOSED':
+      return t('ordering.closed', { start: startLabel })
+    default:
+      return status.message
+  }
+}
 
 function countMenuItems(categories: Array<{ items: unknown[] }> | undefined) {
   return categories?.reduce((sum, cat) => sum + cat.items.length, 0) ?? 0
 }
 
 export function ConsumerMenuPage() {
+  const { t } = useTranslation('consumer')
+
+  useEffect(() => {
+    void ensureNamespace('consumer')
+  }, [])
+
   const { restaurantSlug } = useParams<{ restaurantSlug: string }>()
   const slug = restaurantSlug ?? ''
   const navigate = useNavigate()
@@ -48,6 +89,11 @@ export function ConsumerMenuPage() {
   }, [branchId, storefront?.branches])
 
   const orderingStatus = useMemo(() => orderingStatusFromBranch(activeBranch), [activeBranch])
+  const orderingMessage = useMemo(
+    () => localizedOrderingMessage(orderingStatus, t),
+    [orderingStatus, t]
+  )
+  const orderingClosed = orderingStatus.mode === 'CLOSED'
 
   const {
     data: branchMenuData,
@@ -157,14 +203,23 @@ export function ConsumerMenuPage() {
   }, [])
 
   const handleItemSelect = (item: ConsumerMenuItem) => {
+    if (orderingClosed) {
+      toast.error(orderingMessage)
+      return
+    }
+    if ('is_available' in item && item.is_available === false) return
     setOrderItem(item)
   }
 
   const checkoutBranchId = branchId ?? storefront?.branches[0]?.branchId
 
   const goCheckout = () => {
+    if (orderingClosed) {
+      toast.error(orderingMessage)
+      return
+    }
     if (!cart.length) {
-      toast.error('Your cart is empty')
+      toast.error(t('menu.cartEmpty'))
       return
     }
     navigate(
@@ -175,7 +230,7 @@ export function ConsumerMenuPage() {
   }
 
   if (!slug) {
-    return <p className="p-6 text-muted-foreground">Restaurant slug is required.</p>
+    return <p className="p-6 text-muted-foreground">{t('menu.slugRequired')}</p>
   }
 
   return (
@@ -190,16 +245,16 @@ export function ConsumerMenuPage() {
           variant={orderingStatus.mode === 'CLOSED' ? 'destructive' : 'default'}
         >
           <CalendarClock className="h-4 w-4" />
-          <AlertDescription>{orderingStatus.message}</AlertDescription>
+          <AlertDescription>{orderingMessage}</AlertDescription>
         </Alert>
       )}
 
       <div className="space-y-1">
         {!isLoading && totalItems > 0 && (
           <p className="text-sm text-[var(--text-muted)]">
-            {totalItems} item{totalItems === 1 ? '' : 's'}
+            {t('menu.itemCount', { count: totalItems })}
             {!searchQuery && filteredCategories.length > 1
-              ? ` · ${filteredCategories.length} categories`
+              ? ` · ${t('menu.categoryCount', { count: filteredCategories.length })}`
               : ''}
           </p>
         )}
@@ -211,16 +266,16 @@ export function ConsumerMenuPage() {
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search menu…"
+            placeholder={t('menu.searchPlaceholder')}
             className="h-11 rounded-xl border-[var(--app-border)] bg-[var(--surface)] pl-9 pr-9 shadow-none focus-visible:ring-[var(--brand-mid)]/25"
-            aria-label="Search menu"
+            aria-label={t('menu.searchAria')}
           />
           {searchQuery && (
             <button
               type="button"
               className="consumer-pressable absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-[var(--text-muted)] hover:bg-[var(--brand-ultra)] hover:text-[var(--text)]"
               onClick={() => setSearchQuery('')}
-              aria-label="Clear search"
+              aria-label={t('menu.clearSearch')}
             >
               <X className="h-4 w-4" />
             </button>
@@ -230,7 +285,7 @@ export function ConsumerMenuPage() {
 
       {usingFallbackMenu && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-          Showing the full menu — this location may use a shared menu across branches.
+          {t('menu.fallbackNotice')}
         </p>
       )}
 
@@ -258,9 +313,7 @@ export function ConsumerMenuPage() {
         </div>
       )}
 
-      {isError && (
-        <p className="text-center text-muted-foreground">Unable to load menu. Try again later.</p>
-      )}
+      {isError && <p className="text-center text-muted-foreground">{t('menu.loadError')}</p>}
 
       {filteredCategories.map((category) => (
         <section
@@ -292,10 +345,15 @@ export function ConsumerMenuPage() {
           </div>
           <div>
             {category.items.map((item) => (
-              <MenuItemCard key={item.id} item={item} onSelect={handleItemSelect} />
+              <MenuItemCard
+                key={item.id}
+                item={item}
+                onSelect={handleItemSelect}
+                orderingMode={orderingStatus.mode}
+              />
             ))}
             {!category.items.length && (
-              <p className="py-4 text-sm text-[var(--text-muted)]">No items in this category.</p>
+              <p className="py-4 text-sm text-[var(--text-muted)]">{t('menu.noItemsInCategory')}</p>
             )}
           </div>
         </section>
@@ -304,30 +362,30 @@ export function ConsumerMenuPage() {
       {!isLoading && !isError && !filteredCategories.length && (
         <div className="space-y-4 py-12 text-center">
           <p className="text-base font-medium text-[var(--text)]">
-            {searchQuery ? 'No matches' : 'Menu coming soon'}
+            {searchQuery ? t('menu.empty.noMatches') : t('menu.empty.comingSoon')}
           </p>
           <p className="mx-auto max-w-sm text-sm text-[var(--text-muted)]">
             {searchQuery
-              ? `Nothing matched “${searchQuery}”. Try another dish or clear your search.`
-              : 'This restaurant has not published a menu yet.'}
+              ? t('menu.empty.noMatchesDescription', { query: searchQuery })
+              : t('menu.empty.unpublished')}
           </p>
           {searchQuery && (
             <Button variant="outline" size="sm" onClick={() => setSearchQuery('')}>
-              Clear search
+              {t('menu.clearSearchAction')}
             </Button>
           )}
           {!searchQuery && (
             <p className="mx-auto max-w-md text-xs text-[var(--text-muted)]">
-              Restaurant owners: add items in Menu admin, or run{' '}
+              {t('menu.empty.ownerHint')}{' '}
               <code className="rounded bg-[var(--brand-ultra)] px-1 py-0.5 font-mono text-[11px]">
-                seed-b2c-demo.mjs
+                {t('menu.empty.seedScript')}
               </code>{' '}
-              on the API server.
+              {t('menu.empty.ownerHintSuffix')}
             </p>
           )}
           {!searchQuery && branchId && storefront && storefront.branches.length > 1 && (
             <Button variant="outline" size="sm" asChild>
-              <Link to={`/order/${slug}/menu`}>Try another location</Link>
+              <Link to={`/order/${slug}/menu`}>{t('menu.empty.tryAnotherLocation')}</Link>
             </Button>
           )}
         </div>
@@ -338,6 +396,7 @@ export function ConsumerMenuPage() {
         cartTotal={cartTotal}
         onOpenCart={() => setCartOpen(true)}
         onCheckout={goCheckout}
+        checkoutDisabled={orderingClosed}
       />
 
       <CartDrawer
@@ -359,9 +418,18 @@ export function ConsumerMenuPage() {
           if (!open) setOrderItem(null)
         }}
         item={orderItem}
+        orderingMode={orderingStatus.mode}
         onAdd={(input) => {
+          if (orderingClosed) {
+            toast.error(orderingMessage)
+            return
+          }
           addLine(input)
-          toast.success(`Added ${input.name}`)
+          toast.success(
+            orderingStatus.mode === 'PREORDER_ONLY'
+              ? t('menu.preorderedToCart', { name: input.name })
+              : t('menu.addedToCart', { name: input.name })
+          )
         }}
       />
     </PageShell>

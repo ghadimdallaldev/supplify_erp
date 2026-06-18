@@ -173,6 +173,7 @@ export function findBookableSlot(slots, scheduledAt, partySize) {
  * @param {number} params.closingHour
  * @param {number} params.slotIntervalMinutes
  * @param {number} params.durationMinutes
+ * @param {Date} [params.now]
  */
 export function calculateSlotsFromData({
   tables,
@@ -182,6 +183,7 @@ export function calculateSlotsFromData({
   openingHour,
   closingHour,
   slotIntervalMinutes = DEFAULT_SLOT_INTERVAL_MINUTES,
+  now = new Date(),
 }) {
   const activeTables = tables.filter((t) => t.is_active !== false)
   const totalCapacity = activeTables.reduce((sum, t) => sum + Number(t.capacity || 0), 0)
@@ -191,7 +193,6 @@ export function calculateSlotsFromData({
     return { slots: [], totalCapacity: 0, tableCount: 0 }
   }
 
-  const now = new Date()
   const slotDefs = buildTimeSlots(calendarDate, openingHour, closingHour, slotIntervalMinutes)
 
   const consuming = reservations.filter((r) =>

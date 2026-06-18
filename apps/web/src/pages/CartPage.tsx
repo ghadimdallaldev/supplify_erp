@@ -114,6 +114,16 @@ export function CartPage() {
     if (c) setCouponCode(c)
     const d = searchParams.get('dealId')
     if (d) setPromotionId(d)
+    const scheduledAt = searchParams.get('scheduledAt')
+    if (scheduledAt) {
+      const parsed = new Date(scheduledAt)
+      if (!Number.isNaN(parsed.getTime())) {
+        const year = parsed.getFullYear()
+        const month = String(parsed.getMonth() + 1).padStart(2, '0')
+        const day = String(parsed.getDate()).padStart(2, '0')
+        setDeliveryDate(`${year}-${month}-${day}`)
+      }
+    }
   }, [searchParams])
 
   useEffect(() => {

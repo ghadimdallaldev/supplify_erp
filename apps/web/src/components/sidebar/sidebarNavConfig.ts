@@ -301,7 +301,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
     const overviewItems: SidebarNavItem[] = []
     if (persona.analyticsNav && restaurantAnalyticsNavAllowed(persona, can)) {
       overviewItems.push({
-        name: persona.analyticsNav.label,
+        nameKey: persona.analyticsNav.labelKey,
         href: persona.analyticsNav.href,
         icon: LayoutDashboard,
         anyOf: ['ORDERS_VIEW', 'INVOICES_VIEW'],
@@ -310,7 +310,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
     }
     if (restaurantOverviewNavAllowed(persona, can)) {
       overviewItems.push({
-        name: persona.overviewNav!.label,
+        nameKey: persona.overviewNav!.labelKey,
         href: persona.overviewNav!.href,
         icon: persona.id === 'restaurant_foh' ? CalendarDays : PackageCheck,
         anyOf: ['RESERVATIONS_VIEW', 'RECEIVING_VIEW'],
@@ -416,7 +416,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
                 testId: 'nav-fulfillment',
               },
               {
-                name: 'Run sheet',
+                nameKey: 'runSheet',
                 href: '/app/run-sheet',
                 icon: ClipboardList,
                 anyOf: ['ORDERS_MANAGE', 'FULFILLMENT_VIEW', 'INVOICES_VIEW'],
@@ -485,6 +485,13 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
               },
             ]
           : []),
+        {
+          nameKey: 'loyaltyProgram',
+          href: '/app/loyalty',
+          icon: Gift,
+          permission: 'CATALOG_VIEW',
+          testId: 'nav-loyalty',
+        },
         ...(financeInvoicesEnabled
           ? [
               {
@@ -508,7 +515,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
       const supplierOverview: SidebarNavItem[] = []
       if (persona.overviewNav && supplierOverviewNavAllowed(persona, can, canAny)) {
         supplierOverview.push({
-          name: persona.overviewNav.label,
+          nameKey: persona.overviewNav.labelKey,
           href: persona.overviewNav.href,
           icon: Radar,
           anyOf:
@@ -527,7 +534,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
       }
       if (persona.analyticsNav && supplierAnalyticsNavAllowed(persona, can)) {
         supplierOverview.push({
-          name: persona.analyticsNav.label,
+          nameKey: persona.analyticsNav.labelKey,
           href: persona.analyticsNav.href,
           icon: LayoutDashboard,
           anyOf: [...SUPPLIER_ANALYTICS_ANY_OF],

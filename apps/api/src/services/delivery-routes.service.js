@@ -132,7 +132,7 @@ async function loadRouteStopsForRoutes(routeIds, client = null) {
 
   const db = client ? (sql, p) => client.query(sql, p) : query
   const deliveryZoneJoin = await getDeliveryZoneJoinSql()
-  const { rows } = await db(
+  const result = await db(
     `
     SELECT
       rs.*,
@@ -160,6 +160,7 @@ async function loadRouteStopsForRoutes(routeIds, client = null) {
     `,
     [routeIds]
   )
+  const rows = Array.isArray(result?.rows) ? result.rows : []
 
   for (const row of rows) {
     const list = map.get(row.route_id) ?? []

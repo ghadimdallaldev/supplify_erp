@@ -1,0 +1,40 @@
+{
+  "ordering": {
+    "live": "مفتوح للطلبات حتى {{end}}.",
+    "preorderOnly": "طلبات مسبقة فقط حتى {{start}}. جدول للطلب في {{start}} أو بعده.",
+    "closed": "الطلب مغلق. تستأنف الطلبات المباشرة عند {{start}}.",
+    "midnight": "منتصف الليل"
+  },
+  "menu": {
+    "slugRequired": "معرّف المطعم مطلوب.",
+    "searchPlaceholder": "ابحث في القائمة…",
+    "searchAria": "البحث في القائمة",
+    "clearSearch": "مسح البحث",
+    "clearSearchAction": "مسح البحث",
+    "itemCount_one": "{{count}} عنصر",
+    "itemCount_other": "{{count}} عناصر",
+    "categoryCount": "{{count}} فئات",
+    "fallbackNotice": "عرض القائمة الكاملة — قد يستخدم هذا الموقع قائمة مشتركة بين الفروع.",
+    "loadError": "تعذر تحميل القائمة. حاول مرة أخرى لاحقاً.",
+    "noItemsInCategory": "لا توجد عناصر في هذه الفئة.",
+    "empty": {
+      "noMatches": "لا توجد نتائج",
+      "comingSoon": "القائمة قريباً",
+      "noMatchesDescription": "لا يوجد تطابق لـ «{{query}}». جرّب طبقاً آخر أو امسح البحث.",
+      "unpublished": "لم ينشر هذا المطعم قائمة بعد.",
+      "ownerHint": "أصحاب المطاعم: أضف العناصر في إدارة القائمة، أو شغّل",
+      "seedScript": "seed-b2c-demo.mjs",
+      "ownerHintSuffix": "على خادم API.",
+      "tryAnotherLocation": "جرّب موقعاً آخر"
+    },
+    "cartEmpty": "سلتك فارغة",
+    "addedToCart": "تمت إضافة {{name}}",
+    "preorderedToCart": "تم الطلب المسبق لـ {{name}}"
+  },
+  "menuItem": {
+    "soldOut": "نفدت الكمية",
+    "customize": "تخصيص",
+    "addAria": "إضافة {{name}}",
+    "preorder": "طلب مسبق"
+  }
+}

@@ -33,8 +33,13 @@ export const SUPPLIER_PROFILES = {
     id: 'supplier_owner',
     homePath: '/app/command-center',
     primaryNavHref: '/app/command-center',
-    overviewNav: { label: 'Command Center', href: '/app/command-center', gate: 'command_center' },
-    analyticsNav: { label: 'Analytics', href: '/app/dashboard' },
+    overviewNav: {
+      label: 'Command Center',
+      labelKey: 'commandCenter',
+      href: '/app/command-center',
+      gate: 'command_center',
+    },
+    analyticsNav: { label: 'Analytics', labelKey: 'analytics', href: '/app/dashboard' },
     showGlobalReports: true,
     commandCenterMode: 'full',
     dashboard: {
@@ -63,8 +68,13 @@ export const SUPPLIER_PROFILES = {
     id: 'supplier_manager',
     homePath: '/app/command-center',
     primaryNavHref: '/app/command-center',
-    overviewNav: { label: 'Command Center', href: '/app/command-center', gate: 'command_center' },
-    analyticsNav: { label: 'Analytics', href: '/app/dashboard' },
+    overviewNav: {
+      label: 'Command Center',
+      labelKey: 'commandCenter',
+      href: '/app/command-center',
+      gate: 'command_center',
+    },
+    analyticsNav: { label: 'Analytics', labelKey: 'analytics', href: '/app/dashboard' },
     showGlobalReports: true,
     commandCenterMode: 'full',
     dashboard: {
@@ -93,8 +103,17 @@ export const SUPPLIER_PROFILES = {
     id: 'supplier_warehouse',
     homePath: '/app/fulfillment',
     primaryNavHref: '/app/fulfillment',
-    overviewNav: { label: 'Fulfillment Hub', href: '/app/command-center', gate: 'command_center' },
-    analyticsNav: { label: 'Warehouse analytics', href: '/app/dashboard' },
+    overviewNav: {
+      label: 'Fulfillment Hub',
+      labelKey: 'fulfillmentHub',
+      href: '/app/command-center',
+      gate: 'command_center',
+    },
+    analyticsNav: {
+      label: 'Warehouse analytics',
+      labelKey: 'warehouseAnalytics',
+      href: '/app/dashboard',
+    },
     showGlobalReports: true,
     commandCenterMode: 'fulfillment',
     dashboard: {
@@ -115,8 +134,17 @@ export const SUPPLIER_PROFILES = {
     id: 'supplier_fulfillment',
     homePath: '/app/fulfillment',
     primaryNavHref: '/app/fulfillment',
-    overviewNav: { label: 'Fulfillment Hub', href: '/app/command-center', gate: 'command_center' },
-    analyticsNav: { label: 'Delivery analytics', href: '/app/dashboard' },
+    overviewNav: {
+      label: 'Fulfillment Hub',
+      labelKey: 'fulfillmentHub',
+      href: '/app/command-center',
+      gate: 'command_center',
+    },
+    analyticsNav: {
+      label: 'Delivery analytics',
+      labelKey: 'deliveryAnalytics',
+      href: '/app/dashboard',
+    },
     showGlobalReports: false,
     commandCenterMode: 'fulfillment',
     dashboard: {
@@ -149,8 +177,17 @@ export const SUPPLIER_PROFILES = {
     id: 'supplier_catalog',
     homePath: '/app/products',
     primaryNavHref: '/app/products',
-    overviewNav: { label: 'Catalog Hub', href: '/app/command-center', gate: 'command_center' },
-    analyticsNav: { label: 'Catalog analytics', href: '/app/dashboard' },
+    overviewNav: {
+      label: 'Catalog Hub',
+      labelKey: 'catalogHub',
+      href: '/app/command-center',
+      gate: 'command_center',
+    },
+    analyticsNav: {
+      label: 'Catalog analytics',
+      labelKey: 'catalogAnalytics',
+      href: '/app/dashboard',
+    },
     showGlobalReports: true,
     commandCenterMode: 'catalog',
     dashboard: {
@@ -170,7 +207,12 @@ export const SUPPLIER_PROFILES = {
     id: 'supplier_promotions',
     homePath: '/app/promotions',
     primaryNavHref: '/app/promotions',
-    overviewNav: { label: 'Sales Hub', href: '/app/command-center', gate: 'promotions' },
+    overviewNav: {
+      label: 'Sales Hub',
+      labelKey: 'salesHub',
+      href: '/app/command-center',
+      gate: 'promotions',
+    },
     analyticsNav: null,
     showGlobalReports: false,
     commandCenterMode: 'sales',
@@ -190,8 +232,17 @@ export const SUPPLIER_PROFILES = {
     id: 'supplier_accountant',
     homePath: '/app/invoices',
     primaryNavHref: '/app/invoices',
-    overviewNav: { label: 'Finance Hub', href: '/app/command-center', gate: 'command_center' },
-    analyticsNav: { label: 'Finance analytics', href: '/app/dashboard' },
+    overviewNav: {
+      label: 'Finance Hub',
+      labelKey: 'financeHub',
+      href: '/app/command-center',
+      gate: 'command_center',
+    },
+    analyticsNav: {
+      label: 'Finance analytics',
+      labelKey: 'financeAnalytics',
+      href: '/app/dashboard',
+    },
     showGlobalReports: true,
     commandCenterMode: 'finance',
     dashboard: {
@@ -215,10 +266,11 @@ export const SUPPLIER_PROFILES = {
     primaryNavHref: '/app/command-center',
     overviewNav: {
       label: 'Workspace overview',
+      labelKey: 'workspaceOverview',
       href: '/app/command-center',
       gate: 'command_center',
     },
-    analyticsNav: { label: 'Analytics', href: '/app/dashboard' },
+    analyticsNav: { label: 'Analytics', labelKey: 'analytics', href: '/app/dashboard' },
     showGlobalReports: true,
     commandCenterMode: 'readonly',
     dashboard: {
