@@ -31,6 +31,13 @@ export default defineConfig({
           if (id.includes('recharts') || id.includes('/d3-') || id.includes('victory-vendor'))
             return 'charts'
           if (id.includes('@fullcalendar') || id.includes('/preact')) return 'calendar'
+          // Leaflet is only used by delivery-tracking maps, which are all loaded
+          // via React.lazy (dynamic import). Returning undefined here keeps it OUT
+          // of the eager `vendor` catch-all and lets Rollup co-locate it with its
+          // dynamic importers, so it only downloads when a map actually renders.
+          // (Forcing it into a named chunk made Rollup hoist a side-effect import
+          // into the entry, defeating the lazy split.)
+          if (id.includes('node_modules/leaflet')) return
           if (
             id.includes('framer-motion') ||
             id.includes('motion-dom') ||
@@ -55,17 +62,59 @@ export default defineConfig({
     dedupe: ['react', 'react-dom', 'react-redux', 'react-router-dom'],
   },
   optimizeDeps: {
+    // Pre-bundle dependencies up front so Vite never triggers a mid-navigation
+    // re-optimization (which forces a full-page reload during dev). lucide-react
+    // is the big one: it ships ~1.5k individual icon modules and is imported by
+    // 240+ files — without pre-bundling, the dev server crawls and serves them
+    // one request at a time. The rest are utilities/UI primitives shared across
+    // most lazy routes. esbuild caches the result in node_modules/.vite, so this
+    // only costs time on the first start or a lockfile change.
     include: [
       'react',
       'react-dom',
+      'react-dom/client',
       'react-redux',
       'react-router-dom',
+      '@reduxjs/toolkit',
       '@reduxjs/toolkit/query/react',
       '@tanstack/react-query',
+      'lucide-react',
+      'clsx',
+      'tailwind-merge',
+      'class-variance-authority',
+      'sonner',
+      'cmdk',
+      'date-fns',
+      'i18next',
+      'react-i18next',
+      'socket.io-client',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-tooltip',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-slot',
+      '@radix-ui/react-progress',
+      // Heavy, route-specific libs: pre-bundle them too so the first visit to
+      // their route doesn't pay a re-optimization reload mid-session.
+      'recharts',
+      'leaflet',
     ],
   },
   server: {
     port: 5173,
+    // Warm up the hot entry path so the very first request doesn't pay the
+    // transform cost for the shell on the critical render path.
+    warmup: {
+      clientFiles: [
+        './src/main.tsx',
+        './src/App.tsx',
+        './src/components/Layout.tsx',
+        './src/components/Sidebar.tsx',
+        './src/components/Header.tsx',
+        './src/pages/LoginPage.tsx',
+        './src/pages/SupplierHome.tsx',
+      ],
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:4000',

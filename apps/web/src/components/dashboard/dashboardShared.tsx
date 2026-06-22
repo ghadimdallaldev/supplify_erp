@@ -35,27 +35,6 @@ export function buildOrderSpendTrend(orders: any[], days: number = SPEND_TREND_D
     .map(([name, value]) => ({ name, value }))
 }
 
-export function Sparkline({ data, color }: { data: number[]; color: string }) {
-  if (data.length < 3) return null
-  const max = Math.max(...data, 1)
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 26, marginTop: 8 }}>
-      {data.map((v, i) => (
-        <div
-          key={i}
-          style={{
-            flex: 1,
-            height: `${Math.max(12, Math.round((v / max) * 100))}%`,
-            borderRadius: '2px 2px 0 0',
-            background: color,
-            opacity: 0.25 + (i / data.length) * 0.75,
-          }}
-        />
-      ))}
-    </div>
-  )
-}
-
 export interface KpiCardProps {
   kpiKey: DashboardKpiKey
   label: string
@@ -64,8 +43,6 @@ export interface KpiCardProps {
   iconColor: string
   Icon: any
   meta?: string
-  sparkData: number[]
-  sparkColor: string
 }
 
 export function DashboardSummaryStrip({
@@ -81,23 +58,14 @@ export function DashboardSummaryStrip({
   return <SummaryStrip testId="dashboard-summary" metrics={metrics} />
 }
 
-export function KpiCard({ label, value, iconBg, Icon, meta, sparkData, sparkColor }: KpiCardProps) {
+export function KpiCard({ label, value, iconBg, Icon, meta }: KpiCardProps) {
   const tone: KpiTone = iconBg.includes('mint')
     ? 'success'
     : iconBg.includes('amber')
       ? 'warning'
       : 'brand'
 
-  return (
-    <UiKpiCard
-      label={label}
-      value={value}
-      icon={Icon}
-      tone={tone}
-      description={meta}
-      sparkline={<Sparkline data={sparkData} color={sparkColor} />}
-    />
-  )
+  return <UiKpiCard label={label} value={value} icon={Icon} tone={tone} description={meta} />
 }
 
 export function SectionCard({
@@ -109,38 +77,17 @@ export function SectionCard({
   children: React.ReactNode
   action?: React.ReactNode
 }) {
+  // A flat, static section container — deliberately not the interactive <Card>
+  // primitive (which adds a hover shadow/lift that would be decorative noise here).
   return (
-    <div
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--app-border)',
-        borderRadius: 12,
-        overflow: 'hidden',
-      }}
-    >
-      <div
-        style={{
-          padding: '12px 15px 10px',
-          borderBottom: '1px solid var(--app-border)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <span
-          style={{
-            fontSize: 12,
-            fontWeight: 700,
-            color: 'var(--text-mid)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.07em',
-          }}
-        >
+    <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]">
+      <div className="flex items-center justify-between border-b border-[var(--app-border)] px-[15px] pb-2.5 pt-3">
+        <span className="text-xs font-bold uppercase tracking-[0.07em] text-[var(--text-mid)]">
           {title}
         </span>
         {action}
       </div>
-      <div style={{ padding: '12px 15px' }}>{children}</div>
+      <div className="px-[15px] py-3">{children}</div>
     </div>
   )
 }
