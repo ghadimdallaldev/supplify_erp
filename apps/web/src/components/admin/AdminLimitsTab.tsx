@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
@@ -55,6 +56,7 @@ const SUPPLIER_ADDON_OPTIONS = [
 const RESTAURANT_ADDON_OPTIONS = [{ key: 'restaurant_extra_branch', label: 'Extra branch' }]
 
 export function AdminLimitsTab() {
+  const { t } = useTranslation('admin')
   const [tenantType, setTenantType] = useState<AdminTenantType>('RESTAURANT')
   const [selectedTenant, setSelectedTenant] = useState<AdminTenantOption | null>(null)
   const [orgMainOnly, setOrgMainOnly] = useState(false)
@@ -240,11 +242,11 @@ export function AdminLimitsTab() {
 
   const handleGrantAddon = async () => {
     if (!tenantId) {
-      toast.error('Select a tenant first')
+      toast.error(t('limitsToasts.selectTenantFirst'))
       return
     }
     if (!addonReason.trim()) {
-      toast.error('Please enter a reason for this add-on change')
+      toast.error(t('limitsToasts.addonReasonRequired'))
       return
     }
     try {
@@ -266,16 +268,16 @@ export function AdminLimitsTab() {
 
   const handleSavePlanOverride = async () => {
     if (!planId || !planLimitKey || planOverrideValue === '') {
-      toast.error('Plan, limit key, and value are required')
+      toast.error(t('limitsToasts.planOverrideRequired'))
       return
     }
     if (!planReason.trim()) {
-      toast.error('Please enter a reason for this override')
+      toast.error(t('limitsToasts.overrideReasonRequired'))
       return
     }
     const num = Number(planOverrideValue)
     if (planDefaultLimit != null && planDefaultLimit !== -1 && num < Number(planDefaultLimit)) {
-      toast.error('Override cannot be lower than the plan default')
+      toast.error(t('limitsToasts.overrideBelowDefault'))
       return
     }
     try {
@@ -285,7 +287,7 @@ export function AdminLimitsTab() {
         override_value: num,
         reason: planReason.trim(),
       }).unwrap()
-      toast.success('Plan override saved')
+      toast.success(t('limitsToasts.planOverrideSaved'))
       setPlanOverrideValue('')
       setPlanReason('')
       refetchOverrides()
@@ -297,11 +299,11 @@ export function AdminLimitsTab() {
 
   const handleSaveTenantOverride = async () => {
     if (!tenantId || !tenantLimitKey || tenantOverrideValue === '') {
-      toast.error('Select a tenant and enter limit key and value')
+      toast.error(t('limitsToasts.tenantFieldsRequired'))
       return
     }
     if (!tenantReason.trim()) {
-      toast.error('Please enter a reason for this override')
+      toast.error(t('limitsToasts.overrideReasonRequired'))
       return
     }
     try {
@@ -312,7 +314,7 @@ export function AdminLimitsTab() {
         override_value: Number(tenantOverrideValue),
         reason: tenantReason.trim(),
       }).unwrap()
-      toast.success('Tenant override saved')
+      toast.success(t('limitsToasts.tenantOverrideSaved'))
       setTenantOverrideValue('')
       setTenantReason('')
       refetchOverrides()
@@ -346,8 +348,8 @@ export function AdminLimitsTab() {
   return (
     <>
       <AdminSectionHeader
-        title="Limits & add-ons"
-        description="Review plan limits vs usage, grant branch/warehouse add-ons, and manage plan or tenant overrides."
+        title={t('limits.title')}
+        description={t('limits.description')}
         action={
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={tenantsFetching}>
             {tenantsFetching ? (
@@ -388,7 +390,7 @@ export function AdminLimitsTab() {
         ]}
       />
 
-      <AppPanel title="Select tenant" testId="admin-limits-tenant-picker">
+      <AppPanel title={t('limits.selectTenant')} testId="admin-limits-tenant-picker">
         <AdminTenantPicker
           tenantType={tenantType}
           onTenantTypeChange={(t) => {
@@ -405,11 +407,11 @@ export function AdminLimitsTab() {
         />
       </AppPanel>
 
-      {tenantId && addonsLoading && <AdminLoadingState label="Loading tenant limits…" />}
+      {tenantId && addonsLoading && <AdminLoadingState label={t('limits.loading')} />}
 
       {tenantId && addonsError && (
         <AdminErrorState
-          title="Failed to load add-ons"
+          title={t('limits.addonsFailedTitle')}
           message="Could not fetch subscription add-on data for this tenant."
           onRetry={() => refetchAddons()}
         />
@@ -418,7 +420,7 @@ export function AdminLimitsTab() {
       {tenantId && !addonsLoading && addonData && (
         <>
           <AppPanel
-            title="Tenant summary"
+            title={t('limits.tenantSummary')}
             description={`${addonData.tenantName ?? selectedTenant?.name} · ${formatPlanCodeLabel(addonData.planCode)}`}
             testId="admin-limits-tenant-summary"
           >
@@ -437,17 +439,21 @@ export function AdminLimitsTab() {
                 </p>
               )}
               <div className="grid gap-3 md:grid-cols-2">
-                <LocationMetricCard title="Branches" metric={loc?.branches} showEnterprise />
+                <LocationMetricCard
+                  title={t('limits.branches')}
+                  metric={loc?.branches}
+                  showEnterprise
+                />
                 {tenantType === 'SUPPLIER' && (
-                  <LocationMetricCard title="Warehouses" metric={loc?.warehouses} />
+                  <LocationMetricCard title={t('limits.warehouses')} metric={loc?.warehouses} />
                 )}
               </div>
             </div>
           </AppPanel>
 
           <AppPanel
-            title="Effective limits vs usage"
-            description="Plan base, overrides, effective cap, and current usage for every limit key"
+            title={t('limits.effectiveLimitsTitle')}
+            description={t('limits.effectiveLimitsDescription')}
             testId="admin-limits-effective-table"
             footer={
               entitlementsFetching && !entitlementsLoading ? (
@@ -457,7 +463,7 @@ export function AdminLimitsTab() {
           >
             {entitlementsError ? (
               <AdminErrorState
-                title="Failed to load entitlements"
+                title={t('limits.entitlementsFailedTitle')}
                 message="Could not fetch full limit and usage snapshot."
                 onRetry={() => refetchEntitlements()}
               />
@@ -471,20 +477,20 @@ export function AdminLimitsTab() {
           </AppPanel>
 
           <AppPanel
-            title="Branch & warehouse add-ons"
-            description="Set quantity to 0 to remove. Unit price defaults from plan tier."
+            title={t('limits.addonsTitle')}
+            description={t('limits.addonsDescription')}
             testId="admin-limits-addons"
           >
             <div className="space-y-6">
               {activeAddons.length > 0 ? (
-                <TableScroll aria-label="Active subscription add-ons">
+                <TableScroll aria-label={t('limits.addonsTableAriaLabel')}>
                   <table className="w-full min-w-[520px] text-sm">
                     <thead>
                       <tr className="border-b bg-[var(--app-bg-subtle)]/50 text-left text-xs text-[var(--text-muted)]">
                         <th className="px-3 py-2">Type</th>
                         <th className="px-3 py-2">Qty</th>
                         <th className="px-3 py-2">Unit price</th>
-                        <th className="px-3 py-2 text-right">Actions</th>
+                        <th className="px-3 py-2 text-right">{t('common.table.actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
@@ -515,8 +521,8 @@ export function AdminLimitsTab() {
                 </TableScroll>
               ) : (
                 <AdminEmptyState
-                  title="No active add-ons"
-                  description="Grant an extra branch or warehouse below."
+                  title={t('limits.noAddonsTitle')}
+                  description={t('limits.noAddonsDescription')}
                 />
               )}
 
@@ -542,7 +548,7 @@ export function AdminLimitsTab() {
                       size="icon"
                       className="h-10 w-10 shrink-0"
                       onClick={() => adjustAddonQty(-1)}
-                      aria-label="Decrease quantity"
+                      aria-label={t('limits.decreaseQtyAriaLabel')}
                     >
                       <Minus className="h-4 w-4" />
                     </Button>
@@ -562,7 +568,7 @@ export function AdminLimitsTab() {
                       size="icon"
                       className="h-10 w-10 shrink-0"
                       onClick={() => adjustAddonQty(1)}
-                      aria-label="Increase quantity"
+                      aria-label={t('limits.increaseQtyAriaLabel')}
                     >
                       <Plus className="h-4 w-4" />
                     </Button>
@@ -574,7 +580,7 @@ export function AdminLimitsTab() {
                     className="mt-1.5"
                     value={addonReason}
                     onChange={(e) => setAddonReason(e.target.value)}
-                    placeholder="e.g. Sales-approved Gold add-on pack"
+                    placeholder={t('limits.addonReasonPlaceholder')}
                   />
                 </div>
               </div>
@@ -595,20 +601,20 @@ export function AdminLimitsTab() {
 
       {tenantId && !addonsLoading && !addonData && (
         <AdminEmptyState
-          title="No subscription data"
-          description="This tenant may not have an active or trialing subscription."
+          title={t('limits.noSubscriptionTitle')}
+          description={t('limits.noSubscriptionDescription')}
         />
       )}
 
       <AppPanel
-        title="Plan-tier limit override"
-        description="Raises the default limit for every tenant on that plan (cannot go below plan default)."
+        title={t('limits.planOverrideTitle')}
+        description={t('limits.planOverrideDescription')}
         testId="admin-limits-plan-override"
       >
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <Label>Plan</Label>
+              <Label>{t('common.table.plan')}</Label>
               <Select
                 value={planId}
                 onValueChange={(value) => {
@@ -693,7 +699,7 @@ export function AdminLimitsTab() {
 
       {tenantId && (
         <AppPanel
-          title="Tenant-specific limit override"
+          title={t('limits.tenantOverrideTitle')}
           description={`Applies only to ${selectedTenant?.name} (billing tenant resolved automatically).`}
           testId="admin-limits-tenant-override"
         >
@@ -753,7 +759,7 @@ export function AdminLimitsTab() {
                 <Input
                   value={tenantReason}
                   onChange={(e) => setTenantReason(e.target.value)}
-                  placeholder="Why this tenant needs a higher limit"
+                  placeholder={t('limits.tenantOverrideReasonPlaceholder')}
                 />
               </div>
             </div>
@@ -784,9 +790,12 @@ export function AdminLimitsTab() {
         }
       >
         {overridesError ? (
-          <AdminErrorState title="Failed to load overrides" onRetry={() => refetchOverrides()} />
+          <AdminErrorState
+            title={t('limits.overridesFailedTitle')}
+            onRetry={() => refetchOverrides()}
+          />
         ) : overridesLoading ? (
-          <AdminLoadingState label="Loading overrides…" />
+          <AdminLoadingState label={t('limits.loadingOverrides')} />
         ) : (
           <div className="space-y-6">
             <div className="rounded-lg border border-[var(--app-border)] p-3">
@@ -801,10 +810,10 @@ export function AdminLimitsTab() {
                 />
                 <Input
                   className="h-10 pl-9"
-                  placeholder="Limit key, reason, plan, or value…"
+                  placeholder={t('limits.searchOverridesPlaceholder')}
                   value={overrideSearch}
                   onChange={(e) => setOverrideSearch(e.target.value)}
-                  aria-label="Search overrides"
+                  aria-label={t('limits.searchOverridesAriaLabel')}
                 />
                 {overrideSearch && (
                   <Button
@@ -825,7 +834,7 @@ export function AdminLimitsTab() {
                 <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">Tenant overrides</h3>
                 {filteredTenantOverrides.length === 0 ? (
                   <AdminEmptyState
-                    title="No tenant overrides"
+                    title={t('limits.noTenantOverridesTitle')}
                     description={
                       overrideSearch
                         ? 'No matches for your search on this tenant.'
@@ -841,12 +850,12 @@ export function AdminLimitsTab() {
                       if (!window.confirm('Disable this tenant override?')) return
                       try {
                         await updateTenantOverride({ id, is_active: false }).unwrap()
-                        toast.success('Override disabled')
+                        toast.success(t('limitsToasts.overrideDisabled'))
                         refetchOverrides()
                         refetchAddons()
                         refetchEntitlements()
                       } catch {
-                        toast.error('Failed to disable override')
+                        toast.error(t('limitsToasts.disableFailed'))
                       }
                     }}
                   />
@@ -860,7 +869,7 @@ export function AdminLimitsTab() {
               </h3>
               {filteredPlanOverrides.length === 0 ? (
                 <AdminEmptyState
-                  title="No plan overrides"
+                  title={t('limits.noPlanOverridesTitle')}
                   description={
                     overrideSearch
                       ? 'No matches for your search.'
@@ -875,10 +884,10 @@ export function AdminLimitsTab() {
                     if (!window.confirm('Disable this plan override?')) return
                     try {
                       await updatePlanOverride({ id, is_active: false }).unwrap()
-                      toast.success('Plan override disabled')
+                      toast.success(t('limitsToasts.planOverrideDisabled'))
                       refetchOverrides()
                     } catch {
-                      toast.error('Failed to disable override')
+                      toast.error(t('limitsToasts.disableFailed'))
                     }
                   }}
                 />

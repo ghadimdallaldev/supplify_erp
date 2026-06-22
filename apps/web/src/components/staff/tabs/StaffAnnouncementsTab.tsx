@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
@@ -14,6 +15,7 @@ import {
 import { StaffPanel } from '../staffShared'
 
 export function StaffAnnouncementsTab() {
+  const { t } = useTranslation('staff')
   const [announcementForm, setAnnouncementForm] = useState({
     title: '',
     body: '',
@@ -29,7 +31,7 @@ export function StaffAnnouncementsTab() {
 
   const handleCreateAnnouncement = async () => {
     if (!announcementForm.title || !announcementForm.body) {
-      toast.error('Announcement needs a title and message')
+      toast.error(t('announcements.validationRequired'))
       return
     }
     try {
@@ -46,37 +48,37 @@ export function StaffAnnouncementsTab() {
             }
           : undefined,
       }).unwrap()
-      toast.success('Announcement published')
+      toast.success(t('announcements.published'))
       setAnnouncementForm({ title: '', body: '', requireAck: false, roles: '' })
     } catch {
-      toast.error('Unable to publish announcement')
+      toast.error(t('announcements.publishFailed'))
     }
   }
 
   const handleAckAnnouncement = async (announcementId: string, staffId: string) => {
     try {
       await ackAnnouncement({ id: announcementId, staffId }).unwrap()
-      toast.success('Acknowledged')
+      toast.success(t('announcements.acknowledged'))
     } catch {
-      toast.error('Unable to acknowledge announcement')
+      toast.error(t('announcements.ackFailed'))
     }
   }
 
   return (
     <div className="space-y-4">
       <StaffPanel
-        title="Announcements"
-        description="Keep every shift aligned with clear broadcasts and read receipts."
+        title={t('announcements.title')}
+        description={t('announcements.description')}
         footer={
           <Button onClick={handleCreateAnnouncement} disabled={creatingAnnouncement}>
-            {creatingAnnouncement ? 'Publishing…' : 'Publish announcement'}
+            {creatingAnnouncement ? t('announcements.publishing') : t('announcements.publish')}
           </Button>
         }
       >
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <Label htmlFor="announcementTitle">Title</Label>
+              <Label htmlFor="announcementTitle">{t('announcements.titleLabel')}</Label>
               <Input
                 id="announcementTitle"
                 value={announcementForm.title}
@@ -86,7 +88,7 @@ export function StaffAnnouncementsTab() {
               />
             </div>
             <div>
-              <Label htmlFor="announcementRoles">Audience roles (comma separated)</Label>
+              <Label htmlFor="announcementRoles">{t('announcements.audienceRoles')}</Label>
               <Input
                 id="announcementRoles"
                 value={announcementForm.roles}
@@ -97,7 +99,7 @@ export function StaffAnnouncementsTab() {
             </div>
           </div>
           <div>
-            <Label htmlFor="announcementBody">Message</Label>
+            <Label htmlFor="announcementBody">{t('announcements.message')}</Label>
             <Textarea
               id="announcementBody"
               rows={4}
@@ -115,17 +117,20 @@ export function StaffAnnouncementsTab() {
                 setAnnouncementForm((prev) => ({ ...prev, requireAck: event.target.checked }))
               }
             />
-            Require acknowledgment from staff
+            {t('announcements.requireAck')}
           </label>
         </div>
       </StaffPanel>
 
-      <StaffPanel title="Published" description="Recent broadcasts to your team.">
+      <StaffPanel
+        title={t('announcements.publishedTitle')}
+        description={t('announcements.publishedDescription')}
+      >
         {announcementsLoading ? (
-          <p className="text-sm text-[var(--text-mid)]">Loading announcements…</p>
+          <p className="text-sm text-[var(--text-mid)]">{t('announcements.loading')}</p>
         ) : announcements.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[var(--app-border)] bg-[var(--brand-ultra)]/40 p-6 text-center text-sm text-[var(--text-mid)]">
-            <p>No announcements yet.</p>
+            <p>{t('announcements.empty')}</p>
           </div>
         ) : (
           <ul className="-mx-4 -mb-4 divide-y divide-[var(--app-border)] sm:-mx-5 sm:-mb-5">
@@ -143,14 +148,18 @@ export function StaffAnnouncementsTab() {
                   </div>
                   <Badge className="bg-[var(--brand-pale)] text-[var(--brand-mid)]">
                     {announcement.requireAck
-                      ? `${announcement.acknowledgmentCount} acknowledged`
-                      : 'Info'}
+                      ? t('announcements.ackCount', {
+                          count: announcement.acknowledgmentCount,
+                        })
+                      : t('shared.info')}
                   </Badge>
                 </div>
                 <p className="text-sm text-[var(--text-mid)]">{announcement.body}</p>
                 {announcement.audience?.roles ? (
                   <p className="text-xs text-[var(--text-mid)]">
-                    Audience: {(announcement.audience.roles as string[]).join(', ')}
+                    {t('shared.audiencePrefix', {
+                      roles: (announcement.audience.roles as string[]).join(', '),
+                    })}
                   </p>
                 ) : null}
                 {announcement.requireAck ? (
@@ -158,13 +167,11 @@ export function StaffAnnouncementsTab() {
                     size="sm"
                     variant="outline"
                     onClick={() => {
-                      const staffId = window.prompt(
-                        'Enter staff ID acknowledging this announcement:'
-                      )
+                      const staffId = window.prompt(t('announcements.staffIdPrompt'))
                       if (staffId) handleAckAnnouncement(announcement.id, staffId)
                     }}
                   >
-                    Record acknowledgment
+                    {t('announcements.recordAck')}
                   </Button>
                 ) : null}
               </li>

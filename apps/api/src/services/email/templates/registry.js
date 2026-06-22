@@ -1,8 +1,26 @@
+import { t, resolveLocale } from '../../../i18n/index.js'
 import { renderEmailLayout, textToBodyHtml } from './layout.js'
 
-function standardTemplate({ subject, title, message, ctaUrl, ctaLabel, tenantName, data = {} }) {
+function emailKey(templateId, field) {
+  const [group, ...rest] = templateId.split('.')
+  if (rest.length === 0) return `emails.${group}.${field}`
+  return `emails.${group}.${rest.join('.')}.${field}`
+}
+
+function standardTemplate({
+  subject,
+  title,
+  message,
+  ctaUrl,
+  ctaLabel,
+  tenantName,
+  data = {},
+  locale = 'en',
+}) {
+  const lng = resolveLocale(locale)
   const body = data.bodyHtml || textToBodyHtml(message)
   const { html, text } = renderEmailLayout({
+    locale: lng,
     title: title || subject,
     bodyHtml: body,
     bodyText: message,
@@ -17,372 +35,421 @@ function register(map, id, fn) {
   map[id] = fn
 }
 
-/** @type {Record<string, (data: object) => { subject: string, html: string, text: string }>} */
+/** @type {Record<string, (data: object, locale?: string) => { subject: string, html: string, text: string }>} */
 export const TEMPLATE_REGISTRY = {}
 
-register(TEMPLATE_REGISTRY, 'auth.welcome', (d) =>
-  standardTemplate({
-    subject: 'Welcome to Supplify',
-    title: 'Welcome to Supplify',
-    message:
-      d.message ||
-      `Your ${d.tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'} account is ready.`,
+register(TEMPLATE_REGISTRY, 'auth.welcome', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  const messageKey =
+    d.tenantType === 'SUPPLIER'
+      ? 'emails.auth.welcome.messageSupplier'
+      : 'emails.auth.welcome.messageRestaurant'
+  return standardTemplate({
+    subject: t('emails.auth.welcome.subject', lng),
+    title: t('emails.auth.welcome.title', lng),
+    message: d.message || t(messageKey, lng),
     ctaUrl: d.ctaUrl,
-    ctaLabel: 'Open Supplify',
+    ctaLabel: t('emails.cta.openSupplify', lng),
     tenantName: d.tenantName,
     data: d,
+    locale: lng,
   })
-)
-register(TEMPLATE_REGISTRY, 'auth.team_invite', (d) =>
-  standardTemplate({
-    subject: d.subject || 'You are invited to join Supplify',
-    title: 'Team invitation',
-    message:
-      d.message ||
-      `You have been invited to join ${d.tenantName || 'a team'} on Supplify. Use the link below to accept.`,
-    ctaUrl: d.inviteUrl || d.ctaUrl,
-    ctaLabel: 'Accept invitation',
-    tenantName: d.tenantName,
-    data: d,
-  })
-)
-register(TEMPLATE_REGISTRY, 'auth.password_changed', (d) =>
-  standardTemplate({
-    subject: 'Your Supplify password was reset',
-    title: 'Password reset',
-    message:
-      d.message ||
-      (d.temporaryPassword
-        ? `A temporary password was set for your account: ${d.temporaryPassword}\n\nSign in and change it immediately.`
-        : 'Your account password was changed. If you did not request this, contact your administrator.'),
-    tenantName: d.tenantName,
-    data: d,
-  })
-)
-register(TEMPLATE_REGISTRY, 'auth.role_changed', (d) =>
-  standardTemplate({
-    subject: 'Your Supplify permissions were updated',
-    title: 'Role updated',
-    message:
-      d.message || `Your role or permissions on ${d.tenantName || 'your account'} were updated.`,
-    ctaUrl: d.ctaUrl,
-    ctaLabel: 'Open Supplify',
-    tenantName: d.tenantName,
-    data: d,
-  })
-)
-register(TEMPLATE_REGISTRY, 'auth.test', (d) =>
-  standardTemplate({
-    subject: 'Supplify email test',
-    title: 'Email test',
-    message: d.message || 'If you received this, Supplify email delivery is working.',
-    tenantName: d.tenantName,
-    data: d,
-  })
-)
+})
 
-const orderStatuses = {
-  'order.placed': { subject: 'New order', title: 'Order placed' },
-  'order.acknowledged': { subject: 'Order acknowledged', title: 'Order acknowledged' },
-  'order.processing': { subject: 'Order processing', title: 'Order in progress' },
-  'order.shipped': { subject: 'Order shipped', title: 'Order dispatched' },
-  'order.delivered': { subject: 'Order delivered', title: 'Order delivered' },
-  'order.completed': { subject: 'Order completed', title: 'Order completed' },
-  'order.cancelled': { subject: 'Order cancelled', title: 'Order cancelled' },
-  'order.received': { subject: 'Delivery received', title: 'Order received' },
-  'order.scheduled': { subject: 'Scheduled order update', title: 'Scheduled order' },
-  'order.substitution': { subject: 'Order substitution', title: 'Substitution proposal' },
-  'order.fulfillment_issue': { subject: 'Order fulfillment update', title: 'Fulfillment issue' },
-}
-for (const [id, meta] of Object.entries(orderStatuses)) {
-  register(TEMPLATE_REGISTRY, id, (d) =>
-    standardTemplate({
-      subject: d.subject || meta.subject,
-      title: d.title || meta.title,
+register(TEMPLATE_REGISTRY, 'auth.team_invite', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  return standardTemplate({
+    subject: d.subject || t('emails.auth.team_invite.subject', lng),
+    title: t('emails.auth.team_invite.title', lng),
+    message:
+      d.message ||
+      t('emails.auth.team_invite.message', lng, {
+        tenantName: d.tenantName || t('notifications.common.aTeam', lng),
+      }),
+    ctaUrl: d.inviteUrl || d.ctaUrl,
+    ctaLabel: t('emails.cta.acceptInvitation', lng),
+    tenantName: d.tenantName,
+    data: d,
+    locale: lng,
+  })
+})
+
+register(TEMPLATE_REGISTRY, 'auth.password_changed', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  const defaultMessage = d.temporaryPassword
+    ? t('emails.auth.password_changed.messageTemporary', lng, {
+        temporaryPassword: d.temporaryPassword,
+      })
+    : t('emails.auth.password_changed.messageChanged', lng)
+  return standardTemplate({
+    subject: t('emails.auth.password_changed.subject', lng),
+    title: t('emails.auth.password_changed.title', lng),
+    message: d.message || defaultMessage,
+    tenantName: d.tenantName,
+    data: d,
+    locale: lng,
+  })
+})
+
+register(TEMPLATE_REGISTRY, 'auth.role_changed', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  return standardTemplate({
+    subject: t('emails.auth.role_changed.subject', lng),
+    title: t('emails.auth.role_changed.title', lng),
+    message:
+      d.message ||
+      t('emails.auth.role_changed.message', lng, {
+        tenantName: d.tenantName || t('notifications.common.aTeam', lng),
+      }),
+    ctaUrl: d.ctaUrl,
+    ctaLabel: t('emails.cta.openSupplify', lng),
+    tenantName: d.tenantName,
+    data: d,
+    locale: lng,
+  })
+})
+
+register(TEMPLATE_REGISTRY, 'auth.test', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  return standardTemplate({
+    subject: t('emails.auth.test.subject', lng),
+    title: t('emails.auth.test.title', lng),
+    message: d.message || t('emails.auth.test.message', lng),
+    tenantName: d.tenantName,
+    data: d,
+    locale: lng,
+  })
+})
+
+const orderStatuses = [
+  'placed',
+  'acknowledged',
+  'processing',
+  'shipped',
+  'delivered',
+  'completed',
+  'cancelled',
+  'received',
+  'scheduled',
+  'substitution',
+  'fulfillment_issue',
+]
+for (const status of orderStatuses) {
+  const id = `order.${status}`
+  register(TEMPLATE_REGISTRY, id, (d, locale = 'en') => {
+    const lng = resolveLocale(locale)
+    return standardTemplate({
+      subject: d.subject || t(emailKey(id, 'subject'), lng),
+      title: d.title || t(emailKey(id, 'title'), lng),
       message: d.message,
       ctaUrl: d.ctaUrl,
-      ctaLabel: 'View order',
+      ctaLabel: t('emails.cta.viewOrder', lng),
       tenantName: d.tenantName,
       data: d,
+      locale: lng,
     })
-  )
+  })
 }
 
-register(TEMPLATE_REGISTRY, 'chat.message', (d) =>
-  standardTemplate({
-    subject: d.subject || 'New message',
-    title: 'New message',
+register(TEMPLATE_REGISTRY, 'chat.message', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  return standardTemplate({
+    subject: d.subject || t('emails.chat.message.subject', lng),
+    title: t('emails.chat.message.title', lng),
     message: d.message,
     ctaUrl: d.ctaUrl || '/app/chat',
-    ctaLabel: 'Open chat',
+    ctaLabel: t('emails.cta.openChat', lng),
     tenantName: d.tenantName,
     data: d,
+    locale: lng,
   })
-)
+})
 
-register(TEMPLATE_REGISTRY, 'invoice.issued', (d) =>
-  standardTemplate({
-    subject: d.subject || `Invoice ${d.invoiceNumber || ''} issued`.trim(),
-    title: 'Invoice issued',
+register(TEMPLATE_REGISTRY, 'invoice.issued', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  return standardTemplate({
+    subject:
+      d.subject ||
+      t('emails.invoice.issued.subject', lng, {
+        invoiceNumber: d.invoiceNumber || '',
+      }).trim(),
+    title: t('emails.invoice.issued.title', lng),
     message: d.message,
     ctaUrl: d.ctaUrl || '/app/invoices',
-    ctaLabel: 'View invoice',
+    ctaLabel: t('emails.cta.viewInvoice', lng),
     tenantName: d.tenantName,
     data: d,
+    locale: lng,
   })
-)
-register(TEMPLATE_REGISTRY, 'invoice.overdue', (d) =>
-  standardTemplate({
-    subject: d.subject || 'Invoice overdue',
-    title: 'Invoice overdue',
-    message: d.message,
-    ctaUrl: d.ctaUrl || '/app/invoices',
-    ctaLabel: 'View invoice',
-    tenantName: d.tenantName,
-    data: d,
-  })
-)
-register(TEMPLATE_REGISTRY, 'payment.received', (d) =>
-  standardTemplate({
-    subject: d.subject || 'Payment received',
-    title: 'Payment received',
-    message: d.message,
-    ctaUrl: d.ctaUrl || '/app/invoices',
-    ctaLabel: 'View details',
-    tenantName: d.tenantName,
-    data: d,
-  })
-)
+})
 
-const disputeIds = ['dispute.opened', 'dispute.resolved', 'dispute.updated']
-for (const id of disputeIds) {
-  register(TEMPLATE_REGISTRY, id, (d) =>
-    standardTemplate({
-      subject: d.subject || id.replace('dispute.', 'Dispute '),
-      title: d.title || 'Dispute update',
+register(TEMPLATE_REGISTRY, 'invoice.overdue', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  return standardTemplate({
+    subject: d.subject || t('emails.invoice.overdue.subject', lng),
+    title: t('emails.invoice.overdue.title', lng),
+    message: d.message,
+    ctaUrl: d.ctaUrl || '/app/invoices',
+    ctaLabel: t('emails.cta.viewInvoice', lng),
+    tenantName: d.tenantName,
+    data: d,
+    locale: lng,
+  })
+})
+
+register(TEMPLATE_REGISTRY, 'payment.received', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  return standardTemplate({
+    subject: d.subject || t('emails.payment.received.subject', lng),
+    title: t('emails.payment.received.title', lng),
+    message: d.message,
+    ctaUrl: d.ctaUrl || '/app/invoices',
+    ctaLabel: t('emails.cta.viewDetails', lng),
+    tenantName: d.tenantName,
+    data: d,
+    locale: lng,
+  })
+})
+
+const disputeIds = ['opened', 'resolved', 'updated']
+for (const status of disputeIds) {
+  const id = `dispute.${status}`
+  register(TEMPLATE_REGISTRY, id, (d, locale = 'en') => {
+    const lng = resolveLocale(locale)
+    return standardTemplate({
+      subject: d.subject || t(emailKey(id, 'subject'), lng),
+      title: d.title || t(emailKey(id, 'title'), lng),
       message: d.message,
       ctaUrl: d.ctaUrl,
-      ctaLabel: 'View dispute',
+      ctaLabel: t('emails.cta.viewDispute', lng),
       tenantName: d.tenantName,
       data: d,
+      locale: lng,
     })
-  )
+  })
 }
 
-const dealTemplates = {
-  'deal.submitted': { subject: 'Deal submitted for review', title: 'Deal pending approval' },
-  'deal.approved': { subject: 'Deal approved', title: 'Deal approved' },
-  'deal.rejected': { subject: 'Deal rejected', title: 'Deal rejected' },
-  'deal.payment_required': { subject: 'Deal payment required', title: 'Payment required' },
-  'deal.activated': { subject: 'Deal activated', title: 'Deal is live' },
-  'deal.expired': { subject: 'Deal expired', title: 'Deal expired' },
-  'deal.performance': { subject: 'Deal performance summary', title: 'Deal insights' },
-}
-for (const [id, meta] of Object.entries(dealTemplates)) {
-  register(TEMPLATE_REGISTRY, id, (d) =>
-    standardTemplate({
-      subject: d.subject || meta.subject,
-      title: meta.title,
+const dealTemplates = [
+  'submitted',
+  'approved',
+  'rejected',
+  'payment_required',
+  'activated',
+  'expired',
+  'performance',
+]
+for (const status of dealTemplates) {
+  const id = `deal.${status}`
+  register(TEMPLATE_REGISTRY, id, (d, locale = 'en') => {
+    const lng = resolveLocale(locale)
+    return standardTemplate({
+      subject: d.subject || t(emailKey(id, 'subject'), lng),
+      title: t(emailKey(id, 'title'), lng),
       message: d.message,
       ctaUrl: d.ctaUrl || '/app/promotions',
-      ctaLabel: 'View deals',
+      ctaLabel: t('emails.cta.viewDeals', lng),
       tenantName: d.tenantName,
       data: d,
+      locale: lng,
     })
-  )
+  })
 }
 
-const billingTemplates = {
-  'billing.trial_started': { subject: 'Trial started', title: 'Welcome to your trial' },
-  'billing.trial_ending': { subject: 'Trial ending soon', title: 'Trial ending soon' },
-  'billing.trial_expired': { subject: 'Trial expired', title: 'Trial expired' },
-  'billing.activated': { subject: 'Subscription activated', title: 'Subscription active' },
-  'billing.renewed': { subject: 'Subscription renewed', title: 'Subscription renewed' },
-  'billing.payment_failed': { subject: 'Payment failed', title: 'Payment failed' },
-  'billing.cancelled': { subject: 'Subscription cancelled', title: 'Subscription cancelled' },
-  'billing.plan_changed': { subject: 'Plan updated', title: 'Plan changed' },
-  'billing.trial_extended': { subject: 'Trial extended', title: 'Trial extended' },
-  'billing.account_locked': { subject: 'Account restricted', title: 'Write access restricted' },
-}
-for (const [id, meta] of Object.entries(billingTemplates)) {
-  register(TEMPLATE_REGISTRY, id, (d) =>
-    standardTemplate({
-      subject: d.subject || meta.subject,
-      title: meta.title,
+const billingTemplates = [
+  'trial_started',
+  'trial_ending',
+  'trial_expired',
+  'activated',
+  'renewed',
+  'payment_failed',
+  'cancelled',
+  'plan_changed',
+  'trial_extended',
+  'account_locked',
+]
+for (const status of billingTemplates) {
+  const id = `billing.${status}`
+  register(TEMPLATE_REGISTRY, id, (d, locale = 'en') => {
+    const lng = resolveLocale(locale)
+    return standardTemplate({
+      subject: d.subject || t(emailKey(id, 'subject'), lng),
+      title: t(emailKey(id, 'title'), lng),
       message: d.message,
       ctaUrl: d.ctaUrl || '/app/billing',
-      ctaLabel: 'Manage billing',
+      ctaLabel: t('emails.cta.manageBilling', lng),
       tenantName: d.tenantName,
       data: d,
+      locale: lng,
     })
-  )
+  })
 }
 
-register(TEMPLATE_REGISTRY, 'inventory.low_stock', (d) =>
-  standardTemplate({
-    subject: 'Low stock alert',
-    title: 'Low stock',
-    message: d.message,
-    ctaUrl: d.ctaUrl || '/app/inventory',
-    ctaLabel: 'View inventory',
-    tenantName: d.tenantName,
-    data: d,
+const inventoryTemplates = ['low_stock', 'out_of_stock', 'expiring', 'expired']
+for (const status of inventoryTemplates) {
+  const id = `inventory.${status}`
+  register(TEMPLATE_REGISTRY, id, (d, locale = 'en') => {
+    const lng = resolveLocale(locale)
+    return standardTemplate({
+      subject: t(emailKey(id, 'subject'), lng),
+      title: t(emailKey(id, 'title'), lng),
+      message: d.message,
+      ctaUrl: d.ctaUrl || '/app/inventory',
+      ctaLabel: t('emails.cta.viewInventory', lng),
+      tenantName: d.tenantName,
+      data: d,
+      locale: lng,
+    })
   })
-)
-register(TEMPLATE_REGISTRY, 'inventory.out_of_stock', (d) =>
-  standardTemplate({
-    subject: 'Out of stock',
-    title: 'Out of stock',
-    message: d.message,
-    ctaUrl: d.ctaUrl || '/app/inventory',
-    ctaLabel: 'View inventory',
-    tenantName: d.tenantName,
-    data: d,
-  })
-)
-register(TEMPLATE_REGISTRY, 'inventory.expiring', (d) =>
-  standardTemplate({
-    subject: 'Items expiring soon',
-    title: 'Expiry reminder',
-    message: d.message,
-    ctaUrl: d.ctaUrl || '/app/inventory',
-    ctaLabel: 'View inventory',
-    tenantName: d.tenantName,
-    data: d,
-  })
-)
-register(TEMPLATE_REGISTRY, 'inventory.expired', (d) =>
-  standardTemplate({
-    subject: 'Expired inventory',
-    title: 'Expired items',
-    message: d.message,
-    ctaUrl: d.ctaUrl || '/app/inventory',
-    ctaLabel: 'View inventory',
-    tenantName: d.tenantName,
-    data: d,
-  })
-)
-register(TEMPLATE_REGISTRY, 'reorder.cadence', (d) =>
-  standardTemplate({
-    subject: 'Reorder reminder',
-    title: 'Smart reorder reminder',
+}
+
+register(TEMPLATE_REGISTRY, 'reorder.cadence', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  return standardTemplate({
+    subject: t('emails.reorder.cadence.subject', lng),
+    title: t('emails.reorder.cadence.title', lng),
     message: d.message,
     ctaUrl: d.ctaUrl || '/app/orders',
-    ctaLabel: 'Place order',
+    ctaLabel: t('emails.cta.placeOrder', lng),
     tenantName: d.tenantName,
     data: d,
+    locale: lng,
   })
-)
+})
 
-const reservationTemplates = {
-  'reservation.confirmation': { subject: 'Reservation confirmed', title: 'Reservation confirmed' },
-  'reservation.cancelled': { subject: 'Reservation cancelled', title: 'Reservation cancelled' },
-  'reservation.rescheduled': { subject: 'Reservation rescheduled', title: 'Reservation updated' },
-  'reservation.new': { subject: 'New reservation', title: 'New reservation' },
-  'reservation.waitlist': { subject: 'Waitlist update', title: 'Waitlist update' },
-  'reservation.waitlist_offer': { subject: 'Table available', title: 'Waitlist offer' },
-}
-for (const [id, meta] of Object.entries(reservationTemplates)) {
-  register(TEMPLATE_REGISTRY, id, (d) =>
-    standardTemplate({
-      subject: d.subject || meta.subject,
-      title: meta.title,
+const reservationTemplates = [
+  'confirmation',
+  'cancelled',
+  'rescheduled',
+  'new',
+  'waitlist',
+  'waitlist_offer',
+]
+for (const status of reservationTemplates) {
+  const id = `reservation.${status}`
+  register(TEMPLATE_REGISTRY, id, (d, locale = 'en') => {
+    const lng = resolveLocale(locale)
+    return standardTemplate({
+      subject: d.subject || t(emailKey(id, 'subject'), lng),
+      title: t(emailKey(id, 'title'), lng),
       message: d.message,
       ctaUrl: d.ctaUrl,
-      ctaLabel: d.ctaLabel || 'View reservation',
+      ctaLabel: d.ctaLabel || t('emails.cta.viewReservation', lng),
       tenantName: d.tenantName,
       data: d,
+      locale: lng,
     })
-  )
+  })
 }
 
 const staffTemplates = {
-  'staff.magic_link': {
-    subject: 'Your Supplify staff portal sign-in link',
-    title: 'Staff portal sign-in',
-  },
-  'staff.invite': { subject: 'Your Supplify staff portal account', title: 'Staff portal access' },
-  'staff.shift': { subject: 'Shift update', title: 'Shift assigned' },
-  'staff.swap': { subject: 'Shift swap request', title: 'Shift swap' },
-  'staff.pto': { subject: 'PTO request', title: 'Time off request' },
-  'staff.announcement': { subject: 'Team announcement', title: 'Announcement' },
-  'staff.document': { subject: 'New document', title: 'Document uploaded' },
+  'staff.magic_link': 'openStaffPortal',
+  'staff.invite': 'openPortal',
+  'staff.shift': 'openPortal',
+  'staff.swap': 'openPortal',
+  'staff.pto': 'openPortal',
+  'staff.announcement': 'openPortal',
+  'staff.document': 'openPortal',
 }
-for (const [id, meta] of Object.entries(staffTemplates)) {
-  register(TEMPLATE_REGISTRY, id, (d) =>
-    standardTemplate({
-      subject: d.subject || meta.subject,
-      title: meta.title,
+for (const [id, ctaKey] of Object.entries(staffTemplates)) {
+  register(TEMPLATE_REGISTRY, id, (d, locale = 'en') => {
+    const lng = resolveLocale(locale)
+    return standardTemplate({
+      subject: d.subject || t(emailKey(id, 'subject'), lng),
+      title: t(emailKey(id, 'title'), lng),
       message: d.message,
       ctaUrl: d.ctaUrl || d.loginUrl,
-      ctaLabel: d.ctaLabel || (id === 'staff.magic_link' ? 'Open staff portal' : 'Open portal'),
+      ctaLabel: d.ctaLabel || t(`emails.cta.${ctaKey}`, lng),
       tenantName: d.tenantName,
       data: d,
+      locale: lng,
     })
-  )
+  })
 }
 
-register(TEMPLATE_REGISTRY, 'admin.new_tenant', (d) =>
-  standardTemplate({
-    subject: d.subject || `New ${d.tenantType || 'tenant'} registered`,
-    title: 'New registration',
+register(TEMPLATE_REGISTRY, 'admin.new_tenant', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  const tenantTypeLabel =
+    d.tenantType === 'SUPPLIER'
+      ? t('notifications.admin.tenantTypeSupplier', lng)
+      : t('notifications.admin.tenantTypeRestaurant', lng)
+  return standardTemplate({
+    subject:
+      d.subject ||
+      t('emails.admin.new_tenant.subject', lng, {
+        tenantType: tenantTypeLabel,
+      }),
+    title: t('emails.admin.new_tenant.title', lng),
     message: d.message,
     ctaUrl: d.ctaUrl || '/admin',
-    ctaLabel: 'Open admin',
+    ctaLabel: t('emails.cta.openAdmin', lng),
     tenantName: d.tenantName,
     data: d,
+    locale: lng,
   })
-)
-register(TEMPLATE_REGISTRY, 'admin.deal_review', (d) =>
-  standardTemplate({
-    subject: 'Deal requires approval',
-    title: 'Deal review needed',
+})
+
+register(TEMPLATE_REGISTRY, 'admin.deal_review', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  return standardTemplate({
+    subject: t('emails.admin.deal_review.subject', lng),
+    title: t('emails.admin.deal_review.title', lng),
     message: d.message,
     ctaUrl: d.ctaUrl || '/admin/promotions',
-    ctaLabel: 'Review deal',
+    ctaLabel: t('emails.cta.reviewDeal', lng),
     tenantName: d.tenantName,
     data: d,
+    locale: lng,
   })
-)
-register(TEMPLATE_REGISTRY, 'supplier.access_request', (d) =>
-  standardTemplate({
-    subject: 'Restaurant access request',
-    title: 'New access request',
+})
+
+register(TEMPLATE_REGISTRY, 'supplier.access_request', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  return standardTemplate({
+    subject: t('emails.supplier.access_request.subject', lng),
+    title: t('emails.supplier.access_request.title', lng),
     message: d.message,
     ctaUrl: d.ctaUrl,
-    ctaLabel: 'Review request',
+    ctaLabel: t('emails.cta.reviewRequest', lng),
     tenantName: d.tenantName,
     data: d,
+    locale: lng,
   })
-)
-register(TEMPLATE_REGISTRY, 'notification.generic', (d) =>
-  standardTemplate({
-    subject: d.subject || d.title || 'Supplify notification',
-    title: d.title || 'Notification',
+})
+
+register(TEMPLATE_REGISTRY, 'notification.generic', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  return standardTemplate({
+    subject: d.subject || d.title || t('emails.notification.generic.subject', lng),
+    title: d.title || t('emails.notification.generic.title', lng),
     message: d.message,
     ctaUrl: d.ctaUrl,
-    ctaLabel: d.ctaLabel || 'Open Supplify',
+    ctaLabel: d.ctaLabel || t('emails.cta.openSupplify', lng),
     tenantName: d.tenantName,
     data: d,
+    locale: lng,
   })
-)
-register(TEMPLATE_REGISTRY, 'notification.digest', (d) =>
-  standardTemplate({
-    subject: d.subject || 'Your Supplify digest',
-    title: d.title || 'Your notification digest',
+})
+
+register(TEMPLATE_REGISTRY, 'notification.digest', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  return standardTemplate({
+    subject: d.subject || t('emails.notification.digest.subject', lng),
+    title: d.title || t('emails.notification.digest.title', lng),
     message: d.items ? `${d.message || ''}\n\n${d.items}` : d.message,
     ctaUrl: d.ctaUrl || '/app/notifications',
-    ctaLabel: 'View notifications',
+    ctaLabel: t('emails.cta.viewNotifications', lng),
     tenantName: d.tenantName,
     data: d,
+    locale: lng,
   })
-)
+})
 
-export function renderTemplate(templateId, data = {}) {
+export function renderTemplate(templateId, data = {}, locale = 'en') {
+  const lng = resolveLocale(data.locale || locale)
   const fn = TEMPLATE_REGISTRY[templateId] || TEMPLATE_REGISTRY['notification.generic']
-  const rendered = fn(data)
+  const rendered = fn(data, lng)
   return {
-    subject: rendered.subject || data.subject || 'Supplify',
+    subject: rendered.subject || data.subject || t('emails.layout.brand', lng),
     html: rendered.html,
     text: rendered.text,
   }

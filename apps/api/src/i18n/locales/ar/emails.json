@@ -1,0 +1,181 @@
+{
+  "layout": {
+    "brand": "سبلايفاي",
+    "defaultTitle": "إشعار",
+    "forTenant": "لـ {{tenantName}}",
+    "footer": "هذه رسالة آلية من سبلايفاي. يُرجى عدم الرد على هذه الرسالة.",
+    "open": "فتح",
+    "automatedSignoff": "— سبلايفاي (رسالة آلية)"
+  },
+  "cta": {
+    "openSupplify": "فتح سبلايفاي",
+    "acceptInvitation": "قبول الدعوة",
+    "viewOrder": "عرض الطلب",
+    "openChat": "فتح المحادثة",
+    "viewInvoice": "عرض الفاتورة",
+    "viewDetails": "عرض التفاصيل",
+    "viewDispute": "عرض النزاع",
+    "viewDeals": "عرض العروض",
+    "manageBilling": "إدارة الفوترة",
+    "viewInventory": "عرض المخزون",
+    "placeOrder": "تقديم طلب",
+    "viewReservation": "عرض الحجز",
+    "openStaffPortal": "فتح بوابة الموظفين",
+    "openPortal": "فتح البوابة",
+    "openAdmin": "فتح لوحة الإدارة",
+    "reviewDeal": "مراجعة العرض",
+    "reviewRequest": "مراجعة الطلب",
+    "viewNotifications": "عرض الإشعارات"
+  },
+  "auth": {
+    "welcome": {
+      "subject": "مرحبًا بك في سبلايفاي",
+      "title": "مرحبًا بك في سبلايفاي",
+      "messageSupplier": "حساب المورد الخاص بك جاهز.",
+      "messageRestaurant": "حساب المطعم الخاص بك جاهز."
+    },
+    "team_invite": {
+      "subject": "أنت مدعو للانضمام إلى سبلايفاي",
+      "title": "دعوة فريق",
+      "message": "تمت دعوتك للانضمام إلى {{tenantName}} على سبلايفاي. استخدم الرابط أدناه للقبول."
+    },
+    "password_changed": {
+      "subject": "تم إعادة تعيين كلمة مرور سبلايفاي",
+      "title": "إعادة تعيين كلمة المرور",
+      "messageTemporary": "تم تعيين كلمة مرور مؤقتة لحسابك: {{temporaryPassword}}\n\nسجّل الدخول وغيّرها فورًا.",
+      "messageChanged": "تم تغيير كلمة مرور حسابك. إذا لم تطلب ذلك، تواصل مع المسؤول."
+    },
+    "role_changed": {
+      "subject": "تم تحديث صلاحياتك في سبلايفاي",
+      "title": "تم تحديث الدور",
+      "message": "تم تحديث دورك أو صلاحياتك في {{tenantName}}."
+    },
+    "test": {
+      "subject": "اختبار بريد سبلايفاي",
+      "title": "اختبار البريد",
+      "message": "إذا وصلتك هذه الرسالة، فإرسال البريد في سبلايفاي يعمل."
+    }
+  },
+  "order": {
+    "placed": { "subject": "طلب جديد", "title": "تم تقديم الطلب" },
+    "acknowledged": { "subject": "تم تأكيد الطلب", "title": "تم تأكيد الطلب" },
+    "processing": { "subject": "جاري معالجة الطلب", "title": "الطلب قيد التنفيذ" },
+    "shipped": { "subject": "تم شحن الطلب", "title": "تم إرسال الطلب" },
+    "delivered": { "subject": "تم تسليم الطلب", "title": "تم تسليم الطلب" },
+    "completed": { "subject": "اكتمل الطلب", "title": "اكتمل الطلب" },
+    "cancelled": { "subject": "تم إلغاء الطلب", "title": "تم إلغاء الطلب" },
+    "received": { "subject": "تم استلام التسليم", "title": "تم استلام الطلب" },
+    "scheduled": { "subject": "تحديث الطلب المجدول", "title": "طلب مجدول" },
+    "substitution": { "subject": "استبدال في الطلب", "title": "اقتراح استبدال" },
+    "fulfillment_issue": { "subject": "تحديث تنفيذ الطلب", "title": "مشكلة في التنفيذ" }
+  },
+  "chat": {
+    "message": {
+      "subject": "رسالة جديدة",
+      "title": "رسالة جديدة"
+    }
+  },
+  "invoice": {
+    "issued": {
+      "subject": "تم إصدار الفاتورة {{invoiceNumber}}",
+      "title": "تم إصدار الفاتورة"
+    },
+    "overdue": {
+      "subject": "فاتورة متأخرة",
+      "title": "فاتورة متأخرة"
+    }
+  },
+  "payment": {
+    "received": {
+      "subject": "تم استلام الدفع",
+      "title": "تم استلام الدفع"
+    }
+  },
+  "dispute": {
+    "opened": { "subject": "تم فتح نزاع", "title": "تحديث النزاع" },
+    "resolved": { "subject": "تم حل النزاع", "title": "تحديث النزاع" },
+    "updated": { "subject": "تم تحديث النزاع", "title": "تحديث النزاع" }
+  },
+  "deal": {
+    "submitted": { "subject": "تم تقديم العرض للمراجعة", "title": "العرض بانتظار الموافقة" },
+    "approved": { "subject": "تمت الموافقة على العرض", "title": "تمت الموافقة على العرض" },
+    "rejected": { "subject": "تم رفض العرض", "title": "تم رفض العرض" },
+    "payment_required": { "subject": "الدفع مطلوب للعرض", "title": "الدفع مطلوب" },
+    "activated": { "subject": "تم تفعيل العرض", "title": "العرض متاح الآن" },
+    "expired": { "subject": "انتهى العرض", "title": "انتهى العرض" },
+    "performance": { "subject": "ملخص أداء العرض", "title": "رؤى العرض" }
+  },
+  "billing": {
+    "trial_started": { "subject": "بدأت الفترة التجريبية", "title": "مرحبًا بفترتك التجريبية" },
+    "trial_ending": {
+      "subject": "الفترة التجريبية تنتهي قريبًا",
+      "title": "الفترة التجريبية تنتهي قريبًا"
+    },
+    "trial_expired": { "subject": "انتهت الفترة التجريبية", "title": "انتهت الفترة التجريبية" },
+    "activated": { "subject": "تم تفعيل الاشتراك", "title": "الاشتراك نشط" },
+    "renewed": { "subject": "تم تجديد الاشتراك", "title": "تم تجديد الاشتراك" },
+    "payment_failed": { "subject": "فشل الدفع", "title": "فشل الدفع" },
+    "cancelled": { "subject": "تم إلغاء الاشتراك", "title": "تم إلغاء الاشتراك" },
+    "plan_changed": { "subject": "تم تحديث الخطة", "title": "تم تغيير الخطة" },
+    "trial_extended": {
+      "subject": "تم تمديد الفترة التجريبية",
+      "title": "تم تمديد الفترة التجريبية"
+    },
+    "account_locked": { "subject": "الحساب مقيد", "title": "تم تقييد صلاحية الكتابة" }
+  },
+  "inventory": {
+    "low_stock": { "subject": "تنبيه مخزون منخفض", "title": "مخزون منخفض" },
+    "out_of_stock": { "subject": "نفاد المخزون", "title": "نفاد المخزون" },
+    "expiring": { "subject": "منتجات تنتهي صلاحيتها قريبًا", "title": "تذكير بالانتهاء" },
+    "expired": { "subject": "مخزون منتهي الصلاحية", "title": "منتجات منتهية" }
+  },
+  "reorder": {
+    "cadence": { "subject": "تذكير إعادة الطلب", "title": "تذكير إعادة طلب ذكي" }
+  },
+  "reservation": {
+    "confirmation": { "subject": "تم تأكيد الحجز", "title": "تم تأكيد الحجز" },
+    "cancelled": { "subject": "تم إلغاء الحجز", "title": "تم إلغاء الحجز" },
+    "rescheduled": { "subject": "تم إعادة جدولة الحجز", "title": "تم تحديث الحجز" },
+    "new": { "subject": "حجز جديد", "title": "حجز جديد" },
+    "waitlist": { "subject": "تحديث قائمة الانتظار", "title": "تحديث قائمة الانتظار" },
+    "waitlist_offer": { "subject": "طاولة متاحة", "title": "عرض من قائمة الانتظار" }
+  },
+  "staff": {
+    "magic_link": {
+      "subject": "رابط تسجيل الدخول لبوابة الموظفين",
+      "title": "تسجيل الدخول لبوابة الموظفين"
+    },
+    "invite": { "subject": "حساب بوابة الموظفين", "title": "الوصول لبوابة الموظفين" },
+    "shift": { "subject": "تحديث الوردية", "title": "تم تعيين وردية" },
+    "swap": { "subject": "طلب تبديل وردية", "title": "تبديل وردية" },
+    "pto": { "subject": "طلب إجازة", "title": "طلب إجازة" },
+    "announcement": { "subject": "إعلان للفريق", "title": "إعلان" },
+    "document": { "subject": "مستند جديد", "title": "تم رفع مستند" }
+  },
+  "admin": {
+    "new_tenant": {
+      "subject": "تسجيل {{tenantType}} جديد",
+      "title": "تسجيل جديد"
+    },
+    "deal_review": {
+      "subject": "عرض يحتاج موافقة",
+      "title": "مراجعة العرض مطلوبة"
+    }
+  },
+  "supplier": {
+    "access_request": {
+      "subject": "طلب وصول من مطعم",
+      "title": "طلب وصول جديد"
+    }
+  },
+  "notification": {
+    "generic": {
+      "subject": "إشعار من سبلايفاي",
+      "title": "إشعار"
+    },
+    "digest": {
+      "subject": "ملخص سبلايفاي",
+      "title": "ملخص الإشعارات"
+    }
+  }
+}

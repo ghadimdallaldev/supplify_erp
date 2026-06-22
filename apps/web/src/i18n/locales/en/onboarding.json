@@ -1,0 +1,190 @@
+{
+  "register": {
+    "redirecting": "Redirecting…"
+  },
+  "registerComplete": {
+    "title": "Set up your organization",
+    "description": "Your Keycloak account is ready. Tell us how you will use Supplify.",
+    "accountTypeLabel": "I am a",
+    "restaurant": "Restaurant",
+    "supplier": "Supplier",
+    "businessNameLabel": "Business name",
+    "businessNamePlaceholder": "Your company or venue name",
+    "phoneLabel": "Phone (optional)",
+    "phonePlaceholder": "+961 3 000 000",
+    "submit": "Continue to Supplify",
+    "creatingWorkspace": "Creating your workspace…",
+    "almostDone": "Almost done…",
+    "errors": {
+      "chooseAccountType": "Please choose whether you are a restaurant or a supplier.",
+      "legalRequired": "Please accept all required legal agreements before continuing.",
+      "serverRestart": "The server restarted while saving your profile. Your account may already be set up — refresh this page, or try submitting once more.",
+      "generic": "Could not complete registration. Please try again.",
+      "statusVerify": "Could not verify registration status. Refresh the page or try again in a moment."
+    }
+  },
+  "activation": {
+    "title": "Activate your account",
+    "descriptionSupplier": "Your supplier workspace was created but is not active yet. Start on the free plan, upgrade to a paid tier, or ask a Supplify administrator to activate you manually.",
+    "descriptionRestaurant": "Your restaurant workspace was created but is not active yet. Start on the free plan, upgrade to a paid tier, or ask a Supplify administrator to activate you manually.",
+    "paidPlanHint": "Pay for Silver, Gold, or Platinum to unlock orders, inventory, and the full app immediately.",
+    "freeTierHint": "Free tier unlocks your workspace immediately with core features. Paid plans add more capacity and modules.",
+    "activateFree": "Activate free plan",
+    "comparePlans": "Compare plans & pay",
+    "freePlanActive": "Your free plan is active.",
+    "pendingPlan": "Current plan on file: {{planName}} (pending activation)"
+  },
+  "restaurantSettings": {
+    "title": "Settings",
+    "descriptionWithName": "Manage profile, team, branches, and plan for {{name}}.",
+    "descriptionDefault": "Manage your restaurant profile, team, branches, plan, and notifications.",
+    "tabs": {
+      "profile": "Profile",
+      "team": "Team",
+      "branches": "Branches",
+      "subscription": "Subscription",
+      "plan": "Plan",
+      "notifications": "Notifications",
+      "alerts": "Alerts",
+      "activity": "Activity",
+      "reviews": "Reviews"
+    }
+  },
+  "restaurantProfile": {
+    "fallbackName": "Restaurant",
+    "title": "Business profile",
+    "description": "Update your business information and contact details.",
+    "logo": {
+      "title": "Business Logo",
+      "description": "Upload your business logo. This will be displayed in your profile and to suppliers."
+    },
+    "actions": {
+      "saving": "Saving...",
+      "saveChanges": "Save changes"
+    },
+    "fields": {
+      "businessName": "Business Name",
+      "businessType": "Business Type",
+      "registrationNumber": "Registration Number",
+      "taxId": "Tax ID",
+      "vatNumber": "VAT Number",
+      "contactEmail": "Contact Email",
+      "phone": "Phone",
+      "website": "Website",
+      "description": "Business Description",
+      "street": "Street Address",
+      "city": "City",
+      "region": "Region/State",
+      "country": "Country",
+      "deliveryInstructions": "Delivery Instructions"
+    },
+    "placeholders": {
+      "businessName": "Enter business name",
+      "registrationNumber": "Enter registration number",
+      "taxId": "Enter tax ID",
+      "vatNumber": "Enter VAT number",
+      "description": "Tell suppliers about your restaurant...",
+      "street": "123 Main Street",
+      "city": "City Name",
+      "region": "State or Region",
+      "country": "Country",
+      "deliveryInstructions": "e.g., Gate A, Floor 2, Landmark: next to gas station"
+    },
+    "businessTypes": {
+      "restaurant": "Restaurant",
+      "cafe": "Cafe",
+      "hotel": "Hotel",
+      "catering": "Catering"
+    },
+    "toasts": {
+      "notLoaded": "Restaurant information not loaded",
+      "logoFailed": "Failed to upload logo",
+      "updated": "Profile updated successfully!",
+      "updateFailed": "Failed to update profile"
+    }
+  },
+  "restaurantTeam": {
+    "toast": {
+      "memberRemoved": "Member removed",
+      "removeFailed": "Failed to remove member"
+    }
+  },
+  "restaurantReviews": {
+    "title": "My supplier reviews",
+    "description": "Reviews you have submitted after completed orders",
+    "empty": "You have not written any reviews yet.",
+    "supplierFallback": "Supplier"
+  },
+  "restaurantBranches": {
+    "title": "Branch accounts",
+    "description": "Each branch is a separate account with its own orders, inventory, and settings. Switch between them from the header after creating one.",
+    "actions": {
+      "addBranch": "Add Branch",
+      "cancel": "Cancel",
+      "removeBranch": "Remove branch"
+    },
+    "empty": {
+      "title": "No branch accounts yet",
+      "description": "Add a new account for each additional location (paid plans only)"
+    },
+    "dialog": {
+      "title": "Add Branch",
+      "description": "Add a new branch location",
+      "name": "Branch Name",
+      "namePlaceholder": "e.g., Downtown Branch",
+      "phone": "Phone",
+      "phonePlaceholder": "Enter phone",
+      "address": "Address",
+      "addressPlaceholder": "Enter address",
+      "deliveryInstructions": "Delivery Instructions",
+      "deliveryInstructionsPlaceholder": "Special instructions for deliveries..."
+    },
+    "toasts": {
+      "nameRequired": "Please fill in branch name",
+      "added": "Branch added!",
+      "addFailed": "Failed to add branch",
+      "removed": "Branch removed",
+      "removeFailed": "Failed to remove branch"
+    }
+  },
+  "invite": {
+    "welcome": "Welcome to Supplify",
+    "acceptTitle": "Accept invitation",
+    "validating": "Validating your invitation…",
+    "thisBranch": "this branch",
+    "fullName": "Full name",
+    "password": "Password",
+    "confirmPassword": "Confirm password",
+    "acceptJoin": "Accept & Join",
+    "createAndJoin": "Create Account & Join",
+    "signIn": "Sign In",
+    "signInLink": "Sign in",
+    "signInDifferent": "Sign in with a different account",
+    "alreadyHaveAccount": "Already have an account?",
+    "loggedInAs": "You're logged in as {{name}}. {{headline}}.",
+    "headline": {
+      "restaurantMember": "You've been invited to join {{branch}} as {{role}}",
+      "restaurantBranchWithOrg": "You've been invited to manage {{branch}} — {{org}}",
+      "restaurantBranch": "You've been invited to manage {{branch}}",
+      "defaultWithOrg": "You've been invited to join {{branch}} ({{org}}) as {{role}}",
+      "default": "You've been invited to join {{branch}} as {{role}}"
+    },
+    "expired": {
+      "title": "This invite link has expired.",
+      "description": "Contact your organization admin to get a new one."
+    },
+    "invalid": {
+      "title": "This invite link is no longer valid.",
+      "description": "If you already have an account, sign in."
+    },
+    "errors": {
+      "missingToken": "Missing invitation token or type.",
+      "validateFailed": "Unable to validate invitation.",
+      "legalRequired": "Please accept all required legal agreements before continuing.",
+      "acceptFailed": "Could not accept invitation. Try signing in with a different account.",
+      "passwordMismatch": "Passwords do not match",
+      "passwordTooShort": "Password must be at least 8 characters",
+      "createFailed": "Could not create your account. The link may have expired."
+    }
+  }
+}

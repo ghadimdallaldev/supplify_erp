@@ -144,7 +144,23 @@ export function legalDocumentPath(slug: LegalDocumentSlug): string {
   return `/legal/${slug}`
 }
 
-export function legalDocumentAssetUrl(fileName: string): string {
+export function legalDocumentTitleKey(slug: LegalDocumentSlug): string {
+  return `documents.${slug}.title`
+}
+
+export function legalDocumentDescriptionKey(slug: LegalDocumentSlug): string {
+  return `documents.${slug}.description`
+}
+
+export function legalDocumentShortTitleKey(slug: LegalDocumentSlug): string {
+  return `documents.${slug}.shortTitle`
+}
+
+export function legalDocumentAssetUrl(fileName: string, locale?: string): string {
+  const lang = locale === 'ar' ? 'ar' : 'en'
+  if (lang === 'ar') {
+    return `/legal/ar/${fileName}`
+  }
   return `/legal/${fileName}`
 }
 

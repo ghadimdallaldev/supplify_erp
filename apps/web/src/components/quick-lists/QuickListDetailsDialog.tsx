@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogContent,
@@ -11,11 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { Package, Plus, Clock, ShoppingCart } from 'lucide-react'
 import { formatPrice } from '../../utils/format'
-import { formatDaysOfWeekLabel, parseDaysOfWeek } from '../../utils/parseDaysOfWeek'
-import { cn } from '../../lib/utils'
+import { parseDaysOfWeek } from '../../utils/parseDaysOfWeek'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function QuickListDetailsDialog(props: any) {
+  const { t, i18n } = useTranslation('cart')
   const {
     showListDetails,
     setShowListDetails,
@@ -27,6 +27,14 @@ export function QuickListDetailsDialog(props: any) {
     handleAddProducts,
     handleOrderFromList,
   } = props
+  const formatDaysLabel = (days: string[]) =>
+    days.map((day) => t(`quickLists.days.${day}`, { defaultValue: day })).join(', ')
+  const formatScheduleStatus = (status: string) =>
+    status === 'ACTIVE'
+      ? t('quickLists.statusActive')
+      : status === 'PAUSED'
+        ? t('quickLists.statusPaused')
+        : status
 
   return (
     <Dialog open={showListDetails} onOpenChange={setShowListDetails}>
@@ -34,7 +42,7 @@ export function QuickListDetailsDialog(props: any) {
         <DialogHeader>
           <DialogTitle>{selectedListForDetails?.name}</DialogTitle>
           <DialogDescription>
-            {selectedListForDetails?.description || 'View quick list details and items'}
+            {selectedListForDetails?.description || t('quickLists.detailsDialog.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -46,20 +54,24 @@ export function QuickListDetailsDialog(props: any) {
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Clock className="h-5 w-5" />
-                    Schedule Information
+                    {t('quickLists.detailsDialog.scheduleTitle')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-sm text-[var(--text-muted)]">Status:</span>
+                    <span className="text-sm text-[var(--text-muted)]">
+                      {t('quickLists.detailsDialog.status')}
+                    </span>
                     <Badge
                       variant={selectedListDetails.status === 'ACTIVE' ? 'default' : 'secondary'}
                     >
-                      {selectedListDetails.status}
+                      {formatScheduleStatus(selectedListDetails.status)}
                     </Badge>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-[var(--text-muted)]">Frequency:</span>
+                    <span className="text-sm text-[var(--text-muted)]">
+                      {t('quickLists.detailsDialog.frequency')}
+                    </span>
                     <span className="text-sm font-medium">
                       {formatFrequency(
                         selectedListDetails.frequency,
@@ -72,16 +84,18 @@ export function QuickListDetailsDialog(props: any) {
                     if (!detailDays.length) return null
                     return (
                       <div className="flex justify-between">
-                        <span className="text-sm text-[var(--text-muted)]">Days:</span>
-                        <span className="text-sm font-medium">
-                          {formatDaysOfWeekLabel(detailDays)}
+                        <span className="text-sm text-[var(--text-muted)]">
+                          {t('quickLists.detailsDialog.days')}
                         </span>
+                        <span className="text-sm font-medium">{formatDaysLabel(detailDays)}</span>
                       </div>
                     )
                   })()}
                   {selectedListDetails.preferred_time && (
                     <div className="flex justify-between">
-                      <span className="text-sm text-[var(--text-muted)]">Preferred Time:</span>
+                      <span className="text-sm text-[var(--text-muted)]">
+                        {t('quickLists.detailsDialog.preferredTime')}
+                      </span>
                       <span className="text-sm font-medium">
                         {selectedListDetails.preferred_time.slice(0, 5)}
                       </span>
@@ -90,7 +104,9 @@ export function QuickListDetailsDialog(props: any) {
                   {selectedListDetails.next_execution_date &&
                     formatNextExecution(selectedListDetails) && (
                       <div className="flex justify-between">
-                        <span className="text-sm text-[var(--text-muted)]">Next Execution:</span>
+                        <span className="text-sm text-[var(--text-muted)]">
+                          {t('quickLists.detailsDialog.nextExecution')}
+                        </span>
                         <span className="text-sm font-medium">
                           {formatNextExecution(selectedListDetails)}
                         </span>
@@ -98,18 +114,26 @@ export function QuickListDetailsDialog(props: any) {
                     )}
                   {selectedListDetails.last_execution_date && (
                     <div className="flex justify-between">
-                      <span className="text-sm text-[var(--text-muted)]">Last Execution:</span>
+                      <span className="text-sm text-[var(--text-muted)]">
+                        {t('quickLists.detailsDialog.lastExecution')}
+                      </span>
                       <span className="text-sm font-medium">
-                        {new Date(selectedListDetails.last_execution_date).toLocaleDateString()}
+                        {new Date(selectedListDetails.last_execution_date).toLocaleDateString(
+                          i18n.language
+                        )}
                       </span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-sm text-[var(--text-muted)]">Auto Create Order:</span>
+                    <span className="text-sm text-[var(--text-muted)]">
+                      {t('quickLists.detailsDialog.autoCreateOrder')}
+                    </span>
                     <Badge
                       variant={selectedListDetails.auto_create_order ? 'default' : 'secondary'}
                     >
-                      {selectedListDetails.auto_create_order ? 'Yes' : 'No'}
+                      {selectedListDetails.auto_create_order
+                        ? t('quickLists.detailsDialog.yes')
+                        : t('quickLists.detailsDialog.no')}
                     </Badge>
                   </div>
                 </CardContent>
@@ -121,7 +145,9 @@ export function QuickListDetailsDialog(props: any) {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Package className="h-5 w-5" />
-                  Items ({selectedListDetails.items?.length || 0})
+                  {t('quickLists.detailsDialog.itemsTitle', {
+                    count: selectedListDetails.items?.length || 0,
+                  })}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -135,13 +161,19 @@ export function QuickListDetailsDialog(props: any) {
                           className="flex items-center justify-between p-3 border rounded-md"
                         >
                           <div className="flex-1">
-                            <p className="font-medium">{product?.name || 'Product not found'}</p>
+                            <p className="font-medium">
+                              {product?.name || t('quickLists.detailsDialog.productNotFound')}
+                            </p>
                             {product?.sku && (
-                              <p className="text-sm text-[var(--text-muted)]">SKU: {product.sku}</p>
+                              <p className="text-sm text-[var(--text-muted)]">
+                                {t('quickLists.detailsDialog.sku', { sku: product.sku })}
+                              </p>
                             )}
                           </div>
                           <div className="text-right">
-                            <p className="font-semibold">Qty: {item.quantity}</p>
+                            <p className="font-semibold">
+                              {t('quickLists.detailsDialog.qty', { quantity: item.quantity })}
+                            </p>
                             {product?.price && (
                               <p className="text-sm text-[var(--text-muted)]">
                                 {formatPrice(Number(product.price) * item.quantity)}
@@ -155,7 +187,7 @@ export function QuickListDetailsDialog(props: any) {
                 ) : (
                   <div className="text-center py-8 text-[var(--text-muted)]">
                     <Package className="h-12 w-12 mx-auto mb-2 text-[var(--text-muted)]" />
-                    <p>No items in this list</p>
+                    <p>{t('quickLists.detailsDialog.noItems')}</p>
                     <Button
                       variant="outline"
                       size="sm"
@@ -166,7 +198,7 @@ export function QuickListDetailsDialog(props: any) {
                       }}
                     >
                       <Plus className="h-4 w-4 mr-1" />
-                      Add Items
+                      {t('quickLists.detailsDialog.addItems')}
                     </Button>
                   </div>
                 )}
@@ -177,7 +209,7 @@ export function QuickListDetailsDialog(props: any) {
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setShowListDetails(false)}>
-            Close
+            {t('quickLists.detailsDialog.close')}
           </Button>
           {selectedListForDetails && (
             <Button
@@ -192,7 +224,7 @@ export function QuickListDetailsDialog(props: any) {
               }
             >
               <ShoppingCart className="h-4 w-4 mr-2" />
-              Order Now
+              {t('quickLists.detailsDialog.orderNow')}
             </Button>
           )}
         </DialogFooter>

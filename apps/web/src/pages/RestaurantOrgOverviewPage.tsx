@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Building2, Plus } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -12,8 +13,15 @@ import { usePermissions } from '../hooks/usePermissions'
 import { RestaurantAddBranchModal } from '../components/org/RestaurantAddBranchModal'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
+import { ensureNamespace } from '../i18n'
 
 export function RestaurantOrgOverviewPage() {
+  const { t } = useTranslation('reports')
+
+  useEffect(() => {
+    void ensureNamespace('reports')
+  }, [])
+
   const navigate = useNavigate()
   const { isEffectiveRestaurant } = useImpersonation()
   const { can } = usePermissions()
@@ -43,12 +51,9 @@ export function RestaurantOrgOverviewPage() {
   if (!multiBranch) {
     return (
       <PageShell data-testid="restaurant-org-overview-page">
-        <PageHeader
-          title="Organization"
-          description="Multi-branch accounts are available on Gold and above. Upgrade your plan to add locations."
-        />
+        <PageHeader title={t('org.title')} description={t('org.upgradeDescription')} />
         <Link to="/app/settings?tab=subscription" className="text-sm underline inline-block">
-          View subscription
+          {t('org.viewSubscription')}
         </Link>
       </PageShell>
     )
@@ -57,8 +62,11 @@ export function RestaurantOrgOverviewPage() {
   return (
     <PageShell data-testid="restaurant-org-overview-page">
       <PageHeader
-        title={data?.organization?.name ?? 'Organization'}
-        description={`${branches.length} branch${branches.length === 1 ? '' : 'es'} · ${orgRole}`}
+        title={data?.organization?.name ?? t('org.title')}
+        description={t('org.branchCount', {
+          count: branches.length,
+          role: orgRole ?? '',
+        })}
         actions={
           canManageOrg ? (
             <button
@@ -67,7 +75,7 @@ export function RestaurantOrgOverviewPage() {
               className="inline-flex items-center gap-2 rounded-md bg-[var(--primary)] text-white px-3 py-2 text-sm"
             >
               <Plus className="h-4 w-4" />
-              Add Branch
+              {t('org.addBranch')}
             </button>
           ) : undefined
         }
@@ -86,8 +94,10 @@ export function RestaurantOrgOverviewPage() {
               <div>
                 <p className="font-medium">{String(branch.name)}</p>
                 <p className="text-xs text-[var(--text-muted)] mt-1">
-                  {Number(branch.staff_count ?? 0)} staff · {Number(branch.orders_this_month ?? 0)}{' '}
-                  orders this month
+                  {t('org.staffOrdersThisMonth', {
+                    staff: Number(branch.staff_count ?? 0),
+                    orders: Number(branch.orders_this_month ?? 0),
+                  })}
                 </p>
               </div>
             </div>

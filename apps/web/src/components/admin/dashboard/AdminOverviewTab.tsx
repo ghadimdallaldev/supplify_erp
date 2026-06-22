@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
 import { AppPanel, SummaryStrip } from '../../ui/app-panel'
@@ -50,6 +51,7 @@ export function AdminOverviewTab({
   onNavigateTab,
   onOperationsSubTab,
 }: AdminOverviewTabProps) {
+  const { t } = useTranslation('admin')
   const {
     data: overview,
     isLoading: overviewLoading,
@@ -87,10 +89,7 @@ export function AdminOverviewTab({
   if (overviewLoading) {
     return (
       <>
-        <AdminSectionHeader
-          title="Overview"
-          description="Platform health, tenant growth, and operational metrics."
-        />
+        <AdminSectionHeader title={t('overview.title')} description={t('overview.description')} />
         <AdminLoadingSkeleton rows={10} />
       </>
     )
@@ -99,12 +98,9 @@ export function AdminOverviewTab({
   if (overviewError) {
     return (
       <>
-        <AdminSectionHeader
-          title="Overview"
-          description="Platform health, tenant growth, and operational metrics."
-        />
+        <AdminSectionHeader title={t('overview.title')} description={t('overview.description')} />
         <AdminErrorState
-          title="Could not load dashboard metrics"
+          title={t('overview.loadFailedTitle')}
           message={
             (overviewQueryError as { data?: { message?: string } })?.data?.message ||
             'The overview API request failed. Metrics are not shown as zero to avoid a misleading empty dashboard.'
@@ -120,8 +116,8 @@ export function AdminOverviewTab({
   return (
     <>
       <AdminSectionHeader
-        title="Overview"
-        description="Platform health, tenant growth, and operational metrics."
+        title={t('overview.title')}
+        description={t('overview.description')}
         action={
           <Button
             variant="outline"
@@ -144,21 +140,21 @@ export function AdminOverviewTab({
           columns={6}
           metrics={[
             {
-              label: 'Total tenants',
+              label: t('overview.totalTenants'),
               value: getTotalTenantCount(overviewData),
-              hint: 'Suppliers + restaurants',
+              hint: t('overview.totalTenantsHint'),
               tone: 'brand',
               onClick: canAdminTab.tenants ? () => onNavigateTab('tenants') : undefined,
             },
             {
-              label: 'Active subs',
+              label: t('overview.activeSubscriptions'),
               value: getActiveSubscriptionCount(overviewData),
-              hint: 'ACTIVE + TRIALING',
+              hint: t('executiveSummary.activeSubscriptionsDescription'),
               tone: 'mint',
               onClick: canAdminTab.subscriptions ? () => onNavigateTab('subscriptions') : undefined,
             },
             {
-              label: 'MRR',
+              label: t('overview.mrr'),
               value: formatCurrency(overviewData?.revenue?.mrr),
               hint: `ARR ${formatCurrency(overviewData?.revenue?.arr)}`,
               tone: 'brand',
@@ -216,8 +212,8 @@ export function AdminOverviewTab({
       />
 
       <AppPanel
-        title="Tenants & Revenue"
-        description="Registered tenants and recurring revenue snapshot"
+        title={t('overview.tenantsRevenueTitle')}
+        description={t('overview.tenantsRevenueDescription')}
         testId="admin-overview-tenants-revenue"
         className="mb-4"
         footer={
@@ -231,7 +227,7 @@ export function AdminOverviewTab({
       >
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <AdminKpiCard
-            label="Suppliers"
+            label={t('overview.activeSuppliers')}
             value={overviewData?.tenants?.totalSuppliers ?? 0}
             description={
               (overviewData?.tenants?.newSuppliers7d || 0) > 0
@@ -242,7 +238,7 @@ export function AdminOverviewTab({
             tone="brand"
           />
           <AdminKpiCard
-            label="Restaurants"
+            label={t('overview.activeRestaurants')}
             value={overviewData?.tenants?.totalRestaurants ?? 0}
             description={
               (overviewData?.tenants?.newRestaurants7d || 0) > 0
@@ -253,16 +249,16 @@ export function AdminOverviewTab({
             tone="success"
           />
           <AdminKpiCard
-            label="MRR"
+            label={t('overview.mrr')}
             value={formatCurrency(overviewData?.revenue?.mrr)}
             description={`ARR: ${formatCurrency(overviewData?.revenue?.arr)}`}
             icon={DollarSign}
             tone="success"
           />
           <AdminKpiCard
-            label="Active subs"
+            label={t('overview.activeSubscriptions')}
             value={getPaidActiveSubscriptionCount(overviewData)}
-            description="Paid plans (excl. Free Trial)"
+            description={t('overview.activeSubsDescription')}
             icon={CreditCard}
             tone="brand"
           />
@@ -282,8 +278,8 @@ export function AdminOverviewTab({
       </AppPanel>
 
       <AppPanel
-        title="Subscription status breakdown"
-        description="Live subscription counts by billing status"
+        title={t('overview.subscriptionBreakdownTitle')}
+        description={t('overview.subscriptionBreakdownDescription')}
         testId="admin-overview-subscription-breakdown"
         className="mb-4"
       >
@@ -335,8 +331,8 @@ export function AdminOverviewTab({
       {conversionStats && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <AppPanel
-            title="Conversion funnel (30d)"
-            description="Upgrade path from feature blocks to completed upgrades"
+            title={t('overview.conversionFunnelTitle')}
+            description={t('overview.conversionFunnelDescription')}
             testId="admin-overview-conversion-funnel"
           >
             <div className="mb-4 flex items-center justify-between">
@@ -418,11 +414,11 @@ export function AdminOverviewTab({
 
           {conversionStats.funnelDropOff && (
             <AppPanel
-              title="7-day vs 30-day comparison"
-              description="Recent upgrade funnel momentum"
+              title={t('overview.funnelComparisonTitle')}
+              description={t('overview.funnelComparisonDescription')}
               testId="admin-overview-funnel-comparison"
             >
-              <TableScroll aria-label="Funnel comparison">
+              <TableScroll aria-label={t('overview.funnelComparisonTableAriaLabel')}>
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-[var(--app-border)]">

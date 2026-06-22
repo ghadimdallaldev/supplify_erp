@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   useGetSupplierQuery,
@@ -62,8 +63,10 @@ import {
 } from '../components/ui/dialog'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
+import { ensureNamespace } from '../i18n'
 
 export function SupplierDetailPage() {
+  const { t } = useTranslation('suppliers')
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
@@ -72,6 +75,10 @@ export function SupplierDetailPage() {
   const reviewsWriteEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.supplier_reviews
   )
+
+  useEffect(() => {
+    void ensureNamespace('suppliers')
+  }, [])
 
   const { data, isLoading, error, refetch } = useGetSupplierQuery(id!)
   useGetRestaurantsQuery()
@@ -122,7 +129,7 @@ export function SupplierDetailPage() {
   if (error || !data?.supplier) {
     return (
       <div className="text-center py-12">
-        <p className="text-[var(--red)]">Failed to load supplier</p>
+        <p className="text-[var(--red)]">{t('detail.loadFailed')}</p>
       </div>
     )
   }
@@ -131,22 +138,20 @@ export function SupplierDetailPage() {
 
   const handleSendMessage = async () => {
     if (!user || !id) {
-      toast.error('User or supplier ID missing')
+      toast.error(t('detail.toast.userMissing'))
       return
     }
 
     try {
-      // Create or get conversation
-      // The backend will automatically get the restaurant ID based on the logged-in user's email
       const result = await createConversation({
         supplierId: id,
       }).unwrap()
 
-      toast.success('Opening conversation...')
+      toast.success(t('detail.toast.openingConversation'))
       navigate(`/app/chat?conversation=${result.conversation.id}`)
     } catch (error: any) {
       console.error('Create conversation error:', error)
-      toast.error(error?.data?.error?.message || 'Failed to start conversation')
+      toast.error(error?.data?.error?.message || t('detail.toast.conversationFailed'))
     }
   }
 
@@ -158,13 +163,13 @@ export function SupplierDetailPage() {
     try {
       if (isFollowed) {
         await unfollowSupplier(id).unwrap()
-        toast.success('Supplier unfollowed')
+        toast.success(t('detail.toast.unfollowed'))
       } else {
         await followSupplier(id).unwrap()
-        toast.success('Supplier followed')
+        toast.success(t('detail.toast.followed'))
       }
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to update follow status')
+      toast.error(error?.data?.error?.message || t('detail.toast.followFailed'))
     }
     refetch()
   }
@@ -175,12 +180,12 @@ export function SupplierDetailPage() {
     if (!id) return
     try {
       await blockSupplier({ id, reason: blockReason.trim() || undefined }).unwrap()
-      toast.success('Supplier blocked — they will no longer appear in your catalog')
+      toast.success(t('detail.toast.blocked'))
       setShowBlockDialog(false)
       setBlockReason('')
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to block supplier')
+      toast.error(error?.data?.error?.message || t('detail.toast.blockFailed'))
     }
   }
 
@@ -188,10 +193,10 @@ export function SupplierDetailPage() {
     if (!id) return
     try {
       await unblockSupplier(id).unwrap()
-      toast.success('Supplier unblocked')
+      toast.success(t('detail.toast.unblocked'))
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to unblock supplier')
+      toast.error(error?.data?.error?.message || t('detail.toast.unblockFailed'))
     }
   }
 
@@ -227,7 +232,7 @@ export function SupplierDetailPage() {
                   {isBlocked ? (
                     <>
                       <Badge variant="destructive" className="self-center">
-                        Blocked
+                        {t('detail.blocked')}
                       </Badge>
                       <Button
                         variant="outline"
@@ -236,7 +241,7 @@ export function SupplierDetailPage() {
                         disabled={isUnblocking}
                         data-testid="unblock-supplier"
                       >
-                        Unblock supplier
+                        {t('detail.unblock')}
                       </Button>
                     </>
                   ) : (
@@ -250,7 +255,7 @@ export function SupplierDetailPage() {
                         <Heart
                           className={`h-4 w-4 mr-2 ${supplier.is_followed ? 'fill-current' : ''}`}
                         />
-                        {supplier.is_followed ? 'Following' : 'Follow'}
+                        {supplier.is_followed ? t('detail.following') : t('detail.follow')}
                       </Button>
                       <Button
                         variant="outline"
@@ -259,7 +264,7 @@ export function SupplierDetailPage() {
                         disabled={isCreatingConversation}
                       >
                         <MessageSquare className="h-4 w-4 mr-2" />
-                        {isCreatingConversation ? 'Opening...' : 'Message'}
+                        {isCreatingConversation ? t('detail.opening') : t('detail.message')}
                       </Button>
                       <Button variant="outline" className="whitespace-normal" asChild>
                         <Link
@@ -275,7 +280,7 @@ export function SupplierDetailPage() {
                           }}
                         >
                           <FileQuestion className="h-4 w-4 mr-2" />
-                          Request best price
+                          {t('detail.requestBestPrice')}
                         </Link>
                       </Button>
                       <Button
@@ -286,7 +291,7 @@ export function SupplierDetailPage() {
                         data-testid="block-supplier"
                       >
                         <Ban className="h-4 w-4 mr-2" />
-                        Block
+                        {t('detail.block')}
                       </Button>
                     </>
                   )}
@@ -303,8 +308,10 @@ export function SupplierDetailPage() {
                 />
               ))}
               <span>
-                {Number(ratingSummary.avg_rating).toFixed(1)} (
-                {String(ratingSummary.review_count ?? 0)} reviews)
+                {t('detail.reviewsCount', {
+                  rating: Number(ratingSummary.avg_rating).toFixed(1),
+                  count: String(ratingSummary.review_count ?? 0),
+                })}
               </span>
             </p>
           ) : null}
@@ -323,7 +330,9 @@ export function SupplierDetailPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Total Orders</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">
+                    {t('detail.stats.totalOrders')}
+                  </p>
                   <p className="text-2xl font-bold text-[var(--text)]">{stats.totalOrders}</p>
                 </div>
                 <ShoppingCart className="h-8 w-8 text-[var(--brand-mid)]" />
@@ -334,7 +343,9 @@ export function SupplierDetailPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Total Spent</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">
+                    {t('detail.stats.totalSpent')}
+                  </p>
                   <p className="text-2xl font-bold text-[var(--text)]">
                     {formatCurrency(stats.totalSpent, { maximumFractionDigits: 0 })}
                   </p>
@@ -347,7 +358,9 @@ export function SupplierDetailPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Avg Order Value</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">
+                    {t('detail.stats.avgOrderValue')}
+                  </p>
                   <p className="text-2xl font-bold text-[var(--text)]">
                     {formatCurrency(stats.averageOrderValue, { maximumFractionDigits: 0 })}
                   </p>
@@ -360,7 +373,9 @@ export function SupplierDetailPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Products Available</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">
+                    {t('detail.stats.productsAvailable')}
+                  </p>
                   <p className="text-2xl font-bold text-[var(--text)]">
                     {supplier.product_count || 0}
                   </p>
@@ -378,7 +393,7 @@ export function SupplierDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5" />
-              Contact Information
+              {t('detail.contactInfo')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -424,30 +439,30 @@ export function SupplierDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Business Information
+              {t('detail.businessInfo')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {supplier.legal_name && (
               <div>
-                <p className="text-sm text-[var(--text-muted)]">Legal Name</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('detail.legalName')}</p>
                 <p className="font-medium">{supplier.legal_name}</p>
               </div>
             )}
             {supplier.vat_no && (
               <div>
-                <p className="text-sm text-[var(--text-muted)]">VAT Number</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('detail.vatNumber')}</p>
                 <p className="font-medium">{supplier.vat_no}</p>
               </div>
             )}
             {supplier.trade_license_no && (
               <div>
-                <p className="text-sm text-[var(--text-muted)]">Trade License</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('detail.tradeLicense')}</p>
                 <p className="font-medium">{supplier.trade_license_no}</p>
               </div>
             )}
             <div>
-              <p className="text-sm text-[var(--text-muted)]">Member Since</p>
+              <p className="text-sm text-[var(--text-muted)]">{t('detail.memberSince')}</p>
               <p className="font-medium flex items-center gap-1">
                 <Clock className="h-3 w-3" />
                 {new Date(supplier.created_at).toLocaleDateString('en-US', {
@@ -465,20 +480,24 @@ export function SupplierDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
-              Products & Pricing
+              {t('detail.productsPricing')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <p className="text-3xl font-bold">{supplier.product_count || 0}</p>
-              <p className="text-sm text-[var(--text-muted)]">Total products available</p>
+              <p className="text-sm text-[var(--text-muted)]">
+                {t('detail.totalProductsAvailable')}
+              </p>
             </div>
             {supplier.avg_price > 0 && (
               <div>
                 <p className="text-2xl font-bold text-[var(--mint)]">
                   {formatPrice(supplier.avg_price)}
                 </p>
-                <p className="text-sm text-[var(--text-muted)]">Average product price</p>
+                <p className="text-sm text-[var(--text-muted)]">
+                  {t('detail.averageProductPrice')}
+                </p>
               </div>
             )}
           </CardContent>
@@ -491,13 +510,13 @@ export function SupplierDetailPage() {
           <Button asChild>
             <Link to={`/app/products?supplier=${supplier.id}`}>
               <Package className="h-4 w-4 mr-2" />
-              View All Products
+              {t('detail.viewAllProducts')}
             </Link>
           </Button>
           <Button variant="outline" asChild>
             <Link to={`/app/chat?supplier=${supplier.id}`}>
               <MessageSquare className="h-4 w-4 mr-2" />
-              Send Message
+              {t('detail.sendMessage')}
             </Link>
           </Button>
         </div>
@@ -505,13 +524,13 @@ export function SupplierDetailPage() {
 
       <Tabs defaultValue="products" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="products">Products</TabsTrigger>
-          <TabsTrigger value="reviews">Reviews</TabsTrigger>
+          <TabsTrigger value="products">{t('detail.tabs.products')}</TabsTrigger>
+          <TabsTrigger value="reviews">{t('detail.tabs.reviews')}</TabsTrigger>
         </TabsList>
         <TabsContent value="reviews">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Supplier reviews</CardTitle>
+              <CardTitle>{t('detail.reviews.title')}</CardTitle>
               {isRestaurant && reviewsWriteEnabled && (
                 <Button
                   size="sm"
@@ -520,18 +539,18 @@ export function SupplierDetailPage() {
                     setShowReviewModal(true)
                   }}
                 >
-                  Write review
+                  {t('detail.reviews.writeReview')}
                 </Button>
               )}
               {isRestaurant && !reviewsWriteEnabled && (
                 <p className="text-xs text-[var(--text-muted)]">
-                  Upgrade your plan to write supplier reviews.
+                  {t('detail.reviews.upgradeHint')}
                 </p>
               )}
             </CardHeader>
             <CardContent className="space-y-3">
               {(reviewsData?.reviews || []).length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)]">No reviews yet.</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('detail.reviews.empty')}</p>
               ) : (
                 (reviewsData?.reviews || []).map((r: Record<string, unknown>) => {
                   const reviewId = String(r.id)
@@ -578,7 +597,7 @@ export function SupplierDetailPage() {
                                   setShowReviewModal(true)
                                 }}
                               >
-                                Edit
+                                {t('detail.reviews.edit')}
                               </Button>
                             )}
                             <Button
@@ -587,20 +606,20 @@ export function SupplierDetailPage() {
                               className="h-7 px-2 text-[var(--red)]"
                               disabled={deletingReview}
                               onClick={async () => {
-                                if (!window.confirm('Delete this review?')) return
+                                if (!window.confirm(t('detail.reviews.deleteConfirm'))) return
                                 try {
                                   await deleteReview(reviewId).unwrap()
-                                  toast.success('Review deleted')
+                                  toast.success(t('detail.reviews.deleted'))
                                   refetchMyReviews()
                                 } catch (e: unknown) {
                                   const err = e as { data?: { error?: { message?: string } } }
                                   toast.error(
-                                    err?.data?.error?.message || 'Failed to delete review'
+                                    err?.data?.error?.message || t('detail.reviews.deleteFailed')
                                   )
                                 }
                               }}
                             >
-                              Delete
+                              {t('detail.reviews.delete')}
                             </Button>
                           </div>
                         )}
@@ -621,9 +640,13 @@ export function SupplierDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Package className="h-5 w-5" />
-                <span>Products ({productsData?.products.length || 0})</span>
+                <span>
+                  {t('detail.productsTab.title', {
+                    count: productsData?.products.length || 0,
+                  })}
+                </span>
               </CardTitle>
-              <CardDescription>Browse products from this supplier</CardDescription>
+              <CardDescription>{t('detail.productsTab.description')}</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoadingProducts ? (
@@ -633,9 +656,7 @@ export function SupplierDetailPage() {
               ) : productsData?.products.length === 0 ? (
                 <div className="text-center py-12">
                   <Package className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-4" />
-                  <p className="text-[var(--text-muted)]">
-                    No products available from this supplier
-                  </p>
+                  <p className="text-[var(--text-muted)]">{t('detail.productsTab.empty')}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -651,14 +672,20 @@ export function SupplierDetailPage() {
                       <p className="text-sm text-[var(--text-muted)] mb-2">{product.sku}</p>
                       <div className="flex items-center justify-between">
                         <p className="font-semibold">
-                          {product.current_price ? formatPrice(product.current_price) : 'N/A'}
+                          {product.current_price
+                            ? formatPrice(product.current_price)
+                            : t('detail.productsTab.notAvailable')}
                         </p>
                         <p className="text-sm text-[var(--text-muted)]">
-                          Stock: {product.available_qty || 0}
+                          {t('detail.productsTab.stock', {
+                            count: product.available_qty || 0,
+                          })}
                         </p>
                       </div>
                       <Button size="sm" variant="outline" className="w-full mt-3" asChild>
-                        <Link to={`/app/products/${product.id}`}>View Details</Link>
+                        <Link to={`/app/products/${product.id}`}>
+                          {t('detail.productsTab.viewDetails')}
+                        </Link>
                       </Button>
                     </div>
                   ))}
@@ -672,25 +699,22 @@ export function SupplierDetailPage() {
       <Dialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Block {supplier.name}?</DialogTitle>
-            <DialogDescription>
-              Blocked suppliers are hidden from your catalog and marketplace browse. You can unblock
-              them later from this page.
-            </DialogDescription>
+            <DialogTitle>{t('detail.blockDialog.title', { name: supplier.name })}</DialogTitle>
+            <DialogDescription>{t('detail.blockDialog.description')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="block-reason">Reason (optional)</Label>
+            <Label htmlFor="block-reason">{t('detail.blockDialog.reasonLabel')}</Label>
             <Textarea
               id="block-reason"
               value={blockReason}
               onChange={(e) => setBlockReason(e.target.value)}
-              placeholder="e.g. Quality issues, no longer ordering"
+              placeholder={t('detail.blockDialog.reasonPlaceholder')}
               rows={3}
             />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowBlockDialog(false)}>
-              Cancel
+              {t('detail.blockDialog.cancel')}
             </Button>
             <Button
               variant="destructive"
@@ -698,7 +722,7 @@ export function SupplierDetailPage() {
               disabled={isBlocking}
               data-testid="confirm-block-supplier"
             >
-              {isBlocking ? 'Blocking…' : 'Block supplier'}
+              {isBlocking ? t('detail.blockDialog.blocking') : t('detail.blockDialog.confirm')}
             </Button>
           </DialogFooter>
         </DialogContent>

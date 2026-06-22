@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -28,6 +29,7 @@ function statusBadge(status: string) {
 }
 
 export function ExpiryInventoryTab() {
+  const { t } = useTranslation('inventory')
   const { can } = usePermissions()
   const canManage = can('INVENTORY_MANAGE')
   const [statusFilter, setStatusFilter] = useState('ALL')
@@ -55,7 +57,7 @@ export function ExpiryInventoryTab() {
   const [createLot, { isLoading: creating }] = useCreateExpiryLotMutation()
   const [deleteLot] = useDeleteExpiryLotMutation()
 
-  const lots = data?.lots || []
+  const lots = useMemo(() => data?.lots ?? [], [data?.lots])
   const suppliers = useMemo(() => {
     const map = new Map<string, string>()
     for (const lot of lots) {
@@ -66,7 +68,7 @@ export function ExpiryInventoryTab() {
 
   const handleCreate = async () => {
     if (!form.itemName.trim() || !form.expiryDate) {
-      toast.error('Item name and expiry date are required')
+      toast.error(t('toast.expiryItemAndDateRequired'))
       return
     }
     try {
@@ -79,7 +81,7 @@ export function ExpiryInventoryTab() {
         storageLocation: form.storageLocation || undefined,
         notes: form.notes || undefined,
       }).unwrap()
-      toast.success('Expiry lot added')
+      toast.success(t('toast.expiryLotAdded'))
       setShowAdd(false)
       setForm({
         itemName: '',
@@ -93,17 +95,17 @@ export function ExpiryInventoryTab() {
       refetch()
     } catch (err: unknown) {
       const msg = (err as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Failed to add lot')
+      toast.error(msg || t('toast.expiryAddLotFailed'))
     }
   }
 
   const handleDelete = async (lotId: string) => {
     try {
       await deleteLot(lotId).unwrap()
-      toast.success('Lot removed')
+      toast.success(t('toast.expiryLotRemoved'))
       refetch()
     } catch {
-      toast.error('Could not remove lot')
+      toast.error(t('toast.expiryRemoveLotFailed'))
     }
   }
 

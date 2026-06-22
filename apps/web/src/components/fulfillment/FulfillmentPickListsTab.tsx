@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ClipboardList } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
@@ -13,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 const PICK_STATUSES = ['SHIPPED', 'ACKNOWLEDGED', 'PROCESSING'] as const
 
 export function FulfillmentPickListsTab() {
+  const { t } = useTranslation('fulfillment')
   const [search, setSearch] = useState('')
   const [warehouseFilter, setWarehouseFilter] = useState<string>('ALL')
   const { data: warehousesData } = useGetWarehousesQuery()
@@ -53,7 +55,7 @@ export function FulfillmentPickListsTab() {
         }) => ({
           id: order.id,
           orderRef: order.id.slice(0, 8).toUpperCase(),
-          restaurantName: order.restaurant_name || 'Restaurant',
+          restaurantName: order.restaurant_name || t('pickLists.restaurantFallback'),
           status: order.status,
           itemCount: Array.isArray(order.items) ? order.items.length : 0,
           totalAmount: Number(order.total_amount) || 0,
@@ -61,7 +63,7 @@ export function FulfillmentPickListsTab() {
           warehouseName: order.warehouse_name,
         })
       )
-  }, [ordersData, search])
+  }, [ordersData, search, t])
 
   return (
     <section
@@ -73,20 +75,18 @@ export function FulfillmentPickListsTab() {
           <div className="min-w-0">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
               <ClipboardList className="h-4 w-4 shrink-0 text-[var(--brand-mid)]" aria-hidden />
-              Pick Lists
+              {t('pickLists.title')}
             </h2>
-            <p className="mt-0.5 text-xs text-[var(--text-mid)]">
-              Orders ready for warehouse picking
-            </p>
+            <p className="mt-0.5 text-xs text-[var(--text-mid)]">{t('pickLists.subtitle')}</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             {(warehousesData?.warehouses?.length ?? 0) > 0 && (
               <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
                 <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="All warehouses" />
+                  <SelectValue placeholder={t('pickLists.allWarehouses')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">All warehouses</SelectItem>
+                  <SelectItem value="ALL">{t('pickLists.allWarehouses')}</SelectItem>
                   {(warehousesData?.warehouses ?? []).map((wh: { id: string; name: string }) => (
                     <SelectItem key={wh.id} value={wh.id}>
                       {wh.name}
@@ -96,7 +96,7 @@ export function FulfillmentPickListsTab() {
               </Select>
             )}
             <Input
-              placeholder="Search order or restaurant…"
+              placeholder={t('pickLists.searchPlaceholder')}
               className="w-full sm:max-w-xs shrink-0"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -113,7 +113,7 @@ export function FulfillmentPickListsTab() {
           </div>
         ) : isError ? (
           <div className="py-10 text-center" data-testid="picklists-error" role="alert">
-            <p className="text-sm text-[var(--text-muted)]">Could not load pick lists.</p>
+            <p className="text-sm text-[var(--text-muted)]">{t('pickLists.loadFailed')}</p>
             <Button
               type="button"
               variant="outline"
@@ -121,7 +121,7 @@ export function FulfillmentPickListsTab() {
               className="mt-3"
               onClick={() => refetch()}
             >
-              Retry
+              {t('common:actions.retry')}
             </Button>
           </div>
         ) : pickOrders.length === 0 ? (
@@ -130,10 +130,8 @@ export function FulfillmentPickListsTab() {
             data-testid="picklists-empty"
           >
             <ClipboardList className="mx-auto mb-3 h-9 w-9 text-[var(--text-muted)]" aria-hidden />
-            <p className="text-sm font-medium text-[var(--text)]">No orders ready for picking</p>
-            <p className="mt-1 text-xs text-[var(--text-mid)]">
-              Orders appear here when they reach processing or shipped status.
-            </p>
+            <p className="text-sm font-medium text-[var(--text)]">{t('pickLists.emptyTitle')}</p>
+            <p className="mt-1 text-xs text-[var(--text-mid)]">{t('pickLists.emptyDescription')}</p>
           </div>
         ) : (
           <>
@@ -156,20 +154,26 @@ export function FulfillmentPickListsTab() {
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
-                      <p className="text-xs text-[var(--text-muted)]">Items</p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        {t('pickLists.table.items')}
+                      </p>
                       <p>{order.itemCount}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-[var(--text-muted)]">Total</p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        {t('pickLists.table.total')}
+                      </p>
                       <p>{formatPrice(order.totalAmount)}</p>
                     </div>
                     <div className="col-span-2">
-                      <p className="text-xs text-[var(--text-muted)]">Warehouse</p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        {t('pickLists.table.warehouse')}
+                      </p>
                       <p>{order.warehouseName || '—'}</p>
                     </div>
                   </div>
                   <Button variant="outline" size="sm" className="w-full" asChild>
-                    <Link to={`/app/orders/${order.id}`}>Open order</Link>
+                    <Link to={`/app/orders/${order.id}`}>{t('pickLists.table.openOrder')}</Link>
                   </Button>
                 </article>
               ))}
@@ -178,13 +182,13 @@ export function FulfillmentPickListsTab() {
               <table className="w-full min-w-[560px] text-sm" data-testid="picklists-table">
                 <thead>
                   <tr className="border-b text-left text-[var(--text-muted)]">
-                    <th className="p-2 font-medium">Order</th>
-                    <th className="p-2 font-medium">Restaurant</th>
-                    <th className="p-2 font-medium">Items</th>
-                    <th className="p-2 font-medium">Total</th>
-                    <th className="p-2 font-medium">Warehouse</th>
-                    <th className="p-2 font-medium">Status</th>
-                    <th className="p-2 font-medium text-right">Action</th>
+                    <th className="p-2 font-medium">{t('pickLists.table.order')}</th>
+                    <th className="p-2 font-medium">{t('pickLists.table.restaurant')}</th>
+                    <th className="p-2 font-medium">{t('pickLists.table.items')}</th>
+                    <th className="p-2 font-medium">{t('pickLists.table.total')}</th>
+                    <th className="p-2 font-medium">{t('pickLists.table.warehouse')}</th>
+                    <th className="p-2 font-medium">{t('pickLists.table.status')}</th>
+                    <th className="p-2 font-medium text-right">{t('pickLists.table.action')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -205,7 +209,7 @@ export function FulfillmentPickListsTab() {
                       </td>
                       <td className="p-2 text-right">
                         <Button variant="outline" size="sm" asChild>
-                          <Link to={`/app/orders/${order.id}`}>Open</Link>
+                          <Link to={`/app/orders/${order.id}`}>{t('pickLists.table.open')}</Link>
                         </Button>
                       </td>
                     </tr>

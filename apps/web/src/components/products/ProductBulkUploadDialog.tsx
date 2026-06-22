@@ -1,3 +1,4 @@
+import { useTranslation, Trans } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import {
   Dialog,
@@ -51,11 +52,10 @@ export function ProductBulkUploadDialog({
   importJob,
   importJobActive = false,
 }: ProductBulkUploadDialogProps) {
+  const { t } = useTranslation('products')
   const handleOpenChange = (open: boolean) => {
     if (!open && importJobActive) {
-      const confirmed = window.confirm(
-        'Product import is still running. Close this dialog? The import will continue in the background.'
-      )
+      const confirmed = window.confirm(t('bulkUpload.closeWhileRunningConfirm'))
       if (!confirmed) return
     }
     setShowBulkUpload(open)
@@ -71,25 +71,21 @@ export function ProductBulkUploadDialog({
     <Dialog open={showBulkUpload} onOpenChange={handleOpenChange}>
       <DialogContent size="xl">
         <DialogHeader>
-          <DialogTitle>Bulk Upload Products</DialogTitle>
-          <DialogDescription>
-            Upload a CSV or Excel file to preview and import products. Required: Name, SKU.
-            Optional: Description, Category, Unit, Price, Stock. Duplicate SKUs in the file or
-            existing catalog update the matching product.
-          </DialogDescription>
+          <DialogTitle>{t('bulkUpload.title')}</DialogTitle>
+          <DialogDescription>{t('bulkUpload.description')}</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="file-upload">Select File</Label>
+              <Label htmlFor="file-upload">{t('bulkUpload.selectFile')}</Label>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={downloadExampleFile}
                 className="flex items-center gap-2"
               >
-                Download Example
+                {t('bulkUpload.downloadExample')}
               </Button>
             </div>
             <Input
@@ -100,9 +96,7 @@ export function ProductBulkUploadDialog({
               disabled={importBusy}
               className="cursor-pointer"
             />
-            <p className="text-sm text-[var(--text-muted)]">
-              Supported formats: CSV (.csv) and Excel (.xlsx, .xls).
-            </p>
+            <p className="text-sm text-[var(--text-muted)]">{t('bulkUpload.supportedFormats')}</p>
           </div>
 
           {importPreviewMeta && (
@@ -110,17 +104,26 @@ export function ProductBulkUploadDialog({
               data-testid="import-preview-summary"
               className="rounded-md border border-[var(--app-border)] px-3 py-2 text-sm"
             >
-              <strong>{importPreviewMeta.validCount}</strong> valid ·{' '}
-              <strong className="text-[var(--red)]">{importPreviewMeta.errorCount}</strong> with
-              issues · {importPreviewMeta.totalRows} total rows
+              <Trans
+                i18nKey="bulkUpload.previewSummary"
+                ns="products"
+                values={{
+                  valid: importPreviewMeta.validCount,
+                  errors: importPreviewMeta.errorCount,
+                  total: importPreviewMeta.totalRows,
+                }}
+                components={{ strong: <strong /> }}
+              />
             </div>
           )}
 
           {uploadedFile && (
             <div className="space-y-2">
-              <Label>File: {uploadedFile.name}</Label>
+              <Label>{t('bulkUpload.fileLabel', { name: uploadedFile.name })}</Label>
               <p className="text-sm text-[var(--text-muted)]">
-                Size: {formatNumber(uploadedFile.size / 1024, { maximumFractionDigits: 2 })} KB
+                {t('bulkUpload.fileSize', {
+                  size: formatNumber(uploadedFile.size / 1024, { maximumFractionDigits: 2 }),
+                })}
               </p>
             </div>
           )}
@@ -133,33 +136,28 @@ export function ProductBulkUploadDialog({
                   {importJob.status}…
                 </span>
                 {importJob.rowCount != null && (
-                  <span>
-                    Processing {formatNumber(importJob.rowCount)} row
-                    {importJob.rowCount === 1 ? '' : 's'}
-                  </span>
+                  <span>{t('bulkUpload.processingRows', { count: importJob.rowCount })}</span>
                 )}
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-[var(--app-border)]">
                 <div className="h-full w-1/3 animate-pulse bg-[var(--brand)]" />
               </div>
-              <p className="text-xs text-[var(--text-muted)]">
-                Large imports run in the background. You can close this dialog and return later.
-              </p>
+              <p className="text-xs text-[var(--text-muted)]">{t('bulkUpload.backgroundHint')}</p>
             </div>
           )}
 
           {uploadPreview.length > 0 && !importJobActive && (
             <div className="space-y-2">
-              <Label>Preview</Label>
+              <Label>{t('bulkUpload.preview')}</Label>
               <div className="border rounded-md overflow-x-auto max-h-48">
                 <table className="w-full text-sm" data-testid="import-preview-table">
                   <thead>
                     <tr className="bg-[var(--brand-ultra)] border-b">
-                      <th className="px-3 py-2 text-left">Row</th>
-                      <th className="px-3 py-2 text-left">Status</th>
-                      <th className="px-3 py-2 text-left">SKU</th>
-                      <th className="px-3 py-2 text-left">Name</th>
-                      <th className="px-3 py-2 text-left">Issues</th>
+                      <th className="px-3 py-2 text-left">{t('bulkUpload.row')}</th>
+                      <th className="px-3 py-2 text-left">{t('bulkUpload.status')}</th>
+                      <th className="px-3 py-2 text-left">{t('bulkUpload.sku')}</th>
+                      <th className="px-3 py-2 text-left">{t('bulkUpload.name')}</th>
+                      <th className="px-3 py-2 text-left">{t('bulkUpload.issues')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -186,7 +184,9 @@ export function ProductBulkUploadDialog({
           {(importErrors.length > 0 || (importSummary && importSummary.failed > 0)) && (
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm text-[var(--red)]">
-                {importErrors.length || importSummary?.failed} row(s) need attention
+                {t('bulkUpload.rowsNeedAttention', {
+                  count: importErrors.length || importSummary?.failed || 0,
+                })}
               </p>
               <Button
                 type="button"
@@ -195,7 +195,7 @@ export function ProductBulkUploadDialog({
                 data-testid="import-download-errors"
                 onClick={downloadErrorReport}
               >
-                Download error CSV
+                {t('bulkUpload.downloadErrorCsv')}
               </Button>
             </div>
           )}
@@ -205,34 +205,33 @@ export function ProductBulkUploadDialog({
               data-testid="import-summary"
               className="text-sm rounded-md bg-[var(--mint-pale)] px-3 py-2"
             >
-              Created {importSummary.created}, updated {importSummary.updated}, failed{' '}
-              {importSummary.failed}
+              {t('bulkUpload.importSummary', {
+                created: importSummary.created,
+                updated: importSummary.updated,
+                failed: importSummary.failed,
+              })}
             </div>
           )}
 
           <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4">
             <p className="text-sm text-[var(--brand-mid)]">
-              <strong>CSV Format Example:</strong>
-              <br />
-              Name,SKU,Description,Category,Unit,Price,Stock
-              <br />
-              Fresh Tomatoes,FT001,Premium tomatoes,Vegetables,kg,2.50,100
-              <br />
-              Organic Lettuce,OL002,Fresh organic lettuce,Vegetables,pack,1.80,50
+              <Trans i18nKey="bulkUpload.csvFormatExample" ns="products" />
             </p>
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={importing}>
-            {importJobActive ? 'Close' : 'Cancel'}
+            {importJobActive ? t('bulkUpload.close') : t('bulkUpload.cancel')}
           </Button>
           <Button
             onClick={handleBulkSubmit}
             disabled={!uploadedFile || !importPreviewMeta?.validCount || importBusy || isCreating}
             data-testid="import-submit-btn"
           >
-            {importing || importJobActive ? 'Importing…' : 'Import valid rows'}
+            {importing || importJobActive
+              ? t('bulkUpload.importing')
+              : t('bulkUpload.importValidRows')}
           </Button>
         </DialogFooter>
       </DialogContent>

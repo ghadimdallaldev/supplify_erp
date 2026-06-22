@@ -564,7 +564,15 @@ export const staffApi = api.injectEndpoints({
       }),
       invalidatesTags: (_r, _e, staffId) => [{ type: 'StaffMember', id: staffId }],
     }),
-    getStaffPortalLoginLink: build.query<{ loginUrl: string; status: string }, string>({
+    getStaffPortalLoginLink: build.query<
+      {
+        loginUrl: string
+        status: string
+        linkType?: 'login' | 'magic'
+        expiresAt?: string
+      },
+      string
+    >({
       query: (staffId) => `/api/staff/members/${staffId}/portal/login-link`,
       ...staffQueryCache,
     }),

@@ -1,0 +1,236 @@
+{
+  "home": {
+    "loading": "جارٍ التحميل…"
+  },
+  "commandCenter": {
+    "title": "مركز القيادة",
+    "descriptions": {
+      "sales": "العروض وفرص إعادة الطلب ومتابعة المطاعم",
+      "fulfillment": "طلبات للتجهيز وتوصيلات جارية وتنبيهات المخزون",
+      "catalog": "صحة الكتالوج والتسعير والمنتجات منخفضة المخزون",
+      "finance": "المستحقات والحسابات المتأخرة والتحصيل",
+      "readOnly": "لمحة للقراءة فقط عن أولويات المورد",
+      "full": "أولويات اليوم — مهام عملية وليست مجرد رسوم بيانية"
+    },
+    "gateTitle": {
+      "sales": "مركز المبيعات",
+      "default": "مركز القيادة"
+    },
+    "readOnlyBanner": "مساحة عمل للقراءة فقط · {{role}} — يمكنك عرض الأولويات دون اتخاذ إجراءات.",
+    "refreshing": "(جارٍ التحديث...)",
+    "analyticsDashboard": "لوحة التحليلات",
+    "quickActionsAria": "إجراءات سريعة",
+    "quickActions": {
+      "runSheet": "ورقة التشغيل",
+      "deliveries": "التوصيلات",
+      "receivables": "المستحقات",
+      "reorder": "إعادة الطلب",
+      "lowStock": "مخزون منخفض",
+      "disputes": "النزاعات",
+      "deals": "العروض",
+      "restaurants": "المطاعم",
+      "reorderLeads": "فرص إعادة الطلب",
+      "fulfillmentBoard": "لوحة التنفيذ",
+      "orders": "الطلبات",
+      "products": "المنتجات",
+      "contractPricing": "تسعير العقود",
+      "invoices": "الفواتير"
+    },
+    "error": {
+      "title": "تعذر تحميل مركز القيادة",
+      "description": "تحقق من اتصالك وحاول مرة أخرى.",
+      "retry": "إعادة المحاولة"
+    },
+    "kpis": {
+      "ordersToPrepare": "طلبات للتجهيز اليوم",
+      "deliveriesPending": "توصيلات معلقة",
+      "gpsToday": "GPS اليوم",
+      "live": "مباشر",
+      "stale": "قديم",
+      "noGps": "بدون GPS",
+      "failed": "فشل",
+      "openTracking": "فتح التتبع",
+      "unpaidBalance": "الرصيد غير المدفوع",
+      "reorderDue": "مطاعم مستحقة لإعادة الطلب"
+    },
+    "priorities": {
+      "title": "أولويات اليوم",
+      "emptyTitle": "لا توجد عناصر عاجلة",
+      "emptyDescription": "أنت على اطلاع بكل شيء حالياً."
+    },
+    "previews": {
+      "deliveries": "التوصيلات",
+      "noActiveDeliveries": "لا توجد توصيلات نشطة حالياً.",
+      "receivables": "من يدين لي",
+      "unpaid": "{{amount}} غير مدفوع",
+      "overdue": "متأخر: {{amount}}",
+      "noOpenBalances": "لا توجد أرصدة مفتوحة.",
+      "lowStock": "مخزون منخفض",
+      "stockHealthy": "مستويات المخزون تبدو جيدة.",
+      "left": "{{name}} — متبقي {{qty}}",
+      "viewAll": "عرض الكل"
+    },
+    "reorder": {
+      "title": "فرص إعادة الطلب",
+      "due": "({{count}} مستحق)",
+      "emptyTitle": "لا توجد فرص إعادة طلب",
+      "emptyDescription": "لا يوجد مطعم تجاوز نافذة إعادة الطلب المعتادة حالياً.",
+      "usuallyOrdersEvery": "يطلب عادة كل ~{{days}} يوماً",
+      "lastOrder": "آخر طلب: {{date}} (منذ {{days}} يوماً)",
+      "oftenOrders": "يطلب غالباً: {{products}}",
+      "reviewReminder": "مراجعة التذكير",
+      "viewCustomer": "عرض العميل"
+    },
+    "atRisk": {
+      "title": "طلبات متوقعة معرضة للخطر اليوم",
+      "item": "{{restaurant}} — يطلب عادة {{label}} أيام {{day}} لكنه لم يطلب بعد."
+    },
+    "boostedDeals": {
+      "title": "العروض المعززة (30 يوماً)",
+      "summary": "{{active}} نشط · {{views}} مشاهدة · {{clicks}} نقرة",
+      "manageDeals": "إدارة العروض ←",
+      "empty": "لا يوجد نشاط للعروض المعززة خلال آخر 30 يوماً."
+    },
+    "alerts": {
+      "disputes": "{{count}} نزاع(ات) تحتاج ردك",
+      "fulfillment": "{{count}} تنبيه(ات) تنفيذ"
+    },
+    "toasts": {
+      "unexpectedSent": "غير متوقع: تم وضع علامة على التذكير كمرسل",
+      "draftSaved": "تم حفظ المسودة — راجعها قبل الإرسال",
+      "draftFailed": "تعذر إنشاء مسودة التذكير"
+    }
+  },
+  "runSheet": {
+    "title": "ورقة التشغيل",
+    "description": "عرض واحد للتجهيز والتوصيلات والتحصيل والمتابعات.",
+    "gateTitle": "ورقة التشغيل",
+    "today": "اليوم",
+    "dateAria": "تاريخ ورقة التشغيل",
+    "print": "طباعة",
+    "viewingOtherDay": "· عرض يوم آخر",
+    "commandCenter": "مركز القيادة",
+    "error": "تعذر تحميل ورقة التشغيل.",
+    "retry": "إعادة المحاولة",
+    "priorities": "أولويات اليوم",
+    "kpis": {
+      "ordersToPrepare": "طلبات للتجهيز",
+      "deliveriesPending": "توصيلات معلقة",
+      "overdueAr": "مستحقات متأخرة",
+      "reorderDue": "إعادة طلب مستحقة"
+    },
+    "pickQueue": {
+      "title": "طلبات للتجهيز ({{count}})",
+      "pickLists": "قوائم التجهيز ←",
+      "empty": "لا شيء في قائمة التجهيز لهذا اليوم.",
+      "open": "فتح"
+    },
+    "deliveries": {
+      "title": "التوصيلات ({{count}} مناطق)",
+      "fulfillment": "التنفيذ ←",
+      "empty": "لا توصيلات مجدولة لهذا التاريخ.",
+      "unassignedArea": "منطقة غير معينة",
+      "stops": "{{count}} محطة",
+      "pending": "{{count}} معلق",
+      "enRoute": "{{count}} في الطريق"
+    },
+    "receivables": {
+      "title": "مستحقات مستحقة ({{count}})",
+      "remindOverdue": "تذكير المتأخرين",
+      "invoices": "الفواتير",
+      "emptyTitle": "لا فواتير مستحقة",
+      "emptyDescription": "لا شيء مستحق للتحصيل في هذا التاريخ.",
+      "remind": "تذكير",
+      "view": "عرض"
+    },
+    "shortages": {
+      "title": "النواقص والبدائل ({{count}})"
+    },
+    "reorderFollowUps": "متابعات إعادة الطلب",
+    "daysSinceLastOrder": "منذ {{days}} يوماً من آخر طلب",
+    "toasts": {
+      "bulkSent": "تم إرسال {{count}} تذكير(ات)",
+      "bulkFailed": "تعذر إرسال التذكيرات",
+      "reminderSent": "تم إرسال التذكير",
+      "reminderFailed": "تعذر إرسال التذكير"
+    }
+  },
+  "customerGrowth": {
+    "title": "نمو العملاء",
+    "description": "أحضر عملاء مطاعمك الحاليين إلى Supplify. ارفع قائمة عملاء، واعرف من موجود على المنصة بالفعل، ثم ادعُ مطاعم جديدة أو امنحها خطة مدفوعة للبدء.",
+    "lockedFeature": "نمو العملاء والإحالات",
+    "metricsError": {
+      "title": "تعذر تحميل مقاييس النمو",
+      "description": "تحقق من اتصالك وحاول مرة أخرى.",
+      "retry": "إعادة المحاولة"
+    },
+    "metrics": {
+      "imported": "مستورد",
+      "onSupplify": "على Supplify",
+      "invited": "مدعو",
+      "converted": "محوّل",
+      "sponsored": "برعاية",
+      "registered": "مسجّل",
+      "revenueGenerated": "الإيرادات المحققة",
+      "rewardsEarned": "المكافآت المكتسبة",
+      "rewardsMonths": "{{months}} شهر"
+    },
+    "import": {
+      "title": "استيراد العملاء",
+      "description": "ارفع جدولاً للمطاعم التي تزوّدها بالفعل. نطابق كل صف مع حسابات Supplify تلقائياً لتتمكن من الربط أو الدعوة أو الرعاية من القائمة أدناه.",
+      "howItWorks": "كيف يعمل",
+      "step1": "نزّل ملف CSV النموذجي أو استخدم ملفك الخاص بالأعمدة أدناه.",
+      "step2": "اختر ملفاً — نتحقق من الصفوف ونعرض معاينة قبل حفظ أي شيء.",
+      "step3": "نفّذ الاستيراد — تظهر المطاعم المطابقة في العملاء المستوردين لخطوتك التالية.",
+      "csvColumns": "أعمدة CSV",
+      "csvColumnList": "اسم المطعم، جهة الاتصال، الهاتف، البريد الإلكتروني، العنوان، المنطقة/الإقليم، حد الائتمان، شروط الدفع، مندوب المبيعات، ملاحظات",
+      "csvHelp": "اسم المطعم مطلوب. البريد الإلكتروني أو الهاتف يساعدنا في مطابقة حسابات Supplify الموجودة. باقي الأعمدة اختيارية لكنها مفيدة لسجلاتك.",
+      "downloadTemplate": "تنزيل CSV نموذجي",
+      "runImport": "تنفيذ الاستيراد",
+      "importing": "جارٍ الاستيراد…",
+      "previewSummary": "{{valid}} صالح · {{errors}} بمشاكل · {{total}} صفوف إجمالاً",
+      "previewLabel": "معاينة الاستيراد",
+      "row": "صف",
+      "status": "الحالة",
+      "restaurant": "المطعم",
+      "email": "البريد الإلكتروني",
+      "issues": "المشاكل",
+      "rowsNeedAttention": "{{count}} صف(وف) يحتاج انتباهاً قبل الاستيراد"
+    },
+    "prospects": {
+      "title": "العملاء المستوردون",
+      "description": "المطاعم من استيرادك مع حالة مطابقتها على Supplify. للمطاعم الموجودة على المنصة، أرسل طلب ربط. لغيرهم، شارك رابط دعوة أو رعهم بخطة هدية لمدة شهر.",
+      "defaultGiftPlan": "خطة الهدية الافتراضية للرعاية",
+      "sponsorPlanAria": "خطة هدية الرعاية",
+      "sponsorLimit_one": "حتى {{count}} هدية سنوياً ضمن خطة المورد",
+      "sponsorLimit_other": "حتى {{count}} هدية سنوياً ضمن خطة المورد",
+      "sponsorHelp": "الرعاية تمنح المطعم شهراً مجانياً من Supplify {{plan}} — يمكنه الطلب منك على المنصة بميزات الخطة كاملة. بعد شهر الهدية يختار الاشتراك؛ وقد يستحق خصم الإحالة.",
+      "errorTitle": "تعذر تحميل العملاء المستوردين",
+      "errorDescription": "تحقق من اتصالك وحاول مرة أخرى.",
+      "retry": "إعادة المحاولة",
+      "empty": "لم يُستورد عملاء بعد. ارفع CSV أعلاه — بعد الاستيراد، يظهر كل مطعم هنا بخيارات الربط أو الدعوة أو الرعاية.",
+      "actionsHelp": "ربط — موجود على Supplify؛ يرسل طلب متابعة يجب قبوله. دعوة — ينسخ رابط تسجيل بمزايا الإحالة. رعاية — تبدأ هدية {{plan}} لمدة شهر فوراً.",
+      "match": "المطابقة",
+      "status": "الحالة",
+      "actions": "الإجراءات",
+      "connect": "ربط",
+      "invite": "دعوة",
+      "sponsor": "رعاية"
+    },
+    "toasts": {
+      "noValidRows": "لا صفوف صالحة للاستيراد — أصلح الأخطاء أدناه",
+      "previewSuccess": "معاينة: {{valid}} صالح، {{errors}} بمشاكل ({{total}} صفوف)",
+      "previewFailed": "تعذرت معاينة CSV",
+      "uploadFirst": "ارفع ملف CSV أولاً",
+      "fixErrors": "أصلح أخطاء التحقق قبل الاستيراد",
+      "importSuccess": "تم استيراد {{count}} عميل",
+      "importFailed": "فشل الاستيراد",
+      "connectionSent": "تم إرسال طلب الربط",
+      "connectionFailed": "تعذر إرسال طلب الربط",
+      "inviteCopied": "تم نسخ رابط الدعوة",
+      "inviteFailed": "فشلت الدعوة",
+      "sponsorStarted": "بدأت الرعاية",
+      "sponsorFailed": "فشلت الرعاية"
+    }
+  }
+}

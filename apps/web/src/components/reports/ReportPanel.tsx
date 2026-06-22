@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Download, AlertCircle, BarChart3 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Skeleton } from '../ui/skeleton'
@@ -23,6 +24,7 @@ import {
   ReportSummaryStrip,
   type ReportDef,
 } from './reportSummary'
+import { ensureNamespace } from '../../i18n'
 
 const CHART_GRID = 'var(--app-border)'
 const CHART_BRAND = 'var(--brand-mid)'
@@ -53,6 +55,12 @@ export function ReportPanel({
   branchId: string
   granularity: string
 }) {
+  const { t } = useTranslation('reports')
+
+  useEffect(() => {
+    void ensureNamespace('reports')
+  }, [])
+
   const restaurantQuery = useGetRestaurantReportQuery(
     { path: def.path, from, to, branchId: branchId || undefined, granularity },
     { skip: !isRestaurant, refetchOnMountOrArgChange: true }
@@ -78,7 +86,7 @@ export function ReportPanel({
     [rows, def.xKey, def.yKey]
   )
 
-  const summaryMetrics = useMemo(() => computeReportSummary(def, rows), [def, rows])
+  const summaryMetrics = useMemo(() => computeReportSummary(def, rows, t), [def, rows, t])
 
   const exportCsv = () => {
     downloadCsv(
@@ -98,7 +106,7 @@ export function ReportPanel({
           <BarChart3 className="h-4 w-4 text-[var(--brand-mid)]" aria-hidden />
           <h2 className="text-sm font-semibold text-[var(--text)]">{def.label}</h2>
           {showRefreshing ? (
-            <span className="text-xs text-[var(--text-muted)]">Updating…</span>
+            <span className="text-xs text-[var(--text-muted)]">{t('panel.updating')}</span>
           ) : null}
         </div>
         <Button
@@ -108,7 +116,7 @@ export function ReportPanel({
           disabled={!rows.length || showInitialLoad}
         >
           <Download className="mr-1.5 h-4 w-4" />
-          Export CSV
+          {t('panel.exportCsv')}
         </Button>
       </header>
 
@@ -120,14 +128,14 @@ export function ReportPanel({
             <AlertCircle className="h-8 w-8 text-[var(--red)]" aria-hidden />
             <p className="max-w-md text-sm text-[var(--text-mid)]">{reportErrorMessage(error)}</p>
             <Button variant="outline" size="sm" onClick={() => refetch()}>
-              Try again
+              {t('panel.tryAgain')}
             </Button>
           </div>
         ) : rows.length === 0 ? (
           <EmptyState
             icon={<BarChart3 className="h-6 w-6" aria-hidden />}
-            title="No data for this period"
-            description="Try widening the date range, changing granularity, or placing orders in this window."
+            title={t('panel.emptyTitle')}
+            description={t('panel.emptyDescription')}
           />
         ) : (
           <div className="space-y-5">

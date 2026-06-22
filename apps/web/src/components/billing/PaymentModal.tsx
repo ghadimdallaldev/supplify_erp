@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAppDispatch, useAppSelector } from '../../hooks/redux'
 import { closePaymentModal } from '../../features/billing/billingSlice'
 import {
@@ -25,6 +26,7 @@ function formatMoney(amount: number) {
 }
 
 export function PaymentModal() {
+  const { t } = useTranslation('common')
   const dispatch = useAppDispatch()
   const { paymentModalOpen, paymentModalMode, paymentModalPlan } = useAppSelector((s) => s.billing)
 
@@ -51,7 +53,7 @@ export function PaymentModal() {
   const [cardName, setCardName] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  const methods = methodsData?.paymentMethods ?? []
+  const methods = useMemo(() => methodsData?.paymentMethods ?? [], [methodsData?.paymentMethods])
   const isPayOverdue = paymentModalMode === 'pay_overdue'
   const plan = paymentModalPlan
 
@@ -127,7 +129,7 @@ export function PaymentModal() {
         const paymentMethodId = await ensurePaymentMethod()
         await setAutoRenew({ autoRenew }).unwrap()
         await payNow({ paymentMethodId, idempotencyKey }).unwrap()
-        toast.success('Payment received. Your account has been restored.')
+        toast.success(t('toast.paymentReceivedAccountRestored'))
       } else {
         if (!plan?.planId) {
           setError('Plan not selected')
@@ -150,7 +152,9 @@ export function PaymentModal() {
           }).unwrap()
         }
         toast.success(
-          isFreeCheckout ? 'Your free plan is active.' : `You're now on ${plan.planName}`
+          isFreeCheckout
+            ? t('toast.freePlanActive')
+            : t('toast.nowOnPlan', { planName: plan.planName })
         )
       }
 
@@ -206,7 +210,7 @@ export function PaymentModal() {
                 <button
                   type="button"
                   onClick={() => setBillingCycle('MONTHLY')}
-                  className={`rounded-lg border p-3 text-left transition-colors ${
+                  className={`rounded-lg border p-3 text-start transition-colors ${
                     billingCycle === 'MONTHLY'
                       ? 'border-[var(--brand-mid)] bg-[var(--brand-ultra)] ring-1 ring-[var(--brand-mid)]'
                       : 'border-[var(--app-border)] hover:bg-[var(--bg)]'
@@ -219,7 +223,7 @@ export function PaymentModal() {
                 <button
                   type="button"
                   onClick={() => setBillingCycle('YEARLY')}
-                  className={`rounded-lg border p-3 text-left transition-colors ${
+                  className={`rounded-lg border p-3 text-start transition-colors ${
                     billingCycle === 'YEARLY'
                       ? 'border-[var(--brand-mid)] bg-[var(--brand-ultra)] ring-1 ring-[var(--brand-mid)]'
                       : 'border-[var(--app-border)] hover:bg-[var(--bg)]'
@@ -278,7 +282,7 @@ export function PaymentModal() {
                     <span className="text-sm capitalize">
                       {m.brand || m.type} •••• {m.last4}
                       {m.is_default && (
-                        <span className="ml-2 text-xs text-[var(--text-muted)]">(default)</span>
+                        <span className="ms-2 text-xs text-[var(--text-muted)]">(default)</span>
                       )}
                     </span>
                   </label>
@@ -378,7 +382,7 @@ export function PaymentModal() {
             >
               {busy ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  <Loader2 className="h-4 w-4 animate-spin me-2" />
                   Processing…
                 </>
               ) : isPayOverdue ? (

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   useValidateBranchInviteQuery,
@@ -24,8 +25,10 @@ import {
   isLegalAcceptanceComplete,
 } from '../components/legal/LegalAcceptancePanel'
 import { buildLegalAcceptancePayload, type LegalDocumentSlug } from '../lib/legalDocuments'
+import { ensureNamespace } from '../i18n'
 
 export function BranchInviteAcceptPage() {
+  const { t } = useTranslation('branches')
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') || ''
   const navigate = useNavigate()
@@ -58,6 +61,10 @@ export function BranchInviteAcceptPage() {
   const requiredInviteEmail = invite?.invited_email?.trim() || ''
 
   useEffect(() => {
+    void ensureNamespace('branches')
+  }, [])
+
+  useEffect(() => {
     if (requiredInviteEmail) setEmail(requiredInviteEmail)
     else if (invite?.invited_email) setEmail((prev) => prev || invite.invited_email || '')
     if (invite?.invited_name) setFullName((prev) => prev || invite.invited_name || '')
@@ -66,7 +73,7 @@ export function BranchInviteAcceptPage() {
   if (!token) {
     return (
       <InvitePageLayout>
-        <p className="text-[var(--text-muted)]">Missing invitation token.</p>
+        <p className="text-[var(--text-muted)]">{t('invite.missingToken')}</p>
       </InvitePageLayout>
     )
   }
@@ -74,7 +81,7 @@ export function BranchInviteAcceptPage() {
   if (isLoading || sessionLoading) {
     return (
       <InvitePageLayout>
-        <p>Validating your invitation…</p>
+        <p>{t('invite.validating')}</p>
       </InvitePageLayout>
     )
   }
@@ -82,7 +89,7 @@ export function BranchInviteAcceptPage() {
   if (isError || !invite) {
     return (
       <InvitePageLayout>
-        <p className="text-[var(--text-muted)]">Unable to validate invitation.</p>
+        <p className="text-[var(--text-muted)]">{t('invite.validateError')}</p>
       </InvitePageLayout>
     )
   }
@@ -91,8 +98,8 @@ export function BranchInviteAcceptPage() {
     return (
       <InvitePageLayout className="max-w-md text-center space-y-2">
         <PageHeader
-          title="This invite link has expired."
-          description="Contact your organization admin to get a new one."
+          title={t('invite.expiredTitle')}
+          description={t('invite.expiredDescription')}
           size="compact"
           className="text-center sm:flex-col sm:items-center [&_p]:mx-auto"
         />
@@ -104,13 +111,13 @@ export function BranchInviteAcceptPage() {
     return (
       <InvitePageLayout className="max-w-md text-center space-y-3">
         <PageHeader
-          title="This invite link is no longer valid."
-          description="If you already have an account, sign in."
+          title={t('invite.invalidTitle')}
+          description={t('invite.invalidDescription')}
           size="compact"
           className="text-center sm:flex-col sm:items-center [&_p]:mx-auto"
         />
         <Link to={loginHref} className="text-[var(--brand)] underline">
-          Sign In
+          {t('invite.signIn')}
         </Link>
       </InvitePageLayout>
     )
@@ -119,7 +126,7 @@ export function BranchInviteAcceptPage() {
   const handleAcceptLoggedIn = async () => {
     setError(null)
     if (!legalPayload) {
-      setError('Please accept all required legal agreements before continuing.')
+      setError(t('invite.acceptRequired'))
       return
     }
     try {
@@ -137,12 +144,7 @@ export function BranchInviteAcceptPage() {
       if (isInvitationSessionExpiredError(err)) {
         setSessionExpired(true)
       }
-      setError(
-        invitationAcceptErrorMessage(
-          err,
-          'Could not accept invitation. Try signing in with a different account.'
-        )
-      )
+      setError(invitationAcceptErrorMessage(err, t('invite.acceptFailed')))
     }
   }
 
@@ -150,11 +152,11 @@ export function BranchInviteAcceptPage() {
     e.preventDefault()
     setError(null)
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
+      setError(t('invite.passwordMismatch'))
       return
     }
     if (password.length < 8) {
-      setError('Password must be at least 8 characters')
+      setError(t('invite.passwordMinLength'))
       return
     }
     const signupEmail = (requiredInviteEmail || email).trim()
@@ -163,7 +165,7 @@ export function BranchInviteAcceptPage() {
       return
     }
     if (!legalPayload) {
-      setError('Please accept all required legal agreements before continuing.')
+      setError(t('invite.acceptRequired'))
       return
     }
     try {
@@ -179,12 +181,7 @@ export function BranchInviteAcceptPage() {
       await refetchAppSession(dispatch)
       finishInviteAcceptNavigation(result, navigate, searchParams)
     } catch (err) {
-      setError(
-        invitationAcceptErrorMessage(
-          err,
-          'Could not create your account. The link may have expired.'
-        )
-      )
+      setError(invitationAcceptErrorMessage(err, t('invite.createFailed')))
     }
   }
 
@@ -195,7 +192,7 @@ export function BranchInviteAcceptPage() {
     return (
       <InvitePageLayout>
         <Card>
-          <PageHeader title="Accept branch invitation" size="compact" />
+          <PageHeader title={t('invite.acceptTitle')} size="compact" />
           {emailMismatch && invite.invited_email ? (
             <InviteEmailMismatchCard
               invitedEmail={invite.invited_email}
@@ -205,9 +202,12 @@ export function BranchInviteAcceptPage() {
           ) : (
             <>
               <p className="text-sm text-[var(--text-muted)]">
-                You&apos;re logged in as {sessionUser.displayName || sessionUser.email}. This invite
-                is for <strong>{invite.branch_name}</strong> ({invite.org_name}) as{' '}
-                {invite.role_name}.
+                {t('invite.loggedInAs', {
+                  name: sessionUser.displayName || sessionUser.email,
+                  branch: invite.branch_name,
+                  org: invite.org_name,
+                  role: invite.role_name,
+                })}
               </p>
               <LegalAcceptancePanel
                 variant="invite"
@@ -224,13 +224,13 @@ export function BranchInviteAcceptPage() {
                 disabled={accepting || !legalComplete}
                 onClick={() => handleAcceptLoggedIn()}
               >
-                Accept & Join Branch
+                {t('invite.acceptJoin')}
               </Button>
               <Link
                 to={loginHref}
                 className="block text-center text-sm text-[var(--brand)] underline"
               >
-                Sign in with a different account
+                {t('invite.signInDifferent')}
               </Link>
             </>
           )}
@@ -242,14 +242,17 @@ export function BranchInviteAcceptPage() {
   return (
     <InvitePageLayout>
       <Card>
-        <PageHeader title="Welcome to Supplify" size="compact" />
+        <PageHeader title={t('invite.welcomeTitle')} size="compact" />
         <p className="text-sm text-[var(--text-muted)]">
-          You&apos;ve been invited to join <strong>{invite.branch_name}</strong> ({invite.org_name})
-          as <strong>{invite.role_name}</strong>.
+          {t('invite.invitedToJoin', {
+            branch: invite.branch_name,
+            org: invite.org_name,
+            role: invite.role_name,
+          })}
         </p>
         <form className="space-y-3" onSubmit={(e) => handleCreateAccount(e)}>
           <label className="block text-sm">
-            Full name
+            {t('invite.fullName')}
             <input
               className="mt-1 w-full rounded-md border border-[var(--app-border)] px-3 py-2"
               value={fullName}
@@ -263,7 +266,7 @@ export function BranchInviteAcceptPage() {
             onChange={setEmail}
           />
           <label className="block text-sm">
-            Password
+            {t('invite.password')}
             <input
               type="password"
               className="mt-1 w-full rounded-md border border-[var(--app-border)] px-3 py-2"
@@ -274,7 +277,7 @@ export function BranchInviteAcceptPage() {
             />
           </label>
           <label className="block text-sm">
-            Confirm password
+            {t('invite.confirmPassword')}
             <input
               type="password"
               className="mt-1 w-full rounded-md border border-[var(--app-border)] px-3 py-2"
@@ -294,13 +297,13 @@ export function BranchInviteAcceptPage() {
           />
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button type="submit" className="w-full" disabled={accepting || !legalComplete}>
-            Create Account & Join Branch
+            {t('invite.createJoin')}
           </Button>
         </form>
         <p className="text-xs text-center text-[var(--text-muted)]">
-          Already have an account?{' '}
+          {t('invite.alreadyHaveAccount')}{' '}
           <Link to="/login" className="underline">
-            Sign in
+            {t('invite.signInLink')}
           </Link>
         </p>
       </Card>

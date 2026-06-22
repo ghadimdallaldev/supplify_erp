@@ -10,6 +10,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-
 import { CSS } from '@dnd-kit/utilities'
 import type { CSSProperties } from 'react'
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { normalizeTableId, reservationTableIds } from '../../lib/reservation-tables'
 import { Reservation, ReservationStatus, ReservationTable, ReservationWaitlist } from '../../types'
 import {
@@ -23,11 +24,11 @@ import { Select, SelectItem, SelectTrigger } from '../ui/select'
 import { toast } from 'sonner'
 import { GripVertical } from 'lucide-react'
 
-const STATUS_COLUMNS: Array<{ id: ReservationStatus; title: string; tone: string }> = [
-  { id: 'PENDING', title: 'Pending', tone: 'border-[var(--amber-mid)]/35 bg-[var(--amber-pale)]' },
-  { id: 'CONFIRMED', title: 'Confirmed', tone: 'border-[var(--mint)]/35 bg-[var(--mint-pale)]' },
-  { id: 'SEATED', title: 'Seated', tone: 'border-[var(--app-border)] bg-[var(--brand-ultra)]' },
-  { id: 'WAITLIST', title: 'Waitlist', tone: 'border-amber-200 bg-amber-50' },
+const STATUS_COLUMN_META: Array<{ id: ReservationStatus; tone: string }> = [
+  { id: 'PENDING', tone: 'border-[var(--amber-mid)]/35 bg-[var(--amber-pale)]' },
+  { id: 'CONFIRMED', tone: 'border-[var(--mint)]/35 bg-[var(--mint-pale)]' },
+  { id: 'SEATED', tone: 'border-[var(--app-border)] bg-[var(--brand-ultra)]' },
+  { id: 'WAITLIST', tone: 'border-amber-200 bg-amber-50' },
 ]
 
 interface ReservationBoardProps {
@@ -37,20 +38,6 @@ interface ReservationBoardProps {
   boardDate: string
   branchId?: string
   onOpenReservation?: (reservation: Reservation) => void
-}
-
-const QUICK_STATUS: Partial<
-  Record<ReservationStatus, Array<{ status: ReservationStatus; label: string }>>
-> = {
-  PENDING: [
-    { status: 'CONFIRMED', label: 'Confirm' },
-    { status: 'CANCELLED', label: 'Cancel' },
-  ],
-  CONFIRMED: [
-    { status: 'SEATED', label: 'Seat' },
-    { status: 'CANCELLED', label: 'Cancel' },
-  ],
-  SEATED: [{ status: 'COMPLETED', label: 'Complete' }],
 }
 
 function SortableReservationCard({
@@ -68,15 +55,36 @@ function SortableReservationCard({
   branchId?: string
   updating: boolean
 }) {
+  const { t } = useTranslation('reservations')
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: reservation.id,
   })
   const [pickTableId, setPickTableId] = useState(() => reservationTableIds(reservation)[0] ?? '')
 
+  const quickStatus = useMemo(() => {
+    const actions: Partial<
+      Record<ReservationStatus, Array<{ status: ReservationStatus; labelKey: string }>>
+    > = {
+      PENDING: [
+        { status: 'CONFIRMED', labelKey: 'board.actions.confirm' },
+        { status: 'CANCELLED', labelKey: 'board.actions.cancel' },
+      ],
+      CONFIRMED: [
+        { status: 'SEATED', labelKey: 'board.actions.seat' },
+        { status: 'CANCELLED', labelKey: 'board.actions.cancel' },
+      ],
+      SEATED: [{ status: 'COMPLETED', labelKey: 'board.actions.complete' }],
+    }
+    return actions[reservation.status]?.map((action) => ({
+      ...action,
+      label: t(action.labelKey),
+    }))
+  }, [reservation.status, t])
+
   useEffect(() => {
     const ids = reservationTableIds(reservation)
     if (ids[0]) setPickTableId(ids[0])
-  }, [reservation.id, reservation.updated_at, reservation.tables])
+  }, [reservation])
 
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -107,7 +115,7 @@ function SortableReservationCard({
         <button
           type="button"
           className="mt-0.5 shrink-0 touch-none cursor-grab rounded p-1 text-[var(--text-muted)] hover:bg-[var(--brand-ultra)] active:cursor-grabbing"
-          aria-label="Drag reservation"
+          aria-label={t('board.dragAriaLabel')}
           {...attributes}
           {...listeners}
         >
@@ -129,11 +137,13 @@ function SortableReservationCard({
                 })}
               </p>
             </div>
-            <Badge className="shrink-0 text-xs font-normal">{reservation.party_size} guests</Badge>
+            <Badge className="shrink-0 text-xs font-normal">
+              {t('common.guests', { count: reservation.party_size })}
+            </Badge>
           </div>
           <div className="mt-2 space-y-1 text-xs text-[var(--text-muted)]">
             <p className={assignedTables ? 'font-medium text-[var(--brand-mid)]' : ''}>
-              {assignedTables || 'Unassigned'}
+              {assignedTables || t('board.unassigned')}
             </p>
             {reservation.customer_phone ? <p>{reservation.customer_phone}</p> : null}
             {reservation.customer_email ? (
@@ -150,10 +160,10 @@ function SortableReservationCard({
               onMouseDown={stopDragPropagation}
             >
               <Select value={pickTableId} onValueChange={setPickTableId}>
-                <SelectTrigger placeholder="Choose table…">
+                <SelectTrigger placeholder={t('board.chooseTablePlaceholder')}>
                   {activeTables.map((table) => (
                     <SelectItem key={table.id} value={table.id}>
-                      {table.name} · {table.capacity} seats
+                      {t('board.tableSeats', { name: table.name, capacity: table.capacity })}
                     </SelectItem>
                   ))}
                 </SelectTrigger>
@@ -169,18 +179,18 @@ function SortableReservationCard({
                   await onAssignTables(reservation.id, [pickTableId])
                 }}
               >
-                Assign table
+                {t('board.assignTable')}
               </Button>
             </div>
           ) : null}
 
-          {QUICK_STATUS[reservation.status]?.length ? (
+          {quickStatus?.length ? (
             <div
               className="mt-3 flex flex-wrap gap-1"
               onPointerDown={stopDragPropagation}
               onMouseDown={stopDragPropagation}
             >
-              {QUICK_STATUS[reservation.status]?.map((action) => (
+              {quickStatus.map((action) => (
                 <Button
                   key={action.status}
                   type="button"
@@ -204,17 +214,19 @@ function SortableReservationCard({
 }
 
 function WaitlistCard({ entry }: { entry: ReservationWaitlist }) {
+  const { t } = useTranslation('reservations')
+
   return (
     <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700 shadow-sm">
       <div className="flex items-center justify-between">
         <span className="font-semibold text-amber-900">{entry.customer_name}</span>
         <Badge variant="outline" className="border-amber-300 text-amber-700">
-          {entry.party_size} pax
+          {t('board.pax', { count: entry.party_size })}
         </Badge>
       </div>
       <div className="mt-1 space-y-1 text-amber-800">
         <p>
-          Requested:{' '}
+          {t('board.requested')}{' '}
           {new Date(entry.requested_at).toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit',
@@ -233,6 +245,7 @@ export function ReservationBoard({
   boardDate,
   branchId,
 }: ReservationBoardProps) {
+  const { t } = useTranslation('reservations')
   const [updateStatus, { isLoading: updatingStatus }] = useUpdateReservationStatusMutation()
   const [assignTables, { isLoading: assigningTables }] = useAssignReservationTablesMutation()
   const updating = updatingStatus || assigningTables
@@ -244,17 +257,18 @@ export function ReservationBoard({
   )
 
   const columns = useMemo(() => {
-    return STATUS_COLUMNS.map((column) => ({
+    return STATUS_COLUMN_META.map((column) => ({
       ...column,
+      title: t(`board.columns.${column.id}`),
       reservations: reservations.filter((reservation) => reservation.status === column.id),
     }))
-  }, [reservations])
+  }, [reservations, t])
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const destination = event.over?.id as ReservationStatus | undefined
     const reservationId = event.active.id as string
 
-    if (!destination || !STATUS_COLUMNS.find((col) => col.id === destination)) {
+    if (!destination || !STATUS_COLUMN_META.find((col) => col.id === destination)) {
       return
     }
 
@@ -263,10 +277,14 @@ export function ReservationBoard({
 
     try {
       await updateStatus({ id: reservationId, status: destination }).unwrap()
-      toast.success(`Moved to ${destination.toLowerCase()}`)
+      toast.success(
+        t('board.toasts.movedTo', {
+          status: t(`board.statusLower.${destination}`),
+        })
+      )
     } catch (error: unknown) {
       const err = error as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Could not update reservation')
+      toast.error(err?.data?.error?.message || t('board.toasts.updateFailed'))
     }
   }
 
@@ -274,27 +292,27 @@ export function ReservationBoard({
     try {
       await updateStatus({ id, status }).unwrap()
       if (status === 'COMPLETED') {
-        toast.success('Reservation completed')
+        toast.success(t('board.toasts.completed'))
       } else if (status === 'SEATED') {
-        toast.success('Guest seated')
+        toast.success(t('board.toasts.seated'))
       } else if (status === 'CANCELLED') {
-        toast.success('Reservation cancelled')
+        toast.success(t('board.toasts.cancelled'))
       } else {
-        toast.success('Reservation updated')
+        toast.success(t('board.toasts.updated'))
       }
     } catch (error: unknown) {
       const err = error as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Could not update reservation')
+      toast.error(err?.data?.error?.message || t('board.toasts.updateFailed'))
     }
   }
 
   const handleAssignTables = async (id: string, tableIds: string[]) => {
     try {
       await assignTables({ id, tableIds, boardDate, ...(branchId ? { branchId } : {}) }).unwrap()
-      toast.success('Table assigned')
+      toast.success(t('board.toasts.tableAssigned'))
     } catch (error: unknown) {
       const err = error as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Could not assign table')
+      toast.error(err?.data?.error?.message || t('board.toasts.assignFailed'))
     }
   }
 
@@ -314,17 +332,15 @@ export function ReservationBoard({
       <CardHeader className="px-0">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <CardTitle className="text-xl">Reservations Board</CardTitle>
-            <CardDescription>
-              Assign a table on each card, then use Seat / Complete — or drag by the grip handle.
-            </CardDescription>
+            <CardTitle className="text-xl">{t('board.title')}</CardTitle>
+            <CardDescription>{t('board.description')}</CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--text-muted)]">
             <Badge variant="secondary" className="bg-[var(--brand-pale)] text-[var(--brand-mid)]">
-              Total seats: {totalCapacity}
+              {t('board.totalSeats', { count: totalCapacity })}
             </Badge>
             <Badge variant="secondary" className="bg-[var(--mint-pale)] text-[var(--mint)]">
-              Covers booked: {coversBooked}
+              {t('board.coversBooked', { count: coversBooked })}
             </Badge>
           </div>
         </div>
@@ -368,14 +384,16 @@ export function ReservationBoard({
                       ))
                     ) : (
                       <p className="text-xs italic text-[var(--text-muted)]">
-                        Drop reservations here
+                        {t('board.dropHere')}
                       </p>
                     )}
                   </SortableContext>
                 </ColumnDropZone>
                 {column.id === 'WAITLIST' && waitlist.length > 0 ? (
                   <div className="mt-4 space-y-2">
-                    <p className="text-xs font-semibold uppercase text-amber-600">Live waitlist</p>
+                    <p className="text-xs font-semibold uppercase text-amber-600">
+                      {t('board.liveWaitlist')}
+                    </p>
                     {waitlist.map((entry) => (
                       <WaitlistCard key={entry.id} entry={entry} />
                     ))}
@@ -385,7 +403,9 @@ export function ReservationBoard({
             ))}
           </div>
         </DndContext>
-        {updating ? <p className="mt-4 text-sm text-[var(--text-muted)]">Saving…</p> : null}
+        {updating ? (
+          <p className="mt-4 text-sm text-[var(--text-muted)]">{t('common.saving')}</p>
+        ) : null}
       </CardContent>
     </Card>
   )

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2, Package, Route } from 'lucide-react'
 import { RequirePermission } from '../components/RequirePermission'
 import { Button } from '../components/ui/button'
@@ -29,8 +30,14 @@ import {
   isTerminalDriverDeliveryStatus,
   routeStopIsComplete,
 } from '../lib/driverDeliveryUi'
+import { ensureNamespace } from '../i18n'
 
 export function DriverDeliveriesPage() {
+  const { t } = useTranslation('fulfillment')
+
+  useEffect(() => {
+    void ensureNamespace('fulfillment')
+  }, [])
   const { data, isLoading, isError, refetch } = useGetSupplierDeliveryBoardQuery({})
   const {
     data: routeData,
@@ -46,7 +53,7 @@ export function DriverDeliveriesPage() {
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [showCompleted, setShowCompleted] = useState(false)
 
-  const orders = data?.orders ?? []
+  const orders = useMemo(() => data?.orders ?? [], [data?.orders])
   const activeRoute = routeData?.route ?? null
 
   const routeOrderIds = useMemo(
@@ -113,12 +120,12 @@ export function DriverDeliveriesPage() {
     ids[next] = tmp
     try {
       await reorderStops({ routeId: activeRoute.id, stop_ids: ids }).unwrap()
-      toast.success('Stop order updated')
+      toast.success(t('driverDeliveries.toast.stopOrderUpdated'))
       refetchRoute()
     } catch (e: unknown) {
       const msg =
         (e as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Could not reorder stops'
+        t('driverDeliveries.toast.reorderStopsFailed')
       toast.error(msg)
     }
   }
@@ -127,12 +134,12 @@ export function DriverDeliveriesPage() {
     if (!activeRoute) return
     try {
       await setNextStop({ routeId: activeRoute.id, orderId }).unwrap()
-      toast.success('Next stop updated')
+      toast.success(t('driverDeliveries.toast.nextStopUpdated'))
       refetchRoute()
     } catch (e: unknown) {
       const msg =
         (e as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Could not set next stop'
+        t('driverDeliveries.toast.setNextStopFailed')
       toast.error(msg)
     }
   }
@@ -147,13 +154,13 @@ export function DriverDeliveriesPage() {
   const handleBuildRoute = async () => {
     try {
       await buildRoute({}).unwrap()
-      toast.success('Your route is ready')
+      toast.success(t('driverDeliveries.toast.routeReady'))
       refetchRoute()
       refetch()
     } catch (e: unknown) {
       const msg =
         (e as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Could not build route'
+        t('driverDeliveries.toast.buildRouteFailed')
       toast.error(msg)
     }
   }
@@ -169,16 +176,19 @@ export function DriverDeliveriesPage() {
         routeId: activeRoute.id,
         stopId,
         status,
-        failure_reason: status === 'FAILED' ? notes[orderId] || 'Delivery failed' : undefined,
+        failure_reason:
+          status === 'FAILED'
+            ? notes[orderId] || t('driverDeliveries.deliveryFailedDefault')
+            : undefined,
         notes: notes[orderId] || undefined,
       }).unwrap()
-      toast.success('Stop updated')
+      toast.success(t('driverDeliveries.toast.stopUpdated'))
       refetch()
       refetchRoute()
     } catch (e: unknown) {
       const msg =
         (e as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Failed to update stop'
+        t('driverDeliveries.toast.updateStopFailed')
       toast.error(msg)
     }
   }
@@ -189,15 +199,18 @@ export function DriverDeliveriesPage() {
         orderId,
         status: status as 'out_for_delivery' | 'delivered' | 'failed' | 'rescheduled',
         notes: notes[orderId] || undefined,
-        failure_reason: status === 'failed' ? notes[orderId] || 'Delivery failed' : undefined,
+        failure_reason:
+          status === 'failed'
+            ? notes[orderId] || t('driverDeliveries.deliveryFailedDefault')
+            : undefined,
       }).unwrap()
-      toast.success('Delivery status updated')
+      toast.success(t('driverDeliveries.toast.statusUpdated'))
       refetch()
       refetchRoute()
     } catch (e: unknown) {
       const msg =
         (e as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Failed to update status'
+        t('driverDeliveries.toast.updateStatusFailed')
       toast.error(msg)
     }
   }
@@ -215,14 +228,14 @@ export function DriverDeliveriesPage() {
   if (nextRouteStop) {
     if (nextRouteStop.status === 'PLANNED') {
       stickyAction = {
-        primaryLabel: "I'm on the way",
+        primaryLabel: t('driverDeliveries.onTheWay'),
         onPrimary: () =>
           handleRouteStopStatus(nextRouteStop.id, nextRouteStop.orderId, 'OUT_FOR_DELIVERY'),
         onProblem: () => handleRouteStopStatus(nextRouteStop.id, nextRouteStop.orderId, 'FAILED'),
       }
     } else if (nextRouteStop.status === 'OUT_FOR_DELIVERY') {
       stickyAction = {
-        primaryLabel: 'Delivered',
+        primaryLabel: t('driverDeliveries.delivered'),
         primarySuccess: true,
         onPrimary: () =>
           handleRouteStopStatus(nextRouteStop.id, nextRouteStop.orderId, 'DELIVERED'),
@@ -246,7 +259,10 @@ export function DriverDeliveriesPage() {
   }
 
   return (
-    <RequirePermission permission="DRIVER_DELIVERIES_VIEW" title="my deliveries">
+    <RequirePermission
+      permission="DRIVER_DELIVERIES_VIEW"
+      title={t('driverDeliveries.permissionTitle')}
+    >
       <PageShell
         data-testid="driver-deliveries-page"
         maxWidth="full"
@@ -270,8 +286,8 @@ export function DriverDeliveriesPage() {
             role="alert"
           >
             {permissionDenied
-              ? 'Location permission needed. Turn on location in your phone settings so restaurants can see your progress.'
-              : 'Location not updating. Check your signal or try refreshing.'}
+              ? t('driverDeliveries.locationPermissionNeeded')
+              : t('driverDeliveries.locationNotUpdating')}
           </p>
         )}
 
@@ -285,7 +301,7 @@ export function DriverDeliveriesPage() {
         {isError && (
           <Card data-testid="driver-deliveries-error">
             <CardContent className="pt-4 text-sm text-red-600">
-              Could not load deliveries. Try again.
+              {t('driverDeliveries.loadFailed')}
             </CardContent>
           </Card>
         )}
@@ -293,8 +309,8 @@ export function DriverDeliveriesPage() {
         {!isLoading && !isError && !hasWork && (
           <div data-testid="driver-deliveries-empty">
             <EmptyState
-              title="No deliveries today"
-              description="When dispatch assigns orders to you, they will show up here with Open Maps and one-tap actions."
+              title={t('driverDeliveries.emptyTitle')}
+              description={t('driverDeliveries.emptyDescription')}
               icon={<Package className="h-6 w-6" aria-hidden />}
             />
           </div>
@@ -302,16 +318,16 @@ export function DriverDeliveriesPage() {
 
         {routeLoading && !activeRoute && (
           <p className="text-sm text-[var(--text-muted)]" data-testid="driver-route-loading">
-            Loading your route…
+            {t('driverDeliveries.routeLoading')}
           </p>
         )}
 
         {routeError && (
           <Card data-testid="driver-route-error">
             <CardContent className="pt-4 text-sm text-red-600">
-              Could not load your route.{' '}
+              {t('driverDeliveries.routeLoadFailed')}{' '}
               <button type="button" className="underline" onClick={() => refetchRoute()}>
-                Retry
+                {t('common:actions.retry')}
               </button>
             </CardContent>
           </Card>
@@ -324,10 +340,10 @@ export function DriverDeliveriesPage() {
                 <Route className="mt-0.5 h-5 w-5 shrink-0 text-[var(--brand-mid)]" aria-hidden />
                 <div className="space-y-1">
                   <p className="font-semibold text-[var(--text-primary)]">
-                    You have {standaloneEligibleCount} deliveries today
+                    {t('driverDeliveries.deliveriesToday', { count: standaloneEligibleCount })}
                   </p>
                   <p className="text-sm text-[var(--text-muted)]">
-                    Build a route to choose the delivery order.
+                    {t('driverDeliveries.buildRouteHint')}
                   </p>
                 </div>
               </div>
@@ -341,7 +357,7 @@ export function DriverDeliveriesPage() {
                 {buildingRoute ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
                 ) : null}
-                Build my route
+                {t('driverDeliveries.buildMyRoute')}
               </Button>
             </CardContent>
           </Card>
@@ -363,7 +379,9 @@ export function DriverDeliveriesPage() {
         {activeOrders.length > 0 ? (
           <section className="space-y-3" data-testid="driver-standalone-deliveries">
             {activeRoute ? (
-              <h2 className="text-sm font-semibold text-[var(--text-muted)]">Other deliveries</h2>
+              <h2 className="text-sm font-semibold text-[var(--text-muted)]">
+                {t('driverDeliveries.otherDeliveries')}
+              </h2>
             ) : null}
             {activeOrders.map((order) => (
               <DriverDeliveryCard
@@ -387,7 +405,9 @@ export function DriverDeliveriesPage() {
               onClick={() => setShowCompleted((open) => !open)}
             >
               <span>
-                {showCompleted ? 'Hide' : 'Show'} completed ({completedOrders.length})
+                {showCompleted
+                  ? t('driverDeliveries.hideCompleted', { count: completedOrders.length })
+                  : t('driverDeliveries.showCompleted', { count: completedOrders.length })}
               </span>
             </Button>
             {showCompleted

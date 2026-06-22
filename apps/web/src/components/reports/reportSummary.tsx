@@ -1,4 +1,8 @@
+import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { formatPrice } from '../../utils/format'
+import { ensureNamespace } from '../../i18n'
 
 export type ReportDef = {
   key: string
@@ -18,7 +22,8 @@ export type ReportSummaryMetric = {
 
 export function computeReportSummary(
   def: ReportDef,
-  rows: Array<Record<string, unknown>>
+  rows: Array<Record<string, unknown>>,
+  t: TFunction<'reports'>
 ): ReportSummaryMetric[] {
   if (rows.length === 0) return []
 
@@ -26,9 +31,9 @@ export function computeReportSummary(
     const orders = rows.reduce((sum, row) => sum + Number(row.order_count ?? 0), 0)
     const spend = rows.reduce((sum, row) => sum + Number(row.total_amount ?? 0), 0)
     return [
-      { label: 'Total orders', value: String(orders), emphasis: true },
-      { label: 'Total spend', value: formatPrice(spend) },
-      { label: 'Periods', value: String(rows.length) },
+      { label: t('summary.totalOrders'), value: String(orders), emphasis: true },
+      { label: t('summary.totalSpend'), value: formatPrice(spend) },
+      { label: t('summary.periods'), value: String(rows.length) },
     ]
   }
 
@@ -36,9 +41,9 @@ export function computeReportSummary(
     const spend = rows.reduce((sum, row) => sum + Number(row.total_spend ?? 0), 0)
     const orders = rows.reduce((sum, row) => sum + Number(row.order_count ?? 0), 0)
     return [
-      { label: 'Total spend', value: formatPrice(spend), emphasis: true },
-      { label: 'Suppliers', value: String(rows.length) },
-      { label: 'Orders', value: String(orders) },
+      { label: t('summary.totalSpend'), value: formatPrice(spend), emphasis: true },
+      { label: t('summary.suppliers'), value: String(rows.length) },
+      { label: t('summary.orders'), value: String(orders) },
     ]
   }
 
@@ -46,9 +51,9 @@ export function computeReportSummary(
     const spend = rows.reduce((sum, row) => sum + Number(row.total_spend ?? 0), 0)
     const qty = rows.reduce((sum, row) => sum + Number(row.quantity ?? 0), 0)
     return [
-      { label: 'Product spend', value: formatPrice(spend), emphasis: true },
-      { label: 'Products', value: String(rows.length) },
-      { label: 'Quantity', value: String(qty) },
+      { label: t('summary.productSpend'), value: formatPrice(spend), emphasis: true },
+      { label: t('summary.products'), value: String(rows.length) },
+      { label: t('summary.quantity'), value: String(qty) },
     ]
   }
 
@@ -56,24 +61,24 @@ export function computeReportSummary(
     const revenue = rows.reduce((sum, row) => sum + Number(row.revenue ?? 0), 0)
     const orders = rows.reduce((sum, row) => sum + Number(row.order_count ?? 0), 0)
     return [
-      { label: 'Revenue', value: formatPrice(revenue), emphasis: true },
-      { label: 'Orders', value: String(orders) },
-      { label: 'Periods', value: String(rows.length) },
+      { label: t('summary.revenue'), value: formatPrice(revenue), emphasis: true },
+      { label: t('summary.orders'), value: String(orders) },
+      { label: t('summary.periods'), value: String(rows.length) },
     ]
   }
 
   if (def.key === 'top-restaurants') {
     const revenue = rows.reduce((sum, row) => sum + Number(row.revenue ?? 0), 0)
     return [
-      { label: 'Revenue', value: formatPrice(revenue), emphasis: true },
-      { label: 'Restaurants', value: String(rows.length) },
+      { label: t('summary.revenue'), value: formatPrice(revenue), emphasis: true },
+      { label: t('summary.restaurants'), value: String(rows.length) },
     ]
   }
 
   const total = rows.reduce((sum, row) => sum + Number(row[def.yKey] ?? 0), 0)
   return [
-    { label: 'Total', value: String(total), emphasis: true },
-    { label: 'Rows', value: String(rows.length) },
+    { label: t('summary.total'), value: String(total), emphasis: true },
+    { label: t('summary.rows'), value: String(rows.length) },
   ]
 }
 
@@ -132,6 +137,12 @@ export function ReportDataTable({
   columns: Array<{ key: string; label: string }>
   rows: Array<Record<string, unknown>>
 }) {
+  const { t } = useTranslation('reports')
+
+  useEffect(() => {
+    void ensureNamespace('reports')
+  }, [])
+
   const displayRows = rows.slice(0, 20)
 
   return (
@@ -170,7 +181,7 @@ export function ReportDataTable({
       </div>
       {rows.length > 20 ? (
         <p className="border-t border-[var(--app-border)] px-4 py-2 text-xs text-[var(--text-muted)]">
-          Showing 20 of {rows.length} rows. Export CSV for the full dataset.
+          {t('table.showingRows', { total: rows.length })}
         </p>
       ) : null}
     </div>

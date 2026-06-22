@@ -1,0 +1,87 @@
+{
+  "document": {
+    "notFoundTitle": "Document not found",
+    "notFoundDescription": "The legal document you requested does not exist.",
+    "viewAll": "View all legal documents",
+    "legalCenter": "Legal center",
+    "print": "Print",
+    "effective": "Effective {{date}} · Version {{version}}",
+    "providedBy": "This document is provided by {{company}}. Questions:",
+    "loadError": "Unable to load this document. Please try again later.",
+    "signIn": "Sign in"
+  },
+  "hub": {
+    "title": "Legal center",
+    "description": "Review Supplify's terms, privacy practices, and product policies. Document pack {{version}}, effective {{date}}.",
+    "categories": {
+      "core": "Platform agreements",
+      "role": "Organization-specific",
+      "product": "Product terms",
+      "reference": "Billing & deals"
+    },
+    "footerInquiries": "For legal inquiries contact",
+    "footerPrivacy": "Privacy:"
+  },
+  "reaccept": {
+    "title": "Updated legal agreements",
+    "description": "Our legal documents were updated (pack {{version}}{{previous}}). Review and accept the current agreements to continue using Supplify.",
+    "previousAccepted": " · you previously accepted {{version}}",
+    "signInRequired": "Please sign in to review updated legal agreements.",
+    "acceptRequired": "Please accept all required legal agreements before continuing.",
+    "saveError": "Could not save your acceptance. Try again.",
+    "saving": "Saving…",
+    "acceptContinue": "Accept and continue"
+  },
+  "documents": {
+    "terms_and_conditions": {
+      "title": "Terms and Conditions",
+      "shortTitle": "Terms",
+      "description": "Master platform agreement for all Supplify users and services."
+    },
+    "privacy_policy": {
+      "title": "Privacy Policy",
+      "shortTitle": "Privacy",
+      "description": "How we collect, use, and protect personal and business data."
+    },
+    "acceptable_use_policy": {
+      "title": "Acceptable Use Policy",
+      "shortTitle": "AUP",
+      "description": "Rules for lawful and responsible use of the platform."
+    },
+    "data_processing_addendum": {
+      "title": "Data Processing Addendum",
+      "shortTitle": "DPA",
+      "description": "B2B data processing terms for tenant business data."
+    },
+    "cookie_policy": {
+      "title": "Cookie Policy",
+      "shortTitle": "Cookies",
+      "description": "Cookies, sessions, and similar technologies we use."
+    },
+    "restaurant_agreement": {
+      "title": "Restaurant Agreement",
+      "shortTitle": "Restaurant Agreement",
+      "description": "Additional terms for restaurant and food-service operators."
+    },
+    "supplier_agreement": {
+      "title": "Supplier Agreement",
+      "shortTitle": "Supplier Agreement",
+      "description": "Additional terms for suppliers, distributors, and vendors."
+    },
+    "mobile_app_terms": {
+      "title": "Mobile App Terms",
+      "shortTitle": "Mobile",
+      "description": "Terms for mobile and installable app use, including PWA."
+    },
+    "subscription_addon_terms": {
+      "title": "Subscription & Add-on Terms",
+      "shortTitle": "Subscriptions",
+      "description": "Plans, billing, trials, and add-on purchases."
+    },
+    "deals_boost_terms": {
+      "title": "Deals & Boost Terms",
+      "shortTitle": "Deals & Boosts",
+      "description": "Terms for supplier deals, optional coupon codes, and paid visibility boosts."
+    }
+  }
+}

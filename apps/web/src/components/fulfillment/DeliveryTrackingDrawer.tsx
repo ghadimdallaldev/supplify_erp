@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import { Badge } from '../ui/badge'
@@ -24,6 +25,7 @@ const ACTIVE_ASSIGNMENT_STATUSES = new Set(['assigned', 'picked_up', 'out_for_de
 const LIVE_MAP_STATUSES = new Set(['picked_up', 'out_for_delivery'])
 
 export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
+  const { t } = useTranslation('fulfillment')
   const isDesktop = useMediaQuery('(min-width: 640px)', true)
   const sheetSide = isDesktop ? 'right' : 'bottom'
   const [pollMs, setPollMs] = useState(0)
@@ -58,9 +60,11 @@ export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
         )}
       >
         <SheetHeader className="shrink-0 text-left">
-          <SheetTitle>Delivery tracking</SheetTitle>
+          <SheetTitle>{t('tracking.drawer.title')}</SheetTitle>
           <SheetDescription>
-            {orderId ? `Order ${formatOrderRef(orderId)}` : 'Select an order'}
+            {orderId
+              ? t('tracking.drawer.orderRef', { ref: formatOrderRef(orderId) })
+              : t('tracking.drawer.selectOrder')}
           </SheetDescription>
         </SheetHeader>
 
@@ -74,7 +78,7 @@ export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
 
           {isError && (
             <p className="text-sm text-[var(--text-muted)]" role="alert">
-              Could not load tracking for this order.
+              {t('tracking.drawer.loadFailed')}
             </p>
           )}
 
@@ -82,13 +86,17 @@ export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
             <div className="space-y-4">
               <div className="space-y-1 text-sm">
                 <p>
-                  <span className="text-[var(--text-muted)]">Restaurant: </span>
+                  <span className="text-[var(--text-muted)]">
+                    {t('tracking.drawer.restaurant')}{' '}
+                  </span>
                   {data.restaurantName || '—'}
                 </p>
                 {data.assignment && (
                   <>
                     <p>
-                      <span className="text-[var(--text-muted)]">Driver: </span>
+                      <span className="text-[var(--text-muted)]">
+                        {t('tracking.drawer.driver')}{' '}
+                      </span>
                       {data.assignment.driverName || '—'}
                       {data.assignment.driverPhone ? ` · ${data.assignment.driverPhone}` : ''}
                     </p>
@@ -106,7 +114,9 @@ export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
                   </>
                 )}
                 {data.routeNumber && (
-                  <p className="text-xs text-[var(--text-muted)]">Route {data.routeNumber}</p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {t('tracking.drawer.route', { number: data.routeNumber })}
+                  </p>
                 )}
                 {destinationLabel ? (
                   <p

@@ -1,4 +1,6 @@
 import { Suspense, useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import {
   useGetQuickListsQuery,
   useCreateQuickListMutation,
@@ -30,29 +32,14 @@ import {
   Search,
   X,
   Clock,
-  Repeat,
   Calendar,
-  CheckCircle,
   Pause,
   Eye,
   Filter,
   Zap,
-  TrendingUp,
 } from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../components/ui/dialog'
-import { Label } from '../components/ui/label'
-import { Textarea } from '../components/ui/textarea'
 import { toast } from 'sonner'
 import { useCartActions } from '../hooks/useCartActions'
-import { useNavigate } from 'react-router-dom'
-import { formatPrice } from '../utils/format'
 import { useGetEntitlementsQuery } from '../services/api'
 import {
   getPlanLimitGate,
@@ -64,10 +51,8 @@ import { EmptyState } from '../components/ui/empty-state'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { SummaryStrip } from '../components/ui/app-panel'
-import { Select, SelectTrigger } from '../components/ui/select'
 import { Skeleton } from '../components/ui/skeleton'
-import { formatDaysOfWeekLabel, parseDaysOfWeek } from '../utils/parseDaysOfWeek'
-import { cn } from '../lib/utils'
+import { parseDaysOfWeek } from '../utils/parseDaysOfWeek'
 import {
   LazyQuickListCreateDialog,
   LazyQuickListProductDialog,
@@ -76,6 +61,8 @@ import {
 } from '../components/quick-lists/lazyQuickListDialogs'
 
 export function QuickListsPage() {
+  const { t, i18n } = useTranslation('cart')
+  const dateLocale = i18n.language?.startsWith('ar') ? 'ar' : 'en-US'
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showProductDialog, setShowProductDialog] = useState(false)
   const [showScheduledOrder, setShowScheduledOrder] = useState(false)
@@ -121,7 +108,7 @@ export function QuickListsPage() {
 
   const handleCreateList = async () => {
     if (!newListName.trim()) {
-      toast.error('Please enter a list name')
+      toast.error(t('quickLists.toastListNameRequired'))
       return
     }
     if (!quickListCreateGate.canUse) {
@@ -135,13 +122,13 @@ export function QuickListsPage() {
         description: newListDescription,
         items: [],
       }).unwrap()
-      toast.success('Quick list created!')
+      toast.success(t('quickLists.toastListCreated'))
       setShowCreateDialog(false)
       setNewListName('')
       setNewListDescription('')
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to create quick list')
+      toast.error(error?.data?.error?.message || t('quickLists.toastCreateFailed'))
     }
   }
 
@@ -167,10 +154,10 @@ export function QuickListsPage() {
           notes: '',
         },
       }).unwrap()
-      toast.success(`Added ${product.name} to list!`)
+      toast.success(t('quickLists.toastProductAdded', { name: product.name }))
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to add product')
+      toast.error(error?.data?.error?.message || t('quickLists.toastAddProductFailed'))
     }
   }
 
@@ -195,27 +182,27 @@ export function QuickListsPage() {
   )
 
   const handleDeleteList = async (listId: string, listName: string) => {
-    if (!confirm(`Are you sure you want to delete "${listName}"?`)) return
+    if (!confirm(t('quickLists.confirmDelete', { name: listName }))) return
 
     try {
       await deleteQuickList(listId).unwrap()
-      toast.success('Quick list deleted')
+      toast.success(t('quickLists.toastListDeleted'))
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to delete quick list')
+      toast.error(error?.data?.error?.message || t('quickLists.toastDeleteFailed'))
     }
   }
 
   const handleOrderFromList = async (listId: string) => {
     const list = quickLists.find((l: any) => l.id === listId)
     if (!list) {
-      toast.error('List not found')
+      toast.error(t('quickLists.toastListNotFound'))
       return
     }
 
     // If list doesn't have items array, fetch it from API
     if (!list.items || list.items.length === 0) {
-      toast.error('This list has no items')
+      toast.error(t('quickLists.toastListEmpty'))
       return
     }
 
@@ -233,14 +220,19 @@ export function QuickListsPage() {
         }
       }
 
-      toast.success(`Added ${list.items?.length || 0} items from "${list.name}" to cart!`)
+      toast.success(
+        t('quickLists.toastAddedToCart', {
+          count: list.items?.length || 0,
+          name: list.name,
+        })
+      )
 
       // Optionally navigate to cart
       setTimeout(() => {
         navigate('/app/cart')
       }, 500)
     } catch (error) {
-      toast.error('Failed to add items to cart')
+      toast.error(t('quickLists.toastAddToCartFailed'))
     }
   }
 
@@ -301,7 +293,7 @@ export function QuickListsPage() {
         },
       }).unwrap()
 
-      toast.success(`Scheduled "${selectedListForSchedule.name}" successfully!`, {
+      toast.success(t('quickLists.toastScheduled', { name: selectedListForSchedule.name }), {
         duration: 3000,
       })
 
@@ -315,10 +307,12 @@ export function QuickListsPage() {
       const message =
         apiError?.message ||
         (apiError?.name === 'LIMIT_EXCEEDED'
-          ? `Plan limit reached (${apiError?.details?.limitKey ?? 'limit'}). Upgrade for more.`
+          ? t('quickLists.toastPlanLimitReached', {
+              key: apiError?.details?.limitKey ?? 'limit',
+            })
           : apiError?.name === 'FEATURE_NOT_AVAILABLE'
-            ? 'Scheduled quick lists require Silver or higher on your current plan.'
-            : 'Failed to schedule order')
+            ? t('quickLists.toastScheduleRequiresSilver')
+            : t('quickLists.toastScheduleFailed'))
       toast.error(message)
     }
   }
@@ -336,7 +330,7 @@ export function QuickListsPage() {
         if (scheduleDays.length < 3) {
           setScheduleDays([...scheduleDays, day])
         } else {
-          toast.error('You can only select up to 3 days for "Three times per week"')
+          toast.error(t('quickLists.toastMaxThreeDays'))
         }
       }
       // For other frequencies, allow multiple days
@@ -440,7 +434,7 @@ export function QuickListsPage() {
       }
 
       // Format date nicely
-      const formattedDate = date.toLocaleDateString('en-US', {
+      const formattedDate = date.toLocaleDateString(dateLocale, {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
@@ -450,16 +444,17 @@ export function QuickListsPage() {
       // Format time if available (preferred_time is TIME type: HH:MM:SS or HH:MM)
       if (list.preferred_time) {
         const timeStr = String(list.preferred_time)
-        // Extract hours and minutes (handle both HH:MM:SS and HH:MM formats)
         const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})/)
         if (timeMatch) {
-          const hours = parseInt(timeMatch[1])
-          const minutes = timeMatch[2]
-          // Format as 12-hour time
-          const period = hours >= 12 ? 'PM' : 'AM'
-          const displayHours = hours % 12 || 12
-          const formattedTime = `${displayHours}:${minutes} ${period}`
-          return `${formattedDate} at ${formattedTime}`
+          const hours = parseInt(timeMatch[1], 10)
+          const minutes = parseInt(timeMatch[2], 10)
+          const timeDate = new Date(date)
+          timeDate.setHours(hours, minutes, 0, 0)
+          const formattedTime = timeDate.toLocaleTimeString(dateLocale, {
+            hour: 'numeric',
+            minute: '2-digit',
+          })
+          return t('quickLists.nextExecutionAt', { date: formattedDate, time: formattedTime })
         }
       }
 
@@ -474,29 +469,29 @@ export function QuickListsPage() {
   const formatFrequency = (freq: string, _days?: any) => {
     switch (freq) {
       case 'DAILY':
-        return 'Daily'
+        return t('quickLists.frequencyDaily')
       case 'WEEKLY':
-        return 'Weekly'
+        return t('quickLists.frequencyWeekly')
       case 'WEEKLY_3X':
-        return '3x per week'
+        return t('quickLists.frequencyWeekly3x')
       case 'BIWEEKLY':
-        return 'Biweekly'
+        return t('quickLists.frequencyBiweekly')
       case 'MONTHLY':
-        return 'Monthly'
+        return t('quickLists.frequencyMonthly')
       default:
         return freq
     }
   }
 
   const handleUnschedule = async (listId: string, listName: string) => {
-    if (!confirm(`Are you sure you want to unschedule "${listName}"?`)) return
+    if (!confirm(t('quickLists.confirmUnschedule', { name: listName }))) return
 
     try {
       await unscheduleQuickList(listId).unwrap()
-      toast.success(`"${listName}" unscheduled successfully`)
+      toast.success(t('quickLists.toastUnscheduled', { name: listName }))
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to unschedule')
+      toast.error(error?.data?.error?.message || t('quickLists.toastUnscheduleFailed'))
     }
   }
 
@@ -534,7 +529,7 @@ export function QuickListsPage() {
   const quickLists = data?.quickLists || []
 
   return (
-    <RequirePermission permission="ORDERS_VIEW" title="quick lists">
+    <RequirePermission permission="ORDERS_VIEW" title={t('quickLists.permissionTitle')}>
       <PageShell data-testid="quick-lists-page">
         {!quickListCreateGate.canUse && quickListCreateGate.limit != null && (
           <LimitExceededBanner
@@ -549,8 +544,7 @@ export function QuickListsPage() {
           scheduledQuickListGate.limit === 1 &&
           scheduledQuickListGate.canUse && (
             <p className="text-sm text-[var(--text-muted)] rounded-lg border border-[var(--app-border)] px-4 py-3">
-              Free plan includes 1 scheduled quick list. Upgrade to Silver for more scheduled lists
-              and full automation.
+              {t('quickLists.freePlanHint')}
             </p>
           )}
         {quickListSchedulingEnabled &&
@@ -565,8 +559,8 @@ export function QuickListsPage() {
             />
           )}
         <PageHeader
-          title="Ordering Lists"
-          description="Save supplier-specific lists for fast reorders and schedules."
+          title={t('quickLists.pageTitle')}
+          description={t('quickLists.pageDescription')}
           actions={
             <Button
               onClick={() => setShowCreateDialog(true)}
@@ -574,7 +568,7 @@ export function QuickListsPage() {
               title={quickListCreateGate.message || undefined}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Create List
+              {t('quickLists.createList')}
             </Button>
           }
         />
@@ -583,40 +577,49 @@ export function QuickListsPage() {
           testId="quick-lists-summary"
           metrics={[
             {
-              label: 'Total lists',
+              label: t('quickLists.totalLists'),
               value: stats.total,
               hint:
                 quickListCreateGate.limit != null
-                  ? `${quickListCreateGate.current ?? stats.total} / ${quickListCreateGate.limit} on plan`
+                  ? t('quickLists.onPlan', {
+                      current: quickListCreateGate.current ?? stats.total,
+                      limit: quickListCreateGate.limit,
+                    })
                   : undefined,
               active: filterStatus === 'all' && stats.total > 0,
               onClick: stats.total > 0 ? () => setFilterStatus('all') : undefined,
             },
             {
-              label: 'Scheduled',
+              label: t('quickLists.scheduled'),
               value: stats.scheduled,
               tone: 'mint',
               hint:
                 stats.nextScheduledName && stats.nextScheduledDate
-                  ? `Next: ${stats.nextScheduledName} · ${stats.nextScheduledDate}`
+                  ? t('quickLists.nextScheduled', {
+                      name: stats.nextScheduledName,
+                      date: stats.nextScheduledDate,
+                    })
                   : quickListSchedulingEnabled && scheduledQuickListGate.limit != null
-                    ? `${scheduledQuickListGate.current ?? stats.scheduled} / ${scheduledQuickListGate.limit} slots`
-                    : 'Auto-order on a cadence',
+                    ? t('quickLists.slotsUsed', {
+                        current: scheduledQuickListGate.current ?? stats.scheduled,
+                        limit: scheduledQuickListGate.limit,
+                      })
+                    : t('quickLists.autoOrderCadence'),
               active: filterStatus === 'scheduled',
               onClick: stats.total > 0 ? () => setFilterStatus('scheduled') : undefined,
             },
             {
-              label: 'Active',
+              label: t('quickLists.active'),
               value: stats.active,
-              hint: 'Lists ready to use or run',
+              hint: t('quickLists.activeHint'),
             },
             {
-              label: 'Total items',
+              label: t('quickLists.totalItems'),
               value: stats.totalItems,
               hint:
                 quickListItemGate.limit != null
-                  ? `Up to ${quickListItemGate.limit} items per list`
-                  : 'Products across all lists',
+                  ? t('quickLists.itemsPerListLimit', { limit: quickListItemGate.limit })
+                  : t('quickLists.itemsAcrossLists'),
             },
           ]}
         />
@@ -629,11 +632,11 @@ export function QuickListsPage() {
                 aria-hidden
               />
               <Input
-                placeholder="Search by name or description…"
+                placeholder={t('quickLists.searchPlaceholder')}
                 value={listSearch}
                 onChange={(e) => setListSearch(e.target.value)}
                 className="h-10 w-full rounded-lg border-[var(--app-border-mid)] pl-10"
-                aria-label="Search quick lists"
+                aria-label={t('quickLists.searchAriaLabel')}
               />
             </div>
             <div className="flex flex-wrap gap-2 sm:shrink-0">
@@ -644,7 +647,7 @@ export function QuickListsPage() {
                 onClick={() => setFilterStatus('all')}
               >
                 <Filter className="h-4 w-4 mr-1.5" />
-                All
+                {t('quickLists.filterAll')}
                 <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
                   {stats.total}
                 </Badge>
@@ -656,7 +659,7 @@ export function QuickListsPage() {
                 onClick={() => setFilterStatus('scheduled')}
               >
                 <Clock className="h-4 w-4 mr-1.5" />
-                Scheduled
+                {t('quickLists.filterScheduled')}
                 <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
                   {stats.scheduled}
                 </Badge>
@@ -668,7 +671,7 @@ export function QuickListsPage() {
                 onClick={() => setFilterStatus('unscheduled')}
               >
                 <Package className="h-4 w-4 mr-1.5" />
-                Manual
+                {t('quickLists.filterManual')}
                 <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
                   {stats.total - stats.scheduled}
                 </Badge>
@@ -680,8 +683,8 @@ export function QuickListsPage() {
         {quickLists.length === 0 ? (
           <div className="space-y-4">
             <EmptyState
-              title="No quick lists yet"
-              description="Build a list once, reorder in one click, or let Supplify place orders on your schedule."
+              title={t('quickLists.emptyTitle')}
+              description={t('quickLists.emptyDescription')}
               icon={<List className="h-6 w-6" aria-hidden />}
               action={
                 <Button
@@ -689,7 +692,7 @@ export function QuickListsPage() {
                   disabled={!quickListCreateGate.canUse}
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Create your first list
+                  {t('quickLists.createFirstList')}
                 </Button>
               }
             />
@@ -697,22 +700,22 @@ export function QuickListsPage() {
               {[
                 {
                   step: '1',
-                  title: 'Create a list',
-                  body: 'Name it and add products from your catalog.',
+                  title: t('quickLists.step1Title'),
+                  body: t('quickLists.step1Body'),
                   icon: Package,
                 },
                 {
                   step: '2',
-                  title: 'Set a schedule',
+                  title: t('quickLists.step2Title'),
                   body: quickListSchedulingEnabled
-                    ? 'Choose daily, weekly, or custom days with optional auto-order.'
-                    : 'Upgrade your plan to enable scheduled automation.',
+                    ? t('quickLists.step2BodyScheduled')
+                    : t('quickLists.step2BodyUpgrade'),
                   icon: Calendar,
                 },
                 {
                   step: '3',
-                  title: 'Reorder faster',
-                  body: 'Send the whole list to cart or let orders run automatically.',
+                  title: t('quickLists.step3Title'),
+                  body: t('quickLists.step3Body'),
                   icon: Zap,
                 },
               ].map(({ step, title, body, icon: Icon }) => (
@@ -734,8 +737,8 @@ export function QuickListsPage() {
           </div>
         ) : filteredLists.length === 0 ? (
           <EmptyState
-            title="No lists match your filters"
-            description="Try a different search term or show all lists."
+            title={t('quickLists.noMatchTitle')}
+            description={t('quickLists.noMatchDescription')}
             icon={<Search className="h-6 w-6" aria-hidden />}
             action={
               <Button
@@ -746,7 +749,7 @@ export function QuickListsPage() {
                 }}
               >
                 <X className="h-4 w-4 mr-2" />
-                Clear filters
+                {t('quickLists.clearFilters')}
               </Button>
             }
           />
@@ -762,14 +765,14 @@ export function QuickListsPage() {
                         <span className="truncate">{list.name}</span>
                       </CardTitle>
                       <CardDescription className="mt-1 truncate">
-                        {list.description || 'No description'}
+                        {list.description || t('quickLists.noDescription')}
                       </CardDescription>
                     </div>
                     <CardStatusBadges className="shrink-0 max-w-[45%] justify-end">
                       {list.is_scheduled && list.status === 'ACTIVE' && (
                         <Badge className="bg-[var(--mint)] text-white flex items-center gap-1 text-[10px] px-1.5 py-0">
                           <Clock className="h-3 w-3 shrink-0" />
-                          Scheduled
+                          {t('quickLists.statusScheduled')}
                         </Badge>
                       )}
                       {list.is_scheduled && list.status === 'PAUSED' && (
@@ -778,7 +781,7 @@ export function QuickListsPage() {
                           className="flex items-center gap-1 text-[10px] px-1.5 py-0"
                         >
                           <Pause className="h-3 w-3 shrink-0" />
-                          Paused
+                          {t('quickLists.statusPaused')}
                         </Badge>
                       )}
                     </CardStatusBadges>
@@ -788,7 +791,9 @@ export function QuickListsPage() {
                   <div className="space-y-4">
                     {/* Items Count */}
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-[var(--text-muted)]">Items</span>
+                      <span className="text-sm text-[var(--text-muted)]">
+                        {t('quickLists.itemsLabel')}
+                      </span>
                       <Badge variant="secondary" className="text-sm font-semibold">
                         {list.item_count || 0}
                       </Badge>
@@ -798,7 +803,7 @@ export function QuickListsPage() {
                     {list.items && list.items.length > 0 ? (
                       <div className="border-t pt-3 space-y-2">
                         <p className="text-xs font-medium text-[var(--text-muted)] mb-2">
-                          Products:
+                          {t('quickLists.productsLabel')}
                         </p>
                         <div className="space-y-1.5 max-h-32 overflow-y-auto">
                           {list.items.slice(0, 5).map((item: any, itemIndex: number) => {
@@ -811,7 +816,9 @@ export function QuickListsPage() {
                                 className="flex items-center justify-between text-xs p-1.5 bg-[var(--brand-ultra)] rounded"
                               >
                                 <span className="font-medium text-[var(--text-mid)] flex-1 truncate">
-                                  {product?.name || item.product_name || 'Unknown Product'}
+                                  {product?.name ||
+                                    item.product_name ||
+                                    t('quickLists.unknownProduct')}
                                 </span>
                                 <Badge variant="outline" className="ml-2 text-xs">
                                   {parseFloat(item.quantity) || 1}
@@ -821,7 +828,7 @@ export function QuickListsPage() {
                           })}
                           {list.items.length > 5 && (
                             <p className="text-xs text-[var(--text-muted)] text-center pt-1">
-                              +{list.items.length - 5} more
+                              {t('quickLists.moreProducts', { count: list.items.length - 5 })}
                             </p>
                           )}
                         </div>
@@ -829,7 +836,7 @@ export function QuickListsPage() {
                     ) : (
                       <div className="border-t pt-3">
                         <p className="text-xs text-[var(--text-muted)] text-center">
-                          No products added
+                          {t('quickLists.noProductsAdded')}
                         </p>
                       </div>
                     )}
@@ -838,14 +845,18 @@ export function QuickListsPage() {
                     {list.is_scheduled && (
                       <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-3 space-y-2">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-[var(--brand-mid)] font-medium">Frequency:</span>
+                          <span className="text-[var(--brand-mid)] font-medium">
+                            {t('quickLists.frequencyLabel')}
+                          </span>
                           <span className="text-[var(--text)] font-semibold">
                             {formatFrequency(list.frequency, list.days_of_week)}
                           </span>
                         </div>
                         {list.next_execution_date && formatNextExecution(list) && (
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-[var(--brand-mid)] font-medium">Next:</span>
+                            <span className="text-[var(--brand-mid)] font-medium">
+                              {t('quickLists.nextLabel')}
+                            </span>
                             <span className="text-[var(--text)] font-semibold flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
                               {formatNextExecution(list)}
@@ -854,7 +865,9 @@ export function QuickListsPage() {
                         )}
                         {list.last_execution_date && (
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-[var(--brand-mid)] font-medium">Last:</span>
+                            <span className="text-[var(--brand-mid)] font-medium">
+                              {t('quickLists.lastLabel')}
+                            </span>
                             <span className="text-[var(--text)]">
                               {new Date(list.last_execution_date).toLocaleDateString()}
                             </span>
@@ -871,14 +884,14 @@ export function QuickListsPage() {
                         className={cardActionBtnClass()}
                       >
                         <Eye className="h-4 w-4 mr-1 shrink-0" />
-                        View
+                        {t('quickLists.view')}
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleAddProducts(list.id)}
                         className={cardActionBtnClass({ iconOnly: true })}
-                        aria-label="Add products"
+                        aria-label={t('quickLists.addProducts')}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
@@ -889,14 +902,14 @@ export function QuickListsPage() {
                         className={cardActionBtnClass()}
                       >
                         <ShoppingCart className="h-4 w-4 mr-1 shrink-0" />
-                        Order
+                        {t('quickLists.order')}
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeleteList(list.id, list.name)}
                         className={`${cardActionBtnClass({ iconOnly: true })} text-[var(--red)] hover:text-[var(--red)]`}
-                        aria-label="Delete list"
+                        aria-label={t('quickLists.deleteList')}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -910,14 +923,14 @@ export function QuickListsPage() {
                               className={cardActionBtnClass({ span: 'full' })}
                             >
                               <Edit className="h-4 w-4 mr-1 shrink-0" />
-                              Edit Schedule
+                              {t('quickLists.editSchedule')}
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleUnschedule(list.id, list.name)}
                               className={`${cardActionBtnClass({ iconOnly: true })} text-[var(--amber)] hover:text-[var(--amber-mid)]`}
-                              aria-label="Pause schedule"
+                              aria-label={t('quickLists.pauseSchedule')}
                             >
                               <Pause className="h-4 w-4" />
                             </Button>
@@ -938,14 +951,16 @@ export function QuickListsPage() {
                             }
                           >
                             <Clock className="h-4 w-4 mr-1 shrink-0" />
-                            Schedule Order
+                            {t('quickLists.scheduleOrder')}
                           </Button>
                         ))}
                     </CardActionGrid>
 
                     {list.created_at && (
                       <p className="text-xs text-[var(--text-muted)]">
-                        Created {new Date(list.created_at).toLocaleDateString()}
+                        {t('quickLists.created', {
+                          date: new Date(list.created_at).toLocaleDateString(),
+                        })}
                       </p>
                     )}
                   </div>

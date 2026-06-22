@@ -1,13 +1,23 @@
-export const DELIVERY_STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  assigned: 'Pending',
-  picked_up: 'Picked up order',
-  out_for_delivery: 'Out for delivery',
-  delivered: 'Delivered',
-  failed: 'Failed',
-  rescheduled: 'Moved to tomorrow',
+import i18n from 'i18next'
+
+const NS = 'fulfillment'
+
+function ft(key: string): string {
+  return i18n.t(key, { ns: NS })
+}
+
+const DELIVERY_STATUS_KEYS: Record<string, string> = {
+  pending: 'tracking.deliveryStatus.pending',
+  assigned: 'tracking.deliveryStatus.assigned',
+  picked_up: 'tracking.deliveryStatus.picked_up',
+  out_for_delivery: 'tracking.deliveryStatus.out_for_delivery',
+  delivered: 'tracking.deliveryStatus.delivered',
+  failed: 'tracking.deliveryStatus.failed',
+  rescheduled: 'tracking.deliveryStatus.rescheduled',
 }
 
 export function formatDeliveryStatus(status: string): string {
-  return DELIVERY_STATUS_LABELS[status] ?? status.replace(/_/g, ' ')
+  const key = DELIVERY_STATUS_KEYS[status]
+  if (key) return ft(key)
+  return status.replace(/_/g, ' ')
 }

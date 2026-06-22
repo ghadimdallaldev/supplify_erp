@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import {
   useGetConsumerOrdersQuery,
   useUpdateConsumerOrderStatusMutation,
@@ -16,7 +18,6 @@ import { PageHeader } from '../../components/ui/page-header'
 import { PageShell } from '../../components/ui/page-shell'
 import { formatPrice } from '../../utils/format'
 import {
-  CONSUMER_ORDER_STATUS_LABELS,
   getNextConsumerOrderStatus,
   type ConsumerOrderLine,
   type ConsumerOrderTrackingStatus,
@@ -24,6 +25,7 @@ import {
 import { playNotificationSound, unlockNotificationAudio } from '../../lib/notificationAlerts'
 import { toast } from 'sonner'
 import { Bell, BellOff } from 'lucide-react'
+import { ensureNamespace } from '../../i18n'
 
 type StatusFilter = 'ALL' | 'RECEIVED' | 'PREPARING' | 'SHIPPED'
 
@@ -34,11 +36,12 @@ const KANBAN_COLUMNS: ConsumerOrderTrackingStatus[] = [
   'DELIVERED',
 ]
 
-function statusLabel(status: string): string {
-  if (status in CONSUMER_ORDER_STATUS_LABELS) {
-    return CONSUMER_ORDER_STATUS_LABELS[status as ConsumerOrderTrackingStatus]
-  }
-  return status.replace('_', ' ')
+function statusLabel(status: string, t: TFunction<'consumer'>): string {
+  return t(`orderStatus.${status}`, { defaultValue: status.replace('_', ' ') })
+}
+
+function fulfillmentLabel(type: string, t: TFunction<'consumer'>) {
+  return t(`fulfillment.${type}`, { defaultValue: type.replace('_', ' ') })
 }
 
 function formatModifiers(line: ConsumerOrderLine): string | null {
@@ -67,10 +70,12 @@ function OrderCard({
   order,
   updating,
   onAdvance,
+  t,
 }: {
   order: ConsumerOrderSummary
   updating: boolean
   onAdvance: (id: string, current: string) => void
+  t: TFunction<'consumer'>
 }) {
   const nextStatus = getNextConsumerOrderStatus(order.status)
   const lines = order.lines ?? []
@@ -81,14 +86,14 @@ function OrderCard({
         <div className="min-w-0">
           <CardTitle className="truncate text-sm">{order.order_number}</CardTitle>
           <p className="truncate text-xs text-muted-foreground">
-            {order.guest_name} · {order.fulfillment_type.replace('_', ' ')}
+            {order.guest_name} · {fulfillmentLabel(order.fulfillment_type, t)}
           </p>
         </div>
         <Badge
           variant={order.status === 'CANCELLED' ? 'destructive' : 'secondary'}
           className="shrink-0 text-[10px]"
         >
-          {statusLabel(order.status)}
+          {statusLabel(order.status, t)}
         </Badge>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -129,7 +134,7 @@ function OrderCard({
               disabled={updating}
               onClick={() => onAdvance(order.id, order.status)}
             >
-              → {statusLabel(nextStatus)}
+              {t('orders.advanceTo', { status: statusLabel(nextStatus, t) })}
             </Button>
           )}
         </div>
@@ -139,6 +144,12 @@ function OrderCard({
 }
 
 export function ConsumerOrdersPage() {
+  const { t } = useTranslation('consumer')
+
+  useEffect(() => {
+    void ensureNamespace('consumer')
+  }, [])
+
   const { data: meData } = useGetMeQuery()
   const user = meData?.user
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
@@ -157,7 +168,7 @@ export function ConsumerOrdersPage() {
   })
   const [updateStatus, { isLoading: updating }] = useUpdateConsumerOrderStatusMutation()
 
-  const orders = data?.orders ?? []
+  const orders = useMemo(() => data?.orders ?? [], [data?.orders])
 
   useEffect(() => {
     const unlock = () => unlockNotificationAudio()
@@ -174,7 +185,9 @@ export function ConsumerOrdersPage() {
       if (soundEnabled) {
         playNotificationSound()
         toast.success(
-          payload.orderNumber ? `New order ${payload.orderNumber}` : 'New guest order received'
+          payload.orderNumber
+            ? t('orders.newOrder', { number: payload.orderNumber })
+            : t('orders.newGuestOrder')
         )
       }
     }
@@ -183,7 +196,7 @@ export function ConsumerOrdersPage() {
     return () => {
       socket.off('consumer_order_new', onNewOrder)
     }
-  }, [user?.id, refetch, soundEnabled])
+  }, [user?.id, refetch, soundEnabled, t])
 
   useEffect(() => {
     if (!orders.length) {
@@ -207,23 +220,23 @@ export function ConsumerOrdersPage() {
       playNotificationSound()
       toast.success(
         newReceived.length === 1
-          ? `New order ${newReceived[0].order_number}`
-          : `${newReceived.length} new orders`
+          ? t('orders.newOrder', { number: newReceived[0].order_number })
+          : t('orders.newOrdersCount', { count: newReceived.length })
       )
     }
 
     seenIdsRef.current = currentIds
-  }, [orders, soundEnabled])
+  }, [orders, soundEnabled, t])
 
   const advanceStatus = async (id: string, current: string) => {
     const next = getNextConsumerOrderStatus(current)
     if (!next) return
     try {
       await updateStatus({ id, status: next }).unwrap()
-      toast.success(`Order marked ${statusLabel(next).toLowerCase()}`)
+      toast.success(t('orders.markedStatus', { status: statusLabel(next, t).toLowerCase() }))
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to update order')
+      toast.error(error?.data?.error?.message || t('orders.unableToUpdate'))
     }
   }
 
@@ -246,18 +259,15 @@ export function ConsumerOrdersPage() {
   return (
     <RequirePermission permission="ORDERS_VIEW">
       <PageShell className="space-y-6">
-        <PageHeader
-          title="Guest orders"
-          description="Consumer orders placed through your online storefront."
-        />
+        <PageHeader title={t('orders.title')} description={t('orders.description')} />
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
             <TabsList>
-              <TabsTrigger value="ALL">All</TabsTrigger>
-              <TabsTrigger value="RECEIVED">Received</TabsTrigger>
-              <TabsTrigger value="PREPARING">Preparing</TabsTrigger>
-              <TabsTrigger value="SHIPPED">Shipped</TabsTrigger>
+              <TabsTrigger value="ALL">{t('orders.filterAll')}</TabsTrigger>
+              <TabsTrigger value="RECEIVED">{t('orderStatus.RECEIVED')}</TabsTrigger>
+              <TabsTrigger value="PREPARING">{t('orderStatus.PREPARING')}</TabsTrigger>
+              <TabsTrigger value="SHIPPED">{t('orderStatus.SHIPPED')}</TabsTrigger>
             </TabsList>
           </Tabs>
           <Button
@@ -270,12 +280,12 @@ export function ConsumerOrdersPage() {
             {soundEnabled ? (
               <>
                 <Bell className="mr-2 h-4 w-4" />
-                Sound on
+                {t('orders.soundOn')}
               </>
             ) : (
               <>
                 <BellOff className="mr-2 h-4 w-4" />
-                Sound off
+                {t('orders.soundOff')}
               </>
             )}
           </Button>
@@ -291,7 +301,7 @@ export function ConsumerOrdersPage() {
         {!isLoading && !orders.length && (
           <Card>
             <CardContent className="py-10 text-center text-muted-foreground">
-              No guest orders yet.
+              {t('orders.noOrders')}
             </CardContent>
           </Card>
         )}
@@ -301,7 +311,7 @@ export function ConsumerOrdersPage() {
             {KANBAN_COLUMNS.map((columnStatus) => (
               <section key={columnStatus} className="space-y-2">
                 <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
-                  <h3 className="text-sm font-medium">{statusLabel(columnStatus)}</h3>
+                  <h3 className="text-sm font-medium">{statusLabel(columnStatus, t)}</h3>
                   <Badge variant="secondary">{ordersByStatus[columnStatus]?.length ?? 0}</Badge>
                 </div>
                 <div className="space-y-2">
@@ -311,10 +321,13 @@ export function ConsumerOrdersPage() {
                       order={order}
                       updating={updating}
                       onAdvance={advanceStatus}
+                      t={t}
                     />
                   ))}
                   {!ordersByStatus[columnStatus]?.length && (
-                    <p className="py-4 text-center text-xs text-muted-foreground">No orders</p>
+                    <p className="py-4 text-center text-xs text-muted-foreground">
+                      {t('orders.noOrdersInColumn')}
+                    </p>
                   )}
                 </div>
               </section>
@@ -330,6 +343,7 @@ export function ConsumerOrdersPage() {
                 order={order}
                 updating={updating}
                 onAdvance={advanceStatus}
+                t={t}
               />
             ))}
           </div>
@@ -338,14 +352,16 @@ export function ConsumerOrdersPage() {
         {!isLoading && statusFilter !== 'ALL' && !orders.length && (
           <Card>
             <CardContent className="py-10 text-center text-muted-foreground">
-              No {statusLabel(statusFilter).toLowerCase()} orders.
+              {t('orders.noFilteredOrders', {
+                status: statusLabel(statusFilter, t).toLowerCase(),
+              })}
             </CardContent>
           </Card>
         )}
 
         {!isLoading && statusFilter === 'ALL' && orders.some((o) => o.status === 'CANCELLED') && (
           <section className="space-y-2">
-            <h3 className="text-sm font-medium text-muted-foreground">Cancelled</h3>
+            <h3 className="text-sm font-medium text-muted-foreground">{t('orders.cancelled')}</h3>
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {ordersByStatus.CANCELLED.map((order) => (
                 <OrderCard
@@ -353,6 +369,7 @@ export function ConsumerOrdersPage() {
                   order={order}
                   updating={updating}
                   onAdvance={advanceStatus}
+                  t={t}
                 />
               ))}
             </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, FileText, Loader2, Printer } from 'lucide-react'
 import { LegalMarkdown } from '../components/legal/LegalMarkdown'
@@ -8,9 +9,12 @@ import {
   LEGAL_PACK_VERSION,
   type LegalDocumentSlug,
   legalDocumentAssetUrl,
+  legalDocumentTitleKey,
+  legalDocumentDescriptionKey,
 } from '../lib/legalDocuments'
 import { SupplifyLogo } from '../components/SupplifyLogo'
 import { PageHeader } from '../components/ui/page-header'
+import { ensureNamespace, getActiveLocale } from '../i18n'
 
 const SLUGS = new Set(Object.keys(LEGAL_DOCUMENTS))
 
@@ -19,12 +23,17 @@ function isLegalSlug(value: string | undefined): value is LegalDocumentSlug {
 }
 
 export function LegalDocumentPage() {
+  const { t, i18n } = useTranslation('legal')
   const { slug } = useParams<{ slug: string }>()
   const [markdown, setMarkdown] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const meta = isLegalSlug(slug) ? LEGAL_DOCUMENTS[slug] : null
+
+  useEffect(() => {
+    void ensureNamespace('legal')
+  }, [])
 
   useEffect(() => {
     if (!meta) {
@@ -34,8 +43,16 @@ export function LegalDocumentPage() {
     let cancelled = false
     setLoading(true)
     setError(null)
-    fetch(legalDocumentAssetUrl(meta.fileName))
+    const locale = getActiveLocale()
+    const assetUrl = legalDocumentAssetUrl(meta.fileName, locale)
+    fetch(assetUrl)
       .then((res) => {
+        if (!res.ok && locale === 'ar') {
+          return fetch(legalDocumentAssetUrl(meta.fileName, 'en')).then((fallback) => {
+            if (!fallback.ok) throw new Error('Document not found')
+            return fallback.text()
+          })
+        }
         if (!res.ok) throw new Error('Document not found')
         return res.text()
       })
@@ -43,7 +60,7 @@ export function LegalDocumentPage() {
         if (!cancelled) setMarkdown(text)
       })
       .catch(() => {
-        if (!cancelled) setError('Unable to load this document. Please try again later.')
+        if (!cancelled) setError(t('document.loadError'))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -51,15 +68,15 @@ export function LegalDocumentPage() {
     return () => {
       cancelled = true
     }
-  }, [meta])
+  }, [meta, t, i18n.language])
 
   if (!meta) {
     return (
       <LegalShell>
         <div className="py-16">
           <PageHeader
-            title="Document not found"
-            description="The legal document you requested does not exist."
+            title={t('document.notFoundTitle')}
+            description={t('document.notFoundDescription')}
             className="text-center sm:flex-col sm:items-center [&_p]:mx-auto"
           />
           <div className="mt-6 text-center">
@@ -67,7 +84,7 @@ export function LegalDocumentPage() {
               to="/legal"
               className="text-sm font-medium text-[var(--brand-mid)] hover:underline"
             >
-              View all legal documents
+              {t('document.viewAll')}
             </Link>
           </div>
         </div>
@@ -84,11 +101,11 @@ export function LegalDocumentPage() {
             className="inline-flex items-center gap-1.5 hover:text-[var(--brand-mid)]"
           >
             <ArrowLeft className="h-4 w-4" />
-            Legal center
+            {t('document.legalCenter')}
           </Link>
         }
-        title={meta.title}
-        description={meta.description}
+        title={t(legalDocumentTitleKey(meta.slug))}
+        description={t(legalDocumentDescriptionKey(meta.slug))}
         actions={
           <button
             type="button"
@@ -96,19 +113,22 @@ export function LegalDocumentPage() {
             className="inline-flex items-center gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--surface)] px-4 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--brand-ultra)]"
           >
             <Printer className="h-4 w-4" />
-            Print
+            {t('document.print')}
           </button>
         }
         className="mb-2 print:hidden"
       />
       <p className="mb-8 text-xs text-[var(--text-muted)] print:hidden">
-        Effective {LEGAL_OPERATOR.effectiveDate} · Version {LEGAL_PACK_VERSION}
+        {t('document.effective', {
+          date: LEGAL_OPERATOR.effectiveDate,
+          version: LEGAL_PACK_VERSION,
+        })}
       </p>
 
       <div className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] shadow-sm">
         <div className="border-b border-[var(--app-border)] px-6 py-4 print:hidden">
           <p className="text-xs leading-relaxed text-[var(--text-muted)]">
-            This document is provided by {LEGAL_OPERATOR.companyLegalName}. Questions:{' '}
+            {t('document.providedBy', { company: LEGAL_OPERATOR.companyLegalName })}{' '}
             <a
               href={`mailto:${LEGAL_OPERATOR.supportEmail}`}
               className="text-[var(--brand-mid)] hover:underline"
@@ -132,18 +152,26 @@ export function LegalDocumentPage() {
 }
 
 export function LegalHubPage() {
+  const { t } = useTranslation('legal')
   const categories = [
-    { key: 'core', label: 'Platform agreements' },
-    { key: 'role', label: 'Organization-specific' },
-    { key: 'product', label: 'Product terms' },
-    { key: 'reference', label: 'Billing & deals' },
+    { key: 'core', label: t('hub.categories.core') },
+    { key: 'role', label: t('hub.categories.role') },
+    { key: 'product', label: t('hub.categories.product') },
+    { key: 'reference', label: t('hub.categories.reference') },
   ] as const
+
+  useEffect(() => {
+    void ensureNamespace('legal')
+  }, [])
 
   return (
     <LegalShell>
       <PageHeader
-        title="Legal center"
-        description={`Review Supplify's terms, privacy practices, and product policies. Document pack ${LEGAL_PACK_VERSION}, effective ${LEGAL_OPERATOR.effectiveDate}.`}
+        title={t('hub.title')}
+        description={t('hub.description', {
+          version: LEGAL_PACK_VERSION,
+          date: LEGAL_OPERATOR.effectiveDate,
+        })}
         className="mb-10 mx-auto max-w-2xl text-center sm:flex-col sm:items-center [&_h1]:text-3xl [&_p]:mx-auto"
       />
 
@@ -166,10 +194,10 @@ export function LegalHubPage() {
                       <FileText className="mt-0.5 h-5 w-5 shrink-0 text-[var(--brand-mid)]" />
                       <span>
                         <span className="block text-sm font-semibold text-[var(--text)] group-hover:text-[var(--brand-mid)]">
-                          {doc.title}
+                          {t(legalDocumentTitleKey(doc.slug))}
                         </span>
                         <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
-                          {doc.description}
+                          {t(legalDocumentDescriptionKey(doc.slug))}
                         </span>
                       </span>
                     </Link>
@@ -182,7 +210,7 @@ export function LegalHubPage() {
       </div>
 
       <footer className="mt-12 rounded-xl border border-[var(--app-border)] bg-[var(--brand-ultra)] px-6 py-5 text-center text-xs text-[var(--text-muted)]">
-        For legal inquiries contact{' '}
+        {t('hub.footerInquiries')}{' '}
         <a
           href={`mailto:${LEGAL_OPERATOR.supportEmail}`}
           className="text-[var(--brand-mid)] hover:underline"
@@ -190,7 +218,7 @@ export function LegalHubPage() {
           {LEGAL_OPERATOR.supportEmail}
         </a>
         {' · '}
-        Privacy:{' '}
+        {t('hub.footerPrivacy')}{' '}
         <a
           href={`mailto:${LEGAL_OPERATOR.privacyEmail}`}
           className="text-[var(--brand-mid)] hover:underline"
@@ -203,6 +231,8 @@ export function LegalHubPage() {
 }
 
 function LegalShell({ children }: { children: ReactNode }) {
+  const { t } = useTranslation('legal')
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[var(--brand-ultra)] to-[var(--bg)]">
       <div className="border-b border-[var(--app-border)] bg-[var(--surface)]/80 backdrop-blur print:hidden">
@@ -211,7 +241,7 @@ function LegalShell({ children }: { children: ReactNode }) {
             <SupplifyLogo size={32} variant="lockup" theme="light" />
           </Link>
           <Link to="/login" className="text-sm font-medium text-[var(--brand-mid)] hover:underline">
-            Sign in
+            {t('document.signIn')}
           </Link>
         </div>
       </div>

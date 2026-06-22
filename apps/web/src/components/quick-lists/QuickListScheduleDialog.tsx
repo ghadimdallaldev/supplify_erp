@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogContent,
@@ -9,16 +10,11 @@ import {
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
-import { Textarea } from '../ui/textarea'
 import { Select, SelectTrigger } from '../ui/select'
-import { Badge } from '../ui/badge'
-import { Search, Package, Plus, Clock, Calendar, Repeat } from 'lucide-react'
-import { formatPrice } from '../../utils/format'
-import { formatDaysOfWeekLabel, parseDaysOfWeek } from '../../utils/parseDaysOfWeek'
-import { cn } from '../../lib/utils'
+import { Repeat } from 'lucide-react'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function QuickListScheduleDialog(props: any) {
+  const { t } = useTranslation('cart')
   const {
     showScheduledOrder,
     setShowScheduledOrder,
@@ -36,32 +32,43 @@ export function QuickListScheduleDialog(props: any) {
     daysOfWeek,
     toggleScheduleDay,
   } = props
+  const formatDay = (day: string) => t(`quickLists.days.${day}`, { defaultValue: day })
+  const selectedDaysLabel = scheduleDays.map(formatDay).join(', ')
+  const scheduleNote =
+    scheduleFrequency === 'DAILY'
+      ? t('quickLists.scheduleDialog.note.daily')
+      : scheduleFrequency === 'WEEKLY'
+        ? t('quickLists.scheduleDialog.note.weekly', { days: selectedDaysLabel })
+        : scheduleFrequency === 'WEEKLY_3X'
+          ? t('quickLists.scheduleDialog.note.weekly3x', { days: selectedDaysLabel })
+          : scheduleFrequency === 'BIWEEKLY'
+            ? t('quickLists.scheduleDialog.note.biweekly', { days: selectedDaysLabel })
+            : t('quickLists.scheduleDialog.note.monthly')
 
   return (
     <Dialog open={showScheduledOrder} onOpenChange={setShowScheduledOrder}>
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>Schedule Recurring Order</DialogTitle>
+          <DialogTitle>{t('quickLists.scheduleDialog.title')}</DialogTitle>
           <DialogDescription>
-            Set up automatic ordering from "{selectedListForSchedule?.name}"
+            {t('quickLists.scheduleDialog.description', {
+              name: selectedListForSchedule?.name,
+            })}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
-            <Label>Frequency</Label>
+            <Label>{t('quickLists.scheduleDialog.frequency')}</Label>
             <Select
               value={scheduleFrequency}
               onValueChange={(value) => {
                 const newFrequency = value as any
                 setScheduleFrequency(newFrequency)
 
-                // Adjust days based on new frequency
                 if (newFrequency === 'WEEKLY') {
-                  // Once per week: keep only first day or default to MONDAY
                   setScheduleDays(scheduleDays.length > 0 ? [scheduleDays[0]] : ['MONDAY'])
                 } else if (newFrequency === 'WEEKLY_3X') {
-                  // Three times per week: limit to first 3 days or default to Mon, Wed, Fri
                   if (scheduleDays.length > 3) {
                     setScheduleDays(scheduleDays.slice(0, 3))
                   } else if (scheduleDays.length === 0) {
@@ -71,11 +78,13 @@ export function QuickListScheduleDialog(props: any) {
               }}
             >
               <SelectTrigger className="mt-2">
-                <option value="DAILY">Daily</option>
-                <option value="WEEKLY">Once per week</option>
-                <option value="WEEKLY_3X">Three times per week</option>
-                <option value="BIWEEKLY">Biweekly (Every 2 weeks)</option>
-                <option value="MONTHLY">Monthly</option>
+                <option value="DAILY">{t('quickLists.scheduleDialog.frequencyDaily')}</option>
+                <option value="WEEKLY">{t('quickLists.scheduleDialog.frequencyWeekly')}</option>
+                <option value="WEEKLY_3X">
+                  {t('quickLists.scheduleDialog.frequencyWeekly3x')}
+                </option>
+                <option value="BIWEEKLY">{t('quickLists.scheduleDialog.frequencyBiweekly')}</option>
+                <option value="MONTHLY">{t('quickLists.scheduleDialog.frequencyMonthly')}</option>
               </SelectTrigger>
             </Select>
           </div>
@@ -86,10 +95,14 @@ export function QuickListScheduleDialog(props: any) {
             <div>
               <Label>
                 {scheduleFrequency === 'WEEKLY'
-                  ? 'Select One Day'
+                  ? t('quickLists.scheduleDialog.selectOneDay')
                   : scheduleFrequency === 'WEEKLY_3X'
-                    ? `Select up to 3 Days (${scheduleDays.length} selected)`
-                    : `Days of Week (${scheduleDays.length} selected)`}
+                    ? t('quickLists.scheduleDialog.selectUpToThree', {
+                        count: scheduleDays.length,
+                      })
+                    : t('quickLists.scheduleDialog.daysOfWeek', {
+                        count: scheduleDays.length,
+                      })}
               </Label>
               <div className="grid grid-cols-2 gap-2 mt-2">
                 {daysOfWeek.map((day) => {
@@ -119,29 +132,31 @@ export function QuickListScheduleDialog(props: any) {
                         onChange={() => toggleScheduleDay(day)}
                         className="sr-only"
                       />
-                      <span className="text-sm">{day.charAt(0) + day.slice(1).toLowerCase()}</span>
+                      <span className="text-sm">{formatDay(day)}</span>
                     </label>
                   )
                 })}
               </div>
               {scheduleDays.length === 0 && (
-                <p className="text-sm text-[var(--red)] mt-1">Please select at least one day</p>
+                <p className="text-sm text-[var(--red)] mt-1">
+                  {t('quickLists.scheduleDialog.selectAtLeastOne')}
+                </p>
               )}
               {scheduleFrequency === 'WEEKLY' && scheduleDays.length > 0 && (
                 <p className="text-sm text-[var(--text-muted)] mt-1">
-                  Selecting a different day will replace the current selection
+                  {t('quickLists.scheduleDialog.replaceSelection')}
                 </p>
               )}
               {scheduleFrequency === 'WEEKLY_3X' && scheduleDays.length >= 3 && (
                 <p className="text-sm text-[var(--text-muted)] mt-1">
-                  Maximum of 3 days selected. Deselect a day to select a different one.
+                  {t('quickLists.scheduleDialog.maxThreeSelected')}
                 </p>
               )}
             </div>
           )}
 
           <div>
-            <Label>Preferred Time</Label>
+            <Label>{t('quickLists.scheduleDialog.preferredTime')}</Label>
             <Input
               type="time"
               value={scheduleTime}
@@ -159,20 +174,21 @@ export function QuickListScheduleDialog(props: any) {
               className="w-4 h-4"
             />
             <Label htmlFor="autoCreate" className="cursor-pointer">
-              Automatically create orders
+              {t('quickLists.scheduleDialog.autoCreateOrders')}
             </Label>
           </div>
 
           <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4">
             <p className="text-sm text-[var(--brand-mid)]">
-              <strong>Note:</strong> Orders will be{' '}
-              {autoCreateOrder ? 'automatically created' : 'reminders sent'} for "
-              {selectedListForSchedule?.name}"{scheduleFrequency === 'DAILY' && ' every day'}
-              {scheduleFrequency === 'WEEKLY' && ` every week on ${scheduleDays.join(', ')}`}
-              {scheduleFrequency === 'WEEKLY_3X' &&
-                ` 3 times per week on ${scheduleDays.join(', ')}`}
-              {scheduleFrequency === 'BIWEEKLY' && ` every 2 weeks on ${scheduleDays.join(', ')}`}
-              {scheduleFrequency === 'MONTHLY' && ' on the same date each month'} at {scheduleTime}.
+              <strong>{t('quickLists.scheduleDialog.noteLabel')}</strong>{' '}
+              {t('quickLists.scheduleDialog.note.body', {
+                action: autoCreateOrder
+                  ? t('quickLists.scheduleDialog.note.autoCreated')
+                  : t('quickLists.scheduleDialog.note.remindersSent'),
+                name: selectedListForSchedule?.name,
+                schedule: scheduleNote,
+                time: scheduleTime,
+              })}
             </p>
           </div>
         </div>
@@ -185,7 +201,7 @@ export function QuickListScheduleDialog(props: any) {
               setSelectedListForSchedule(null)
             }}
           >
-            Cancel
+            {t('quickLists.scheduleDialog.cancel')}
           </Button>
           <Button
             onClick={handleCreateScheduledOrder}
@@ -197,7 +213,7 @@ export function QuickListScheduleDialog(props: any) {
             }
           >
             <Repeat className="h-4 w-4 mr-2" />
-            Schedule Recurring Order
+            {t('quickLists.scheduleDialog.schedule')}
           </Button>
         </DialogFooter>
       </DialogContent>

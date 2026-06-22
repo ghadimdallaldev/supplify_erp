@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { LayoutGrid, Map, Truck, Navigation } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
@@ -13,6 +14,7 @@ import { ActiveDeliveriesMap } from '../maps/ActiveDeliveriesMap'
 type ViewMode = 'board' | 'map'
 
 export function FulfillmentTrackingTab() {
+  const { t } = useTranslation('fulfillment')
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('board')
   const { data, isLoading, isError, refetch } = useGetSupplierDeliveryBoardQuery(
@@ -33,11 +35,9 @@ export function FulfillmentTrackingTab() {
             <div>
               <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                 <Truck className="h-4 w-4 text-[var(--brand-mid)]" aria-hidden />
-                Delivery Tracking
+                {t('tracking.title')}
               </h2>
-              <p className="mt-0.5 text-xs text-[var(--text-mid)]">
-                Active deliveries — refreshes every 30s
-              </p>
+              <p className="mt-0.5 text-xs text-[var(--text-mid)]">{t('tracking.subtitle')}</p>
             </div>
             <div
               className="flex rounded-lg border border-[var(--app-border)] bg-[var(--bg)] p-0.5"
@@ -52,7 +52,7 @@ export function FulfillmentTrackingTab() {
                 onClick={() => setViewMode('board')}
               >
                 <LayoutGrid className="h-3.5 w-3.5" aria-hidden />
-                Board
+                {t('tracking.board')}
               </Button>
               <Button
                 type="button"
@@ -63,7 +63,7 @@ export function FulfillmentTrackingTab() {
                 onClick={() => setViewMode('map')}
               >
                 <Map className="h-3.5 w-3.5" aria-hidden />
-                Map
+                {t('tracking.map')}
               </Button>
             </div>
           </div>
@@ -77,7 +77,7 @@ export function FulfillmentTrackingTab() {
             </div>
           ) : isError ? (
             <div className="py-10 text-center" data-testid="tracking-error" role="alert">
-              <p className="text-sm text-[var(--text-muted)]">Could not load active deliveries.</p>
+              <p className="text-sm text-[var(--text-muted)]">{t('tracking.loadFailed')}</p>
               <Button
                 type="button"
                 variant="outline"
@@ -85,7 +85,7 @@ export function FulfillmentTrackingTab() {
                 className="mt-3"
                 onClick={() => refetch()}
               >
-                Retry
+                {t('common:actions.retry')}
               </Button>
             </div>
           ) : orders.length === 0 ? (
@@ -94,7 +94,7 @@ export function FulfillmentTrackingTab() {
               data-testid="tracking-empty"
             >
               <Truck className="mx-auto mb-3 h-9 w-9 text-[var(--text-muted)]" aria-hidden />
-              <p className="text-sm text-[var(--text-mid)]">No active deliveries right now.</p>
+              <p className="text-sm text-[var(--text-mid)]">{t('tracking.empty')}</p>
             </div>
           ) : viewMode === 'map' ? (
             <ActiveDeliveriesMap orders={orders} onSelectOrder={setTrackingOrderId} />
@@ -103,14 +103,14 @@ export function FulfillmentTrackingTab() {
               <table className="w-full min-w-[720px] text-sm" data-testid="tracking-table">
                 <thead>
                   <tr className="border-b text-left text-[var(--text-muted)]">
-                    <th className="p-2 font-medium">Order</th>
-                    <th className="p-2 font-medium">Restaurant</th>
-                    <th className="p-2 font-medium">Driver</th>
-                    <th className="p-2 font-medium">Area</th>
-                    <th className="p-2 font-medium">Scheduled</th>
-                    <th className="p-2 font-medium">GPS</th>
-                    <th className="p-2 font-medium">Status</th>
-                    <th className="p-2 font-medium text-right">Action</th>
+                    <th className="p-2 font-medium">{t('tracking.table.order')}</th>
+                    <th className="p-2 font-medium">{t('tracking.table.restaurant')}</th>
+                    <th className="p-2 font-medium">{t('tracking.table.driver')}</th>
+                    <th className="p-2 font-medium">{t('tracking.table.area')}</th>
+                    <th className="p-2 font-medium">{t('tracking.table.scheduled')}</th>
+                    <th className="p-2 font-medium">{t('tracking.table.gps')}</th>
+                    <th className="p-2 font-medium">{t('tracking.table.status')}</th>
+                    <th className="p-2 font-medium text-right">{t('tracking.table.action')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -121,9 +121,9 @@ export function FulfillmentTrackingTab() {
                     >
                       <td className="p-2 font-mono text-xs">{formatOrderRef(o.orderId)}</td>
                       <td className="p-2">{o.restaurantName}</td>
-                      <td className="p-2">{o.driverName || 'Unassigned'}</td>
+                      <td className="p-2">{o.driverName || t('tracking.table.unassigned')}</td>
                       <td className="p-2 text-[var(--text-muted)]">
-                        {o.deliveryArea?.trim() || 'Area not set'}
+                        {o.deliveryArea?.trim() || t('tracking.table.areaNotSet')}
                       </td>
                       <td className="p-2 text-[var(--text-muted)]">
                         {formatScheduledAt(o.scheduledAt)}
@@ -152,7 +152,7 @@ export function FulfillmentTrackingTab() {
                           onClick={() => setTrackingOrderId(o.orderId)}
                         >
                           <Navigation className="h-3.5 w-3.5 mr-1" aria-hidden />
-                          View tracking
+                          {t('tracking.table.viewTracking')}
                         </Button>
                       </td>
                     </tr>

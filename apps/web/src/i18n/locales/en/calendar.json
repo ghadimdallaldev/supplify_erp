@@ -14,6 +14,46 @@
     "createOrder": "Create Order",
     "createManualOrder": "Create Manual Order"
   },
+  "roles": {
+    "restaurantView": "Restaurant view",
+    "supplierView": "Supplier view"
+  },
+  "counterpart": {
+    "restaurant": "Restaurant",
+    "supplier": "Supplier"
+  },
+  "filters": {
+    "allStatuses": "All statuses",
+    "allSuppliers": "All suppliers",
+    "allRestaurants": "All restaurants",
+    "allBranches": "All branches",
+    "allCategories": "All categories",
+    "liveHint": "Filters update in real time",
+    "reset": "Reset",
+    "updating": "Updating..."
+  },
+  "plan": {
+    "fallbackName": "your plan",
+    "lockedTitle": "{{feature}} is not on {{planName}}",
+    "lockedDescription": "Visualize orders, deliveries, and payment due dates in one place. Upgrade to Silver or Gold to unlock the calendar - Free is for setup and light testing only.",
+    "comparePlans": "Compare plans & upgrade"
+  },
+  "state": {
+    "loading": "Loading calendar...",
+    "loadError": "Unable to load the order calendar right now.",
+    "tryAgain": "Try again",
+    "showingEvents": "Showing {{shown}} of {{total}} events",
+    "previous": "Prev",
+    "next": "Next",
+    "pageOf": "Page {{page}} of {{totalPages}}"
+  },
+  "eventCard": {
+    "order": "Order",
+    "status": "Status",
+    "counterpart": "Counterpart",
+    "branch": "Branch",
+    "categories": "Categories"
+  },
   "eventSheet": {
     "orderTitle": "Order #{{id}}",
     "total": "Total",

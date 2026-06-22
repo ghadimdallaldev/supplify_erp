@@ -1,0 +1,46 @@
+{
+  "detail": {
+    "title": "Branch",
+    "settingsDescription": "Branch settings",
+    "notEnabled": "Multi-branch is not enabled on your plan.",
+    "viewSubscription": "View subscription",
+    "loading": "Loading branch…",
+    "notFound": "Branch not found.",
+    "backToOrg": "Back to organization",
+    "organization": "← Organization"
+  },
+  "invite": {
+    "missingToken": "Missing invitation token.",
+    "validating": "Validating your invitation…",
+    "validateError": "Unable to validate invitation.",
+    "expiredTitle": "This invite link has expired.",
+    "expiredDescription": "Contact your organization admin to get a new one.",
+    "invalidTitle": "This invite link is no longer valid.",
+    "invalidDescription": "If you already have an account, sign in.",
+    "signIn": "Sign In",
+    "acceptTitle": "Accept branch invitation",
+    "loggedInAs": "You're logged in as {{name}}. This invite is for {{branch}} ({{org}}) as {{role}}.",
+    "acceptJoin": "Accept & Join Branch",
+    "signInDifferent": "Sign in with a different account",
+    "welcomeTitle": "Welcome to Supplify",
+    "invitedToJoin": "You've been invited to join {{branch}} ({{org}}) as {{role}}.",
+    "fullName": "Full name",
+    "password": "Password",
+    "confirmPassword": "Confirm password",
+    "createJoin": "Create Account & Join Branch",
+    "alreadyHaveAccount": "Already have an account?",
+    "signInLink": "Sign in",
+    "acceptRequired": "Please accept all required legal agreements before continuing.",
+    "passwordMismatch": "Passwords do not match",
+    "passwordMinLength": "Password must be at least 8 characters",
+    "acceptFailed": "Could not accept invitation. Try signing in with a different account.",
+    "createFailed": "Could not create your account. The link may have expired."
+  },
+  "toast": {
+    "nameRequired": "Branch name is required",
+    "created": "Branch created",
+    "createFailed": "Failed to create branch",
+    "removed": "Branch removed",
+    "removeFailed": "Failed to remove branch"
+  }
+}

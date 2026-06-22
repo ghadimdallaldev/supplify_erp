@@ -137,13 +137,13 @@ export function formatOrderRef(id: string): string {
 export function canSelectOrderForRoute(order: {
   active_route_id?: string | null
   status?: string
-}): { ok: boolean; reason?: string } {
+}): { ok: boolean; reasonKey?: string } {
   if (order.active_route_id) {
-    return { ok: false, reason: 'Already on a route' }
+    return { ok: false, reasonKey: 'dispatch.selectReason.alreadyOnRoute' }
   }
   const plannedEligible = ['PLACED', 'PENDING_APPROVAL', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED']
   if (order.status && !plannedEligible.includes(order.status)) {
-    return { ok: false, reason: 'Not eligible for route planning' }
+    return { ok: false, reasonKey: 'dispatch.selectReason.notEligible' }
   }
   return { ok: true }
 }

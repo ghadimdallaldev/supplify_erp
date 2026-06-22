@@ -80,7 +80,7 @@ export function SupplierMobileNav() {
               to={item.href}
               data-testid={item.testId}
               className={cn(
-                'flex min-h-[44px] flex-1 flex-col items-center justify-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors',
+                'flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors touch-manipulation',
                 active
                   ? 'text-[var(--brand-mid)]'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-mid)]'

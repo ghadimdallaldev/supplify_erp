@@ -1,4 +1,5 @@
 import { Suspense, useState, useMemo, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   useGetProductsQuery,
   useGetProductCategoriesQuery,
@@ -12,9 +13,8 @@ import {
   useFavoriteProductMutation,
   useUnfavoriteProductMutation,
 } from '../services/api'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/button'
-import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
@@ -65,7 +65,10 @@ import {
 const PRODUCTS_PAGE_SIZE = 50
 
 export function ProductsPage() {
-  const { search, setSearch, debouncedSearch } = useDebouncedSearch()
+  const { t } = useTranslation('products')
+  const [searchParams] = useSearchParams()
+  const searchFromUrl = searchParams.get('q') ?? ''
+  const { search, setSearch, debouncedSearch } = useDebouncedSearch(searchFromUrl)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [category, setCategory] = useState('')
   const [categoryId, setCategoryId] = useState('')
@@ -190,7 +193,7 @@ export function ProductsPage() {
     submitImport,
   } = useProductCatalogImport({ refetch, onImportSuccess: clearBulkUpload })
 
-  const allProducts = data?.products ?? []
+  const allProducts = useMemo(() => data?.products ?? [], [data?.products])
   const filteredProducts = useMemo(() => {
     if (!isSupplier) return allProducts
     const email = user?.email?.trim().toLowerCase()
@@ -224,6 +227,10 @@ export function ProductsPage() {
   const hasPrevPage = cursorHistory.length > 0 || Boolean(cursor) || offset > 0
   const showInitialLoad = isLoading && !data
 
+  useEffect(() => {
+    setSearch(searchFromUrl)
+  }, [searchFromUrl, setSearch])
+
   const goToNextPage = () => {
     if (pagination?.nextCursor) {
       setCursorHistory((prev) => [...prev, cursor ?? ''])
@@ -246,20 +253,20 @@ export function ProductsPage() {
 
   const handleAddToCart = (product: any) => {
     addItem({ productId: product.id, product, quantity: 1 })
-    toast.success('Added to cart')
+    toast.success(t('toast.addedToCart'))
   }
 
   const handleToggleFavorite = async (product: any) => {
     try {
       if (product.is_favorited) {
         await unfavoriteProduct(product.id).unwrap()
-        toast.success('Removed from favorites')
+        toast.success(t('toast.removedFromFavorites'))
       } else {
         await favoriteProduct({ productId: product.id }).unwrap()
-        toast.success('Added to favorites')
+        toast.success(t('toast.addedToFavorites'))
       }
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to update favorite')
+      toast.error(error?.data?.error?.message || t('toast.favoriteUpdateFailed'))
     }
   }
 
@@ -267,11 +274,11 @@ export function ProductsPage() {
     const file = event.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file')
+      toast.error(t('toast.uploadImageFile'))
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB')
+      toast.error(t('toast.imageTooLarge'))
       return
     }
     setProductImage(file)
@@ -303,7 +310,7 @@ export function ProductsPage() {
           if (!uploadResponse.ok) throw new Error('Failed to upload image')
           imageUrl = presignedResponse.publicUrl || uploadUrl.split('?')[0]
         } catch (error: any) {
-          toast.error(error?.data?.error?.message || 'Failed to upload image')
+          toast.error(error?.data?.error?.message || t('toast.imageUploadFailed'))
           return
         }
       }
@@ -320,14 +327,14 @@ export function ProductsPage() {
         image_url: imageUrl || undefined,
         warehouse_id: productForm.warehouse_id || undefined,
       }).unwrap()
-      toast.success('Product created successfully')
+      toast.success(t('toast.productCreated'))
       setShowAddProduct(false)
       setProductForm(EMPTY_PRODUCT_FORM)
       setNewTag('')
       setProductImage(null)
       setImagePreview(null)
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to create product')
+      toast.error(error?.data?.error?.message || t('toast.productCreateFailed'))
     }
   }
 
@@ -336,7 +343,7 @@ export function ProductsPage() {
     if (!file) return
     const name = file.name.toLowerCase()
     if (!name.endsWith('.csv') && !name.endsWith('.xlsx') && !name.endsWith('.xls')) {
-      toast.error('Please upload a .csv, .xlsx, or .xls file')
+      toast.error(t('toast.invalidImportFile'))
       return
     }
     setUploadedFile(file)
@@ -354,20 +361,18 @@ export function ProductsPage() {
       <RequirePermission anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']} title="products">
         <PageShell maxWidth="wide" data-testid="products-page">
           <PageHeader
-            title="Products"
+            title={t('page.title')}
             description={
-              isSupplier
-                ? 'Manage your product catalog'
-                : 'Browse and search products from suppliers'
+              isSupplier ? t('page.supplierDescription') : t('page.restaurantDescription')
             }
           />
           <EmptyState
-            title="Failed to load products"
-            description="Check your connection and try again."
+            title={t('page.loadFailedTitle')}
+            description={t('page.loadFailedDescription')}
             icon={<Package className="h-10 w-10" aria-hidden />}
             action={
               <Button onClick={() => refetch()} data-testid="products-retry">
-                Retry
+                {t('page.retry')}
               </Button>
             }
           />
@@ -380,10 +385,8 @@ export function ProductsPage() {
     <RequirePermission anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']} title="products">
       <PageShell maxWidth="wide" data-testid="products-page">
         <PageHeader
-          title="Products"
-          description={
-            isSupplier ? 'Manage your product catalog' : 'Browse and search products from suppliers'
-          }
+          title={t('page.title')}
+          description={isSupplier ? t('page.supplierDescription') : t('page.restaurantDescription')}
           actions={
             <div className="flex flex-wrap gap-2">
               {isSupplier ? (
@@ -391,15 +394,15 @@ export function ProductsPage() {
                   <>
                     <Button onClick={() => setShowAddProduct(true)}>
                       <Plus className="h-4 w-4 mr-2" />
-                      Add Product
+                      {t('page.addProduct')}
                     </Button>
                     <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
                       <Upload className="h-4 w-4 mr-2" />
-                      Bulk Upload
+                      {t('page.bulkUpload')}
                     </Button>
                     <Button variant="outline" onClick={() => setShowImageImport(true)}>
                       <Image className="h-4 w-4 mr-2" />
-                      Import Product Images
+                      {t('page.importImages')}
                     </Button>
                   </>
                 </PermissionGate>
@@ -409,11 +412,11 @@ export function ProductsPage() {
                     <Button asChild variant="outline">
                       <Link to="/app/quote-requests/new">
                         <FileQuestion className="h-4 w-4 mr-2" />
-                        Request best price
+                        {t('page.requestBestPrice')}
                       </Link>
                     </Button>
                     <Button asChild>
-                      <Link to="/app/cart">View Cart</Link>
+                      <Link to="/app/cart">{t('page.viewCart')}</Link>
                     </Button>
                   </>
                 </PermissionGate>
@@ -424,10 +427,10 @@ export function ProductsPage() {
         {isRestaurant && activeDeals.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 -mt-2">
             <Badge variant="secondary">
-              {activeDeals.length} active deal{activeDeals.length === 1 ? '' : 's'}
+              {t('page.activeDeals', { count: activeDeals.length })}
             </Badge>
             <Button variant="link" size="sm" className="h-auto p-0" asChild>
-              <Link to="/app/deals">View all deals</Link>
+              <Link to="/app/deals">{t('page.viewAllDeals')}</Link>
             </Button>
           </div>
         )}
@@ -439,8 +442,8 @@ export function ProductsPage() {
               entityType="product"
               value={search}
               onChange={setSearch}
-              placeholder="Search products..."
-              aria-label="Search products"
+              placeholder={t('page.searchPlaceholder')}
+              aria-label={t('page.searchAriaLabel')}
               inputClassName={cn(filterControlClass, 'pl-10')}
             />
           }
@@ -457,7 +460,7 @@ export function ProductsPage() {
                     className={`mr-1.5 h-4 w-4 ${favoritesOnly ? 'fill-current' : ''}`}
                     aria-hidden
                   />
-                  Favorites
+                  {t('page.favorites')}
                 </Button>
               )}
               <ProductFilterFields
@@ -508,7 +511,7 @@ export function ProductsPage() {
               >
                 <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-muted)]">
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                  Updating…
+                  {t('page.updating')}
                 </div>
               </div>
             )}
@@ -530,8 +533,8 @@ export function ProductsPage() {
               data-testid="products-pagination"
             >
               <p className="text-sm text-[var(--text-muted)]">
-                Showing {rangeStart}–{rangeEnd}
-                {total != null ? ` of ${total}` : ''}
+                {t('page.showingRange', { start: rangeStart, end: rangeEnd })}
+                {total != null ? t('page.showingTotal', { total }) : ''}
               </p>
               <div className="flex items-center gap-2">
                 <Button
@@ -543,7 +546,7 @@ export function ProductsPage() {
                   data-testid="products-prev-page"
                 >
                   <ChevronLeft className="h-4 w-4 mr-1" />
-                  Previous
+                  {t('page.previous')}
                 </Button>
                 <Button
                   type="button"
@@ -553,7 +556,7 @@ export function ProductsPage() {
                   onClick={goToNextPage}
                   data-testid="products-next-page"
                 >
-                  Next
+                  {t('page.next')}
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>

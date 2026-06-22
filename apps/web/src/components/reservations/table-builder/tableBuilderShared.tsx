@@ -6,6 +6,7 @@ import type {
   ReservationTableZone,
 } from '../../../types'
 import { Circle, RectangleHorizontal, Square, Armchair, Sparkles } from 'lucide-react'
+import { i18n } from '../../../i18n'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -59,103 +60,115 @@ export interface ServiceInfo {
 
 // ─── Static Data ──────────────────────────────────────────────────────────────
 
-export const SHAPE_PRESETS: Array<{
+const SHAPE_PRESET_BASE: Array<{
   value: TableShape
-  label: string
-  description: string
   width: number
   height: number
   Icon: ComponentType<SVGProps<SVGSVGElement>>
 }> = [
-  {
-    value: 'round',
-    label: 'Round',
-    description: 'Perfect for intimate groups.',
-    width: 120,
-    height: 120,
-    Icon: Circle,
-  },
-  {
-    value: 'square',
-    label: 'Square',
-    description: 'Ideal for couples.',
-    width: 115,
-    height: 115,
-    Icon: Square,
-  },
-  {
-    value: 'rectangle',
-    label: 'Banquet',
-    description: 'Seats larger parties.',
-    width: 160,
-    height: 100,
-    Icon: RectangleHorizontal,
-  },
-  {
-    value: 'booth',
-    label: 'Booth',
-    description: 'Cozy seating with privacy.',
-    width: 180,
-    height: 110,
-    Icon: Armchair,
-  },
-  {
-    value: 'chef_table',
-    label: "Chef's table",
-    description: 'Facing the action.',
-    width: 200,
-    height: 90,
-    Icon: Sparkles,
-  },
+  { value: 'round', width: 120, height: 120, Icon: Circle },
+  { value: 'square', width: 115, height: 115, Icon: Square },
+  { value: 'rectangle', width: 160, height: 100, Icon: RectangleHorizontal },
+  { value: 'booth', width: 180, height: 110, Icon: Armchair },
+  { value: 'chef_table', width: 200, height: 90, Icon: Sparkles },
 ]
 
-export const COLOR_PRESETS = [
-  { value: '#2563eb', label: 'Classic blue' },
-  { value: '#0ea5e9', label: 'Aqua' },
-  { value: '#16a34a', label: 'Garden green' },
-  { value: '#f97316', label: 'Sunset orange' },
-  { value: '#facc15', label: 'Golden hour' },
-  { value: '#a855f7', label: 'Lavender' },
-  { value: '#f87171', label: 'Rose' },
-  { value: '#475569', label: 'Slate' },
+export function getShapePresets() {
+  return SHAPE_PRESET_BASE.map((preset) => ({
+    ...preset,
+    label: i18n.t(`reservations:tableBuilder.shapes.${preset.value}.label`),
+    description: i18n.t(`reservations:tableBuilder.shapes.${preset.value}.description`),
+  }))
+}
+
+export function shapePresetLabel(shape: TableShape) {
+  return i18n.t(`reservations:tableBuilder.shapes.${shape}.label`)
+}
+
+const COLOR_PRESET_BASE = [
+  { value: '#2563eb', key: 'classicBlue' },
+  { value: '#0ea5e9', key: 'aqua' },
+  { value: '#16a34a', key: 'gardenGreen' },
+  { value: '#f97316', key: 'sunsetOrange' },
+  { value: '#facc15', key: 'goldenHour' },
+  { value: '#a855f7', key: 'lavender' },
+  { value: '#f87171', key: 'rose' },
+  { value: '#475569', key: 'slate' },
+] as const
+
+export function getColorPresets() {
+  return COLOR_PRESET_BASE.map((preset) => ({
+    ...preset,
+    label: i18n.t(`reservations:tableBuilder.colors.${preset.key}`),
+  }))
+}
+
+const ZONE_BASE: Array<{ value: TableZone; emoji: string }> = [
+  { value: 'main', emoji: '🍽️' },
+  { value: 'patio', emoji: '☀️' },
+  { value: 'bar', emoji: '🍸' },
+  { value: 'vip', emoji: '⭐' },
+  { value: 'private', emoji: '🔒' },
 ]
 
-export const ZONES: Array<{ value: TableZone; label: string; emoji: string }> = [
-  { value: 'main', label: 'Main floor', emoji: '🍽️' },
-  { value: 'patio', label: 'Patio', emoji: '☀️' },
-  { value: 'bar', label: 'Bar', emoji: '🍸' },
-  { value: 'vip', label: 'VIP', emoji: '⭐' },
-  { value: 'private', label: 'Private', emoji: '🔒' },
-]
+export function getZones() {
+  return ZONE_BASE.map((zone) => ({
+    ...zone,
+    label: i18n.t(`reservations:tableBuilder.zones.${zone.value}`),
+  }))
+}
 
-export const FEATURE_OPTIONS = [
-  { value: 'accessible', label: 'Accessible' },
-  { value: 'window', label: 'Window view' },
-  { value: 'high_top', label: 'High top' },
-  { value: 'power', label: 'Power outlet' },
-  { value: 'romantic', label: 'Romantic' },
-  { value: 'near_music', label: 'Near live music' },
-]
+const FEATURE_BASE = [
+  'accessible',
+  'window',
+  'high_top',
+  'power',
+  'romantic',
+  'near_music',
+] as const
 
-export const SERVICE_STATUS_STYLES: Record<string, { bg: string; border: string; label: string }> =
-  {
-    SEATED: { bg: '#16a34a18', border: '#16a34a', label: 'Seated' },
-    CONFIRMED: { bg: '#2563eb18', border: '#2563eb', label: 'Confirmed' },
-    PENDING: { bg: '#f9731618', border: '#f97316', label: 'Pending' },
-    WAITLIST: { bg: '#eab30818', border: '#eab308', label: 'Waitlist' },
-    available: { bg: '#f8fafc', border: '#cbd5e1', label: 'Available' },
-  }
+export function getFeatureOptions() {
+  return FEATURE_BASE.map((value) => ({
+    value,
+    label: i18n.t(`reservations:tableBuilder.features.${value}`),
+  }))
+}
+
+const SERVICE_STATUS_STYLE_BASE: Record<string, { bg: string; border: string; key: string }> = {
+  SEATED: { bg: '#16a34a18', border: '#16a34a', key: 'SEATED' },
+  CONFIRMED: { bg: '#2563eb18', border: '#2563eb', key: 'CONFIRMED' },
+  PENDING: { bg: '#f9731618', border: '#f97316', key: 'PENDING' },
+  WAITLIST: { bg: '#eab30818', border: '#eab308', key: 'WAITLIST' },
+  available: { bg: '#f8fafc', border: '#cbd5e1', key: 'available' },
+}
+
+export function getServiceStatusStyles() {
+  return Object.fromEntries(
+    Object.entries(SERVICE_STATUS_STYLE_BASE).map(([status, style]) => [
+      status,
+      {
+        bg: style.bg,
+        border: style.border,
+        label: i18n.t(`reservations:tableBuilder.serviceStatus.${style.key}`),
+      },
+    ])
+  ) as Record<string, { bg: string; border: string; label: string }>
+}
+
+export function featureLabel(feature: string) {
+  const key = `reservations:tableBuilder.features.${feature}`
+  const translated = i18n.t(key)
+  return translated === feature ? feature.replace(/_/g, ' ') : translated
+}
 
 // ─── Helper Functions ─────────────────────────────────────────────────────────
 
-type ShapePresetRow = (typeof SHAPE_PRESETS)[number]
-
-export const shapeDefaults = SHAPE_PRESETS.reduce(
-  (acc, p) => {
-    acc[p.value] = p
+export const shapeDefaults = SHAPE_PRESET_BASE.reduce(
+  (acc, preset) => {
+    acc[preset.value] = preset
     return acc
   },
-  {} as Record<TableShape, ShapePresetRow>
+  {} as Record<TableShape, (typeof SHAPE_PRESET_BASE)[number]>
 )
 
 export const clamp = (value: number, min: number, max: number) =>
@@ -237,6 +250,7 @@ export const findNextTablePosition = (
 
 export const hydrateTables = (tables: ReservationTable[]): EditableTable[] => {
   const placed: EditableTable[] = []
+  const colorPresets = getColorPresets()
 
   for (const table of tables) {
     const layout = table.layout ?? {}
@@ -267,7 +281,7 @@ export const hydrateTables = (tables: ReservationTable[]): EditableTable[] => {
       yRatio = slot.y
     }
 
-    const color = typeof layout.color === 'string' ? layout.color : COLOR_PRESETS[0].value
+    const color = typeof layout.color === 'string' ? layout.color : colorPresets[0].value
     const zone = (layout.zone as TableZone) || 'main'
     const features = Array.isArray(layout.features)
       ? (layout.features.filter((f) => typeof f === 'string') as string[])

@@ -1,0 +1,263 @@
+{
+  "page": {
+    "title": "العروض المتاحة",
+    "description": "عروض الموردين الذين تتابعهم، بالإضافة إلى العروض الممولة من موردين جدد",
+    "redemptionsToday": "استردادات العروض اليوم: {{current}}/{{limit}}",
+    "sort": "ترتيب",
+    "supplier": "المورد",
+    "allSuppliers": "كل الموردين",
+    "expiringSoon": "تنتهي خلال 7 أيام",
+    "sponsored_one": "{{count}} عرض ممول في خلاصتك",
+    "sponsored_other": "{{count}} عروض ممولة في خلاصتك",
+    "sortOptions": {
+      "newest": "الأحدث",
+      "biggest_discount": "أكبر خصم",
+      "expiring_soon": "تنتهي قريباً",
+      "sponsored": "الممولة أولاً"
+    },
+    "empty": {
+      "supplierTitle": "لا توجد عروض من {{name}}",
+      "supplierTitleGeneric": "لا توجد عروض لهذا المورد",
+      "supplierDescription": "قد لا يكون لديه عروض نشطة حالياً. تصفّح خلاصتك الكاملة أو اختر مورداً آخر.",
+      "showAllSuppliers": "عرض كل الموردين",
+      "expiringTitle": "لا توجد عروض تنتهي خلال 7 أيام",
+      "expiringDescription": "أوقف «تنتهي خلال 7 أيام» لرؤية كل شيء في خلاصتك، أو عد لاحقاً عند نشر عروض جديدة.",
+      "showAllDeals": "عرض كل العروض",
+      "defaultTitle": "لا توجد عروض نشطة حالياً",
+      "defaultDescription": "عندما ينشر موردوك عروضاً، ستظهر هنا.",
+      "browseSuppliers": "تصفّح الموردين"
+    }
+  },
+  "labels": {
+    "emDash": "—",
+    "dealTypes": {
+      "percentage_discount": "نسبة خصم",
+      "percentage_off": "نسبة خصم",
+      "fixed_discount": "مبلغ ثابت",
+      "fixed_off": "مبلغ ثابت",
+      "buy_x_get_y": "اشترِ X واحصل على Y",
+      "bogo": "اشترِ X واحصل على Y",
+      "bundle": "حزمة",
+      "free_shipping": "شحن مجاني",
+      "featured_listing": "ظهور فقط"
+    },
+    "dealTypeHelpers": {
+      "percentage_discount": "امنح المطاعم نسبة خصم على المنتجات المؤهلة.",
+      "percentage_off": "امنح المطاعم نسبة خصم على المنتجات المؤهلة.",
+      "fixed_discount": "امنح المطاعم مبلغاً ثابتاً من الخصم على الطلبات المؤهلة.",
+      "fixed_off": "امنح المطاعم مبلغاً ثابتاً من الخصم على الطلبات المؤهلة.",
+      "buy_x_get_y": "كافئ المطاعم عند شراء كمية من المنتجات المحددة.",
+      "bogo": "كافئ المطاعم عند شراء كمية من المنتجات المحددة.",
+      "bundle": "اجمع منتجات محددة بسعر خاص.",
+      "free_shipping": "أزل تكلفة الشحن للطلبات المؤهلة.",
+      "featured_listing": "عرض للظهور فقط. لا يخصم من الطلب."
+    },
+    "dealStatus": {
+      "active": "نشط",
+      "scheduled": "مجدول",
+      "expired": "منتهٍ",
+      "paused": "متوقف مؤقتاً",
+      "draft": "مسودة",
+      "pending_approval": "بانتظار الموافقة",
+      "pending_admin_approval": "بانتظار الموافقة",
+      "pending_review": "قيد المراجعة",
+      "rejected": "مرفوض",
+      "approved_pending_payment": "بانتظار دفع التعزيز",
+      "cancelled": "ملغى"
+    },
+    "boostStatus": {
+      "active": "تعزيز نشط",
+      "expired": "تعزيز منتهٍ",
+      "scheduled": "تعزيز مجدول",
+      "none": "بدون تعزيز",
+      "sponsored": "ممول",
+      "boosted": "معزّز"
+    },
+    "cta": {
+      "supplier": {
+        "order_now": "اطلب الآن",
+        "use_coupon": "استخدم القسيمة",
+        "message_supplier": "راسل المورد",
+        "view_products": "عرض المنتجات"
+      },
+      "restaurant": {
+        "order_now": "اطلب مع العرض",
+        "use_coupon": "استخدم القسيمة",
+        "message_supplier": "راسل المورد",
+        "view_products": "عرض المنتجات"
+      },
+      "helpers": {
+        "order_now": "أرسل المطاعم مباشرة إلى تدفق الطلب مع سياق هذا العرض.",
+        "use_coupon": "اعرض رمز القسيمة وطبّقه أثناء الدفع.",
+        "message_supplier": "ابدأ محادثة برسالة جاهزة عن هذا العرض.",
+        "view_products": "اعرض للمطاعم المنتجات المؤهلة لهذا العرض."
+      }
+    },
+    "coupon": {
+      "fieldHelper": "رموز القسائم مرتبطة بهذا العرض. ليست قسائم مستقلة.",
+      "linkedHelper": "هذا الرمز مرتبط بعرض المورد هذا.",
+      "copiedToast": "تم نسخ القسيمة. سنطبّقها عند الدفع عند الأهلية."
+    },
+    "schedule": {
+      "sectionHelper": "يتحكم في وقت استرداد المطاعم لهذا الخصم أو القسيمة. هذا منفصل عن حزمة التعزيز التي تتحكم فقط في مدة ظهور العرض في خلاصات المطاعم.",
+      "endsHelper": "اتركه فارغاً لإبقاء العرض مفتوحاً طوال فترة التعزيز (أو حتى توقفه). حدّد تاريخ انتهاء فقط إذا أردت إيقاف الخصم قبل أو بعد انتهاء الظهور المعزّز."
+    },
+    "discount": {
+      "percentageOff": "خصم {{value}}%",
+      "fixedOff": "خصم {{value}}",
+      "freeShipping": "شحن مجاني",
+      "freeShip": "شحن مجاني"
+    },
+    "validUntil": {
+      "noExpiry": "بدون انتهاء",
+      "label": "صالح حتى {{date}}"
+    },
+    "minOrder": "الحد الأدنى للطلب: {{amount}}",
+    "code": "الرمز: {{code}}",
+    "applyLimitReached": "تم بلوغ حد التطبيق — قم بالترقية لمزيد من الاستردادات",
+    "dailyLimitReached": "تم بلوغ الحد اليومي",
+    "supplierFallback": "المورد",
+    "sponsored": "ممول",
+    "featured": "مميز"
+  },
+  "empty": {
+    "supplier": {
+      "title": "لا توجد عروض بعد",
+      "description": "أنشئ أول عرض مورد لتقديم خصومات أو قسائم أو عروض ظهور للمطاعم.",
+      "cta": "إنشاء عرض"
+    },
+    "restaurant": {
+      "title": "لا توجد عروض نشطة حالياً",
+      "description": "عندما ينشر موردوك عروضاً، ستظهر هنا."
+    },
+    "admin": {
+      "title": "لم يتم العثور على عروض",
+      "description": "ستظهر هنا العروض التي ينشئها الموردون والتعزيزات الممولة."
+    },
+    "boost": {
+      "title": "لا توجد عروض معزّزة بعد",
+      "description": "التعزيزات حملات مدفوعة اختيارية تزيد ظهور العرض في خلاصة عروض المطاعم."
+    },
+    "adminBoostPackages": {
+      "title": "لم يتم تكوين حزم التعزيز",
+      "description": "تحدد حزم التعزيز أسعار الظهور الممول الذي يراه الموردون عند تعزيز العروض."
+    }
+  },
+  "boostPackagePicker": {
+    "loading": "جارٍ تحميل حزم التعزيز…",
+    "noneAvailable": "لا تتوفر حزم تعزيز. تواصل مع الدعم.",
+    "helperText": "سيحصل عرضك على ظهور ممول في خلاصات عروض المطاعم خلال فترة التعزيز. تصف تسميات الوصول أولوية الظهور وليس أعداد المشاهدات الدقيقة.",
+    "boostPeriod": "فترة التعزيز",
+    "days_one": "{{count}} يوم",
+    "days_other": "{{count}} أيام",
+    "oneTime": "مرة واحدة"
+  },
+  "promoteDialog": {
+    "title": "عزّز هذا العرض",
+    "description": "اختر حزمة تعزيز للظهور الممول في خلاصات عروض المطاعم — بما في ذلك المطاعم التي لا تتابعك بعد.",
+    "helperText": "سيظهر عرضك أعلى في خلاصات عروض المطاعم خلال فترة التعزيز. تقديرات الوصول تصف أولوية الظهور وليس أعداد المشاهدات الدقيقة.",
+    "loading": "جارٍ تحميل حزم التعزيز…",
+    "noneAvailable": "لا تتوفر حزم تعزيز حالياً. تواصل مع الدعم أو حاول لاحقاً.",
+    "recommended": "موصى به",
+    "daysBoost_one": "تعزيز {{count}} يوم",
+    "daysBoost_other": "تعزيز {{count}} أيام",
+    "boostPeriod": "فترة التعزيز",
+    "oneTime": "مرة واحدة",
+    "boostingWith": "أنت تعزّز باستخدام {{name}}",
+    "priceForDays_one": "${{amount}} لمدة {{count}} يوم",
+    "priceForDays_other": "${{amount}} لمدة {{count}} أيام",
+    "priceForPeriod": "${{amount}} لفترة التعزيز",
+    "cancel": "إلغاء",
+    "boostDeal": "تعزيز العرض",
+    "toastSuccess": "تم تفعيل تعزيز العرض",
+    "toastError": "فشل تعزيز العرض"
+  },
+  "submitDialog": {
+    "title": "إرسال للموافقة",
+    "descriptionWithName": "اختر كيفية تعزيز \"{{name}}\" قبل مراجعة المسؤول. الموافقة تنشر عرضك للمطاعم.",
+    "description": "اختر حزمة تعزيز قبل مراجعة المسؤول. الموافقة تنشر عرضك للمطاعم.",
+    "cancel": "إلغاء",
+    "submit": "إرسال للموافقة",
+    "toastSelectPackage": "اختر حزمة تعزيز",
+    "toastSuccess": "تم إرسال العرض والتعزيز للموافقة",
+    "toastError": "فشل إرسال العرض"
+  },
+  "targeting": {
+    "helperText": "حدّد عناصر الكتالوج التي ينطبق عليها هذا العرض. اتركه لجميع المنتجات للعروض على مستوى المتجر.",
+    "appliesTo": "ينطبق على",
+    "allProducts": "جميع المنتجات",
+    "specificProducts": "منتجات محددة",
+    "specificCategories": "فئات محددة",
+    "products": "المنتجات",
+    "removeProduct": "إزالة {{name}}",
+    "searchProducts": "البحث في المنتجات...",
+    "loadingCatalog": "جارٍ تحميل كتالوجك…",
+    "noProductsFound": "لم يتم العثور على منتجات",
+    "categories": "الفئات",
+    "noCategoriesAvailable": "لا تتوفر فئات",
+    "clearSelection": "مسح التحديد"
+  },
+  "banner": {
+    "andMore": " و{{count}} أخرى",
+    "tapToBrowse": " — اضغط لتصفح العروض.",
+    "viewDeal_one": "عرض العرض",
+    "viewDeal_other": "عرض العروض",
+    "dismiss": "إغلاق شريط العروض",
+    "percentageOff": "خصم {{value}}%",
+    "fixedOff": "خصم ${{value}}"
+  },
+  "supplierRow": {
+    "sponsored": "ممول",
+    "percentageOff": "خصم {{value}}%",
+    "fixedOff": "خصم ${{value}}",
+    "rejected": "مرفوض: {{reason}}",
+    "boostPrice_one": "تعزيز ${{price}} · {{count}} يوم",
+    "boostPrice_other": "تعزيز ${{price}} · {{count}} أيام",
+    "awaitingPayment": "بانتظار دفع التعزيز للنشر",
+    "submitWithBoost": "إرسال مع التعزيز",
+    "delete": "حذف",
+    "pause": "إيقاف مؤقت",
+    "viewAnalytics": "عرض التحليلات",
+    "resume": "استئناف",
+    "boostAgain": "تعزيز مجدداً",
+    "filterAriaLabel": "تصفية العروض حسب الحالة",
+    "statusFilters": {
+      "all": "الكل",
+      "draft": "مسودة",
+      "pending_approval": "قيد الانتظار",
+      "rejected": "مرفوض",
+      "approved_pending_payment": "بانتظار الدفع",
+      "active": "منشور",
+      "paused": "متوقف",
+      "expired": "منتهٍ"
+    }
+  },
+  "analytics": {
+    "boostTitle": "تحليلات التعزيز",
+    "performanceTitle": "أداء العرض",
+    "views": "المشاهدات",
+    "clicks": "النقرات",
+    "redemptions": "استردادات العروض",
+    "messages": "الرسائل",
+    "couponUses": "استخدامات القسيمة",
+    "conversion": "التحويل",
+    "discountAmount": "مبلغ الخصم",
+    "boostSummary": "التعزيز: {{status}} · الميزانية ${{budget}} · {{impressions}} مشاهدة · ظهور ممول"
+  },
+  "boostStatusCard": {
+    "active": "تعزيز نشط · {{packageName}}",
+    "boostFallback": "تعزيز",
+    "daysLeft_one": "متبقي {{count}} يوم",
+    "daysLeft_other": "متبقي {{count}} أيام",
+    "running": "قيد التشغيل",
+    "activeUntil": "نشط حتى {{date}}",
+    "scheduled": "{{packageName}} مجدول",
+    "starts": " · يبدأ {{date}}",
+    "ended": "انتهى التعزيز",
+    "expired": " · انتهى {{date}}"
+  },
+  "card": {
+    "toastCouponError": "تعذّر استرداد القسيمة",
+    "toastMessageError": "تعذّر بدء المحادثة"
+  }
+}

@@ -1,4 +1,5 @@
 import { CheckCircle, Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import {
@@ -13,6 +14,7 @@ type Props = {
 }
 
 export function RestaurantConfirmPodButton({ orderId, className, fullWidth }: Props) {
+  const { t } = useTranslation('fulfillment')
   const { data, isLoading: loadingPod } = useGetOrderProofOfDeliveryQuery(orderId)
   const [confirmPod, { isLoading: confirming }] = useConfirmOrderProofOfDeliveryMutation()
 
@@ -24,10 +26,10 @@ export function RestaurantConfirmPodButton({ orderId, className, fullWidth }: Pr
   const handleConfirm = async () => {
     try {
       await confirmPod(orderId).unwrap()
-      toast.success('Proof of delivery confirmed')
+      toast.success(t('pod.toast.confirmed'))
     } catch (error: unknown) {
       const msg = (error as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Failed to confirm proof of delivery')
+      toast.error(msg || t('pod.toast.confirmFailed'))
     }
   }
 
@@ -45,7 +47,7 @@ export function RestaurantConfirmPodButton({ orderId, className, fullWidth }: Pr
       ) : (
         <CheckCircle className="mr-2 h-4 w-4" />
       )}
-      Confirm proof of delivery
+      {t('pod.confirmButton')}
     </Button>
   )
 }

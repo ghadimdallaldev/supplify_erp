@@ -1,80 +1,33 @@
 import { api } from '../base'
-import type { LegalAcceptancePayload } from '../../../lib/legalDocuments'
-import type {
-  User,
-  Product,
-  CreateProductRequest,
-  UpdateProductRequest,
-  ProductFilters,
-  ProductsResponse,
-  Order,
-  CreateOrderRequest,
-  CreateManualOrderRequest,
-  UpdateOrderRequest,
-  OrderFilters,
-  OrdersResponse,
-  Supplier,
-  SupplierFilters,
-  SuppliersResponse,
-  Restaurant,
-  RestaurantFilters,
-  RestaurantsResponse,
-  Price,
-  CreatePriceRequest,
-  Inventory,
-  UpdateInventoryRequest,
-  AuditLogFilters,
-  AuditLogsResponse,
-  PresignedUrlRequest,
-  PresignedUrlResponse,
-  AttachFileRequest,
-  Attachment,
-  ReorderSuggestionsResponse,
-  ReorderAssistanceItem,
-  SubscriptionPlan,
-  Subscription,
-  Entitlements,
-  AdminFeatureFlag,
-  EffectiveFeature,
-  SubscriptionPlanChangePreview,
-  BillingStatus,
-  BillingPaymentMethod,
-  UsageMeter,
-  PublicRestaurant,
-  PublicSupplier,
-  PublicSupplierProductsResponse,
-  QuoteRequestSummary,
-  QuoteRequestDetail,
-  SupplierQuoteInboxEntry,
-  SupplierQuoteRequestDetail,
-  QuoteCartPayload,
-  PublicAvailabilityResponse,
-  PublicReservationSummary,
-  StaffPortalSession,
-  StaffPortalDashboard,
-  StaffPtoRequest,
-  StaffShiftSwap,
-  StaffTimeEntry,
-  PublicReservationDetails,
-  DispatchOrderCard,
-  DeliveryRouteSummary,
-  DeliveryRouteDetail,
-  OrderTrackingResponse,
-  AdminUserPreferences,
-} from '../../../types'
-import {
-  normalizeAdminPlanUpdateResult,
-  type AdminPlanUpdateResult,
-} from '../../../lib/adminPlanSaveFeedback'
-import { normalizeListResponse } from '../../../lib/apiError'
-import {
-  normalizeContractPricingList,
-  normalizeContractPricingRecord,
-  normalizeMyContractPricing,
-  normalizeResolvedContractPrices,
-} from '../../../lib/contractPricingResponse'
-import { normalizeReportResponse } from '../../../lib/reportResponse'
-import { resolveUpgradeUrl } from '../../../lib/externallyControlledFeatures'
+export type SupplierStatementSummary = {
+  openingBalance: number
+  totalCharges: number
+  totalPayments: number
+  totalAdjustments: number
+  closingBalance: number
+  invoiceCount?: number
+}
+
+export type SupplierStatementInvoice = {
+  id: string
+  invoice_number?: string
+  invoice_date?: string
+  total_amount?: string | number
+  total_paid?: string | number
+  supplier_name?: string
+  status?: string
+}
+
+export type SupplierStatementResponse = {
+  invoices: SupplierStatementInvoice[]
+  summary: SupplierStatementSummary
+}
+
+export type SupplierStatementQueryArgs = {
+  supplierId: string
+  startDate: string
+  endDate: string
+}
 
 export const financeApi = api.injectEndpoints({
   endpoints: (builder) => ({
@@ -139,10 +92,10 @@ export const financeApi = api.injectEndpoints({
         'RestaurantFinance',
       ],
     }),
-    getSupplierStatement: builder.query<any, { supplierId: string; params?: any }>({
-      query: ({ supplierId, params }) => ({
+    getSupplierStatement: builder.query<SupplierStatementResponse, SupplierStatementQueryArgs>({
+      query: ({ supplierId, startDate, endDate }) => ({
         url: `/api/restaurant-finance/suppliers/${supplierId}/statement`,
-        params,
+        params: { startDate, endDate },
       }),
       providesTags: ['RestaurantFinance'],
     }),

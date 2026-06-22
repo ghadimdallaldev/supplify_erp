@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { format, isAfter } from 'date-fns'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
@@ -26,14 +27,10 @@ import {
 } from '../../../services/staffApi'
 import type { StaffShiftSwap } from '../../../types'
 import { getApiErrorMessage } from '../../../lib/apiError'
-import {
-  clampToISODate,
-  initialShiftForm,
-  swapStatusLabels,
-  type ShiftFormState,
-} from '../staffShared'
+import { clampToISODate, initialShiftForm, type ShiftFormState } from '../staffShared'
 
 export function StaffScheduleTab() {
+  const { t } = useTranslation('staff')
   const [isAddShiftOpen, setIsAddShiftOpen] = useState(false)
   const [shiftForm, setShiftForm] = useState<ShiftFormState>(initialShiftForm)
   const [swapForm, setSwapForm] = useState({
@@ -80,7 +77,7 @@ export function StaffScheduleTab() {
 
   const handleCreateShift = async () => {
     if (!shiftForm.role || !shiftForm.shiftDate || !shiftForm.startTime || !shiftForm.endTime) {
-      toast.error('Please provide role, date, start time, and end time')
+      toast.error(t('schedule.validationShiftFields'))
       return
     }
 
@@ -88,7 +85,7 @@ export function StaffScheduleTab() {
     const endsAt = new Date(`${shiftForm.shiftDate}T${shiftForm.endTime}`)
 
     if (endsAt <= startsAt) {
-      toast.error('End time must be after start time')
+      toast.error(t('schedule.endAfterStart'))
       return
     }
 
@@ -102,17 +99,17 @@ export function StaffScheduleTab() {
         status: 'PUBLISHED',
         notes: shiftForm.notes || undefined,
       }).unwrap()
-      toast.success('Shift scheduled')
+      toast.success(t('schedule.shiftScheduled'))
       setIsAddShiftOpen(false)
       resetShiftForm()
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Unable to schedule shift'))
+      toast.error(getApiErrorMessage(error, t('schedule.scheduleFailed')))
     }
   }
 
   const handleCreateSwap = async () => {
     if (!swapForm.shiftId || !swapForm.requestedBy) {
-      toast.error('Please select shift and requesting staff')
+      toast.error(t('schedule.validationSwapFields'))
       return
     }
     try {
@@ -122,21 +119,21 @@ export function StaffScheduleTab() {
         proposedCoverId: swapForm.proposedCoverId || undefined,
         reason: swapForm.reason || undefined,
       }).unwrap()
-      toast.success('Shift swap requested')
+      toast.success(t('schedule.swapRequested'))
       setSwapForm({ shiftId: '', requestedBy: '', proposedCoverId: '', reason: '' })
     } catch {
-      toast.error('Unable to submit shift swap request')
+      toast.error(t('schedule.swapSubmitFailed'))
     }
   }
 
   const handleSwapDecision = async (id: string, status: StaffShiftSwap['status']) => {
     const managerNote =
-      window.prompt(`Add note for ${status.toLowerCase()} decision (optional):`) ?? undefined
+      window.prompt(t('schedule.swapDecisionPrompt', { status: status.toLowerCase() })) ?? undefined
     try {
-      await decideSwap({ id, status, managerNote: managerNote || undefined }).unwrap()
-      toast.success(`Swap ${status.toLowerCase()}`)
+      await decideSwap({ id, status: status, managerNote: managerNote || undefined }).unwrap()
+      toast.success(t('schedule.swapUpdated', { status: status.toLowerCase() }))
     } catch {
-      toast.error('Unable to update swap')
+      toast.error(t('schedule.swapUpdateFailed'))
     }
   }
 
@@ -145,28 +142,26 @@ export function StaffScheduleTab() {
       <div className="flex justify-end">
         <Dialog open={isAddShiftOpen} onOpenChange={setIsAddShiftOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline">Create shift</Button>
+            <Button variant="outline">{t('schedule.createShift')}</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Schedule shift</DialogTitle>
-              <DialogDescription>
-                Drop a shift on the calendar with clear start and end times.
-              </DialogDescription>
+              <DialogTitle>{t('schedule.scheduleShiftTitle')}</DialogTitle>
+              <DialogDescription>{t('schedule.scheduleShiftDescription')}</DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
               <div>
-                <Label htmlFor="shiftRole">Role</Label>
+                <Label htmlFor="shiftRole">{t('schedule.role')}</Label>
                 <Input
                   id="shiftRole"
                   value={shiftForm.role}
                   onChange={(event) => handleShiftInputChange('role', event.target.value)}
-                  placeholder="Server, kitchen, cashier..."
+                  placeholder={t('schedule.rolePlaceholder')}
                 />
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <Label htmlFor="shiftDate">Date</Label>
+                  <Label htmlFor="shiftDate">{t('schedule.date')}</Label>
                   <Input
                     id="shiftDate"
                     type="date"
@@ -175,13 +170,13 @@ export function StaffScheduleTab() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="shiftStaff">Assign to (optional)</Label>
+                  <Label htmlFor="shiftStaff">{t('schedule.assignOptional')}</Label>
                   <Select
                     value={shiftForm.staffId}
                     onValueChange={(value) => handleShiftInputChange('staffId', value)}
                   >
                     <SelectTrigger id="shiftStaff" className="mt-1 w-full">
-                      <option value="">Unassigned</option>
+                      <option value="">{t('shared.unassigned')}</option>
                       {staffMembers.map((member) => (
                         <option key={member.id} value={member.id}>
                           {member.displayName} · {member.role}
@@ -193,7 +188,7 @@ export function StaffScheduleTab() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <Label htmlFor="startTime">Start time</Label>
+                  <Label htmlFor="startTime">{t('schedule.startTime')}</Label>
                   <Input
                     id="startTime"
                     type="time"
@@ -202,7 +197,7 @@ export function StaffScheduleTab() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="endTime">End time</Label>
+                  <Label htmlFor="endTime">{t('schedule.endTime')}</Label>
                   <Input
                     id="endTime"
                     type="time"
@@ -212,18 +207,18 @@ export function StaffScheduleTab() {
                 </div>
               </div>
               <div>
-                <Label htmlFor="shiftNotes">Notes</Label>
+                <Label htmlFor="shiftNotes">{t('shared.notes')}</Label>
                 <Input
                   id="shiftNotes"
                   value={shiftForm.notes}
                   onChange={(event) => handleShiftInputChange('notes', event.target.value)}
-                  placeholder="Prep, handover, reminders..."
+                  placeholder={t('schedule.notesPlaceholder')}
                 />
               </div>
             </div>
             <DialogFooter>
               <Button onClick={handleCreateShift} disabled={creatingShift}>
-                {creatingShift ? 'Scheduling…' : 'Schedule shift'}
+                {creatingShift ? t('schedule.scheduling') : t('schedule.scheduleShift')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -232,17 +227,15 @@ export function StaffScheduleTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Upcoming schedule</CardTitle>
-          <CardDescription>
-            At-a-glance view of the next week for quick staffing checks.
-          </CardDescription>
+          <CardTitle>{t('schedule.upcomingTitle')}</CardTitle>
+          <CardDescription>{t('schedule.upcomingDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           {shiftsLoading ? (
-            <p className="text-sm text-[var(--text-muted)]">Loading schedule…</p>
+            <p className="text-sm text-[var(--text-muted)]">{t('schedule.loadingSchedule')}</p>
           ) : upcomingShifts.length === 0 ? (
             <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">
-              <p>No upcoming shifts scheduled yet.</p>
+              <p>{t('schedule.noUpcomingShifts')}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -250,22 +243,22 @@ export function StaffScheduleTab() {
                 <thead className="bg-[var(--brand-ultra)]">
                   <tr>
                     <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">
-                      Date
+                      {t('shared.date')}
                     </th>
                     <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">
-                      Staff
+                      {t('schedule.staff')}
                     </th>
                     <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">
-                      Role
+                      {t('schedule.roleColumn')}
                     </th>
                     <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">
-                      Time
+                      {t('shared.time')}
                     </th>
                     <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">
-                      Status
+                      {t('shared.status')}
                     </th>
                     <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">
-                      Notes
+                      {t('schedule.notesColumn')}
                     </th>
                   </tr>
                 </thead>
@@ -278,7 +271,7 @@ export function StaffScheduleTab() {
                       <td className="px-4 py-3">
                         <div className="flex flex-col">
                           <span className="font-medium text-[var(--text)]">
-                            {shift.staff?.name ?? 'Unassigned'}
+                            {shift.staff?.name ?? t('shared.unassigned')}
                           </span>
                           {shift.staff?.role ? (
                             <span className="text-xs text-[var(--text-muted)]">
@@ -297,7 +290,9 @@ export function StaffScheduleTab() {
                           {shift.status.toLowerCase()}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-[var(--text-muted)]">{shift.notes || '—'}</td>
+                      <td className="px-4 py-3 text-[var(--text-muted)]">
+                        {shift.notes || t('shared.emDash')}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -309,15 +304,15 @@ export function StaffScheduleTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent shift swaps</CardTitle>
-          <CardDescription>Approve coverage changes to keep the board accurate.</CardDescription>
+          <CardTitle>{t('schedule.swapsTitle')}</CardTitle>
+          <CardDescription>{t('schedule.swapsDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {swapsLoading ? (
-            <p className="text-sm text-[var(--text-muted)]">Loading swaps…</p>
+            <p className="text-sm text-[var(--text-muted)]">{t('schedule.loadingSwaps')}</p>
           ) : swaps.length === 0 ? (
             <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">
-              <p>No swap requests yet.</p>
+              <p>{t('schedule.noSwaps')}</p>
             </div>
           ) : (
             swaps.map((swap) => (
@@ -328,23 +323,27 @@ export function StaffScheduleTab() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold text-[var(--text)]">
-                      {swap.requester?.name} → {swap.cover?.name || 'Waiting for cover'}
+                      {swap.requester?.name} → {swap.cover?.name || t('schedule.waitingForCover')}
                     </p>
                     <p className="text-xs text-[var(--text-muted)]">
                       {swap.shift?.role} ·{' '}
-                      {swap.shift ? format(new Date(swap.shift.startsAt), 'MMM d, p') : 'TBD'}
+                      {swap.shift
+                        ? format(new Date(swap.shift.startsAt), 'MMM d, p')
+                        : t('schedule.tbd')}
                     </p>
                   </div>
                   <Badge className="bg-[var(--brand-pale)] text-[var(--brand-mid)]">
-                    {swapStatusLabels[swap.status]}
+                    {t(`shared.swapStatus.${swap.status}`)}
                   </Badge>
                 </div>
                 {swap.reason ? (
-                  <p className="mt-2 text-xs text-[var(--text-muted)]">Reason: {swap.reason}</p>
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">
+                    {t('shared.reasonPrefix', { reason: swap.reason })}
+                  </p>
                 ) : null}
                 {swap.managerNote ? (
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
-                    Decision note: {swap.managerNote}
+                    {t('shared.decisionNotePrefix', { note: swap.managerNote })}
                   </p>
                 ) : null}
                 {swap.status === 'REQUESTED' ? (
@@ -355,7 +354,7 @@ export function StaffScheduleTab() {
                       onClick={() => handleSwapDecision(swap.id, 'APPROVED')}
                       disabled={decidingSwap}
                     >
-                      Approve
+                      {t('shared.approve')}
                     </Button>
                     <Button
                       size="sm"
@@ -363,7 +362,7 @@ export function StaffScheduleTab() {
                       onClick={() => handleSwapDecision(swap.id, 'DECLINED')}
                       disabled={decidingSwap}
                     >
-                      Decline
+                      {t('shared.decline')}
                     </Button>
                   </div>
                 ) : null}
@@ -375,18 +374,18 @@ export function StaffScheduleTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Log new swap</CardTitle>
-          <CardDescription>Let a team member request coverage for their shift.</CardDescription>
+          <CardTitle>{t('schedule.logSwapTitle')}</CardTitle>
+          <CardDescription>{t('schedule.logSwapDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
           <div>
-            <Label htmlFor="swapShift">Shift</Label>
+            <Label htmlFor="swapShift">{t('schedule.shift')}</Label>
             <Select
               value={swapForm.shiftId}
               onValueChange={(value) => setSwapForm((prev) => ({ ...prev, shiftId: value }))}
             >
               <SelectTrigger id="swapShift" className="mt-1 w-full">
-                <option value="">Select shift</option>
+                <option value="">{t('schedule.selectShift')}</option>
                 {shifts.map((shift) => (
                   <option key={shift.id} value={shift.id}>
                     {format(new Date(shift.startsAt), 'EEE, MMM d · p')} — {shift.role}
@@ -396,13 +395,13 @@ export function StaffScheduleTab() {
             </Select>
           </div>
           <div>
-            <Label htmlFor="swapRequester">Requested by</Label>
+            <Label htmlFor="swapRequester">{t('schedule.requestedBy')}</Label>
             <Select
               value={swapForm.requestedBy}
               onValueChange={(value) => setSwapForm((prev) => ({ ...prev, requestedBy: value }))}
             >
               <SelectTrigger id="swapRequester" className="mt-1 w-full">
-                <option value="">Choose staff</option>
+                <option value="">{t('schedule.chooseStaff')}</option>
                 {staffMembers.map((member) => (
                   <option key={member.id} value={member.id}>
                     {member.displayName}
@@ -412,7 +411,7 @@ export function StaffScheduleTab() {
             </Select>
           </div>
           <div>
-            <Label htmlFor="swapCover">Proposed cover</Label>
+            <Label htmlFor="swapCover">{t('schedule.proposedCover')}</Label>
             <Select
               value={swapForm.proposedCoverId}
               onValueChange={(value) =>
@@ -420,7 +419,7 @@ export function StaffScheduleTab() {
               }
             >
               <SelectTrigger id="swapCover" className="mt-1 w-full">
-                <option value="">Open to team</option>
+                <option value="">{t('schedule.openToTeam')}</option>
                 {staffMembers.map((member) => (
                   <option key={member.id} value={member.id}>
                     {member.displayName}
@@ -430,7 +429,7 @@ export function StaffScheduleTab() {
             </Select>
           </div>
           <div className="sm:col-span-2">
-            <Label htmlFor="swapReason">Reason</Label>
+            <Label htmlFor="swapReason">{t('shared.reason')}</Label>
             <Input
               id="swapReason"
               value={swapForm.reason}
@@ -439,7 +438,7 @@ export function StaffScheduleTab() {
           </div>
           <div className="sm:col-span-2 flex justify-end">
             <Button onClick={handleCreateSwap} disabled={creatingSwap}>
-              {creatingSwap ? 'Submitting…' : 'Submit swap request'}
+              {creatingSwap ? t('portal.dashboard.submitting') : t('schedule.submitSwap')}
             </Button>
           </div>
         </CardContent>

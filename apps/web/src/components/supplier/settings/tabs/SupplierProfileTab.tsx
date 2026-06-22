@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../ui/card'
 import { Button } from '../../../ui/button'
 import { Input } from '../../../ui/input'
@@ -27,8 +28,10 @@ import {
   useGetPresignedUrlMutation,
   useGetEntitlementsQuery,
 } from '../../../../services/api'
+import { ensureNamespace } from '../../../../i18n'
 
 export function SupplierProfileTab() {
+  const { t } = useTranslation('suppliers')
   const { user } = useAppSelector((state) => state.auth)
   const { can } = usePermissions()
   const {
@@ -68,6 +71,10 @@ export function SupplierProfileTab() {
   }, [supplier?.id, supplier?.slug])
 
   useEffect(() => {
+    void ensureNamespace('suppliers')
+  }, [])
+
+  useEffect(() => {
     if (supplier) {
       setProfileForm({
         name: supplier.name || '',
@@ -87,9 +94,9 @@ export function SupplierProfileTab() {
     if (!catalogLink) return
     try {
       await navigator.clipboard.writeText(catalogLink)
-      toast.success('Catalog link copied')
+      toast.success(t('profile.toast.linkCopied'))
     } catch {
-      toast.error('Could not copy link')
+      toast.error(t('profile.toast.copyFailed'))
     }
   }
 
@@ -102,26 +109,28 @@ export function SupplierProfileTab() {
           publicCatalogEnabled?: boolean
         },
       }).unwrap()
-      toast.success(enabled ? 'Public catalog enabled' : 'Public catalog disabled')
+      toast.success(
+        enabled ? t('profile.toast.catalogEnabled') : t('profile.toast.catalogDisabled')
+      )
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'data' in err
           ? (err as { data?: { error?: { message?: string } } }).data?.error?.message
           : undefined
-      toast.error(message || 'Failed to update catalog setting')
+      toast.error(message || t('profile.toast.catalogUpdateFailed'))
     }
   }
 
   const handleLogoUpload = async (logoUrl: string) => {
     if (!supplier?.id) {
-      toast.error('Supplier information not loaded')
-      throw new Error('Supplier information not loaded')
+      toast.error(t('profile.toast.notLoaded'))
+      throw new Error(t('profile.toast.notLoaded'))
     }
     try {
       await uploadSupplierLogo({ id: supplier.id, logoUrl }).unwrap()
       refetchSupplier()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to upload logo')
+      toast.error(error?.data?.error?.message || t('profile.toast.logoUploadFailed'))
       throw error
     }
   }
@@ -136,7 +145,7 @@ export function SupplierProfileTab() {
 
   const handleSaveProfile = async () => {
     if (!supplier?.id) {
-      toast.error('Supplier information not loaded')
+      toast.error(t('profile.toast.notLoaded'))
       return
     }
 
@@ -151,10 +160,10 @@ export function SupplierProfileTab() {
           address: profileForm.address,
         },
       }).unwrap()
-      toast.success('Profile updated successfully!')
+      toast.success(t('profile.toast.updated'))
       refetchSupplier()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to update profile')
+      toast.error(error?.data?.error?.message || t('profile.toast.updateFailed'))
     }
   }
 
@@ -162,7 +171,7 @@ export function SupplierProfileTab() {
     return (
       <div className="flex items-center gap-3 text-sm text-[var(--text-muted)] py-8">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Loading profile…
+        {t('profile.loading')}
       </div>
     )
   }
@@ -172,13 +181,13 @@ export function SupplierProfileTab() {
       <TenantBrandingPanel
         tenantType="SUPPLIER"
         entityId={supplier?.id}
-        entityName={supplier?.name || 'Supplier'}
+        entityName={supplier?.name || t('profile.defaultEntityName')}
         currentLogo={supplier?.logo_url}
         entitlements={entitlements}
         canEditBranding={can('SETTINGS_EDIT') || can('SETTINGS_MANAGE')}
         upgradeTab="plan"
-        logoTitle="Company Logo"
-        logoDescription="Upload your company logo. This will be displayed in your profile and to restaurants."
+        logoTitle={t('profile.logoTitle')}
+        logoDescription={t('profile.logoDescription')}
         onLogoUpload={handleLogoUpload}
         getPresignedUrl={handleGetPresignedUrl}
       />
@@ -187,12 +196,9 @@ export function SupplierProfileTab() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Link2 className="h-5 w-5" />
-            Supplier catalog link
+            {t('profile.catalogLink.title')}
           </CardTitle>
-          <CardDescription>
-            Share this link with restaurants so they can browse your catalog and request quotes
-            without full onboarding.
-          </CardDescription>
+          <CardDescription>{t('profile.catalogLink.description')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -200,13 +206,13 @@ export function SupplierProfileTab() {
             <div className="flex gap-2 shrink-0">
               <Button type="button" variant="outline" size="sm" onClick={handleCopyCatalogLink}>
                 <Copy className="h-4 w-4 mr-1" />
-                Copy catalog link
+                {t('profile.catalogLink.copy')}
               </Button>
               {catalogLink && (
                 <Button type="button" variant="outline" size="sm" asChild>
                   <a href={catalogLink} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="h-4 w-4 mr-1" />
-                    Preview catalog
+                    {t('profile.catalogLink.preview')}
                   </a>
                 </Button>
               )}
@@ -214,9 +220,9 @@ export function SupplierProfileTab() {
           </div>
           <div className="flex items-center justify-between rounded-lg border border-[var(--app-border)] p-3">
             <div>
-              <p className="text-sm font-medium">Public catalog enabled</p>
+              <p className="text-sm font-medium">{t('profile.catalogLink.publicEnabled')}</p>
               <p className="text-xs text-[var(--text-muted)]">
-                When off, the catalog link returns not found.
+                {t('profile.catalogLink.publicEnabledHint')}
               </p>
             </div>
             <Button
@@ -226,7 +232,9 @@ export function SupplierProfileTab() {
               disabled={isUpdating}
               onClick={() => handleTogglePublicCatalog(supplier?.public_catalog_enabled === false)}
             >
-              {supplier?.public_catalog_enabled !== false ? 'Enabled' : 'Disabled'}
+              {supplier?.public_catalog_enabled !== false
+                ? t('profile.catalogLink.enabled')
+                : t('profile.catalogLink.disabled')}
             </Button>
           </div>
         </CardContent>
@@ -236,55 +244,55 @@ export function SupplierProfileTab() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5" />
-            Company Information
+            {t('profile.companyInfo.title')}
           </CardTitle>
-          <CardDescription>Update your company details and contact information</CardDescription>
+          <CardDescription>{t('profile.companyInfo.description')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Company Name *</Label>
+              <Label htmlFor="name">{t('profile.fields.companyName')}</Label>
               <Input
                 id="name"
                 value={profileForm.name}
                 onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                placeholder="Fresh Produce Co"
+                placeholder={t('profile.placeholders.companyName')}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="legal_name">Legal Name</Label>
+              <Label htmlFor="legal_name">{t('profile.fields.legalName')}</Label>
               <Input
                 id="legal_name"
                 value={profileForm.legal_name}
                 onChange={(e) => setProfileForm({ ...profileForm, legal_name: e.target.value })}
-                placeholder="Fresh Produce Co LLC"
+                placeholder={t('profile.placeholders.legalName')}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="vat_no">VAT Number</Label>
+              <Label htmlFor="vat_no">{t('profile.fields.vatNumber')}</Label>
               <Input
                 id="vat_no"
                 value={profileForm.vat_no}
                 onChange={(e) => setProfileForm({ ...profileForm, vat_no: e.target.value })}
-                placeholder="VAT-123456"
+                placeholder={t('profile.placeholders.vatNumber')}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="trade_license_no">Trade License</Label>
+              <Label htmlFor="trade_license_no">{t('profile.fields.tradeLicense')}</Label>
               <Input
                 id="trade_license_no"
                 value={profileForm.trade_license_no}
                 onChange={(e) =>
                   setProfileForm({ ...profileForm, trade_license_no: e.target.value })
                 }
-                placeholder="TL-456789"
+                placeholder={t('profile.placeholders.tradeLicense')}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="contact_email">Contact Email *</Label>
+              <Label htmlFor="contact_email">{t('profile.fields.contactEmail')}</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                 <Input
@@ -294,13 +302,13 @@ export function SupplierProfileTab() {
                   onChange={(e) =>
                     setProfileForm({ ...profileForm, contact_email: e.target.value })
                   }
-                  placeholder="contact@example.com"
+                  placeholder={t('profile.placeholders.contactEmail')}
                   className="pl-10"
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">{t('profile.fields.phone')}</Label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                 <Input
@@ -308,7 +316,7 @@ export function SupplierProfileTab() {
                   type="tel"
                   value={profileForm.phone}
                   onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                  placeholder="+1 (555) 123-4567"
+                  placeholder={t('profile.placeholders.phone')}
                   className="pl-10"
                 />
               </div>
@@ -316,7 +324,7 @@ export function SupplierProfileTab() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="website">Website</Label>
+            <Label htmlFor="website">{t('profile.fields.website')}</Label>
             <div className="relative">
               <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
               <Input
@@ -324,26 +332,26 @@ export function SupplierProfileTab() {
                 type="url"
                 value={profileForm.website}
                 onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
-                placeholder="https://www.example.com"
+                placeholder={t('profile.placeholders.website')}
                 className="pl-10"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Company Description</Label>
+            <Label htmlFor="description">{t('profile.fields.description')}</Label>
             <Textarea
               id="description"
               value={profileForm.description}
               onChange={(e) => setProfileForm({ ...profileForm, description: e.target.value })}
-              placeholder="Tell restaurants about your company..."
+              placeholder={t('profile.placeholders.description')}
               rows={4}
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="street">Street Address</Label>
+              <Label htmlFor="street">{t('profile.fields.street')}</Label>
               <Input
                 id="street"
                 value={profileForm.address.street}
@@ -353,11 +361,11 @@ export function SupplierProfileTab() {
                     address: { ...profileForm.address, street: e.target.value },
                   })
                 }
-                placeholder="123 Main Street"
+                placeholder={t('profile.placeholders.street')}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
+              <Label htmlFor="city">{t('profile.fields.city')}</Label>
               <Input
                 id="city"
                 value={profileForm.address.city}
@@ -367,11 +375,11 @@ export function SupplierProfileTab() {
                     address: { ...profileForm.address, city: e.target.value },
                   })
                 }
-                placeholder="City Name"
+                placeholder={t('profile.placeholders.city')}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="region">Region/State</Label>
+              <Label htmlFor="region">{t('profile.fields.region')}</Label>
               <Input
                 id="region"
                 value={profileForm.address.region}
@@ -381,11 +389,11 @@ export function SupplierProfileTab() {
                     address: { ...profileForm.address, region: e.target.value },
                   })
                 }
-                placeholder="State or Region"
+                placeholder={t('profile.placeholders.region')}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="country">Country</Label>
+              <Label htmlFor="country">{t('profile.fields.country')}</Label>
               <Input
                 id="country"
                 value={profileForm.address.country}
@@ -395,7 +403,7 @@ export function SupplierProfileTab() {
                     address: { ...profileForm.address, country: e.target.value },
                   })
                 }
-                placeholder="Country"
+                placeholder={t('profile.placeholders.country')}
               />
             </div>
           </div>
@@ -404,12 +412,12 @@ export function SupplierProfileTab() {
             {isUpdating ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
+                {t('profile.saving')}
               </>
             ) : (
               <>
                 <Save className="h-4 w-4 mr-2" />
-                Save Changes
+                {t('profile.saveChanges')}
               </>
             )}
           </Button>

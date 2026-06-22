@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
 import { Textarea } from '../../ui/textarea'
-import { Select, SelectTrigger } from '../../ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '../../ui/select'
 import { Mail, Phone, Globe, Save, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { TenantBrandingPanel } from '../../settings/TenantBrandingPanel'
@@ -20,6 +21,7 @@ import { normalizeAddress } from '../../../lib/address'
 import { OnboardingTabLoading, SettingsSection } from './onboardingShared'
 
 export function OnboardingProfileTab() {
+  const { t } = useTranslation('onboarding')
   const { can } = usePermissions()
   const {
     data: restaurantData,
@@ -67,14 +69,14 @@ export function OnboardingProfileTab() {
 
   const handleLogoUpload = async (logoUrl: string) => {
     if (!restaurant?.id) {
-      toast.error('Restaurant information not loaded')
-      throw new Error('Restaurant information not loaded')
+      toast.error(t('restaurantProfile.toasts.notLoaded'))
+      throw new Error(t('restaurantProfile.toasts.notLoaded'))
     }
     try {
       await uploadRestaurantLogo({ id: restaurant.id, logoUrl }).unwrap()
       refetchRestaurant()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to upload logo')
+      toast.error(error?.data?.error?.message || t('restaurantProfile.toasts.logoFailed'))
       throw error
     }
   }
@@ -87,7 +89,7 @@ export function OnboardingProfileTab() {
 
   const handleSaveProfile = async () => {
     if (!restaurant?.id) {
-      toast.error('Restaurant information not loaded')
+      toast.error(t('restaurantProfile.toasts.notLoaded'))
       return
     }
 
@@ -102,10 +104,10 @@ export function OnboardingProfileTab() {
           address: profileForm.address,
         },
       }).unwrap()
-      toast.success('Profile updated successfully!')
+      toast.success(t('restaurantProfile.toasts.updated'))
       refetchRestaurant()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to update profile')
+      toast.error(error?.data?.error?.message || t('restaurantProfile.toasts.updateFailed'))
     }
   }
 
@@ -118,31 +120,31 @@ export function OnboardingProfileTab() {
       <TenantBrandingPanel
         tenantType="RESTAURANT"
         entityId={restaurant?.id}
-        entityName={restaurant?.name || 'Restaurant'}
+        entityName={restaurant?.name || t('restaurantProfile.fallbackName')}
         currentLogo={restaurant?.logo_url}
         entitlements={entitlements}
         canEditBranding={can('SETTINGS_EDIT') || can('SETTINGS_MANAGE')}
         upgradeTab="subscription"
-        logoTitle="Business Logo"
-        logoDescription="Upload your business logo. This will be displayed in your profile and to suppliers."
+        logoTitle={t('restaurantProfile.logo.title')}
+        logoDescription={t('restaurantProfile.logo.description')}
         onLogoUpload={handleLogoUpload}
         getPresignedUrl={handleGetPresignedUrl}
       />
 
       <SettingsSection
-        title="Business profile"
-        description="Update your business information and contact details."
+        title={t('restaurantProfile.title')}
+        description={t('restaurantProfile.description')}
         footer={
           <Button onClick={handleSaveProfile} disabled={isUpdating}>
             {isUpdating ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving…
+                {t('restaurantProfile.actions.saving')}
               </>
             ) : (
               <>
                 <Save className="mr-2 h-4 w-4" />
-                Save changes
+                {t('restaurantProfile.actions.saveChanges')}
               </>
             )}
           </Button>
@@ -151,36 +153,45 @@ export function OnboardingProfileTab() {
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="businessName">Business Name *</Label>
+              <Label htmlFor="businessName">{t('restaurantProfile.fields.businessName')} *</Label>
               <Input
                 id="businessName"
-                placeholder="Enter business name"
+                placeholder={t('restaurantProfile.placeholders.businessName')}
                 value={profileForm.name}
                 onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="businessType">Business Type *</Label>
+              <Label htmlFor="businessType">{t('restaurantProfile.fields.businessType')} *</Label>
               <Select
                 value={profileForm.business_type}
                 onValueChange={(value) => setProfileForm({ ...profileForm, business_type: value })}
               >
-                <SelectTrigger id="businessType">
-                  <option value="restaurant">Restaurant</option>
-                  <option value="cafe">Café</option>
-                  <option value="hotel">Hotel</option>
-                  <option value="catering">Catering</option>
-                </SelectTrigger>
+                <SelectTrigger id="businessType" />
+                <SelectContent>
+                  <SelectItem value="restaurant">
+                    {t('restaurantProfile.businessTypes.restaurant')}
+                  </SelectItem>
+                  <SelectItem value="cafe">{t('restaurantProfile.businessTypes.cafe')}</SelectItem>
+                  <SelectItem value="hotel">
+                    {t('restaurantProfile.businessTypes.hotel')}
+                  </SelectItem>
+                  <SelectItem value="catering">
+                    {t('restaurantProfile.businessTypes.catering')}
+                  </SelectItem>
+                </SelectContent>
               </Select>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="registrationNumber">Registration Number</Label>
+              <Label htmlFor="registrationNumber">
+                {t('restaurantProfile.fields.registrationNumber')}
+              </Label>
               <Input
                 id="registrationNumber"
-                placeholder="Enter registration number"
+                placeholder={t('restaurantProfile.placeholders.registrationNumber')}
                 value={profileForm.trade_license_no}
                 onChange={(e) =>
                   setProfileForm({ ...profileForm, trade_license_no: e.target.value })
@@ -188,10 +199,10 @@ export function OnboardingProfileTab() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="taxId">Tax ID</Label>
+              <Label htmlFor="taxId">{t('restaurantProfile.fields.taxId')}</Label>
               <Input
                 id="taxId"
-                placeholder="Enter tax ID"
+                placeholder={t('restaurantProfile.placeholders.taxId')}
                 value={profileForm.tax_id}
                 onChange={(e) => setProfileForm({ ...profileForm, tax_id: e.target.value })}
               />
@@ -199,10 +210,10 @@ export function OnboardingProfileTab() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="vatNumber">VAT Number</Label>
+            <Label htmlFor="vatNumber">{t('restaurantProfile.fields.vatNumber')}</Label>
             <Input
               id="vatNumber"
-              placeholder="Enter VAT number"
+              placeholder={t('restaurantProfile.placeholders.vatNumber')}
               value={profileForm.vat_number}
               onChange={(e) => setProfileForm({ ...profileForm, vat_number: e.target.value })}
             />
@@ -210,7 +221,7 @@ export function OnboardingProfileTab() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="contact-email">Contact Email *</Label>
+              <Label htmlFor="contact-email">{t('restaurantProfile.fields.contactEmail')} *</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                 <Input
@@ -226,7 +237,7 @@ export function OnboardingProfileTab() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="contact-phone">Phone</Label>
+              <Label htmlFor="contact-phone">{t('restaurantProfile.fields.phone')}</Label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                 <Input
@@ -242,7 +253,7 @@ export function OnboardingProfileTab() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="website">Website</Label>
+            <Label htmlFor="website">{t('restaurantProfile.fields.website')}</Label>
             <div className="relative">
               <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
               <Input
@@ -257,10 +268,10 @@ export function OnboardingProfileTab() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Business Description</Label>
+            <Label htmlFor="description">{t('restaurantProfile.fields.description')}</Label>
             <Textarea
               id="description"
-              placeholder="Tell suppliers about your restaurant..."
+              placeholder={t('restaurantProfile.placeholders.description')}
               rows={4}
               value={profileForm.description}
               onChange={(e) => setProfileForm({ ...profileForm, description: e.target.value })}
@@ -269,10 +280,10 @@ export function OnboardingProfileTab() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="street">Street Address</Label>
+              <Label htmlFor="street">{t('restaurantProfile.fields.street')}</Label>
               <Input
                 id="street"
-                placeholder="123 Main Street"
+                placeholder={t('restaurantProfile.placeholders.street')}
                 value={profileForm.address.street}
                 onChange={(e) =>
                   setProfileForm({
@@ -283,10 +294,10 @@ export function OnboardingProfileTab() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
+              <Label htmlFor="city">{t('restaurantProfile.fields.city')}</Label>
               <Input
                 id="city"
-                placeholder="City Name"
+                placeholder={t('restaurantProfile.placeholders.city')}
                 value={profileForm.address.city}
                 onChange={(e) =>
                   setProfileForm({
@@ -297,10 +308,10 @@ export function OnboardingProfileTab() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="region">Region/State</Label>
+              <Label htmlFor="region">{t('restaurantProfile.fields.region')}</Label>
               <Input
                 id="region"
-                placeholder="State or Region"
+                placeholder={t('restaurantProfile.placeholders.region')}
                 value={profileForm.address.region}
                 onChange={(e) =>
                   setProfileForm({
@@ -311,10 +322,10 @@ export function OnboardingProfileTab() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="country">Country</Label>
+              <Label htmlFor="country">{t('restaurantProfile.fields.country')}</Label>
               <Input
                 id="country"
-                placeholder="Country"
+                placeholder={t('restaurantProfile.placeholders.country')}
                 value={profileForm.address.country}
                 onChange={(e) =>
                   setProfileForm({
@@ -327,10 +338,12 @@ export function OnboardingProfileTab() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="deliveryInstructions">Delivery Instructions</Label>
+            <Label htmlFor="deliveryInstructions">
+              {t('restaurantProfile.fields.deliveryInstructions')}
+            </Label>
             <Textarea
               id="deliveryInstructions"
-              placeholder="e.g., Gate A, Floor 2, Landmark: next to gas station"
+              placeholder={t('restaurantProfile.placeholders.deliveryInstructions')}
               rows={3}
               value={profileForm.delivery_instructions}
               onChange={(e) =>

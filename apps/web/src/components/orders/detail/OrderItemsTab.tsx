@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useGetOrderQuery } from '../../../services/api'
 import { AppPanel } from '../../ui/app-panel'
 import { Badge } from '../../ui/badge'
@@ -9,6 +10,7 @@ export interface OrderItemsTabProps {
 }
 
 export function OrderItemsTab({ orderId }: OrderItemsTabProps) {
+  const { t } = useTranslation('orders')
   const { data, isLoading } = useGetOrderQuery(orderId)
 
   if (isLoading || !data?.order) {
@@ -18,10 +20,13 @@ export function OrderItemsTab({ orderId }: OrderItemsTabProps) {
   const order = data.order
 
   return (
-    <AppPanel title="Order Items" description={`${order.items?.length || 0} items`}>
+    <AppPanel
+      title={t('itemsTab.title')}
+      description={t('itemsTab.description', { count: order.items?.length || 0 })}
+    >
       {(order as any).multiLocationFulfillment && (
         <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-          This order is being fulfilled from multiple warehouse locations.
+          {t('itemsTab.multiLocationHint')}
         </div>
       )}
       <div className="space-y-4">
@@ -37,8 +42,12 @@ export function OrderItemsTab({ orderId }: OrderItemsTabProps) {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2 flex-wrap">
-                    <h4 className="font-semibold text-lg">{item.product_name || 'Product'}</h4>
-                    <Badge variant="outline">SKU: {item.product_sku || 'N/A'}</Badge>
+                    <h4 className="font-semibold text-lg">
+                      {item.product_name || t('itemsTab.productFallback')}
+                    </h4>
+                    <Badge variant="outline">
+                      {t('itemsTab.sku', { sku: item.product_sku || t('itemsTab.notAvailable') })}
+                    </Badge>
                     {assignment && (
                       <Badge variant="secondary">
                         {assignment.warehouse_name} · {assignment.status}
@@ -47,20 +56,22 @@ export function OrderItemsTab({ orderId }: OrderItemsTabProps) {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-[var(--text-muted)]">
                     <div>
-                      <span className="font-medium">Quantity:</span> {item.quantity}
+                      <span className="font-medium">{t('itemsTab.quantity')}</span> {item.quantity}
                     </div>
                     <div>
-                      <span className="font-medium">Unit Price:</span> $
+                      <span className="font-medium">{t('itemsTab.unitPrice')}</span> $
                       {formatPrice(item.unit_price)}
                     </div>
                     {item.supplier_name && (
                       <div>
-                        <span className="font-medium">Supplier:</span> {item.supplier_name}
+                        <span className="font-medium">{t('itemsTab.supplier')}</span>{' '}
+                        {item.supplier_name}
                       </div>
                     )}
                     {item.location && (
                       <div>
-                        <span className="font-medium">Location:</span> {item.location}
+                        <span className="font-medium">{t('itemsTab.location')}</span>{' '}
+                        {item.location}
                       </div>
                     )}
                   </div>
@@ -70,7 +81,10 @@ export function OrderItemsTab({ orderId }: OrderItemsTabProps) {
                     ${formatPrice(item.line_total)}
                   </p>
                   <p className="text-sm text-[var(--text-muted)]">
-                    {item.quantity} × ${formatPrice(item.unit_price)}
+                    {t('itemsTab.lineTotal', {
+                      quantity: item.quantity,
+                      price: formatPrice(item.unit_price),
+                    })}
                   </p>
                 </div>
               </div>

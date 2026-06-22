@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Copy, Check } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
@@ -39,7 +39,7 @@ export function RestaurantMemberInviteModal({ open, onClose }: Props) {
     error: rolesQueryError,
   } = useGetRestaurantMemberInviteRolesQuery(undefined, { skip: !open })
   const [createInvitation, { isLoading }] = useCreateRestaurantMemberInvitationMutation()
-  const roles = rolesData?.roles ?? []
+  const roles = useMemo(() => rolesData?.roles ?? [], [rolesData?.roles])
   const rolesForbidden = rolesError && (rolesQueryError as { status?: number })?.status === 403
 
   useEffect(() => {

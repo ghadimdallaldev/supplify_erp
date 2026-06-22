@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Badge } from '../ui/badge'
 import { useGetPromotionPricingQuery, usePromoteDealMutation } from '../../services/api'
+import { ensureNamespace } from '../../i18n'
 import { Megaphone, Sparkles, TrendingUp, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -30,11 +32,15 @@ export function PromoteDealDialog({
   onOpenChange: (open: boolean) => void
   onSuccess?: () => void
 }) {
+  const { t } = useTranslation('deals')
   const { data: pricingData, isLoading: loadingPricing } = useGetPromotionPricingQuery(undefined, {
     skip: !open,
   })
   const [promoteDeal, { isLoading }] = usePromoteDealMutation()
-  const pricingOptions = (pricingData?.pricing || []) as PricingOption[]
+  const pricingOptions = useMemo(
+    () => (pricingData?.pricing || []) as PricingOption[],
+    [pricingData?.pricing]
+  )
 
   const defaultKey = useMemo(() => {
     const recommended = pricingOptions.find((o) => o.is_recommended)
@@ -42,6 +48,10 @@ export function PromoteDealDialog({
   }, [pricingOptions])
 
   const [selectedPricingKey, setSelectedPricingKey] = useState('')
+
+  useEffect(() => {
+    void ensureNamespace('deals')
+  }, [])
 
   useEffect(() => {
     if (open && defaultKey) {
@@ -55,12 +65,12 @@ export function PromoteDealDialog({
     if (!dealId || !selectedPricingKey) return
     try {
       await promoteDeal({ id: dealId, pricingKey: selectedPricingKey }).unwrap()
-      toast.success('Deal boost activated')
+      toast.success(t('promoteDialog.toastSuccess'))
       onOpenChange(false)
       onSuccess?.()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to boost deal')
+      toast.error(err?.data?.error?.message || t('promoteDialog.toastError'))
     }
   }
 
@@ -70,25 +80,21 @@ export function PromoteDealDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Megaphone className="h-5 w-5" />
-            Boost this deal
+            {t('promoteDialog.title')}
           </DialogTitle>
         </DialogHeader>
 
-        <p className="text-sm text-[var(--text-muted)]">
-          Choose a boost package for sponsored placement in restaurant deal feeds — including
-          restaurants that do not follow you yet.
-        </p>
+        <p className="text-sm text-[var(--text-muted)]">{t('promoteDialog.description')}</p>
 
         <p className="text-xs text-[var(--text-muted)] rounded-md bg-[var(--surface-muted)] px-3 py-2">
-          Your deal will appear higher in restaurant deal feeds during the boost period. Reach
-          estimates describe placement priority, not exact impression counts.
+          {t('promoteDialog.helperText')}
         </p>
 
         {loadingPricing ? (
-          <p className="text-sm text-[var(--text-muted)] py-4">Loading boost packages…</p>
+          <p className="text-sm text-[var(--text-muted)] py-4">{t('promoteDialog.loading')}</p>
         ) : pricingOptions.length === 0 ? (
           <p className="text-sm text-[var(--text-muted)] py-4">
-            No boost packages are available right now. Contact support or try again later.
+            {t('promoteDialog.noneAvailable')}
           </p>
         ) : (
           <div className="grid gap-3 mt-1">
@@ -125,11 +131,13 @@ export function PromoteDealDialog({
                             </Badge>
                           ) : null}
                           {opt.is_recommended && !opt.badge_label ? (
-                            <Badge>Recommended</Badge>
+                            <Badge>{t('promoteDialog.recommended')}</Badge>
                           ) : null}
                         </div>
                         <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                          {days ? `${days} day${days === 1 ? '' : 's'} boost` : 'Boost period'}
+                          {days
+                            ? t('promoteDialog.daysBoost', { count: days })
+                            : t('promoteDialog.boostPeriod')}
                           {opt.estimated_reach_label ? ` · ${opt.estimated_reach_label}` : ''}
                         </p>
                         {opt.description ? (
@@ -144,7 +152,7 @@ export function PromoteDealDialog({
                         ${Number(opt.amount).toFixed(0)}
                       </p>
                       <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                        one-time
+                        {t('promoteDialog.oneTime')}
                       </p>
                     </div>
                   </div>
@@ -156,12 +164,18 @@ export function PromoteDealDialog({
 
         {selected ? (
           <div className="rounded-lg border border-dashed p-3 text-sm">
-            <p className="font-medium">You are boosting with {selected.display_name}</p>
+            <p className="font-medium">
+              {t('promoteDialog.boostingWith', { name: selected.display_name })}
+            </p>
             <p className="text-xs text-[var(--text-muted)] mt-1">
-              ${Number(selected.amount).toFixed(2)} for{' '}
               {selected.duration_days
-                ? `${selected.duration_days} day${selected.duration_days === 1 ? '' : 's'}`
-                : 'the boost period'}
+                ? t('promoteDialog.priceForDays', {
+                    amount: Number(selected.amount).toFixed(2),
+                    count: selected.duration_days,
+                  })
+                : t('promoteDialog.priceForPeriod', {
+                    amount: Number(selected.amount).toFixed(2),
+                  })}
               {selected.estimated_reach_label ? ` · ${selected.estimated_reach_label}` : ''}
             </p>
           </div>
@@ -169,14 +183,14 @@ export function PromoteDealDialog({
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('promoteDialog.cancel')}
           </Button>
           <Button
             onClick={handlePromote}
             disabled={isLoading || !selectedPricingKey || pricingOptions.length === 0}
           >
             <Megaphone className="h-4 w-4 mr-2" />
-            Boost deal
+            {t('promoteDialog.boostDeal')}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Badge } from '../ui/badge'
 import { useGetPromotionPricingQuery } from '../../services/api'
+import { ensureNamespace } from '../../i18n'
 import { Sparkles, TrendingUp, Zap } from 'lucide-react'
 
 export type BoostPricingOption = {
@@ -25,13 +27,18 @@ export function DealBoostPackagePicker({
   onSelect: (pricingKey: string) => void
   disabled?: boolean
 }) {
+  const { t } = useTranslation('deals')
   const { data, isLoading } = useGetPromotionPricingQuery()
-  const options = (data?.pricing || []) as BoostPricingOption[]
+  const options = useMemo(() => (data?.pricing || []) as BoostPricingOption[], [data?.pricing])
 
   const defaultKey = useMemo(() => {
     const recommended = options.find((o) => o.is_recommended)
     return recommended?.pricing_key || options[0]?.pricing_key || ''
   }, [options])
+
+  useEffect(() => {
+    void ensureNamespace('deals')
+  }, [])
 
   useEffect(() => {
     if (!selectedPricingKey && defaultKey) {
@@ -40,22 +47,19 @@ export function DealBoostPackagePicker({
   }, [defaultKey, onSelect, selectedPricingKey])
 
   if (isLoading) {
-    return <p className="text-sm text-[var(--text-muted)]">Loading boost packages…</p>
+    return <p className="text-sm text-[var(--text-muted)]">{t('boostPackagePicker.loading')}</p>
   }
 
   if (options.length === 0) {
     return (
-      <p className="text-sm text-[var(--text-muted)]">
-        No boost packages available. Contact support.
-      </p>
+      <p className="text-sm text-[var(--text-muted)]">{t('boostPackagePicker.noneAvailable')}</p>
     )
   }
 
   return (
     <div className="space-y-3">
       <p className="text-xs text-[var(--text-muted)] rounded-md bg-[var(--surface-muted)] px-3 py-2">
-        Your deal will get sponsored placement in restaurant deal feeds during the boost period.
-        Reach labels describe placement priority, not exact impression counts.
+        {t('boostPackagePicker.helperText')}
       </p>
       <div className="grid gap-3">
         {options.map((opt, index) => {
@@ -93,7 +97,9 @@ export function DealBoostPackagePicker({
                       ) : null}
                     </div>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                      {days ? `${days} day${days === 1 ? '' : 's'}` : 'Boost period'}
+                      {days
+                        ? t('boostPackagePicker.days', { count: days })
+                        : t('boostPackagePicker.boostPeriod')}
                       {opt.estimated_reach_label ? ` · ${opt.estimated_reach_label}` : ''}
                     </p>
                     {opt.description ? (
@@ -106,7 +112,7 @@ export function DealBoostPackagePicker({
                 <div className="text-right shrink-0">
                   <p className="text-lg font-bold tabular-nums">${Number(opt.amount).toFixed(0)}</p>
                   <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                    one-time
+                    {t('boostPackagePicker.oneTime')}
                   </p>
                 </div>
               </div>

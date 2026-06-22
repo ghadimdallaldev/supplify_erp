@@ -22,8 +22,11 @@ import { LanguageSwitcher } from './LanguageSwitcher'
 
 const PAGE_NAMES: Record<string, string> = {
   '/app/dashboard': 'dashboard',
+  '/app/command-center': 'commandCenter',
+  '/app/run-sheet': 'runSheet',
   '/app/orders': 'orders',
   '/app/products': 'products',
+  '/app/my-prices': 'myPrices',
   '/app/fulfillment': 'fulfillment',
   '/app/restaurants': 'restaurants',
   '/app/suppliers': 'suppliers',
@@ -45,6 +48,13 @@ const PAGE_NAMES: Record<string, string> = {
   '/app/disputes': 'disputes',
   '/app/deals': 'deals',
   '/app/promotions': 'promotions',
+  '/app/loyalty': 'loyaltyProgram',
+  '/app/consumer-menu': 'guestMenu',
+  '/app/consumer-orders': 'guestOrders',
+  '/app/consumer-loyalty': 'guestRewards',
+  '/app/contract-pricing': 'contractPricing',
+  '/app/quote-requests/supplier': 'quoteInbox',
+  '/app/quote-requests': 'quoteRequests',
   '/app/driver-deliveries': 'myDeliveries',
   '/app/onboarding': 'onboarding',
   '/app/org': 'organization',
@@ -117,9 +127,14 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
   const workspace = user?.workspace
   const workspaceLabel =
     workspace?.tenantName &&
-    `${workspace.tenantType === 'SUPPLIER' ? 'Supplier' : 'Restaurant'}: ${workspace.tenantName}${
-      workspace.roleName ? ` · ${workspace.roleName}` : ''
-    }`
+    t('header.workspaceContext', {
+      type:
+        workspace.tenantType === 'SUPPLIER'
+          ? t('workspace.supplier', { ns: 'common' })
+          : t('workspace.restaurant', { ns: 'common' }),
+      name: workspace.tenantName,
+      rolePart: workspace.roleName ? ` · ${workspace.roleName}` : '',
+    })
   const showUpgrade = (!isPlatformAdmin || isImpersonating) && user?.role !== 'PENDING'
   const isAdminPortalRoute =
     isPlatformAdmin && !isImpersonating && location.pathname.startsWith('/app/admin')
@@ -151,14 +166,14 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
     try {
       const data = await logout().unwrap()
       dispatch(api.util.resetApiState())
-      toast.success('Logged out successfully')
+      toast.success(t('header.loggedOutSuccess'))
       if (data?.keycloakLogoutUrl) {
         window.location.href = data.keycloakLogoutUrl
       } else {
         window.location.href = '/login'
       }
     } catch (error) {
-      toast.error('Logout failed')
+      toast.error(t('header.logoutFailed'))
     }
   }
 
@@ -186,7 +201,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         <button
           type="button"
           className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)] lg:hidden"
-          aria-label={t('openMenu', { ns: 'navigation' })}
+          aria-label={t('openMenu')}
           onClick={onOpenMobileNav}
         >
           <Menu size={18} />
@@ -236,32 +251,21 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
                   : { borderColor: 'var(--app-border-mid)', color: 'var(--text-mid)' }
               }
             >
-              <TrendingUp style={{ width: 14, height: 14, marginRight: 4 }} />
-              {hasUrgency ? 'Upgrade' : 'Plans'}
+              <TrendingUp className="me-1" style={{ width: 14, height: 14 }} />
+              {hasUrgency ? t('header.upgrade') : t('header.plans')}
               {hasUrgency && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: -2,
-                    right: -2,
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: 'var(--amber-mid)',
-                    border: '2px solid var(--surface)',
-                  }}
-                />
+                <span className="absolute -top-0.5 -end-0.5 h-2 w-2 rounded-full border-2 border-[var(--surface)] bg-[var(--amber-mid)]" />
               )}
             </Button>
             <button
               type="button"
               className="relative flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)] sm:hidden"
-              aria-label={hasUrgency ? 'Upgrade plan' : 'View plans'}
+              aria-label={hasUrgency ? t('header.upgradePlan') : t('header.viewPlans')}
               onClick={handleNavUpgrade}
             >
               <TrendingUp size={16} className={hasUrgency ? 'text-[var(--brand)]' : undefined} />
               {hasUrgency && (
-                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--amber-mid)]" />
+                <span className="absolute end-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--amber-mid)]" />
               )}
             </button>
           </>
@@ -271,7 +275,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         <button
           type="button"
           className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)] md:hidden"
-          aria-label="Open command palette"
+          aria-label={t('header.openCommandPalette')}
           onClick={openCommandPalette}
         >
           <Search size={16} />
@@ -279,7 +283,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         <button
           type="button"
           className="hidden h-8 min-w-[140px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--app-border)]/50 bg-[var(--brand-ultra)]/30 px-2.5 text-start transition-colors hover:border-[var(--app-border)]/70 hover:bg-[var(--brand-ultra)]/50 md:flex lg:min-w-[200px]"
-          aria-label="Open command palette"
+          aria-label={t('header.openCommandPalette')}
           onClick={openCommandPalette}
         >
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden>
@@ -292,7 +296,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
             />
           </svg>
           <span className="flex-1 text-xs text-[var(--text-muted)]">
-            {isAdminPortalRoute ? 'Search admin…' : 'Search products…'}
+            {isAdminPortalRoute ? t('header.searchAdmin') : t('header.searchProducts')}
           </span>
           <kbd className="hidden rounded border border-[var(--app-border)]/40 bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]/80 lg:inline">
             ⌘K
@@ -306,13 +310,17 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
           <button
             type="button"
             className="erp-pressable relative flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)]"
-            aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+            aria-label={
+              unreadCount > 0
+                ? t('header.notificationsUnread', { count: unreadCount })
+                : t('notifications')
+            }
             aria-expanded={notificationsVisible}
             onClick={toggleNotifications}
           >
             <Bell size={16} />
             {unreadCount > 0 && (
-              <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full border border-[var(--surface)] bg-[var(--red)]" />
+              <span className="absolute end-1.5 top-1.5 h-1.5 w-1.5 rounded-full border border-[var(--surface)] bg-[var(--red)]" />
             )}
           </button>
 
@@ -325,7 +333,9 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
               )}
             >
               <div className="flex items-center justify-between border-b border-[var(--app-border)]/40 px-4 py-3">
-                <span className="text-[13px] font-semibold text-[var(--text)]">Notifications</span>
+                <span className="text-[13px] font-semibold text-[var(--text)]">
+                  {t('notifications')}
+                </span>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   {unreadCount > 0 && (
                     <button
@@ -345,10 +355,12 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
                         }
                       }}
                     >
-                      Mark all read
+                      {t('header.markAllRead')}
                     </button>
                   )}
                   <button
+                    type="button"
+                    aria-label={t('header.closeNotifications')}
                     style={{
                       background: 'none',
                       border: 'none',
@@ -368,10 +380,10 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
                 {notifications.length === 0 ? (
                   <div className="px-4 py-6 text-center">
                     <p className="text-sm font-medium text-[var(--text)]">
-                      You&apos;re all caught up
+                      {t('header.allCaughtUp')}
                     </p>
                     <p className="mt-1 text-xs text-[var(--text-muted)]">
-                      Order updates and alerts will appear here.
+                      {t('header.notificationsEmptyHint')}
                     </p>
                   </div>
                 ) : (
@@ -430,17 +442,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
                           </div>
                         </div>
                         {!notification.is_read && (
-                          <div
-                            style={{
-                              width: 7,
-                              height: 7,
-                              borderRadius: '50%',
-                              background: 'var(--brand)',
-                              marginLeft: 8,
-                              marginTop: 3,
-                              flexShrink: 0,
-                            }}
-                          />
+                          <div className="ms-2 mt-0.5 h-[7px] w-[7px] shrink-0 rounded-full bg-[var(--brand)]" />
                         )}
                       </div>
                     </div>
@@ -458,8 +460,8 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
           type="button"
           className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)]"
           onClick={() => navigate('/app/settings')}
-          aria-label="Settings"
-          title="Settings"
+          aria-label={t('settings')}
+          title={t('settings')}
         >
           <Settings size={15} />
         </button>
@@ -469,7 +471,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
           type="button"
           data-testid="logout-button"
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--brand)] to-[var(--mint-mid)] text-[11px] font-semibold text-white ring-1 ring-[var(--app-border)]/30 transition-opacity hover:opacity-90"
-          title={`${user?.displayName || user?.email} — click to logout`}
+          title={t('header.logoutTitle', { name: user?.displayName || user?.email })}
           onClick={handleLogout}
         >
           {initials}

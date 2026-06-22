@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   useGetFeaturedPlacementPackagesQuery,
   useGetMyFeaturedPlacementsQuery,
@@ -11,8 +12,10 @@ import { Skeleton } from '../ui/skeleton'
 import { Sparkles, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatCurrency } from '../../utils/format'
+import { ensureNamespace } from '../../i18n'
 
 export function FeaturedPlacementPanel() {
+  const { t } = useTranslation('suppliers')
   const { data: packagesData, isLoading: packagesLoading } = useGetFeaturedPlacementPackagesQuery()
   const { data: mineData, isLoading: mineLoading } = useGetMyFeaturedPlacementsQuery()
   const [purchase, { isLoading: purchasing }] = usePurchaseFeaturedPlacementMutation()
@@ -24,13 +27,17 @@ export function FeaturedPlacementPanel() {
     (p: any) => p.status === 'active' && new Date(p.ends_at) > new Date()
   )
 
+  useEffect(() => {
+    void ensureNamespace('suppliers')
+  }, [])
+
   const handlePurchase = async (pricingKey: string) => {
     setBusyKey(pricingKey)
     try {
       await purchase({ pricingKey }).unwrap()
-      toast.success('Featured placement activated')
+      toast.success(t('featuredPlacement.toast.activated'))
     } catch (e: any) {
-      toast.error(e?.data?.error?.message || 'Could not activate featured placement')
+      toast.error(e?.data?.error?.message || t('featuredPlacement.toast.activateFailed'))
     } finally {
       setBusyKey(null)
     }

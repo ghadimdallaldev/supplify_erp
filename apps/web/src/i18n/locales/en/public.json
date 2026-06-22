@@ -1,0 +1,61 @@
+{
+  "catalog": {
+    "loadingTitle": "Supplier catalog",
+    "notFoundTitle": "Catalog not found",
+    "notFoundSubtitle": "This supplier catalog is unavailable or has been disabled.",
+    "emptyTitle": "Nothing to show",
+    "emptyDescription": "The link may be wrong or the supplier has disabled public access.",
+    "logIn": "Log in",
+    "logInToOrder": "Log in to order",
+    "requestAccess": "Request access",
+    "viewInApp": "View in app",
+    "subtitleWithTerms": "Wholesale catalog · {{terms}}",
+    "subtitleDefault": "Wholesale catalog · browse products and request pricing",
+    "stats": {
+      "catalog": "Catalog",
+      "product_one": "{{count}} product",
+      "product_other": "{{count}} products",
+      "paymentTerms": "Payment terms",
+      "minimumOrder": "Minimum order"
+    },
+    "guestPanel": {
+      "title": "Restaurant ordering on Supplify",
+      "description": "Sign in to see contract pricing, add items to your cart, and place orders with this supplier."
+    },
+    "searchPlaceholder": "Search by name, SKU, or category…",
+    "searchAriaLabel": "Search products",
+    "categoryAll": "All",
+    "categoryAriaLabel": "Product categories",
+    "filterCategoryAriaLabel": "Filter by category",
+    "allCategories": "All categories",
+    "emptyFilteredTitle": "No matching products",
+    "emptyDefaultTitle": "No products yet",
+    "emptyFilteredDescription": "Try a different search term or category.",
+    "emptyDefaultDescription": "This supplier has not published any products to their catalog.",
+    "clearFilters": "Clear filters",
+    "showing": "Showing {{shown}} of {{total}}",
+    "updating": "Updating…",
+    "paginationAriaLabel": "Product catalog pagination",
+    "previous": "Previous",
+    "next": "Next",
+    "pageOf": "Page {{page}} of {{total}}",
+    "share": {
+      "title": "Share this catalog",
+      "description": "Send the link to buyers on your team so they can browse and request access.",
+      "copied": "Copied",
+      "copyLink": "Copy link"
+    },
+    "product": {
+      "outOfStock": "Out of stock",
+      "inStock": "In stock",
+      "signInForPricing": "Sign in for pricing",
+      "addToCart": "Add to cart",
+      "requestBestPrice": "Request best price"
+    },
+    "toast": {
+      "addedToCart": "Added to cart",
+      "linkCopied": "Catalog link copied",
+      "copyFailed": "Could not copy link"
+    }
+  }
+}

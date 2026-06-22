@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { AlertCircle, Clock3, Plus, Smartphone, Users } from 'lucide-react'
@@ -72,6 +73,7 @@ function StaffMemberRow({
   onCheckIn: (staff: StaffMember) => void
   onCheckOut: (staff: StaffMember, entryId: string) => void
 }) {
+  const { t } = useTranslation('staff')
   const isOnShift = Boolean(openEntry)
   const initial = member.displayName.charAt(0).toUpperCase()
   const accent = member.profileColor || '#7c3aed'
@@ -90,7 +92,7 @@ function StaffMemberRow({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-semibold text-[var(--text)]">{member.displayName}</p>
-              {renderStaffStatus(member.status)}
+              {renderStaffStatus(member.status, t)}
               <Badge
                 variant={isOnShift ? 'default' : 'outline'}
                 className={cn(
@@ -98,12 +100,12 @@ function StaffMemberRow({
                   isOnShift && 'bg-[var(--mint)] hover:bg-[var(--mint)]'
                 )}
               >
-                {isOnShift ? 'On shift' : 'Off shift'}
+                {isOnShift ? t('team.onShift') : t('team.offShift')}
               </Badge>
             </div>
             <p className="mt-0.5 truncate text-sm text-[var(--text-mid)]">{member.role}</p>
             <p className="mt-1 truncate text-xs text-[var(--text-muted)]">
-              {member.email || 'No email on file'}
+              {member.email || t('team.noEmail')}
               {member.phone ? ` · ${member.phone}` : ''}
             </p>
           </div>
@@ -111,23 +113,23 @@ function StaffMemberRow({
 
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-[var(--text-muted)] sm:grid-cols-3">
           <div>
-            <dt className="sr-only">Wage</dt>
+            <dt className="sr-only">{t('team.srOnlyWage')}</dt>
             <dd>
-              {member.wageType.toLowerCase()}
+              {t(`shared.wageType.${member.wageType}`)}
               {member.wageRate ? ` · ${formatPrice(member.wageRate)}` : ''}
             </dd>
           </div>
           {member.hireDate ? (
             <div>
-              <dt className="sr-only">Hired</dt>
-              <dd>Hired {format(parseISO(member.hireDate), 'MMM d, yyyy')}</dd>
+              <dt className="sr-only">{t('team.srOnlyHired')}</dt>
+              <dd>{t('team.hired', { date: format(parseISO(member.hireDate), 'MMM d, yyyy') })}</dd>
             </div>
           ) : null}
           {isOnShift && openEntry ? (
             <div className="col-span-2 sm:col-span-1">
-              <dt className="sr-only">Clocked in</dt>
+              <dt className="sr-only">{t('team.srOnlyClockedIn')}</dt>
               <dd className="text-[var(--mint)]">
-                Since {format(new Date(openEntry.clockInAt), 'p')}
+                {t('team.since', { time: format(new Date(openEntry.clockInAt), 'p') })}
               </dd>
             </div>
           ) : null}
@@ -143,7 +145,7 @@ function StaffMemberRow({
                 onClick={() => openEntry && onCheckOut(member, openEntry.id)}
                 disabled={rowClockLoading}
               >
-                {rowClockLoading ? 'Closing…' : 'Clock out'}
+                {rowClockLoading ? t('team.closing') : t('team.clockOut')}
               </Button>
             ) : (
               <Button
@@ -152,7 +154,7 @@ function StaffMemberRow({
                 onClick={() => onCheckIn(member)}
                 disabled={rowClockLoading}
               >
-                {rowClockLoading ? 'Clocking…' : 'Clock in'}
+                {rowClockLoading ? t('team.clocking') : t('team.clockIn')}
               </Button>
             )}
           </div>
@@ -165,12 +167,15 @@ function StaffMemberRow({
 }
 
 function TimeEntryRow({ entry }: { entry: StaffTimeEntry }) {
+  const { t } = useTranslation('staff')
   const isOpen = !entry.clockOutAt
   return (
     <li className="px-4 py-3 sm:px-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-medium text-[var(--text)]">{entry.staffName ?? 'Staff member'}</p>
+          <p className="font-medium text-[var(--text)]">
+            {entry.staffName ?? t('shared.staffMember')}
+          </p>
           <p className="text-xs text-[var(--text-muted)]">{entry.role}</p>
         </div>
         <Badge
@@ -182,21 +187,29 @@ function TimeEntryRow({ entry }: { entry: StaffTimeEntry }) {
               : 'border-[var(--mint)] bg-[var(--mint-pale)] text-[var(--mint)]'
           )}
         >
-          {isOpen ? 'Open' : 'Closed'}
+          {isOpen ? t('shared.open') : t('shared.closed')}
         </Badge>
       </div>
       <p className="mt-2 text-xs text-[var(--text-muted)]">
-        In {format(new Date(entry.clockInAt), 'MMM d · p')}
-        {entry.clockOutAt ? <> → Out {format(new Date(entry.clockOutAt), 'p')}</> : null}
+        {t('team.timeEntryIn')} {format(new Date(entry.clockInAt), 'MMM d · p')}
+        {entry.clockOutAt ? (
+          <>
+            {' '}
+            → {t('team.timeEntryOut')} {format(new Date(entry.clockOutAt), 'p')}
+          </>
+        ) : null}
       </p>
       {entry.breakMinutes ? (
-        <p className="mt-1 text-xs text-[var(--text-muted)]">Break {entry.breakMinutes} min</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          {t('team.breakMinutes', { minutes: entry.breakMinutes })}
+        </p>
       ) : null}
     </li>
   )
 }
 
 export function StaffTeamTab() {
+  const { t } = useTranslation('staff')
   const { canAny } = usePermissions()
   const canWriteStaff = canAny('STAFF_EDIT', 'STAFF_MANAGE', 'STAFF_INVITE')
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false)
@@ -255,7 +268,7 @@ export function StaffTeamTab() {
 
   const handleCreateStaff = async () => {
     if (!staffForm.firstName || !staffForm.lastName || !staffForm.role) {
-      toast.error('Please provide first name, last name, and role')
+      toast.error(t('team.validationRequired'))
       return
     }
 
@@ -272,11 +285,11 @@ export function StaffTeamTab() {
         hireDate: staffForm.hireDate || undefined,
         profileColor: staffForm.profileColor || '#2563eb',
       }).unwrap()
-      toast.success('Staff member added')
+      toast.success(t('team.staffAdded'))
       setIsAddStaffOpen(false)
       resetStaffForm()
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Unable to create staff member'))
+      toast.error(getApiErrorMessage(error, t('team.createFailed')))
     }
   }
 
@@ -287,9 +300,9 @@ export function StaffTeamTab() {
         staffId: staff.id,
         method: 'web',
       }).unwrap()
-      toast.success(`${staff.displayName} checked in`)
+      toast.success(t('team.checkedIn', { name: staff.displayName }))
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Unable to check in'))
+      toast.error(getApiErrorMessage(error, t('team.checkInFailed')))
     } finally {
       setClockActionStaffId(null)
     }
@@ -302,9 +315,9 @@ export function StaffTeamTab() {
         id: timeEntryId,
         method: 'web',
       }).unwrap()
-      toast.success(`${staff.displayName} checked out`)
+      toast.success(t('team.checkedOut', { name: staff.displayName }))
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Unable to check out'))
+      toast.error(getApiErrorMessage(error, t('team.checkOutFailed')))
     } finally {
       setClockActionStaffId(null)
     }
@@ -316,9 +329,11 @@ export function StaffTeamTab() {
         <div className="flex items-start gap-2">
           <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand-mid)]" aria-hidden />
           <div>
-            <h2 className="text-base font-semibold text-[var(--text)]">Latest time entries</h2>
+            <h2 className="text-base font-semibold text-[var(--text)]">
+              {t('team.timeEntriesTitle')}
+            </h2>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Who clocked in or out in the last seven days.
+              {t('team.timeEntriesDescription')}
             </p>
           </div>
         </div>
@@ -331,8 +346,8 @@ export function StaffTeamTab() {
       ) : recentEntries.length === 0 ? (
         <EmptyState
           className="py-10"
-          title="No punches yet"
-          description="Clock someone in from the team list, or ask staff to use the portal on their phone."
+          title={t('team.noPunchesTitle')}
+          description={t('team.noPunchesDescription')}
           icon={<Clock3 className="h-8 w-8" aria-hidden />}
         />
       ) : (
@@ -351,9 +366,11 @@ export function StaffTeamTab() {
         <div className="flex items-start gap-2">
           <Users className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand-mid)]" aria-hidden />
           <div>
-            <h2 className="text-base font-semibold text-[var(--text)]">Team directory</h2>
+            <h2 className="text-base font-semibold text-[var(--text)]">
+              {t('team.directoryTitle')}
+            </h2>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Roles, contact info, clock status, and portal access.
+              {t('team.directoryDescription')}
             </p>
           </div>
         </div>
@@ -365,20 +382,18 @@ export function StaffTeamTab() {
                 className="erp-pressable pwa-touch-target w-full shrink-0 bg-[var(--brand-mid)] hover:bg-[var(--brand)] sm:w-auto"
               >
                 <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-                Add staff
+                {t('team.addStaff')}
               </Button>
             </DialogTrigger>
             <DialogContent size="md" className="pb-[max(1rem,env(safe-area-inset-bottom))]">
               <DialogHeader>
-                <DialogTitle>Add staff member</DialogTitle>
-                <DialogDescription>
-                  Capture key details so they can clock shifts and receive schedules.
-                </DialogDescription>
+                <DialogTitle>{t('team.addStaffDialogTitle')}</DialogTitle>
+                <DialogDescription>{t('team.addStaffDialogDescription')}</DialogDescription>
               </DialogHeader>
               <div className="space-y-3">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor="firstName">First name</Label>
+                    <Label htmlFor="firstName">{t('team.firstName')}</Label>
                     <Input
                       id="firstName"
                       className="mt-1.5 min-h-11"
@@ -387,7 +402,7 @@ export function StaffTeamTab() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="lastName">Last name</Label>
+                    <Label htmlFor="lastName">{t('team.lastName')}</Label>
                     <Input
                       id="lastName"
                       className="mt-1.5 min-h-11"
@@ -397,18 +412,18 @@ export function StaffTeamTab() {
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="displayName">Display name</Label>
+                  <Label htmlFor="displayName">{t('team.displayName')}</Label>
                   <Input
                     id="displayName"
                     className="mt-1.5 min-h-11"
                     value={staffForm.displayName}
                     onChange={(event) => handleStaffInputChange('displayName', event.target.value)}
-                    placeholder="Optional alias used in the app"
+                    placeholder={t('team.displayNamePlaceholder')}
                   />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email">{t('team.email')}</Label>
                     <Input
                       id="email"
                       type="email"
@@ -417,9 +432,10 @@ export function StaffTeamTab() {
                       value={staffForm.email}
                       onChange={(event) => handleStaffInputChange('email', event.target.value)}
                     />
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">{t('team.emailHint')}</p>
                   </div>
                   <div>
-                    <Label htmlFor="phone">Phone</Label>
+                    <Label htmlFor="phone">{t('team.phone')}</Label>
                     <Input
                       id="phone"
                       type="tel"
@@ -431,18 +447,18 @@ export function StaffTeamTab() {
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="role">Role</Label>
+                  <Label htmlFor="role">{t('team.role')}</Label>
                   <Input
                     id="role"
                     className="mt-1.5 min-h-11"
                     value={staffForm.role}
                     onChange={(event) => handleStaffInputChange('role', event.target.value)}
-                    placeholder="Server, kitchen, barista..."
+                    placeholder={t('team.rolePlaceholder')}
                   />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor="wageType">Wage type</Label>
+                    <Label htmlFor="wageType">{t('team.wageType')}</Label>
                     <Select
                       value={staffForm.wageType}
                       onValueChange={(value) => handleStaffInputChange('wageType', value)}
@@ -450,14 +466,14 @@ export function StaffTeamTab() {
                       <SelectTrigger id="wageType" className="mt-1.5 min-h-11 w-full">
                         {wageTypeOptions.map((option) => (
                           <option key={option} value={option}>
-                            {option.charAt(0) + option.slice(1).toLowerCase()}
+                            {t(`shared.wageType.${option}`)}
                           </option>
                         ))}
                       </SelectTrigger>
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="wageRate">Base rate</Label>
+                    <Label htmlFor="wageRate">{t('team.baseRate')}</Label>
                     <Input
                       id="wageRate"
                       type="number"
@@ -471,7 +487,7 @@ export function StaffTeamTab() {
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor="hireDate">Hire date</Label>
+                    <Label htmlFor="hireDate">{t('team.hireDate')}</Label>
                     <Input
                       id="hireDate"
                       type="date"
@@ -481,7 +497,7 @@ export function StaffTeamTab() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="profileColor">Accent color</Label>
+                    <Label htmlFor="profileColor">{t('team.accentColor')}</Label>
                     <Input
                       id="profileColor"
                       type="color"
@@ -500,7 +516,7 @@ export function StaffTeamTab() {
                   onClick={handleCreateStaff}
                   disabled={creatingStaff}
                 >
-                  {creatingStaff ? 'Adding…' : 'Add staff member'}
+                  {creatingStaff ? t('team.adding') : t('team.addStaffMember')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -512,7 +528,7 @@ export function StaffTeamTab() {
         <div className="flex flex-col items-center gap-3 px-4 py-10 text-center sm:px-5">
           <AlertCircle className="h-8 w-8 text-[var(--red)]" />
           <p className="max-w-md text-sm text-[var(--text-muted)]">
-            {getApiErrorMessage(staffLoadErrorDetail, 'Unable to load staff directory.')}
+            {getApiErrorMessage(staffLoadErrorDetail, t('team.loadFailed'))}
           </p>
           <Button
             variant="outline"
@@ -520,7 +536,7 @@ export function StaffTeamTab() {
             className="erp-pressable"
             onClick={() => refetchStaffMembers()}
           >
-            Try again
+            {t('shared.tryAgain')}
           </Button>
         </div>
       ) : staffLoading ? (
@@ -534,8 +550,8 @@ export function StaffTeamTab() {
       ) : staffMembers.length === 0 ? (
         <EmptyState
           className="py-10"
-          title="No staff yet"
-          description="Add your first teammate to start scheduling and clocking time."
+          title={t('team.noStaffTitle')}
+          description={t('team.noStaffDescription')}
           icon={<Users className="h-8 w-8" aria-hidden />}
         />
       ) : (
@@ -559,19 +575,23 @@ export function StaffTeamTab() {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <TeamSummaryStat label="Active staff" value={staffMembers.length} />
-        <TeamSummaryStat label="On shift now" value={onShiftCount} />
+        <TeamSummaryStat label={t('team.activeStaff')} value={staffMembers.length} />
+        <TeamSummaryStat label={t('team.onShiftNow')} value={onShiftCount} />
         <TeamSummaryStat
-          label="Portal access"
+          label={t('team.portalAccess')}
           value={portalEnabledCount}
-          hint="Magic link or password"
+          hint={t('team.portalAccessHint')}
         />
-        <TeamSummaryStat label="Recent punches" value={recentEntries.length} hint="Last 7 days" />
+        <TeamSummaryStat
+          label={t('team.recentPunches')}
+          value={recentEntries.length}
+          hint={t('team.recentPunchesHint')}
+        />
       </div>
 
       <p className="flex items-center gap-2 text-xs text-[var(--text-muted)] sm:hidden">
         <Smartphone className="h-3.5 w-3.5 shrink-0" aria-hidden />
-        Staff clock in from their phones at /staff — managers clock in here.
+        {t('team.mobileHint')}
       </p>
 
       <div className="flex flex-col gap-6 xl:grid xl:grid-cols-[1.5fr,1fr]">

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   useGetQuickListsQuery,
   useAddItemToQuickListMutation,
@@ -23,6 +24,7 @@ export function AddToOrderingListButton({
   defaultQuantity = 1,
   defaultUnit,
 }: Props) {
+  const { t } = useTranslation('inventory')
   const { data } = useGetQuickListsQuery()
   const [addItem, { isLoading }] = useAddItemToQuickListMutation()
   const [createList, { isLoading: creating }] = useCreateQuickListMutation()
@@ -46,11 +48,15 @@ export function AddToOrderingListButton({
           defaultUnit,
         },
       }).unwrap()
-      toast.success(`Added ${productName || 'item'} to ordering list`)
+      toast.success(
+        t('toast.addedToOrderingList', {
+          name: productName || t('toast.orderingListItemFallback'),
+        })
+      )
       setOpen(false)
     } catch (err: unknown) {
       const msg = (err as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Could not add to list')
+      toast.error(msg || t('toast.addToOrderingListFailed'))
     }
   }
 
@@ -61,12 +67,12 @@ export function AddToOrderingListButton({
         supplierId,
         items: [{ productId, supplierId, quantity: defaultQuantity, defaultUnit }],
       }).unwrap()
-      toast.success('Created list and added item')
+      toast.success(t('toast.createdListAndAddedItem'))
       setOpen(false)
       void result
     } catch (err: unknown) {
       const msg = (err as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Could not create list')
+      toast.error(msg || t('toast.createOrderingListFailed'))
     }
   }
 

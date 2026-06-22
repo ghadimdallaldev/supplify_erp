@@ -99,6 +99,12 @@ router.patch(
           phone: 'phone',
           address: 'address_json',
           publicCatalogEnabled: 'public_catalog_enabled',
+          salesContactEmail: 'sales_contact_email',
+          salesContactPhone: 'sales_contact_phone',
+          accountingContactEmail: 'accounting_contact_email',
+          accountingContactPhone: 'accounting_contact_phone',
+          logisticsContactEmail: 'logistics_contact_email',
+          logisticsContactPhone: 'logistics_contact_phone',
         },
         {
           valueTransform: (dbField, value) =>

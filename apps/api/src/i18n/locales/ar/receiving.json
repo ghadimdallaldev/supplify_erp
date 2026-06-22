@@ -1,0 +1,13 @@
+{
+  "errors": {
+    "restaurantNotFound": "المطعم غير موجود",
+    "supplierNotFound": "المورد غير موجود",
+    "failedPendingOrders": "تعذر جلب الطلبات المعلقة",
+    "failedSupplierPendingOrders": "تعذر جلب قائمة استلام المورد",
+    "orderNotReady": "هذا الطلب غير جاهز للاستلام بعد. انتظر حتى يحدد المورد أنه تم التسليم.",
+    "reportAlreadyExists": "يوجد تقرير استلام لهذا الطلب بالفعل",
+    "receivedExceedsOrdered": "لا يمكن أن تتجاوز الكمية المستلمة الكمية المطلوبة ({{ordered}} {{unit}})",
+    "failedCreateReport": "تعذر إنشاء تقرير الاستلام",
+    "failedReceivingHistory": "تعذر جلب سجل الاستلام"
+  }
+}

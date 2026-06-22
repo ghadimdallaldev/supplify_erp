@@ -1,13 +1,15 @@
 import { useCallback, useState } from 'react'
 import { useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Menu, Search } from 'lucide-react'
 import { useAppSelector, useAppDispatch } from '../../../hooks/redux'
 import { useLogoutMutation, api } from '../../../services/api'
 import { toast } from 'sonner'
 import { CommandPalette } from '../../search/CommandPalette'
-import { ADMIN_TAB_LABELS, resolveAdminPortal } from './adminNavConfig'
+import { resolveAdminPortal } from './adminNavConfig'
 import { getAdminPageHeader } from '../../../lib/adminPageHeaders'
 import type { AdminTabKey } from '../dashboard/adminDashboardShared'
+import { useAdminTabLabels } from './useAdminNavLabels'
 
 type AdminTopBarProps = {
   selectedTab?: AdminTabKey
@@ -15,6 +17,8 @@ type AdminTopBarProps = {
 }
 
 export function AdminTopBar({ selectedTab, onOpenMobileNav }: AdminTopBarProps) {
+  const { t } = useTranslation('admin')
+  const tabLabels = useAdminTabLabels()
   const { user } = useAppSelector((state) => state.auth)
   const dispatch = useAppDispatch()
   const location = useLocation()
@@ -27,7 +31,7 @@ export function AdminTopBar({ selectedTab, onOpenMobileNav }: AdminTopBarProps) 
   const pageTitle = isSettings
     ? getAdminPageHeader('settings').title
     : selectedTab
-      ? ADMIN_TAB_LABELS[selectedTab]
+      ? tabLabels[selectedTab]
       : getAdminPageHeader(
           portal === 'suppliers'
             ? 'suppliers'
@@ -54,12 +58,12 @@ export function AdminTopBar({ selectedTab, onOpenMobileNav }: AdminTopBarProps) 
     try {
       const data = await logout().unwrap()
       dispatch(api.util.resetApiState())
-      toast.success('Logged out successfully')
+      toast.success(t('common.logoutSuccess'))
       window.location.href = data?.keycloakLogoutUrl || '/login'
     } catch {
-      toast.error('Logout failed')
+      toast.error(t('common.logoutFailed'))
     }
-  }, [dispatch, logout])
+  }, [dispatch, logout, t])
 
   return (
     <header className="admin-topbar" data-testid="admin-topbar">
@@ -68,7 +72,7 @@ export function AdminTopBar({ selectedTab, onOpenMobileNav }: AdminTopBarProps) 
           <button
             type="button"
             className="admin-topbar-icon-btn lg:hidden"
-            aria-label="Open admin menu"
+            aria-label={t('nav.aria.openMenu')}
             onClick={onOpenMobileNav}
           >
             <Menu size={18} />
@@ -86,7 +90,7 @@ export function AdminTopBar({ selectedTab, onOpenMobileNav }: AdminTopBarProps) 
         <button
           type="button"
           className="admin-topbar-icon-btn md:hidden"
-          aria-label="Open search"
+          aria-label={t('nav.aria.openSearch')}
           onClick={() => setCommandOpen(true)}
         >
           <Search size={16} />
@@ -94,11 +98,11 @@ export function AdminTopBar({ selectedTab, onOpenMobileNav }: AdminTopBarProps) 
         <button
           type="button"
           className="admin-topbar-search hidden md:flex"
-          aria-label="Open search"
+          aria-label={t('nav.aria.openSearch')}
           onClick={() => setCommandOpen(true)}
         >
           <Search size={14} className="shrink-0 text-[var(--text-mid)]" />
-          <span>Search admin…</span>
+          <span>{t('nav.searchPlaceholder')}</span>
           <kbd className="admin-topbar-kbd">⌘K</kbd>
         </button>
 
@@ -108,7 +112,7 @@ export function AdminTopBar({ selectedTab, onOpenMobileNav }: AdminTopBarProps) 
           type="button"
           className="admin-topbar-avatar"
           data-testid="logout-button"
-          title={`${user?.displayName || user?.email} — click to logout`}
+          title={t('nav.logoutTitle', { name: user?.displayName || user?.email || '' })}
           onClick={handleLogout}
         >
           {initials}

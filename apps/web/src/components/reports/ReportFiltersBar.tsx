@@ -1,14 +1,17 @@
+import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Filter } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Select, SelectTrigger } from '../ui/select'
 import { cn } from '../../lib/utils'
+import { ensureNamespace } from '../../i18n'
 
-const DATE_PRESETS = [
-  { label: '7 days', days: 7 },
-  { label: '30 days', days: 30 },
-  { label: '90 days', days: 90 },
+const DATE_PRESET_KEYS = [
+  { key: 'days7', days: 7 },
+  { key: 'days30', days: 30 },
+  { key: 'days90', days: 90 },
 ] as const
 
 type Props = {
@@ -38,6 +41,12 @@ export function ReportFiltersBar({
   onBranchChange,
   onPresetDays,
 }: Props) {
+  const { t } = useTranslation('reports')
+
+  useEffect(() => {
+    void ensureNamespace('reports')
+  }, [])
+
   return (
     <section
       className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4"
@@ -46,10 +55,10 @@ export function ReportFiltersBar({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-[var(--brand-mid)]" aria-hidden />
-          <p className="text-sm font-semibold text-[var(--text)]">Date range & filters</p>
+          <p className="text-sm font-semibold text-[var(--text)]">{t('filters.title')}</p>
         </div>
         <div className="flex flex-wrap gap-1">
-          {DATE_PRESETS.map((preset) => (
+          {DATE_PRESET_KEYS.map((preset) => (
             <Button
               key={preset.days}
               type="button"
@@ -58,7 +67,7 @@ export function ReportFiltersBar({
               className="h-8 rounded-full px-3 text-xs"
               onClick={() => onPresetDays(preset.days)}
             >
-              Last {preset.label}
+              {t('filters.lastPreset', { period: t(`filters.presets.${preset.key}`) })}
             </Button>
           ))}
         </div>
@@ -72,7 +81,7 @@ export function ReportFiltersBar({
       >
         <div>
           <Label htmlFor="report-from" className="text-xs font-medium text-[var(--text-mid)]">
-            From
+            {t('filters.from')}
           </Label>
           <Input
             id="report-from"
@@ -84,7 +93,7 @@ export function ReportFiltersBar({
         </div>
         <div>
           <Label htmlFor="report-to" className="text-xs font-medium text-[var(--text-mid)]">
-            To
+            {t('filters.to')}
           </Label>
           <Input
             id="report-to"
@@ -99,24 +108,24 @@ export function ReportFiltersBar({
             htmlFor="report-granularity"
             className="text-xs font-medium text-[var(--text-mid)]"
           >
-            Granularity
+            {t('filters.granularity')}
           </Label>
           <Select value={granularity} onValueChange={onGranularityChange}>
             <SelectTrigger id="report-granularity" className="mt-1">
-              <option value="day">Day</option>
-              <option value="week">Week</option>
-              <option value="month">Month</option>
+              <option value="day">{t('filters.granularityOptions.day')}</option>
+              <option value="week">{t('filters.granularityOptions.week')}</option>
+              <option value="month">{t('filters.granularityOptions.month')}</option>
             </SelectTrigger>
           </Select>
         </div>
         {showBranchFilter ? (
           <div>
             <Label htmlFor="report-branch" className="text-xs font-medium text-[var(--text-mid)]">
-              Branch
+              {t('filters.branch')}
             </Label>
             <Select value={branchId} onValueChange={onBranchChange}>
               <SelectTrigger id="report-branch" className="mt-1">
-                <option value="">All branches</option>
+                <option value="">{t('filters.allBranches')}</option>
                 {branches.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}

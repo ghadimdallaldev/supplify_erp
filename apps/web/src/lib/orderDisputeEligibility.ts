@@ -1,3 +1,11 @@
+import i18n from 'i18next'
+
+const NS = 'disputes'
+
+function dt(key: string): string {
+  return i18n.t(key, { ns: NS })
+}
+
 /** Must match `DELIVERED_ORDER_STATUSES` in apps/api/src/services/reviews.service.js */
 export const DISPUTE_ELIGIBLE_ORDER_STATUSES = [
   'COMPLETED',
@@ -17,5 +25,5 @@ export function isOrderEligibleForDispute(status: string | undefined | null): bo
 
 export function disputeEligibilityMessage(status: string | undefined | null): string {
   if (isOrderEligibleForDispute(status)) return ''
-  return 'Disputes can only be opened after the supplier has delivered the order (delivered, received, or completed).'
+  return dt('eligibility.notEligible')
 }

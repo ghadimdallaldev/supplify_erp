@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Building2, CreditCard, HeartPulse, ListOrdered, Store, Users } from 'lucide-react'
 import type { AdminOverview } from '../../lib/adminOverview'
 import {
@@ -15,6 +16,7 @@ export function AdminExecutiveSummary({
   overview?: AdminOverview | null
   recentErrorCount?: number
 }) {
+  const { t } = useTranslation('admin')
   const health = deriveSystemHealth(overview, recentErrorCount)
   const healthTone = health === 'healthy' ? 'success' : health === 'degraded' ? 'warning' : 'danger'
 
@@ -24,52 +26,52 @@ export function AdminExecutiveSummary({
       data-testid="admin-executive-summary"
     >
       <AdminKpiCard
-        label="Total tenants"
+        label={t('executiveSummary.totalTenants')}
         value={getTotalTenantCount(overview)}
-        description="Suppliers + restaurants registered"
+        description={t('executiveSummary.totalTenantsDescription')}
         icon={Users}
         tone="neutral"
         testId="kpi-total-tenants"
       />
       <AdminKpiCard
-        label="Active suppliers"
+        label={t('executiveSummary.activeSuppliers')}
         value={overview?.tenantCounts?.SUPPLIER ?? 0}
-        description="Active or trialing subscriptions"
+        description={t('executiveSummary.subscriptionDescription')}
         icon={Building2}
         tone="brand"
         testId="kpi-active-suppliers"
       />
       <AdminKpiCard
-        label="Active restaurants"
+        label={t('executiveSummary.activeRestaurants')}
         value={overview?.tenantCounts?.RESTAURANT ?? 0}
-        description="Active or trialing subscriptions"
+        description={t('executiveSummary.subscriptionDescription')}
         icon={Store}
         tone="success"
         testId="kpi-active-restaurants"
       />
       <AdminKpiCard
-        label="Active subscriptions"
+        label={t('executiveSummary.activeSubscriptions')}
         value={getActiveSubscriptionCount(overview)}
-        description="ACTIVE + TRIALING"
+        description={t('executiveSummary.activeSubscriptionsDescription')}
         icon={CreditCard}
         tone="brand"
         testId="kpi-active-subscriptions"
       />
       <AdminKpiCard
-        label="Orders today"
+        label={t('executiveSummary.ordersToday')}
         value={overview?.orders?.today ?? 0}
-        description={`${overview?.orders?.week ?? 0} this week`}
+        description={t('executiveSummary.ordersThisWeek', { count: overview?.orders?.week ?? 0 })}
         icon={ListOrdered}
         tone="info"
         testId="kpi-orders-today"
       />
       <AdminKpiCard
-        label="System health"
+        label={t('executiveSummary.systemHealth')}
         value={formatSystemHealthLabel(health)}
         description={
           recentErrorCount > 0
-            ? `${recentErrorCount} recent error${recentErrorCount > 1 ? 's' : ''}`
-            : 'Platform operational status'
+            ? t('executiveSummary.recentErrors', { count: recentErrorCount })
+            : t('executiveSummary.platformOperational')
         }
         icon={HeartPulse}
         tone={healthTone}

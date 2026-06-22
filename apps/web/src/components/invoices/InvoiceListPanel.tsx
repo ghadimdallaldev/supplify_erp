@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { FileText, Search, CreditCard, Receipt } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -34,36 +35,38 @@ export function InvoiceListPanel({
   onSelectInvoice,
   onPayInvoice,
 }: InvoiceListPanelProps) {
+  const { t } = useTranslation('invoices')
+
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Invoice List</CardTitle>
+          <CardTitle>{t('list.title')}</CardTitle>
           <div className="flex gap-2">
             <div className="flex items-center gap-2 border rounded-md px-3 py-1">
               <Search className="h-4 w-4 text-[var(--text-muted)]" />
               <input
                 type="text"
-                placeholder="Search invoices..."
+                placeholder={t('list.searchPlaceholder')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="border-none outline-none"
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]" placeholder="Status">
-                <SelectItem value="ALL">All Status</SelectItem>
-                <SelectItem value="ISSUED">Issued</SelectItem>
-                <SelectItem value="PARTIALLY_PAID">Partially Paid</SelectItem>
-                <SelectItem value="PAID">Paid</SelectItem>
-                <SelectItem value="OVERDUE">Overdue</SelectItem>
-                <SelectItem value="VOID">Void</SelectItem>
+              <SelectTrigger className="w-[180px]" placeholder={t('list.status')}>
+                <SelectItem value="ALL">{t('list.allStatus')}</SelectItem>
+                <SelectItem value="ISSUED">{t('list.statuses.ISSUED')}</SelectItem>
+                <SelectItem value="PARTIALLY_PAID">{t('list.statuses.PARTIALLY_PAID')}</SelectItem>
+                <SelectItem value="PAID">{t('list.statuses.PAID')}</SelectItem>
+                <SelectItem value="OVERDUE">{t('list.statuses.OVERDUE')}</SelectItem>
+                <SelectItem value="VOID">{t('list.statuses.VOID')}</SelectItem>
               </SelectTrigger>
             </Select>
             {suppliers.length > 0 && (
               <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-                <SelectTrigger className="w-[200px]" placeholder="Supplier">
-                  <SelectItem value="ALL">All Suppliers</SelectItem>
+                <SelectTrigger className="w-[200px]" placeholder={t('list.supplier')}>
+                  <SelectItem value="ALL">{t('list.allSuppliers')}</SelectItem>
                   {suppliers.map((s: any) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.name}
@@ -97,11 +100,16 @@ export function InvoiceListPanel({
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                       <h3 className="font-semibold">{invoice.invoice_number}</h3>
-                      <StatusBadge status={invoice.status} />
+                      <StatusBadge
+                        status={invoice.status}
+                        label={t(`list.statuses.${invoice.status}`, {
+                          defaultValue: invoice.status.replace(/_/g, ' '),
+                        })}
+                      />
                       {isOverdue && (
                         <StatusBadge
                           status="OVERDUE"
-                          label={`${invoice.days_overdue || 0} days overdue`}
+                          label={t('list.daysOverdue', { count: invoice.days_overdue || 0 })}
                         />
                       )}
                     </div>
@@ -110,9 +118,12 @@ export function InvoiceListPanel({
                     </p>
                     <div className="flex gap-4 text-xs text-[var(--text-muted)] mt-2">
                       <span>
-                        Invoice Date: {new Date(invoice.invoice_date).toLocaleDateString()}
+                        {t('list.invoiceDate')}:{' '}
+                        {new Date(invoice.invoice_date).toLocaleDateString()}
                       </span>
-                      <span>Due Date: {new Date(invoice.due_date).toLocaleDateString()}</span>
+                      <span>
+                        {t('list.dueDate')}: {new Date(invoice.due_date).toLocaleDateString()}
+                      </span>
                       {invoice.order_id && (
                         <Link
                           to={`/app/orders/${invoice.order_id}`}
@@ -120,23 +131,23 @@ export function InvoiceListPanel({
                           className="text-[var(--brand-mid)] hover:underline flex items-center gap-1"
                         >
                           <Receipt className="h-3 w-3" />
-                          Order #{invoice.order_id.slice(0, 8)}
+                          {t('list.orderLink', { id: invoice.order_id.slice(0, 8) })}
                         </Link>
                       )}
                     </div>
                   </div>
-                  <div className="text-left sm:text-right shrink-0 min-w-[7rem]">
+                  <div className="text-start sm:text-end shrink-0 min-w-[7rem]">
                     <p className="text-lg font-semibold tabular-nums">
                       {formatPrice(invoice.total_amount)}
                     </p>
                     <p
                       className={`text-sm ${remaining > 0 ? 'text-[var(--red)] font-semibold' : 'text-[var(--mint)]'}`}
                     >
-                      Balance: {formatPrice(remaining)}
+                      {t('list.balance')}: {formatPrice(remaining)}
                     </p>
                     {parseFloat(invoice.total_paid || 0) > 0 && (
                       <p className="text-xs text-[var(--mint)]">
-                        Paid: {formatPrice(invoice.total_paid)}
+                        {t('list.paid')}: {formatPrice(invoice.total_paid)}
                       </p>
                     )}
                     {canRecordPayments && remaining > 0 && (
@@ -149,8 +160,8 @@ export function InvoiceListPanel({
                           onPayInvoice(invoice)
                         }}
                       >
-                        <CreditCard className="h-3 w-3 mr-1" />
-                        Pay
+                        <CreditCard className="h-3 w-3 me-1" />
+                        {t('list.pay')}
                       </Button>
                     )}
                   </div>
@@ -162,8 +173,10 @@ export function InvoiceListPanel({
           {filteredInvoices.length === 0 && (
             <div className="text-center py-12">
               <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
-              <p className="text-lg font-semibold text-[var(--text)] mb-2">No invoices found</p>
-              <p className="text-[var(--text-muted)]">Try adjusting your filters</p>
+              <p className="text-lg font-semibold text-[var(--text)] mb-2">
+                {t('list.emptyTitle')}
+              </p>
+              <p className="text-[var(--text-muted)]">{t('list.emptyDescription')}</p>
             </div>
           )}
         </div>

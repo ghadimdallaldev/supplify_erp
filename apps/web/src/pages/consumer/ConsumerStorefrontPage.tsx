@@ -1,16 +1,18 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   useGetPublicConsumerMenuQuery,
   useGetPublicConsumerStorefrontQuery,
   type ConsumerMenuItem,
+  type ConsumerOrderingStatus,
 } from '../../services/consumerApi'
 import { useConsumerAuth } from '../../contexts/ConsumerAuthContext'
 import { Button } from '../../components/ui/button'
 import { PageHeader } from '../../components/ui/page-header'
 import { PageShell } from '../../components/ui/page-shell'
 import { Skeleton } from '../../components/ui/skeleton'
-import { orderingStatusFromBranch } from '../../lib/consumerOrderingHours'
+import { orderingStatusFromBranch, formatMinutesToTime } from '../../lib/consumerOrderingHours'
 import { formatPrice } from '../../utils/format'
 import {
   ArrowRight,
@@ -23,6 +25,39 @@ import {
   Truck,
   UtensilsCrossed,
 } from 'lucide-react'
+import { ensureNamespace } from '../../i18n'
+
+function parseTimeToMinutes(timeStr?: string | null): number | null {
+  if (!timeStr) return null
+  const normalized = timeStr.trim()
+  if (normalized === '24:00') return 1440
+  const match = normalized.match(/^(\d{1,2}):(\d{2})$/)
+  if (!match) return null
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null
+  return hours * 60 + minutes
+}
+
+function localizedOrderingMessage(
+  status: ConsumerOrderingStatus,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
+  const startLabel = formatMinutesToTime(parseTimeToMinutes(status.liveOrderStart) ?? 12 * 60)
+  const endIsMidnight = status.liveOrderEnd === '00:00' || status.liveOrderEnd === '24:00'
+  const endLabel = endIsMidnight ? t('ordering.midnight') : status.liveOrderEnd
+
+  switch (status.mode) {
+    case 'LIVE':
+      return t('ordering.live', { end: endLabel })
+    case 'PREORDER_ONLY':
+      return t('ordering.preorderOnly', { start: startLabel })
+    case 'CLOSED':
+      return t('ordering.closed', { start: startLabel })
+    default:
+      return status.message
+  }
+}
 
 function pickPreviewItems(
   categories: Array<{ items: ConsumerMenuItem[] }> | undefined,
@@ -44,6 +79,12 @@ function countMenuItems(categories: Array<{ items: unknown[] }> | undefined) {
 }
 
 export function ConsumerStorefrontPage() {
+  const { t } = useTranslation('consumer')
+
+  useEffect(() => {
+    void ensureNamespace('consumer')
+  }, [])
+
   const { restaurantSlug } = useParams<{ restaurantSlug: string }>()
   const slug = restaurantSlug ?? ''
   const [searchParams, setSearchParams] = useSearchParams()
@@ -59,7 +100,7 @@ export function ConsumerStorefrontPage() {
   })
 
   const restaurant = storefront?.restaurant
-  const branches = storefront?.branches ?? []
+  const branches = useMemo(() => storefront?.branches ?? [], [storefront?.branches])
   const activeBranch = useMemo(() => {
     if (branchId) return branches.find((b) => b.branchId === branchId) ?? branches[0]
     return branches[0]
@@ -70,7 +111,11 @@ export function ConsumerStorefrontPage() {
     ? `/order/${slug}/menu?branchId=${defaultBranchId}`
     : `/order/${slug}/menu`
 
-  const orderingStatus = orderingStatusFromBranch(activeBranch)
+  const orderingStatus = useMemo(() => orderingStatusFromBranch(activeBranch), [activeBranch])
+  const orderingMessage = useMemo(
+    () => localizedOrderingMessage(orderingStatus, t),
+    [orderingStatus, t]
+  )
 
   useEffect(() => {
     if (branchId || !branches.length) return
@@ -93,16 +138,16 @@ export function ConsumerStorefrontPage() {
   const fulfillmentLabels = useMemo(() => {
     if (!activeBranch) return []
     const labels: string[] = []
-    if (activeBranch.deliveryEnabled) labels.push('Delivery')
-    if (activeBranch.takeawayEnabled) labels.push('Pickup')
-    if (activeBranch.dineInEnabled) labels.push('Dine-in')
+    if (activeBranch.deliveryEnabled) labels.push(t('fulfillment.DELIVERY'))
+    if (activeBranch.takeawayEnabled) labels.push(t('fulfillment.pickup'))
+    if (activeBranch.dineInEnabled) labels.push(t('fulfillment.DINE_IN'))
     return labels
-  }, [activeBranch])
+  }, [activeBranch, t])
 
   if (!slug) {
     return (
       <PageShell className="p-6">
-        <p className="text-center text-[var(--text-muted)]">Restaurant slug is required.</p>
+        <p className="text-center text-[var(--text-muted)]">{t('common.slugRequired')}</p>
       </PageShell>
     )
   }
@@ -131,7 +176,7 @@ export function ConsumerStorefrontPage() {
   if (isError || !restaurant) {
     return (
       <PageShell className="p-6">
-        <p className="text-center text-[var(--text-muted)]">Restaurant not found.</p>
+        <p className="text-center text-[var(--text-muted)]">{t('common.restaurantNotFound')}</p>
       </PageShell>
     )
   }
@@ -156,14 +201,12 @@ export function ConsumerStorefrontPage() {
               </div>
             )}
             <div className="min-w-0 flex-1 pt-0.5">
-              <PageHeader
-                title={restaurant.name}
-                description={orderingStatus.message}
-                size="compact"
-              />
+              <PageHeader title={restaurant.name} description={orderingMessage} size="compact" />
               {fulfillmentLabels.length > 0 && (
                 <p className="mt-2 text-xs text-[var(--text-muted)]">
-                  {fulfillmentLabels.join(' · ')} · Cash on delivery or pickup
+                  {t('storefront.cashPayment', {
+                    fulfillment: fulfillmentLabels.join(' · '),
+                  })}
                 </p>
               )}
             </div>
@@ -172,21 +215,29 @@ export function ConsumerStorefrontPage() {
           {activeBranch && (
             <dl className="mt-5 grid grid-cols-3 divide-x divide-[var(--app-border)] rounded-xl border border-[var(--app-border)] bg-[var(--brand-ultra)]">
               <div className="px-3 py-3 text-center">
-                <dt className="text-xs font-medium text-[var(--text-muted)]">Prep</dt>
+                <dt className="text-xs font-medium text-[var(--text-muted)]">
+                  {t('storefront.prep')}
+                </dt>
                 <dd className="mt-1 text-sm font-semibold tabular-nums text-[var(--text)]">
-                  ~{activeBranch.estimatedPrepMinutes} min
+                  {t('storefront.prepTime', { minutes: activeBranch.estimatedPrepMinutes })}
                 </dd>
               </div>
               <div className="px-3 py-3 text-center">
-                <dt className="text-xs font-medium text-[var(--text-muted)]">Min order</dt>
+                <dt className="text-xs font-medium text-[var(--text-muted)]">
+                  {t('storefront.minOrder')}
+                </dt>
                 <dd className="mt-1 text-sm font-semibold tabular-nums text-[var(--text)]">
                   {formatPrice(activeBranch.minOrderAmount)}
                 </dd>
               </div>
               <div className="px-3 py-3 text-center">
-                <dt className="text-xs font-medium text-[var(--text-muted)]">Delivery</dt>
+                <dt className="text-xs font-medium text-[var(--text-muted)]">
+                  {t('common.delivery')}
+                </dt>
                 <dd className="mt-1 text-sm font-semibold tabular-nums text-[var(--text)]">
-                  from {formatPrice(activeBranch.deliveryFee)}
+                  {t('storefront.deliveryFrom', {
+                    amount: formatPrice(activeBranch.deliveryFee),
+                  })}
                 </dd>
               </div>
             </dl>
@@ -199,7 +250,9 @@ export function ConsumerStorefrontPage() {
           >
             <Link to={menuHref}>
               <ShoppingBag className="mr-2 h-5 w-5" />
-              {menuItemCount > 0 ? `Browse menu · ${menuItemCount} items` : 'Browse menu'}
+              {menuItemCount > 0
+                ? t('storefront.browseMenuWithCount', { count: menuItemCount })
+                : t('storefront.browseMenu')}
             </Link>
           </Button>
         </div>
@@ -209,14 +262,18 @@ export function ConsumerStorefrontPage() {
         <section className="border-b border-[var(--app-border)] py-5">
           <div className="mx-auto flex max-w-3xl items-end justify-between gap-3 px-4">
             <div>
-              <h2 className="text-base font-semibold text-[var(--text)]">From the menu</h2>
-              <p className="mt-0.5 text-sm text-[var(--text-muted)]">Tap an item or browse all</p>
+              <h2 className="text-base font-semibold text-[var(--text)]">
+                {t('storefront.fromMenu')}
+              </h2>
+              <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+                {t('storefront.tapOrBrowse')}
+              </p>
             </div>
             <Link
               to={menuHref}
               className="inline-flex shrink-0 items-center gap-0.5 text-sm font-medium text-[var(--brand-mid)] hover:text-[var(--brand)]"
             >
-              See all
+              {t('storefront.seeAll')}
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -270,8 +327,12 @@ export function ConsumerStorefrontPage() {
               <PackageSearch className="h-5 w-5" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block font-medium text-[var(--text)]">Track an order</span>
-              <span className="text-sm text-[var(--text-muted)]">Look up by order number</span>
+              <span className="block font-medium text-[var(--text)]">
+                {t('storefront.trackOrder')}
+              </span>
+              <span className="text-sm text-[var(--text-muted)]">
+                {t('storefront.trackOrderHint')}
+              </span>
             </span>
             <ChevronRight className="h-5 w-5 shrink-0 text-[var(--text-muted)]" />
           </Link>
@@ -285,12 +346,12 @@ export function ConsumerStorefrontPage() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block font-medium text-[var(--text)]">
-                {isAuthenticated ? 'My rewards' : 'Join rewards'}
+                {isAuthenticated ? t('storefront.myRewards') : t('storefront.joinRewards')}
               </span>
               <span className="text-sm text-[var(--text-muted)]">
                 {isAuthenticated
-                  ? 'View points and redeem at checkout'
-                  : 'Earn points on every order — free to join'}
+                  ? t('storefront.rewardsAuthenticated')
+                  : t('storefront.rewardsGuest')}
               </span>
             </span>
             <ChevronRight className="h-5 w-5 shrink-0 text-[var(--text-muted)]" />
@@ -305,7 +366,9 @@ export function ConsumerStorefrontPage() {
                 <Phone className="h-5 w-5" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block font-medium text-[var(--text)]">Call the restaurant</span>
+                <span className="block font-medium text-[var(--text)]">
+                  {t('storefront.callRestaurant')}
+                </span>
                 <span className="text-sm text-[var(--text-muted)]">{restaurant.phone}</span>
               </span>
               <ChevronRight className="h-5 w-5 shrink-0 text-[var(--text-muted)]" />
@@ -322,7 +385,7 @@ export function ConsumerStorefrontPage() {
                 <p className="mt-0.5 text-sm text-[var(--text-muted)]">
                   {fulfillmentLabels.join(' · ')}
                   {activeBranch.deliveryZones.length > 0 &&
-                    ` · ${activeBranch.deliveryZones.length} delivery zones`}
+                    ` · ${t('storefront.deliveryZones', { count: activeBranch.deliveryZones.length })}`}
                 </p>
               </div>
             </div>
@@ -333,7 +396,7 @@ export function ConsumerStorefrontPage() {
           <div className="mx-auto mt-6 max-w-3xl">
             <p className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--text)]">
               <MapPin className="h-4 w-4 text-[var(--brand-mid)]" />
-              Other locations
+              {t('storefront.otherLocations')}
             </p>
             <div className="divide-y divide-[var(--app-border)] rounded-xl border border-[var(--app-border)]">
               {branches.map((branch) => (
@@ -355,17 +418,18 @@ export function ConsumerStorefrontPage() {
             <div className="flex items-start gap-3">
               <UtensilsCrossed className="mt-0.5 h-5 w-5 shrink-0 text-[var(--brand-mid)]" />
               <div>
-                <p className="text-sm font-medium text-[var(--text)]">First time ordering here?</p>
+                <p className="text-sm font-medium text-[var(--text)]">
+                  {t('storefront.firstTimeTitle')}
+                </p>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  No account needed to checkout. Create one anytime to save your details and earn
-                  rewards.
+                  {t('storefront.firstTimeDescription')}
                 </p>
                 <Button
                   asChild
                   variant="link"
                   className="consumer-pressable mt-1 h-auto p-0 text-[var(--brand-mid)]"
                 >
-                  <Link to={`/order/${slug}/account`}>Create free account</Link>
+                  <Link to={`/order/${slug}/account`}>{t('storefront.createFreeAccount')}</Link>
                 </Button>
               </div>
             </div>

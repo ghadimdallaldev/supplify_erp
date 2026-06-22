@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { ensureNamespace } from '../i18n'
 import {
   useGetConversationsQuery,
   useGetMessagesQuery,
@@ -31,6 +33,12 @@ import { NewConversationDialog } from '../components/chat/NewConversationDialog'
 import { Skeleton } from '../components/ui/skeleton'
 
 export function ChatPage() {
+  const { t } = useTranslation('chat')
+
+  useEffect(() => {
+    void ensureNamespace('chat')
+  }, [])
+
   const { user } = useAppSelector((state) => state.auth)
   const { canAny } = usePermissions()
   const canSendMessages = canAny('CHAT_SEND', 'CHAT_MANAGE')
@@ -86,8 +94,11 @@ export function ChatPage() {
     { skip: !selectedConversation }
   )
 
-  const conversations = conversationsData?.conversations || []
-  const messages = messagesData?.messages || []
+  const conversations = useMemo(
+    () => conversationsData?.conversations || [],
+    [conversationsData?.conversations]
+  )
+  const messages = useMemo(() => messagesData?.messages || [], [messagesData?.messages])
 
   const handleTypingChange = useCallback((typing: boolean) => {
     setOtherPartyTyping(typing)
@@ -102,14 +113,15 @@ export function ChatPage() {
   const formatMessageDate = (date: string) => {
     const messageDate = new Date(date)
     if (isToday(messageDate)) return format(messageDate, 'HH:mm')
-    if (isYesterday(messageDate)) return `Yesterday ${format(messageDate, 'HH:mm')}`
+    if (isYesterday(messageDate))
+      return t('dates.yesterdayAt', { time: format(messageDate, 'HH:mm') })
     return format(messageDate, 'MMM d, HH:mm')
   }
 
   const formatConversationDate = (date: string) => {
     const convDate = new Date(date)
     if (isToday(convDate)) return format(convDate, 'HH:mm')
-    if (isYesterday(convDate)) return 'Yesterday'
+    if (isYesterday(convDate)) return t('dates.yesterday')
     return format(convDate, 'MMM d')
   }
 
@@ -118,12 +130,15 @@ export function ChatPage() {
     setShowScrollButton(false)
   }
 
-  const selectConversation = (id: string) => {
-    setSelectedConversation(id)
-    setMobileShowThread(true)
-    setShowNewConversation(false)
-    navigate(`/app/chat?conversation=${id}`, { replace: true })
-  }
+  const selectConversation = useCallback(
+    (id: string) => {
+      setSelectedConversation(id)
+      setMobileShowThread(true)
+      setShowNewConversation(false)
+      navigate(`/app/chat?conversation=${id}`, { replace: true })
+    },
+    [navigate]
+  )
 
   const handleStartConversation = async (participantId: string) => {
     const isSupplier = user?.role === 'SUPPLIER'
@@ -141,11 +156,12 @@ export function ChatPage() {
         isSupplier ? { restaurantId: participantId } : { supplierId: participantId }
       ).unwrap()
       selectConversation(result.conversation.id)
-      toast.success('Conversation started')
+      toast.success(t('toast.conversationStarted'))
     } catch (error: unknown) {
       const err = error as { data?: { error?: { message?: string }; message?: string } }
-      const msg = err?.data?.message || err?.data?.error?.message || 'Failed to start conversation'
-      toast.error(typeof msg === 'string' ? msg : 'Failed to start conversation')
+      const msg =
+        err?.data?.message || err?.data?.error?.message || t('toast.failedStartConversation')
+      toast.error(typeof msg === 'string' ? msg : t('toast.failedStartConversation'))
     }
   }
 
@@ -203,7 +219,7 @@ export function ChatPage() {
 
     if (restaurantId && !conversationId && user?.role === 'SUPPLIER' && !isCreatingConversation) {
       if (!uuidRe.test(restaurantId)) {
-        toast.error('This restaurant link is invalid. Open chat from the restaurant profile.')
+        toast.error(t('toast.invalidRestaurantLink'))
         navigate('/app/chat', { replace: true })
         return
       }
@@ -217,19 +233,21 @@ export function ChatPage() {
           .unwrap()
           .then((result) => {
             selectConversation(result.conversation.id)
-            toast.success('Conversation created')
+            toast.success(t('toast.conversationCreated'))
           })
           .catch((error: { data?: { error?: { message?: string }; message?: string } }) => {
             const msg =
-              error?.data?.message || error?.data?.error?.message || 'Failed to create conversation'
-            toast.error(typeof msg === 'string' ? msg : 'Failed to create conversation')
+              error?.data?.message ||
+              error?.data?.error?.message ||
+              t('toast.failedCreateConversation')
+            toast.error(typeof msg === 'string' ? msg : t('toast.failedCreateConversation'))
           })
       }
     }
 
     if (supplierId && !conversationId && user?.role === 'RESTAURANT' && !isCreatingConversation) {
       if (!uuidRe.test(supplierId)) {
-        toast.error('This supplier link is invalid. Open chat from the supplier profile.')
+        toast.error(t('toast.invalidSupplierLink'))
         navigate('/app/chat', { replace: true })
         return
       }
@@ -243,12 +261,14 @@ export function ChatPage() {
           .unwrap()
           .then((result) => {
             selectConversation(result.conversation.id)
-            toast.success('Conversation created')
+            toast.success(t('toast.conversationCreated'))
           })
           .catch((error: { data?: { error?: { message?: string }; message?: string } }) => {
             const msg =
-              error?.data?.message || error?.data?.error?.message || 'Failed to create conversation'
-            toast.error(typeof msg === 'string' ? msg : 'Failed to create conversation')
+              error?.data?.message ||
+              error?.data?.error?.message ||
+              t('toast.failedCreateConversation')
+            toast.error(typeof msg === 'string' ? msg : t('toast.failedCreateConversation'))
           })
       }
     }
@@ -261,6 +281,8 @@ export function ChatPage() {
     navigate,
     createConversation,
     conversations,
+    selectConversation,
+    t,
   ])
 
   useEffect(() => {
@@ -293,10 +315,10 @@ export function ChatPage() {
     try {
       await pinConversation(selectedConversation).unwrap()
       refetchConversations()
-      toast.success('Conversation pinned')
+      toast.success(t('toast.conversationPinned'))
     } catch (error: unknown) {
       const err = error as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to pin conversation')
+      toast.error(err?.data?.error?.message || t('toast.failedPinConversation'))
     }
   }
 
@@ -307,26 +329,25 @@ export function ChatPage() {
       setSelectedConversation(null)
       setMobileShowThread(false)
       refetchConversations()
-      toast.success('Conversation archived')
+      toast.success(t('toast.conversationArchived'))
     } catch (error: unknown) {
       const err = error as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to archive conversation')
+      toast.error(err?.data?.error?.message || t('toast.failedArchiveConversation'))
     }
   }
 
   const handleDeleteConversation = async () => {
     if (!selectedConversation) return
-    if (!confirm('Are you sure you want to delete this conversation? This cannot be undone.'))
-      return
+    if (!confirm(t('toast.deleteConfirm'))) return
     try {
       await deleteConversation(selectedConversation).unwrap()
       setSelectedConversation(null)
       setMobileShowThread(false)
       refetchConversations()
-      toast.success('Conversation deleted')
+      toast.success(t('toast.conversationDeleted'))
     } catch (error: unknown) {
       const err = error as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to delete conversation')
+      toast.error(err?.data?.error?.message || t('toast.failedDeleteConversation'))
     }
   }
 
@@ -334,7 +355,7 @@ export function ChatPage() {
     const files = Array.from(e.target.files || [])
     const validFiles = files.filter((file) => {
       if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name} is too large (max 10MB)`)
+        toast.error(t('toast.fileTooLarge', { fileName: file.name }))
         return false
       }
       return true
@@ -357,7 +378,8 @@ export function ChatPage() {
       return
 
     const messageContent =
-      message.trim() || (selectedOrder ? `📦 Order #${selectedOrder.id.slice(0, 8)}` : '')
+      message.trim() ||
+      (selectedOrder ? t('toast.orderReferenceMessage', { id: selectedOrder.id.slice(0, 8) }) : '')
     const replyToId = replyingTo?.id ? String(replyingTo.id) : undefined
 
     try {
@@ -412,7 +434,7 @@ export function ChatPage() {
       setTimeout(() => scrollToBottom(), 100)
     } catch (error: unknown) {
       const err = error as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to send message')
+      toast.error(err?.data?.error?.message || t('toast.failedSendMessage'))
     }
   }
 
@@ -442,7 +464,7 @@ export function ChatPage() {
 
   if (conversationsLoading || isCreatingConversation) {
     return (
-      <RequirePermission permission="CHAT_VIEW" title="chat">
+      <RequirePermission permission="CHAT_VIEW" title={t('page.permissionTitle')}>
         <PageShell data-testid="chat-page">
           <Skeleton className="h-10 w-48" />
           <Skeleton className="h-4 w-72 max-w-full" />
@@ -464,16 +486,16 @@ export function ChatPage() {
   const newMessageAction = canStartConversation ? (
     <Button size="sm" onClick={() => setShowNewConversation(true)}>
       <Plus className="mr-2 h-4 w-4" />
-      New message
+      {t('page.newMessage')}
     </Button>
   ) : undefined
 
   return (
-    <RequirePermission permission="CHAT_VIEW" title="chat">
+    <RequirePermission permission="CHAT_VIEW" title={t('page.permissionTitle')}>
       <PageShell data-testid="chat-page">
         <PageHeader
-          title="Messages"
-          description="Chat with suppliers and restaurants in real time."
+          title={t('page.title')}
+          description={t('page.description')}
           actions={newMessageAction}
         />
 
@@ -518,7 +540,7 @@ export function ChatPage() {
               {selectedConversation && activeConv ? (
                 <>
                   <ChatHeader
-                    participantName={activeConv.participant_name || 'Chat'}
+                    participantName={activeConv.participant_name || t('page.defaultParticipant')}
                     isPinned={activeConv.is_pinned}
                     searchQuery={searchQuery}
                     onSearchChange={setSearchQuery}
@@ -592,11 +614,13 @@ export function ChatPage() {
                     <MessageSquare className="h-7 w-7" aria-hidden />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-[var(--text)]">Select a conversation</p>
+                    <p className="text-sm font-medium text-[var(--text)]">
+                      {t('page.selectConversation')}
+                    </p>
                     <p className="mt-1 max-w-xs text-sm text-[var(--text-mid)]">
                       {user?.role === 'SUPPLIER'
-                        ? 'Pick a restaurant from your inbox or start a new message.'
-                        : 'Choose a supplier from your inbox to view messages.'}
+                        ? t('page.selectHintSupplier')
+                        : t('page.selectHintRestaurant')}
                     </p>
                   </div>
                   {canStartConversation ? (
@@ -606,7 +630,7 @@ export function ChatPage() {
                       onClick={() => setShowNewConversation(true)}
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      New message
+                      {t('page.newMessage')}
                     </Button>
                   ) : null}
                 </div>

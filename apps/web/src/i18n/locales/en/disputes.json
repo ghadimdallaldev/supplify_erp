@@ -1,0 +1,121 @@
+{
+  "openDialog": {
+    "title": "Open dispute",
+    "description": "Report missing, damaged, or incorrect items. The supplier will see this under Disputes and on the order timeline. You can dispute part of an order (e.g. 1 of 3 lines).",
+    "supplier": "Supplier",
+    "selectSupplier": "Select supplier",
+    "supplierFallback": "Supplier {{id}}",
+    "type": "Type",
+    "lineItems": "Line items (optional — select what is disputed)",
+    "includeInDispute": "Include {{name}} in dispute",
+    "ordered": "Ordered",
+    "received": "Received",
+    "linesSelected_one": "{{count}} line selected for dispute",
+    "linesSelected_other": "{{count}} lines selected for dispute",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "What went wrong? Include quantities and product names.",
+    "cancel": "Cancel",
+    "submitting": "Submitting…",
+    "submit": "Submit dispute",
+    "toast": {
+      "supplierRequired": "Supplier is required",
+      "descriptionRequired": "Description is required",
+      "lineItemRequired": "Select at least one line item to dispute, or describe the issue in the description",
+      "created": "Dispute opened — the supplier has been notified",
+      "createFailed": "Failed to create dispute"
+    }
+  },
+  "list": {
+    "noOrderLinked": "No order linked",
+    "review": "Review",
+    "resolve": "Resolve",
+    "reject": "Reject"
+  },
+  "banner": {
+    "title": "Dispute in progress",
+    "supplierHint": "Review and resolve from Disputes or below.",
+    "restaurantHint": "The supplier has been notified.",
+    "manageDispute": "Manage dispute",
+    "viewDispute": "View dispute",
+    "ref": "Ref: {{id}}",
+    "defaultType": "issue"
+  },
+  "types": {
+    "short_delivery": "Short delivery",
+    "damaged_goods": "Damaged goods",
+    "wrong_items": "Wrong items",
+    "quality_issue": "Quality issue",
+    "billing_error": "Billing error",
+    "other": "Other"
+  },
+  "status": {
+    "open": "Open",
+    "under_review": "Under review",
+    "resolved": "Resolved",
+    "rejected": "Rejected",
+    "cancelled": "Cancelled"
+  },
+  "eligibility": {
+    "notEligible": "Disputes can only be opened after the supplier has delivered the order (delivered, received, or completed)."
+  },
+  "detail": {
+    "title": "Dispute",
+    "titleDetails": "Dispute details",
+    "notOnPlan": "Disputes are not on your plan.",
+    "notFound": "Dispute not found or you do not have access.",
+    "backToDisputes": "Back to disputes",
+    "replacementTitle": "Replacement order created",
+    "replacementDescription": "The supplier resolved this dispute by shipping replacement goods on a new order.",
+    "viewReplacementOrder": "View replacement order {{ref}}",
+    "summary": "Summary",
+    "status": "Status",
+    "order": "Order",
+    "restaurant": "Restaurant",
+    "supplier": "Supplier",
+    "disputedAmount": "Disputed amount",
+    "orderStatus": "Order status",
+    "description": "Description",
+    "resolutionNotes": "Resolution notes",
+    "lineItems": "Disputed line items",
+    "lineItemsAriaLabel": "Disputed line items",
+    "product": "Product",
+    "ordered": "Ordered",
+    "received": "Received",
+    "issue": "Issue",
+    "orderedQty": "Ordered: {{qty}}",
+    "receivedQty": "Received: {{qty}}",
+    "creditNotes": "Credit notes",
+    "markUnderReview": "Mark under review",
+    "resolve": "Resolve",
+    "reject": "Reject",
+    "cancelDispute": "Cancel dispute",
+    "resolveDialog": {
+      "title": "Resolve dispute",
+      "description": "Choose how to close this dispute for the restaurant.",
+      "resolution": "Resolution",
+      "creditNote": "Credit note",
+      "replacement": "Replacement",
+      "refund": "Refund",
+      "noAction": "No action",
+      "creditAmount": "Credit amount",
+      "notes": "Notes",
+      "confirm": "Confirm"
+    },
+    "rejectDialog": {
+      "title": "Reject dispute",
+      "description": "Explain why this dispute is rejected.",
+      "placeholder": "Reason for rejection (required)"
+    },
+    "toast": {
+      "markedUnderReview": "Marked under review",
+      "updateFailed": "Failed to update dispute",
+      "resolved": "Dispute resolved",
+      "resolveFailed": "Failed to resolve",
+      "rejectNotesRequired": "Notes are required when rejecting",
+      "rejected": "Dispute rejected",
+      "rejectFailed": "Failed to reject",
+      "cancelled": "Dispute cancelled",
+      "cancelFailed": "Failed to cancel"
+    }
+  }
+}

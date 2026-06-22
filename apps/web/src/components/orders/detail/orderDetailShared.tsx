@@ -1,7 +1,10 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiUrl } from '../../../lib/apiBase'
+import type { OrderStatusDisplayInput } from '../../../lib/orderStatusDisplay'
 
 export const VALID_ORDER_TABS = [
   'timeline',
@@ -65,7 +68,65 @@ export function OrderDetailTabLoading({ className = 'py-12' }: { className?: str
   )
 }
 
+export function resolveOrderStatusLabel(
+  t: TFunction<'orders'>,
+  order: OrderStatusDisplayInput,
+  viewerRole: 'RESTAURANT' | 'SUPPLIER'
+): string {
+  if (order.status === 'RECEIVED_WITH_DISPUTE') {
+    return t('status.RECEIVED_WITH_DISPUTE')
+  }
+
+  if (order.status !== 'CANCELLED') {
+    return t(`status.${order.status}`, { defaultValue: order.status.replace(/_/g, ' ') })
+  }
+
+  if (order.cancelled_by === 'SUPPLIER') {
+    return viewerRole === 'RESTAURANT'
+      ? t('statusDisplay.declinedBySupplier')
+      : t('statusDisplay.declined')
+  }
+
+  if (order.cancelled_by === 'RESTAURANT') {
+    return viewerRole === 'SUPPLIER'
+      ? t('statusDisplay.cancelledByRestaurant')
+      : t('statusDisplay.cancelled')
+  }
+
+  return t('statusDisplay.cancelled')
+}
+
+export function resolveOrderCancellationBanner(
+  t: TFunction<'orders'>,
+  order: OrderStatusDisplayInput,
+  viewerRole: 'RESTAURANT' | 'SUPPLIER'
+): { title: string; reason?: string } | null {
+  if (order.status !== 'CANCELLED') return null
+
+  const reason = order.cancel_reason?.trim()
+  if (order.cancelled_by === 'SUPPLIER' && viewerRole === 'RESTAURANT') {
+    return {
+      title: t('cancellationBanner.declinedBySupplier'),
+      reason: reason || t('cancellationBanner.noReasonProvided'),
+    }
+  }
+
+  if (order.cancelled_by === 'RESTAURANT' && viewerRole === 'SUPPLIER' && reason) {
+    return {
+      title: t('cancellationBanner.cancelledByRestaurant'),
+      reason,
+    }
+  }
+
+  if (reason && viewerRole === 'RESTAURANT' && order.cancelled_by !== 'SUPPLIER') {
+    return { title: t('cancellationBanner.orderCancelled'), reason }
+  }
+
+  return null
+}
+
 export function usePackingSlipActions(orderId: string) {
+  const { t } = useTranslation('orders')
   const [downloadingPdf, setDownloadingPdf] = useState(false)
   const [printingPdf, setPrintingPdf] = useState(false)
 
@@ -87,16 +148,16 @@ export function usePackingSlipActions(orderId: string) {
       const printWindow = window.open(url, '_blank')
       if (!printWindow) {
         URL.revokeObjectURL(url)
-        toast.error('Allow pop-ups to print the packing slip')
+        toast.error(t('packingSlip.allowPopups'))
         return
       }
       printWindow.addEventListener('load', () => {
         printWindow.focus()
         printWindow.print()
       })
-      toast.success('Opening packing slip for printing…')
+      toast.success(t('packingSlip.openingPrint'))
     } catch {
-      toast.error('Could not print packing slip')
+      toast.error(t('packingSlip.printFailed'))
     } finally {
       setPrintingPdf(false)
     }
@@ -113,9 +174,9 @@ export function usePackingSlipActions(orderId: string) {
       a.download = `packing-slip-${orderId.slice(0, 8)}.pdf`
       a.click()
       URL.revokeObjectURL(url)
-      toast.success('Packing slip PDF downloaded')
+      toast.success(t('packingSlip.downloadSuccess'))
     } catch {
-      toast.error('Could not download packing slip PDF')
+      toast.error(t('packingSlip.downloadFailed'))
     } finally {
       setDownloadingPdf(false)
     }

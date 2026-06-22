@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { MapPin } from 'lucide-react'
 import { Badge } from '../ui/badge'
@@ -13,6 +14,7 @@ type Props = {
 }
 
 export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
+  const { t } = useTranslation('fulfillment')
   const { data, isLoading, isError, refetch } = useGetFulfillmentRoutesQuery()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null)
@@ -32,11 +34,9 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
         <header className="border-b border-[var(--app-border)] px-4 py-4 sm:px-5">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
             <MapPin className="h-4 w-4 text-[var(--brand-mid)]" aria-hidden />
-            Delivery Routes
+            {t('routes.title')}
           </h2>
-          <p className="mt-0.5 text-xs text-[var(--text-mid)]">
-            Planned delivery runs built from Driver Dispatch
-          </p>
+          <p className="mt-0.5 text-xs text-[var(--text-mid)]">{t('routes.subtitle')}</p>
         </header>
         <div className="p-4 sm:p-5">
           {isLoading ? (
@@ -47,7 +47,7 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
             </div>
           ) : isError ? (
             <div className="py-10 text-center" data-testid="routes-error" role="alert">
-              <p className="text-sm text-[var(--text-muted)]">Could not load routes.</p>
+              <p className="text-sm text-[var(--text-muted)]">{t('routes.loadFailed')}</p>
               <Button
                 type="button"
                 variant="outline"
@@ -55,7 +55,7 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
                 className="mt-3"
                 onClick={() => refetch()}
               >
-                Retry
+                {t('common:actions.retry')}
               </Button>
             </div>
           ) : routes.length === 0 ? (
@@ -64,13 +64,13 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
               data-testid="routes-empty"
             >
               <MapPin className="mx-auto mb-3 h-10 w-10 text-[var(--text-muted)]" />
-              <p className="font-medium text-[var(--text)]">No routes planned yet</p>
+              <p className="font-medium text-[var(--text)]">{t('routes.emptyTitle')}</p>
               <p className="mt-2 text-sm text-[var(--text-muted)] max-w-md mx-auto">
-                Create a route from{' '}
+                {t('routes.emptyDescriptionBefore')}{' '}
                 <Link to="/app/fulfillment" className="text-[var(--brand-mid)] hover:underline">
-                  Driver Dispatch
+                  {t('routes.emptyDescriptionLink')}
                 </Link>{' '}
-                by selecting orders and clicking Create route.
+                {t('routes.emptyDescriptionAfter')}
               </p>
             </div>
           ) : (
@@ -89,7 +89,7 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
                         <p className="text-sm text-[var(--text-muted)]">{route.driverName}</p>
                       </div>
                       <Badge variant={route.status === 'IN_PROGRESS' ? 'default' : 'secondary'}>
-                        {route.status === 'PLANNED' ? 'Route planned' : route.status}
+                        {route.status === 'PLANNED' ? t('routes.routePlanned') : route.status}
                       </Badge>
                     </div>
                     <p className="mt-2 text-sm text-[var(--text-muted)]">
@@ -99,8 +99,10 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
                       {route.area ? ` · ${route.area}` : ''}
                     </p>
                     <p className="mt-1 text-sm text-[var(--text)]">
-                      {Array.isArray(route.stops) ? route.stops.length : route.stops} stops ·{' '}
-                      {route.completedStops} done
+                      {t('routes.stopsSummary', {
+                        stops: Array.isArray(route.stops) ? route.stops.length : route.stops,
+                        done: route.completedStops,
+                      })}
                     </p>
                     <Button
                       className="mt-3 min-h-[44px] w-full"
@@ -108,7 +110,7 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
                       variant="outline"
                       onClick={() => setSelectedId(route.id)}
                     >
-                      View route
+                      {t('routes.viewRoute')}
                     </Button>
                   </article>
                 ))}
@@ -117,14 +119,14 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
                 <table className="w-full min-w-[720px] text-sm" data-testid="routes-table">
                   <thead>
                     <tr className="border-b text-left text-[var(--text-muted)]">
-                      <th className="p-2 font-medium">Route</th>
-                      <th className="p-2 font-medium">Driver</th>
-                      <th className="p-2 font-medium">Date</th>
-                      <th className="p-2 font-medium">Area</th>
-                      <th className="p-2 font-medium">Stops</th>
-                      <th className="p-2 font-medium">Progress</th>
-                      <th className="p-2 font-medium">Status</th>
-                      <th className="p-2 font-medium text-right">Action</th>
+                      <th className="p-2 font-medium">{t('routes.table.route')}</th>
+                      <th className="p-2 font-medium">{t('routes.table.driver')}</th>
+                      <th className="p-2 font-medium">{t('routes.table.date')}</th>
+                      <th className="p-2 font-medium">{t('routes.table.area')}</th>
+                      <th className="p-2 font-medium">{t('routes.table.stops')}</th>
+                      <th className="p-2 font-medium">{t('routes.table.progress')}</th>
+                      <th className="p-2 font-medium">{t('routes.table.status')}</th>
+                      <th className="p-2 font-medium text-right">{t('routes.table.action')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -147,8 +149,13 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
                           {Array.isArray(route.stops) ? route.stops.length : route.stops}
                         </td>
                         <td className="p-2 text-xs text-[var(--text-muted)]">
-                          {route.completedStops} done · {route.failedStops} failed
-                          {route.rescheduledStops > 0 ? ` · ${route.rescheduledStops} resched` : ''}
+                          {t('routes.table.progressSummary', {
+                            done: route.completedStops,
+                            failed: route.failedStops,
+                          })}
+                          {route.rescheduledStops > 0
+                            ? t('routes.table.rescheduled', { count: route.rescheduledStops })
+                            : ''}
                         </td>
                         <td className="p-2">
                           <Badge variant={route.status === 'IN_PROGRESS' ? 'default' : 'secondary'}>
@@ -161,7 +168,7 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
                             variant="outline"
                             onClick={() => setSelectedId(route.id)}
                           >
-                            View
+                            {t('routes.table.view')}
                           </Button>
                         </td>
                       </tr>
@@ -183,7 +190,7 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
           data-testid="routes-detail-error"
           role="alert"
         >
-          <p className="text-sm text-[var(--text-muted)]">Could not load route details.</p>
+          <p className="text-sm text-[var(--text-muted)]">{t('routes.detailLoadFailed')}</p>
           <Button
             type="button"
             variant="outline"
@@ -191,7 +198,7 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
             className="mt-3"
             onClick={() => refetchDetail()}
           >
-            Retry
+            {t('common:actions.retry')}
           </Button>
         </div>
       )}

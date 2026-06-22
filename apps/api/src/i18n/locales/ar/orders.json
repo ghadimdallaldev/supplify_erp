@@ -1,0 +1,13 @@
+{
+  "packingSlip": {
+    "title": "قائمة التعبئة",
+    "orderNumber": "طلب رقم {{number}}",
+    "date": "التاريخ:",
+    "shipTo": "الشحن إلى:",
+    "items": "العناصر",
+    "qty": "الكمية:",
+    "itemFallback": "عنصر",
+    "total": "الإجمالي:",
+    "na": "غير متاح"
+  }
+}

@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   useGetQuoteRequestCompareQuery,
   useConvertQuoteResponseToCartMutation,
@@ -16,21 +17,28 @@ import { formatPrice } from '../utils/format'
 import { toast } from 'sonner'
 import { ArrowLeft, ShoppingCart } from 'lucide-react'
 import type { QuoteRequestSupplierEntry } from '../types'
+import { ensureNamespace } from '../i18n'
 
-function responseStatusLabel(status: string) {
+function responseStatusLabel(status: string, t: (key: string) => string) {
   switch (status) {
     case 'pending':
-      return 'Pending'
+      return t('status.pending')
     case 'responded':
-      return 'Responded'
+      return t('status.responded')
     case 'declined':
-      return 'Declined'
+      return t('status.declined')
     default:
       return status
   }
 }
 
 export function QuoteRequestDetailPage() {
+  const { t } = useTranslation('quotes')
+
+  useEffect(() => {
+    void ensureNamespace('quotes')
+  }, [])
+
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { addItem } = useCartActions()
@@ -57,10 +65,10 @@ export function QuoteRequestDetailPage() {
           },
         })
       }
-      toast.success('Added to cart')
+      toast.success(t('detail.addedToCart'))
       navigate('/app/cart')
     } catch (err: any) {
-      toast.error(err?.data?.error?.message || 'Could not add to cart')
+      toast.error(err?.data?.error?.message || t('detail.addToCartFailed'))
     }
   }
 
@@ -82,11 +90,11 @@ export function QuoteRequestDetailPage() {
     return (
       <PageShell data-testid="quote-request-detail-page">
         <EmptyState
-          title="Quote request not found"
-          description="This request may have been removed or you do not have access."
+          title={t('detail.notFoundTitle')}
+          description={t('detail.notFoundDescription')}
           action={
             <Button variant="outline" onClick={() => refetch()}>
-              Retry
+              {t('common.retry')}
             </Button>
           }
         />
@@ -97,8 +105,8 @@ export function QuoteRequestDetailPage() {
   const { quoteRequest, items, suppliers } = data
 
   const headerDescription = [
-    `Created ${new Date(quoteRequest.createdAt).toLocaleString()}`,
-    quoteRequest.neededBy ? `Needed by ${quoteRequest.neededBy}` : null,
+    t('detail.createdAt', { date: new Date(quoteRequest.createdAt).toLocaleString() }),
+    quoteRequest.neededBy ? t('detail.neededBy', { date: quoteRequest.neededBy }) : null,
   ]
     .filter(Boolean)
     .join(' · ')
@@ -106,31 +114,33 @@ export function QuoteRequestDetailPage() {
   return (
     <PageShell className="space-y-6" data-testid="quote-request-detail-page">
       <PageHeader
-        title="Compare offers"
+        title={t('detail.title')}
         description={headerDescription}
         breadcrumb={
           <Button variant="ghost" size="sm" className="-ml-2" asChild>
             <Link to="/app/quote-requests">
               <ArrowLeft className="h-4 w-4 mr-1" />
-              Back to quote requests
+              {t('detail.backToRequests')}
             </Link>
           </Button>
         }
-        actions={<Badge>{quoteRequest.status === 'open' ? 'Open' : quoteRequest.status}</Badge>}
+        actions={
+          <Badge>{quoteRequest.status === 'open' ? t('status.open') : quoteRequest.status}</Badge>
+        }
       />
 
       {quoteRequest.note && <p className="text-sm text-[var(--text)]">{quoteRequest.note}</p>}
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Requested items</CardTitle>
+          <CardTitle className="text-base">{t('detail.requestedItemsTitle')}</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-[var(--text-muted)]">
-                <th className="py-2 pr-4">Product</th>
-                <th className="py-2 pr-4">Qty</th>
+                <th className="py-2 pr-4">{t('common.product')}</th>
+                <th className="py-2 pr-4">{t('common.qty')}</th>
               </tr>
             </thead>
             <tbody>
@@ -151,13 +161,10 @@ export function QuoteRequestDetailPage() {
       </Card>
 
       {respondedSuppliers.length === 0 ? (
-        <EmptyState
-          title="Waiting for supplier responses"
-          description="Suppliers will be notified. Check back when responses arrive."
-        />
+        <EmptyState title={t('detail.waitingTitle')} description={t('detail.waitingDescription')} />
       ) : (
         <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Supplier responses</h2>
+          <h2 className="text-lg font-semibold">{t('detail.responsesTitle')}</h2>
           {suppliers.map((supplier) => (
             <Card key={supplier.id}>
               <CardHeader className="pb-2">
@@ -167,14 +174,14 @@ export function QuoteRequestDetailPage() {
                     {supplier.supplierSlug && (
                       <CardDescription>
                         <Link to={`/supplier/${supplier.supplierSlug}`} className="hover:underline">
-                          View catalog
+                          {t('detail.viewCatalog')}
                         </Link>
                       </CardDescription>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={supplier.status === 'responded' ? 'default' : 'secondary'}>
-                      {responseStatusLabel(supplier.status)}
+                      {responseStatusLabel(supplier.status, t)}
                     </Badge>
                     {supplier.status === 'responded' && (
                       <Button
@@ -183,7 +190,7 @@ export function QuoteRequestDetailPage() {
                         onClick={() => handleAddToCart(supplier)}
                       >
                         <ShoppingCart className="h-4 w-4 mr-1" />
-                        Add to cart
+                        {t('detail.addToCart')}
                       </Button>
                     )}
                   </div>
@@ -199,12 +206,12 @@ export function QuoteRequestDetailPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b text-left text-[var(--text-muted)]">
-                        <th className="py-2 pr-3">Item</th>
-                        <th className="py-2 pr-3">Available</th>
-                        <th className="py-2 pr-3">Price</th>
-                        <th className="py-2 pr-3">Qty</th>
-                        <th className="py-2 pr-3">Delivery</th>
-                        <th className="py-2 pr-3">Note</th>
+                        <th className="py-2 pr-3">{t('detail.item')}</th>
+                        <th className="py-2 pr-3">{t('detail.available')}</th>
+                        <th className="py-2 pr-3">{t('detail.price')}</th>
+                        <th className="py-2 pr-3">{t('common.qty')}</th>
+                        <th className="py-2 pr-3">{t('detail.delivery')}</th>
+                        <th className="py-2 pr-3">{t('detail.note')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -216,17 +223,25 @@ export function QuoteRequestDetailPage() {
                           <tr key={reqItem.id} className="border-b border-[var(--app-border)]">
                             <td className="py-2 pr-3">{reqItem.productName}</td>
                             <td className="py-2 pr-3">
-                              {line ? (line.isAvailable ? 'Yes' : 'No') : '—'}
+                              {line
+                                ? line.isAvailable
+                                  ? t('common.yes')
+                                  : t('common.no')
+                                : t('common.emDash')}
                             </td>
                             <td className="py-2 pr-3">
-                              {line?.unitPrice != null ? formatPrice(line.unitPrice) : '—'}
+                              {line?.unitPrice != null
+                                ? formatPrice(line.unitPrice)
+                                : t('common.emDash')}
                             </td>
-                            <td className="py-2 pr-3">{line?.quantity ?? '—'}</td>
-                            <td className="py-2 pr-3">{line?.deliveryDate ?? '—'}</td>
+                            <td className="py-2 pr-3">{line?.quantity ?? t('common.emDash')}</td>
+                            <td className="py-2 pr-3">
+                              {line?.deliveryDate ?? t('common.emDash')}
+                            </td>
                             <td className="py-2 pr-3 max-w-[160px] truncate">
                               {line?.substituteProductName
-                                ? `Substitute: ${line.substituteProductName}`
-                                : line?.note || '—'}
+                                ? t('detail.substitute', { name: line.substituteProductName })
+                                : line?.note || t('common.emDash')}
                             </td>
                           </tr>
                         )

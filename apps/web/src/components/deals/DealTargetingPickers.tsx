@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Label } from '../ui/label'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
@@ -10,6 +11,7 @@ import {
   useGetSupplierMeQuery,
 } from '../../services/api'
 import { useAppSelector } from '../../hooks/redux'
+import { ensureNamespace } from '../../i18n'
 import type { Product } from '../../types'
 import { Loader2, Search, X } from 'lucide-react'
 
@@ -27,6 +29,7 @@ type Props = {
 }
 
 export function DealTargetingPickers({ value, onChange }: Props) {
+  const { t } = useTranslation('deals')
   const [productSearch, setProductSearch] = useState('')
   const { user } = useAppSelector((state) => state.auth)
   const isSupplier = user?.role === 'SUPPLIER'
@@ -46,7 +49,10 @@ export function DealTargetingPickers({ value, onChange }: Props) {
   )
 
   const categories = categoriesData?.categories || []
-  const products: Product[] = productsData?.products ?? []
+  const products = useMemo(
+    () => (productsData?.products ?? []) as Product[],
+    [productsData?.products]
+  )
 
   const selectedProducts = useMemo(() => {
     const map = new Map(products.map((p) => [String(p.id), p]))
@@ -55,6 +61,10 @@ export function DealTargetingPickers({ value, onChange }: Props) {
       name: String(map.get(id)?.name || id.slice(0, 8)),
     }))
   }, [value.productIds, products])
+
+  useEffect(() => {
+    void ensureNamespace('deals')
+  }, [])
 
   const toggleProduct = (productId: string) => {
     const set = new Set(value.productIds)
@@ -72,11 +82,9 @@ export function DealTargetingPickers({ value, onChange }: Props) {
 
   return (
     <div className="space-y-3 border rounded-lg p-3 bg-[var(--app-muted)]/30">
-      <p className="text-xs text-[var(--text-muted)]">
-        Limit which catalog items this deal applies to. Leave as all products for store-wide offers.
-      </p>
+      <p className="text-xs text-[var(--text-muted)]">{t('targeting.helperText')}</p>
       <div>
-        <Label>Applies to</Label>
+        <Label>{t('targeting.appliesTo')}</Label>
         <Select
           value={value.appliesTo}
           onValueChange={(v) => {
@@ -89,16 +97,16 @@ export function DealTargetingPickers({ value, onChange }: Props) {
           }}
         >
           <SelectTrigger className="mt-1">
-            <option value="all">All products</option>
-            <option value="specific_products">Specific products</option>
-            <option value="specific_categories">Specific categories</option>
+            <option value="all">{t('targeting.allProducts')}</option>
+            <option value="specific_products">{t('targeting.specificProducts')}</option>
+            <option value="specific_categories">{t('targeting.specificCategories')}</option>
           </SelectTrigger>
         </Select>
       </div>
 
       {value.appliesTo === 'specific_products' ? (
         <div className="space-y-2">
-          <Label>Products</Label>
+          <Label>{t('targeting.products')}</Label>
           {selectedProducts.length > 0 ? (
             <div className="flex flex-wrap gap-1">
               {selectedProducts.map((p) => (
@@ -108,7 +116,7 @@ export function DealTargetingPickers({ value, onChange }: Props) {
                     type="button"
                     className="hover:opacity-70"
                     onClick={() => toggleProduct(p.id)}
-                    aria-label={`Remove ${p.name}`}
+                    aria-label={t('targeting.removeProduct', { name: p.name })}
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -120,13 +128,13 @@ export function DealTargetingPickers({ value, onChange }: Props) {
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-[var(--text-muted)]" />
             <Input
               className="pl-8"
-              placeholder="Search products..."
+              placeholder={t('targeting.searchProducts')}
               value={productSearch}
               onChange={(e) => setProductSearch(e.target.value)}
             />
           </div>
           {isSupplier && !supplierId ? (
-            <p className="text-xs text-[var(--text-muted)]">Loading your catalog…</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('targeting.loadingCatalog')}</p>
           ) : productsLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
@@ -151,7 +159,9 @@ export function DealTargetingPickers({ value, onChange }: Props) {
                 )
               })}
               {products.length === 0 ? (
-                <p className="px-3 py-4 text-xs text-[var(--text-muted)]">No products found</p>
+                <p className="px-3 py-4 text-xs text-[var(--text-muted)]">
+                  {t('targeting.noProductsFound')}
+                </p>
               ) : null}
             </div>
           )}
@@ -160,7 +170,7 @@ export function DealTargetingPickers({ value, onChange }: Props) {
 
       {value.appliesTo === 'specific_categories' ? (
         <div className="space-y-2">
-          <Label>Categories</Label>
+          <Label>{t('targeting.categories')}</Label>
           {categoriesLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
@@ -179,7 +189,9 @@ export function DealTargetingPickers({ value, onChange }: Props) {
                 )
               })}
               {categories.length === 0 ? (
-                <p className="text-xs text-[var(--text-muted)]">No categories available</p>
+                <p className="text-xs text-[var(--text-muted)]">
+                  {t('targeting.noCategoriesAvailable')}
+                </p>
               ) : null}
             </div>
           )}
@@ -190,7 +202,7 @@ export function DealTargetingPickers({ value, onChange }: Props) {
               size="sm"
               onClick={() => onChange({ ...value, categoryIds: [] })}
             >
-              Clear selection
+              {t('targeting.clearSelection')}
             </Button>
           ) : null}
         </div>

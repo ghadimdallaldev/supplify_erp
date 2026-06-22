@@ -1,4 +1,11 @@
+import i18n from 'i18next'
 import type { DeliveryTrackingInfo } from '../types'
+
+const NS = 'fulfillment'
+
+function ft(key: string, options?: Record<string, unknown>): string {
+  return i18n.t(key, { ns: NS, ...options })
+}
 
 export type GpsDisplayStatus = 'off' | 'none' | 'live' | 'stale'
 
@@ -13,26 +20,28 @@ export function getGpsStatusLabel(tracking?: DeliveryTrackingInfo | null): strin
   const status = getGpsDisplayStatus(tracking)
   switch (status) {
     case 'off':
-      return 'Tracking off'
+      return ft('tracking.gps.trackingOff')
     case 'none':
-      return 'No GPS yet'
+      return ft('tracking.gps.noGpsYet')
     case 'stale':
       return tracking?.lastUpdatedLabel
-        ? `Location not updating · ${tracking.lastUpdatedLabel}`
-        : 'Location not updating'
+        ? ft('tracking.gps.locationNotUpdatingWithTime', { time: tracking.lastUpdatedLabel })
+        : ft('tracking.gps.locationNotUpdating')
     case 'live':
-      return tracking?.lastUpdatedLabel ? `Live now · ${tracking.lastUpdatedLabel}` : 'Live now'
+      return tracking?.lastUpdatedLabel
+        ? ft('tracking.gps.liveNowWithTime', { time: tracking.lastUpdatedLabel })
+        : ft('tracking.gps.liveNow')
     default:
-      return 'No GPS yet'
+      return ft('tracking.gps.noGpsYet')
   }
 }
 
 export function getGpsStatusShort(tracking?: DeliveryTrackingInfo | null): string {
   const status = getGpsDisplayStatus(tracking)
-  if (status === 'live') return 'Live'
-  if (status === 'stale') return 'Stale'
-  if (status === 'off') return 'Off'
-  return 'No GPS'
+  if (status === 'live') return ft('tracking.gps.live')
+  if (status === 'stale') return ft('tracking.gps.stale')
+  if (status === 'off') return ft('tracking.gps.off')
+  return ft('tracking.gps.noGps')
 }
 
 /** Human-friendly live status for active deliveries (modal / map footer). */
@@ -40,7 +49,7 @@ export function getLiveDeliveryStatusLine(status: string | null | undefined): st
   const normalized = String(status || '')
     .toLowerCase()
     .trim()
-  if (normalized === 'picked_up') return 'Picked up order · Live now'
-  if (normalized === 'out_for_delivery') return 'On the way · Live now'
+  if (normalized === 'picked_up') return ft('tracking.gps.pickedUpLive')
+  if (normalized === 'out_for_delivery') return ft('tracking.gps.onTheWayLive')
   return null
 }

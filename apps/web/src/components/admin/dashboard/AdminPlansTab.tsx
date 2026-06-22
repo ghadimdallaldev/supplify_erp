@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card } from '../../ui/card'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
@@ -45,6 +46,7 @@ export interface AdminPlansTabProps {
 }
 
 export function AdminPlansTab({ active }: AdminPlansTabProps) {
+  const { t } = useTranslation('admin')
   const [plansTenantFilter, setPlansTenantFilter] = useState<'RESTAURANT' | 'SUPPLIER' | undefined>(
     undefined
   )
@@ -99,7 +101,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
         limits: {},
         features: {},
       }).unwrap()
-      toast.success('Plan created')
+      toast.success(t('plansToasts.created'))
       setCreatePlanOpen(false)
       setCreatePlanForm({
         code: '',
@@ -181,8 +183,8 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
     <>
       <div>
         <AdminSectionHeader
-          title="Subscription Defaults"
-          description="Platform-wide subscription settings"
+          title={t('plans.subscriptionDefaultsTitle')}
+          description={t('plans.subscriptionDefaultsDescription')}
         />
         <AdminPlatformSettingsPanel variant="compact" />
         <div className="mt-4">
@@ -192,7 +194,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
 
       <div>
         <AdminSectionHeader
-          title="Subscription Plans"
+          title={t('plans.subscriptionPlansTitle')}
           action={
             <div className="flex items-center gap-2">
               <span className="text-sm text-[var(--text-muted)]">Filter:</span>
@@ -206,8 +208,8 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
               >
                 <SelectTrigger className="h-9 w-36">
                   <option value="">All</option>
-                  <option value="RESTAURANT">Restaurant</option>
-                  <option value="SUPPLIER">Supplier</option>
+                  <option value="RESTAURANT">{t('common.restaurant')}</option>
+                  <option value="SUPPLIER">{t('common.supplier')}</option>
                 </SelectTrigger>
               </Select>
               <Dialog open={createPlanOpen} onOpenChange={setCreatePlanOpen}>
@@ -219,7 +221,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                 </DialogTrigger>
                 <DialogContent size="sm">
                   <DialogHeader>
-                    <DialogTitle>Create Plan</DialogTitle>
+                    <DialogTitle>{t('plans.createPlanTitle')}</DialogTitle>
                     <DialogDescription>
                       Add a subscription plan for restaurants or suppliers.
                     </DialogDescription>
@@ -230,7 +232,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                       <Input
                         value={createPlanForm.code}
                         onChange={(e) => setCreatePlanForm((s) => ({ ...s, code: e.target.value }))}
-                        placeholder="free"
+                        placeholder={t('plans.codePlaceholder')}
                       />
                     </div>
                     <div>
@@ -238,7 +240,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                       <Input
                         value={createPlanForm.name}
                         onChange={(e) => setCreatePlanForm((s) => ({ ...s, name: e.target.value }))}
-                        placeholder="Free"
+                        placeholder={t('plans.namePlaceholder')}
                       />
                     </div>
                     <div>
@@ -253,8 +255,8 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                         }
                       >
                         <SelectTrigger>
-                          <option value="RESTAURANT">Restaurant</option>
-                          <option value="SUPPLIER">Supplier</option>
+                          <option value="RESTAURANT">{t('common.restaurant')}</option>
+                          <option value="SUPPLIER">{t('common.supplier')}</option>
                         </SelectTrigger>
                       </Select>
                     </div>
@@ -265,7 +267,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                         onChange={(e) =>
                           setCreatePlanForm((s) => ({ ...s, description: e.target.value }))
                         }
-                        placeholder="Optional"
+                        placeholder={t('common.optional')}
                       />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -410,7 +412,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
       <Dialog open={!!editPlanModal?.open} onOpenChange={(open) => !open && setEditPlanModal(null)}>
         <DialogContent size="lg">
           <DialogHeader>
-            <DialogTitle>Edit Plan</DialogTitle>
+            <DialogTitle>{t('plans.editPlanTitle')}</DialogTitle>
             <DialogDescription>
               Update pricing, limits, features, trial days, and visibility for this plan.
             </DialogDescription>
@@ -422,7 +424,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                 <Input
                   value={editPlanForm.name}
                   onChange={(e) => setEditPlanForm((s) => ({ ...s, name: e.target.value }))}
-                  placeholder="Plan name"
+                  placeholder={t('plans.planNamePlaceholder')}
                 />
               </div>
               <div>
@@ -430,7 +432,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                 <Input
                   value={editPlanForm.description}
                   onChange={(e) => setEditPlanForm((s) => ({ ...s, description: e.target.value }))}
-                  placeholder="Optional"
+                  placeholder={t('common.optional')}
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

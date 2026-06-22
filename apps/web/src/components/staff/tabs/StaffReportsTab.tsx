@@ -1,7 +1,6 @@
 import { useState } from 'react'
-
 import { format } from 'date-fns'
-
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
@@ -25,6 +24,7 @@ import { clampToISODate } from '../staffShared'
 import { formatPrice } from '../../../utils/format'
 
 export function StaffReportsTab() {
+  const { t } = useTranslation('staff')
   const [payrollForm, setPayrollForm] = useState({
     periodStart: clampToISODate(new Date(new Date().getTime() - 14 * 24 * 60 * 60 * 1000)),
 
@@ -44,7 +44,7 @@ export function StaffReportsTab() {
 
   const handleLoadPreview = async () => {
     if (!payrollForm.periodStart || !payrollForm.periodEnd) {
-      toast.error('Select a period start and end')
+      toast.error(t('reports.validationPeriod'))
 
       return
     }
@@ -56,13 +56,13 @@ export function StaffReportsTab() {
         periodEnd: payrollForm.periodEnd,
       }).unwrap()
     } catch {
-      toast.error('Unable to load labour hours summary')
+      toast.error(t('reports.previewFailed'))
     }
   }
 
   const handleCreatePayroll = async () => {
     if (!payrollForm.periodStart || !payrollForm.periodEnd) {
-      toast.error('Payroll export needs start and end dates')
+      toast.error(t('reports.validationExportDates'))
 
       return
     }
@@ -76,9 +76,9 @@ export function StaffReportsTab() {
         usePreview: true,
       }).unwrap()
 
-      toast.success('Payroll export draft created')
+      toast.success(t('reports.exportCreated'))
     } catch {
-      toast.error('Unable to generate payroll export')
+      toast.error(t('reports.exportFailed'))
     }
   }
 
@@ -86,9 +86,9 @@ export function StaffReportsTab() {
     try {
       await updatePayrollExport({ id, status }).unwrap()
 
-      toast.success(`Export marked ${status.toLowerCase()}`)
+      toast.success(t('reports.exportMarked', { status: status.toLowerCase() }))
     } catch {
-      toast.error('Unable to update export status')
+      toast.error(t('reports.exportUpdateFailed'))
     }
   }
 
@@ -96,17 +96,15 @@ export function StaffReportsTab() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Labour hours summary</CardTitle>
+          <CardTitle>{t('reports.labourTitle')}</CardTitle>
 
-          <CardDescription>
-            Estimated hours and labour cost from time entries — not tax-ready payroll processing.
-          </CardDescription>
+          <CardDescription>{t('reports.labourDescription')}</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
-              <Label htmlFor="payrollStart">Period start</Label>
+              <Label htmlFor="payrollStart">{t('reports.periodStart')}</Label>
 
               <Input
                 id="payrollStart"
@@ -119,7 +117,7 @@ export function StaffReportsTab() {
             </div>
 
             <div>
-              <Label htmlFor="payrollEnd">Period end</Label>
+              <Label htmlFor="payrollEnd">{t('reports.periodEnd')}</Label>
 
               <Input
                 id="payrollEnd"
@@ -133,11 +131,11 @@ export function StaffReportsTab() {
 
             <div className="flex items-end gap-2">
               <Button variant="outline" onClick={handleLoadPreview} disabled={previewLoading}>
-                {previewLoading ? 'Loading…' : 'Preview hours'}
+                {previewLoading ? t('reports.loadingPreview') : t('reports.previewHours')}
               </Button>
 
               <Button onClick={handleCreatePayroll} disabled={creatingPayroll}>
-                {creatingPayroll ? 'Generating…' : 'Generate payroll export'}
+                {creatingPayroll ? t('reports.generating') : t('reports.generateExport')}
               </Button>
             </div>
           </div>
@@ -146,13 +144,13 @@ export function StaffReportsTab() {
             <div className="space-y-4 rounded-xl border border-[var(--app-border)] bg-[var(--brand-ultra)]/30 p-4">
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
-                  <p className="text-xs text-[var(--text-muted)]">Total hours</p>
+                  <p className="text-xs text-[var(--text-muted)]">{t('reports.totalHours')}</p>
 
                   <p className="text-lg font-semibold text-[var(--text)]">{preview.totalHours}h</p>
                 </div>
 
                 <div>
-                  <p className="text-xs text-[var(--text-muted)]">Break minutes</p>
+                  <p className="text-xs text-[var(--text-muted)]">{t('reports.breakMinutes')}</p>
 
                   <p className="text-lg font-semibold text-[var(--text)]">
                     {preview.totalBreakMinutes}
@@ -160,12 +158,12 @@ export function StaffReportsTab() {
                 </div>
 
                 <div>
-                  <p className="text-xs text-[var(--text-muted)]">Estimated labour cost</p>
+                  <p className="text-xs text-[var(--text-muted)]">{t('reports.estLabourCost')}</p>
 
                   <p className="text-lg font-semibold text-[var(--text)]">
                     {preview.estimatedLabourCost != null
                       ? formatPrice(preview.estimatedLabourCost)
-                      : 'Not available'}
+                      : t('shared.notAvailable')}
                   </p>
                 </div>
               </div>
@@ -174,8 +172,9 @@ export function StaffReportsTab() {
 
               {preview.staffMissingRate.length > 0 ? (
                 <p className="text-xs text-[var(--text-muted)]">
-                  Missing hourly rates:{' '}
-                  {preview.staffMissingRate.map((s) => s.staffName).join(', ')}
+                  {t('reports.missingRates', {
+                    names: preview.staffMissingRate.map((s) => s.staffName).join(', '),
+                  })}
                 </p>
               ) : null}
 
@@ -184,13 +183,13 @@ export function StaffReportsTab() {
                   <table className="min-w-full text-sm">
                     <thead className="bg-[var(--brand-ultra)]">
                       <tr>
-                        <th className="px-3 py-2 text-left">Staff</th>
+                        <th className="px-3 py-2 text-left">{t('shared.staff')}</th>
 
-                        <th className="px-3 py-2 text-left">Role</th>
+                        <th className="px-3 py-2 text-left">{t('team.role')}</th>
 
-                        <th className="px-3 py-2 text-left">Hours</th>
+                        <th className="px-3 py-2 text-left">{t('reports.hoursColumn')}</th>
 
-                        <th className="px-3 py-2 text-left">Est. cost</th>
+                        <th className="px-3 py-2 text-left">{t('reports.estCostColumn')}</th>
                       </tr>
                     </thead>
 
@@ -206,7 +205,7 @@ export function StaffReportsTab() {
                           <td className="px-3 py-2">
                             {line.estimatedCost != null
                               ? formatPrice(line.estimatedCost)
-                              : 'Not available'}
+                              : t('shared.notAvailable')}
                           </td>
                         </tr>
                       ))}
@@ -221,20 +220,17 @@ export function StaffReportsTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Payroll export</CardTitle>
+          <CardTitle>{t('reports.payrollTitle')}</CardTitle>
 
-          <CardDescription>
-            Draft exports from time entries. Mark approved when reviewed; exported when file is
-            ready.
-          </CardDescription>
+          <CardDescription>{t('reports.payrollDescription')}</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-3">
           {payrollLoading ? (
-            <p className="text-sm text-[var(--text-muted)]">Loading payroll exports…</p>
+            <p className="text-sm text-[var(--text-muted)]">{t('reports.loadingExports')}</p>
           ) : payrollExports.length === 0 ? (
             <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">
-              <p>No payroll exports generated yet.</p>
+              <p>{t('reports.noExports')}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -242,23 +238,23 @@ export function StaffReportsTab() {
                 <thead className="bg-[var(--brand-ultra)]">
                   <tr>
                     <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">
-                      Period
+                      {t('shared.period')}
                     </th>
 
                     <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">
-                      Status
+                      {t('shared.status')}
                     </th>
 
                     <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">
-                      Totals
+                      {t('shared.totals')}
                     </th>
 
                     <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">
-                      Export
+                      {t('shared.export')}
                     </th>
 
                     <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">
-                      Actions
+                      {t('shared.actions')}
                     </th>
                   </tr>
                 </thead>
@@ -281,8 +277,8 @@ export function StaffReportsTab() {
                         'totalHours' in exportRow.totals
                           ? `${exportRow.totals.totalHours}h`
                           : exportRow.totals
-                            ? 'See export'
-                            : '—'}
+                            ? t('shared.seeExport')
+                            : t('shared.emDash')}
                       </td>
 
                       <td className="px-4 py-3 text-[var(--text-mid)]">
@@ -293,11 +289,11 @@ export function StaffReportsTab() {
                             rel="noreferrer"
                             className="text-xs font-medium text-[var(--brand-mid)] hover:underline"
                           >
-                            Download
+                            {t('shared.download')}
                           </a>
                         ) : (
                           <span className="text-xs text-[var(--text-muted)]">
-                            Export file not generated
+                            {t('reports.exportFileMissing')}
                           </span>
                         )}
                       </td>
@@ -311,7 +307,7 @@ export function StaffReportsTab() {
                               disabled={updatingPayroll}
                               onClick={() => handleStatusUpdate(exportRow.id, 'APPROVED')}
                             >
-                              Approve
+                              {t('shared.approve')}
                             </Button>
                           ) : null}
 
@@ -322,7 +318,7 @@ export function StaffReportsTab() {
                               disabled={updatingPayroll}
                               onClick={() => handleStatusUpdate(exportRow.id, 'EXPORTED')}
                             >
-                              Mark exported
+                              {t('reports.markExported')}
                             </Button>
                           ) : null}
                         </div>

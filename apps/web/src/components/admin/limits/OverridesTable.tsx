@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Button } from '../../ui/button'
 import { TableScroll } from '../../ui/table-scroll'
 import { formatLimitKeyLabel, formatPlanCodeLabel } from '../../../lib/adminLimitLabels'
@@ -14,19 +15,20 @@ export function OverridesTable({
   tenantName?: string
   onDisable: (id: string) => void
 }) {
+  const { t } = useTranslation('admin')
   return (
     <TableScroll aria-label={`${kind} limit overrides`}>
       <table className="w-full min-w-[760px] text-sm">
         <thead>
-          <tr className="border-b bg-[var(--app-bg-subtle)]/50 text-left text-xs text-[var(--text-muted)]">
-            {kind === 'plan' && <th className="px-3 py-2">Plan</th>}
+          <tr className="border-b bg-[var(--app-bg-subtle)]/50 text-start text-xs text-[var(--text-muted)]">
+            {kind === 'plan' && <th className="px-3 py-2">{t('common.table.plan')}</th>}
             <th className="px-3 py-2">Limit</th>
             <th className="px-3 py-2">Value</th>
-            {kind === 'tenant' && <th className="px-3 py-2">Tenant</th>}
+            {kind === 'tenant' && <th className="px-3 py-2">{t('common.table.tenant')}</th>}
             <th className="px-3 py-2">Reason</th>
             <th className="px-3 py-2">Updated</th>
-            <th className="px-3 py-2">Status</th>
-            <th className="px-3 py-2 text-right">Actions</th>
+            <th className="px-3 py-2">{t('common.table.status')}</th>
+            <th className="px-3 py-2 text-end">{t('common.table.actions')}</th>
           </tr>
         </thead>
         <tbody className="divide-y">
@@ -51,7 +53,7 @@ export function OverridesTable({
               <td className="px-3 py-2">
                 <AdminStatusBadge status={row.is_active === false ? 'inactive' : 'active'} />
               </td>
-              <td className="px-3 py-2 text-right">
+              <td className="px-3 py-2 text-end">
                 {row.is_active !== false && (
                   <Button size="sm" variant="outline" onClick={() => onDisable(String(row.id))}>
                     Disable

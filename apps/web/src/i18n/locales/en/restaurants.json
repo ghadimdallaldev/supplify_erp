@@ -1,0 +1,106 @@
+{
+  "list": {
+    "title": "Restaurants",
+    "titleSupplier": "My Restaurants",
+    "description": "Manage restaurants in the marketplace",
+    "descriptionSupplier": "Restaurants that follow you or purchase from you",
+    "loadError": "Failed to load restaurants",
+    "grid": "Grid",
+    "list": "List",
+    "stats": {
+      "total": "Total Restaurants",
+      "totalHint": "Following you or ordering from you",
+      "totalOrders": "Total Orders",
+      "totalOrdersHint": "All time across your network",
+      "totalRevenue": "Total Revenue",
+      "totalRevenueHint": "Lifetime order value",
+      "avgOrderValue": "Avg Order Value",
+      "avgOrderValueHint": "Per order average"
+    },
+    "searchPlaceholder": "Search restaurants by name, email, or city...",
+    "cityPlaceholder": "Filter by city...",
+    "filters": {
+      "all": "All",
+      "active": "Active",
+      "new": "New"
+    },
+    "sort": {
+      "name": "Sort by Name",
+      "orders": "Sort by Orders",
+      "revenue": "Sort by Revenue",
+      "recent": "Sort by Recent"
+    },
+    "badges": {
+      "active": "Active",
+      "new": "New",
+      "following": "Following"
+    },
+    "license": "License: {{number}}",
+    "noLicense": "No License",
+    "joined": "Joined {{date}}",
+    "empty": "No restaurants found",
+    "emptyFilteredTitle": "No restaurants found",
+    "emptyFilteredDescription": "Try adjusting your search or filters",
+    "emptyDefaultDescription": "No restaurants follow you or have purchased from you yet",
+    "clearFilters": "Clear Filters",
+    "orders": "Orders",
+    "details": "Details",
+    "revenue": "Revenue",
+    "lastOrder": "Last order",
+    "lastOrderList": "Last Order",
+    "notAvailable": "N/A",
+    "latestOrder": "Latest Order",
+    "orderNumber": "Order #{{id}}"
+  },
+  "detail": {
+    "notFound": "Restaurant not found",
+    "backToList": "Back to Restaurants",
+    "back": "Back",
+    "message": "Message",
+    "pinned": "Pinned",
+    "pinRestaurant": "Pin Restaurant",
+    "pinnedToast": "Restaurant pinned",
+    "unpinnedToast": "Restaurant unpinned",
+    "contactInfo": "Contact Information",
+    "license": "License: {{number}}",
+    "stats": {
+      "totalOrders": "Total Orders",
+      "recentOrders": "{{count}} in last 6 months",
+      "totalRevenue": "Total Revenue",
+      "lifetimeValue": "Lifetime value",
+      "averageOrder": "Average Order",
+      "perOrder": "Per order",
+      "memberSince": "Member Since",
+      "customerSince": "Customer since"
+    },
+    "topProducts": {
+      "title": "Top Products",
+      "description": "Most frequently purchased products",
+      "sku": "SKU: {{sku}}",
+      "units": "{{count}} units",
+      "empty": "No products purchased yet"
+    },
+    "recentOrders": {
+      "title": "Recent Orders",
+      "description": "Latest orders from this restaurant",
+      "viewAll": "View All Orders",
+      "orderNumber": "Order #{{id}}",
+      "empty": "No orders yet"
+    },
+    "unknownProduct": "Unknown Product"
+  },
+  "deliveryLocation": {
+    "validation": {
+      "bothOrEmpty": "Enter both latitude and longitude, or leave both empty.",
+      "invalidNumbers": "Latitude and longitude must be valid numbers.",
+      "outOfRange": "Latitude or longitude is out of range.",
+      "invalidCoordinates": "Invalid coordinates."
+    },
+    "toast": {
+      "saved": "Delivery location saved",
+      "saveFailed": "Failed to save delivery location",
+      "branchSaved": "Branch delivery location saved",
+      "branchSaveFailed": "Failed to save branch delivery location"
+    }
+  }
+}

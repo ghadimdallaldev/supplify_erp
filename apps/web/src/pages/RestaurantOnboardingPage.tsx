@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { SettingsHubLayout } from '../components/settings/SettingsHubLayout'
@@ -30,8 +31,10 @@ import {
   LazyOnboardingTeamTab,
 } from '../components/restaurant/onboarding/lazyRestaurantOnboardingTabs'
 import { useAppSelector } from '../hooks/redux'
+import { ensureNamespace } from '../i18n'
 
 export function RestaurantOnboardingPage() {
+  const { t } = useTranslation('onboarding')
   const { user } = useAppSelector((state) => state.auth)
   const [searchParams] = useSearchParams()
   const { data: restaurantData, isLoading: isLoadingRestaurant } = useGetRestaurantMeQuery()
@@ -49,6 +52,10 @@ export function RestaurantOnboardingPage() {
     entitlementsData?.entitlements,
     'tenant_audit_log'
   )
+
+  useEffect(() => {
+    void ensureNamespace('onboarding')
+  }, [])
 
   useEffect(() => {
     const tab = searchParams.get('tab')
@@ -87,11 +94,11 @@ export function RestaurantOnboardingPage() {
 
   return (
     <SettingsHubLayout
-      title="Settings"
+      title={t('restaurantSettings.title')}
       description={
         restaurantName
-          ? `Manage profile, team, branches, and plan for ${restaurantName}.`
-          : 'Manage your restaurant profile, team, branches, plan, and notifications.'
+          ? t('restaurantSettings.descriptionWithName', { name: restaurantName })
+          : t('restaurantSettings.descriptionDefault')
       }
       stats={
         <RestaurantSettingsSummary
@@ -106,35 +113,35 @@ export function RestaurantOnboardingPage() {
         <TabsList className="tabs-scroll h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
           <TabsTrigger value="profile" className="gap-1.5 text-xs sm:text-sm">
             <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Profile
+            {t('restaurantSettings.tabs.profile')}
           </TabsTrigger>
           <TabsTrigger value="team" className="gap-1.5 text-xs sm:text-sm">
             <Users className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Team
+            {t('restaurantSettings.tabs.team')}
           </TabsTrigger>
           <TabsTrigger value="branches" className="gap-1.5 text-xs sm:text-sm">
             <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Branches
+            {t('restaurantSettings.tabs.branches')}
           </TabsTrigger>
           <TabsTrigger value="subscription" className="gap-1.5 text-xs sm:text-sm">
             <CreditCard className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            <span className="hidden sm:inline">Subscription</span>
-            <span className="sm:hidden">Plan</span>
+            <span className="hidden sm:inline">{t('restaurantSettings.tabs.subscription')}</span>
+            <span className="sm:hidden">{t('restaurantSettings.tabs.plan')}</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-1.5 text-xs sm:text-sm">
             <Bell className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            <span className="hidden sm:inline">Notifications</span>
-            <span className="sm:hidden">Alerts</span>
+            <span className="hidden sm:inline">{t('restaurantSettings.tabs.notifications')}</span>
+            <span className="sm:hidden">{t('restaurantSettings.tabs.alerts')}</span>
           </TabsTrigger>
           {isOwner && tenantAuditEnabled ? (
             <TabsTrigger value="activity" className="gap-1.5 text-xs sm:text-sm">
               <Activity className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Activity
+              {t('restaurantSettings.tabs.activity')}
             </TabsTrigger>
           ) : null}
           <TabsTrigger value="reviews" className="gap-1.5 text-xs sm:text-sm">
             <Star className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Reviews
+            {t('restaurantSettings.tabs.reviews')}
           </TabsTrigger>
         </TabsList>
 

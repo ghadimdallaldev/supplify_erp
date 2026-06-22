@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   useCreateSupplierReviewMutation,
   useGetMyReviewsQuery,
@@ -14,6 +15,7 @@ import { Label } from '../ui/label'
 import { Textarea } from '../ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../ui/select'
 import { toast } from 'sonner'
+import { ensureNamespace } from '../../i18n'
 
 export type SupplierReviewEditTarget = {
   id: string
@@ -40,6 +42,7 @@ export function SupplierReviewModal({
   editingReview,
   onSuccess,
 }: Props) {
+  const { t } = useTranslation('suppliers')
   const isEdit = Boolean(editingReview?.id)
   const [orderId, setOrderId] = useState('')
   const [overallRating, setOverallRating] = useState(5)
@@ -52,6 +55,10 @@ export function SupplierReviewModal({
   const { data: myReviewsData } = useGetMyReviewsQuery(undefined, { skip: !open || isEdit })
   const [createReview, { isLoading: creating }] = useCreateSupplierReviewMutation()
   const [updateReview, { isLoading: updating }] = useUpdateReviewMutation()
+
+  useEffect(() => {
+    void ensureNamespace('suppliers')
+  }, [])
 
   const reviewedOrderIds = useMemo(
     () => new Set((myReviewsData?.reviews ?? []).map((r) => String(r.order_id))),
@@ -156,10 +163,10 @@ export function SupplierReviewModal({
                       comment: comment || null,
                     },
                   }).unwrap()
-                  toast.success('Review updated')
+                  toast.success(t('reviewModal.toast.updated'))
                 } else {
                   if (!orderId || orderId === '__none__') {
-                    toast.error('Select an order to review')
+                    toast.error(t('reviewModal.toast.selectOrder'))
                     return
                   }
                   await createReview({
@@ -170,13 +177,13 @@ export function SupplierReviewModal({
                       comment: comment || null,
                     },
                   }).unwrap()
-                  toast.success('Review submitted')
+                  toast.success(t('reviewModal.toast.submitted'))
                 }
                 onOpenChange(false)
                 onSuccess?.()
               } catch (e: unknown) {
                 const err = e as { data?: { error?: { message?: string } } }
-                toast.error(err?.data?.error?.message || 'Failed to save review')
+                toast.error(err?.data?.error?.message || t('reviewModal.toast.saveFailed'))
               }
             }}
           >

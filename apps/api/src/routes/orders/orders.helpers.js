@@ -53,6 +53,7 @@ import {
 import { ordersRouterMutationGuard } from '../../lib/route-permissions.js'
 import { releaseOrderFromPlannedRoutes } from '../../services/delivery-routes.service.js'
 import { getEffectiveTenant } from '../../lib/impersonation.js'
+import { t, toIntlLocale, resolveLocale } from '../../i18n/index.js'
 
 function elapsedMsSince(startMs) {
   return Math.round(performance.now() - startMs)
@@ -134,7 +135,10 @@ function scheduleOrderPlacedNotification(order, supplierId) {
 }
 
 /** Build PDF buffer for a packing slip */
-function buildPackingSlipPdf(packingSlip) {
+function buildPackingSlipPdf(packingSlip, locale = 'en') {
+  const lng = resolveLocale(locale)
+  const intlLocale = toIntlLocale(lng)
+
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50 })
     const chunks = []
@@ -142,14 +146,22 @@ function buildPackingSlipPdf(packingSlip) {
     doc.on('end', () => resolve(Buffer.concat(chunks)))
     doc.on('error', reject)
 
-    doc.fontSize(20).text('PACKING SLIP', { continued: false })
-    doc.fontSize(10).text(`Order #${packingSlip.orderNumber}`, { continued: false })
+    doc.fontSize(20).text(t('orders.packingSlip.title', lng), { continued: false })
+    doc
+      .fontSize(10)
+      .text(t('orders.packingSlip.orderNumber', lng, { number: packingSlip.orderNumber }), {
+        continued: false,
+      })
     doc.moveDown()
     doc.text(
-      `Date: ${packingSlip.orderDate ? new Date(packingSlip.orderDate).toLocaleDateString() : 'N/A'}`
+      `${t('orders.packingSlip.date', lng)} ${
+        packingSlip.orderDate
+          ? new Date(packingSlip.orderDate).toLocaleDateString(intlLocale)
+          : t('orders.packingSlip.na', lng)
+      }`
     )
     doc.moveDown()
-    doc.text(`Ship To: ${packingSlip.restaurantName || ''}`)
+    doc.text(`${t('orders.packingSlip.shipTo', lng)} ${packingSlip.restaurantName || ''}`)
     if (packingSlip.restaurantAddress && typeof packingSlip.restaurantAddress === 'object') {
       const addr = packingSlip.restaurantAddress
       doc.text([addr.street, addr.city, addr.region, addr.country].filter(Boolean).join(', '))
@@ -158,17 +170,17 @@ function buildPackingSlipPdf(packingSlip) {
     }
     doc.moveDown(1.5)
 
-    doc.fontSize(12).text('Items', { underline: true })
+    doc.fontSize(12).text(t('orders.packingSlip.items', lng), { underline: true })
     doc.moveDown(0.5)
     doc.fontSize(10)
     packingSlip.items.forEach((line, i) => {
       doc.text(
-        `${i + 1}. ${line.sku || '-'} | ${line.name || 'Item'} | Qty: ${line.quantity} ${line.unit || ''}`.trim()
+        `${i + 1}. ${line.sku || '-'} | ${line.name || t('orders.packingSlip.itemFallback', lng)} | ${t('orders.packingSlip.qty', lng)} ${line.quantity} ${line.unit || ''}`.trim()
       )
     })
     doc.moveDown(1)
     doc.text(
-      `Total: ${packingSlip.currency || 'USD'} ${Number(packingSlip.totalAmount || 0).toFixed(2)}`
+      `${t('orders.packingSlip.total', lng)} ${packingSlip.currency || 'USD'} ${Number(packingSlip.totalAmount || 0).toFixed(2)}`
     )
     doc.end()
   })

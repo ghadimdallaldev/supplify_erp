@@ -130,7 +130,77 @@
   "support": {
     "title": "Support",
     "hint": "Need help? Contact our support team.",
-    "contact": "Contact Support"
+    "contact": "Contact Support",
+    "toast": {
+      "chatReady": "Support chat ready",
+      "startFailed": "Could not start support chat"
+    }
   },
-  "roleUnknown": "unknown"
+  "activityLog": {
+    "locked": "Activity log is not on your plan. Upgrade to Gold or Platinum to view tenant audit history and exports.",
+    "title": "Activity log",
+    "refresh": "Refresh",
+    "clearFilters": "Clear filters",
+    "exportServer": "Export (server)",
+    "labels": {
+      "action": "Action",
+      "resourceType": "Resource type",
+      "from": "From",
+      "to": "To"
+    },
+    "filters": {
+      "allActions": "All actions",
+      "allResources": "All resources"
+    },
+    "table": {
+      "time": "Time",
+      "action": "Action",
+      "resource": "Resource",
+      "user": "User"
+    },
+    "empty": {
+      "title": "No activity recorded for these filters.",
+      "filteredPrefix": "Try",
+      "clearFiltersLink": "clearing filters",
+      "filteredSuffix": "or widening the date range. Seeded demo orders do not appear until you run {{command}} or place a new order in the app.",
+      "defaultPrefix": "The log only records actions through the app (e.g. placing an order). For tier demo data, run {{command}} once, then refresh."
+    },
+    "pagination": "Showing {{shown}} of {{total}} entries. Refine filters or use server export for more.",
+    "csv": {
+      "time": "Time",
+      "action": "Action",
+      "resource": "Resource",
+      "user": "User",
+      "email": "Email"
+    },
+    "toasts": {
+      "exported": "Audit log exported",
+      "exportFailed": "Failed to export audit log"
+    },
+    "errors": {
+      "exportFailed": "Export failed"
+    },
+    "emptyValue": "-"
+  },
+  "roleUnknown": "unknown",
+  "toast": {
+    "brandingUpdated": "Branding updated",
+    "brandingSaveFailed": "Failed to save branding",
+    "brandColorsReset": "Brand colors reset to defaults",
+    "brandColorsResetFailed": "Failed to reset brand colors",
+    "multiWarehouseEnabled": "Multi-warehouse enabled",
+    "multiWarehouseDisabled": "Multi-warehouse disabled",
+    "fulfillmentUpdateFailed": "Failed to update fulfillment settings",
+    "routeWouldRouteTo": "Would route to: {{warehouseName}}",
+    "simulationComplete": "Simulation complete",
+    "simulationFailed": "Simulation failed",
+    "roleNameRequired": "Role name is required",
+    "selectAtLeastOnePermission": "Select at least one permission",
+    "roleCreated": "Role created",
+    "roleUpdated": "Role updated",
+    "roleSaveFailed": "Failed to save role",
+    "roleDeleted": "Role deleted",
+    "roleDeleteFailed": "Failed to delete role",
+    "roleAssignFailed": "Failed to assign role"
+  }
 }

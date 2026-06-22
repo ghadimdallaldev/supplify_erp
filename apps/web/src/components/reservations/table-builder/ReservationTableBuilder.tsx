@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ComponentType, SVGProps } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Rnd } from 'react-rnd'
-import type {
-  Reservation,
-  ReservationTable,
-  ReservationTableShape,
-  ReservationTableZone,
-} from '../../../types'
 import { Button } from '../../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 import { Input } from '../../ui/input'
@@ -18,11 +12,6 @@ import { findReservationForTable, lookupTableAssignment } from '../../../lib/res
 import { useSaveReservationTablesMutation } from '../../../services/reservationsApi'
 import { toast } from 'sonner'
 import {
-  Circle,
-  RectangleHorizontal,
-  Square,
-  Armchair,
-  Sparkles,
   Copy,
   RotateCcw,
   Trash2,
@@ -45,11 +34,13 @@ import {
   ZOOM_STEP,
   GRID_PX,
   MAX_HISTORY,
-  SHAPE_PRESETS,
-  COLOR_PRESETS,
-  ZONES,
-  FEATURE_OPTIONS,
-  SERVICE_STATUS_STYLES,
+  getShapePresets,
+  getColorPresets,
+  getZones,
+  getFeatureOptions,
+  getServiceStatusStyles,
+  featureLabel,
+  shapePresetLabel,
   shapeDefaults,
   clamp,
   createLocalId,
@@ -68,6 +59,13 @@ export function ReservationTableBuilder({
   reservations = [],
   defaultLiveView = false,
 }: ReservationTableBuilderProps) {
+  const { t } = useTranslation('reservations')
+  const shapePresets = useMemo(() => getShapePresets(), [t])
+  const colorPresets = useMemo(() => getColorPresets(), [t])
+  const zones = useMemo(() => getZones(), [t])
+  const featureOptions = useMemo(() => getFeatureOptions(), [t])
+  const serviceStatusStyles = useMemo(() => getServiceStatusStyles(), [t])
+
   // Core state
   const [editableTables, setEditableTables] = useState<EditableTable[]>(() => hydrateTables(tables))
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null)
@@ -319,7 +317,7 @@ export function ReservationTableBuilder({
 
     setEditableTables((prev) => {
       const localId = createLocalId()
-      const base = defaults.label
+      const base = shapePresetLabel(shape)
       let suffix = prev.filter((t) => t.name.startsWith(base)).length + 1
       let name = `${base} ${suffix}`
       while (prev.some((t) => t.name === name)) {
@@ -342,8 +340,8 @@ export function ReservationTableBuilder({
         rotation: 0,
         shape,
         color:
-          COLOR_PRESETS[Math.floor(Math.random() * COLOR_PRESETS.length)]?.value ||
-          COLOR_PRESETS[0].value,
+          colorPresets[Math.floor(Math.random() * colorPresets.length)]?.value ||
+          colorPresets[0].value,
         zone: 'main',
         features: [],
         isActive: true,
@@ -362,7 +360,7 @@ export function ReservationTableBuilder({
         ...table,
         id: undefined,
         localId,
-        name: `${table.name} copy`,
+        name: `${table.name} ${t('common.copySuffix')}`,
         x: offsetX,
         y: offsetY,
         features: [...table.features],
@@ -425,9 +423,9 @@ export function ReservationTableBuilder({
         },
       }))
       await saveTables({ tables: payload }).unwrap()
-      toast.success('Tables saved')
+      toast.success(t('tableBuilder.toasts.saved'))
     } catch {
-      toast.error('Failed to save tables')
+      toast.error(t('tableBuilder.toasts.saveFailed'))
     }
   }
 
@@ -471,7 +469,7 @@ export function ReservationTableBuilder({
 
     if (serviceInfo) {
       const key = serviceInfo.status ?? 'available'
-      const style = SERVICE_STATUS_STYLES[key] ?? SERVICE_STATUS_STYLES.available
+      const style = serviceStatusStyles[key] ?? serviceStatusStyles.available
       if (serviceMode) {
         bgColor = style.bg
         borderColor = style.border
@@ -480,7 +478,7 @@ export function ReservationTableBuilder({
         borderColor = 'var(--brand-mid)'
       }
     } else if (serviceMode) {
-      const style = SERVICE_STATUS_STYLES.available
+      const style = serviceStatusStyles.available
       bgColor = style.bg
       borderColor = style.border
     }
@@ -539,14 +537,14 @@ export function ReservationTableBuilder({
               className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow"
               style={{ backgroundColor: borderColor }}
             >
-              {SERVICE_STATUS_STYLES[serviceInfo.status]?.label ?? serviceInfo.status}
+              {serviceStatusStyles[serviceInfo.status]?.label ?? serviceInfo.status}
             </span>
           ) : null}
 
           {/* Inactive overlay */}
           {isInactive && (
             <span className="absolute inset-0 flex items-center justify-center rounded-[inherit] bg-gray-200/60 text-[10px] font-bold uppercase tracking-widest text-gray-500">
-              Inactive
+              {t('common.inactive')}
             </span>
           )}
 
@@ -556,7 +554,7 @@ export function ReservationTableBuilder({
                 {serviceInfo.customerName}
               </span>
               <span className="mt-1 text-[10px] font-medium text-[var(--text-muted)]">
-                {serviceInfo.partySize} guests · {table.name}
+                {t('tableBuilder.tableGuests', { count: serviceInfo.partySize, name: table.name })}
               </span>
             </>
           ) : (
@@ -565,7 +563,7 @@ export function ReservationTableBuilder({
                 {table.name}
               </span>
               <span className="mt-1 text-[10px] font-medium text-[var(--text-muted)]">
-                {table.capacity} guests
+                {t('common.guests', { count: table.capacity })}
               </span>
             </>
           )}
@@ -577,7 +575,7 @@ export function ReservationTableBuilder({
                 variant="outline"
                 className="border-white/60 bg-white/80 text-[9px] font-medium text-[var(--text-muted)]"
               >
-                {f.replace(/_/g, ' ')}
+                {featureLabel(f)}
               </Badge>
             ))}
           </div>
@@ -590,9 +588,7 @@ export function ReservationTableBuilder({
   const renderDetailsPanel = () => {
     if (!selectedTable) {
       return (
-        <p className="mt-3 text-sm text-[var(--text-muted)]">
-          Select a table from the canvas to reveal granular controls.
-        </p>
+        <p className="mt-3 text-sm text-[var(--text-muted)]">{t('tableBuilder.selectTableHint')}</p>
       )
     }
 
@@ -607,30 +603,34 @@ export function ReservationTableBuilder({
             {svcInfo ? (
               <>
                 <p className="text-xs text-[var(--text-muted)]">
-                  Guest:{' '}
+                  {t('tableBuilder.guest')}{' '}
                   <span className="font-semibold text-[var(--text)]">{svcInfo.customerName}</span>
                 </p>
                 <p className="text-xs text-[var(--text-muted)]">
-                  Party size:{' '}
+                  {t('tableBuilder.partySize')}{' '}
                   <span className="font-semibold text-[var(--text)]">{svcInfo.partySize}</span>
                 </p>
                 <p className="text-xs text-[var(--text-muted)]">
-                  Status:{' '}
+                  {t('tableBuilder.status')}{' '}
                   <span
                     className="font-semibold"
-                    style={{ color: SERVICE_STATUS_STYLES[svcInfo.status]?.border }}
+                    style={{ color: serviceStatusStyles[svcInfo.status]?.border }}
                   >
-                    {SERVICE_STATUS_STYLES[svcInfo.status]?.label ?? svcInfo.status}
+                    {serviceStatusStyles[svcInfo.status]?.label ?? svcInfo.status}
                   </span>
                 </p>
               </>
             ) : (
-              <p className="text-xs text-[var(--text-muted)]">Available — no active reservation</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                {t('tableBuilder.availableNoReservation')}
+              </p>
             )}
           </div>
           <p className="text-xs text-[var(--text-muted)]">
-            Capacity: {selectedTable.capacity} · Zone:{' '}
-            {ZONES.find((z) => z.value === selectedTable.zone)?.label ?? selectedTable.zone}
+            {t('tableBuilder.capacityZone', {
+              capacity: selectedTable.capacity,
+              zone: zones.find((z) => z.value === selectedTable.zone)?.label ?? selectedTable.zone,
+            })}
           </p>
         </div>
       )
@@ -640,14 +640,18 @@ export function ReservationTableBuilder({
       <div className="mt-4 space-y-4">
         <div className="grid gap-3">
           <div>
-            <Label className="text-xs uppercase text-[var(--text-muted)]">Table name</Label>
+            <Label className="text-xs uppercase text-[var(--text-muted)]">
+              {t('tableBuilder.tableName')}
+            </Label>
             <Input
               value={selectedTable.name}
               onChange={(e) => updateTable(selectedTable.localId, { name: e.target.value })}
             />
           </div>
           <div>
-            <Label className="text-xs uppercase text-[var(--text-muted)]">Capacity</Label>
+            <Label className="text-xs uppercase text-[var(--text-muted)]">
+              {t('tableBuilder.capacity')}
+            </Label>
             <Input
               type="number"
               min={1}
@@ -659,8 +663,10 @@ export function ReservationTableBuilder({
           </div>
           <div className="flex items-center justify-between rounded-xl border border-[var(--app-border)] bg-[var(--brand-ultra)] px-3 py-2">
             <div>
-              <p className="text-xs uppercase text-[var(--text-muted)]">Active</p>
-              <p className="text-sm text-[var(--text-mid)]">Include in booking flow</p>
+              <p className="text-xs uppercase text-[var(--text-muted)]">
+                {t('tableBuilder.active')}
+              </p>
+              <p className="text-sm text-[var(--text-mid)]">{t('tableBuilder.activeHint')}</p>
             </div>
             <Switch
               checked={selectedTable.isActive}
@@ -670,9 +676,11 @@ export function ReservationTableBuilder({
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs uppercase text-[var(--text-muted)]">Shape</Label>
+          <Label className="text-xs uppercase text-[var(--text-muted)]">
+            {t('tableBuilder.shape')}
+          </Label>
           <div className="flex flex-wrap gap-2">
-            {SHAPE_PRESETS.map(({ value, label, Icon }) => {
+            {shapePresets.map(({ value, label, Icon }) => {
               const active = selectedTable.shape === value
               return (
                 <button
@@ -694,9 +702,11 @@ export function ReservationTableBuilder({
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs uppercase text-[var(--text-muted)]">Zone</Label>
+          <Label className="text-xs uppercase text-[var(--text-muted)]">
+            {t('tableBuilder.zone')}
+          </Label>
           <div className="grid grid-cols-2 gap-2">
-            {ZONES.map(({ value, label, emoji }) => {
+            {zones.map(({ value, label, emoji }) => {
               const active = selectedTable.zone === value
               return (
                 <button
@@ -717,9 +727,11 @@ export function ReservationTableBuilder({
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs uppercase text-[var(--text-muted)]">Signature color</Label>
+          <Label className="text-xs uppercase text-[var(--text-muted)]">
+            {t('tableBuilder.signatureColor')}
+          </Label>
           <div className="flex flex-wrap gap-2">
-            {COLOR_PRESETS.map(({ value, label }) => {
+            {colorPresets.map(({ value, label }) => {
               const active = selectedTable.color === value
               return (
                 <button
@@ -740,9 +752,11 @@ export function ReservationTableBuilder({
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs uppercase text-[var(--text-muted)]">Features</Label>
+          <Label className="text-xs uppercase text-[var(--text-muted)]">
+            {t('tableBuilder.features')}
+          </Label>
           <div className="flex flex-wrap gap-2">
-            {FEATURE_OPTIONS.map(({ value, label }) => {
+            {featureOptions.map(({ value, label }) => {
               const active = selectedTable.features.includes(value)
               return (
                 <button
@@ -764,14 +778,16 @@ export function ReservationTableBuilder({
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label className="text-xs uppercase text-[var(--text-muted)]">Rotation</Label>
+            <Label className="text-xs uppercase text-[var(--text-muted)]">
+              {t('tableBuilder.rotation')}
+            </Label>
             <button
               type="button"
               className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--brand-mid)]"
               onClick={() => updateTable(selectedTable.localId, { rotation: 0 })}
             >
               <RotateCcw className="h-3 w-3" />
-              Reset
+              {t('tableBuilder.reset')}
             </button>
           </div>
           <input
@@ -788,11 +804,13 @@ export function ReservationTableBuilder({
         </div>
 
         <div>
-          <Label className="text-xs uppercase text-[var(--text-muted)]">Special notes</Label>
+          <Label className="text-xs uppercase text-[var(--text-muted)]">
+            {t('tableBuilder.specialNotes')}
+          </Label>
           <Textarea
             value={selectedTable.notes ?? ''}
             onChange={(e) => updateTable(selectedTable.localId, { notes: e.target.value })}
-            placeholder="Mention sight lines, server ownership, or ambience tips."
+            placeholder={t('tableBuilder.notesPlaceholder')}
           />
         </div>
       </div>
@@ -803,13 +821,14 @@ export function ReservationTableBuilder({
   const canvasLegend = (
     <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--text-muted)]">
       <span className="inline-flex items-center gap-1">
-        <span className="inline-flex h-2 w-2 rounded-full bg-[var(--brand)]" /> Drag & drop
+        <span className="inline-flex h-2 w-2 rounded-full bg-[var(--brand)]" />{' '}
+        {t('tableBuilder.legend.dragDrop')}
       </span>
       <span className="inline-flex items-center gap-1">
         <span className="inline-flex h-2 w-2 rounded-sm border border-[var(--app-border-mid)] bg-[var(--surface)]" />{' '}
-        Drag handles to resize
+        {t('tableBuilder.legend.resize')}
       </span>
-      <span>Del/Backspace: delete · Ctrl+D: duplicate · Ctrl+Z/Y: undo/redo</span>
+      <span>{t('tableBuilder.legend.keyboard')}</span>
     </div>
   )
 
@@ -821,14 +840,10 @@ export function ReservationTableBuilder({
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle>Floor builder</CardTitle>
+            <CardTitle>{t('tableBuilder.title')}</CardTitle>
             <CardDescription className="mt-1">
-              {serviceMode
-                ? 'Live view: assigned tables show the guest name and status for today’s board.'
-                : 'Edit layout mode — turn on Live view to see table assignments from the board above.'}{' '}
-              <span className="opacity-60">
-                Del: delete · Ctrl+D: duplicate · Ctrl+Z: undo · Ctrl+Y: redo · Esc: deselect
-              </span>
+              {serviceMode ? t('tableBuilder.descriptionLive') : t('tableBuilder.descriptionEdit')}{' '}
+              <span className="opacity-60">{t('tableBuilder.shortcuts')}</span>
             </CardDescription>
           </div>
           <Button
@@ -838,7 +853,7 @@ export function ReservationTableBuilder({
             onClick={() => setServiceMode((v) => !v)}
           >
             <Eye className="h-4 w-4" />
-            {serviceMode ? 'Live view' : 'Service mode'}
+            {serviceMode ? t('tableBuilder.liveView') : t('tableBuilder.serviceMode')}
           </Button>
         </div>
       </CardHeader>
@@ -850,14 +865,14 @@ export function ReservationTableBuilder({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">
-                  Virtual floor
+                  {t('tableBuilder.virtualFloor')}
                 </p>
                 <p className="text-sm text-[var(--text-muted)]">
-                  Drag tables, resize footprints, and mirror your actual service.
+                  {t('tableBuilder.virtualFloorHint')}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                {SHAPE_PRESETS.map(({ value, label, Icon }) => (
+                {shapePresets.map(({ value, label, Icon }) => (
                   <Button
                     key={value}
                     variant="outline"
@@ -881,9 +896,9 @@ export function ReservationTableBuilder({
                   className={`rounded-full px-3 py-1 text-xs font-medium transition ${zoneFilter === 'all' ? 'bg-[var(--brand)] text-white' : 'text-[var(--text-muted)] hover:text-[var(--brand-mid)]'}`}
                   onClick={() => setZoneFilter('all')}
                 >
-                  All
+                  {t('common.all')}
                 </button>
-                {ZONES.map(({ value, emoji, label }) => (
+                {zones.map(({ value, emoji, label }) => (
                   <button
                     key={value}
                     type="button"
@@ -902,7 +917,7 @@ export function ReservationTableBuilder({
                 <div className="flex items-center gap-0.5 rounded-full border border-[var(--app-border)] bg-[var(--surface)] p-1">
                   <button
                     type="button"
-                    title="Undo (Ctrl+Z)"
+                    title={t('tableBuilder.toolbar.undo')}
                     disabled={history.length === 0}
                     className="rounded-full p-1.5 text-[var(--text-muted)] transition hover:text-[var(--brand-mid)] disabled:opacity-30"
                     onClick={handleUndo}
@@ -911,7 +926,7 @@ export function ReservationTableBuilder({
                   </button>
                   <button
                     type="button"
-                    title="Redo (Ctrl+Y)"
+                    title={t('tableBuilder.toolbar.redo')}
                     disabled={future.length === 0}
                     className="rounded-full p-1.5 text-[var(--text-muted)] transition hover:text-[var(--brand-mid)] disabled:opacity-30"
                     onClick={handleRedo}
@@ -923,7 +938,7 @@ export function ReservationTableBuilder({
                 {/* Snap toggle */}
                 <button
                   type="button"
-                  title="Grid snap"
+                  title={t('tableBuilder.toolbar.gridSnap')}
                   className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                     gridSnap
                       ? 'border-[var(--brand)] bg-[var(--brand-pale)] text-[var(--brand-mid)]'
@@ -932,14 +947,14 @@ export function ReservationTableBuilder({
                   onClick={() => setGridSnap((v) => !v)}
                 >
                   <LayoutGrid className="h-3.5 w-3.5" />
-                  Snap
+                  {t('tableBuilder.toolbar.snap')}
                 </button>
 
                 {/* Zoom controls */}
                 <div className="flex items-center gap-0 rounded-full border border-[var(--app-border)] bg-[var(--surface)] p-1">
                   <button
                     type="button"
-                    title="Zoom out"
+                    title={t('tableBuilder.toolbar.zoomOut')}
                     disabled={zoom <= MIN_ZOOM}
                     className="rounded-full p-1.5 text-[var(--text-muted)] transition hover:text-[var(--brand-mid)] disabled:opacity-30"
                     onClick={zoomOut}
@@ -948,7 +963,7 @@ export function ReservationTableBuilder({
                   </button>
                   <button
                     type="button"
-                    title="Reset zoom"
+                    title={t('tableBuilder.toolbar.resetZoom')}
                     className="min-w-[3.5rem] rounded-full px-2 py-1 text-xs font-medium text-[var(--text-muted)] transition hover:text-[var(--brand-mid)]"
                     onClick={zoomReset}
                   >
@@ -956,7 +971,7 @@ export function ReservationTableBuilder({
                   </button>
                   <button
                     type="button"
-                    title="Zoom in"
+                    title={t('tableBuilder.toolbar.zoomIn')}
                     disabled={zoom >= MAX_ZOOM}
                     className="rounded-full p-1.5 text-[var(--text-muted)] transition hover:text-[var(--brand-mid)] disabled:opacity-30"
                     onClick={zoomIn}
@@ -970,8 +985,10 @@ export function ReservationTableBuilder({
             {/* Service mode legend strip */}
             {serviceMode && (
               <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--app-border)] bg-white/80 px-4 py-2 text-xs">
-                <span className="font-semibold text-[var(--text-mid)]">Live status:</span>
-                {Object.entries(SERVICE_STATUS_STYLES).map(([key, { border, label }]) => (
+                <span className="font-semibold text-[var(--text-mid)]">
+                  {t('tableBuilder.liveStatus')}
+                </span>
+                {Object.entries(serviceStatusStyles).map(([key, { border, label }]) => (
                   <span key={key} className="inline-flex items-center gap-1">
                     <span
                       className="inline-block h-2.5 w-2.5 rounded-full border"
@@ -1017,8 +1034,8 @@ export function ReservationTableBuilder({
 
                 {!editableTables.length && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-sm text-[var(--text-muted)]">
-                    <p className="font-medium">No tables yet</p>
-                    <p className="text-xs">Start by adding a shape above.</p>
+                    <p className="font-medium">{t('tableBuilder.noTablesTitle')}</p>
+                    <p className="text-xs">{t('tableBuilder.noTablesHint')}</p>
                   </div>
                 )}
               </div>
@@ -1030,28 +1047,22 @@ export function ReservationTableBuilder({
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/60 bg-white/80 px-5 py-4 shadow-sm backdrop-blur">
               <div className="flex flex-col gap-2 text-sm text-[var(--text-muted)] sm:flex-row sm:items-center sm:gap-6">
                 <span>
-                  Active tables:{' '}
-                  <span className="font-semibold text-[var(--text)]">
-                    {activeTableCount}/{editableTables.length}
-                  </span>
+                  {t('tableBuilder.stats.activeTables', {
+                    active: activeTableCount,
+                    total: editableTables.length,
+                  })}
                 </span>
-                <span>
-                  Total capacity:{' '}
-                  <span className="font-semibold text-[var(--text)]">{totalCapacity}</span>
-                </span>
+                <span>{t('tableBuilder.stats.totalCapacity', { count: totalCapacity })}</span>
                 {occupiedCount > 0 ? (
                   <span>
-                    Assigned on floor:{' '}
-                    <span className="font-semibold text-[var(--brand-mid)]">
-                      {occupiedCount} / {activeTableCount}
-                    </span>
+                    {t('tableBuilder.stats.assignedOnFloor', {
+                      assigned: occupiedCount,
+                      active: activeTableCount,
+                    })}
                   </span>
                 ) : null}
                 {selectedTable && (
-                  <span>
-                    Selected:{' '}
-                    <span className="font-semibold text-[var(--text)]">{selectedTable.name}</span>
-                  </span>
+                  <span>{t('tableBuilder.stats.selected', { name: selectedTable.name })}</span>
                 )}
               </div>
               <div className="flex gap-2">
@@ -1062,10 +1073,10 @@ export function ReservationTableBuilder({
                     setEditableTables([])
                   }}
                 >
-                  Clear floor
+                  {t('tableBuilder.clearFloor')}
                 </Button>
                 <Button onClick={handleSave} disabled={isLoading}>
-                  {isLoading ? 'Saving…' : 'Save layout'}
+                  {isLoading ? t('common.saving') : t('tableBuilder.saveLayout')}
                 </Button>
               </div>
             </div>
@@ -1075,7 +1086,9 @@ export function ReservationTableBuilder({
           {isDetailsOpen ? (
             <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--surface)] p-5 shadow-lg transition-[box-shadow,opacity,transform] duration-200 ease-out lg:absolute lg:top-6 lg:right-6 lg:mt-0 lg:w-[360px] lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto lg:bg-white/95 lg:backdrop-blur">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-[var(--text)]">Table details</h3>
+                <h3 className="text-sm font-semibold text-[var(--text)]">
+                  {t('tableBuilder.tableDetails')}
+                </h3>
                 <div className="flex gap-2">
                   {selectedTable && !serviceMode && (
                     <>
@@ -1087,7 +1100,7 @@ export function ReservationTableBuilder({
                           pushHistoryRef.current(editableTables)
                           handleDuplicateTable(selectedTable)
                         }}
-                        aria-label="Duplicate table"
+                        aria-label={t('tableBuilder.duplicateTable')}
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
@@ -1099,7 +1112,7 @@ export function ReservationTableBuilder({
                           pushHistoryRef.current(editableTables)
                           handleDeleteTable(selectedTable.localId)
                         }}
-                        aria-label="Delete table"
+                        aria-label={t('tableBuilder.deleteTable')}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -1110,7 +1123,7 @@ export function ReservationTableBuilder({
                     variant="ghost"
                     className="h-8 w-8 text-[var(--text-muted)]"
                     onClick={() => setIsDetailsOpen(false)}
-                    aria-label="Hide table details"
+                    aria-label={t('tableBuilder.hideTableDetails')}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -1127,19 +1140,15 @@ export function ReservationTableBuilder({
                 className="flex items-center gap-2 rounded-full border-[var(--app-border-mid)] text-[var(--text-muted)] hover:text-[var(--brand-mid)]"
               >
                 <ChevronRight className="h-4 w-4" />
-                Show table details
+                {t('tableBuilder.showTableDetails')}
               </Button>
             </div>
           )}
         </div>
 
         <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-white/80 p-5 text-xs text-[var(--text-muted)]">
-          <p className="font-semibold text-[var(--text)]">Expert tip</p>
-          <p className="mt-1">
-            Assign colors and zones to match how your team speaks on the floor. Servers can now
-            cross-reference reservations with a single glance, reducing handovers and double-sat
-            mishaps.
-          </p>
+          <p className="font-semibold text-[var(--text)]">{t('tableBuilder.expertTipTitle')}</p>
+          <p className="mt-1">{t('tableBuilder.expertTipBody')}</p>
         </div>
       </CardContent>
     </Card>

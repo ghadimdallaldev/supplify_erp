@@ -22,6 +22,7 @@ const emailService = {
     metadata,
     userId,
     tenantId,
+    locale,
   }) {
     if (!email) return false
     try {
@@ -37,9 +38,11 @@ const emailService = {
         to: email,
         template,
         subject,
+        locale,
         data: {
           title: subject,
           message,
+          locale,
           ...(metadata && typeof metadata === 'object' ? metadata : {}),
         },
         tenantId,

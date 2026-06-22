@@ -1,0 +1,175 @@
+{
+  "layout": {
+    "brand": "Supplify",
+    "defaultTitle": "Notification",
+    "forTenant": "For {{tenantName}}",
+    "footer": "This is an automated email from Supplify. Please do not reply to this message.",
+    "open": "Open",
+    "automatedSignoff": "— Supplify (automated message)"
+  },
+  "cta": {
+    "openSupplify": "Open Supplify",
+    "acceptInvitation": "Accept invitation",
+    "viewOrder": "View order",
+    "openChat": "Open chat",
+    "viewInvoice": "View invoice",
+    "viewDetails": "View details",
+    "viewDispute": "View dispute",
+    "viewDeals": "View deals",
+    "manageBilling": "Manage billing",
+    "viewInventory": "View inventory",
+    "placeOrder": "Place order",
+    "viewReservation": "View reservation",
+    "openStaffPortal": "Open staff portal",
+    "openPortal": "Open portal",
+    "openAdmin": "Open admin",
+    "reviewDeal": "Review deal",
+    "reviewRequest": "Review request",
+    "viewNotifications": "View notifications"
+  },
+  "auth": {
+    "welcome": {
+      "subject": "Welcome to Supplify",
+      "title": "Welcome to Supplify",
+      "messageSupplier": "Your supplier account is ready.",
+      "messageRestaurant": "Your restaurant account is ready."
+    },
+    "team_invite": {
+      "subject": "You are invited to join Supplify",
+      "title": "Team invitation",
+      "message": "You have been invited to join {{tenantName}} on Supplify. Use the link below to accept."
+    },
+    "password_changed": {
+      "subject": "Your Supplify password was reset",
+      "title": "Password reset",
+      "messageTemporary": "A temporary password was set for your account: {{temporaryPassword}}\n\nSign in and change it immediately.",
+      "messageChanged": "Your account password was changed. If you did not request this, contact your administrator."
+    },
+    "role_changed": {
+      "subject": "Your Supplify permissions were updated",
+      "title": "Role updated",
+      "message": "Your role or permissions on {{tenantName}} were updated."
+    },
+    "test": {
+      "subject": "Supplify email test",
+      "title": "Email test",
+      "message": "If you received this, Supplify email delivery is working."
+    }
+  },
+  "order": {
+    "placed": { "subject": "New order", "title": "Order placed" },
+    "acknowledged": { "subject": "Order acknowledged", "title": "Order acknowledged" },
+    "processing": { "subject": "Order processing", "title": "Order in progress" },
+    "shipped": { "subject": "Order shipped", "title": "Order dispatched" },
+    "delivered": { "subject": "Order delivered", "title": "Order delivered" },
+    "completed": { "subject": "Order completed", "title": "Order completed" },
+    "cancelled": { "subject": "Order cancelled", "title": "Order cancelled" },
+    "received": { "subject": "Delivery received", "title": "Order received" },
+    "scheduled": { "subject": "Scheduled order update", "title": "Scheduled order" },
+    "substitution": { "subject": "Order substitution", "title": "Substitution proposal" },
+    "fulfillment_issue": { "subject": "Order fulfillment update", "title": "Fulfillment issue" }
+  },
+  "chat": {
+    "message": {
+      "subject": "New message",
+      "title": "New message"
+    }
+  },
+  "invoice": {
+    "issued": {
+      "subject": "Invoice {{invoiceNumber}} issued",
+      "title": "Invoice issued"
+    },
+    "overdue": {
+      "subject": "Invoice overdue",
+      "title": "Invoice overdue"
+    }
+  },
+  "payment": {
+    "received": {
+      "subject": "Payment received",
+      "title": "Payment received"
+    }
+  },
+  "dispute": {
+    "opened": { "subject": "Dispute opened", "title": "Dispute update" },
+    "resolved": { "subject": "Dispute resolved", "title": "Dispute update" },
+    "updated": { "subject": "Dispute updated", "title": "Dispute update" }
+  },
+  "deal": {
+    "submitted": { "subject": "Deal submitted for review", "title": "Deal pending approval" },
+    "approved": { "subject": "Deal approved", "title": "Deal approved" },
+    "rejected": { "subject": "Deal rejected", "title": "Deal rejected" },
+    "payment_required": { "subject": "Deal payment required", "title": "Payment required" },
+    "activated": { "subject": "Deal activated", "title": "Deal is live" },
+    "expired": { "subject": "Deal expired", "title": "Deal expired" },
+    "performance": { "subject": "Deal performance summary", "title": "Deal insights" }
+  },
+  "billing": {
+    "trial_started": { "subject": "Trial started", "title": "Welcome to your trial" },
+    "trial_ending": { "subject": "Trial ending soon", "title": "Trial ending soon" },
+    "trial_expired": { "subject": "Trial expired", "title": "Trial expired" },
+    "activated": { "subject": "Subscription activated", "title": "Subscription active" },
+    "renewed": { "subject": "Subscription renewed", "title": "Subscription renewed" },
+    "payment_failed": { "subject": "Payment failed", "title": "Payment failed" },
+    "cancelled": { "subject": "Subscription cancelled", "title": "Subscription cancelled" },
+    "plan_changed": { "subject": "Plan updated", "title": "Plan changed" },
+    "trial_extended": { "subject": "Trial extended", "title": "Trial extended" },
+    "account_locked": { "subject": "Account restricted", "title": "Write access restricted" }
+  },
+  "inventory": {
+    "low_stock": { "subject": "Low stock alert", "title": "Low stock" },
+    "out_of_stock": { "subject": "Out of stock", "title": "Out of stock" },
+    "expiring": { "subject": "Items expiring soon", "title": "Expiry reminder" },
+    "expired": { "subject": "Expired inventory", "title": "Expired items" }
+  },
+  "reorder": {
+    "cadence": { "subject": "Reorder reminder", "title": "Smart reorder reminder" }
+  },
+  "reservation": {
+    "confirmation": { "subject": "Reservation confirmed", "title": "Reservation confirmed" },
+    "cancelled": { "subject": "Reservation cancelled", "title": "Reservation cancelled" },
+    "rescheduled": { "subject": "Reservation rescheduled", "title": "Reservation updated" },
+    "new": { "subject": "New reservation", "title": "New reservation" },
+    "waitlist": { "subject": "Waitlist update", "title": "Waitlist update" },
+    "waitlist_offer": { "subject": "Table available", "title": "Waitlist offer" }
+  },
+  "staff": {
+    "magic_link": {
+      "subject": "Your Supplify staff portal sign-in link",
+      "title": "Staff portal sign-in"
+    },
+    "invite": { "subject": "Your Supplify staff portal account", "title": "Staff portal access" },
+    "shift": { "subject": "Shift update", "title": "Shift assigned" },
+    "swap": { "subject": "Shift swap request", "title": "Shift swap" },
+    "pto": { "subject": "PTO request", "title": "Time off request" },
+    "announcement": { "subject": "Team announcement", "title": "Announcement" },
+    "document": { "subject": "New document", "title": "Document uploaded" }
+  },
+  "admin": {
+    "new_tenant": {
+      "subject": "New {{tenantType}} registered",
+      "title": "New registration"
+    },
+    "deal_review": {
+      "subject": "Deal requires approval",
+      "title": "Deal review needed"
+    }
+  },
+  "supplier": {
+    "access_request": {
+      "subject": "Restaurant access request",
+      "title": "New access request"
+    }
+  },
+  "notification": {
+    "generic": {
+      "subject": "Supplify notification",
+      "title": "Notification"
+    },
+    "digest": {
+      "subject": "Your Supplify digest",
+      "title": "Your notification digest"
+    }
+  }
+}

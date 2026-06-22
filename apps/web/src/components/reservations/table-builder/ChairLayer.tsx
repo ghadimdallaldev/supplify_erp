@@ -1,7 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ComponentType, SVGProps } from 'react'
 import type { ReservationTableShape } from '../../../types'
-import { DEFAULT_CANVAS_WIDTH, MAX_VISIBLE_CHAIRS, type TableRect } from './tableBuilderShared'
+import { MAX_VISIBLE_CHAIRS } from './tableBuilderShared'
 
 interface ChairLayerProps {
   shape: ReservationTableShape

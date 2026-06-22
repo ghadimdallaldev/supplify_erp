@@ -62,7 +62,7 @@ const viewOptionKeys: Array<{ labelKey: string; value: CalendarViewType }> = [
 const DEFAULT_PAGE_SIZE = 60
 
 export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarViewProps) {
-  const { t } = useTranslation('calendar')
+  const { t, i18n } = useTranslation('calendar')
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const { can } = usePermissions()
@@ -74,7 +74,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
   const { data: entitlementsData, isLoading: entitlementsLoading } = useGetEntitlementsQuery()
   const entitlements = entitlementsData?.entitlements
   const hasOrderCalendar = isEntitlementFeatureEnabled(entitlements, 'order_calendar')
-  const planName = entitlements?.plan?.name ?? 'your plan'
+  const planName = entitlements?.plan?.name ?? t('plan.fallbackName')
 
   const initialRole: 'RESTAURANT' | 'SUPPLIER' = role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
   const [activeRole, setActiveRole] = useState<'RESTAURANT' | 'SUPPLIER'>(initialRole)
@@ -139,10 +139,10 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
     }
     const message =
       error.message?.includes('Invalid base URL') || error.message?.includes('Failed to construct')
-        ? 'Unable to load the order calendar right now.'
+        ? t('state.loadError')
         : error.message
     return { kind: 'error' as const, message }
-  }, [entitlementsLoading, hasOrderCalendar, error])
+  }, [entitlementsLoading, hasOrderCalendar, error, t])
 
   const calendarEvents = useMemo(() => {
     if (!data?.events) return []
@@ -157,7 +157,8 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
     }))
   }, [data?.events, t])
 
-  const supplierLabel = activeRole === 'SUPPLIER' ? 'Restaurant' : 'Supplier'
+  const supplierFilterLabel =
+    activeRole === 'SUPPLIER' ? t('filters.allRestaurants') : t('filters.allSuppliers')
   const totalPages = useMemo(() => {
     if (!data?.pagination?.total) return 1
     return Math.max(1, Math.ceil(data.pagination.total / DEFAULT_PAGE_SIZE))
@@ -210,7 +211,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
       const amount = event.totalAmount
       const formattedAmount =
         typeof amount === 'number'
-          ? new Intl.NumberFormat('en-US', {
+          ? new Intl.NumberFormat(i18n.language || 'en', {
               style: 'currency',
               currency: event.currency || 'USD',
               maximumFractionDigits: 2,
@@ -226,22 +227,26 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             />
             <div className="pointer-events-none absolute left-1/2 top-full z-30 hidden w-60 -translate-x-1/2 translate-y-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 text-xs text-[var(--text-mid)] shadow-xl group-hover:block">
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                {event.type?.replace(/_/g, ' ') || 'Order'}
+                {event.type?.replace(/_/g, ' ') || t('eventCard.order')}
               </p>
               <p className="mt-1 text-sm font-semibold text-[var(--text)]">{`#${event.orderId?.slice(0, 8) ?? content.event.id}`}</p>
               {event.status && (
                 <p className="mt-1 capitalize text-[var(--text-muted)]">
-                  Status: {event.status.replace(/_/g, ' ').toLowerCase()}
+                  {t('eventCard.status')}: {event.status.replace(/_/g, ' ').toLowerCase()}
                 </p>
               )}
-              <p className="mt-1 text-[var(--text-muted)]">Counterpart: {event.counterpartName}</p>
+              <p className="mt-1 text-[var(--text-muted)]">
+                {t('eventCard.counterpart')}: {event.counterpartName}
+              </p>
               <p className="mt-1 font-semibold text-[var(--text)]">{formattedAmount}</p>
               {event.branchName && (
-                <p className="mt-1 text-[var(--text-muted)]">Branch: {event.branchName}</p>
+                <p className="mt-1 text-[var(--text-muted)]">
+                  {t('eventCard.branch')}: {event.branchName}
+                </p>
               )}
               {event.categories?.length ? (
                 <p className="mt-1 text-[var(--text-muted)]">
-                  Categories: {event.categories.join(', ')}
+                  {t('eventCard.categories')}: {event.categories.join(', ')}
                 </p>
               ) : null}
             </div>
@@ -283,7 +288,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
         >
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide">
-              {event.type?.replace(/_/g, ' ') || 'Order'}
+              {event.type?.replace(/_/g, ' ') || t('eventCard.order')}
             </span>
             {event.status && (
               <span className="text-[10px] rounded-full bg-white/70 px-2 py-0.5 font-medium text-[var(--text-mid)] shadow-sm">
@@ -299,7 +304,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
         </div>
       )
     },
-    []
+    [i18n.language, t]
   )
 
   const clearFilters = useCallback(() => {
@@ -355,8 +360,8 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
               onValueChange={(val) => handleRoleSwitch(val as 'RESTAURANT' | 'SUPPLIER')}
             >
               <SelectTrigger className="w-40">
-                <option value="RESTAURANT">Restaurant view</option>
-                <option value="SUPPLIER">Supplier view</option>
+                <option value="RESTAURANT">{t('roles.restaurantView')}</option>
+                <option value="SUPPLIER">{t('roles.supplierView')}</option>
               </SelectTrigger>
             </Select>
           )}
@@ -392,8 +397,8 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             setPage(1)
           }}
         >
-          <SelectTrigger placeholder="All statuses">
-            <option value="">All statuses</option>
+          <SelectTrigger placeholder={t('filters.allStatuses')}>
+            <option value="">{t('filters.allStatuses')}</option>
             {data?.filters?.statuses?.map((status) => (
               <SelectItem key={status} value={status}>
                 {status.replace(/_/g, ' ')}
@@ -409,8 +414,8 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             setPage(1)
           }}
         >
-          <SelectTrigger placeholder={`All ${supplierLabel.toLowerCase()}s`}>
-            <option value="">{`All ${supplierLabel.toLowerCase()}s`}</option>
+          <SelectTrigger placeholder={supplierFilterLabel}>
+            <option value="">{supplierFilterLabel}</option>
             {data?.filters?.suppliers?.map((supplier) => (
               <SelectItem key={supplier.id} value={supplier.id}>
                 {supplier.name}
@@ -426,8 +431,8 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             setPage(1)
           }}
         >
-          <SelectTrigger placeholder="All branches">
-            <option value="">All branches</option>
+          <SelectTrigger placeholder={t('filters.allBranches')}>
+            <option value="">{t('filters.allBranches')}</option>
             {data?.filters?.branches?.map((branch) => (
               <SelectItem key={branch.id} value={branch.id}>
                 {branch.name}
@@ -443,8 +448,8 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             setPage(1)
           }}
         >
-          <SelectTrigger placeholder="All categories">
-            <option value="">All categories</option>
+          <SelectTrigger placeholder={t('filters.allCategories')}>
+            <option value="">{t('filters.allCategories')}</option>
             {data?.filters?.categories?.map((category) => (
               <SelectItem key={category} value={category}>
                 {category}
@@ -460,7 +465,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
           className="flex items-center gap-1 border-dashed border-[var(--brand)] text-[var(--brand-mid)]"
         >
           <Filter className="h-3.5 w-3.5" />
-          Filters update in real time
+          {t('filters.liveHint')}
         </Badge>
         <Button
           variant="ghost"
@@ -470,12 +475,12 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
           disabled={filtersDisabled}
         >
           <RefreshCcw className="mr-1 h-3.5 w-3.5" />
-          Reset
+          {t('filters.reset')}
         </Button>
         {isFetching && (
           <span className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Updating…
+            {t('filters.updating')}
           </span>
         )}
       </div>
@@ -484,7 +489,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
         {(entitlementsLoading || (isLoading && !calendarBlocked)) && (
           <div className="flex h-64 items-center justify-center text-[var(--text-muted)]">
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            Loading calendar…
+            {t('state.loading')}
           </div>
         )}
 
@@ -495,12 +500,12 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             </div>
             <div className="max-w-md space-y-2">
               <p className="text-lg font-semibold text-[var(--text)]">
-                {FEATURE_KEY_LABELS.order_calendar} is not on {planName}
+                {t('plan.lockedTitle', {
+                  feature: FEATURE_KEY_LABELS.order_calendar,
+                  planName,
+                })}
               </p>
-              <p className="text-sm text-[var(--text-muted)]">
-                Visualize orders, deliveries, and payment due dates in one place. Upgrade to Silver
-                or Gold to unlock the calendar — Free is for setup and light testing only.
-              </p>
+              <p className="text-sm text-[var(--text-muted)]">{t('plan.lockedDescription')}</p>
             </div>
             <Button
               type="button"
@@ -508,7 +513,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
               onClick={() => openBrowseUpgrade(dispatch, { currentPlan: planName })}
             >
               <TrendingUp className="h-4 w-4" />
-              Compare plans & upgrade
+              {t('plan.comparePlans')}
             </Button>
           </div>
         )}
@@ -518,9 +523,9 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
           !entitlementsLoading &&
           calendarBlocked?.kind === 'error' && (
             <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 px-6 py-10 text-center text-[var(--text-muted)]">
-              <p>{calendarBlocked.message || 'Unable to load the order calendar right now.'}</p>
+              <p>{calendarBlocked.message || t('state.loadError')}</p>
               <Button onClick={() => refetch()} size="sm">
-                Try again
+                {t('state.tryAgain')}
               </Button>
             </div>
           )}
@@ -567,8 +572,10 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
         <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
           <CalendarDays className="h-4 w-4" />
           <span>
-            Showing {data?.events?.length ? data.events.length : 0} of{' '}
-            {data?.pagination?.total ? data.pagination.total : 0} events
+            {t('state.showingEvents', {
+              shown: data?.events?.length ? data.events.length : 0,
+              total: data?.pagination?.total ? data.pagination.total : 0,
+            })}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -579,10 +586,10 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             disabled={page === 1}
           >
             <ArrowLeft className="mr-1 h-4 w-4" />
-            Prev
+            {t('state.previous')}
           </Button>
           <span className="text-sm text-[var(--text-muted)]">
-            Page {page} of {totalPages}
+            {t('state.pageOf', { page, totalPages })}
           </span>
           <Button
             variant="outline"
@@ -590,7 +597,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
             disabled={page >= totalPages}
           >
-            Next
+            {t('state.next')}
             <ArrowRight className="ml-1 h-4 w-4" />
           </Button>
         </div>
@@ -625,7 +632,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
                 <div className="flex items-center justify-between text-base font-semibold text-[var(--text)]">
                   <span>{t('eventSheet.total')}</span>
                   <span>
-                    {new Intl.NumberFormat('en-US', {
+                    {new Intl.NumberFormat(i18n.language || 'en', {
                       style: 'currency',
                       currency: selectedEvent.currency || 'USD',
                       maximumFractionDigits: 2,

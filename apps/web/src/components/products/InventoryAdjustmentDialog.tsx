@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -44,31 +45,27 @@ export function InventoryAdjustmentDialog({
   adjustmentNotes,
   setAdjustmentNotes,
 }: InventoryAdjustmentDialogProps) {
+  const { t } = useTranslation('products')
   const [createInventoryAdjustment, { isLoading: isAdjustingInventory }] =
     useCreateInventoryAdjustmentMutation()
 
-  const resetForm = () => {
-    setShowInventoryAdjustment(false)
-    setSelectedProductForAdjustment(null)
-    setAdjustmentQuantity('')
-    setAdjustmentReason('')
-    setAdjustmentNotes('')
-  }
+  const reasonOptions = ['STOCK_TAKE', 'DAMAGE', 'RETURN', 'ADJUSTMENT', 'OTHER'] as const
 
   return (
     <Dialog open={showInventoryAdjustment} onOpenChange={setShowInventoryAdjustment}>
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>Adjust Stock</DialogTitle>
+          <DialogTitle>{t('inventory.title')}</DialogTitle>
           <DialogDescription>
-            {adjustmentType === 'ADD' ? 'Add' : 'Remove'} stock for{' '}
-            {selectedProductForAdjustment?.name}
+            {adjustmentType === 'ADD'
+              ? t('inventory.descriptionAdd', { name: selectedProductForAdjustment?.name })
+              : t('inventory.descriptionRemove', { name: selectedProductForAdjustment?.name })}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
-            <Label>Adjustment Type</Label>
+            <Label>{t('inventory.adjustmentType')}</Label>
             <div className="flex gap-2 mt-2">
               <Button
                 type="button"
@@ -77,7 +74,7 @@ export function InventoryAdjustmentDialog({
                 className="flex-1"
               >
                 <TrendingUp className="h-4 w-4 mr-2" />
-                Add Stock
+                {t('inventory.addStock')}
               </Button>
               <Button
                 type="button"
@@ -86,13 +83,13 @@ export function InventoryAdjustmentDialog({
                 className="flex-1"
               >
                 <TrendingDown className="h-4 w-4 mr-2" />
-                Remove Stock
+                {t('inventory.removeStock')}
               </Button>
             </div>
           </div>
 
           <div>
-            <Label htmlFor="quantity">Quantity</Label>
+            <Label htmlFor="quantity">{t('inventory.quantity')}</Label>
             <Input
               id="quantity"
               type="number"
@@ -100,54 +97,57 @@ export function InventoryAdjustmentDialog({
               step="0.01"
               value={adjustmentQuantity}
               onChange={(e) => setAdjustmentQuantity(e.target.value)}
-              placeholder="Enter quantity"
+              placeholder={t('inventory.quantityPlaceholder')}
             />
           </div>
 
           <div>
-            <Label htmlFor="reason">Reason</Label>
+            <Label htmlFor="reason">{t('inventory.reason')}</Label>
             <Select value={adjustmentReason} onValueChange={setAdjustmentReason}>
               <SelectTrigger id="reason">
-                <option value="">Select a reason</option>
-                <option value="STOCK_TAKE">Stock Take / Count</option>
-                <option value="DAMAGE">Damage / Spoilage</option>
-                <option value="RETURN">Return</option>
-                <option value="ADJUSTMENT">Manual Adjustment</option>
-                <option value="OTHER">Other</option>
+                <option value="">{t('inventory.selectReason')}</option>
+                {reasonOptions.map((reason) => (
+                  <option key={reason} value={reason}>
+                    {t(`inventory.reasons.${reason}`)}
+                  </option>
+                ))}
               </SelectTrigger>
             </Select>
           </div>
 
           <div>
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes">{t('inventory.notes')}</Label>
             <textarea
               id="notes"
               className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
               rows={3}
               value={adjustmentNotes}
               onChange={(e) => setAdjustmentNotes(e.target.value)}
-              placeholder="Additional notes (optional)"
+              placeholder={t('inventory.notesPlaceholder')}
             />
           </div>
 
           {selectedProductForAdjustment && (
             <div className="bg-[var(--brand-ultra)] p-4 rounded-md">
-              <p className="text-sm font-medium text-[var(--text-mid)]">Current Stock</p>
+              <p className="text-sm font-medium text-[var(--text-mid)]">
+                {t('inventory.currentStock')}
+              </p>
               <p className="text-lg font-semibold text-[var(--mint)]">
                 {formatNumber(selectedProductForAdjustment.available_qty, {
                   maximumFractionDigits: 2,
                 })}{' '}
-                {selectedProductForAdjustment.unit || 'units'}
+                {selectedProductForAdjustment.unit || t('inventory.units')}
               </p>
               {adjustmentQuantity && (
                 <p className="text-sm text-[var(--text-muted)] mt-2">
-                  New Stock:{' '}
-                  {formatNumber(
-                    parseFloat(String(selectedProductForAdjustment.available_qty || 0)) +
-                      (adjustmentType === 'ADD' ? 1 : -1) * parseFloat(adjustmentQuantity),
-                    { maximumFractionDigits: 2 }
-                  )}{' '}
-                  {selectedProductForAdjustment.unit || 'units'}
+                  {t('inventory.newStock', {
+                    qty: formatNumber(
+                      parseFloat(String(selectedProductForAdjustment.available_qty || 0)) +
+                        (adjustmentType === 'ADD' ? 1 : -1) * parseFloat(adjustmentQuantity),
+                      { maximumFractionDigits: 2 }
+                    ),
+                    unit: selectedProductForAdjustment.unit || t('inventory.units'),
+                  })}
                 </p>
               )}
             </div>
@@ -165,7 +165,7 @@ export function InventoryAdjustmentDialog({
               setAdjustmentNotes('')
             }}
           >
-            Cancel
+            {t('inventory.cancel')}
           </Button>
           <Button
             onClick={async () => {
@@ -180,7 +180,7 @@ export function InventoryAdjustmentDialog({
                   notes: adjustmentNotes || undefined,
                 }).unwrap()
                 toast.success(
-                  `Stock ${adjustmentType === 'ADD' ? 'added' : 'removed'} successfully`
+                  adjustmentType === 'ADD' ? t('toast.stockAdded') : t('toast.stockRemoved')
                 )
                 setShowInventoryAdjustment(false)
                 setSelectedProductForAdjustment(null)
@@ -188,12 +188,12 @@ export function InventoryAdjustmentDialog({
                 setAdjustmentReason('')
                 setAdjustmentNotes('')
               } catch (err: any) {
-                toast.error(err?.data?.error?.message || 'Failed to update inventory')
+                toast.error(err?.data?.error?.message || t('toast.inventoryUpdateFailed'))
               }
             }}
             disabled={!adjustmentQuantity || !adjustmentReason || isAdjustingInventory}
           >
-            {adjustmentType === 'ADD' ? 'Add' : 'Remove'} Stock
+            {adjustmentType === 'ADD' ? t('inventory.addStock') : t('inventory.removeStock')}
           </Button>
         </DialogFooter>
       </DialogContent>

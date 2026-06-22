@@ -1,4 +1,5 @@
 import { Package } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { EmptyState } from '../ui/empty-state'
 import { ProductCatalogRow } from './ProductCatalogRow'
 
@@ -12,7 +13,7 @@ type ProductCatalogTableProps = {
 }
 
 const thClass =
-  'border-b border-[var(--app-border)] px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]'
+  'border-b border-[var(--app-border)] px-4 py-3 text-start text-sm font-semibold text-[var(--text-mid)]'
 const tdClass = 'border-b border-[var(--app-border)] px-4 py-4 align-middle'
 
 export function ProductCatalogTable({
@@ -23,6 +24,7 @@ export function ProductCatalogTable({
   onToggleFavorite,
   onAdjustStock,
 }: ProductCatalogTableProps) {
+  const { t } = useTranslation('products')
   const showFavorite = isRestaurant && Boolean(onToggleFavorite)
 
   return (
@@ -45,12 +47,12 @@ export function ProductCatalogTable({
         <table className="w-full min-w-[640px] border-collapse">
           <thead className="bg-[var(--brand-ultra)]/80">
             <tr>
-              <th className={thClass}>Product</th>
-              <th className={thClass}>Category</th>
-              <th className={thClass}>Supplier</th>
-              <th className={thClass}>Price</th>
-              <th className={thClass}>Stock</th>
-              <th className={thClass}>Actions</th>
+              <th className={thClass}>{t('catalog.product')}</th>
+              <th className={thClass}>{t('catalog.category')}</th>
+              <th className={thClass}>{t('catalog.supplier')}</th>
+              <th className={thClass}>{t('catalog.price')}</th>
+              <th className={thClass}>{t('catalog.stock')}</th>
+              <th className={thClass}>{t('catalog.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -73,11 +75,11 @@ export function ProductCatalogTable({
       </div>
       {filteredProducts?.length === 0 && (
         <EmptyState
-          title={isSupplier ? 'No products in your catalog' : 'No products found'}
+          title={isSupplier ? t('catalog.emptySupplierTitle') : t('catalog.emptyRestaurantTitle')}
           description={
             isSupplier
-              ? 'Add your first product or adjust filters to see existing items.'
-              : 'Try a different search or supplier filter.'
+              ? t('catalog.emptySupplierDescription')
+              : t('catalog.emptyRestaurantDescription')
           }
           icon={<Package className="h-10 w-10" aria-hidden />}
         />

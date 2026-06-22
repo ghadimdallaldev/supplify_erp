@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Card, CardContent } from '../../components/ui/card'
 import { Label } from '../../components/ui/label'
@@ -14,17 +15,11 @@ import { getDealRedeemGate } from '../../lib/planLimits'
 import { LIMIT_UPGRADE_COPY } from '../../lib/upgradeCopy'
 import { Sparkles, Store } from 'lucide-react'
 import { useAppSelector } from '../../hooks/redux'
-import { RESTAURANT_EMPTY_STATE } from '../../lib/dealDisplayLabels'
 import { RequirePermission } from '../../components/RequirePermission'
-
-const SORT_OPTIONS = [
-  { value: 'newest', label: 'Newest' },
-  { value: 'biggest_discount', label: 'Biggest discount' },
-  { value: 'expiring_soon', label: 'Expiring soon' },
-  { value: 'sponsored', label: 'Sponsored first' },
-]
+import { ensureNamespace } from '../../i18n'
 
 export function DealsPage() {
+  const { t } = useTranslation('deals')
   const [searchParams] = useSearchParams()
   const highlightDealId = searchParams.get('highlight') || ''
   const [sort, setSort] = useState('newest')
@@ -62,6 +57,20 @@ export function DealsPage() {
 
   const sponsoredCount = promotions.filter((p) => p.is_sponsored).length
 
+  const sortOptions = useMemo(
+    () => [
+      { value: 'newest', label: t('page.sortOptions.newest') },
+      { value: 'biggest_discount', label: t('page.sortOptions.biggest_discount') },
+      { value: 'expiring_soon', label: t('page.sortOptions.expiring_soon') },
+      { value: 'sponsored', label: t('page.sortOptions.sponsored') },
+    ],
+    [t]
+  )
+
+  useEffect(() => {
+    void ensureNamespace('deals')
+  }, [])
+
   useEffect(() => {
     const supplierFromUrl = searchParams.get('supplierId')
     if (supplierFromUrl) setSupplierFilter(supplierFromUrl)
@@ -76,10 +85,7 @@ export function DealsPage() {
   return (
     <RequirePermission anyOf={['ORDERS_VIEW', 'CATALOG_VIEW']} title="deals">
       <PageShell data-testid="deals-page">
-        <PageHeader
-          title="Available deals"
-          description="Supplier deals from suppliers you follow, plus sponsored placement from new suppliers"
-        />
+        <PageHeader title={t('page.title')} description={t('page.description')} />
         {!canRedeem ? (
           <div
             className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
@@ -89,16 +95,19 @@ export function DealsPage() {
           </div>
         ) : dealRedeemGate.limit != null ? (
           <p className="text-sm text-[var(--text-muted)]">
-            Deal redemptions today: {dealRedeemGate.current}/{dealRedeemGate.limit}
+            {t('page.redemptionsToday', {
+              current: dealRedeemGate.current,
+              limit: dealRedeemGate.limit,
+            })}
           </p>
         ) : null}
         <Card>
           <CardContent className="pt-6 flex flex-wrap gap-4 items-end">
             <div>
-              <Label>Sort</Label>
+              <Label>{t('page.sort')}</Label>
               <Select value={sort} onValueChange={setSort}>
                 <SelectTrigger className="mt-1 min-w-[160px]">
-                  {SORT_OPTIONS.map((o) => (
+                  {sortOptions.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>
@@ -107,10 +116,10 @@ export function DealsPage() {
               </Select>
             </div>
             <div>
-              <Label>Supplier</Label>
+              <Label>{t('page.supplier')}</Label>
               <Select value={supplierFilter} onValueChange={setSupplierFilter}>
                 <SelectTrigger className="mt-1 min-w-[180px]">
-                  <option value="">All suppliers</option>
+                  <option value="">{t('page.allSuppliers')}</option>
                   {suppliers.map(([id, name]) => (
                     <option key={id} value={id}>
                       {name}
@@ -125,14 +134,14 @@ export function DealsPage() {
                 checked={expiringSoon}
                 onChange={(e) => setExpiringSoon(e.target.checked)}
               />
-              Expiring within 7 days
+              {t('page.expiringSoon')}
             </label>
           </CardContent>
         </Card>
 
         {sponsoredCount > 0 ? (
           <p className="text-xs text-[var(--text-muted)]">
-            {sponsoredCount} sponsored {sponsoredCount === 1 ? 'deal' : 'deals'} in your feed
+            {t('page.sponsored', { count: sponsoredCount })}
           </p>
         ) : null}
 
@@ -199,15 +208,21 @@ function DealsEmptyState({
   onClearSupplier: () => void
   onClearExpiringSoon: () => void
 }) {
+  const { t } = useTranslation('deals')
+
   if (supplierFilter) {
     return (
       <EmptyState
-        title={supplierName ? `No deals from ${supplierName}` : 'No deals for this supplier'}
-        description="They may not have active deals right now. Browse your full feed or pick another supplier."
+        title={
+          supplierName
+            ? t('page.empty.supplierTitle', { name: supplierName })
+            : t('page.empty.supplierTitleGeneric')
+        }
+        description={t('page.empty.supplierDescription')}
         icon={<Store className="h-6 w-6" aria-hidden />}
         action={
           <Button type="button" variant="outline" size="sm" onClick={onClearSupplier}>
-            Show all suppliers
+            {t('page.empty.showAllSuppliers')}
           </Button>
         }
       />
@@ -217,12 +232,12 @@ function DealsEmptyState({
   if (expiringSoon) {
     return (
       <EmptyState
-        title="No deals expiring in the next 7 days"
-        description="Turn off “Expiring within 7 days” to see everything in your feed, or check back as new deals go live."
+        title={t('page.empty.expiringTitle')}
+        description={t('page.empty.expiringDescription')}
         icon={<Sparkles className="h-6 w-6" aria-hidden />}
         action={
           <Button type="button" variant="outline" size="sm" onClick={onClearExpiringSoon}>
-            Show all deals
+            {t('page.empty.showAllDeals')}
           </Button>
         }
       />
@@ -231,8 +246,8 @@ function DealsEmptyState({
 
   return (
     <EmptyState
-      title={RESTAURANT_EMPTY_STATE.title}
-      description={RESTAURANT_EMPTY_STATE.description}
+      title={t('page.empty.defaultTitle')}
+      description={t('page.empty.defaultDescription')}
       icon={<Sparkles className="h-6 w-6" aria-hidden />}
       action={
         <Button
@@ -241,7 +256,7 @@ function DealsEmptyState({
           className="text-white"
           style={{ background: 'var(--brand)', borderColor: 'var(--brand)' }}
         >
-          <Link to="/app/suppliers">Browse suppliers</Link>
+          <Link to="/app/suppliers">{t('page.empty.browseSuppliers')}</Link>
         </Button>
       }
     />

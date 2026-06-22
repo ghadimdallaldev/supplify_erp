@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from 'react-i18next'
 import { Reservation, ReservationTable } from '../../types'
 import { normalizeTableId, reservationTableIds } from '../../lib/reservation-tables'
 import { Badge } from '../ui/badge'
@@ -15,6 +16,8 @@ export function ReservationAssignmentsSummary({
   tables,
   boardDate,
 }: ReservationAssignmentsSummaryProps) {
+  const { t } = useTranslation('reservations')
+
   const tableNameById = new Map(
     tables.filter((t) => t.id).map((t) => [normalizeTableId(t.id), t.name])
   )
@@ -23,7 +26,9 @@ export function ReservationAssignmentsSummary({
     .filter((r) => r.status !== 'CANCELLED' && r.status !== 'COMPLETED')
     .map((r) => {
       const ids = reservationTableIds(r)
-      const tableNames = ids.map((id) => tableNameById.get(id) || 'Unknown table').join(', ')
+      const tableNames = ids
+        .map((id) => tableNameById.get(id) || t('common.unknownTable'))
+        .join(', ')
       return {
         id: r.id,
         name: r.customer_name,
@@ -47,8 +52,12 @@ export function ReservationAssignmentsSummary({
     return (
       <Card className="border-dashed border-[var(--app-border)] bg-[var(--brand-ultra)]/50">
         <CardContent className="py-4 text-sm text-[var(--text-muted)]">
-          No reservations on <strong>{boardDate}</strong>. Change the date above or share your
-          booking link with guests.
+          <Trans
+            i18nKey="assignments.empty"
+            ns="reservations"
+            values={{ date: boardDate }}
+            components={{ strong: <strong /> }}
+          />
         </CardContent>
       </Card>
     )
@@ -56,8 +65,12 @@ export function ReservationAssignmentsSummary({
 
   return (
     <AppPanel
-      title="Today's table map"
-      description={`${assigned.length} assigned · ${unassigned.length} unassigned on ${boardDate}. Matches what should appear on the floor below.`}
+      title={t('assignments.title')}
+      description={t('assignments.description', {
+        assigned: assigned.length,
+        unassigned: unassigned.length,
+        date: boardDate,
+      })}
       className="border border-[var(--app-border)]"
     >
       <div className="space-y-2">
@@ -78,7 +91,9 @@ export function ReservationAssignmentsSummary({
         ))}
         {unassigned.length > 0 ? (
           <p className="text-xs text-[var(--text-muted)]">
-            Unassigned: {unassigned.map((r) => r.name).join(', ')}
+            {t('assignments.unassignedList', {
+              names: unassigned.map((r) => r.name).join(', '),
+            })}
           </p>
         ) : null}
       </div>

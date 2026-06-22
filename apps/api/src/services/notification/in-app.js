@@ -8,6 +8,7 @@ import { sendWhatsAppMessage as sendWhatsAppMessageService } from '../whatsapp.s
 import { emitNotificationNew } from '../../lib/socket.js'
 import { emailService } from './email.js'
 import { dispatchPushNotification, isPushConfigured } from './push.js'
+import { fetchUserLocales, resolveLocale, DEFAULT_LOCALE } from '../../i18n/index.js'
 import {
   DEFAULT_NOTIFICATION_PREFS,
   isPrefEnabled,
@@ -201,6 +202,7 @@ export async function notifyTenantUsers({
   notificationCategory,
   title,
   message,
+  contentForLocale = null,
   referenceId = null,
   referenceType = null,
   metadata = null,
@@ -215,15 +217,19 @@ export async function notifyTenantUsers({
   }
 
   const startedAt = performance.now()
+  const localesByUser = await fetchUserLocales(userIds)
   const results = await mapWithConcurrency(userIds, concurrency, async (userId) => {
     try {
+      const locale = localesByUser.get(userId) || DEFAULT_LOCALE
+      const localized = contentForLocale ? contentForLocale(locale) : { title, message }
       const row = await sendNotification({
         userId,
         userType: tenantType,
         notificationType,
         notificationCategory,
-        title,
-        message,
+        title: localized.title,
+        message: localized.message,
+        locale,
         referenceId,
         referenceType,
         metadata,
@@ -281,11 +287,13 @@ export async function sendNotification({
   notificationCategory,
   title,
   message,
+  locale = null,
   referenceId = null,
   referenceType = null,
   metadata = null,
 }) {
   try {
+    const resolvedLocale = resolveLocale(locale || DEFAULT_LOCALE)
     // Get user preferences
     const prefs = await getUserPreferences(userId, userType)
     const contact = await getUserContactInfo(userId, userType)
@@ -375,6 +383,7 @@ export async function sendNotification({
           metadata: metadataPayload,
           userId,
           tenantId,
+          locale: resolvedLocale,
         })
       } catch (error) {
         logger.error('Email send failed', { error: error.message })
