@@ -167,7 +167,7 @@ export function OrderSheet({
         )}
 
         <div className="space-y-4 p-4">
-          <DialogHeader className="text-left">
+          <DialogHeader className="text-start">
             <DialogTitle>{item.name}</DialogTitle>
             <DialogDescription id="order-sheet-description">
               {item.description || t('orderSheet.customizeFallback')}
@@ -207,7 +207,7 @@ export function OrderSheet({
                             type="button"
                             onClick={() => toggleOption(group, option.id)}
                             className={cn(
-                              'flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition',
+                              'flex w-full items-center justify-between rounded-lg border px-3 py-2 text-start text-sm transition',
                               isSelected
                                 ? 'border-[var(--brand-mid)] bg-[var(--brand-pale)]'
                                 : 'hover:bg-muted/50'

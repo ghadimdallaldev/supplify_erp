@@ -860,7 +860,7 @@ export function ReservationTableBuilder({
 
       <CardContent className="space-y-6 lg:space-y-10">
         <div className="relative">
-          <div className="rounded-3xl border border-dashed border-[var(--app-border)] bg-[var(--brand-ultra)] p-6 lg:pr-[420px]">
+          <div className="rounded-3xl border border-dashed border-[var(--app-border)] bg-[var(--brand-ultra)] p-6 lg:pe-[420px]">
             {/* Shape add buttons */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -1084,7 +1084,7 @@ export function ReservationTableBuilder({
 
           {/* ── Details panel ── */}
           {isDetailsOpen ? (
-            <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--surface)] p-5 shadow-lg transition-[box-shadow,opacity,transform] duration-200 ease-out lg:absolute lg:top-6 lg:right-6 lg:mt-0 lg:w-[360px] lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto lg:bg-white/95 lg:backdrop-blur">
+            <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--surface)] p-5 shadow-lg transition-[box-shadow,opacity,transform] duration-200 ease-out lg:absolute lg:top-6 lg:end-6 lg:mt-0 lg:w-[360px] lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto lg:bg-white/95 lg:backdrop-blur">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-[var(--text)]">
                   {t('tableBuilder.tableDetails')}
@@ -1132,14 +1132,14 @@ export function ReservationTableBuilder({
               {renderDetailsPanel()}
             </div>
           ) : (
-            <div className="mt-6 flex justify-end lg:absolute lg:top-6 lg:right-6 lg:mt-0">
+            <div className="mt-6 flex justify-end lg:absolute lg:top-6 lg:end-6 lg:mt-0">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setIsDetailsOpen(true)}
                 className="flex items-center gap-2 rounded-full border-[var(--app-border-mid)] text-[var(--text-muted)] hover:text-[var(--brand-mid)]"
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-4 w-4 rtl:rotate-180" />
                 {t('tableBuilder.showTableDetails')}
               </Button>
             </div>

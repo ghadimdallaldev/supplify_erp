@@ -8,7 +8,13 @@ import {
   getLanguageDirection,
   isSupportedLocale,
 } from './config'
-import { lazyLocaleBackend, loadNamespace, loadNamespaces } from './loadNamespace'
+import {
+  getActiveNamespaces,
+  lazyLocaleBackend,
+  loadNamespace,
+  loadNamespaces,
+} from './loadNamespace'
+import { IDLE_PRELOAD_NAMESPACES } from './pageNamespaces'
 import type { I18nNamespace } from './config'
 import enCommon from './locales/en/common.json'
 import enNavigation from './locales/en/navigation.json'
@@ -124,7 +130,23 @@ i18n.loadNamespaces = ((namespaces, callback) => {
 }) as typeof i18n.loadNamespaces
 
 i18n.on('languageChanged', (lng) => {
-  applyHtmlAttributes(lng.split('-')[0])
+  const locale = lng.split('-')[0]
+  applyHtmlAttributes(locale)
+  const namespaces = getActiveNamespaces()
+  if (namespaces.length > 0) {
+    void loadNamespaces(i18n, locale, namespaces)
+  }
 })
+
+if (typeof window !== 'undefined') {
+  const warmNamespaces = () => {
+    void loadNamespaces(i18n, getActiveLocale(), [...IDLE_PRELOAD_NAMESPACES])
+  }
+  const scheduleIdle =
+    typeof requestIdleCallback === 'function'
+      ? (cb: () => void) => requestIdleCallback(cb, { timeout: 4000 })
+      : (cb: () => void) => window.setTimeout(cb, 2000)
+  window.setTimeout(() => scheduleIdle(warmNamespaces), 1500)
+}
 
 export { i18n, loadNamespaces }
