@@ -14,7 +14,12 @@ export function SettingsHubLayout({
   children: ReactNode
 }) {
   return (
-    <PageShell maxWidth="focused" data-testid="restaurant-settings-page">
+    <PageShell
+      maxWidth="default"
+      padding
+      className="w-full overflow-x-hidden"
+      data-testid="restaurant-settings-page"
+    >
       <PageHeader title={title} description={description} />
       {stats}
       {children}

@@ -1,0 +1,31 @@
+{
+  "page": {
+    "title": "Available deals",
+    "description": "Supplier deals from suppliers you follow, plus sponsored placement from new suppliers",
+    "redemptionsToday": "Deal redemptions today: {{current}}/{{limit}}",
+    "sort": "Sort",
+    "supplier": "Supplier",
+    "allSuppliers": "All suppliers",
+    "expiringSoon": "Expiring within 7 days",
+    "sponsored_one": "{{count}} sponsored deal in your feed",
+    "sponsored_other": "{{count}} sponsored deals in your feed",
+    "sortOptions": {
+      "newest": "Newest",
+      "biggest_discount": "Biggest discount",
+      "expiring_soon": "Expiring soon",
+      "sponsored": "Sponsored first"
+    },
+    "empty": {
+      "supplierTitle": "No deals from {{name}}",
+      "supplierTitleGeneric": "No deals for this supplier",
+      "supplierDescription": "They may not have active deals right now. Browse your full feed or pick another supplier.",
+      "showAllSuppliers": "Show all suppliers",
+      "expiringTitle": "No deals expiring in the next 7 days",
+      "expiringDescription": "Turn off “Expiring within 7 days” to see everything in your feed, or check back as new deals go live.",
+      "showAllDeals": "Show all deals",
+      "defaultTitle": "No active deals right now",
+      "defaultDescription": "When your suppliers publish offers, they'll appear here.",
+      "browseSuppliers": "Browse suppliers"
+    }
+  }
+}

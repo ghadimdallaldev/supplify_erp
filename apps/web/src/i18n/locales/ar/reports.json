@@ -1,0 +1,189 @@
+{
+  "page": {
+    "title": "التقارير",
+    "purchasingTitle": "تقارير المشتريات",
+    "analyticsTitle": "التقارير والتحليلات",
+    "purchasingDescription": "تتبّع حجم الطلبات وإنفاق الموردين وأهم المنتجات عبر مواقعك.",
+    "analyticsDescription": "رؤى الإيرادات والتنفيذ للموردين",
+    "planUnavailable": "التقارير غير متاحة في خطتك الحالية. تواصل مع الدعم إذا كان ذلك يبدو خطأً."
+  },
+  "reports": {
+    "orderVolume": {
+      "label": "حجم الطلبات",
+      "columns": {
+        "period": "الفترة",
+        "orderCount": "الطلبات",
+        "totalAmount": "الإجمالي",
+        "revenue": "الإيرادات"
+      }
+    },
+    "spendBySupplier": {
+      "label": "الإنفاق حسب المورد",
+      "columns": {
+        "supplierName": "المورد",
+        "totalSpend": "الإنفاق",
+        "orderCount": "الطلبات"
+      }
+    },
+    "topProducts": {
+      "label": "أهم المنتجات",
+      "columns": {
+        "productName": "المنتج",
+        "totalSpend": "الإنفاق",
+        "quantity": "الكمية"
+      }
+    },
+    "revenueTrend": {
+      "label": "اتجاه الإيرادات",
+      "columns": {
+        "period": "الفترة",
+        "revenue": "الإيرادات",
+        "orderCount": "الطلبات"
+      }
+    },
+    "topRestaurants": {
+      "label": "أهم المطاعم",
+      "columns": {
+        "restaurantName": "المطعم",
+        "revenue": "الإيرادات",
+        "orderCount": "الطلبات"
+      }
+    }
+  },
+  "filters": {
+    "title": "نطاق التاريخ والفلاتر",
+    "presets": {
+      "days7": "7 أيام",
+      "days30": "30 يوماً",
+      "days90": "90 يوماً"
+    },
+    "lastPreset": "آخر {{period}}",
+    "from": "من",
+    "to": "إلى",
+    "granularity": "الدقة الزمنية",
+    "granularityOptions": {
+      "day": "يوم",
+      "week": "أسبوع",
+      "month": "شهر"
+    },
+    "branch": "الفرع",
+    "allBranches": "جميع الفروع"
+  },
+  "panel": {
+    "updating": "جارٍ التحديث…",
+    "exportCsv": "تصدير CSV",
+    "tryAgain": "إعادة المحاولة",
+    "emptyTitle": "لا توجد بيانات لهذه الفترة",
+    "emptyDescription": "جرّب توسيع نطاق التاريخ أو تغيير الدقة الزمنية أو إجراء طلبات خلال هذه الفترة."
+  },
+  "summary": {
+    "totalOrders": "إجمالي الطلبات",
+    "totalSpend": "إجمالي الإنفاق",
+    "periods": "الفترات",
+    "suppliers": "الموردون",
+    "orders": "الطلبات",
+    "productSpend": "إنفاق المنتجات",
+    "products": "المنتجات",
+    "quantity": "الكمية",
+    "revenue": "الإيرادات",
+    "restaurants": "المطاعم",
+    "total": "الإجمالي",
+    "rows": "الصفوف"
+  },
+  "table": {
+    "showingRows": "عرض 20 من {{total}} صف. صدّر CSV للحصول على مجموعة البيانات الكاملة."
+  },
+  "disputes": {
+    "title": "النزاعات",
+    "supplierDescription": "النزاعات الواردة من المطاعم",
+    "restaurantDescription": "فتح وتتبّع نزاعات الطلبات",
+    "unavailableTitle": "النزاعات غير متاحة",
+    "unavailableDescription": "النزاعات والمرتجعات غير مشمولة في خطتك. قم بالترقية لإدارة مشكلات التسليم والإشعارات الدائنة.",
+    "openDispute": "فتح نزاع",
+    "eligibilityMessage": "لا يمكن فتح النزاعات إلا بعد أن يُسلّم المورد الطلب (تم التسليم أو الاستلام أو الإكمال).",
+    "filterTitle": "تصفية النزاعات",
+    "statusFilter": "فلتر الحالة",
+    "statusAll": "الكل",
+    "statusOpen": "مفتوح",
+    "statusUnderReview": "قيد المراجعة",
+    "statusResolved": "تم الحل",
+    "statusRejected": "مرفوض",
+    "incomingTitle": "النزاعات الواردة",
+    "myDisputesTitle": "نزاعاتي",
+    "emptyTitle": "لم يتم العثور على نزاعات",
+    "emptyFiltered": "جرّب مسح فلتر الحالة لرؤية المزيد من النتائج.",
+    "emptyDefault": "ستظهر هنا النزاعات المفتوحة من الاستلام أو مشكلات الطلبات.",
+    "table": {
+      "order": "الطلب",
+      "restaurant": "المطعم",
+      "type": "النوع",
+      "status": "الحالة",
+      "amount": "المبلغ",
+      "actions": "الإجراءات"
+    },
+    "actions": {
+      "review": "مراجعة",
+      "resolve": "حل",
+      "reject": "رفض"
+    },
+    "createDialog": {
+      "title": "فتح نزاع",
+      "description": "أبلغ عن مشكلات التسليم أو الجودة أو الفوترة لطلب تم تسليمه أو استلامه.",
+      "order": "الطلب",
+      "loadingOrders": "جارٍ تحميل الطلبات…",
+      "noEligibleOrders": "لا توجد طلبات مسلّمة مؤهّلة",
+      "selectOrder": "اختر طلباً",
+      "supplier": "المورد",
+      "selectOrderFirst": "اختر طلباً أولاً",
+      "noSuppliersOnOrder": "لا يوجد موردون في هذا الطلب",
+      "selectSupplier": "اختر المورد",
+      "lineItemsHint": "بعد ذلك يمكنك اختيار بنود وكميات محددة (مثلاً: استلمت 1 من 3 منتجات).",
+      "cancel": "إلغاء",
+      "continue": "متابعة"
+    },
+    "resolveDialog": {
+      "title": "حل النزاع",
+      "resolution": "الحل",
+      "creditNote": "إشعار دائن",
+      "replacement": "استبدال",
+      "refund": "استرداد",
+      "noAction": "لا إجراء",
+      "creditAmount": "مبلغ الإشعار الدائن",
+      "notes": "ملاحظات",
+      "confirm": "تأكيد"
+    },
+    "rejectDialog": {
+      "title": "رفض النزاع",
+      "placeholder": "سبب الرفض (مطلوب)",
+      "reject": "رفض"
+    },
+    "toasts": {
+      "markedUnderReview": "تم وضع علامة قيد المراجعة",
+      "updateFailed": "فشل تحديث النزاع",
+      "resolved": "تم حل النزاع",
+      "resolveFailed": "فشل الحل",
+      "rejected": "تم رفض النزاع",
+      "rejectFailed": "فشل الرفض",
+      "notesRequired": "الملاحظات مطلوبة عند الرفض",
+      "orderRequired": "الطلب مطلوب",
+      "supplierRequired": "المورد مطلوب"
+    },
+    "supplierFallback": "مورد {{id}}"
+  },
+  "org": {
+    "title": "المؤسسة",
+    "upgradeDescription": "حسابات متعددة الفروع متاحة في Gold وما فوق. قم بترقية خطتك لإضافة مواقع.",
+    "viewSubscription": "عرض الاشتراك",
+    "loadingBranches": "جارٍ تحميل الفروع…",
+    "addBranchAccount": "إضافة حساب فرع",
+    "addBranch": "إضافة فرع",
+    "branchCount_one": "{{count}} فرع · {{role}}",
+    "branchCount_other": "{{count}} فروع · {{role}}",
+    "main": "رئيسي",
+    "inactive": "غير نشط",
+    "staffOrders": "{{staff}} موظف · {{orders}} طلب",
+    "staffOrdersThisMonth": "{{staff}} موظف · {{orders}} طلب هذا الشهر",
+    "openBranch": "فتح الفرع",
+    "invitations": "الدعوات"
+  }
+}

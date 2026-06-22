@@ -78,6 +78,12 @@ export const supplierCreateSchema = z.object({
 
 export const supplierUpdateSchema = supplierCreateSchema.partial().extend({
   publicCatalogEnabled: z.boolean().optional(),
+  salesContactEmail: z.string().email().optional().nullable(),
+  salesContactPhone: z.string().max(20).optional().nullable(),
+  accountingContactEmail: z.string().email().optional().nullable(),
+  accountingContactPhone: z.string().max(20).optional().nullable(),
+  logisticsContactEmail: z.string().email().optional().nullable(),
+  logisticsContactPhone: z.string().max(20).optional().nullable(),
 })
 
 export const supplierListSchema = z.object({

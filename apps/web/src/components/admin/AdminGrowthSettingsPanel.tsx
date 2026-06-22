@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -50,6 +51,7 @@ function parseSponsorshipLimits(form: SponsorshipLimitForm): Record<string, numb
 }
 
 export function AdminGrowthSettingsPanel() {
+  const { t } = useTranslation('admin')
   const { data, isLoading } = useGetAdminGrowthSettingsQuery()
   const [update, { isLoading: saving }] = useUpdateAdminGrowthSettingsMutation()
   const [discount, setDiscount] = useState('20')
@@ -71,11 +73,11 @@ export function AdminGrowthSettingsPanel() {
     const discountNum = Number(discount)
     const validityNum = Number(validityDays)
     if (!Number.isFinite(discountNum) || discountNum < 0 || discountNum > 100) {
-      toast.error('Discount must be between 0 and 100 percent')
+      toast.error(t('growthToasts.discountRange'))
       return
     }
     if (!Number.isFinite(validityNum) || validityNum < 1) {
-      toast.error('Referral validity must be at least 1 day')
+      toast.error(t('growthToasts.validityMin'))
       return
     }
     const parsedLimits = parseSponsorshipLimits(sponsorshipLimits)
@@ -87,9 +89,9 @@ export function AdminGrowthSettingsPanel() {
         supplierRewardType: rewardType,
         sponsorshipLimitsPerYear: parsedLimits,
       }).unwrap()
-      toast.success('Growth program settings saved')
+      toast.success(t('growthToasts.saved'))
     } catch {
-      toast.error('Failed to save growth settings')
+      toast.error(t('growthToasts.saveFailed'))
     }
   }
 

@@ -1,4 +1,5 @@
 import { CreditCard, Loader2, Lock, Shield } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader } from '../components/ui/card'
 import { PageHeader } from '../components/ui/page-header'
@@ -10,8 +11,10 @@ import { canLeaveActivationPage } from '../lib/refetchAppSession'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { ensureNamespace } from '../i18n'
 
 export function AccountActivationPage() {
+  const { t } = useTranslation('onboarding')
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
@@ -20,6 +23,11 @@ export function AccountActivationPage() {
   const [activatingFree, setActivatingFree] = useState(false)
 
   const pending = billing?.access?.pendingActivation && billing.access.isLocked
+  const isSupplier = user?.role === 'SUPPLIER'
+
+  useEffect(() => {
+    void ensureNamespace('onboarding')
+  }, [])
 
   useEffect(() => {
     if (isLoading || !billing?.access) return
@@ -28,14 +36,12 @@ export function AccountActivationPage() {
     }
   }, [billing, isLoading, navigate])
 
-  const tenantLabel = user?.role === 'SUPPLIER' ? 'supplier' : 'restaurant'
-
   const handleActivateFree = async () => {
     setActivatingFree(true)
     const result = await activateFreePlanFromPlans(dispatch, plansData?.plans)
     setActivatingFree(false)
     if (result.ok) {
-      toast.success('Your free plan is active.')
+      toast.success(t('activation.freePlanActive'))
       navigate('/app', { replace: true })
       return
     }
@@ -50,8 +56,12 @@ export function AccountActivationPage() {
             <Lock className="h-7 w-7" aria-hidden />
           </div>
           <PageHeader
-            title="Activate your account"
-            description={`Your ${tenantLabel} workspace was created but is not active yet. Start on the free plan, upgrade to a paid tier, or ask a Supplify administrator to activate you manually.`}
+            title={t('activation.title')}
+            description={
+              isSupplier
+                ? t('activation.descriptionSupplier')
+                : t('activation.descriptionRestaurant')
+            }
             className="text-center sm:flex-col sm:items-center [&_p]:mx-auto"
           />
         </CardHeader>
@@ -59,13 +69,11 @@ export function AccountActivationPage() {
           <div className="rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)]/50 p-4 text-sm text-[var(--text-mid)]">
             <p className="flex items-start gap-2">
               <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand-mid)]" />
-              Pay for Silver, Gold, or Platinum to unlock orders, inventory, and the full app
-              immediately.
+              {t('activation.paidPlanHint')}
             </p>
             <p className="mt-3 flex items-start gap-2">
               <Shield className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand-mid)]" />
-              Free tier unlocks your workspace immediately with core features. Paid plans add more
-              capacity and modules.
+              {t('activation.freeTierHint')}
             </p>
           </div>
           <Button
@@ -80,7 +88,7 @@ export function AccountActivationPage() {
             ) : (
               <Shield className="h-4 w-4" />
             )}
-            Activate free plan
+            {t('activation.activateFree')}
           </Button>
           <Button
             type="button"
@@ -88,11 +96,11 @@ export function AccountActivationPage() {
             onClick={() => openBrowseUpgrade(dispatch)}
           >
             <CreditCard className="h-4 w-4" />
-            Compare plans & pay
+            {t('activation.comparePlans')}
           </Button>
           {pending && billing?.subscription?.planName && (
             <p className="text-center text-xs text-[var(--text-muted)]">
-              Current plan on file: {billing.subscription.planName} (pending activation)
+              {t('activation.pendingPlan', { planName: billing.subscription.planName })}
             </p>
           )}
         </CardContent>

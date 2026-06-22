@@ -10,6 +10,7 @@ import {
   WifiOff,
   X,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { CardHeader } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -43,6 +44,7 @@ export function ChatHeader({
   connected,
   otherPartyTyping,
 }: Props) {
+  const { t } = useTranslation('chat')
   const initial = (participantName.trim().charAt(0) || '?').toUpperCase()
 
   return (
@@ -57,7 +59,7 @@ export function ChatHeader({
             onClick={onBack}
           >
             <ArrowLeft className="mr-1 h-4 w-4" />
-            Back
+            {t('header.back')}
           </Button>
         ) : null}
 
@@ -79,16 +81,16 @@ export function ChatHeader({
           </div>
           <p className="text-xs text-[var(--text-mid)]">
             {otherPartyTyping ? (
-              <span className="text-[var(--brand-mid)]">Typing…</span>
+              <span className="text-[var(--brand-mid)]">{t('header.typing')}</span>
             ) : connected ? (
               <span className="inline-flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-[var(--mint)]" aria-hidden />
-                Connected
+                {t('header.connected')}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 text-[var(--amber)]">
                 <WifiOff className="h-3 w-3" aria-hidden />
-                Reconnecting
+                {t('header.reconnecting')}
               </span>
             )}
           </p>
@@ -101,10 +103,10 @@ export function ChatHeader({
                 ? 'bg-[var(--mint-pale)] text-[var(--mint)]'
                 : 'bg-[var(--amber-pale)] text-[var(--amber)]'
             }`}
-            title={connected ? 'Live connection' : 'Reconnecting'}
+            title={connected ? t('header.liveConnectionTitle') : t('header.reconnectingTitle')}
           >
             {connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-            {connected ? 'Live' : 'Offline'}
+            {connected ? t('header.live') : t('header.offline')}
           </span>
 
           <div className="relative hidden md:block">
@@ -113,18 +115,18 @@ export function ChatHeader({
               aria-hidden
             />
             <Input
-              placeholder="Search in thread…"
+              placeholder={t('header.searchInThread')}
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               className="h-8 w-36 pl-8 lg:w-44"
-              aria-label="Search messages in thread"
+              aria-label={t('header.searchMessagesAria')}
             />
             {searchQuery ? (
               <button
                 type="button"
                 onClick={() => onSearchChange('')}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text)]"
-                aria-label="Clear message search"
+                aria-label={t('header.clearMessageSearchAria')}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -138,7 +140,7 @@ export function ChatHeader({
               size="sm"
               onClick={onToggleMenu}
               className="h-8 w-8 p-0"
-              aria-label="Conversation options"
+              aria-label={t('header.conversationOptionsAria')}
               aria-expanded={showMenu}
             >
               <MoreVertical className="h-4 w-4" />
@@ -155,11 +157,11 @@ export function ChatHeader({
                 >
                   {isPinned ? (
                     <>
-                      <PinOff className="h-4 w-4" /> Unpin
+                      <PinOff className="h-4 w-4" /> {t('header.unpin')}
                     </>
                   ) : (
                     <>
-                      <Pin className="h-4 w-4" /> Pin conversation
+                      <Pin className="h-4 w-4" /> {t('header.pinConversation')}
                     </>
                   )}
                 </button>
@@ -171,7 +173,7 @@ export function ChatHeader({
                   }}
                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--text)] transition-colors hover:bg-[var(--brand-ultra)]"
                 >
-                  <Archive className="h-4 w-4" /> Archive
+                  <Archive className="h-4 w-4" /> {t('header.archive')}
                 </button>
                 <div className="my-1 h-px bg-[var(--app-border)]" />
                 <button
@@ -182,7 +184,7 @@ export function ChatHeader({
                   }}
                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--red)] transition-colors hover:bg-[var(--red-pale)]"
                 >
-                  <Trash2 className="h-4 w-4" /> Delete
+                  <Trash2 className="h-4 w-4" /> {t('header.delete')}
                 </button>
               </div>
             ) : null}
@@ -196,11 +198,11 @@ export function ChatHeader({
           aria-hidden
         />
         <Input
-          placeholder="Search in thread…"
+          placeholder={t('header.searchInThread')}
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           className="h-8 pl-8"
-          aria-label="Search messages in thread"
+          aria-label={t('header.searchMessagesAria')}
         />
       </div>
     </CardHeader>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import {
   Building2,
@@ -97,6 +98,7 @@ export function AdminTenantsTab({
   onPasswordReset,
   onTenantDiag,
 }: AdminTenantsTabProps) {
+  const { t } = useTranslation('admin')
   const { can } = usePermissions()
   const canResetPassword = can('ADMIN_SUPPORT')
 
@@ -431,12 +433,12 @@ export function AdminTenantsTab({
               }
               value={tenantSearch}
               onChange={(e) => setTenantSearch(e.target.value)}
-              aria-label="Search tenants"
+              aria-label={t('tenants.searchAriaLabel')}
             />
           </div>
 
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-10 w-full" aria-label="Filter by subscription status">
+            <SelectTrigger className="h-10 w-full" aria-label={t('tenants.filterStatusAriaLabel')}>
               {STATUS_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
@@ -457,7 +459,7 @@ export function AdminTenantsTab({
       <div className="space-y-4">
         {!showRestaurantsOnly && (
           <AppPanel
-            title="Suppliers"
+            title={t('tenants.suppliersTitle')}
             description={
               suppliersLoading && supplierListOffset === 0
                 ? 'Loading suppliers…'
@@ -475,7 +477,7 @@ export function AdminTenantsTab({
           >
             {suppliersError ? (
               <AdminErrorState
-                title="Failed to load suppliers"
+                title={t('tenants.suppliersFailedTitle')}
                 message="The supplier directory request failed."
                 onRetry={() => refetchSuppliers()}
               />
@@ -500,17 +502,17 @@ export function AdminTenantsTab({
               />
             ) : (
               <>
-                <TableScroll aria-label="Supplier tenants">
+                <TableScroll aria-label={t('tenants.suppliersTableAriaLabel')}>
                   <table className="w-full min-w-[880px] text-sm">
                     <thead>
                       <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                        <th className="px-4 py-3">Supplier</th>
-                        <th className="px-4 py-3">Plan</th>
-                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">{t('common.supplier')}</th>
+                        <th className="px-4 py-3">{t('common.table.plan')}</th>
+                        <th className="px-4 py-3">{t('common.table.status')}</th>
                         <th className="hidden px-4 py-3 md:table-cell">Products</th>
                         <th className="hidden px-4 py-3 lg:table-cell">Warehouses</th>
                         <th className="hidden px-4 py-3 sm:table-cell">Revenue</th>
-                        <th className="px-4 py-3 text-right">Actions</th>
+                        <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--app-border)]">
@@ -551,7 +553,7 @@ export function AdminTenantsTab({
                           </td>
                           <td className="px-4 py-3.5">
                             <div className="flex flex-wrap justify-end gap-1.5">
-                              <AdminTooltip label="Diagnostics">
+                              <AdminTooltip label={t('common.tooltips.diagnostics')}>
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -567,7 +569,7 @@ export function AdminTenantsTab({
                                   <Stethoscope className="h-4 w-4" />
                                 </Button>
                               </AdminTooltip>
-                              <AdminTooltip label="Impersonate">
+                              <AdminTooltip label={t('common.tooltips.impersonate')}>
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -584,7 +586,7 @@ export function AdminTenantsTab({
                                 </Button>
                               </AdminTooltip>
                               {canResetPassword && supplier.contact_email && (
-                                <AdminTooltip label="Reset password">
+                                <AdminTooltip label={t('common.tooltips.resetPassword')}>
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -600,7 +602,7 @@ export function AdminTenantsTab({
                                   </Button>
                                 </AdminTooltip>
                               )}
-                              <AdminTooltip label="Change plan">
+                              <AdminTooltip label={t('common.tooltips.changePlan')}>
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -652,7 +654,7 @@ export function AdminTenantsTab({
 
         {!showSuppliersOnly && (
           <AppPanel
-            title="Restaurants"
+            title={t('tenants.restaurantsTitle')}
             description={
               restaurantsLoading && restaurantListOffset === 0
                 ? 'Loading restaurants…'
@@ -670,7 +672,7 @@ export function AdminTenantsTab({
           >
             {restaurantsError ? (
               <AdminErrorState
-                title="Failed to load restaurants"
+                title={t('tenants.restaurantsFailedTitle')}
                 message="The restaurant directory request failed."
                 onRetry={() => refetchRestaurants()}
               />
@@ -697,16 +699,16 @@ export function AdminTenantsTab({
               />
             ) : (
               <>
-                <TableScroll aria-label="Restaurant tenants">
+                <TableScroll aria-label={t('tenants.restaurantsTableAriaLabel')}>
                   <table className="w-full min-w-[760px] text-sm">
                     <thead>
                       <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                        <th className="px-4 py-3">Restaurant</th>
-                        <th className="px-4 py-3">Plan</th>
-                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">{t('common.restaurant')}</th>
+                        <th className="px-4 py-3">{t('common.table.plan')}</th>
+                        <th className="px-4 py-3">{t('common.table.status')}</th>
                         <th className="hidden px-4 py-3 md:table-cell">Orders (30d)</th>
                         <th className="hidden px-4 py-3 sm:table-cell">Total spent</th>
-                        <th className="px-4 py-3 text-right">Actions</th>
+                        <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--app-border)]">
@@ -744,7 +746,7 @@ export function AdminTenantsTab({
                           </td>
                           <td className="px-4 py-3.5">
                             <div className="flex flex-wrap justify-end gap-1.5">
-                              <AdminTooltip label="Diagnostics">
+                              <AdminTooltip label={t('common.tooltips.diagnostics')}>
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -760,7 +762,7 @@ export function AdminTenantsTab({
                                   <Stethoscope className="h-4 w-4" />
                                 </Button>
                               </AdminTooltip>
-                              <AdminTooltip label="Impersonate">
+                              <AdminTooltip label={t('common.tooltips.impersonate')}>
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -777,7 +779,7 @@ export function AdminTenantsTab({
                                 </Button>
                               </AdminTooltip>
                               {canResetPassword && restaurant.contact_email && (
-                                <AdminTooltip label="Reset password">
+                                <AdminTooltip label={t('common.tooltips.resetPassword')}>
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -793,7 +795,7 @@ export function AdminTenantsTab({
                                   </Button>
                                 </AdminTooltip>
                               )}
-                              <AdminTooltip label="Change plan">
+                              <AdminTooltip label={t('common.tooltips.changePlan')}>
                                 <Button
                                   size="sm"
                                   variant="outline"

@@ -1,4 +1,11 @@
+import i18n from 'i18next'
 import { getAvailableDriverDeliveryStatuses } from './driverDeliveryActions'
+
+const NS = 'fulfillment'
+
+function ft(key: string, options?: Record<string, unknown>): string {
+  return i18n.t(key, { ns: NS, ...options })
+}
 
 export type DriverStatusTone = 'neutral' | 'active' | 'success' | 'warning' | 'danger'
 
@@ -48,11 +55,17 @@ export type DriverAction = {
   variant: 'primary' | 'success' | 'outline' | 'danger'
 }
 
-const ACTION_META: Record<DriverAction['value'], Omit<DriverAction, 'value'>> = {
-  out_for_delivery: { label: "I'm on the way", variant: 'primary' },
-  delivered: { label: 'Delivered', variant: 'success' },
-  failed: { label: 'Problem', variant: 'danger' },
-  rescheduled: { label: 'Reschedule', variant: 'outline' },
+function getActionMeta(value: DriverAction['value']): Omit<DriverAction, 'value'> {
+  switch (value) {
+    case 'out_for_delivery':
+      return { label: ft('driverDeliveries.onTheWay'), variant: 'primary' }
+    case 'delivered':
+      return { label: ft('driverDeliveries.delivered'), variant: 'success' }
+    case 'failed':
+      return { label: ft('driverDeliveries.actions.problem'), variant: 'danger' }
+    case 'rescheduled':
+      return { label: ft('driverDeliveries.actions.reschedule'), variant: 'outline' }
+  }
 }
 
 /** Driver GPS banner for the deliveries header (plain language). */
@@ -64,16 +77,16 @@ export function getDriverGpsBannerLabel(input: {
 }): string | null {
   const { trackableCount, trackingActive, permissionDenied, gpsError } = input
   if (trackableCount === 0) return null
-  if (permissionDenied) return 'Location permission needed'
-  if (trackingActive) return 'Location active'
-  if (gpsError) return 'Location not updating'
-  return 'Location permission needed'
+  if (permissionDenied) return ft('driverDeliveries.gpsBanner.permissionNeeded')
+  if (trackingActive) return ft('driverDeliveries.gpsBanner.active')
+  if (gpsError) return ft('driverDeliveries.gpsBanner.notUpdating')
+  return ft('driverDeliveries.gpsBanner.permissionNeeded')
 }
 
 export function getDriverActionsForStatus(deliveryStatus: string): DriverAction[] {
   return getAvailableDriverDeliveryStatuses(deliveryStatus).map((value) => ({
     value,
-    ...ACTION_META[value],
+    ...getActionMeta(value),
   }))
 }
 

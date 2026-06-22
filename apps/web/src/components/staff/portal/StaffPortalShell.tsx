@@ -1,19 +1,20 @@
 import type { ReactNode } from 'react'
 import { CalendarDays, ClipboardList, Home, MoreHorizontal } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../../ui/button'
 import { cn } from '../../../lib/utils'
 
 export type StaffPortalTab = 'home' | 'schedule' | 'requests' | 'more'
 
-const TABS: Array<{
+const TAB_CONFIG: Array<{
   id: StaffPortalTab
-  label: string
+  labelKey: 'home' | 'shifts' | 'requests' | 'more'
   icon: typeof Home
 }> = [
-  { id: 'home', label: 'Home', icon: Home },
-  { id: 'schedule', label: 'Shifts', icon: CalendarDays },
-  { id: 'requests', label: 'Requests', icon: ClipboardList },
-  { id: 'more', label: 'More', icon: MoreHorizontal },
+  { id: 'home', labelKey: 'home', icon: Home },
+  { id: 'schedule', labelKey: 'shifts', icon: CalendarDays },
+  { id: 'requests', labelKey: 'requests', icon: ClipboardList },
+  { id: 'more', labelKey: 'more', icon: MoreHorizontal },
 ]
 
 type StaffPortalShellProps = {
@@ -49,6 +50,8 @@ export function StaffPortalShell({
   tabBadges,
   children,
 }: StaffPortalShellProps) {
+  const { t } = useTranslation('staff')
+
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--brand-ultra)]">
       <header className="sticky top-0 z-40 border-b border-[var(--app-border)] bg-[var(--surface)] pwa-safe-top">
@@ -76,7 +79,7 @@ export function StaffPortalShell({
                 onClick={onClockOut}
                 disabled={checkingOut}
               >
-                {checkingOut ? 'Out…' : 'Clock out'}
+                {checkingOut ? t('portal.shell.clockingOut') : t('portal.shell.clockOut')}
               </Button>
             ) : (
               <Button
@@ -85,7 +88,7 @@ export function StaffPortalShell({
                 onClick={onClockIn}
                 disabled={checkingIn}
               >
-                {checkingIn ? 'In…' : 'Clock in'}
+                {checkingIn ? t('portal.shell.clockingIn') : t('portal.shell.clockIn')}
               </Button>
             )}
             <Button
@@ -101,11 +104,12 @@ export function StaffPortalShell({
         <div
           className="mx-auto hidden max-w-3xl gap-1 overflow-x-auto px-4 pb-2 scrollbar-none sm:flex sm:px-6"
           role="tablist"
-          aria-label="Staff portal sections"
+          aria-label={t('portal.shell.sectionsAria')}
         >
-          {TABS.map(({ id, label, icon: Icon }) => {
+          {TAB_CONFIG.map(({ id, labelKey, icon: Icon }) => {
             const active = activeTab === id
             const badge = tabBadges?.[id]
+            const label = t(`portal.shell.${labelKey}`)
             return (
               <button
                 key={id}
@@ -140,12 +144,13 @@ export function StaffPortalShell({
 
       <nav
         className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--app-border)] bg-[var(--surface)] pwa-bottom-nav sm:hidden"
-        aria-label="Staff portal navigation"
+        aria-label={t('portal.shell.navAria')}
       >
         <div className="mx-auto flex max-w-3xl items-stretch justify-around px-1" role="tablist">
-          {TABS.map(({ id, label, icon: Icon }) => {
+          {TAB_CONFIG.map(({ id, labelKey, icon: Icon }) => {
             const active = activeTab === id
             const badge = tabBadges?.[id]
+            const label = t(`portal.shell.${labelKey}`)
             return (
               <button
                 key={id}

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useGetOrderQuery } from '../../../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 import { Button } from '../../ui/button'
@@ -14,6 +15,7 @@ export interface OrderPackingTabProps {
 }
 
 export function OrderPackingTab({ orderId }: OrderPackingTabProps) {
+  const { t } = useTranslation('orders')
   const { data, isLoading } = useGetOrderQuery(orderId)
   const { downloadingPdf, printingPdf, handlePrintPackingSlip, handleDownloadPackingSlipPdf } =
     usePackingSlipActions(orderId)
@@ -33,14 +35,14 @@ export function OrderPackingTab({ orderId }: OrderPackingTabProps) {
           <div>
             <CardTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
-              Packing Slip
+              {t('packingTab.title')}
             </CardTitle>
-            <CardDescription>Print-ready packing slip for shipping</CardDescription>
+            <CardDescription>{t('packingTab.description')}</CardDescription>
           </div>
           <div className="flex gap-2">
             <Button onClick={() => handlePrintPackingSlip()} disabled={printingPdf}>
               <Printer className="h-4 w-4 mr-2" />
-              {printingPdf ? 'Preparing…' : 'Print'}
+              {printingPdf ? t('packingTab.preparing') : t('packingTab.print')}
             </Button>
             <Button
               variant="outline"
@@ -48,25 +50,25 @@ export function OrderPackingTab({ orderId }: OrderPackingTabProps) {
               disabled={downloadingPdf}
             >
               <Download className="h-4 w-4 mr-2" />
-              {downloadingPdf ? 'Downloading...' : 'Download PDF'}
+              {downloadingPdf ? t('packingTab.downloading') : t('packingTab.downloadPdf')}
             </Button>
           </div>
         </div>
       </CardHeader>
       <CardContent>
         <div className="border-2 border-dashed border-[var(--app-border-mid)] rounded-lg p-8 space-y-6">
-          {/* Header */}
           <div className="text-center">
-            <h2 className="text-2xl font-bold">PACKING SLIP</h2>
+            <h2 className="text-2xl font-bold">{t('packingTab.header')}</h2>
             <p className="text-sm text-[var(--text-muted)]">
-              Order #{order.id.slice(-8).toUpperCase()}
+              {t('packingTab.orderNumber', { id: order.id.slice(-8).toUpperCase() })}
             </p>
           </div>
 
-          {/* Ship To */}
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
             <div>
-              <p className="text-sm font-bold text-[var(--text-muted)] mb-2">SHIP TO:</p>
+              <p className="text-sm font-bold text-[var(--text-muted)] mb-2">
+                {t('packingTab.shipTo')}
+              </p>
               <p className="font-semibold">{order.restaurant_name}</p>
               {addressLines.length > 0 ? (
                 addressLines.map((line) => (
@@ -75,29 +77,48 @@ export function OrderPackingTab({ orderId }: OrderPackingTabProps) {
                   </p>
                 ))
               ) : (
-                <p className="text-sm text-[var(--text-muted)]">No delivery address on file</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('packingTab.noAddress')}</p>
               )}
             </div>
             <div>
-              <p className="text-sm font-bold text-[var(--text-muted)] mb-2">ORDER DETAILS:</p>
-              <p className="text-sm">
-                Order Date: {new Date(order.created_at).toLocaleDateString()}
+              <p className="text-sm font-bold text-[var(--text-muted)] mb-2">
+                {t('packingTab.orderDetails')}
               </p>
-              <p className="text-sm">Status: {order.status}</p>
-              <p className="text-sm">Items: {order.items?.length || 0}</p>
+              <p className="text-sm">
+                {t('packingTab.orderDate', {
+                  date: new Date(order.created_at).toLocaleDateString(),
+                })}
+              </p>
+              <p className="text-sm">
+                {t('packingTab.status', {
+                  status: t(`status.${order.status}`, { defaultValue: order.status }),
+                })}
+              </p>
+              <p className="text-sm">
+                {t('packingTab.items', { count: order.items?.length || 0 })}
+              </p>
             </div>
           </div>
 
-          {/* Items Table */}
           <div>
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b-2 border-[var(--app-border-mid)]">
-                  <th className="text-left py-2 px-3 text-sm font-bold">Item</th>
-                  <th className="text-left py-2 px-3 text-sm font-bold">SKU</th>
-                  <th className="text-right py-2 px-3 text-sm font-bold">Qty</th>
-                  <th className="text-right py-2 px-3 text-sm font-bold">Unit Price</th>
-                  <th className="text-right py-2 px-3 text-sm font-bold">Total</th>
+                  <th className="text-left py-2 px-3 text-sm font-bold">
+                    {t('packingTab.tableItem')}
+                  </th>
+                  <th className="text-left py-2 px-3 text-sm font-bold">
+                    {t('packingTab.tableSku')}
+                  </th>
+                  <th className="text-right py-2 px-3 text-sm font-bold">
+                    {t('packingTab.tableQty')}
+                  </th>
+                  <th className="text-right py-2 px-3 text-sm font-bold">
+                    {t('packingTab.tableUnitPrice')}
+                  </th>
+                  <th className="text-right py-2 px-3 text-sm font-bold">
+                    {t('packingTab.tableTotal')}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -120,13 +141,14 @@ export function OrderPackingTab({ orderId }: OrderPackingTabProps) {
             </table>
           </div>
 
-          {/* Footer */}
           <div className="border-t-2 pt-4 flex justify-between">
             <div>
-              <p className="text-sm text-[var(--text-muted)]">Thank you for your business!</p>
+              <p className="text-sm text-[var(--text-muted)]">{t('packingTab.thankYou')}</p>
             </div>
             <div className="text-right">
-              <p className="font-bold text-lg">Total: ${formatPrice(order.total_amount)}</p>
+              <p className="font-bold text-lg">
+                {t('packingTab.total', { amount: formatPrice(order.total_amount) })}
+              </p>
             </div>
           </div>
         </div>

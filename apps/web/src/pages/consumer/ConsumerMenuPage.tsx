@@ -140,9 +140,8 @@ export function ConsumerMenuPage() {
     setSearchParams(params, { replace: true })
   }, [branchId, searchParams, setSearchParams, storefront?.branches])
 
-  const categories = data?.menu.categories ?? []
-
   const filteredCategories = useMemo(() => {
+    const categories = data?.menu.categories ?? []
     const q = searchQuery.trim().toLowerCase()
     if (!q) return categories
     return categories
@@ -155,7 +154,7 @@ export function ConsumerMenuPage() {
         ),
       }))
       .filter((cat) => cat.items.length > 0)
-  }, [categories, searchQuery])
+  }, [data?.menu.categories, searchQuery])
 
   const totalItems = useMemo(
     () => filteredCategories.reduce((sum, cat) => sum + cat.items.length, 0),

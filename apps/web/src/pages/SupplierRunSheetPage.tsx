@@ -1,5 +1,7 @@
-import { useState, type ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
+import { ensureNamespace } from '../i18n'
 import {
   useGetSupplierRunSheetQuery,
   useSendInvoiceReminderMutation,
@@ -52,6 +54,12 @@ function formatShortTime(iso: string | undefined) {
 }
 
 export function SupplierRunSheetPage() {
+  const { t } = useTranslation('supplierOps')
+
+  useEffect(() => {
+    void ensureNamespace('supplierOps')
+  }, [])
+
   const [date, setDate] = useState(todayIsoDate)
   const queryDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined
   const isToday = queryDate === todayIsoDate()
@@ -67,22 +75,22 @@ export function SupplierRunSheetPage() {
   const handleBulkRemind = async () => {
     try {
       const result = await remindOverdue().unwrap()
-      toast.success(`Sent ${result?.sent ?? 0} reminder(s)`)
+      toast.success(t('runSheet.toasts.bulkSent', { count: result?.sent ?? 0 }))
       refetch()
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Could not send reminders')
+      toast.error(msg || t('runSheet.toasts.bulkFailed'))
     }
   }
 
   const handleRemindInvoice = async (invoiceId: string) => {
     try {
       await sendReminder({ invoiceId }).unwrap()
-      toast.success('Reminder sent')
+      toast.success(t('runSheet.toasts.reminderSent'))
       refetch()
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Could not send reminder')
+      toast.error(msg || t('runSheet.toasts.reminderFailed'))
     }
   }
 
@@ -92,12 +100,12 @@ export function SupplierRunSheetPage() {
   return (
     <RequirePermission
       anyOf={['ORDERS_MANAGE', 'FULFILLMENT_VIEW', 'INVOICES_VIEW']}
-      title="run sheet"
+      title={t('runSheet.gateTitle')}
     >
       <PageShell maxWidth="wide" className="print:max-w-none" data-testid="supplier-run-sheet-page">
         <PageHeader
-          title="Run sheet"
-          description="One view for picking, deliveries, collections, and follow-ups."
+          title={t('runSheet.title')}
+          description={t('runSheet.description')}
           actions={
             <div className="flex flex-wrap items-center gap-2 print:hidden">
               {!isToday && (
@@ -108,7 +116,7 @@ export function SupplierRunSheetPage() {
                   className="text-[var(--text-muted)]"
                 >
                   <RotateCcw className="h-3.5 w-3.5 mr-1" aria-hidden />
-                  Today
+                  {t('runSheet.today')}
                 </Button>
               )}
               <Input
@@ -116,11 +124,11 @@ export function SupplierRunSheetPage() {
                 value={date}
                 onChange={(e) => setDate(e.target.value || todayIsoDate())}
                 className="h-9 w-auto"
-                aria-label="Run sheet date"
+                aria-label={t('runSheet.dateAria')}
               />
               <Button variant="outline" size="sm" onClick={() => window.print()}>
                 <Printer className="h-4 w-4 mr-1.5" aria-hidden />
-                Print
+                {t('runSheet.print')}
               </Button>
             </div>
           }
@@ -143,7 +151,7 @@ export function SupplierRunSheetPage() {
             {formattedDate}
             {!isToday && sheet && (
               <span className="ml-2 font-normal text-[var(--text-muted)] print:hidden">
-                · viewing another day
+                {t('runSheet.viewingOtherDay')}
               </span>
             )}
           </p>
@@ -151,7 +159,7 @@ export function SupplierRunSheetPage() {
             to="/app/command-center"
             className="ml-auto text-xs font-medium text-[var(--brand)] no-underline hover:underline print:hidden"
           >
-            Command center
+            {t('runSheet.commandCenter')}
           </Link>
         </div>
 
@@ -164,9 +172,9 @@ export function SupplierRunSheetPage() {
             role="alert"
           >
             <AlertTriangle className="mx-auto mb-2 h-5 w-5 text-[var(--brand-mid)]" aria-hidden />
-            <p className="text-sm text-[var(--text-muted)]">Could not load run sheet.</p>
+            <p className="text-sm text-[var(--text-muted)]">{t('runSheet.error')}</p>
             <Button className="mt-3" variant="outline" size="sm" onClick={() => refetch()}>
-              Retry
+              {t('runSheet.retry')}
             </Button>
           </div>
         ) : (
@@ -176,7 +184,7 @@ export function SupplierRunSheetPage() {
                 className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5 print:break-inside-avoid"
                 data-testid="run-sheet-priorities"
               >
-                <SectionHeading icon={ClipboardList} title="Today's priorities" />
+                <SectionHeading icon={ClipboardList} title={t('runSheet.priorities')} />
                 <ul className="list-none p-0 m-0 flex flex-col gap-2">
                   {sheet.summary.todaysPriorities.map((item) => (
                     <li key={item.id}>
@@ -207,21 +215,21 @@ export function SupplierRunSheetPage() {
             <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 print:break-inside-avoid">
               <KpiTile
                 icon={Package}
-                label="Orders to prepare"
+                label={t('runSheet.kpis.ordersToPrepare')}
                 value={sheet.summary.kpis.ordersToPrepareToday}
                 href="/app/orders"
                 testId="run-sheet-kpi-orders"
               />
               <KpiTile
                 icon={Truck}
-                label="Deliveries pending"
+                label={t('runSheet.kpis.deliveriesPending')}
                 value={sheet.summary.kpis.deliveriesPendingToday}
                 href="/app/fulfillment"
                 testId="run-sheet-kpi-deliveries"
               />
               <KpiTile
                 icon={DollarSign}
-                label="Overdue AR"
+                label={t('runSheet.kpis.overdueAr')}
                 value={formatCurrency(sheet.summary.kpis.overdueBalance)}
                 href="/app/invoices"
                 testId="run-sheet-kpi-ar"
@@ -229,7 +237,7 @@ export function SupplierRunSheetPage() {
               />
               <KpiTile
                 icon={Users}
-                label="Reorder due"
+                label={t('runSheet.kpis.reorderDue')}
                 value={sheet.summary.kpis.customersDueReorder}
                 href="/app/command-center#reorder"
                 testId="run-sheet-kpi-reorder"
@@ -239,18 +247,18 @@ export function SupplierRunSheetPage() {
             <section className="grid gap-4 lg:grid-cols-2 lg:gap-6">
               <RunSheetPanel testId="run-sheet-pick-queue" className="print:break-inside-avoid">
                 <PanelHeader
-                  title={`Orders to pick (${sheet.ordersToPick.count})`}
+                  title={t('runSheet.pickQueue.title', { count: sheet.ordersToPick.count })}
                   action={
                     <Link
                       to="/app/fulfillment"
                       className="text-xs font-medium text-[var(--brand)] no-underline hover:underline print:hidden"
                     >
-                      Pick lists →
+                      {t('runSheet.pickQueue.pickLists')}
                     </Link>
                   }
                 />
                 {sheet.ordersToPick.orders.length === 0 ? (
-                  <InlineEmpty message="Nothing queued for picking today." icon={Package} />
+                  <InlineEmpty message={t('runSheet.pickQueue.empty')} icon={Package} />
                 ) : (
                   <ul className="divide-y divide-[var(--app-border)]">
                     {sheet.ordersToPick.orders.slice(0, 12).map((o) => {
@@ -275,7 +283,7 @@ export function SupplierRunSheetPage() {
                                 to={`/app/orders/${o.orderId}`}
                                 className="text-xs font-medium text-[var(--brand)] no-underline hover:underline print:hidden"
                               >
-                                Open
+                                {t('runSheet.pickQueue.open')}
                               </Link>
                             }
                           />
@@ -288,33 +296,39 @@ export function SupplierRunSheetPage() {
 
               <RunSheetPanel testId="run-sheet-deliveries" className="print:break-inside-avoid">
                 <PanelHeader
-                  title={`Deliveries (${sheet.deliveries?.routeSummary?.length ?? 0} areas)`}
+                  title={t('runSheet.deliveries.title', {
+                    count: sheet.deliveries?.routeSummary?.length ?? 0,
+                  })}
                   action={
                     <Link
                       to="/app/fulfillment"
                       className="text-xs font-medium text-[var(--brand)] no-underline hover:underline print:hidden"
                     >
-                      Fulfillment →
+                      {t('runSheet.deliveries.fulfillment')}
                     </Link>
                   }
                 />
                 {(sheet.deliveries?.routeSummary ?? []).length === 0 ? (
-                  <InlineEmpty message="No deliveries scheduled for this date." icon={Truck} />
+                  <InlineEmpty message={t('runSheet.deliveries.empty')} icon={Truck} />
                 ) : (
                   <ul className="divide-y divide-[var(--app-border)]">
                     {(sheet.deliveries?.routeSummary ?? []).slice(0, 8).map((g, index) => (
                       <li key={`${g.area ?? 'unknown'}-${index}`}>
                         <RunSheetRow
-                          primary={g.area || 'Unassigned area'}
+                          primary={g.area || t('runSheet.deliveries.unassignedArea')}
                           secondary={
                             <>
-                              <span>{g.orderCount ?? 0} stops</span>
+                              <span>
+                                {t('runSheet.deliveries.stops', { count: g.orderCount ?? 0 })}
+                              </span>
                               {(g.pending ?? 0) > 0 && (
-                                <span className="text-amber-700">{g.pending} pending</span>
+                                <span className="text-amber-700">
+                                  {t('runSheet.deliveries.pending', { count: g.pending })}
+                                </span>
                               )}
                               {(g.outForDelivery ?? 0) > 0 && (
                                 <span className="text-[var(--brand)]">
-                                  {g.outForDelivery} en route
+                                  {t('runSheet.deliveries.enRoute', { count: g.outForDelivery })}
                                 </span>
                               )}
                             </>
@@ -331,7 +345,9 @@ export function SupplierRunSheetPage() {
               <PanelHeader
                 title={
                   <>
-                    Receivables due ({sheet.receivablesDueToday.summary.count})
+                    {t('runSheet.receivables.title', {
+                      count: sheet.receivablesDueToday.summary.count,
+                    })}
                     <span className="font-normal text-[var(--text-muted)]">
                       {' '}
                       · {formatCurrency(sheet.receivablesDueToday.summary.totalBalanceDue)}
@@ -347,11 +363,11 @@ export function SupplierRunSheetPage() {
                       disabled={sendingBulk || sheet.receivablesDueToday.summary.overdueCount === 0}
                       onClick={handleBulkRemind}
                     >
-                      Remind overdue
+                      {t('runSheet.receivables.remindOverdue')}
                     </Button>
                     <Link to="/app/invoices">
                       <Button size="sm" variant="outline">
-                        Invoices
+                        {t('runSheet.receivables.invoices')}
                       </Button>
                     </Link>
                   </div>
@@ -359,8 +375,8 @@ export function SupplierRunSheetPage() {
               />
               {sheet.receivablesDueToday.invoices.length === 0 ? (
                 <EmptyState
-                  title="No invoices due"
-                  description="Nothing due for collection on this date."
+                  title={t('runSheet.receivables.emptyTitle')}
+                  description={t('runSheet.receivables.emptyDescription')}
                   icon={<DollarSign className="h-5 w-5" />}
                   className="py-8"
                 />
@@ -394,11 +410,11 @@ export function SupplierRunSheetPage() {
                               disabled={sendingOne}
                               onClick={() => handleRemindInvoice(inv.id)}
                             >
-                              Remind
+                              {t('runSheet.receivables.remind')}
                             </Button>
                             <Link to="/app/invoices">
                               <Button size="sm" variant="ghost" className="h-8 px-2">
-                                View
+                                {t('runSheet.receivables.view')}
                               </Button>
                             </Link>
                           </div>
@@ -417,7 +433,7 @@ export function SupplierRunSheetPage() {
               >
                 <SectionHeading
                   icon={AlertTriangle}
-                  title={`Shortages & substitutions (${sheet.shortages.count})`}
+                  title={t('runSheet.shortages.title', { count: sheet.shortages.count })}
                   className="text-amber-950"
                   iconClassName="text-amber-700"
                 />
@@ -437,7 +453,7 @@ export function SupplierRunSheetPage() {
 
             {(sheet.reorderLeads?.length ?? 0) > 0 && (
               <RunSheetPanel
-                title="Reorder follow-ups"
+                title={t('runSheet.reorderFollowUps')}
                 testId="run-sheet-reorder-leads"
                 className="print:break-inside-avoid"
               >
@@ -447,7 +463,11 @@ export function SupplierRunSheetPage() {
                       <RunSheetRow
                         primary={lead.restaurantName}
                         secondary={
-                          <span>{lead.daysSinceLastOrder ?? '—'} days since last order</span>
+                          <span>
+                            {t('runSheet.daysSinceLastOrder', {
+                              days: lead.daysSinceLastOrder ?? '—',
+                            })}
+                          </span>
                         }
                       />
                     </li>

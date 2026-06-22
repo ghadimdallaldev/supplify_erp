@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import {
   Dialog,
@@ -26,6 +27,7 @@ export function DeclineOrderDialog({
   orderLabel,
   isSubmitting = false,
 }: DeclineOrderDialogProps) {
+  const { t } = useTranslation('orders')
   const [reason, setReason] = useState('')
 
   const handleClose = (next: boolean) => {
@@ -47,25 +49,25 @@ export function DeclineOrderDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Decline order</DialogTitle>
+          <DialogTitle>{t('declineDialog.title')}</DialogTitle>
           <DialogDescription>
             {orderLabel
-              ? `Tell ${orderLabel} why you cannot fulfill this order. They will see your message on the order.`
-              : 'Provide a reason the restaurant will see on this order.'}
+              ? t('declineDialog.descriptionWithLabel', { label: orderLabel })
+              : t('declineDialog.descriptionGeneric')}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
-          <Label htmlFor="decline-reason">Reason (required)</Label>
+          <Label htmlFor="decline-reason">{t('declineDialog.reasonLabel')}</Label>
           <Textarea
             id="decline-reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="e.g. Out of stock for key items until next week"
+            placeholder={t('declineDialog.reasonPlaceholder')}
             rows={4}
             maxLength={2000}
             disabled={isSubmitting}
           />
-          <p className="text-xs text-[var(--text-muted)]">Minimum 3 characters.</p>
+          <p className="text-xs text-[var(--text-muted)]">{t('declineDialog.minChars')}</p>
         </div>
         <DialogFooter>
           <Button
@@ -74,7 +76,7 @@ export function DeclineOrderDialog({
             onClick={() => handleClose(false)}
             disabled={isSubmitting}
           >
-            Cancel
+            {t('declineDialog.cancel')}
           </Button>
           <Button
             type="button"
@@ -82,7 +84,7 @@ export function DeclineOrderDialog({
             onClick={() => void handleSubmit()}
             disabled={isSubmitting || reason.trim().length < 3}
           >
-            {isSubmitting ? 'Declining…' : 'Decline order'}
+            {isSubmitting ? t('declineDialog.declining') : t('declineDialog.confirm')}
           </Button>
         </DialogFooter>
       </DialogContent>

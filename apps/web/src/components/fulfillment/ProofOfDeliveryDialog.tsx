@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2, Camera, Eraser } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '../ui/button'
@@ -39,6 +40,7 @@ async function uploadPresignedFile(
 }
 
 export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted }: Props) {
+  const { t } = useTranslation('fulfillment')
   const [recipientName, setRecipientName] = useState('')
   const [notes, setNotes] = useState('')
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -144,11 +146,11 @@ export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted
     const file = event.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file')
+      toast.error(t('pod.toast.selectImage'))
       return
     }
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('Image must be under 10MB')
+      toast.error(t('pod.toast.imageTooLarge'))
       return
     }
     setPhotoFile(file)
@@ -216,12 +218,12 @@ export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted
         longitude,
       }).unwrap()
 
-      toast.success('Proof of delivery saved')
+      toast.success(t('pod.toast.saved'))
       onOpenChange(false)
       onSubmitted?.()
     } catch (error: unknown) {
       const msg = (error as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Failed to save proof of delivery')
+      toast.error(msg || t('pod.toast.saveFailed'))
     }
   }
 
@@ -229,12 +231,12 @@ export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Proof of delivery</DialogTitle>
+          <DialogTitle>{t('pod.dialog.title')}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
-            <Label htmlFor="pod-photo">Delivery photo</Label>
+            <Label htmlFor="pod-photo">{t('pod.dialog.deliveryPhotoLabel')}</Label>
             <div className="mt-2 flex flex-wrap items-start gap-3">
               <Button
                 type="button"
@@ -243,7 +245,7 @@ export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Camera className="mr-2 h-4 w-4" />
-                {photoFile ? 'Change photo' : 'Add photo'}
+                {photoFile ? t('pod.dialog.changePhoto') : t('pod.dialog.addPhoto')}
               </Button>
               <input
                 ref={fileInputRef}
@@ -256,7 +258,7 @@ export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted
               {photoPreview && (
                 <img
                   src={photoPreview}
-                  alt="Delivery photo preview"
+                  alt={t('pod.dialog.photoPreviewAlt')}
                   className="h-24 w-24 rounded-lg border border-[var(--app-border)] object-cover"
                 />
               )}
@@ -265,10 +267,10 @@ export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted
 
           <div>
             <div className="flex items-center justify-between gap-2">
-              <Label>Recipient signature</Label>
+              <Label>{t('pod.dialog.recipientSignature')}</Label>
               <Button type="button" variant="ghost" size="sm" onClick={clearSignature}>
                 <Eraser className="mr-1 h-3 w-3" />
-                Clear
+                {t('pod.dialog.clear')}
               </Button>
             </div>
             <canvas
@@ -287,7 +289,7 @@ export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted
           </div>
 
           <div>
-            <Label htmlFor="pod-recipient">Recipient name</Label>
+            <Label htmlFor="pod-recipient">{t('pod.dialog.recipientName')}</Label>
             <Input
               id="pod-recipient"
               value={recipientName}
@@ -297,7 +299,7 @@ export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted
           </div>
 
           <div>
-            <Label htmlFor="pod-notes">Notes</Label>
+            <Label htmlFor="pod-notes">{t('pod.dialog.notes')}</Label>
             <Textarea
               id="pod-notes"
               value={notes}
@@ -314,17 +316,17 @@ export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted
               onChange={(e) => setIncludeGps(e.target.checked)}
               className="rounded border-[var(--app-border)]"
             />
-            Include GPS location when available
+            {t('pod.dialog.includeGps')}
           </label>
         </div>
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Skip
+            {t('pod.dialog.skip')}
           </Button>
           <Button type="button" onClick={handleSubmit} disabled={submitting}>
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save proof
+            {t('pod.dialog.saveProof')}
           </Button>
         </DialogFooter>
       </DialogContent>

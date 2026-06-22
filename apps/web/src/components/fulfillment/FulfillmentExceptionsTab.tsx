@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { AlertCircle } from 'lucide-react'
 import { Button } from '../ui/button'
@@ -19,6 +20,7 @@ type Props = {
 }
 
 export function FulfillmentExceptionsTab({ warehouseId }: Props) {
+  const { t } = useTranslation('fulfillment')
   const { can } = usePermissions()
   const canManage = can('FULFILLMENT_MANAGE')
   const [notesById, setNotesById] = useState<Record<string, string>>({})
@@ -42,12 +44,12 @@ export function FulfillmentExceptionsTab({ warehouseId }: Props) {
         id,
         resolution_notes: notesById[id]?.trim() || undefined,
       }).unwrap()
-      toast.success('Exception marked resolved')
+      toast.success(t('exceptions.toast.resolved'))
       refetch()
     } catch (err: unknown) {
       const message =
         (err as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Failed to resolve exception'
+        t('exceptions.toast.resolveFailed')
       toast.error(message)
     }
   }
@@ -55,12 +57,12 @@ export function FulfillmentExceptionsTab({ warehouseId }: Props) {
   const handleIgnore = async (id: string) => {
     try {
       await ignoreException(id).unwrap()
-      toast.success('Exception ignored')
+      toast.success(t('exceptions.toast.ignored'))
       refetch()
     } catch (err: unknown) {
       const message =
         (err as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Failed to ignore exception'
+        t('exceptions.toast.ignoreFailed')
       toast.error(message)
     }
   }
@@ -73,16 +75,14 @@ export function FulfillmentExceptionsTab({ warehouseId }: Props) {
       <header className="border-b border-[var(--app-border)] px-4 py-4 sm:px-5">
         <h2 className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[var(--text)]">
           <AlertCircle className="h-4 w-4 text-[var(--brand-mid)]" aria-hidden />
-          Delivery Exceptions
+          {t('exceptions.title')}
           {openCount > 0 && (
             <Badge variant="destructive" data-testid="exceptions-open-count">
-              {openCount} open
+              {t('exceptions.openCount', { count: openCount })}
             </Badge>
           )}
         </h2>
-        <p className="mt-0.5 text-xs text-[var(--text-mid)]">
-          Short deliveries, damages, and returns requiring attention
-        </p>
+        <p className="mt-0.5 text-xs text-[var(--text-mid)]">{t('exceptions.subtitle')}</p>
       </header>
       <div className="p-4 sm:p-5">
         {isLoading ? (
@@ -93,7 +93,7 @@ export function FulfillmentExceptionsTab({ warehouseId }: Props) {
           </div>
         ) : isError ? (
           <div className="py-10 text-center" data-testid="exceptions-error" role="alert">
-            <p className="text-sm text-[var(--text-muted)]">Could not load exceptions.</p>
+            <p className="text-sm text-[var(--text-muted)]">{t('exceptions.loadFailed')}</p>
             <Button
               type="button"
               variant="outline"
@@ -101,7 +101,7 @@ export function FulfillmentExceptionsTab({ warehouseId }: Props) {
               className="mt-3"
               onClick={() => refetch()}
             >
-              Retry
+              {t('common:actions.retry')}
             </Button>
           </div>
         ) : exceptions.length === 0 ? (
@@ -110,19 +110,19 @@ export function FulfillmentExceptionsTab({ warehouseId }: Props) {
             data-testid="exceptions-empty"
           >
             <AlertCircle className="mx-auto mb-3 h-9 w-9 text-[var(--text-muted)]" aria-hidden />
-            <p className="text-sm text-[var(--text-mid)]">No delivery exceptions recorded.</p>
+            <p className="text-sm text-[var(--text-mid)]">{t('exceptions.empty')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto -mx-1 px-1">
             <table className="w-full min-w-[640px] text-sm" data-testid="exceptions-table">
               <thead>
                 <tr className="border-b text-left text-[var(--text-muted)]">
-                  <th className="p-2 font-medium">Type</th>
-                  <th className="p-2 font-medium">Order</th>
-                  <th className="p-2 font-medium">Restaurant</th>
-                  <th className="p-2 font-medium">Status</th>
-                  <th className="p-2 font-medium">Created</th>
-                  <th className="p-2 font-medium text-right">Action</th>
+                  <th className="p-2 font-medium">{t('exceptions.table.type')}</th>
+                  <th className="p-2 font-medium">{t('exceptions.table.order')}</th>
+                  <th className="p-2 font-medium">{t('exceptions.table.restaurant')}</th>
+                  <th className="p-2 font-medium">{t('exceptions.table.status')}</th>
+                  <th className="p-2 font-medium">{t('exceptions.table.created')}</th>
+                  <th className="p-2 font-medium text-right">{t('exceptions.table.action')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -141,7 +141,7 @@ export function FulfillmentExceptionsTab({ warehouseId }: Props) {
                       {canManage && ex.status === 'open' && (
                         <div className="mt-2 max-w-xs">
                           <Label htmlFor={`notes-${ex.id}`} className="text-xs">
-                            Resolution notes (optional)
+                            {t('exceptions.table.resolutionNotes')}
                           </Label>
                           <Textarea
                             id={`notes-${ex.id}`}
@@ -176,7 +176,9 @@ export function FulfillmentExceptionsTab({ warehouseId }: Props) {
                       <div className="flex flex-col items-end gap-2">
                         {ex.orderId && (
                           <Button variant="outline" size="sm" asChild>
-                            <Link to={`/app/orders/${ex.orderId}`}>View order</Link>
+                            <Link to={`/app/orders/${ex.orderId}`}>
+                              {t('exceptions.table.viewOrder')}
+                            </Link>
                           </Button>
                         )}
                         {canManage && ex.status === 'open' && (
@@ -189,7 +191,7 @@ export function FulfillmentExceptionsTab({ warehouseId }: Props) {
                               data-testid={`exception-resolve-${ex.id}`}
                               onClick={() => handleResolve(ex.id)}
                             >
-                              Resolve
+                              {t('exceptions.table.resolve')}
                             </Button>
                             <Button
                               type="button"
@@ -199,7 +201,7 @@ export function FulfillmentExceptionsTab({ warehouseId }: Props) {
                               data-testid={`exception-ignore-${ex.id}`}
                               onClick={() => handleIgnore(ex.id)}
                             >
-                              Ignore
+                              {t('exceptions.table.ignore')}
                             </Button>
                           </div>
                         )}

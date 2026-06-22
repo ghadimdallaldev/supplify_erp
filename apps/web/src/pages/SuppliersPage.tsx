@@ -1,4 +1,5 @@
-import { useState, useMemo, type ReactNode } from 'react'
+import { useState, useMemo, useEffect, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   useGetSuppliersQuery,
   useFollowSupplierMutation,
@@ -49,6 +50,7 @@ import { PageShell } from '../components/ui/page-shell'
 import { ConnectionRequestsPanel } from '../components/supplier/ConnectionRequestsPanel'
 import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { cn } from '../lib/utils'
+import { ensureNamespace } from '../i18n'
 
 function SupplierStatCard({
   label,
@@ -116,6 +118,7 @@ function getStoreDealSortScore(supplier: {
 }
 
 export function SuppliersPage() {
+  const { t } = useTranslation('suppliers')
   const { user } = useAppSelector((state) => state.auth)
   const navigate = useNavigate()
   const { search, setSearch, debouncedSearch } = useDebouncedSearch()
@@ -127,6 +130,10 @@ export function SuppliersPage() {
   const [filterBy, setFilterBy] = useState<'all' | 'followed' | 'new' | 'on_sale'>('all')
 
   const isRestaurant = user?.role === 'RESTAURANT'
+
+  useEffect(() => {
+    void ensureNamespace('suppliers')
+  }, [])
 
   const { data, isLoading, error, refetch } = useGetSuppliersQuery({
     q: debouncedSearch || undefined,
@@ -208,22 +215,20 @@ export function SuppliersPage() {
   const handleFollow = async (supplierId: string) => {
     try {
       await followSupplier(supplierId).unwrap()
-      toast.success('Supplier followed')
-      // RTK Query will automatically refetch due to invalidatesTags, but manual refetch ensures immediate UI update
+      toast.success(t('list.toast.followed'))
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to follow supplier')
+      toast.error(error?.data?.error?.message || t('list.toast.followFailed'))
     }
   }
 
   const handleUnfollow = async (supplierId: string) => {
     try {
       await unfollowSupplier(supplierId).unwrap()
-      toast.success('Supplier unfollowed')
-      // RTK Query will automatically refetch due to invalidatesTags, but manual refetch ensures immediate UI update
+      toast.success(t('list.toast.unfollowed'))
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to unfollow supplier')
+      toast.error(error?.data?.error?.message || t('list.toast.unfollowFailed'))
     }
   }
 
@@ -238,25 +243,51 @@ export function SuppliersPage() {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-[var(--red)]">Failed to load suppliers</p>
+        <p className="text-[var(--red)]">{t('list.loadFailed')}</p>
       </div>
     )
   }
 
+  const sortLabels: Record<typeof sortBy, string> = {
+    name: t('list.sort.name'),
+    products: t('list.sort.products'),
+    recent: t('list.sort.recent'),
+    followed: t('list.filters.following'),
+    deals: t('list.sort.deals'),
+  }
+
+  const onboardingSteps = [
+    {
+      step: '1',
+      title: t('list.onboarding.step1Title'),
+      body: t('list.onboarding.step1Body'),
+      icon: Package,
+      to: '/app/products',
+    },
+    {
+      step: '2',
+      title: t('list.onboarding.step2Title'),
+      body: t('list.onboarding.step2Body'),
+      icon: Heart,
+    },
+    {
+      step: '3',
+      title: t('list.onboarding.step3Title'),
+      body: t('list.onboarding.step3Body'),
+      icon: MessageCircle,
+    },
+  ]
+
   return (
     <PageShell data-testid="suppliers-page">
       <PageHeader
-        title="Suppliers"
-        description={
-          isRestaurant
-            ? 'Discover suppliers, follow favorites, and browse their catalogs.'
-            : 'Manage suppliers in the marketplace'
-        }
+        title={t('list.title')}
+        description={isRestaurant ? t('list.descriptionRestaurant') : t('list.descriptionAdmin')}
         actions={
           isRestaurant ? (
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" asChild>
-                <Link to="/app/products">Browse products</Link>
+                <Link to="/app/products">{t('list.browseProducts')}</Link>
               </Button>
               <Button
                 variant={viewMode === 'grid' ? 'default' : 'outline'}
@@ -265,7 +296,7 @@ export function SuppliersPage() {
                 aria-pressed={viewMode === 'grid'}
               >
                 <Grid3x3 className="h-4 w-4 mr-1" />
-                Grid
+                {t('list.grid')}
               </Button>
               <Button
                 variant={viewMode === 'list' ? 'default' : 'outline'}
@@ -274,7 +305,7 @@ export function SuppliersPage() {
                 aria-pressed={viewMode === 'list'}
               >
                 <List className="h-4 w-4 mr-1" />
-                List
+                {t('list.list')}
               </Button>
             </div>
           ) : undefined
@@ -287,37 +318,37 @@ export function SuppliersPage() {
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
             <SupplierStatCard
-              label="Total suppliers"
+              label={t('list.stats.total')}
               value={stats.total}
-              hint="Available in your marketplace"
+              hint={t('list.stats.totalHint')}
               icon={<Building2 className="h-5 w-5 text-[var(--brand-mid)]" />}
               iconWrapClassName="bg-[var(--brand-pale)]"
               active={filterBy === 'all' && stats.total > 0}
               onClick={stats.total > 0 ? () => setFilterBy('all') : undefined}
             />
             <SupplierStatCard
-              label="Following"
+              label={t('list.stats.following')}
               value={stats.followed}
-              hint="Suppliers you follow for quick access"
+              hint={t('list.stats.followingHint')}
               icon={<Heart className="h-5 w-5 text-[var(--red)]" />}
               iconWrapClassName="bg-[var(--red-pale)]"
               active={filterBy === 'followed'}
               onClick={stats.total > 0 ? () => setFilterBy('followed') : undefined}
             />
             <SupplierStatCard
-              label="With products"
+              label={t('list.stats.withProducts')}
               value={stats.withProducts}
-              hint="Ready to browse and order"
+              hint={t('list.stats.withProductsHint')}
               icon={<Package className="h-5 w-5 text-[var(--mint)]" />}
               iconWrapClassName="bg-[var(--mint)]/15"
             />
             <SupplierStatCard
-              label="Total products"
+              label={t('list.stats.totalProducts')}
               value={stats.totalProducts}
               hint={
                 stats.newSuppliers > 0
-                  ? `${stats.newSuppliers} new supplier${stats.newSuppliers === 1 ? '' : 's'} this month`
-                  : 'Across all suppliers'
+                  ? t('list.stats.newThisMonth', { count: stats.newSuppliers })
+                  : t('list.stats.acrossAll')
               }
               icon={<TrendingUp className="h-5 w-5 text-[var(--amber-mid)]" />}
               iconWrapClassName="bg-[var(--amber-pale)]"
@@ -331,17 +362,17 @@ export function SuppliersPage() {
               entityType="supplier"
               value={search}
               onChange={setSearch}
-              placeholder="Search by name, email, or city…"
+              placeholder={t('list.searchPlaceholder')}
               className="min-w-0 flex-1"
               inputClassName="rounded-lg border-[var(--app-border-mid)]"
-              aria-label="Search suppliers"
+              aria-label={t('list.searchAriaLabel')}
             />
             <Input
-              placeholder="City"
+              placeholder={t('list.cityPlaceholder')}
               value={cityFilter}
               onChange={(e) => setCityFilter(e.target.value)}
               className="h-10 w-full rounded-lg border-[var(--app-border-mid)] lg:w-40"
-              aria-label="Filter by city"
+              aria-label={t('list.cityAriaLabel')}
             />
             <div className="flex flex-wrap gap-2">
               <Button
@@ -351,7 +382,7 @@ export function SuppliersPage() {
                 onClick={() => setFilterBy('all')}
               >
                 <Filter className="h-4 w-4 mr-1.5" />
-                All
+                {t('list.filters.all')}
                 <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
                   {stats.total}
                 </Badge>
@@ -363,7 +394,7 @@ export function SuppliersPage() {
                 onClick={() => setFilterBy('followed')}
               >
                 <Heart className="h-4 w-4 mr-1.5" />
-                Following
+                {t('list.filters.following')}
                 <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
                   {stats.followed}
                 </Badge>
@@ -375,7 +406,7 @@ export function SuppliersPage() {
                 onClick={() => setFilterBy('new')}
               >
                 <Sparkles className="h-4 w-4 mr-1.5" />
-                New
+                {t('list.filters.new')}
                 <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
                   {stats.newSuppliers}
                 </Badge>
@@ -387,7 +418,7 @@ export function SuppliersPage() {
                 onClick={() => setFilterBy('on_sale')}
               >
                 <Tag className="h-4 w-4 mr-1.5" />
-                On sale now
+                {t('list.filters.onSale')}
                 <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
                   {stats.onSale}
                 </Badge>
@@ -403,13 +434,7 @@ export function SuppliersPage() {
                 }}
               >
                 <ArrowUpDown className="h-4 w-4 mr-1.5" />
-                {sortBy === 'name'
-                  ? 'Name'
-                  : sortBy === 'products'
-                    ? 'Products'
-                    : sortBy === 'recent'
-                      ? 'Recent'
-                      : 'Best deals'}
+                {sortLabels[sortBy]}
               </Button>
             </div>
           </div>
@@ -419,13 +444,13 @@ export function SuppliersPage() {
       {filteredSuppliers.length === 0 ? (
         <div className="space-y-4">
           <EmptyState
-            title={hasActiveFilters ? 'No suppliers match your filters' : 'No suppliers yet'}
+            title={hasActiveFilters ? t('list.empty.filteredTitle') : t('list.empty.defaultTitle')}
             description={
               hasActiveFilters
-                ? 'Try clearing filters or broadening your search.'
+                ? t('list.empty.filteredDescription')
                 : isRestaurant
-                  ? 'When suppliers join the marketplace, they will appear here. Browse products or check back soon.'
-                  : 'No suppliers are registered in the marketplace yet.'
+                  ? t('list.empty.defaultDescriptionRestaurant')
+                  : t('list.empty.defaultDescriptionAdmin')
             }
             icon={<Building2 className="h-6 w-6" aria-hidden />}
             action={
@@ -439,45 +464,25 @@ export function SuppliersPage() {
                   }}
                 >
                   <X className="h-4 w-4 mr-2" />
-                  Clear filters
+                  {t('list.empty.clearFilters')}
                 </Button>
               ) : isRestaurant ? (
                 <Button asChild>
                   <Link to="/app/products">
                     <ShoppingCart className="h-4 w-4 mr-2" />
-                    Browse products
+                    {t('list.browseProducts')}
                   </Link>
                 </Button>
               ) : (
                 <Button variant="outline" onClick={() => refetch()}>
-                  Refresh
+                  {t('list.empty.refresh')}
                 </Button>
               )
             }
           />
           {isRestaurant && !hasActiveFilters && suppliers.length === 0 && (
             <div className="grid gap-3 sm:grid-cols-3">
-              {[
-                {
-                  step: '1',
-                  title: 'Explore the catalog',
-                  body: 'Browse products from every connected supplier.',
-                  icon: Package,
-                  to: '/app/products',
-                },
-                {
-                  step: '2',
-                  title: 'Follow suppliers',
-                  body: 'Save favorites to find them quickly later.',
-                  icon: Heart,
-                },
-                {
-                  step: '3',
-                  title: 'Message & order',
-                  body: 'Chat with suppliers and place orders from their catalog.',
-                  icon: MessageCircle,
-                },
-              ].map(({ step, title, body, icon: Icon, to }) => (
+              {onboardingSteps.map(({ step, title, body, icon: Icon, to }) => (
                 <div
                   key={step}
                   className="rounded-xl border border-[var(--app-border-mid)] bg-[var(--surface)] p-4 shadow-sm"
@@ -492,7 +497,7 @@ export function SuppliersPage() {
                   <p className="text-sm leading-relaxed text-[var(--text-muted)]">{body}</p>
                   {to && (
                     <Button variant="link" size="sm" className="mt-2 h-auto p-0" asChild>
-                      <Link to={to}>Go to products</Link>
+                      <Link to={to}>{t('list.onboarding.goToProducts')}</Link>
                     </Button>
                   )}
                 </div>
@@ -546,12 +551,12 @@ export function SuppliersPage() {
                           {isNew && (
                             <Badge className="bg-[var(--mint)] text-white flex items-center gap-1 shadow-sm text-[10px] px-1.5 py-0">
                               <Sparkles className="h-3 w-3 shrink-0" />
-                              New
+                              {t('list.badges.new')}
                             </Badge>
                           )}
                           {supplier.is_featured && (
                             <Badge className="bg-amber-500 text-white flex items-center gap-1 shadow-sm text-[10px] px-1.5 py-0">
-                              Featured
+                              {t('list.badges.featured')}
                             </Badge>
                           )}
                           {supplier.has_store_deal && supplier.store_deal_label && (
@@ -563,7 +568,7 @@ export function SuppliersPage() {
                           {isRestaurant && supplier.is_followed && (
                             <Badge className="bg-[var(--brand)] text-white flex items-center gap-1 shadow-sm text-[10px] px-1.5 py-0">
                               <Heart className="h-3 w-3 fill-current shrink-0" />
-                              Following
+                              {t('list.badges.following')}
                             </Badge>
                           )}
                         </CardStatusBadges>
@@ -580,7 +585,7 @@ export function SuppliersPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <Package className="h-4 w-4 text-[var(--brand-mid)]" />
                         <span className="text-xs font-medium text-[var(--brand-mid)]">
-                          Products
+                          {t('list.card.products')}
                         </span>
                       </div>
                       <p className="text-xl font-bold text-[var(--text)]">
@@ -591,7 +596,9 @@ export function SuppliersPage() {
                       <div className="bg-[var(--mint-pale)] rounded-lg p-3 border border-[var(--mint)]/25">
                         <div className="flex items-center gap-2 mb-1">
                           <TrendingUp className="h-4 w-4 text-[var(--mint)]" />
-                          <span className="text-xs font-medium text-[var(--mint)]">Avg Price</span>
+                          <span className="text-xs font-medium text-[var(--mint)]">
+                            {t('list.card.avgPrice')}
+                          </span>
                         </div>
                         <p className="text-xl font-bold text-[var(--mint)]">
                           ${formatPrice(supplier.avg_price)}
@@ -607,7 +614,7 @@ export function SuppliersPage() {
                     </CardMetaLine>
                   ) : isRestaurant ? (
                     <CardMetaLine icon={MapPin} className="italic">
-                      Location not provided
+                      {t('list.card.locationNotProvided')}
                     </CardMetaLine>
                   ) : null}
 
@@ -630,7 +637,7 @@ export function SuppliersPage() {
                       <Button variant="default" size="sm" className={cardActionBtnClass()} asChild>
                         <Link to={`/app/chat?supplier=${supplier.id}`}>
                           <MessageCircle className="h-4 w-4 mr-1 shrink-0" />
-                          Message
+                          {t('list.card.message')}
                         </Link>
                       </Button>
                     )}
@@ -641,12 +648,12 @@ export function SuppliersPage() {
                       onClick={() => handleViewProducts(supplier.id)}
                     >
                       <Package className="h-4 w-4 mr-1 shrink-0" />
-                      Products
+                      {t('list.card.products')}
                     </Button>
                     <Button variant="outline" size="sm" className={cardActionBtnClass()} asChild>
                       <Link to={`/app/suppliers/${supplier.id}`}>
                         <Eye className="h-4 w-4 mr-1 shrink-0" />
-                        View
+                        {t('list.card.view')}
                       </Link>
                     </Button>
                     {isRestaurant && (
@@ -657,7 +664,7 @@ export function SuppliersPage() {
                             variant="outline"
                             onClick={() => handleFollow(supplier.id)}
                             className={`${cardActionBtnClass({ iconOnly: true })} text-[var(--red)] hover:text-[var(--red)] hover:bg-[var(--red-pale)]`}
-                            aria-label="Follow supplier"
+                            aria-label={t('list.card.followAriaLabel')}
                           >
                             <Heart className="h-4 w-4" />
                           </Button>
@@ -667,7 +674,7 @@ export function SuppliersPage() {
                             variant="outline"
                             onClick={() => handleUnfollow(supplier.id)}
                             className={`${cardActionBtnClass({ iconOnly: true })} text-[var(--red)] bg-[var(--red-pale)] hover:bg-[var(--red-pale)]`}
-                            aria-label="Unfollow supplier"
+                            aria-label={t('list.card.unfollowAriaLabel')}
                           >
                             <Heart className="h-4 w-4 fill-current" />
                           </Button>
@@ -677,11 +684,17 @@ export function SuppliersPage() {
                   </CardActionGrid>
 
                   <CardFooterMeta
-                    left={supplier.vat_no ? `VAT: ${supplier.vat_no}` : undefined}
+                    left={
+                      supplier.vat_no ? t('list.card.vat', { number: supplier.vat_no }) : undefined
+                    }
                     right={
                       <>
                         <Clock className="h-3 w-3 shrink-0" aria-hidden />
-                        <span>Joined {new Date(supplier.created_at).toLocaleDateString()}</span>
+                        <span>
+                          {t('list.card.joined', {
+                            date: new Date(supplier.created_at).toLocaleDateString(),
+                          })}
+                        </span>
                       </>
                     }
                   />
@@ -722,7 +735,9 @@ export function SuppliersPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="text-lg font-bold text-[var(--text)]">{supplier.name}</h3>
                         {supplier.is_featured && (
-                          <Badge className="bg-amber-500 text-white text-xs">Featured</Badge>
+                          <Badge className="bg-amber-500 text-white text-xs">
+                            {t('list.badges.featured')}
+                          </Badge>
                         )}
                         {supplier.has_store_deal && supplier.store_deal_label && (
                           <Badge className="bg-[var(--red)] text-white text-xs flex items-center gap-1">
@@ -733,19 +748,23 @@ export function SuppliersPage() {
                         {isRestaurant && supplier.is_followed && (
                           <Badge className="bg-[var(--brand)] text-white">
                             <Heart className="h-3 w-3 mr-1 fill-current" />
-                            Following
+                            {t('list.badges.following')}
                           </Badge>
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[var(--text-muted)]">
                         <span className="flex items-center gap-1 shrink-0">
                           <Package className="h-4 w-4 shrink-0" />
-                          {Number(supplier.product_count || 0)} Products
+                          {t('list.card.productsCount', {
+                            count: Number(supplier.product_count || 0),
+                          })}
                         </span>
                         {supplier.avg_price > 0 && (
                           <span className="flex items-center gap-1 shrink-0">
                             <TrendingUp className="h-4 w-4 shrink-0" />
-                            Avg: ${formatPrice(supplier.avg_price)}
+                            {t('list.card.avgPriceShort', {
+                              price: formatPrice(supplier.avg_price),
+                            })}
                           </span>
                         )}
                         {formatAddressLine(supplier.address_json) ? (
@@ -764,7 +783,7 @@ export function SuppliersPage() {
                       <Button variant="default" size="sm" asChild>
                         <Link to={`/app/chat?supplier=${supplier.id}`}>
                           <MessageCircle className="h-4 w-4 mr-1" />
-                          Message
+                          {t('list.card.message')}
                         </Link>
                       </Button>
                     )}
@@ -774,12 +793,12 @@ export function SuppliersPage() {
                       onClick={() => handleViewProducts(supplier.id)}
                     >
                       <Package className="h-4 w-4 mr-1" />
-                      View Products
+                      {t('list.card.viewProducts')}
                     </Button>
                     <Button variant="outline" size="sm" asChild>
                       <Link to={`/app/suppliers/${supplier.id}`}>
                         <Eye className="h-4 w-4 mr-1" />
-                        Details
+                        {t('list.card.details')}
                       </Link>
                     </Button>
                     {isRestaurant && (
@@ -791,7 +810,7 @@ export function SuppliersPage() {
                             onClick={() => handleFollow(supplier.id)}
                           >
                             <Heart className="h-4 w-4 mr-1" />
-                            Follow
+                            {t('list.card.follow')}
                           </Button>
                         ) : (
                           <Button
@@ -801,7 +820,7 @@ export function SuppliersPage() {
                             className="text-[var(--red)]"
                           >
                             <Heart className="h-4 w-4 mr-1 fill-current" />
-                            Unfollow
+                            {t('list.card.unfollow')}
                           </Button>
                         )}
                       </>

@@ -1,0 +1,92 @@
+{
+  "list": {
+    "title": "المطاعم",
+    "titleSupplier": "مطاعمي",
+    "description": "إدارة المطاعم في السوق",
+    "descriptionSupplier": "المطاعم التي تتابعك أو تشتري منك",
+    "loadError": "تعذّر تحميل المطاعم",
+    "grid": "شبكة",
+    "list": "قائمة",
+    "stats": {
+      "total": "إجمالي المطاعم",
+      "totalHint": "تتابعك أو تطلب منك",
+      "totalOrders": "إجمالي الطلبات",
+      "totalOrdersHint": "على مدار شبكتك",
+      "totalRevenue": "إجمالي الإيرادات",
+      "totalRevenueHint": "قيمة الطلبات مدى الحياة",
+      "avgOrderValue": "متوسط قيمة الطلب",
+      "avgOrderValueHint": "متوسط لكل طلب"
+    },
+    "searchPlaceholder": "ابحث عن مطاعم بالاسم أو البريد أو المدينة...",
+    "cityPlaceholder": "تصفية حسب المدينة...",
+    "filters": {
+      "all": "الكل",
+      "active": "نشط",
+      "new": "جديد"
+    },
+    "sort": {
+      "name": "ترتيب حسب الاسم",
+      "orders": "ترتيب حسب الطلبات",
+      "revenue": "ترتيب حسب الإيرادات",
+      "recent": "ترتيب حسب الأحدث"
+    },
+    "badges": {
+      "active": "نشط",
+      "new": "جديد",
+      "following": "متابِع"
+    },
+    "license": "الرخصة: {{number}}",
+    "noLicense": "بدون رخصة",
+    "joined": "انضم في {{date}}",
+    "empty": "لم يتم العثور على مطاعم",
+    "emptyFilteredTitle": "لم يتم العثور على مطاعم",
+    "emptyFilteredDescription": "جرّب تعديل البحث أو عوامل التصفية",
+    "emptyDefaultDescription": "لا توجد مطاعم تتابعك أو اشتريت منها بعد",
+    "clearFilters": "مسح عوامل التصفية",
+    "orders": "الطلبات",
+    "details": "التفاصيل",
+    "revenue": "الإيرادات",
+    "lastOrder": "آخر طلب",
+    "lastOrderList": "آخر طلب",
+    "notAvailable": "غير متاح",
+    "latestOrder": "أحدث طلب",
+    "orderNumber": "طلب #{{id}}"
+  },
+  "detail": {
+    "notFound": "المطعم غير موجود",
+    "backToList": "العودة إلى المطاعم",
+    "back": "رجوع",
+    "message": "رسالة",
+    "pinned": "مثبّت",
+    "pinRestaurant": "تثبيت المطعم",
+    "pinnedToast": "تم تثبيت المطعم",
+    "unpinnedToast": "تم إلغاء تثبيت المطعم",
+    "contactInfo": "معلومات الاتصال",
+    "license": "الرخصة: {{number}}",
+    "stats": {
+      "totalOrders": "إجمالي الطلبات",
+      "recentOrders": "{{count}} في آخر 6 أشهر",
+      "totalRevenue": "إجمالي الإيرادات",
+      "lifetimeValue": "القيمة مدى الحياة",
+      "averageOrder": "متوسط الطلب",
+      "perOrder": "لكل طلب",
+      "memberSince": "عضو منذ",
+      "customerSince": "عميل منذ"
+    },
+    "topProducts": {
+      "title": "أفضل المنتجات",
+      "description": "المنتجات الأكثر شراءً",
+      "sku": "رمز المنتج: {{sku}}",
+      "units": "{{count}} وحدة",
+      "empty": "لم يتم شراء منتجات بعد"
+    },
+    "recentOrders": {
+      "title": "الطلبات الأخيرة",
+      "description": "أحدث الطلبات من هذا المطعم",
+      "viewAll": "عرض كل الطلبات",
+      "orderNumber": "طلب #{{id}}",
+      "empty": "لا توجد طلبات بعد"
+    },
+    "unknownProduct": "منتج غير معروف"
+  }
+}

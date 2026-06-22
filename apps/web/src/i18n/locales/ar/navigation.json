@@ -66,5 +66,53 @@
     "deliveries": "التسليمات",
     "hospitalityAddOns": "إضافات الضيافة"
   },
-  "openMenu": "فتح قائمة التنقل"
+  "openMenu": "فتح قائمة التنقل",
+  "role": {
+    "admin": "مسؤول",
+    "supplier": "مورد",
+    "restaurant": "مطعم",
+    "pending": "قيد الانتظار",
+    "staff_portal": "بوابة الموظفين"
+  },
+  "sidebar": {
+    "mainNavAriaLabel": "التنقل الرئيسي",
+    "sectionsAriaLabel": "أقسام التطبيق"
+  },
+  "header": {
+    "upgrade": "ترقية",
+    "plans": "الخطط",
+    "upgradePlan": "ترقية الخطة",
+    "viewPlans": "عرض الخطط",
+    "openCommandPalette": "فتح لوحة الأوامر",
+    "searchAdmin": "بحث في الإدارة…",
+    "searchProducts": "بحث في المنتجات…",
+    "notificationsUnread": "الإشعارات، {{count}} غير مقروء",
+    "markAllRead": "تعليم الكل كمقروء",
+    "closeNotifications": "إغلاق الإشعارات",
+    "allCaughtUp": "لا توجد إشعارات جديدة",
+    "notificationsEmptyHint": "ستظهر تحديثات الطلبات والتنبيهات هنا.",
+    "logoutTitle": "{{name}} — انقر لتسجيل الخروج",
+    "loggedOutSuccess": "تم تسجيل الخروج بنجاح",
+    "logoutFailed": "فشل تسجيل الخروج",
+    "workspaceContext": "{{type}}: {{name}}{{rolePart}}"
+  },
+  "command": {
+    "searchPages": "ابحث في الصفحات...",
+    "noResults": "لا توجد نتائج.",
+    "navigate": "تنقل",
+    "keywords": {
+      "dashboard": "الرئيسية نظرة عامة",
+      "products": "كتالوج بحث",
+      "orders": "شراء طلبات",
+      "fulfillment": "تسليم شحن",
+      "staff": "فريق موظفون",
+      "settings": "تفضيلات حساب"
+    }
+  },
+  "badge": {
+    "pendingOrders": "طلبات قيد الانتظار",
+    "unreadNotifications": "إشعارات غير مقروءة",
+    "activeDisputes": "نزاعات نشطة",
+    "dailyOrdersUsed": "الطلبات اليومية المستخدمة اليوم"
+  }
 }

@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ensureNamespace } from '../i18n'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -19,8 +21,13 @@ import { cn } from '../lib/utils'
 import { CalendarDays, Clock3, Sparkles, Users } from 'lucide-react'
 
 export function PublicReservationPortal() {
+  const { t } = useTranslation('reservations')
   const { restaurantIdOrSlug } = useParams<{ restaurantIdOrSlug?: string }>()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    void ensureNamespace('reservations')
+  }, [])
 
   const {
     data: restaurant,
@@ -45,7 +52,7 @@ export function PublicReservationPortal() {
   })
   const [availabilityChecked, setAvailabilityChecked] = useState(false)
 
-  const slots = availabilityData?.slots ?? []
+  const slots = useMemo(() => availabilityData?.slots ?? [], [availabilityData?.slots])
   const totalCapacity = availabilityData?.totalCapacity
   const bookingWindow = availabilityData?.bookingWindow
   const hasBookableSlot = slots.some((slot) => slot.isAvailable)
@@ -57,7 +64,7 @@ export function PublicReservationPortal() {
   const handleCheckAvailability = async () => {
     if (!restaurant?.id) return
     if (!form.date) {
-      toast.error('Please choose a date')
+      toast.error(t('portal.chooseDate'))
       return
     }
 
@@ -69,18 +76,18 @@ export function PublicReservationPortal() {
       }).unwrap()
       setAvailabilityChecked(true)
       if (result.totalCapacity != null && form.partySize > result.totalCapacity) {
-        toast.error(
-          `Maximum capacity is ${result.totalCapacity} guests. Join the waitlist or reduce party size.`
-        )
+        toast.error(t('portal.maxCapacity', { capacity: result.totalCapacity }))
         setShowWaitlistForm(true)
         return
       }
       setShowWaitlistForm(false)
-      toast.success('Availability updated')
+      toast.success(t('portal.availabilityUpdated'))
     } catch (error: unknown) {
       setAvailabilityChecked(false)
       const err = error as { data?: { message?: string; error?: { message?: string } } }
-      toast.error(err?.data?.message || err?.data?.error?.message || 'Unable to check availability')
+      toast.error(
+        err?.data?.message || err?.data?.error?.message || t('portal.checkAvailabilityFailed')
+      )
     }
   }
 
@@ -93,15 +100,15 @@ export function PublicReservationPortal() {
   const handleCreateReservation = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!restaurant?.id || !form.selectedSlot) {
-      toast.error('Please select a time slot')
+      toast.error(t('portal.selectTimeSlot'))
       return
     }
     if (!form.customerEmail.trim()) {
-      toast.error('Email is required')
+      toast.error(t('portal.emailRequired'))
       return
     }
     if (!form.customerPhone.trim()) {
-      toast.error('Phone is required')
+      toast.error(t('portal.phoneRequired'))
       return
     }
 
@@ -116,13 +123,13 @@ export function PublicReservationPortal() {
         notes: form.notes || undefined,
       }).unwrap()
 
-      toast.success('Reservation confirmed!')
+      toast.success(t('portal.reservationConfirmed'))
       const reservation = response.reservation
       navigate(`/reserve/confirmation?token=${reservation.manageToken}`)
     } catch (error: unknown) {
       const err = error as { data?: { message?: string; error?: { message?: string } } }
       const message =
-        err?.data?.error?.message || err?.data?.message || 'Unable to create reservation'
+        err?.data?.error?.message || err?.data?.message || t('portal.createReservationFailed')
       toast.error(message)
       if (
         message.toLowerCase().includes('just booked') ||
@@ -136,7 +143,7 @@ export function PublicReservationPortal() {
 
   const handleJoinWaitlist = async () => {
     if (!restaurant?.id || !form.customerName.trim()) {
-      toast.error('Enter your name to join the waitlist')
+      toast.error(t('portal.enterNameForWaitlist'))
       return
     }
     try {
@@ -148,11 +155,11 @@ export function PublicReservationPortal() {
         desiredAt: form.selectedSlot || undefined,
         notes: form.notes || undefined,
       }).unwrap()
-      toast.success('You are on the waitlist. We will contact you when a table opens.')
+      toast.success(t('portal.waitlistJoined'))
       setShowWaitlistForm(false)
     } catch (error: unknown) {
       const err = error as { data?: { message?: string; error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || err?.data?.message || 'Could not join waitlist')
+      toast.error(err?.data?.error?.message || err?.data?.message || t('portal.joinWaitlistFailed'))
     }
   }
 
@@ -161,8 +168,8 @@ export function PublicReservationPortal() {
       <PublicPageLayout
         centered
         narrow
-        title="Reserve a table"
-        subtitle="Use the reservation link provided by your restaurant. Each venue has its own booking page."
+        title={t('portal.missingLinkTitle')}
+        subtitle={t('portal.missingLinkSubtitle')}
       />
     )
   }
@@ -184,8 +191,8 @@ export function PublicReservationPortal() {
       <PublicPageLayout
         centered
         narrow
-        title="Restaurant not found"
-        subtitle="This reservation link is invalid or the restaurant may have been removed."
+        title={t('portal.restaurantNotFoundTitle')}
+        subtitle={t('portal.restaurantNotFoundSubtitle')}
       />
     )
   }
@@ -194,15 +201,15 @@ export function PublicReservationPortal() {
 
   return (
     <PublicPageLayout
-      title={`Book at ${restaurantName}`}
-      subtitle="Choose your date and party size, pick a time, then confirm in under a minute."
+      title={t('portal.bookAt', { name: restaurantName })}
+      subtitle={t('portal.bookAtSubtitle')}
       logoInitial={restaurantName.charAt(0).toUpperCase()}
       className="pb-12"
     >
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
         <PublicPanel
-          title="When are you coming?"
-          description="Set your party size and date, then check which times are open."
+          title={t('portal.whenComingTitle')}
+          description={t('portal.whenComingDescription')}
           className="lg:sticky lg:top-6 lg:w-[42%] lg:shrink-0"
         >
           <div className="space-y-4">
@@ -213,7 +220,7 @@ export function PublicReservationPortal() {
                   className="flex items-center gap-1.5 text-[var(--text-mid)]"
                 >
                   <Users className="h-3.5 w-3.5 text-[var(--text-muted)]" aria-hidden />
-                  Party size
+                  {t('portal.partySize')}
                 </Label>
                 <Input
                   id="partySize"
@@ -238,7 +245,7 @@ export function PublicReservationPortal() {
                   className="flex items-center gap-1.5 text-[var(--text-mid)]"
                 >
                   <CalendarDays className="h-3.5 w-3.5 text-[var(--text-muted)]" aria-hidden />
-                  Date
+                  {t('portal.date')}
                 </Label>
                 <Input
                   id="resDate"
@@ -259,30 +266,33 @@ export function PublicReservationPortal() {
               disabled={loadingAvailability}
               className="consumer-pressable w-full bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
             >
-              {loadingAvailability ? 'Checking…' : 'Check availability'}
+              {loadingAvailability ? t('portal.checking') : t('portal.checkAvailability')}
             </Button>
 
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5 text-[var(--text-mid)]">
                 <Clock3 className="h-3.5 w-3.5 text-[var(--text-muted)]" aria-hidden />
-                Available times
+                {t('portal.availableTimes')}
               </Label>
               {bookingWindow?.openTime && bookingWindow?.closeTime && !bookingWindow.closed ? (
                 <p className="text-xs text-[var(--text-muted)]">
-                  Booking window {bookingWindow.openTime} – {bookingWindow.closeTime}
-                  {totalCapacity != null ? ` · ${totalCapacity} seats in dining room` : ''}
+                  {t('portal.bookingWindow', {
+                    open: bookingWindow.openTime,
+                    close: bookingWindow.closeTime,
+                  })}
+                  {totalCapacity != null
+                    ? t('portal.seatsInDiningRoom', { count: totalCapacity })
+                    : ''}
                 </p>
               ) : null}
 
               {slots.length === 0 ? (
                 <p className="rounded-lg bg-[var(--brand-ultra)] px-3 py-2.5 text-sm text-[var(--text-muted)]">
-                  {!availabilityChecked
-                    ? 'Pick a date and tap “Check availability” to see open times.'
-                    : 'No slots for this date. Try another day or a smaller party size.'}
+                  {!availabilityChecked ? t('portal.pickDateHint') : t('portal.noSlotsHint')}
                 </p>
               ) : !hasBookableSlot ? (
                 <p className="rounded-lg bg-[var(--amber-pale)] px-3 py-2.5 text-sm text-[var(--amber)]">
-                  All times are full for your party. Try another date or join the waitlist below.
+                  {t('portal.allTimesFullHint')}
                 </p>
               ) : (
                 <ReservationTimeSlotGrid
@@ -302,10 +312,10 @@ export function PublicReservationPortal() {
               <div className="space-y-2 rounded-xl border border-[var(--amber-mid)]/30 bg-[var(--amber-pale)] p-3">
                 <p className="flex items-center gap-1.5 text-sm font-medium text-[var(--amber)]">
                   <Sparkles className="h-4 w-4" aria-hidden />
-                  Join the waitlist
+                  {t('portal.joinWaitlistTitle')}
                 </p>
                 <p className="text-xs leading-relaxed text-[var(--text-mid)]">
-                  Leave your details and the restaurant will reach out when a table opens.
+                  {t('portal.joinWaitlistDescription')}
                 </p>
                 <Button
                   type="button"
@@ -315,23 +325,25 @@ export function PublicReservationPortal() {
                   disabled={joiningWaitlist || !form.customerName.trim()}
                   onClick={handleJoinWaitlist}
                 >
-                  {joiningWaitlist ? 'Joining…' : 'Join waitlist'}
+                  {joiningWaitlist ? t('portal.joining') : t('portal.joinWaitlist')}
                 </Button>
               </div>
             ) : null}
 
             {totalCapacity != null && form.partySize > totalCapacity ? (
               <p className="text-sm text-[var(--red)]">
-                Party of {form.partySize} exceeds dining room capacity ({totalCapacity}). Reduce
-                guests or join the waitlist.
+                {t('portal.partyExceedsCapacity', {
+                  partySize: form.partySize,
+                  capacity: totalCapacity,
+                })}
               </p>
             ) : null}
           </div>
         </PublicPanel>
 
         <PublicPanel
-          title="Your details"
-          description={`Contact info to confirm your table at ${restaurantName}.`}
+          title={t('portal.yourDetailsTitle')}
+          description={t('portal.yourDetailsDescription', { name: restaurantName })}
           className="lg:min-w-0 lg:flex-1"
         >
           <form className="space-y-4" onSubmit={handleCreateReservation}>
@@ -343,21 +355,19 @@ export function PublicReservationPortal() {
                   : 'border-[var(--app-border)] bg-[var(--brand-ultra)] text-[var(--text-muted)]'
               )}
             >
-              {selectedSlotDetails ? (
-                <>
-                  Booking for <strong>{form.partySize}</strong> guest
-                  {form.partySize === 1 ? '' : 's'} on{' '}
-                  <strong>{new Date(form.date).toLocaleDateString()}</strong> at{' '}
-                  <strong>{formatTime(selectedSlotDetails.startTime)}</strong>.
-                </>
-              ) : (
-                'Select a time above after checking availability.'
-              )}
+              {selectedSlotDetails
+                ? t('portal.bookingSummary', {
+                    count: form.partySize,
+                    partySize: form.partySize,
+                    date: new Date(form.date).toLocaleDateString(),
+                    time: formatTime(selectedSlotDetails.startTime),
+                  })
+                : t('portal.selectTimeHint')}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <Label htmlFor="customerName">Name</Label>
+                <Label htmlFor="customerName">{t('portal.name')}</Label>
                 <Input
                   id="customerName"
                   className="mt-1.5"
@@ -371,7 +381,7 @@ export function PublicReservationPortal() {
               </div>
               <div>
                 <Label htmlFor="customerEmail">
-                  Email <span className="text-[var(--red)]">*</span>
+                  {t('portal.email')} <span className="text-[var(--red)]">*</span>
                 </Label>
                 <Input
                   id="customerEmail"
@@ -387,7 +397,7 @@ export function PublicReservationPortal() {
               </div>
               <div>
                 <Label htmlFor="customerPhone">
-                  Phone <span className="text-[var(--red)]">*</span>
+                  {t('portal.phone')} <span className="text-[var(--red)]">*</span>
                 </Label>
                 <Input
                   id="customerPhone"
@@ -402,7 +412,7 @@ export function PublicReservationPortal() {
                 />
               </div>
               <div className="sm:col-span-2">
-                <Label>Selected time</Label>
+                <Label>{t('portal.selectedTime')}</Label>
                 <div className="mt-1.5 flex min-h-[44px] items-center rounded-lg border border-[var(--app-border)] px-3 text-sm">
                   {selectedSlotDetails ? (
                     <div className="flex items-center gap-2">
@@ -410,19 +420,19 @@ export function PublicReservationPortal() {
                       <span>{new Date(form.date).toLocaleDateString()}</span>
                     </div>
                   ) : (
-                    <span className="text-[var(--text-muted)]">No time selected yet</span>
+                    <span className="text-[var(--text-muted)]">{t('portal.noTimeSelected')}</span>
                   )}
                 </div>
               </div>
             </div>
 
             <div>
-              <Label htmlFor="notes">Notes</Label>
+              <Label htmlFor="notes">{t('portal.notes')}</Label>
               <Textarea
                 id="notes"
                 value={form.notes}
                 onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
-                placeholder="Special occasions, allergies, seating preferences…"
+                placeholder={t('portal.notesPlaceholder')}
                 className="mt-1.5 min-h-[100px]"
               />
             </div>
@@ -432,20 +442,19 @@ export function PublicReservationPortal() {
               disabled={creatingReservation || !canConfirm}
               className="consumer-pressable w-full bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
             >
-              {creatingReservation ? 'Reserving…' : 'Confirm reservation'}
+              {creatingReservation ? t('portal.reserving') : t('portal.confirmReservation')}
             </Button>
 
             {!canConfirm && !creatingReservation ? (
               <p className="text-xs text-[var(--text-muted)]">
                 {!form.selectedSlot
-                  ? 'Select an available time after checking availability.'
-                  : 'Enter your name, email, and phone to confirm.'}
+                  ? t('portal.selectTimeToConfirm')
+                  : t('portal.enterContactToConfirm')}
               </p>
             ) : null}
 
             <p className="text-xs leading-relaxed text-[var(--text-muted)]">
-              By booking you agree to receive reservation updates for this visit. Modify or cancel
-              using the confirmation link sent after booking.
+              {t('portal.bookingAgreement')}
             </p>
           </form>
         </PublicPanel>

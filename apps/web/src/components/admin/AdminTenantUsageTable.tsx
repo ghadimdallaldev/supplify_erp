@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { SubscriptionPlan } from '../../types'
 import { type UsageStatus } from '../../lib/adminUsageStatus'
 import { computeUsageStatus } from '../../lib/adminUsageStatus'
@@ -27,8 +28,9 @@ function UsageMetricCell({
   limit: number | null | undefined
   status: UsageStatus
 }) {
+  const { t } = useTranslation('admin')
   if (used == null) {
-    return <span className="text-xs text-[var(--text-muted)]">Not available</span>
+    return <span className="text-xs text-[var(--text-muted)]">{t('common.notAvailable')}</span>
   }
   return (
     <div className="min-w-[120px]">
@@ -59,6 +61,7 @@ export function AdminTenantUsageTable({
   onDiagnostics?: (id: string, name: string) => void
   onChangePlan?: (id: string, name: string, tenantType: 'SUPPLIER' | 'RESTAURANT') => void
 }) {
+  const { t } = useTranslation('admin')
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState<UsageStatus | 'all'>('all')
@@ -125,15 +128,19 @@ export function AdminTenantUsageTable({
     <div className="space-y-3" data-testid={`admin-usage-table-${mode}`}>
       <div className="flex flex-wrap gap-2">
         <Input
-          placeholder={`Search ${mode === 'supplier' ? 'suppliers' : 'restaurants'}…`}
+          placeholder={
+            mode === 'supplier'
+              ? t('usage.searchSuppliersPlaceholder')
+              : t('usage.searchRestaurantsPlaceholder')
+          }
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="h-8 max-w-xs text-sm"
-          aria-label={`Search ${mode} tenants`}
+          aria-label={t('usage.searchTenantsAriaLabel', { mode })}
         />
         <Select value={planFilter} onValueChange={(value) => setPlanFilter(value)}>
-          <SelectTrigger className="w-auto" aria-label="Filter by plan">
-            <option value="all">All plans</option>
+          <SelectTrigger className="w-auto" aria-label={t('usage.filterByPlanAriaLabel')}>
+            <option value="all">{t('common.allPlans')}</option>
             {planOptions.map((p) => (
               <option key={p} value={p}>
                 {p}
@@ -145,41 +152,41 @@ export function AdminTenantUsageTable({
           value={statusFilter}
           onValueChange={(value) => setStatusFilter(value as UsageStatus | 'all')}
         >
-          <SelectTrigger className="w-auto" aria-label="Filter by usage status">
-            <option value="all">All statuses</option>
-            <option value="healthy">Healthy</option>
-            <option value="near_limit">Near limit</option>
-            <option value="over_limit">Over limit</option>
-            <option value="unlimited">Unlimited</option>
+          <SelectTrigger className="w-auto" aria-label={t('usage.filterByUsageStatusAriaLabel')}>
+            <option value="all">{t('common.allStatuses')}</option>
+            <option value="healthy">{t('common.usageFilter.healthy')}</option>
+            <option value="near_limit">{t('common.usageFilter.nearLimit')}</option>
+            <option value="over_limit">{t('common.usageFilter.overLimit')}</option>
+            <option value="unlimited">{t('common.usageFilter.unlimited')}</option>
           </SelectTrigger>
         </Select>
         <Select value={sortKey} onValueChange={(value) => setSortKey(value as SortKey)}>
-          <SelectTrigger className="w-auto" aria-label="Sort tenants">
-            <option value="pressure">Sort: usage pressure</option>
-            <option value="status">Sort: worst status</option>
-            <option value="name">Sort: name</option>
+          <SelectTrigger className="w-auto" aria-label={t('usage.sortTenantsAriaLabel')}>
+            <option value="pressure">{t('common.sort.pressure')}</option>
+            <option value="status">{t('common.sort.status')}</option>
+            <option value="name">{t('common.sort.name')}</option>
           </SelectTrigger>
         </Select>
       </div>
 
       {filtered.length === 0 ? (
         <AdminEmptyState
-          title="No matching tenants"
-          description="Adjust filters or load more tenants to see usage data."
+          title={t('usage.noMatchingTenantsTitle')}
+          description={t('usage.noMatchingTenantsDescription')}
         />
       ) : mode === 'supplier' ? (
-        <TableScroll aria-label="Supplier usage">
+        <TableScroll aria-label={t('usage.supplierUsageTableAriaLabel')}>
           <table className="w-full min-w-[960px] text-sm">
             <thead>
-              <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                <th className="px-4 py-3">Supplier</th>
-                <th className="px-4 py-3">Plan</th>
-                <th className="px-4 py-3">Products</th>
-                <th className="px-4 py-3">Warehouses</th>
-                <th className="px-4 py-3">Active deals</th>
-                <th className="px-4 py-3">Storage</th>
-                <th className="px-4 py-3">Usage status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+              <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-start text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                <th className="px-4 py-3">{t('common.supplier')}</th>
+                <th className="px-4 py-3">{t('common.table.plan')}</th>
+                <th className="px-4 py-3">{t('common.table.products')}</th>
+                <th className="px-4 py-3">{t('common.table.warehouses')}</th>
+                <th className="px-4 py-3">{t('common.table.activeDeals')}</th>
+                <th className="px-4 py-3">{t('common.table.storage')}</th>
+                <th className="px-4 py-3">{t('common.table.usageStatus')}</th>
+                <th className="px-4 py-3 text-end">{t('common.table.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--app-border)]">
@@ -216,13 +223,15 @@ export function AdminTenantUsageTable({
                         status={s.storageStatus}
                       />
                     ) : (
-                      <span className="text-xs text-[var(--text-mid)]">Not available</span>
+                      <span className="text-xs text-[var(--text-mid)]">
+                        {t('common.notAvailable')}
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-3.5">
                     <UsageStatusBadge status={s.status} />
                   </td>
-                  <td className="px-4 py-3.5 text-right">
+                  <td className="px-4 py-3.5 text-end">
                     <div className="flex justify-end gap-1.5">
                       {onDiagnostics && (
                         <Button
@@ -232,7 +241,7 @@ export function AdminTenantUsageTable({
                           className="h-8 px-2.5 text-xs"
                           onClick={() => onDiagnostics(s.id, s.name)}
                         >
-                          Diagnostics
+                          {t('common.tooltips.diagnostics')}
                         </Button>
                       )}
                       {onChangePlan && (
@@ -243,7 +252,7 @@ export function AdminTenantUsageTable({
                           className="h-8 px-2.5 text-xs"
                           onClick={() => onChangePlan(s.id, s.name, 'SUPPLIER')}
                         >
-                          Plan
+                          {t('common.table.plan')}
                         </Button>
                       )}
                     </div>
@@ -254,19 +263,19 @@ export function AdminTenantUsageTable({
           </table>
         </TableScroll>
       ) : (
-        <TableScroll aria-label="Restaurant usage">
+        <TableScroll aria-label={t('usage.restaurantUsageTableAriaLabel')}>
           <table className="w-full min-w-[960px] text-sm">
             <thead>
-              <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                <th className="px-4 py-3">Restaurant</th>
-                <th className="px-4 py-3">Plan</th>
-                <th className="px-4 py-3">Orders today</th>
-                <th className="px-4 py-3">Orders (30d)</th>
-                <th className="px-4 py-3">Suppliers</th>
-                <th className="px-4 py-3">Inventory SKUs</th>
-                <th className="px-4 py-3">Storage</th>
+              <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-start text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                <th className="px-4 py-3">{t('common.restaurant')}</th>
+                <th className="px-4 py-3">{t('common.table.plan')}</th>
+                <th className="px-4 py-3">{t('common.table.ordersToday')}</th>
+                <th className="px-4 py-3">{t('common.table.orders30d')}</th>
+                <th className="px-4 py-3">{t('common.table.suppliers')}</th>
+                <th className="px-4 py-3">{t('common.table.inventorySkus')}</th>
+                <th className="px-4 py-3">{t('common.table.storage')}</th>
                 <th className="px-4 py-3">Usage status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3 text-end">{t('common.table.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--app-border)]">
@@ -282,7 +291,9 @@ export function AdminTenantUsageTable({
                         status={r.ordersTodayStatus}
                       />
                     ) : (
-                      <span className="text-xs text-[var(--text-mid)]">Not available</span>
+                      <span className="text-xs text-[var(--text-mid)]">
+                        {t('common.notAvailable')}
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-3.5 tabular-nums text-[var(--text)]">{r.orders30d}</td>
@@ -316,13 +327,15 @@ export function AdminTenantUsageTable({
                         status={computeUsageStatus(r.storageUsed, r.storageLimit)}
                       />
                     ) : (
-                      <span className="text-xs text-[var(--text-mid)]">Not available</span>
+                      <span className="text-xs text-[var(--text-mid)]">
+                        {t('common.notAvailable')}
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-3.5">
                     <UsageStatusBadge status={r.status} />
                   </td>
-                  <td className="px-4 py-3.5 text-right">
+                  <td className="px-4 py-3.5 text-end">
                     <div className="flex justify-end gap-1.5">
                       {onDiagnostics && (
                         <Button

@@ -1,0 +1,109 @@
+{
+  "greeting": {
+    "morning": "صباح الخير",
+    "afternoon": "طاب يومك",
+    "evening": "مساء الخير",
+    "fallbackName": "صديقي"
+  },
+  "error": {
+    "loadFailed": "فشل تحميل لوحة التحكم",
+    "refreshHint": "يرجى محاولة تحديث الصفحة"
+  },
+  "readOnlyWorkspace": "مساحة عمل للقراءة فقط · {{roleLabel}}",
+  "kpi": {
+    "zeroCurrency": "٠ $",
+    "supplier": {
+      "revenue": { "label": "الإيرادات", "meta": "طوال الوقت" },
+      "orders": { "label": "الطلبات", "meta": "جميع الطلبات" },
+      "pending": { "label": "قيد الانتظار", "meta": "في انتظار التنفيذ" },
+      "counterpart": { "label": "المطاعم", "meta": "العملاء النشطون" }
+    },
+    "restaurant": {
+      "revenue": { "label": "إجمالي الإنفاق", "meta": "طوال الوقت" },
+      "orders": { "label": "طلباتي", "meta": "جميع الطلبات" },
+      "pending": { "label": "قيد الانتظار", "meta": "قيد التنفيذ" },
+      "counterpart": { "label": "الموردون", "meta": "البائعون النشطون" }
+    }
+  },
+  "onboarding": {
+    "allSet": "أنت جاهز للبدء",
+    "restaurant": {
+      "description": "أنشئ طلبك الأول لبدء الاستلام من الموردين.",
+      "cta": "إنشاء أول طلب"
+    },
+    "supplier": {
+      "description": "أضف منتجك الأول ليتمكن المطاعم من الطلب منك.",
+      "cta": "إضافة أول منتج"
+    }
+  },
+  "widgets": {
+    "recentOrders": {
+      "title": "الطلبات الأخيرة",
+      "viewAll": "عرض الكل ←",
+      "empty": "لا توجد طلبات حديثة",
+      "customerFallback": "عميل",
+      "fromSupplier": "من: {{name}}",
+      "supplierFallback": "مورد"
+    },
+    "orderStatus": {
+      "title": "حالة الطلب",
+      "completed": "مكتمل",
+      "pending": "قيد الانتظار",
+      "processing": "قيد المعالجة",
+      "totalAllTime": "إجمالي الطلبات (طوال الوقت)"
+    },
+    "spendTrend": {
+      "title": "اتجاه الإنفاق",
+      "periodAriaLabel": "فترة اتجاه الإنفاق",
+      "periodDays": "{{days}} ي",
+      "loadingAriaLabel": "جاري تحميل اتجاه الإنفاق",
+      "emptyNoRecent": "لا يوجد إنفاق خلال آخر {{days}} يومًا. إجمالي طلباتك طوال الوقت موجود في المؤشر أعلاه.",
+      "emptyNoData": "لا توجد بيانات إنفاق بعد",
+      "footerLastDays": "آخر {{days}} يومًا",
+      "footerLastDaysOrders": "آخر {{days}} يومًا (طلبات)",
+      "footerAllTimeOrders": "طوال الوقت (طلبات)",
+      "tooltipLabel": "الإنفاق"
+    },
+    "stockAlerts": {
+      "lowStockTitle": "مخزون منخفض",
+      "reorderTitle": "تنبيهات إعادة الطلب",
+      "allAboveThreshold": "جميع المنتجات فوق حدود المخزون",
+      "productFallback": "منتج",
+      "available": "المتاح: {{qty}}",
+      "threshold": "الحد: {{threshold}}",
+      "availableWithThreshold": "المتاح: {{qty}} · الحد: {{threshold}}",
+      "noSuggestions": "لا توجد اقتراحات لإعادة الطلب",
+      "currentSuggest": "الحالي: {{current}} · المقترح: {{suggest}}",
+      "addButton": "+ إضافة"
+    },
+    "expiry": {
+      "title": "انتهاء صلاحية المخزون",
+      "expiringSoon": "تنتهي قريبًا",
+      "expired": "منتهية الصلاحية"
+    },
+    "reorderReminders": {
+      "title": "تذكيرات إعادة الطلب المقترحة",
+      "orderingLists": "قوائم الطلب ←",
+      "pattern": "عادةً ما تطلب {{label}} يوم {{dayName}}."
+    },
+    "atRisk": {
+      "title": "الطلبات المتوقعة المعرّضة للخطر",
+      "commandCenter": "مركز القيادة ←",
+      "pattern": "{{restaurantName}} — عادةً ما يطلب {{label}} يوم {{dayName}}."
+    },
+    "customerGrowth": {
+      "title": "نمو العملاء",
+      "manage": "إدارة ←",
+      "imported": "مستوردون",
+      "converted": "تم تحويلهم",
+      "invited": "مدعوون",
+      "rewards": "المكافآت",
+      "freeMonths": "{{count}} شهر"
+    }
+  },
+  "toast": {
+    "createQuickListFirst": "أنشئ قائمة سريعة أولًا",
+    "addedToQuickList": "تمت إضافة {{productName}} ({{qty}}) إلى {{listName}}",
+    "addToQuickListFailed": "فشلت الإضافة إلى القائمة السريعة"
+  }
+}

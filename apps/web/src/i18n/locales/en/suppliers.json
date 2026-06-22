@@ -1,0 +1,548 @@
+{
+  "settings": {
+    "title": "Supplier Settings",
+    "description": "Manage your business profile and settings",
+    "permissionTitle": "supplier settings",
+    "stats": {
+      "totalProducts": "Total Products",
+      "activeProducts": "{{count}} active",
+      "totalOrders": "Total Orders",
+      "completedOrders": "{{count}} completed",
+      "pendingOrders": "Pending Orders",
+      "pendingDescription": "Awaiting fulfillment",
+      "totalRevenue": "Total Revenue",
+      "allTime": "All-time"
+    },
+    "tabs": {
+      "profile": "Profile",
+      "contacts": "Contacts",
+      "team": "Team & roles",
+      "business": "Business",
+      "warehouses": "Warehouses",
+      "delivery": "Delivery Zones",
+      "drivers": "Drivers",
+      "branches": "Branches",
+      "notifications": "Notifications",
+      "plan": "Plan & usage",
+      "activity": "Activity"
+    }
+  },
+  "list": {
+    "title": "Suppliers",
+    "descriptionRestaurant": "Discover suppliers, follow favorites, and browse their catalogs.",
+    "descriptionAdmin": "Manage suppliers in the marketplace",
+    "browseProducts": "Browse products",
+    "grid": "Grid",
+    "list": "List",
+    "stats": {
+      "total": "Total suppliers",
+      "totalHint": "Available in your marketplace",
+      "following": "Following",
+      "followingHint": "Suppliers you follow for quick access",
+      "withProducts": "With products",
+      "withProductsHint": "Ready to browse and order",
+      "totalProducts": "Total products",
+      "acrossAll": "Across all suppliers",
+      "newThisMonth_one": "{{count}} new supplier this month",
+      "newThisMonth_other": "{{count}} new suppliers this month"
+    },
+    "searchPlaceholder": "Search by name, email, or city…",
+    "searchAriaLabel": "Search suppliers",
+    "cityPlaceholder": "City",
+    "cityAriaLabel": "Filter by city",
+    "filters": {
+      "all": "All",
+      "following": "Following",
+      "new": "New",
+      "onSale": "On sale now"
+    },
+    "sort": {
+      "name": "Name",
+      "products": "Products",
+      "recent": "Recent",
+      "deals": "Best deals"
+    },
+    "empty": {
+      "filteredTitle": "No suppliers match your filters",
+      "filteredDescription": "Try clearing filters or broadening your search.",
+      "defaultTitle": "No suppliers yet",
+      "defaultDescriptionRestaurant": "When suppliers join the marketplace, they will appear here. Browse products or check back soon.",
+      "defaultDescriptionAdmin": "No suppliers are registered in the marketplace yet.",
+      "clearFilters": "Clear filters",
+      "refresh": "Refresh"
+    },
+    "onboarding": {
+      "step1Title": "Explore the catalog",
+      "step1Body": "Browse products from every connected supplier.",
+      "step2Title": "Follow suppliers",
+      "step2Body": "Save favorites to find them quickly later.",
+      "step3Title": "Message & order",
+      "step3Body": "Chat with suppliers and place orders from their catalog.",
+      "goToProducts": "Go to products"
+    },
+    "badges": {
+      "new": "New",
+      "featured": "Featured",
+      "following": "Following"
+    },
+    "card": {
+      "products": "Products",
+      "avgPrice": "Avg Price",
+      "locationNotProvided": "Location not provided",
+      "message": "Message",
+      "view": "View",
+      "viewProducts": "View Products",
+      "details": "Details",
+      "follow": "Follow",
+      "unfollow": "Unfollow",
+      "followAriaLabel": "Follow supplier",
+      "unfollowAriaLabel": "Unfollow supplier",
+      "vat": "VAT: {{number}}",
+      "joined": "Joined {{date}}",
+      "productsCount": "{{count}} Products",
+      "avgPriceShort": "Avg: ${{price}}"
+    },
+    "toast": {
+      "followed": "Supplier followed",
+      "unfollowed": "Supplier unfollowed",
+      "followFailed": "Failed to follow supplier",
+      "unfollowFailed": "Failed to unfollow supplier"
+    },
+    "loadFailed": "Failed to load suppliers"
+  },
+  "detail": {
+    "loadFailed": "Failed to load supplier",
+    "blocked": "Blocked",
+    "unblock": "Unblock supplier",
+    "following": "Following",
+    "follow": "Follow",
+    "opening": "Opening...",
+    "message": "Message",
+    "requestBestPrice": "Request best price",
+    "block": "Block",
+    "reviewsCount": "{{rating}} ({{count}} reviews)",
+    "stats": {
+      "totalOrders": "Total Orders",
+      "totalSpent": "Total Spent",
+      "avgOrderValue": "Avg Order Value",
+      "productsAvailable": "Products Available"
+    },
+    "contactInfo": "Contact Information",
+    "businessInfo": "Business Information",
+    "legalName": "Legal Name",
+    "vatNumber": "VAT Number",
+    "tradeLicense": "Trade License",
+    "memberSince": "Member Since",
+    "productsPricing": "Products & Pricing",
+    "totalProductsAvailable": "Total products available",
+    "averageProductPrice": "Average product price",
+    "viewAllProducts": "View All Products",
+    "sendMessage": "Send Message",
+    "tabs": {
+      "products": "Products",
+      "reviews": "Reviews"
+    },
+    "reviews": {
+      "title": "Supplier reviews",
+      "writeReview": "Write review",
+      "upgradeHint": "Upgrade your plan to write supplier reviews.",
+      "empty": "No reviews yet.",
+      "edit": "Edit",
+      "delete": "Delete",
+      "deleteConfirm": "Delete this review?",
+      "deleted": "Review deleted",
+      "deleteFailed": "Failed to delete review"
+    },
+    "productsTab": {
+      "title": "Products ({{count}})",
+      "description": "Browse products from this supplier",
+      "empty": "No products available from this supplier",
+      "stock": "Stock: {{count}}",
+      "viewDetails": "View Details",
+      "notAvailable": "N/A"
+    },
+    "blockDialog": {
+      "title": "Block {{name}}?",
+      "description": "Blocked suppliers are hidden from your catalog and marketplace browse. You can unblock them later from this page.",
+      "reasonLabel": "Reason (optional)",
+      "reasonPlaceholder": "e.g. Quality issues, no longer ordering",
+      "cancel": "Cancel",
+      "confirm": "Block supplier",
+      "blocking": "Blocking…"
+    },
+    "toast": {
+      "userMissing": "User or supplier ID missing",
+      "openingConversation": "Opening conversation...",
+      "conversationFailed": "Failed to start conversation",
+      "followed": "Supplier followed",
+      "unfollowed": "Supplier unfollowed",
+      "followFailed": "Failed to update follow status",
+      "blocked": "Supplier blocked — they will no longer appear in your catalog",
+      "blockFailed": "Failed to block supplier",
+      "unblocked": "Supplier unblocked",
+      "unblockFailed": "Failed to unblock supplier"
+    }
+  },
+  "contacts": {
+    "loading": "Loading contacts…",
+    "email": "Email",
+    "phone": "Phone",
+    "phonePlaceholder": "+1 (555) 123-4567",
+    "emailPlaceholder": "{{section}}@example.com",
+    "save": "Save Contacts",
+    "saving": "Saving...",
+    "sections": {
+      "sales": {
+        "title": "Sales",
+        "description": "Primary contact for orders, quotes, and restaurant inquiries."
+      },
+      "accounting": {
+        "title": "Accounting",
+        "description": "Contact for invoices, payments, and billing questions."
+      },
+      "logistics": {
+        "title": "Logistics",
+        "description": "Contact for deliveries, fulfillment, and warehouse coordination."
+      }
+    },
+    "toast": {
+      "notLoaded": "Supplier information not loaded",
+      "updated": "Contacts updated successfully!",
+      "updateFailed": "Failed to update contacts"
+    }
+  },
+  "deliveryZones": {
+    "upgradeRequired": "Delivery zones require warehouse locations on Silver or higher.",
+    "viewPlans": "View plans",
+    "title": "Delivery zones by warehouse",
+    "description": "View and manage delivery coverage, fees, and minimum orders for each warehouse location.",
+    "noWarehouses": "No warehouses yet",
+    "noWarehousesHint": "Add a warehouse under the Warehouses tab to configure delivery zones.",
+    "manageZones": "Manage zones",
+    "loading": "Loading…",
+    "zone_one": "zone",
+    "zone_other": "zones",
+    "sheetTitle": "Delivery zones",
+    "sheetDescriptionWarehouse": "Coverage and fees for {{name}}",
+    "sheetDescriptionDefault": "Warehouse delivery zones"
+  },
+  "profile": {
+    "loading": "Loading profile…",
+    "defaultEntityName": "Supplier",
+    "logoTitle": "Company Logo",
+    "logoDescription": "Upload your company logo. This will be displayed in your profile and to restaurants.",
+    "catalogLink": {
+      "title": "Supplier catalog link",
+      "description": "Share this link with restaurants so they can browse your catalog and request quotes without full onboarding.",
+      "copy": "Copy catalog link",
+      "preview": "Preview catalog",
+      "publicEnabled": "Public catalog enabled",
+      "publicEnabledHint": "When off, the catalog link returns not found.",
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "companyInfo": {
+      "title": "Company Information",
+      "description": "Update your company details and contact information"
+    },
+    "fields": {
+      "companyName": "Company Name *",
+      "legalName": "Legal Name",
+      "vatNumber": "VAT Number",
+      "tradeLicense": "Trade License",
+      "contactEmail": "Contact Email *",
+      "phone": "Phone",
+      "website": "Website",
+      "description": "Company Description",
+      "street": "Street Address",
+      "city": "City",
+      "region": "Region/State",
+      "country": "Country"
+    },
+    "placeholders": {
+      "companyName": "Fresh Produce Co",
+      "legalName": "Fresh Produce Co LLC",
+      "vatNumber": "VAT-123456",
+      "tradeLicense": "TL-456789",
+      "contactEmail": "contact@example.com",
+      "phone": "+1 (555) 123-4567",
+      "website": "https://www.example.com",
+      "description": "Tell restaurants about your company...",
+      "street": "123 Main Street",
+      "city": "City Name",
+      "region": "State or Region",
+      "country": "Country"
+    },
+    "saveChanges": "Save Changes",
+    "saving": "Saving...",
+    "toast": {
+      "linkCopied": "Catalog link copied",
+      "copyFailed": "Could not copy link",
+      "catalogEnabled": "Public catalog enabled",
+      "catalogDisabled": "Public catalog disabled",
+      "catalogUpdateFailed": "Failed to update catalog setting",
+      "notLoaded": "Supplier information not loaded",
+      "logoUploadFailed": "Failed to upload logo",
+      "updated": "Profile updated successfully!",
+      "updateFailed": "Failed to update profile"
+    }
+  },
+  "business": {
+    "title": "Business Hours & Policies",
+    "description": "Set your operating hours and business policies",
+    "operatingHours": "Operating Hours",
+    "configureSchedule": "Configure your weekly schedule",
+    "closed": "Closed",
+    "to": "to",
+    "policies": "Business Policies",
+    "termsBadge": "Terms & Conditions",
+    "minOrderValue": "Minimum Order Value ($)",
+    "minOrderHint": "Restaurants must order at least this amount",
+    "paymentTerms": "Payment Terms",
+    "paymentTermsHint": "e.g., Net 30, Cash on Delivery",
+    "returnPolicy": "Return Policy",
+    "returnPolicyPlaceholder": "7 days return window for damaged goods...",
+    "termsConditions": "Terms & Conditions",
+    "termsPlaceholder": "Your terms and conditions for orders...",
+    "paymentTermsPlaceholder": "Net 30",
+    "save": "Save Business Settings",
+    "days": {
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "sunday": "Sunday"
+    }
+  },
+  "notifications": {
+    "title": "Notification Preferences",
+    "description": "Choose how you want to be notified",
+    "loading": "Loading notification preferences…",
+    "browserPush": "Browser push",
+    "browserPushHint": "Get real-time alerts even when Supplify is in the background.",
+    "blockedTitle": "Notifications blocked by your browser",
+    "blockedSteps": {
+      "step1": "Click the lock / tune icon left of the address bar",
+      "step2": "Open Permissions → set Notifications to Allow",
+      "step3": "Reload this page, then click Enable below"
+    },
+    "blockedEdgeHint": "In Edge: Settings → Cookies and site permissions → All permissions → Notifications → remove this site if listed as blocked.",
+    "enablePush": "Enable push notifications",
+    "enable": "Enable",
+    "disable": "Disable",
+    "pushNotConfigured": "Push is not configured on this server. Ask your admin to set VAPID keys on the API.",
+    "pushNotOnPlan": "Browser push is not included on your plan. Upgrade to enable real-time alerts.",
+    "savePreferences": "Save preferences",
+    "saving": "Saving…",
+    "fields": {
+      "emailEnabled": {
+        "label": "Email notifications",
+        "description": "Receive important updates via email."
+      },
+      "whatsappEnabled": {
+        "label": "WhatsApp notifications",
+        "description": "Get alerts on WhatsApp when your phone is on file."
+      },
+      "inAppEnabled": {
+        "label": "In-app notifications",
+        "description": "Show alerts inside Supplify."
+      },
+      "notifyOrderNew": {
+        "label": "New orders",
+        "description": "Be notified when restaurants place orders."
+      },
+      "notifyMessageReceived": {
+        "label": "Chat messages",
+        "description": "Receive pings for new chat messages."
+      },
+      "notifyInvoiceIssued": {
+        "label": "Invoices",
+        "description": "Invoice and payment reminders."
+      },
+      "notifyLowStock": {
+        "label": "Low stock",
+        "description": "Warehouse low stock warnings."
+      }
+    },
+    "toast": {
+      "saved": "Notification preferences saved!",
+      "saveFailed": "Failed to save notification preferences",
+      "pushUpdateFailed": "Could not update push notifications"
+    }
+  },
+  "warehouses": {
+    "upgradeRequired": "Warehouse management requires Silver or higher. Free accounts do not include warehouse locations; any legacy default warehouse from older data is not usable until you upgrade.",
+    "viewPlans": "View plans",
+    "title": "Warehouses",
+    "description": "Manage your warehouse locations",
+    "addWarehouse": "Add Warehouse",
+    "noWarehouses": "No warehouses yet",
+    "noWarehousesHint": "Add a warehouse to manage multiple locations",
+    "default": "Default",
+    "manageZones": "Manage zones",
+    "sheetTitle": "Delivery zones",
+    "sheetDescriptionWarehouse": "Coverage and fees for {{name}}",
+    "sheetDescriptionDefault": "Warehouse delivery zones",
+    "addDialog": {
+      "title": "Add New Warehouse",
+      "description": "Create a new warehouse location for your business",
+      "name": "Warehouse Name *",
+      "code": "Warehouse Code *",
+      "address": "Street Address",
+      "city": "City",
+      "country": "Country",
+      "setMain": "Set as main warehouse",
+      "cancel": "Cancel",
+      "namePlaceholder": "Main Warehouse",
+      "codePlaceholder": "WH-001",
+      "addressPlaceholder": "123 Farm Road",
+      "cityPlaceholder": "Agricultural City",
+      "countryPlaceholder": "USA"
+    },
+    "toast": {
+      "planLimit": "Additional warehouses are not included on your current plan. Upgrade to add more.",
+      "nameRequired": "Warehouse name is required",
+      "added": "Warehouse added successfully!",
+      "addFailed": "Failed to add warehouse",
+      "noPermission": "You do not have permission to manage warehouses"
+    }
+  },
+  "zones": {
+    "noPermission": "You do not have permission to manage delivery zones",
+    "nameRequired": "Zone name is required",
+    "updated": "Zone updated",
+    "created": "Zone created",
+    "saveFailed": "Failed to save zone",
+    "deleted": "Zone deleted",
+    "deleteFailed": "Failed to delete zone",
+    "deleteConfirm": "Delete zone \"{{name}}\"?",
+    "editTitle": "Edit delivery zone",
+    "addTitle": "Add delivery zone",
+    "cancelEdit": "Cancel edit",
+    "name": "Name *",
+    "postalCodes": "Postal codes",
+    "postalCodesHint": "Comma-separated prefixes or codes",
+    "minOrder": "Min order amount",
+    "deliveryFee": "Delivery fee",
+    "radius": "Radius (km)",
+    "centerLat": "Center latitude",
+    "centerLng": "Center longitude",
+    "saveChanges": "Save changes",
+    "addZone": "Add zone",
+    "listTitle": "Delivery zones",
+    "loading": "Loading zones…",
+    "loadFailed": "Could not load delivery zones.",
+    "empty": "No delivery zones yet. Add a zone to define coverage and fees for this warehouse.",
+    "inactive": "Inactive",
+    "minOrderFee": "Min order {{min}} · Fee {{fee}}",
+    "radiusSummary": "Radius {{km}} km",
+    "namePlaceholder": "Downtown delivery",
+    "postalCodesPlaceholder": "SW1, SW2, E1",
+    "editAriaLabel": "Edit {{name}}",
+    "deleteAriaLabel": "Delete {{name}}"
+  },
+  "pushBanner": {
+    "title": "Enable push notifications?",
+    "description": "Stay updated on orders and messages.",
+    "enable": "Enable",
+    "notNow": "Not now",
+    "enableFailed": "Could not enable push"
+  },
+  "team": {
+    "inviteHint": "Use branch invitations below to invite staff with a role. Each person can only belong to one supplier account."
+  },
+  "branches": {
+    "entityLabel": "supplier location"
+  },
+  "receivables": {
+    "loadError": "Could not load receivables.",
+    "empty": "No open receivables — all caught up on invoices.",
+    "title": "Open receivables",
+    "remindOverdue": "Remind overdue",
+    "sending": "Sending…",
+    "stats": {
+      "unpaidTotal": "Unpaid total",
+      "overdue": "Overdue",
+      "partialPayments": "Partial payments",
+      "whoOwesMe": "Who owes me"
+    },
+    "aging": "Aging:",
+    "agingBuckets": {
+      "current": "Current",
+      "0_7": "1–7 days overdue",
+      "8_30": "8–30 days",
+      "31_60": "31–60 days",
+      "60_plus": "60+ days"
+    },
+    "status": {
+      "partial": "Partial",
+      "overdue": "Overdue",
+      "unpaid": "Unpaid"
+    },
+    "topDebtors": "Top debtors",
+    "sendReminder": "Send reminder",
+    "table": {
+      "invoice": "Invoice",
+      "restaurant": "Restaurant",
+      "due": "Due",
+      "balance": "Balance",
+      "status": "Status"
+    }
+  },
+  "followUp": {
+    "loadError": "Could not load follow-up suggestions",
+    "title": "Customer follow-up",
+    "description": "Restaurants that missed expected orders or may need a reorder nudge",
+    "empty": "No follow-up suggestions right now",
+    "churnRisk": "Churn risk",
+    "urgency": {
+      "HIGH": "High",
+      "MEDIUM": "Medium",
+      "LOW": "Low"
+    },
+    "history": "History",
+    "reminder": "Reminder",
+    "message": "Message",
+    "toast": {
+      "createFailed": "Could not create reminder",
+      "openingChat": "Opening chat — paste your message when ready",
+      "prepareFailed": "Failed to prepare message"
+    }
+  },
+  "fulfillmentIssue": {
+    "selectLine": "Select an order line",
+    "messageSent": "Message sent to restaurant",
+    "sendFailed": "Could not send",
+    "title": "Shortage & substitution",
+    "description": "Report shortages or open a structured chat. The restaurant must accept before order lines change.",
+    "openIssues_one": "{{count}} open issue on this order.",
+    "openIssues_other": "{{count}} open issues on this order.",
+    "affectedLine": "Affected line",
+    "unit": "unit",
+    "shortageQty": "Shortage qty",
+    "availableQty": "Available qty",
+    "replacementQty": "Replacement qty",
+    "replacementUnit": "Replacement unit",
+    "noteOptional": "Note (optional)",
+    "notePlaceholder": "Additional context for the restaurant",
+    "reportShortage": "Report shortage",
+    "suggestSubstitution": "Suggest substitution",
+    "openChat": "Open chat",
+    "viewConversation": "View conversation →"
+  },
+  "substitution": {
+    "proposeDescription": "Propose substitute: {{name}}",
+    "proposeSuccess": "Substitute proposed — awaiting restaurant acceptance",
+    "proposeFailed": "Could not propose substitute",
+    "loadError": "Could not load substitute options.",
+    "empty": "No substitute mappings for items on this order. Add substitutes on the product detail page first.",
+    "title": "Suggest substitutes",
+    "description": "Propose a pre-approved alternative. The restaurant must accept before the order line updates (shown on the timeline).",
+    "pending_one": "{{count}} substitution request awaiting restaurant response.",
+    "pending_other": "{{count}} substitution requests awaiting restaurant response.",
+    "orderLine": "Order line",
+    "propose": "Propose"
+  }
+}

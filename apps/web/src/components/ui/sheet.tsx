@@ -40,9 +40,9 @@ const sheetVariants = cva(
         top: 'inset-x-0 top-0 border-b data-[state=closed]:-translate-y-full data-[state=open]:translate-y-0',
         bottom:
           'inset-x-0 bottom-0 border-t data-[state=closed]:translate-y-full data-[state=open]:translate-y-0',
-        left: 'inset-y-0 left-0 h-full border-r data-[state=closed]:-translate-x-full data-[state=open]:translate-x-0',
+        left: 'inset-y-0 start-0 h-full border-e data-[state=closed]:-translate-x-full data-[state=closed]:rtl:translate-x-full data-[state=open]:translate-x-0',
         right:
-          'inset-y-0 right-0 h-full border-l data-[state=closed]:translate-x-full data-[state=open]:translate-x-0',
+          'inset-y-0 end-0 h-full border-s data-[state=closed]:translate-x-full data-[state=closed]:rtl:-translate-x-full data-[state=open]:translate-x-0',
       },
       width: {
         default: 'w-[min(100vw,var(--drawer-default))]',
@@ -72,7 +72,7 @@ const SheetContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]/40 focus:ring-offset-2 focus:ring-offset-[var(--surface)] erp-pressable">
+      <DialogPrimitive.Close className="absolute end-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]/40 focus:ring-offset-2 focus:ring-offset-[var(--surface)] erp-pressable">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
@@ -82,7 +82,7 @@ const SheetContent = React.forwardRef<
 SheetContent.displayName = DialogPrimitive.Content.displayName
 
 const SheetHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex flex-col space-y-1.5 text-left', className)} {...props} />
+  <div className={cn('flex flex-col space-y-1.5 text-start', className)} {...props} />
 )
 SheetHeader.displayName = 'SheetHeader'
 

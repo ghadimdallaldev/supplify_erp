@@ -15,7 +15,7 @@ Non-secret configuration for Railway lives here. On deploy, the API and web Dock
 
 Keycloak Railway setup (all envs): [`keycloak/RAILWAY_SETUP.md`](keycloak/RAILWAY_SETUP.md).  
 Memory / JVM (all envs): [`KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](KEYCLOAK_RAILWAY_MEMORY_NOTES.md).  
-Full fix write-up: [`docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`](../../docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md).  
+Full fix write-up: [`docs/operations/keycloak-railway-memory-fix.md`](../../docs/operations/keycloak-railway-memory-fix.md).  
 Database / persistence: [`KEYCLOAK_RAILWAY_DB_NOTES.md`](KEYCLOAK_RAILWAY_DB_NOTES.md).
 
 Each folder: `api.env`, `web.env`, `secrets.env.example`, `keycloak.env`.

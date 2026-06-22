@@ -1,0 +1,35 @@
+{
+  "document": {
+    "notFoundTitle": "Document not found",
+    "notFoundDescription": "The legal document you requested does not exist.",
+    "viewAll": "View all legal documents",
+    "legalCenter": "Legal center",
+    "print": "Print",
+    "effective": "Effective {{date}} · Version {{version}}",
+    "providedBy": "This document is provided by {{company}}. Questions:",
+    "loadError": "Unable to load this document. Please try again later.",
+    "signIn": "Sign in"
+  },
+  "hub": {
+    "title": "Legal center",
+    "description": "Review Supplify's terms, privacy practices, and product policies. Document pack {{version}}, effective {{date}}.",
+    "categories": {
+      "core": "Platform agreements",
+      "role": "Organization-specific",
+      "product": "Product terms",
+      "reference": "Billing & deals"
+    },
+    "footerInquiries": "For legal inquiries contact",
+    "footerPrivacy": "Privacy:"
+  },
+  "reaccept": {
+    "title": "Updated legal agreements",
+    "description": "Our legal documents were updated (pack {{version}}{{previous}}). Review and accept the current agreements to continue using Supplify.",
+    "previousAccepted": " · you previously accepted {{version}}",
+    "signInRequired": "Please sign in to review updated legal agreements.",
+    "acceptRequired": "Please accept all required legal agreements before continuing.",
+    "saveError": "Could not save your acceptance. Try again.",
+    "saving": "Saving…",
+    "acceptContinue": "Accept and continue"
+  }
+}

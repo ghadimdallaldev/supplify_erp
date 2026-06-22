@@ -3,17 +3,19 @@ import { initReactI18next } from 'react-i18next'
 import {
   DEFAULT_LOCALE,
   EAGER_NAMESPACES,
+  LAZY_NAMESPACES,
   LOCALE_STORAGE_KEY,
   getLanguageDirection,
   isSupportedLocale,
 } from './config'
-import { loadNamespace, loadNamespaces } from './loadNamespace'
+import { lazyLocaleBackend, loadNamespace, loadNamespaces } from './loadNamespace'
 import type { I18nNamespace } from './config'
-
 import enCommon from './locales/en/common.json'
 import enNavigation from './locales/en/navigation.json'
 import arCommon from './locales/ar/common.json'
 import arNavigation from './locales/ar/navigation.json'
+
+const ALL_NAMESPACES = [...EAGER_NAMESPACES, ...LAZY_NAMESPACES] as const
 
 function readStoredLocale(): string {
   if (typeof window === 'undefined') return DEFAULT_LOCALE
@@ -53,39 +55,56 @@ export async function ensureNamespace(ns: I18nNamespace) {
 
 const initialLocale = readStoredLocale()
 
-void i18n.use(initReactI18next).init({
-  lng: initialLocale,
-  fallbackLng: DEFAULT_LOCALE,
-  supportedLngs: ['en', 'ar'],
-  ns: [...EAGER_NAMESPACES],
-  defaultNS: 'common',
-  resources: {
-    en: {
-      common: enCommon,
-      navigation: enNavigation,
-    },
-    ar: {
-      common: arCommon,
-      navigation: arNavigation,
-    },
-  },
-  interpolation: { escapeValue: false },
-  returnEmptyString: false,
-  react: { useSuspense: false },
-})
+if (!i18n.isInitialized) {
+  void i18n
+    .use(lazyLocaleBackend)
+    .use(initReactI18next)
+    .init({
+      lng: initialLocale,
+      fallbackLng: DEFAULT_LOCALE,
+      supportedLngs: ['en', 'ar'],
+      ns: [...EAGER_NAMESPACES],
+      defaultNS: 'common',
+      partialBundledLanguages: true,
+      resources: {
+        en: {
+          common: enCommon,
+          navigation: enNavigation,
+        },
+        ar: {
+          common: arCommon,
+          navigation: arNavigation,
+        },
+      },
+      interpolation: { escapeValue: false },
+      returnEmptyString: false,
+      react: { useSuspense: false },
+    })
 
-applyHtmlAttributes(initialLocale)
+  applyHtmlAttributes(initialLocale)
+}
+
+const nativeLoadNamespaces = i18n.loadNamespaces.bind(i18n)
+i18n.loadNamespaces = ((namespaces, callback) => {
+  const requested = Array.isArray(namespaces) ? namespaces : [namespaces]
+  const appNamespaces = requested.filter((ns): ns is I18nNamespace =>
+    ALL_NAMESPACES.includes(ns as I18nNamespace)
+  )
+
+  if (appNamespaces.length === 0) {
+    return nativeLoadNamespaces(namespaces, callback)
+  }
+
+  const promise = loadNamespaces(i18n, getActiveLocale(), appNamespaces)
+  void promise.then(
+    () => callback?.(undefined, i18n.t),
+    (error) => callback?.(error, i18n.t)
+  )
+  return promise
+}) as typeof i18n.loadNamespaces
 
 i18n.on('languageChanged', (lng) => {
   applyHtmlAttributes(lng.split('-')[0])
-  void loadNamespaces(i18n, lng.split('-')[0], [
-    'auth',
-    'settings',
-    'inventory',
-    'consumer',
-    'loyalty',
-    'calendar',
-  ])
 })
 
 export { i18n, loadNamespaces }

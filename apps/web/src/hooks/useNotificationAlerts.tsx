@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Bell } from 'lucide-react'
@@ -108,22 +108,25 @@ export function useNotificationAlerts() {
     }
   )
 
-  const alertForNotification = (item: NotificationLike) => {
-    if (!item.id || seenIdsRef.current.has(item.id)) return
-    seenIdsRef.current.add(item.id)
-    if (item.is_read) return
-    if (shouldSuppressChatToast(item, location.pathname, activeConversationIdRef.current)) {
-      return
-    }
-    playNotificationSound()
-    showNotificationToast(item, (path) => navigate(path))
-    showBrowserNotificationAlways(
-      item.title || 'Supplify',
-      item.message || 'You have a new notification',
-      resolveNotificationUrl(item)
-    )
-    dispatch(api.util.invalidateTags(['Notification']))
-  }
+  const alertForNotification = useCallback(
+    (item: NotificationLike) => {
+      if (!item.id || seenIdsRef.current.has(item.id)) return
+      seenIdsRef.current.add(item.id)
+      if (item.is_read) return
+      if (shouldSuppressChatToast(item, location.pathname, activeConversationIdRef.current)) {
+        return
+      }
+      playNotificationSound()
+      showNotificationToast(item, (path) => navigate(path))
+      showBrowserNotificationAlways(
+        item.title || 'Supplify',
+        item.message || 'You have a new notification',
+        resolveNotificationUrl(item)
+      )
+      dispatch(api.util.invalidateTags(['Notification']))
+    },
+    [dispatch, navigate, location.pathname]
+  )
 
   useEffect(() => {
     registerServiceWorker()
@@ -152,7 +155,7 @@ export function useNotificationAlerts() {
       socket.off('disconnect', onDisconnect)
       socket.off('notification_new', onNotificationNew)
     }
-  }, [user?.id, dispatch, navigate, location.pathname])
+  }, [user?.id, alertForNotification])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -198,5 +201,5 @@ export function useNotificationAlerts() {
     for (const item of newcomers) {
       alertForNotification(item)
     }
-  }, [data?.notifications, user])
+  }, [data?.notifications, user, alertForNotification])
 }

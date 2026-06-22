@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   useGetOrdersQuery,
   useUpdateOrderMutation,
@@ -58,14 +59,28 @@ import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { toast } from 'sonner'
 import { formatPrice } from '../utils/format'
 import { DeclineOrderDialog } from '../components/orders/DeclineOrderDialog'
-import { getOrderStatusLabel } from '../lib/orderStatusDisplay'
+import { resolveOrderStatusLabel } from '../components/orders/detail/orderDetailShared'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { getActiveDisputeForOrder } from '../lib/disputeHelpers'
 import { isDisputeReplacementOrder } from '../lib/orderPlacement'
 
 const ORDERS_PAGE_SIZE = 20
 
+const ORDER_STATUS_FILTER_VALUES = [
+  'PLACED',
+  'ACKNOWLEDGED',
+  'PROCESSING',
+  'SHIPPED',
+  'DELIVERED',
+  'RECEIVED_PARTIAL',
+  'RECEIVED_FULL',
+  'INVOICED',
+  'COMPLETED',
+  'CANCELLED',
+] as const
+
 export function OrdersPage() {
+  const { t } = useTranslation('orders')
   const [status, setStatus] = useState('')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -94,11 +109,11 @@ export function OrdersPage() {
   const { isEffectiveSupplier: isSupplier } = useImpersonation()
   const { persona } = useWorkspaceRole()
   const ordersTitle = isSupplier
-    ? 'Orders Inbox'
-    : (persona.pageCopy?.orders?.title ?? 'Orders Inbox')
+    ? (persona.pageCopy?.orders?.title ?? t('page.supplierTitle'))
+    : (persona.pageCopy?.orders?.title ?? t('page.restaurantTitle'))
   const ordersDescription = isSupplier
-    ? 'Manage inbound orders from restaurants'
-    : (persona.pageCopy?.orders?.description ?? 'Track your orders and their status')
+    ? (persona.pageCopy?.orders?.description ?? t('page.supplierDescription'))
+    : (persona.pageCopy?.orders?.description ?? t('page.restaurantDescription'))
   const canManageOrders = can('ORDERS_MANAGE')
   const canEditOrders = can('ORDERS_EDIT') || canManageOrders
   const canCreateOrders = can('ORDERS_CREATE') || canManageOrders
@@ -192,12 +207,12 @@ export function OrdersPage() {
 
   const handleCreateOrder = async () => {
     if (!selectedRestaurant) {
-      toast.error('Please select a restaurant')
+      toast.error(t('toast.selectRestaurant'))
       return
     }
 
     if (manualOrderItems.length === 0) {
-      toast.error('Please add at least one product to the order')
+      toast.error(t('toast.addProductRequired'))
       return
     }
 
@@ -208,7 +223,7 @@ export function OrdersPage() {
         notes: orderNotes,
       }).unwrap()
 
-      toast.success('Order created successfully!')
+      toast.success(t('toast.orderCreated'))
       setShowManualOrderDialog(false)
       setShowProductSelection(false)
       setSelectedRestaurant('')
@@ -216,7 +231,7 @@ export function OrdersPage() {
       setManualOrderItems([])
       refetch()
     } catch (error: any) {
-      const errorMessage = error?.data?.error?.message || 'Failed to create order'
+      const errorMessage = error?.data?.error?.message || t('toast.createFailed')
       const errorName = error?.data?.error?.name
 
       // For limit exceeded errors, show a more helpful message with upgrade suggestion
@@ -230,7 +245,7 @@ export function OrdersPage() {
           toast.custom(
             (id) => (
               <div className="flex items-center gap-3">
-                <span>💡 Want more orders? Upgrade your subscription!</span>
+                <span>{t('page.upgradeHint')}</span>
                 <button
                   onClick={() => {
                     toast.dismiss(id)
@@ -238,7 +253,7 @@ export function OrdersPage() {
                   }}
                   className="px-3 py-1 text-sm font-medium text-white bg-[var(--brand)] rounded-md hover:bg-[var(--brand)]/90 erp-pressable"
                 >
-                  View Plans
+                  {t('page.viewPlans')}
                 </button>
               </div>
             ),
@@ -296,12 +311,14 @@ export function OrdersPage() {
       await updateOrder({ id: orderId, data: { status: newStatus, ...extra } }).unwrap()
       const successLabel =
         newStatus === 'CANCELLED' && isSupplier
-          ? 'Order declined'
-          : `Order status updated to ${newStatus}`
+          ? t('toast.orderDeclined')
+          : t('toast.statusUpdated', {
+              status: t(`status.${newStatus}`, { defaultValue: newStatus }),
+            })
       toast.success(successLabel)
       setUpdatingOrderId(null)
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to update order status')
+      toast.error(error?.data?.error?.message || t('toast.updateFailed'))
       setUpdatingOrderId(null)
     }
   }
@@ -309,10 +326,10 @@ export function OrdersPage() {
   const handleSendReminder = async (orderId: string) => {
     try {
       await sendReminder(orderId).unwrap()
-      toast.success('Reminder sent to supplier successfully')
+      toast.success(t('toast.reminderSent'))
       refetch() // Refresh orders to update reminder count
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to send reminder')
+      toast.error(error?.data?.error?.message || t('toast.reminderFailed'))
     }
   }
 
@@ -387,15 +404,15 @@ export function OrdersPage() {
   }
 
   if (error) {
-    const errorMessage = (error as any)?.data?.error?.message || 'Failed to load orders'
+    const errorMessage = (error as any)?.data?.error?.message || t('page.loadFailedTitle')
     return (
       <EmptyState
-        title="Failed to load orders"
+        title={t('page.loadFailedTitle')}
         description={errorMessage}
         icon={<AlertCircle className="h-10 w-10" aria-hidden />}
         action={
           <Button onClick={() => refetch()} variant="outline">
-            Try again
+            {t('page.tryAgain')}
           </Button>
         }
       />
@@ -413,14 +430,14 @@ export function OrdersPage() {
               {isSupplier && canCreateOrders && (
                 <Button onClick={() => setShowManualOrderDialog(true)}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Create Order
+                  {t('page.createOrder')}
                 </Button>
               )}
               {!isSupplier && canCreateOrders && (
                 <Button asChild>
                   <Link to="/app/cart" data-testid="orders-create-new-order">
                     <Plus className="h-4 w-4 mr-2" />
-                    Create New Order
+                    {t('page.createNewOrder')}
                   </Link>
                 </Button>
               )}
@@ -439,13 +456,13 @@ export function OrdersPage() {
               <Input
                 placeholder={
                   isSupplier
-                    ? 'Search by order ID or restaurant…'
-                    : 'Search by order ID, restaurant, or supplier…'
+                    ? t('page.searchSupplierPlaceholder')
+                    : t('page.searchRestaurantPlaceholder')
                 }
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className={`${ordersFilterControlClass} pl-11 pr-4`}
-                aria-label="Search orders"
+                aria-label={t('page.searchAriaLabel')}
               />
             </div>
           }
@@ -459,18 +476,13 @@ export function OrdersPage() {
                   if (value) setActiveTab('all')
                 }}
               >
-                <SelectTrigger className="shadow-sm" aria-label="Filter by order status">
-                  <option value="">All Statuses</option>
-                  <option value="PLACED">Placed</option>
-                  <option value="ACKNOWLEDGED">Acknowledged</option>
-                  <option value="PROCESSING">Processing</option>
-                  <option value="SHIPPED">Shipped</option>
-                  <option value="DELIVERED">Delivered</option>
-                  <option value="RECEIVED_PARTIAL">Received (Partial)</option>
-                  <option value="RECEIVED_FULL">Received (Full)</option>
-                  <option value="INVOICED">Invoiced</option>
-                  <option value="COMPLETED">Completed</option>
-                  <option value="CANCELLED">Cancelled</option>
+                <SelectTrigger className="shadow-sm" aria-label={t('page.filterStatusAriaLabel')}>
+                  <option value="">{t('page.allStatuses')}</option>
+                  {ORDER_STATUS_FILTER_VALUES.map((statusValue) => (
+                    <option key={statusValue} value={statusValue}>
+                      {t(`status.${statusValue}`)}
+                    </option>
+                  ))}
                 </SelectTrigger>
               </Select>
               <Button
@@ -481,10 +493,10 @@ export function OrdersPage() {
                 aria-expanded={moreFiltersOpen}
               >
                 <Filter className="h-4 w-4" />
-                More Filters
+                {t('page.moreFilters')}
                 {hasAdvancedFilters ? (
                   <Badge variant="secondary" className="ml-0.5 px-2 py-0 text-xs font-medium">
-                    On
+                    {t('page.filtersOn')}
                   </Badge>
                 ) : null}
               </Button>
@@ -496,26 +508,28 @@ export function OrdersPage() {
               <div className="mb-4 border-b border-[var(--app-border)] pb-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="mr-1 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-                    Active filters
+                    {t('page.activeFilters')}
                   </span>
                   {debouncedSearch ? (
                     <Badge variant="outline" className="px-2.5 py-1 font-normal">
-                      Search: {debouncedSearch}
+                      {t('page.filterSearch', { value: debouncedSearch })}
                     </Badge>
                   ) : null}
                   {status ? (
                     <Badge variant="outline" className="px-2.5 py-1 font-normal">
-                      Status: {status}
+                      {t('page.filterStatus', {
+                        value: t(`status.${status}`, { defaultValue: status }),
+                      })}
                     </Badge>
                   ) : null}
                   {dateFrom ? (
                     <Badge variant="outline" className="px-2.5 py-1 font-normal">
-                      From: {dateFrom}
+                      {t('page.filterFrom', { value: dateFrom })}
                     </Badge>
                   ) : null}
                   {dateTo ? (
                     <Badge variant="outline" className="px-2.5 py-1 font-normal">
-                      To: {dateTo}
+                      {t('page.filterTo', { value: dateTo })}
                     </Badge>
                   ) : null}
                   <Button
@@ -525,7 +539,7 @@ export function OrdersPage() {
                     className="h-8 px-3 text-xs"
                     onClick={clearAllFilters}
                   >
-                    Clear all
+                    {t('page.clearAll')}
                   </Button>
                 </div>
               </div>
@@ -534,14 +548,12 @@ export function OrdersPage() {
             <Dialog open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
               <DialogContent size="sm">
                 <DialogHeader>
-                  <DialogTitle>More filters</DialogTitle>
-                  <DialogDescription>
-                    Narrow orders by placed date. Search and status filters apply from the toolbar.
-                  </DialogDescription>
+                  <DialogTitle>{t('page.moreFiltersTitle')}</DialogTitle>
+                  <DialogDescription>{t('page.moreFiltersDescription')}</DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor="orders-date-from">Placed from</Label>
+                    <Label htmlFor="orders-date-from">{t('page.placedFrom')}</Label>
                     <Input
                       id="orders-date-from"
                       type="date"
@@ -551,7 +563,7 @@ export function OrdersPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="orders-date-to">Placed to</Label>
+                    <Label htmlFor="orders-date-to">{t('page.placedTo')}</Label>
                     <Input
                       id="orders-date-to"
                       type="date"
@@ -563,10 +575,10 @@ export function OrdersPage() {
                 </div>
                 <DialogFooter className="gap-2 sm:gap-0">
                   <Button type="button" variant="outline" onClick={clearAllFilters}>
-                    Clear all
+                    {t('page.clearAll')}
                   </Button>
                   <Button type="button" onClick={() => setMoreFiltersOpen(false)}>
-                    Apply
+                    {t('page.apply')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -576,19 +588,19 @@ export function OrdersPage() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
               <TabsList className="h-auto w-full flex-wrap justify-start gap-1 p-1.5">
                 <TabsTrigger value="all" className="px-3 py-2">
-                  All Orders
+                  {t('page.tabs.all')}
                 </TabsTrigger>
                 <TabsTrigger value="new" className="px-3 py-2">
-                  New (Needs Action)
+                  {t('page.tabs.new')}
                 </TabsTrigger>
                 <TabsTrigger value="processing" className="px-3 py-2">
-                  Processing
+                  {t('page.tabs.processing')}
                 </TabsTrigger>
                 <TabsTrigger value="shipped" className="px-3 py-2">
-                  Shipped
+                  {t('page.tabs.shipped')}
                 </TabsTrigger>
                 <TabsTrigger value="completed" className="px-3 py-2">
-                  Completed
+                  {t('page.tabs.completed')}
                 </TabsTrigger>
               </TabsList>
 
@@ -605,7 +617,9 @@ export function OrdersPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                               <CardTitle className="text-lg">
-                                Order #{order.id.slice(-8).toUpperCase()}
+                                {t('page.orderNumber', {
+                                  id: order.id.slice(-8).toUpperCase(),
+                                })}
                               </CardTitle>
                               <span className="inline-flex items-center gap-1">
                                 <span className="text-[var(--text-muted)]" aria-hidden>
@@ -613,13 +627,14 @@ export function OrdersPage() {
                                 </span>
                                 <StatusBadge
                                   status={order.status}
-                                  label={getOrderStatusLabel(
+                                  label={resolveOrderStatusLabel(
+                                    t,
                                     order,
                                     isSupplier ? 'SUPPLIER' : 'RESTAURANT'
                                   )}
                                 />
                                 {isDisputeReplacementOrder(order) && (
-                                  <Badge variant="secondary">Replacement</Badge>
+                                  <Badge variant="secondary">{t('page.replacement')}</Badge>
                                 )}
                                 {disputesEnabled &&
                                   getActiveDisputeForOrder(allDisputes, order.id) && (
@@ -628,7 +643,7 @@ export function OrdersPage() {
                                       className="border-amber-400 text-amber-800 bg-amber-50"
                                     >
                                       <Scale className="h-3 w-3 mr-1" aria-hidden />
-                                      Dispute open
+                                      {t('page.disputeOpen')}
                                     </Badge>
                                   )}
                                 {!isSupplier &&
@@ -641,31 +656,33 @@ export function OrdersPage() {
                                   )}
                               </span>
                               {order.status === 'PLACED' && isSupplier && (
-                                <Badge variant="destructive">Action Required</Badge>
+                                <Badge variant="destructive">{t('page.actionRequired')}</Badge>
                               )}
                             </div>
                             <div className="text-sm text-[var(--text-muted)] space-y-1">
-                              <div>Restaurant: {order.restaurant_name}</div>
+                              <div>{t('page.restaurant', { name: order.restaurant_name })}</div>
                               <div>
-                                Placed:{' '}
-                                {new Date(order.placed_at || order.created_at).toLocaleString()}
+                                {t('page.placed', {
+                                  date: new Date(
+                                    order.placed_at || order.created_at
+                                  ).toLocaleString(),
+                                })}
                               </div>
                               {!isSupplier && order.status === 'DELIVERED' && (
                                 <div className="mt-2 p-2 rounded bg-[var(--brand-ultra)] text-[var(--brand-mid)] border border-[var(--app-border)] text-xs">
-                                  Supplier marked this order as delivered. Please{' '}
+                                  {t('page.deliveredReceiveHintBefore')}{' '}
                                   <Link
                                     to={`/app/receiving?order=${order.id}`}
                                     className="underline"
                                   >
-                                    receive this order
+                                    {t('page.deliveredReceiveLink')}
                                   </Link>{' '}
-                                  to update inventory and generate an invoice.
+                                  {t('page.deliveredReceiveHintAfter')}
                                 </div>
                               )}
                               {isSupplier && order.status === 'DELIVERED' && (
                                 <div className="mt-2 p-2 rounded bg-[var(--amber-pale)] text-[var(--amber)] border border-[var(--amber-mid)]/35 text-xs">
-                                  Awaiting restaurant receiving. You’ll see the invoice after they
-                                  receive.
+                                  {t('page.awaitingReceivingHint')}
                                 </div>
                               )}
                             </div>
@@ -675,7 +692,7 @@ export function OrdersPage() {
                               {`$${formatPrice(order.total_amount)}`}
                             </div>
                             <div className="text-sm text-[var(--text-muted)]">
-                              {order.items?.length || 0} items
+                              {t('page.itemsCount', { count: order.items?.length || 0 })}
                             </div>
                           </div>
                         </div>
@@ -684,7 +701,9 @@ export function OrdersPage() {
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                           {/* Order Items Preview */}
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm text-[var(--text-muted)] mb-2">Items:</div>
+                            <div className="text-sm text-[var(--text-muted)] mb-2">
+                              {t('page.itemsLabel')}
+                            </div>
                             <div className="flex flex-wrap gap-2">
                               {order.items?.slice(0, 3).map((item: any, idx: number) => (
                                 <Badge key={idx} variant="outline" className="text-xs">
@@ -693,7 +712,7 @@ export function OrdersPage() {
                               ))}
                               {order.items && order.items.length > 3 && (
                                 <Badge variant="outline" className="text-xs">
-                                  +{order.items.length - 3} more
+                                  {t('page.moreItems', { count: order.items.length - 3 })}
                                 </Badge>
                               )}
                             </div>
@@ -708,7 +727,7 @@ export function OrdersPage() {
                                   onClick={() => handleStatusUpdate(order.id, 'ACKNOWLEDGED')}
                                   data-testid={`order-${order.id}-acknowledge`}
                                 >
-                                  Acknowledge
+                                  {t('page.acknowledge')}
                                 </Button>
                                 {canDeclineOrder && (
                                   <Button
@@ -720,7 +739,7 @@ export function OrdersPage() {
                                     }}
                                     data-testid={`order-${order.id}-decline`}
                                   >
-                                    Decline
+                                    {t('page.decline')}
                                   </Button>
                                 )}
                               </>
@@ -731,7 +750,7 @@ export function OrdersPage() {
                                 onClick={() => handleStatusUpdate(order.id, 'PROCESSING')}
                                 data-testid={`order-${order.id}-start-processing`}
                               >
-                                Start Processing
+                                {t('page.startProcessing')}
                               </Button>
                             )}
                             {isSupplier && canEditOrders && order.status === 'PROCESSING' && (
@@ -740,7 +759,7 @@ export function OrdersPage() {
                                 onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}
                                 data-testid={`order-${order.id}-ship`}
                               >
-                                Mark as Shipped
+                                {t('page.markShipped')}
                               </Button>
                             )}
                             {isSupplier &&
@@ -753,7 +772,7 @@ export function OrdersPage() {
                                   disabled={false}
                                   data-testid={`order-${order.id}-deliver`}
                                 >
-                                  Mark Delivered
+                                  {t('page.markDelivered')}
                                 </Button>
                               )}
                             {isSupplier &&
@@ -765,11 +784,11 @@ export function OrdersPage() {
                                   className="cursor-not-allowed opacity-75"
                                 >
                                   {updatingOrderId === order.id ? (
-                                    <>Updating...</>
+                                    <>{t('page.updating')}</>
                                   ) : (
                                     <>
                                       <CheckCircle className="h-4 w-4 mr-1" />
-                                      Delivered
+                                      {t('page.delivered')}
                                     </>
                                   )}
                                 </Button>
@@ -782,21 +801,21 @@ export function OrdersPage() {
                               >
                                 <AlertCircle className="h-4 w-4 mr-1" />
                                 {order.reminder_count > 0
-                                  ? `Remind (${order.reminder_count})`
-                                  : 'Send Reminder'}
+                                  ? t('page.remindCount', { count: order.reminder_count })
+                                  : t('page.sendReminder')}
                               </Button>
                             )}
                             <Button variant="outline" size="sm" asChild>
                               <Link to={`/app/orders/${order.id}`}>
                                 <FileText className="h-4 w-4 mr-1" />
-                                View Details
+                                {t('page.viewDetails')}
                               </Link>
                             </Button>
                             {isSupplier && (
                               <Button variant="outline" size="sm" asChild>
                                 <Link to={`/app/orders/${order.id}?tab=packing`}>
                                   <Package className="h-4 w-4 mr-1" />
-                                  Packing Slip
+                                  {t('page.packingSlip')}
                                 </Link>
                               </Button>
                             )}
@@ -811,15 +830,15 @@ export function OrdersPage() {
                   <EmptyState
                     title={
                       debouncedSearch || status || hasAdvancedFilters || activeTab !== 'all'
-                        ? 'No orders match your filters'
-                        : 'No orders yet'
+                        ? t('page.emptyFilteredTitle')
+                        : t('page.emptyTitle')
                     }
                     description={
                       debouncedSearch || status || hasAdvancedFilters || activeTab !== 'all'
-                        ? 'Try adjusting search, status, or date filters.'
+                        ? t('page.emptyFilteredDescription')
                         : !isSupplier
-                          ? 'Create your first order to get started.'
-                          : 'Orders from restaurants will appear here.'
+                          ? t('page.emptyRestaurantDescription')
+                          : t('page.emptySupplierDescription')
                     }
                     icon={<ShoppingCart className="h-10 w-10" aria-hidden />}
                     action={
@@ -832,7 +851,7 @@ export function OrdersPage() {
                         <Button asChild>
                           <Link to="/app/cart">
                             <Plus className="h-4 w-4 mr-2" />
-                            Create first order
+                            {t('page.createFirstOrder')}
                           </Link>
                         </Button>
                       ) : undefined
@@ -848,8 +867,8 @@ export function OrdersPage() {
                 data-testid="orders-pagination"
               >
                 <p className="text-sm text-[var(--text-muted)]">
-                  Showing {rangeStart}–{rangeEnd}
-                  {total != null ? ` of ${total}` : ''}
+                  {t('page.paginationShowing', { start: rangeStart, end: rangeEnd })}
+                  {total != null ? t('page.paginationOf', { total }) : ''}
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
@@ -861,7 +880,7 @@ export function OrdersPage() {
                     data-testid="orders-prev-page"
                   >
                     <ChevronLeft className="mr-1 h-4 w-4" />
-                    Previous
+                    {t('page.previous')}
                   </Button>
                   <Button
                     type="button"
@@ -871,7 +890,7 @@ export function OrdersPage() {
                     onClick={() => setOffset((prev) => prev + pageSize)}
                     data-testid="orders-next-page"
                   >
-                    Next
+                    {t('page.next')}
                     <ChevronRight className="ml-1 h-4 w-4" />
                   </Button>
                 </div>
@@ -885,23 +904,20 @@ export function OrdersPage() {
           <Dialog open={showManualOrderDialog} onOpenChange={setShowManualOrderDialog}>
             <DialogContent size="lg">
               <DialogHeader>
-                <DialogTitle>Create Manual Order</DialogTitle>
-                <DialogDescription>
-                  Create an order for a restaurant that follows you or has ordered from you before
-                  (phone calls, chat orders, etc.)
-                </DialogDescription>
+                <DialogTitle>{t('page.manualOrderTitle')}</DialogTitle>
+                <DialogDescription>{t('page.manualOrderDescription')}</DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4">
                 {/* Restaurant Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="restaurant">Restaurant *</Label>
+                  <Label htmlFor="restaurant">{t('page.restaurantRequired')}</Label>
                   <Select value={selectedRestaurant} onValueChange={setSelectedRestaurant}>
                     <SelectTrigger id="restaurant">
                       <option value="">
                         {(restaurantsData?.restaurants?.length ?? 0) === 0
-                          ? 'No eligible restaurants yet'
-                          : 'Select a restaurant'}
+                          ? t('page.noEligibleRestaurants')
+                          : t('page.selectRestaurant')}
                       </option>
                       {restaurantsData?.restaurants?.map((restaurant: any) => (
                         <option key={restaurant.id} value={restaurant.id}>
@@ -912,20 +928,19 @@ export function OrdersPage() {
                   </Select>
                   {(restaurantsData?.restaurants?.length ?? 0) === 0 && (
                     <p className="text-xs text-[var(--text-muted)]">
-                      Restaurants appear here after they follow your supplier profile or place their
-                      first order with you.
+                      {t('page.eligibleRestaurantsHint')}
                     </p>
                   )}
                 </div>
 
                 {/* Order Notes */}
                 <div className="space-y-2">
-                  <Label htmlFor="orderNotes">Order Notes</Label>
+                  <Label htmlFor="orderNotes">{t('page.orderNotes')}</Label>
                   <textarea
                     id="orderNotes"
                     rows={3}
                     className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
-                    placeholder="Additional notes for this order..."
+                    placeholder={t('page.orderNotesPlaceholder')}
                     value={orderNotes}
                     onChange={(e) => setOrderNotes(e.target.value)}
                   />
@@ -934,14 +949,14 @@ export function OrdersPage() {
                 {/* Products in Order */}
                 {manualOrderItems.length > 0 && (
                   <div className="space-y-2">
-                    <Label>Products in Order</Label>
+                    <Label>{t('page.productsInOrder')}</Label>
                     <div className="border rounded-md divide-y">
                       {manualOrderItems.map((item) => (
                         <div key={item.productId} className="flex items-center justify-between p-3">
                           <div className="flex-1">
                             <p className="font-medium">{item.productName}</p>
                             <p className="text-sm text-[var(--text-muted)]">
-                              ${formatPrice(item.price)} each
+                              {t('page.priceEach', { price: formatPrice(item.price) })}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -979,7 +994,7 @@ export function OrdersPage() {
                   className="w-full"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Products
+                  {t('page.addProducts')}
                 </Button>
               </div>
 
@@ -993,7 +1008,7 @@ export function OrdersPage() {
                     setManualOrderItems([])
                   }}
                 >
-                  Cancel
+                  {t('page.cancel')}
                 </Button>
                 <Button
                   disabled={
@@ -1001,7 +1016,7 @@ export function OrdersPage() {
                   }
                   onClick={handleCreateOrder}
                 >
-                  {isCreatingManualOrder ? 'Creating...' : 'Create Order'}
+                  {isCreatingManualOrder ? t('page.creating') : t('page.createOrder')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -1012,8 +1027,8 @@ export function OrdersPage() {
         <Dialog open={showProductSelection} onOpenChange={setShowProductSelection}>
           <DialogContent size="xl">
             <DialogHeader>
-              <DialogTitle>Select Products</DialogTitle>
-              <DialogDescription>Search and add products to the order</DialogDescription>
+              <DialogTitle>{t('page.selectProductsTitle')}</DialogTitle>
+              <DialogDescription>{t('page.selectProductsDescription')}</DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">
@@ -1021,7 +1036,7 @@ export function OrdersPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                 <Input
-                  placeholder="Search products..."
+                  placeholder={t('page.searchProductsPlaceholder')}
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
                   className="pl-10"
@@ -1046,24 +1061,26 @@ export function OrdersPage() {
                       size="sm"
                       onClick={() => {
                         handleAddProductToOrder(product)
-                        toast.success(`Added ${product.name} to order`)
+                        toast.success(t('toast.productAdded', { name: product.name }))
                       }}
                     >
                       <Plus className="h-4 w-4 mr-1" />
-                      Add
+                      {t('page.add')}
                     </Button>
                   </div>
                 ))}
 
                 {(!filteredProducts || filteredProducts.length === 0) && (
-                  <div className="text-center py-8 text-[var(--text-muted)]">No products found</div>
+                  <div className="text-center py-8 text-[var(--text-muted)]">
+                    {t('page.noProductsFound')}
+                  </div>
                 )}
               </div>
             </div>
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowProductSelection(false)}>
-                Done
+                {t('page.done')}
               </Button>
             </DialogFooter>
           </DialogContent>

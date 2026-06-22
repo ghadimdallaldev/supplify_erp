@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ClipboardList, CheckCircle2 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
@@ -25,20 +26,21 @@ function todayIsoDate() {
   return new Date().toISOString().slice(0, 10)
 }
 
-function waveStatusLabel(status: string) {
+function waveStatusLabel(status: string, t: (key: string) => string) {
   switch (status) {
     case 'PICKING':
-      return 'Picking'
+      return t('pickWaves.status.picking')
     case 'PICKED':
-      return 'Picked'
+      return t('pickWaves.status.picked')
     case 'PENDING':
-      return 'Pending'
+      return t('pickWaves.status.pending')
     default:
       return status
   }
 }
 
 export function PickListsTab({ warehouseId }: Props) {
+  const { t } = useTranslation('fulfillment')
   const { can } = usePermissions()
   const canManage = can('FULFILLMENT_MANAGE')
   const today = todayIsoDate()
@@ -77,14 +79,14 @@ export function PickListsTab({ warehouseId }: Props) {
         date: today,
         warehouseId,
       }).unwrap()
-      toast.success('Pick wave generated')
+      toast.success(t('pickWaves.toast.generated'))
       refetchWaves()
       const newId = (result.wave as { id?: string }).id
       if (newId) setSelectedWaveId(newId)
     } catch (err: unknown) {
       const message =
         (err as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Failed to generate wave'
+        t('pickWaves.toast.generateFailed')
       toast.error(message)
     }
   }
@@ -93,7 +95,7 @@ export function PickListsTab({ warehouseId }: Props) {
     const raw = pickedDraft[itemId]
     const quantityPicked = raw != null && raw !== '' ? Number(raw) : quantityOrdered
     if (!Number.isFinite(quantityPicked) || quantityPicked < 0) {
-      toast.error('Enter a valid picked quantity')
+      toast.error(t('pickWaves.toast.invalidQuantity'))
       return
     }
     try {
@@ -107,7 +109,7 @@ export function PickListsTab({ warehouseId }: Props) {
     } catch (err: unknown) {
       const message =
         (err as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Failed to update pick line'
+        t('pickWaves.toast.updateLineFailed')
       toast.error(message)
     }
   }
@@ -116,13 +118,13 @@ export function PickListsTab({ warehouseId }: Props) {
     if (!selectedWaveId) return
     try {
       await completeWave(selectedWaveId).unwrap()
-      toast.success('Wave picking completed')
+      toast.success(t('pickWaves.toast.completed'))
       refetchWaves()
       refetchDetail()
     } catch (err: unknown) {
       const message =
         (err as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Failed to complete wave'
+        t('pickWaves.toast.completeFailed')
       toast.error(message)
     }
   }
@@ -135,11 +137,9 @@ export function PickListsTab({ warehouseId }: Props) {
             <div className="min-w-0">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                 <ClipboardList className="h-4 w-4 shrink-0 text-[var(--brand-mid)]" aria-hidden />
-                Pick waves — {today}
+                {t('pickWaves.title', { date: today })}
               </h2>
-              <p className="mt-0.5 text-xs text-[var(--text-mid)]">
-                Generate a wave for today and check off picked quantities
-              </p>
+              <p className="mt-0.5 text-xs text-[var(--text-mid)]">{t('pickWaves.subtitle')}</p>
             </div>
             {canManage && (
               <Button
@@ -149,7 +149,7 @@ export function PickListsTab({ warehouseId }: Props) {
                 disabled={isGenerating}
                 data-testid="generate-pick-wave"
               >
-                {isGenerating ? 'Generating…' : 'Generate for today'}
+                {isGenerating ? t('pickWaves.generating') : t('pickWaves.generateForToday')}
               </Button>
             )}
           </div>
@@ -163,7 +163,7 @@ export function PickListsTab({ warehouseId }: Props) {
             </div>
           ) : wavesError ? (
             <div className="py-10 text-center" data-testid="picklists-error" role="alert">
-              <p className="text-sm text-[var(--text-muted)]">Could not load pick waves.</p>
+              <p className="text-sm text-[var(--text-muted)]">{t('pickWaves.loadFailed')}</p>
               <Button
                 type="button"
                 variant="outline"
@@ -171,7 +171,7 @@ export function PickListsTab({ warehouseId }: Props) {
                 className="mt-3"
                 onClick={() => refetchWaves()}
               >
-                Retry
+                {t('common:actions.retry')}
               </Button>
             </div>
           ) : waves.length === 0 ? (
@@ -183,9 +183,9 @@ export function PickListsTab({ warehouseId }: Props) {
                 className="mx-auto mb-3 h-9 w-9 text-[var(--text-muted)]"
                 aria-hidden
               />
-              <p className="text-sm font-medium text-[var(--text)]">No pick waves for today</p>
+              <p className="text-sm font-medium text-[var(--text)]">{t('pickWaves.emptyTitle')}</p>
               <p className="mt-1 text-xs text-[var(--text-mid)]">
-                Generate a wave from eligible processing or shipped orders.
+                {t('pickWaves.emptyDescription')}
               </p>
             </div>
           ) : (
@@ -205,11 +205,15 @@ export function PickListsTab({ warehouseId }: Props) {
                     <div>
                       <p className="font-medium text-[var(--text)]">{w.waveNumber}</p>
                       <p className="text-xs text-[var(--text-muted)]">
-                        {w.orderCount} orders · {w.itemsPicked}/{w.itemCount} lines picked
+                        {t('pickWaves.ordersSummary', {
+                          orders: w.orderCount,
+                          picked: w.itemsPicked,
+                          total: w.itemCount,
+                        })}
                       </p>
                     </div>
                     <Badge variant={w.status === 'PICKED' ? 'default' : 'secondary'}>
-                      {waveStatusLabel(w.status)}
+                      {waveStatusLabel(w.status, t)}
                     </Badge>
                   </div>
                 </button>
@@ -228,11 +232,9 @@ export function PickListsTab({ warehouseId }: Props) {
             <div className={splitRowClass}>
               <div>
                 <h3 className="text-sm font-semibold text-[var(--text)]">
-                  {wave?.waveNumber ?? 'Pick checklist'}
+                  {wave?.waveNumber ?? t('pickWaves.checklistTitle')}
                 </h3>
-                <p className="text-xs text-[var(--text-mid)]">
-                  Enter picked quantities for each line
-                </p>
+                <p className="text-xs text-[var(--text-mid)]">{t('pickWaves.checklistSubtitle')}</p>
               </div>
               {canManage && wave && wave.status !== 'PICKED' && (
                 <Button
@@ -244,7 +246,7 @@ export function PickListsTab({ warehouseId }: Props) {
                   data-testid="complete-pick-wave"
                 >
                   <CheckCircle2 className="mr-1.5 h-4 w-4" aria-hidden />
-                  {isCompleting ? 'Completing…' : 'Complete picking'}
+                  {isCompleting ? t('pickWaves.completing') : t('pickWaves.completePicking')}
                 </Button>
               )}
             </div>
@@ -256,7 +258,9 @@ export function PickListsTab({ warehouseId }: Props) {
               </div>
             ) : detailError ? (
               <div className="py-8 text-center" role="alert">
-                <p className="text-sm text-[var(--text-muted)]">Could not load wave detail.</p>
+                <p className="text-sm text-[var(--text-muted)]">
+                  {t('pickWaves.detailLoadFailed')}
+                </p>
                 <Button
                   type="button"
                   variant="outline"
@@ -264,11 +268,11 @@ export function PickListsTab({ warehouseId }: Props) {
                   className="mt-3"
                   onClick={() => refetchDetail()}
                 >
-                  Retry
+                  {t('common:actions.retry')}
                 </Button>
               </div>
             ) : !wave?.pickLists?.length ? (
-              <p className="text-sm text-[var(--text-muted)]">No pick lists in this wave.</p>
+              <p className="text-sm text-[var(--text-muted)]">{t('pickWaves.noPickLists')}</p>
             ) : (
               <div className="space-y-6">
                 {wave.pickLists.map((pickList) => (
@@ -284,8 +288,11 @@ export function PickListsTab({ warehouseId }: Props) {
                           {pickList.orderLabel ? ` · #${pickList.orderLabel}` : ''}
                         </p>
                         <p className="text-xs text-[var(--text-muted)]">
-                          {pickList.warehouseName || 'Warehouse'} · {pickList.itemsPicked}/
-                          {pickList.itemCount} picked
+                          {pickList.warehouseName || t('pickWaves.warehouseFallback')} ·{' '}
+                          {t('pickWaves.pickedSummary', {
+                            picked: pickList.itemsPicked,
+                            total: pickList.itemCount,
+                          })}
                         </p>
                       </div>
                       <Badge variant={pickList.status === 'COMPLETED' ? 'default' : 'secondary'}>
@@ -309,7 +316,9 @@ export function PickListsTab({ warehouseId }: Props) {
                               <Checkbox
                                 checked={isDone}
                                 disabled
-                                aria-label={`${item.productName} picked`}
+                                aria-label={t('pickWaves.pickedAria', {
+                                  product: item.productName,
+                                })}
                                 className="mt-0.5"
                               />
                               <div className="min-w-0">
@@ -327,7 +336,7 @@ export function PickListsTab({ warehouseId }: Props) {
                                 htmlFor={`picked-${item.id}`}
                                 className="text-xs text-[var(--text-muted)]"
                               >
-                                Qty
+                                {t('pickWaves.qty')}
                               </Label>
                               <Input
                                 id={`picked-${item.id}`}
@@ -354,7 +363,7 @@ export function PickListsTab({ warehouseId }: Props) {
                                     handleSaveItem(pickList.id, item.id, item.quantityOrdered)
                                   }
                                 >
-                                  Save
+                                  {t('common:actions.save')}
                                 </Button>
                               )}
                             </div>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useGetOrderQuery } from '../../../services/api'
 import { OrderProofOfDeliveryPanel } from '../../fulfillment/OrderProofOfDeliveryPanel'
 import { useImpersonation } from '../../../hooks/useImpersonation'
@@ -14,6 +15,7 @@ export interface OrderDeliveryTabProps {
 }
 
 export function OrderDeliveryTab({ orderId }: OrderDeliveryTabProps) {
+  const { t } = useTranslation('orders')
   const { isEffectiveSupplier: isSupplier } = useImpersonation()
   const { data, isLoading } = useGetOrderQuery(orderId)
 
@@ -37,25 +39,27 @@ export function OrderDeliveryTab({ orderId }: OrderDeliveryTabProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Truck className="h-5 w-5" />
-              Delivery Instructions
+              {t('deliveryTab.deliveryInstructions')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm font-medium text-[var(--text-muted)] mb-1">
-                Delivery Time Window
+                {t('deliveryTab.deliveryTimeWindow')}
               </p>
-              <p className="text-sm">{operatingHoursLabel || 'Not specified'}</p>
+              <p className="text-sm">{operatingHoursLabel || t('deliveryTab.notSpecified')}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-[var(--text-muted)] mb-1">
-                Access Instructions
+                {t('deliveryTab.accessInstructions')}
               </p>
-              <p className="text-sm">{deliveryInstructions || 'Not specified'}</p>
+              <p className="text-sm">{deliveryInstructions || t('deliveryTab.notSpecified')}</p>
             </div>
             {deliveryPhone && (
               <div>
-                <p className="text-sm font-medium text-[var(--text-muted)] mb-1">Contact</p>
+                <p className="text-sm font-medium text-[var(--text-muted)] mb-1">
+                  {t('deliveryTab.contact')}
+                </p>
                 <p className="text-sm">{deliveryPhone}</p>
               </div>
             )}
@@ -66,7 +70,7 @@ export function OrderDeliveryTab({ orderId }: OrderDeliveryTabProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5" />
-              Delivery Address
+              {t('deliveryTab.deliveryAddress')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -74,7 +78,7 @@ export function OrderDeliveryTab({ orderId }: OrderDeliveryTabProps) {
               <p className="font-medium">{order.restaurant_name}</p>
               {(order as any).branch_name && (
                 <p className="text-sm text-[var(--text-muted)]">
-                  Branch: {(order as any).branch_name}
+                  {t('deliveryTab.branch', { name: (order as any).branch_name })}
                 </p>
               )}
               {addressLines.length > 0 ? (
@@ -86,7 +90,7 @@ export function OrderDeliveryTab({ orderId }: OrderDeliveryTabProps) {
                   ))}
                 </p>
               ) : (
-                <p className="text-sm text-[var(--text-muted)]">No delivery address on file</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('deliveryTab.noAddress')}</p>
               )}
             </div>
           </CardContent>

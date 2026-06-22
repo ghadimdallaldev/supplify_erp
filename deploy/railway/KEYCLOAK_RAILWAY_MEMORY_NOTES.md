@@ -1,6 +1,6 @@
 # Keycloak on Railway — memory & JVM (all environments)
 
-Applies to **all** Railway Keycloak services. See also [`docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`](../../docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md) for the full incident write-up.
+Applies to **all** Railway Keycloak services. See also [`docs/operations/keycloak-railway-memory-fix.md`](../../docs/operations/keycloak-railway-memory-fix.md) for the full incident write-up.
 
 ## Per-environment settings (current)
 
@@ -102,4 +102,4 @@ Monitor: Railway → Keycloak service → Metrics.
 - `deploy/railway/keycloak/Dockerfile`
 - `deploy/railway/keycloak/railway-entrypoint.sh`
 - `deploy/railway/keycloak/RAILWAY_SETUP.md`
-- `docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`
+- `docs/operations/keycloak-railway-memory-fix.md`

@@ -1,0 +1,31 @@
+{
+  "page": {
+    "title": "العروض المتاحة",
+    "description": "عروض الموردين الذين تتابعهم، بالإضافة إلى العروض الممولة من موردين جدد",
+    "redemptionsToday": "استردادات العروض اليوم: {{current}}/{{limit}}",
+    "sort": "ترتيب",
+    "supplier": "المورد",
+    "allSuppliers": "كل الموردين",
+    "expiringSoon": "تنتهي خلال 7 أيام",
+    "sponsored_one": "{{count}} عرض ممول في خلاصتك",
+    "sponsored_other": "{{count}} عروض ممولة في خلاصتك",
+    "sortOptions": {
+      "newest": "الأحدث",
+      "biggest_discount": "أكبر خصم",
+      "expiring_soon": "تنتهي قريباً",
+      "sponsored": "الممولة أولاً"
+    },
+    "empty": {
+      "supplierTitle": "لا توجد عروض من {{name}}",
+      "supplierTitleGeneric": "لا توجد عروض لهذا المورد",
+      "supplierDescription": "قد لا يكون لديه عروض نشطة حالياً. تصفّح خلاصتك الكاملة أو اختر مورداً آخر.",
+      "showAllSuppliers": "عرض كل الموردين",
+      "expiringTitle": "لا توجد عروض تنتهي خلال 7 أيام",
+      "expiringDescription": "أوقف «تنتهي خلال 7 أيام» لرؤية كل شيء في خلاصتك، أو عد لاحقاً عند نشر عروض جديدة.",
+      "showAllDeals": "عرض كل العروض",
+      "defaultTitle": "لا توجد عروض نشطة حالياً",
+      "defaultDescription": "عندما ينشر موردوك عروضاً، ستظهر هنا.",
+      "browseSuppliers": "تصفّح الموردين"
+    }
+  }
+}

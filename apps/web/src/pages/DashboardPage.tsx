@@ -1,4 +1,4 @@
-import { Link, Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import {
   useGetDashboardStatsQuery,
@@ -14,23 +14,11 @@ import {
   useGetInventoryListQuery,
 } from '../services/api'
 import { usePermissions } from '../hooks/usePermissions'
-import { Button } from '../components/ui/button'
 import { Skeleton } from '../components/ui/skeleton'
-import { StatusBadge } from '../components/ui/status-badge'
-import {
-  Package,
-  ShoppingCart,
-  Users,
-  Building2,
-  DollarSign,
-  Loader2,
-  AlertTriangle,
-  TrendingUp,
-  Warehouse,
-} from 'lucide-react'
-import { toast } from 'sonner'
-import { useState } from 'react'
+import { ShoppingCart, Users, Building2, DollarSign, AlertTriangle, TrendingUp } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ensureNamespace } from '../i18n'
 import { formatDate } from '../i18n/formatters'
 import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
@@ -40,7 +28,6 @@ import { canUseFinanceInvoices } from '../lib/planFeatureGates'
 import {
   getRestaurantDashboardLayout,
   shouldShowDashboardCalendar,
-  type DashboardKpiKey,
 } from '../lib/workspaceRoleProfile'
 import { formatPlanDisplayName } from '../lib/planComparison'
 import { formatCurrency } from '../utils/format'
@@ -52,6 +39,7 @@ import {
   KpiCard,
   buildOrderSpendTrend,
   type KpiCardProps,
+  type SpendTrendPeriodDays,
 } from '../components/dashboard/dashboardShared'
 import { DashboardLoading } from '../components/dashboard/DashboardLoading'
 import { DashboardPostOnboardingBanners } from '../components/dashboard/DashboardPostOnboardingBanners'
@@ -62,7 +50,11 @@ const CalendarView = lazy(() =>
 )
 
 export function DashboardPage() {
-  const { t } = useTranslation('common')
+  const { t } = useTranslation('dashboard')
+
+  useEffect(() => {
+    void ensureNamespace('dashboard')
+  }, [])
   const { user } = useAppSelector((state) => state.auth)
   const {
     isImpersonating,
@@ -128,16 +120,18 @@ export function DashboardPage() {
   })
   const [addItemToQuickList] = useAddItemToQuickListMutation()
   const [addingSuggestionId, setAddingSuggestionId] = useState<string | null>(null)
+  const [periodDays, setPeriodDays] = useState<SpendTrendPeriodDays>(30)
   const financeInvoicesEnabled = canUseFinanceInvoices(entitlementsData?.entitlements)
   const { data: invoiceAnalytics } = useGetInvoiceAnalyticsQuery(
-    { period: 30 },
+    { period: periodDays },
     { skip: !isRestaurant || !financeInvoicesEnabled }
   )
   const planName = formatPlanDisplayName(
     entitlementsData?.entitlements?.plan?.code,
     entitlementsData?.entitlements?.plan?.name
   )
-  const firstName = (user?.displayName || user?.email || '').split(/[\s@]/)[0] || 'there'
+  const firstName =
+    (user?.displayName || user?.email || '').split(/[\s@]/)[0] || t('greeting.fallbackName')
 
   const now = new Date()
   const hour = now.getHours()
@@ -172,9 +166,9 @@ export function DashboardPage() {
       <div style={{ textAlign: 'center', paddingTop: 64 }} data-testid="dashboard-page">
         <AlertTriangle size={32} style={{ color: 'var(--brand)', margin: '0 auto 12px' }} />
         <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
-          Failed to load dashboard
+          {t('error.loadFailed')}
         </p>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Please try refreshing the page</p>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('error.refreshHint')}</p>
       </div>
     )
   }
@@ -193,7 +187,10 @@ export function DashboardPage() {
         value: Number(p.total) || 0,
       }))
     : []
-  const orderSpendTrend = buildOrderSpendTrend(isRestaurant ? ordersData?.orders || [] : [])
+  const orderSpendTrend = buildOrderSpendTrend(
+    isRestaurant ? ordersData?.orders || [] : [],
+    periodDays
+  )
   const spendTrendSource: 'invoices' | 'orders' | null =
     invoiceSpendTrend.length > 0 ? 'invoices' : orderSpendTrend.length > 0 ? 'orders' : null
   const spendTrend = spendTrendSource === 'invoices' ? invoiceSpendTrend : orderSpendTrend
@@ -206,45 +203,48 @@ export function DashboardPage() {
   const supplierKpis: KpiCardProps[] = [
     {
       kpiKey: 'revenue',
-      label: 'Revenue',
-      value: typeof stats?.totalRevenue === 'number' ? formatCurrency(stats.totalRevenue) : '$0',
+      label: t('kpi.supplier.revenue.label'),
+      value:
+        typeof stats?.totalRevenue === 'number'
+          ? formatCurrency(stats.totalRevenue)
+          : t('kpi.zeroCurrency'),
       iconBg: 'var(--brand-pale)',
       iconColor: 'var(--brand)',
       Icon: DollarSign,
-      meta: 'All-time',
+      meta: t('kpi.supplier.revenue.meta'),
       sparkData: revenueSparkData,
       sparkColor: 'var(--brand)',
     },
     {
       kpiKey: 'orders',
-      label: 'Orders',
+      label: t('kpi.supplier.orders.label'),
       value: stats?.totalOrders ?? 0,
       iconBg: 'var(--mint-pale)',
       iconColor: 'var(--mint)',
       Icon: ShoppingCart,
-      meta: 'All orders',
+      meta: t('kpi.supplier.orders.meta'),
       sparkData: ordersSparkData,
       sparkColor: 'var(--mint-mid)',
     },
     {
       kpiKey: 'pending',
-      label: 'Pending',
+      label: t('kpi.supplier.pending.label'),
       value: stats?.pendingOrders ?? 0,
       iconBg: 'var(--amber-pale)',
       iconColor: 'var(--amber)',
       Icon: TrendingUp,
-      meta: 'Awaiting fulfillment',
+      meta: t('kpi.supplier.pending.meta'),
       sparkData: pendingSparkData,
       sparkColor: 'var(--amber-mid)',
     },
     {
       kpiKey: 'counterpart',
-      label: 'Restaurants',
+      label: t('kpi.supplier.counterpart.label'),
       value: stats?.totalRestaurants ?? 0,
       iconBg: 'var(--brand-pale)',
       iconColor: 'var(--brand)',
       Icon: Users,
-      meta: 'Active customers',
+      meta: t('kpi.supplier.counterpart.meta'),
       sparkData: counterpartSparkData,
       sparkColor: 'var(--brand-light)',
     },
@@ -253,45 +253,48 @@ export function DashboardPage() {
   const restaurantKpis: KpiCardProps[] = [
     {
       kpiKey: 'revenue',
-      label: 'Total Spent',
-      value: typeof stats?.totalSpent === 'number' ? formatCurrency(stats.totalSpent) : '$0',
+      label: t('kpi.restaurant.revenue.label'),
+      value:
+        typeof stats?.totalSpent === 'number'
+          ? formatCurrency(stats.totalSpent)
+          : t('kpi.zeroCurrency'),
       iconBg: 'var(--brand-pale)',
       iconColor: 'var(--brand)',
       Icon: DollarSign,
-      meta: 'All-time',
+      meta: t('kpi.restaurant.revenue.meta'),
       sparkData: revenueSparkData,
       sparkColor: 'var(--brand)',
     },
     {
       kpiKey: 'orders',
-      label: 'My Orders',
+      label: t('kpi.restaurant.orders.label'),
       value: stats?.totalOrders ?? 0,
       iconBg: 'var(--mint-pale)',
       iconColor: 'var(--mint)',
       Icon: ShoppingCart,
-      meta: 'All orders',
+      meta: t('kpi.restaurant.orders.meta'),
       sparkData: ordersSparkData,
       sparkColor: 'var(--mint-mid)',
     },
     {
       kpiKey: 'pending',
-      label: 'Pending',
+      label: t('kpi.restaurant.pending.label'),
       value: stats?.pendingOrders ?? 0,
       iconBg: 'var(--amber-pale)',
       iconColor: 'var(--amber)',
       Icon: TrendingUp,
-      meta: 'In progress',
+      meta: t('kpi.restaurant.pending.meta'),
       sparkData: pendingSparkData,
       sparkColor: 'var(--amber-mid)',
     },
     {
       kpiKey: 'counterpart',
-      label: 'Suppliers',
+      label: t('kpi.restaurant.counterpart.label'),
       value: stats?.totalSuppliers ?? 0,
       iconBg: 'var(--brand-pale)',
       iconColor: 'var(--brand)',
       Icon: Building2,
-      meta: 'Active vendors',
+      meta: t('kpi.restaurant.counterpart.meta'),
       sparkData: counterpartSparkData,
       sparkColor: 'var(--brand-light)',
     },
@@ -315,7 +318,7 @@ export function DashboardPage() {
           className="m-0 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-3 py-2.5 text-xs text-[var(--text-muted)]"
           role="status"
         >
-          Read-only workspace · {persona.roleLabel}
+          {t('readOnlyWorkspace', { roleLabel: persona.roleLabel })}
         </p>
       )}
 
@@ -367,6 +370,8 @@ export function DashboardPage() {
           spendTrend={spendTrend}
           spendTrendSource={spendTrendSource}
           spendTrendPeriodTotal={spendTrendPeriodTotal}
+          periodDays={periodDays}
+          onPeriodDaysChange={setPeriodDays}
           lowStockItems={lowStockItems}
           smartReorderEnabled={smartReorderEnabled}
           inventoryMgmtEnabled={inventoryMgmtEnabled}

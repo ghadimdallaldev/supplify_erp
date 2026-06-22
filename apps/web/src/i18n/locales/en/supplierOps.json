@@ -1,0 +1,236 @@
+{
+  "home": {
+    "loading": "Loading…"
+  },
+  "commandCenter": {
+    "title": "Command Center",
+    "descriptions": {
+      "sales": "Deals, reorder leads, and restaurant follow-ups",
+      "fulfillment": "Orders to pick, deliveries in progress, and stock alerts",
+      "catalog": "Catalog health, pricing, and low-stock items",
+      "finance": "Receivables, overdue accounts, and collections",
+      "readOnly": "Read-only snapshot of supplier priorities",
+      "full": "Today's priorities — action items, not just charts"
+    },
+    "gateTitle": {
+      "sales": "sales hub",
+      "default": "command center"
+    },
+    "readOnlyBanner": "Read-only workspace · {{role}} — you can view priorities but cannot take actions.",
+    "refreshing": "(Refreshing...)",
+    "analyticsDashboard": "Analytics dashboard",
+    "quickActionsAria": "Quick actions",
+    "quickActions": {
+      "runSheet": "Run sheet",
+      "deliveries": "Deliveries",
+      "receivables": "Receivables",
+      "reorder": "Reorder",
+      "lowStock": "Low stock",
+      "disputes": "Disputes",
+      "deals": "Deals",
+      "restaurants": "Restaurants",
+      "reorderLeads": "Reorder leads",
+      "fulfillmentBoard": "Fulfillment board",
+      "orders": "Orders",
+      "products": "Products",
+      "contractPricing": "Contract pricing",
+      "invoices": "Invoices"
+    },
+    "error": {
+      "title": "Failed to load command center",
+      "description": "Check your connection and try again.",
+      "retry": "Retry"
+    },
+    "kpis": {
+      "ordersToPrepare": "Orders to prepare today",
+      "deliveriesPending": "Deliveries pending",
+      "gpsToday": "GPS today",
+      "live": "Live",
+      "stale": "Stale",
+      "noGps": "No GPS",
+      "failed": "Failed",
+      "openTracking": "Open tracking",
+      "unpaidBalance": "Unpaid balance",
+      "reorderDue": "Restaurants due to reorder"
+    },
+    "priorities": {
+      "title": "Today's priorities",
+      "emptyTitle": "No urgent items",
+      "emptyDescription": "You're caught up for now."
+    },
+    "previews": {
+      "deliveries": "Deliveries",
+      "noActiveDeliveries": "No active deliveries right now.",
+      "receivables": "Who owes me",
+      "unpaid": "{{amount}} unpaid",
+      "overdue": "Overdue: {{amount}}",
+      "noOpenBalances": "No open balances.",
+      "lowStock": "Low stock",
+      "stockHealthy": "Stock levels look healthy.",
+      "left": "{{name}} — {{qty}} left",
+      "viewAll": "View all"
+    },
+    "reorder": {
+      "title": "Reorder opportunities",
+      "due": "({{count}} due)",
+      "emptyTitle": "No reorder opportunities",
+      "emptyDescription": "No restaurants are past their usual reorder window right now.",
+      "usuallyOrdersEvery": "Usually orders every ~{{days}} days",
+      "lastOrder": "Last order: {{date}} ({{days}} days ago)",
+      "oftenOrders": "Often orders: {{products}}",
+      "reviewReminder": "Review reminder",
+      "viewCustomer": "View customer"
+    },
+    "atRisk": {
+      "title": "At-risk expected orders today",
+      "item": "{{restaurant}} — usually orders {{label}} on {{day}}s but has not ordered yet."
+    },
+    "boostedDeals": {
+      "title": "Boosted deals (30 days)",
+      "summary": "{{active}} active · {{views}} impressions · {{clicks}} clicks",
+      "manageDeals": "Manage deals →",
+      "empty": "No boosted deal activity in the last 30 days."
+    },
+    "alerts": {
+      "disputes": "{{count}} dispute(s) need your response",
+      "fulfillment": "{{count}} fulfillment alert(s)"
+    },
+    "toasts": {
+      "unexpectedSent": "Unexpected: reminder was marked as sent",
+      "draftSaved": "Draft saved — review before sending",
+      "draftFailed": "Could not create reminder draft"
+    }
+  },
+  "runSheet": {
+    "title": "Run sheet",
+    "description": "One view for picking, deliveries, collections, and follow-ups.",
+    "gateTitle": "run sheet",
+    "today": "Today",
+    "dateAria": "Run sheet date",
+    "print": "Print",
+    "viewingOtherDay": "· viewing another day",
+    "commandCenter": "Command center",
+    "error": "Could not load run sheet.",
+    "retry": "Retry",
+    "priorities": "Today's priorities",
+    "kpis": {
+      "ordersToPrepare": "Orders to prepare",
+      "deliveriesPending": "Deliveries pending",
+      "overdueAr": "Overdue AR",
+      "reorderDue": "Reorder due"
+    },
+    "pickQueue": {
+      "title": "Orders to pick ({{count}})",
+      "pickLists": "Pick lists →",
+      "empty": "Nothing queued for picking today.",
+      "open": "Open"
+    },
+    "deliveries": {
+      "title": "Deliveries ({{count}} areas)",
+      "fulfillment": "Fulfillment →",
+      "empty": "No deliveries scheduled for this date.",
+      "unassignedArea": "Unassigned area",
+      "stops": "{{count}} stops",
+      "pending": "{{count}} pending",
+      "enRoute": "{{count}} en route"
+    },
+    "receivables": {
+      "title": "Receivables due ({{count}})",
+      "remindOverdue": "Remind overdue",
+      "invoices": "Invoices",
+      "emptyTitle": "No invoices due",
+      "emptyDescription": "Nothing due for collection on this date.",
+      "remind": "Remind",
+      "view": "View"
+    },
+    "shortages": {
+      "title": "Shortages & substitutions ({{count}})"
+    },
+    "reorderFollowUps": "Reorder follow-ups",
+    "daysSinceLastOrder": "{{days}} days since last order",
+    "toasts": {
+      "bulkSent": "Sent {{count}} reminder(s)",
+      "bulkFailed": "Could not send reminders",
+      "reminderSent": "Reminder sent",
+      "reminderFailed": "Could not send reminder"
+    }
+  },
+  "customerGrowth": {
+    "title": "Customer Growth",
+    "description": "Bring your existing restaurant customers onto Supplify. Upload a customer list, see who is already on the platform, then invite new restaurants or gift them a paid plan to get them started.",
+    "lockedFeature": "Customer growth & referrals",
+    "metricsError": {
+      "title": "Could not load growth metrics",
+      "description": "Check your connection and try again.",
+      "retry": "Retry"
+    },
+    "metrics": {
+      "imported": "Imported",
+      "onSupplify": "On Supplify",
+      "invited": "Invited",
+      "converted": "Converted",
+      "sponsored": "Sponsored",
+      "registered": "Registered",
+      "revenueGenerated": "Revenue generated",
+      "rewardsEarned": "Rewards earned",
+      "rewardsMonths": "{{months}} mo"
+    },
+    "import": {
+      "title": "Import customers",
+      "description": "Upload a spreadsheet of restaurants you already supply. We match each row to Supplify accounts automatically so you can connect, invite, or sponsor them from the list below.",
+      "howItWorks": "How it works",
+      "step1": "Download the example CSV or use your own file with the columns below.",
+      "step2": "Choose a file — we validate rows and show a preview before anything is saved.",
+      "step3": "Run import — matched restaurants appear in Imported customers for your next step.",
+      "csvColumns": "CSV columns",
+      "csvColumnList": "Restaurant Name, Contact Person, Phone, Email, Address, Area/Region, Credit Limit, Payment Terms, Sales Representative, Notes",
+      "csvHelp": "Restaurant Name is required. Email or phone helps us match existing Supplify accounts. All other columns are optional but useful for your records.",
+      "downloadTemplate": "Download example CSV",
+      "runImport": "Run import",
+      "importing": "Importing…",
+      "previewSummary": "{{valid}} valid · {{errors}} with issues · {{total}} total rows",
+      "previewLabel": "Import preview",
+      "row": "Row",
+      "status": "Status",
+      "restaurant": "Restaurant",
+      "email": "Email",
+      "issues": "Issues",
+      "rowsNeedAttention": "{{count}} row(s) need attention before import"
+    },
+    "prospects": {
+      "title": "Imported customers",
+      "description": "Restaurants from your import, with their match status on Supplify. For restaurants already on the platform, send a connection request. For everyone else, share an invite link or sponsor them with a one-month gift subscription.",
+      "defaultGiftPlan": "Default gift plan for Sponsor",
+      "sponsorPlanAria": "Sponsorship gift plan",
+      "sponsorLimit_one": "Up to {{count}} gift per year on your supplier plan",
+      "sponsorLimit_other": "Up to {{count}} gifts per year on your supplier plan",
+      "sponsorHelp": "Sponsoring gives a restaurant one free month of Supplify {{plan}} — they can order from you on the platform with full plan features. After the gift month they choose whether to subscribe; they may still qualify for your referral discount.",
+      "errorTitle": "Could not load imported customers",
+      "errorDescription": "Check your connection and try again.",
+      "retry": "Retry",
+      "empty": "No customers imported yet. Upload a CSV above — after import, each restaurant will show here with options to connect, invite, or sponsor.",
+      "actionsHelp": "Connect — already on Supplify; sends a follow request they must accept. Invite — copies a signup link with your referral benefits. Sponsor — starts their one-month {{plan}} gift immediately.",
+      "match": "Match",
+      "status": "Status",
+      "actions": "Actions",
+      "connect": "Connect",
+      "invite": "Invite",
+      "sponsor": "Sponsor"
+    },
+    "toasts": {
+      "noValidRows": "No valid rows to import — fix errors below",
+      "previewSuccess": "Preview: {{valid}} valid, {{errors}} with issues ({{total}} rows)",
+      "previewFailed": "Could not preview CSV",
+      "uploadFirst": "Upload a CSV file first",
+      "fixErrors": "Fix validation errors before importing",
+      "importSuccess": "Imported {{count}} customers",
+      "importFailed": "Import failed",
+      "connectionSent": "Connection request sent",
+      "connectionFailed": "Could not send connection request",
+      "inviteCopied": "Invite link copied",
+      "inviteFailed": "Invite failed",
+      "sponsorStarted": "Sponsorship started",
+      "sponsorFailed": "Sponsor failed"
+    }
+  }
+}

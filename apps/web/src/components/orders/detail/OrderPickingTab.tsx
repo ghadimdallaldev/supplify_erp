@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useGetOrderQuery } from '../../../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 import { Button } from '../../ui/button'
@@ -9,6 +10,7 @@ export interface OrderPickingTabProps {
 }
 
 export function OrderPickingTab({ orderId }: OrderPickingTabProps) {
+  const { t } = useTranslation('orders')
   const { data, isLoading } = useGetOrderQuery(orderId)
   const { handlePrintPackingSlip } = usePackingSlipActions(orderId)
 
@@ -25,13 +27,13 @@ export function OrderPickingTab({ orderId }: OrderPickingTabProps) {
           <div>
             <CardTitle className="flex items-center gap-2">
               <ClipboardList className="h-5 w-5" />
-              Picking Notes & Labels
+              {t('pickingTab.title')}
             </CardTitle>
-            <CardDescription>Internal picking instructions and labels</CardDescription>
+            <CardDescription>{t('pickingTab.description')}</CardDescription>
           </div>
           <Button onClick={() => handlePrintPackingSlip()}>
             <Printer className="h-4 w-4 mr-2" />
-            Print Picking List
+            {t('pickingTab.printPickingList')}
           </Button>
         </div>
       </CardHeader>
@@ -41,26 +43,38 @@ export function OrderPickingTab({ orderId }: OrderPickingTabProps) {
             <div key={item.id || idx} className="border rounded-lg p-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Product</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">
+                    {t('pickingTab.product')}
+                  </p>
                   <p className="font-semibold">{item.product_name}</p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">SKU: {item.product_sku}</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">
+                    {t('pickingTab.sku', { sku: item.product_sku })}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Quantity</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">
+                    {t('pickingTab.quantity')}
+                  </p>
                   <p className="text-lg font-bold">{item.quantity}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Warehouse Location</p>
-                  <p className="font-medium">{item.location_code || 'Not assigned'}</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">
+                    {t('pickingTab.warehouseLocation')}
+                  </p>
+                  <p className="font-medium">{item.location_code || t('pickingTab.notAssigned')}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Lot/Expiry</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">
+                    {t('pickingTab.lotExpiry')}
+                  </p>
                   <p className="text-sm">—</p>
                 </div>
               </div>
               {item.picking_notes && (
                 <div className="mt-3 pt-3 border-t">
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Picking Notes:</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">
+                    {t('pickingTab.pickingNotes')}
+                  </p>
                   <p className="text-sm">{item.picking_notes}</p>
                 </div>
               )}

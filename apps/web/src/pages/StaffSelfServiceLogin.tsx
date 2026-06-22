@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -8,18 +9,25 @@ import { useRequestStaffPortalLinkMutation } from '../services/api'
 import { redirectToAuth } from '../lib/authRedirect'
 import { PublicPageLayout, PublicPanel } from '../components/public/PublicPageLayout'
 import { CalendarDays, Clock3, FileText, Megaphone } from 'lucide-react'
+import { ensureNamespace } from '../i18n'
 
-const FEATURES = [
-  { icon: CalendarDays, text: 'See upcoming shifts and coverage needs' },
-  { icon: Clock3, text: 'Clock in and out from your phone' },
-  { icon: Megaphone, text: 'Read announcements from your manager' },
-  { icon: FileText, text: 'Access policies and onboarding documents' },
-]
+const FEATURE_KEYS = ['shifts', 'clock', 'announcements', 'documents'] as const
+const FEATURE_ICONS = {
+  shifts: CalendarDays,
+  clock: Clock3,
+  announcements: Megaphone,
+  documents: FileText,
+} as const
 
 export function StaffSelfServiceLogin() {
+  const { t } = useTranslation('staff')
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [requestLink, { isLoading }] = useRequestStaffPortalLinkMutation()
+
+  useEffect(() => {
+    void ensureNamespace('staff')
+  }, [])
 
   const handleKeycloakLogin = () => {
     redirectToAuth('login')
@@ -28,25 +36,22 @@ export function StaffSelfServiceLogin() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!email) {
-      toast.error('Please enter your work email address')
+      toast.error(t('portal.signIn.enterEmail'))
       return
     }
 
     try {
       const response = await requestLink({ email }).unwrap()
       if (response.sessionToken) {
-        toast.success('Magic link ready (dev mode). Opening your dashboard…')
+        toast.success(t('portal.signIn.magicLinkDev'))
         navigate(`/staff/dashboard?token=${response.sessionToken}`)
         return
       }
-      toast.success(
-        response.message ||
-          'If an account exists for this email, a sign-in link has been sent. Check your inbox.'
-      )
+      toast.success(response.message || t('portal.signIn.magicLinkSent'))
     } catch (error: unknown) {
       const err = error as { data?: { message?: string; error?: { message?: string } } }
       toast.error(
-        err?.data?.message || err?.data?.error?.message || 'Unable to generate login link'
+        err?.data?.message || err?.data?.error?.message || t('portal.signIn.loginLinkFailed')
       )
     }
   }
@@ -54,15 +59,15 @@ export function StaffSelfServiceLogin() {
   return (
     <PublicPageLayout
       wide
-      title="Staff portal"
-      subtitle="View your schedule, request time off, and clock in — from any device."
+      title={t('portal.title')}
+      subtitle={t('portal.subtitle')}
       logoInitial="S"
       className="pb-[max(3rem,env(safe-area-inset-bottom))]"
     >
       <div className="mx-auto grid w-full max-w-4xl grid-cols-1 gap-6 lg:grid-cols-2">
         <PublicPanel
-          title="Sign in"
-          description="Use the account your manager created, or request a one-time link to your work email."
+          title={t('portal.signIn.title')}
+          description={t('portal.signIn.description')}
           className="lg:col-start-2 lg:row-start-1"
         >
           <div className="space-y-5">
@@ -72,10 +77,10 @@ export function StaffSelfServiceLogin() {
                 className="consumer-pressable pwa-touch-target w-full bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
                 onClick={handleKeycloakLogin}
               >
-                Sign in with email & password
+                {t('portal.signIn.emailPassword')}
               </Button>
               <p className="text-center text-xs text-[var(--text-muted)]">
-                For accounts created by your restaurant manager
+                {t('portal.signIn.emailPasswordHint')}
               </p>
             </div>
 
@@ -85,14 +90,14 @@ export function StaffSelfServiceLogin() {
               </div>
               <div className="relative flex justify-center">
                 <span className="bg-[var(--surface)] px-3 text-xs text-[var(--text-muted)]">
-                  or email a magic link
+                  {t('portal.signIn.orMagicLink')}
                 </span>
               </div>
             </div>
 
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div>
-                <Label htmlFor="email">Work email</Label>
+                <Label htmlFor="email">{t('portal.signIn.workEmail')}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -101,7 +106,7 @@ export function StaffSelfServiceLogin() {
                   autoCorrect="off"
                   enterKeyHint="send"
                   className="mt-1.5 h-11 text-base sm:text-sm"
-                  placeholder="you@restaurant.com"
+                  placeholder={t('portal.signIn.emailPlaceholder')}
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   required
@@ -114,22 +119,28 @@ export function StaffSelfServiceLogin() {
                 className="consumer-pressable pwa-touch-target w-full"
                 disabled={isLoading}
               >
-                {isLoading ? 'Sending…' : 'Send magic link'}
+                {isLoading ? t('portal.signIn.sending') : t('portal.signIn.sendMagicLink')}
               </Button>
             </form>
           </div>
         </PublicPanel>
 
-        <PublicPanel title="What you can do here" className="h-fit lg:col-start-1 lg:row-start-1">
+        <PublicPanel
+          title={t('portal.features.title')}
+          className="h-fit lg:col-start-1 lg:row-start-1"
+        >
           <ul className="space-y-3">
-            {FEATURES.map(({ icon: Icon, text }) => (
-              <li key={text} className="flex items-start gap-3 text-sm text-[var(--text-mid)]">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--brand-pale)] text-[var(--brand-mid)]">
-                  <Icon className="h-4 w-4" aria-hidden />
-                </span>
-                {text}
-              </li>
-            ))}
+            {FEATURE_KEYS.map((key) => {
+              const Icon = FEATURE_ICONS[key]
+              return (
+                <li key={key} className="flex items-start gap-3 text-sm text-[var(--text-mid)]">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--brand-pale)] text-[var(--brand-mid)]">
+                    <Icon className="h-4 w-4" aria-hidden />
+                  </span>
+                  {t(`portal.features.${key}`)}
+                </li>
+              )
+            })}
           </ul>
         </PublicPanel>
       </div>

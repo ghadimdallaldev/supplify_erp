@@ -1,4 +1,5 @@
 export { AdminShell, useRegisterAdminShellNav } from './AdminShell'
+export { AdminShellPage } from './AdminShellPage'
 export { AdminSidebar } from './AdminSidebar'
 export { AdminTopBar } from './AdminTopBar'
 export {

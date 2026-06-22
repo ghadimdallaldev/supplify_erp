@@ -66,5 +66,53 @@
     "deliveries": "DELIVERIES",
     "hospitalityAddOns": "HOSPITALITY ADD-ONS"
   },
-  "openMenu": "Open navigation menu"
+  "openMenu": "Open navigation menu",
+  "role": {
+    "admin": "Admin",
+    "supplier": "Supplier",
+    "restaurant": "Restaurant",
+    "pending": "Pending",
+    "staff_portal": "Staff portal"
+  },
+  "sidebar": {
+    "mainNavAriaLabel": "Main navigation",
+    "sectionsAriaLabel": "Application sections"
+  },
+  "header": {
+    "upgrade": "Upgrade",
+    "plans": "Plans",
+    "upgradePlan": "Upgrade plan",
+    "viewPlans": "View plans",
+    "openCommandPalette": "Open command palette",
+    "searchAdmin": "Search admin…",
+    "searchProducts": "Search products…",
+    "notificationsUnread": "Notifications, {{count}} unread",
+    "markAllRead": "Mark all read",
+    "closeNotifications": "Close notifications",
+    "allCaughtUp": "You're all caught up",
+    "notificationsEmptyHint": "Order updates and alerts will appear here.",
+    "logoutTitle": "{{name}} — click to logout",
+    "loggedOutSuccess": "Logged out successfully",
+    "logoutFailed": "Logout failed",
+    "workspaceContext": "{{type}}: {{name}}{{rolePart}}"
+  },
+  "command": {
+    "searchPages": "Search pages...",
+    "noResults": "No results found.",
+    "navigate": "Navigate",
+    "keywords": {
+      "dashboard": "home overview",
+      "products": "catalog search",
+      "orders": "purchase",
+      "fulfillment": "delivery shipping",
+      "staff": "team employees",
+      "settings": "preferences account"
+    }
+  },
+  "badge": {
+    "pendingOrders": "Pending orders",
+    "unreadNotifications": "Unread notifications",
+    "activeDisputes": "Active disputes",
+    "dailyOrdersUsed": "Daily orders used today"
+  }
 }

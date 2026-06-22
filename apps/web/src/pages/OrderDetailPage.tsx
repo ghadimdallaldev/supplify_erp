@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams, Link as RouterLink, Link } from 'react-router-dom'
 import {
   useGetOrderQuery,
@@ -29,13 +30,14 @@ import { useImpersonation } from '../hooks/useImpersonation'
 import { usePermissions } from '../hooks/usePermissions'
 import { toast } from 'sonner'
 import { DeclineOrderDialog } from '../components/orders/DeclineOrderDialog'
-import { getOrderCancellationBanner, getOrderStatusLabel } from '../lib/orderStatusDisplay'
 import { formatOrderRef, isDisputeReplacementOrder } from '../lib/orderPlacement'
 import { LazyTabMount } from '../components/LazyTabMount'
 import {
   VALID_ORDER_TABS,
   getOrderStatusColor,
   OrderDetailTabLoading,
+  resolveOrderCancellationBanner,
+  resolveOrderStatusLabel,
 } from '../components/orders/detail/orderDetailShared'
 import {
   LazyOrderDeliveryTab,
@@ -48,6 +50,7 @@ import {
 } from '../components/orders/detail/lazyOrderDetailTabs'
 
 export function OrderDetailPage() {
+  const { t } = useTranslation('orders')
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
   const tabFromUrl = searchParams.get('tab')
@@ -97,7 +100,7 @@ export function OrderDetailPage() {
     if (!first?.supplier_id) return null
     return {
       id: String(first.supplier_id),
-      name: first.supplier_name ? String(first.supplier_name) : 'Supplier',
+      name: first.supplier_name ? String(first.supplier_name) : t('detail.defaultSupplierName'),
     }
   })()
   const existingOrderReview = (myReviewsData?.reviews ?? []).find(
@@ -128,12 +131,14 @@ export function OrderDetailPage() {
       await updateOrder({ id, data: { status: newStatus, ...extra } }).unwrap()
       const successLabel =
         newStatus === 'CANCELLED' && isSupplier
-          ? 'Order declined'
-          : `Order status updated to ${newStatus}`
+          ? t('toast.orderDeclined')
+          : t('toast.statusUpdated', {
+              status: t(`status.${newStatus}`, { defaultValue: newStatus }),
+            })
       toast.success(successLabel)
       setIsUpdating(false)
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to update order status')
+      toast.error(error?.data?.error?.message || t('toast.updateFailed'))
       setIsUpdating(false)
     }
   }
@@ -143,10 +148,10 @@ export function OrderDetailPage() {
 
     try {
       await sendReminder(id).unwrap()
-      toast.success('Reminder sent to supplier successfully')
+      toast.success(t('toast.reminderSent'))
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to send reminder')
+      toast.error(error?.data?.error?.message || t('toast.reminderFailed'))
     }
   }
 
@@ -157,17 +162,18 @@ export function OrderDetailPage() {
   if (error || !data || !id) {
     return (
       <div className="text-center py-12">
-        <p className="text-[var(--red)]">Order not found</p>
+        <p className="text-[var(--red)]">{t('detail.notFound')}</p>
       </div>
     )
   }
 
   const order = data.order
-  const cancellationBanner = getOrderCancellationBanner(
+  const cancellationBanner = resolveOrderCancellationBanner(
+    t,
     order,
     isSupplier ? 'SUPPLIER' : 'RESTAURANT'
   )
-  const statusLabel = getOrderStatusLabel(order, isSupplier ? 'SUPPLIER' : 'RESTAURANT')
+  const statusLabel = resolveOrderStatusLabel(t, order, isSupplier ? 'SUPPLIER' : 'RESTAURANT')
   const allDisputes = isSupplier
     ? (incomingDisputesData?.disputes ?? [])
     : (disputesData?.disputes ?? [])
@@ -200,9 +206,9 @@ export function OrderDetailPage() {
         )}
         {isReplacementOrder && (
           <div className="rounded-lg border border-sky-300 bg-sky-50 px-4 py-3 text-sm text-sky-950 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100">
-            <strong>Replacement for dispute</strong>
+            <strong>{t('detail.replacementBannerTitle')}</strong>
             <p className="mt-1 text-sky-900/90 dark:text-sky-200/90">
-              This order was created to ship missing or corrected goods from a resolved dispute.
+              {t('detail.replacementBannerDescription')}
             </p>
             <div className="mt-2 flex flex-wrap gap-3">
               {sourceOrderId && (
@@ -210,7 +216,7 @@ export function OrderDetailPage() {
                   to={`/app/orders/${sourceOrderId}`}
                   className="text-[var(--brand-mid)] hover:underline font-medium"
                 >
-                  Original order {formatOrderRef(sourceOrderId)}
+                  {t('detail.originalOrder', { ref: formatOrderRef(sourceOrderId) })}
                 </RouterLink>
               )}
               {sourceDispute?.id != null && String(sourceDispute.id) !== '' ? (
@@ -218,7 +224,7 @@ export function OrderDetailPage() {
                   to={`/app/disputes/${String(sourceDispute.id)}`}
                   className="text-[var(--brand-mid)] hover:underline font-medium"
                 >
-                  Dispute {formatOrderRef(String(sourceDispute.id))}
+                  {t('detail.disputeRef', { ref: formatOrderRef(String(sourceDispute.id)) })}
                 </RouterLink>
               ) : null}
             </div>
@@ -230,17 +236,17 @@ export function OrderDetailPage() {
             <Button variant="outline" size="sm" className="self-start shrink-0" asChild>
               <Link to="/app/orders">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Orders
+                {t('detail.backToOrders')}
               </Link>
             </Button>
           }
-          title={`Order #${order.id.slice(-8).toUpperCase()}`}
+          title={t('detail.orderNumber', { id: order.id.slice(-8).toUpperCase() })}
           description={order.restaurant_name}
           actions={
             <>
               {isReplacementOrder && (
                 <Badge variant="secondary" className="text-sm">
-                  Replacement
+                  {t('detail.replacement')}
                 </Badge>
               )}
               <Badge variant={getOrderStatusColor(order.status)} className="text-lg px-3 py-1">
@@ -255,10 +261,10 @@ export function OrderDetailPage() {
                 >
                   <AlertCircle className="h-4 w-4 mr-2" />
                   {isSendingReminder
-                    ? 'Sending...'
+                    ? t('detail.sending')
                     : order.reminder_count > 0
-                      ? `Send Reminder (${order.reminder_count})`
-                      : 'Send Reminder'}
+                      ? t('detail.sendReminderCount', { count: order.reminder_count })
+                      : t('detail.sendReminder')}
                 </Button>
               )}
               {!isSupplier &&
@@ -267,18 +273,18 @@ export function OrderDetailPage() {
                 isOrderEligibleForDispute(order.status) &&
                 !activeDispute && (
                   <Button size="sm" variant="outline" onClick={() => setShowOpenDispute(true)}>
-                    Open dispute
+                    {t('detail.openDispute')}
                   </Button>
                 )}
               {canLeaveReview && (
                 <Button size="sm" variant="outline" onClick={() => setShowReviewModal(true)}>
                   <Star className="h-4 w-4 mr-2" />
-                  Leave review
+                  {t('detail.leaveReview')}
                 </Button>
               )}
               {isSupplier && disputesEnabled && activeDispute && (
                 <Button size="sm" variant="outline" asChild>
-                  <RouterLink to="/app/disputes">Manage dispute</RouterLink>
+                  <RouterLink to="/app/disputes">{t('detail.manageDispute')}</RouterLink>
                 </Button>
               )}
               {isSupplier && (
@@ -286,7 +292,7 @@ export function OrderDetailPage() {
                   {order.status === 'PLACED' && (
                     <>
                       <Button size="sm" onClick={() => handleStatusUpdate('ACKNOWLEDGED')}>
-                        Acknowledge
+                        {t('detail.acknowledge')}
                       </Button>
                       {canDeclineOrder && (
                         <Button
@@ -295,19 +301,19 @@ export function OrderDetailPage() {
                           onClick={() => setShowDeclineDialog(true)}
                           data-testid="order-decline"
                         >
-                          Decline
+                          {t('detail.decline')}
                         </Button>
                       )}
                     </>
                   )}
                   {order.status === 'ACKNOWLEDGED' && (
                     <Button size="sm" onClick={() => handleStatusUpdate('PROCESSING')}>
-                      Start Processing
+                      {t('detail.startProcessing')}
                     </Button>
                   )}
                   {order.status === 'PROCESSING' && (
                     <Button size="sm" onClick={() => handleStatusUpdate('SHIPPED')}>
-                      Mark as Shipped
+                      {t('detail.markShipped')}
                     </Button>
                   )}
                   {order.status === 'SHIPPED' && !isUpdating && (
@@ -316,7 +322,7 @@ export function OrderDetailPage() {
                       variant="default"
                       onClick={() => handleStatusUpdate('DELIVERED')}
                     >
-                      Mark Delivered
+                      {t('detail.markDelivered')}
                     </Button>
                   )}
                   {(isUpdating || order.status === 'DELIVERED' || order.status === 'COMPLETED') && (
@@ -331,11 +337,11 @@ export function OrderDetailPage() {
                       className="cursor-not-allowed opacity-75"
                     >
                       {isUpdating ? (
-                        <>Updating...</>
+                        <>{t('detail.updating')}</>
                       ) : (
                         <>
                           <Check className="h-4 w-4 mr-1" />
-                          Delivered
+                          {t('detail.delivered')}
                         </>
                       )}
                     </Button>
@@ -348,21 +354,21 @@ export function OrderDetailPage() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList>
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
-            <TabsTrigger value="details">Order Details</TabsTrigger>
-            <TabsTrigger value="items">Items</TabsTrigger>
+            <TabsTrigger value="timeline">{t('detail.tabs.timeline')}</TabsTrigger>
+            <TabsTrigger value="details">{t('detail.tabs.details')}</TabsTrigger>
+            <TabsTrigger value="items">{t('detail.tabs.items')}</TabsTrigger>
             {!isSupplier &&
               (invoicesData?.invoices?.length > 0 ||
                 order.status === 'COMPLETED' ||
                 order.status === 'DELIVERED') && (
                 <TabsTrigger value="invoice">
-                  Invoice{' '}
-                  {invoicesData?.invoices?.length > 0 && `(${invoicesData.invoices.length})`}
+                  {t('detail.tabs.invoice')}
+                  {invoicesData?.invoices?.length > 0 && ` (${invoicesData.invoices.length})`}
                 </TabsTrigger>
               )}
-            {isSupplier && <TabsTrigger value="picking">Picking Notes</TabsTrigger>}
-            {isSupplier && <TabsTrigger value="delivery">Delivery Info</TabsTrigger>}
-            {isSupplier && <TabsTrigger value="packing">Packing Slip</TabsTrigger>}
+            {isSupplier && <TabsTrigger value="picking">{t('detail.tabs.picking')}</TabsTrigger>}
+            {isSupplier && <TabsTrigger value="delivery">{t('detail.tabs.delivery')}</TabsTrigger>}
+            {isSupplier && <TabsTrigger value="packing">{t('detail.tabs.packing')}</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="timeline" className="space-y-4">

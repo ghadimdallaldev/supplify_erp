@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Navigation, Package } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
@@ -17,6 +18,7 @@ import {
   DeliveryTrackingEtaSection,
   getDestinationLabelText,
 } from '../maps/DeliveryTrackingEtaSection'
+import { ensureNamespace } from '../../i18n'
 import { RestaurantConfirmPodButton } from '../fulfillment/RestaurantConfirmPodButton'
 import { isRestaurantOrderTracking } from '../../types'
 
@@ -28,9 +30,15 @@ type Props = {
 const ACTIVE_ORDER_POLL_STATUSES = new Set(['CANCELLED', 'COMPLETED'])
 
 export function RestaurantOrderTrackingPanel({ orderId, orderStatus }: Props) {
+  const { t } = useTranslation('orders')
   const [pollMs, setPollMs] = useState(() =>
     orderStatus && !ACTIVE_ORDER_POLL_STATUSES.has(orderStatus) ? 30_000 : 0
   )
+
+  useEffect(() => {
+    void ensureNamespace('orders')
+    void ensureNamespace('fulfillment')
+  }, [])
 
   const {
     data: rawData,
@@ -76,7 +84,7 @@ export function RestaurantOrderTrackingPanel({ orderId, orderStatus }: Props) {
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-bold flex items-center gap-2">
           <Navigation className="h-5 w-5 text-[var(--brand-mid)]" aria-hidden />
-          Delivery tracking
+          {t('tracking.title')}
         </CardTitle>
         {data?.delivery?.label && <CardDescription>{data.delivery.label}</CardDescription>}
       </CardHeader>
@@ -142,7 +150,7 @@ export function RestaurantOrderTrackingPanel({ orderId, orderStatus }: Props) {
           >
             <Link to={`/app/receiving?order=${orderId}`}>
               <Package className="h-4 w-4 mr-2" aria-hidden />
-              Receive order
+              {t('tracking.receiveOrder')}
             </Link>
           </Button>
         )}

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { formatPrice } from '../../utils/format'
 import { SummaryStrip } from '../ui/app-panel'
 
@@ -28,38 +29,43 @@ export function InvoiceStatsCards({
   analyticsData,
   overdueData,
 }: InvoiceStatsCardsProps) {
+  const { t } = useTranslation('invoices')
+
   return (
     <div className="space-y-4">
       <SummaryStrip
         testId="invoice-summary-primary"
         metrics={[
           {
-            label: 'Total invoices',
+            label: t('stats.totalInvoices'),
             value: stats.total,
-            hint: `${analytics.issued_count || 0} issued · ${analytics.partial_count || 0} partial`,
+            hint: t('stats.issuedPartial', {
+              issued: analytics.issued_count || 0,
+              partial: analytics.partial_count || 0,
+            }),
           },
           {
-            label: 'Outstanding',
+            label: t('stats.outstanding'),
             value: formatPrice(stats.totalOutstanding),
             tone: 'amber',
-            hint: `${stats.unpaid} unpaid`,
+            hint: t('stats.unpaid', { count: stats.unpaid }),
           },
           {
-            label: 'Overdue',
+            label: t('stats.overdue'),
             value: stats.overdue,
             tone: stats.overdue > 0 ? 'danger' : 'default',
             hint: overdueData?.summary?.totalOverdue
               ? formatPrice(overdueData.summary.totalOverdue)
-              : 'All current',
+              : t('stats.allCurrent'),
           },
           {
-            label: 'Total paid',
+            label: t('stats.totalPaid'),
             value: formatPrice(stats.totalPaid),
             tone: 'mint',
             hint:
               stats.paidCount > 0
-                ? `${stats.paidCount} paid invoice${stats.paidCount === 1 ? '' : 's'}`
-                : 'No paid invoices yet',
+                ? t('stats.paidCount', { count: stats.paidCount })
+                : t('stats.noPaidYet'),
           },
         ]}
       />
@@ -69,19 +75,19 @@ export function InvoiceStatsCards({
           testId="invoice-summary-analytics"
           metrics={[
             {
-              label: 'Avg days to pay',
+              label: t('stats.avgDaysToPay'),
               value:
                 analytics.avg_days_to_pay != null
-                  ? `${parseInt(String(analytics.avg_days_to_pay), 10)} days`
-                  : 'N/A',
+                  ? t('stats.days', { count: parseInt(String(analytics.avg_days_to_pay), 10) })
+                  : t('stats.na'),
             },
             {
-              label: 'Paid (30d)',
+              label: t('stats.paid30d'),
               value: formatPrice(analytics.total_paid_amount),
               tone: 'mint',
             },
             {
-              label: 'Outstanding (30d)',
+              label: t('stats.outstanding30d'),
               value: formatPrice(analytics.total_outstanding),
               tone: 'amber',
             },

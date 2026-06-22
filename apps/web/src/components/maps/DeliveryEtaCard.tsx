@@ -1,10 +1,14 @@
+import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Badge } from '../ui/badge'
+import { ensureNamespace } from '../../i18n'
 
 export type DeliveryEtaCardProps = {
   primary: string
   secondary?: string | null
   showLowConfidence?: boolean
   unavailableMessage?: string | null
+  unavailableIsDestinationMissing?: boolean
   testId?: string
 }
 
@@ -13,13 +17,20 @@ export function DeliveryEtaCard({
   secondary,
   showLowConfidence,
   unavailableMessage,
+  unavailableIsDestinationMissing,
   testId = 'delivery-eta-card',
 }: DeliveryEtaCardProps) {
+  const { t } = useTranslation('fulfillment')
+
+  useEffect(() => {
+    void ensureNamespace('fulfillment')
+  }, [])
+
   if (unavailableMessage) {
     return (
       <p
         className={`rounded-lg border px-3 py-2 text-xs ${
-          unavailableMessage.includes('delivery location is not set')
+          unavailableIsDestinationMissing
             ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100'
             : 'border-[var(--app-border)] text-[var(--text-muted)]'
         }`}
@@ -48,7 +59,7 @@ export function DeliveryEtaCard({
       ) : null}
       {showLowConfidence ? (
         <Badge variant="outline" className="mt-2 text-xs" data-testid={`${testId}-confidence`}>
-          Low confidence
+          {t('tracking.eta.lowConfidence')}
         </Badge>
       ) : null}
     </div>

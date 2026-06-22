@@ -1,0 +1,548 @@
+{
+  "settings": {
+    "title": "إعدادات المورد",
+    "description": "إدارة ملف عملك وإعداداتك",
+    "permissionTitle": "إعدادات المورد",
+    "stats": {
+      "totalProducts": "إجمالي المنتجات",
+      "activeProducts": "{{count}} نشط",
+      "totalOrders": "إجمالي الطلبات",
+      "completedOrders": "{{count}} مكتمل",
+      "pendingOrders": "طلبات قيد الانتظار",
+      "pendingDescription": "في انتظار التنفيذ",
+      "totalRevenue": "إجمالي الإيرادات",
+      "allTime": "طوال الوقت"
+    },
+    "tabs": {
+      "profile": "الملف الشخصي",
+      "contacts": "جهات الاتصال",
+      "team": "الفريق والأدوار",
+      "business": "الأعمال",
+      "warehouses": "المستودعات",
+      "delivery": "مناطق التوصيل",
+      "drivers": "السائقون",
+      "branches": "الفروع",
+      "notifications": "الإشعارات",
+      "plan": "الخطة والاستخدام",
+      "activity": "النشاط"
+    }
+  },
+  "list": {
+    "title": "الموردون",
+    "descriptionRestaurant": "اكتشف الموردين، تابع المفضلين، وتصفح كتالوجاتهم.",
+    "descriptionAdmin": "إدارة الموردين في السوق",
+    "browseProducts": "تصفح المنتجات",
+    "grid": "شبكة",
+    "list": "قائمة",
+    "stats": {
+      "total": "إجمالي الموردين",
+      "totalHint": "متاحون في سوقك",
+      "following": "المتابَعون",
+      "followingHint": "الموردون الذين تتابعهم للوصول السريع",
+      "withProducts": "لديهم منتجات",
+      "withProductsHint": "جاهزون للتصفح والطلب",
+      "totalProducts": "إجمالي المنتجات",
+      "acrossAll": "عبر جميع الموردين",
+      "newThisMonth_one": "{{count}} مورد جديد هذا الشهر",
+      "newThisMonth_other": "{{count}} موردين جدد هذا الشهر"
+    },
+    "searchPlaceholder": "ابحث بالاسم أو البريد أو المدينة…",
+    "searchAriaLabel": "البحث عن الموردين",
+    "cityPlaceholder": "المدينة",
+    "cityAriaLabel": "تصفية حسب المدينة",
+    "filters": {
+      "all": "الكل",
+      "following": "المتابَعون",
+      "new": "جديد",
+      "onSale": "تخفيضات الآن"
+    },
+    "sort": {
+      "name": "الاسم",
+      "products": "المنتجات",
+      "recent": "الأحدث",
+      "deals": "أفضل العروض"
+    },
+    "empty": {
+      "filteredTitle": "لا يوجد موردون يطابقون الفلاتر",
+      "filteredDescription": "جرّب مسح الفلاتر أو توسيع البحث.",
+      "defaultTitle": "لا يوجد موردون بعد",
+      "defaultDescriptionRestaurant": "عند انضمام الموردين إلى السوق، سيظهرون هنا. تصفح المنتجات أو عد لاحقاً.",
+      "defaultDescriptionAdmin": "لا يوجد موردون مسجلون في السوق بعد.",
+      "clearFilters": "مسح الفلاتر",
+      "refresh": "تحديث"
+    },
+    "onboarding": {
+      "step1Title": "استكشف الكتالوج",
+      "step1Body": "تصفح المنتجات من كل مورد متصل.",
+      "step2Title": "تابع الموردين",
+      "step2Body": "احفظ المفضلين للعثور عليهم بسرعة لاحقاً.",
+      "step3Title": "راسل واطلب",
+      "step3Body": "تحدث مع الموردين وقدّم الطلبات من الكتالوجهم.",
+      "goToProducts": "انتقل إلى المنتجات"
+    },
+    "badges": {
+      "new": "جديد",
+      "featured": "مميز",
+      "following": "متابَع"
+    },
+    "card": {
+      "products": "المنتجات",
+      "avgPrice": "متوسط السعر",
+      "locationNotProvided": "الموقع غير متوفر",
+      "message": "رسالة",
+      "view": "عرض",
+      "viewProducts": "عرض المنتجات",
+      "details": "التفاصيل",
+      "follow": "متابعة",
+      "unfollow": "إلغاء المتابعة",
+      "followAriaLabel": "متابعة المورد",
+      "unfollowAriaLabel": "إلغاء متابعة المورد",
+      "vat": "ض.ق.م: {{number}}",
+      "joined": "انضم {{date}}",
+      "productsCount": "{{count}} منتجات",
+      "avgPriceShort": "المتوسط: ${{price}}"
+    },
+    "toast": {
+      "followed": "تمت متابعة المورد",
+      "unfollowed": "تم إلغاء متابعة المورد",
+      "followFailed": "فشلت متابعة المورد",
+      "unfollowFailed": "فشل إلغاء متابعة المورد"
+    },
+    "loadFailed": "فشل تحميل الموردين"
+  },
+  "detail": {
+    "loadFailed": "فشل تحميل المورد",
+    "blocked": "محظور",
+    "unblock": "إلغاء حظر المورد",
+    "following": "متابَع",
+    "follow": "متابعة",
+    "opening": "جارٍ الفتح...",
+    "message": "رسالة",
+    "requestBestPrice": "طلب أفضل سعر",
+    "block": "حظر",
+    "reviewsCount": "{{rating}} ({{count}} مراجعة)",
+    "stats": {
+      "totalOrders": "إجمالي الطلبات",
+      "totalSpent": "إجمالي الإنفاق",
+      "avgOrderValue": "متوسط قيمة الطلب",
+      "productsAvailable": "المنتجات المتاحة"
+    },
+    "contactInfo": "معلومات الاتصال",
+    "businessInfo": "معلومات الأعمال",
+    "legalName": "الاسم القانوني",
+    "vatNumber": "رقم ض.ق.م",
+    "tradeLicense": "الرخصة التجارية",
+    "memberSince": "عضو منذ",
+    "productsPricing": "المنتجات والأسعار",
+    "totalProductsAvailable": "إجمالي المنتجات المتاحة",
+    "averageProductPrice": "متوسط سعر المنتج",
+    "viewAllProducts": "عرض جميع المنتجات",
+    "sendMessage": "إرسال رسالة",
+    "tabs": {
+      "products": "المنتجات",
+      "reviews": "المراجعات"
+    },
+    "reviews": {
+      "title": "مراجعات المورد",
+      "writeReview": "كتابة مراجعة",
+      "upgradeHint": "قم بترقية خطتك لكتابة مراجعات الموردين.",
+      "empty": "لا توجد مراجعات بعد.",
+      "edit": "تعديل",
+      "delete": "حذف",
+      "deleteConfirm": "حذف هذه المراجعة؟",
+      "deleted": "تم حذف المراجعة",
+      "deleteFailed": "فشل حذف المراجعة"
+    },
+    "productsTab": {
+      "title": "المنتجات ({{count}})",
+      "description": "تصفح منتجات هذا المورد",
+      "empty": "لا توجد منتجات متاحة من هذا المورد",
+      "stock": "المخزون: {{count}}",
+      "viewDetails": "عرض التفاصيل",
+      "notAvailable": "غ/م"
+    },
+    "blockDialog": {
+      "title": "حظر {{name}}؟",
+      "description": "الموردون المحظورون مخفيون من الكتالوجك وتصفح السوق. يمكنك إلغاء الحظر لاحقاً من هذه الصفحة.",
+      "reasonLabel": "السبب (اختياري)",
+      "reasonPlaceholder": "مثال: مشاكل جودة، لم نعد نطلب",
+      "cancel": "إلغاء",
+      "confirm": "حظر المورد",
+      "blocking": "جارٍ الحظر…"
+    },
+    "toast": {
+      "userMissing": "معرّف المستخدم أو المورد مفقود",
+      "openingConversation": "جارٍ فتح المحادثة...",
+      "conversationFailed": "فشل بدء المحادثة",
+      "followed": "تمت متابعة المورد",
+      "unfollowed": "تم إلغاء متابعة المورد",
+      "followFailed": "فشل تحديث حالة المتابعة",
+      "blocked": "تم حظر المورد — لن يظهر في الكتالوجك",
+      "blockFailed": "فشل حظر المورد",
+      "unblocked": "تم إلغاء حظر المورد",
+      "unblockFailed": "فشل إلغاء حظر المورد"
+    }
+  },
+  "contacts": {
+    "loading": "جارٍ تحميل جهات الاتصال…",
+    "email": "البريد الإلكتروني",
+    "phone": "الهاتف",
+    "phonePlaceholder": "+1 (555) 123-4567",
+    "emailPlaceholder": "{{section}}@example.com",
+    "save": "حفظ جهات الاتصال",
+    "saving": "جارٍ الحفظ...",
+    "sections": {
+      "sales": {
+        "title": "المبيعات",
+        "description": "جهة الاتصال الرئيسية للطلبات والعروض واستفسارات المطاعم."
+      },
+      "accounting": {
+        "title": "المحاسبة",
+        "description": "جهة الاتصال للفواتير والمدفوعات وأسئلة الفوترة."
+      },
+      "logistics": {
+        "title": "اللوجستيات",
+        "description": "جهة الاتصال للتوصيل والتنفيذ وتنسيق المستودعات."
+      }
+    },
+    "toast": {
+      "notLoaded": "لم يتم تحميل معلومات المورد",
+      "updated": "تم تحديث جهات الاتصال بنجاح!",
+      "updateFailed": "فشل تحديث جهات الاتصال"
+    }
+  },
+  "deliveryZones": {
+    "upgradeRequired": "تتطلب مناطق التوصيل مواقع مستودعات على الخطة الفضية أو أعلى.",
+    "viewPlans": "عرض الخطط",
+    "title": "مناطق التوصيل حسب المستودع",
+    "description": "عرض وإدارة تغطية التوصيل والرسوم والحد الأدنى للطلب لكل موقع مستودع.",
+    "noWarehouses": "لا توجد مستودعات بعد",
+    "noWarehousesHint": "أضف مستودعاً من تبويب المستودعات لتكوين مناطق التوصيل.",
+    "manageZones": "إدارة المناطق",
+    "loading": "جارٍ التحميل…",
+    "zone_one": "منطقة",
+    "zone_other": "مناطق",
+    "sheetTitle": "مناطق التوصيل",
+    "sheetDescriptionWarehouse": "التغطية والرسوم لـ {{name}}",
+    "sheetDescriptionDefault": "مناطق توصيل المستودع"
+  },
+  "profile": {
+    "loading": "جارٍ تحميل الملف…",
+    "defaultEntityName": "مورد",
+    "logoTitle": "شعار الشركة",
+    "logoDescription": "ارفع شعار شركتك. سيظهر في ملفك ولدى المطاعم.",
+    "catalogLink": {
+      "title": "رابط الكتالوج المورد",
+      "description": "شارك هذا الرابط مع المطاعم لتصفح الكتالوجك وطلب عروض الأسعار دون تسجيل كامل.",
+      "copy": "نسخ رابط الكتالوج",
+      "preview": "معاينة الكتالوج",
+      "publicEnabled": "الكتالوج العام مفعّل",
+      "publicEnabledHint": "عند الإيقاف، يُرجع رابط الكتالوج غير موجود.",
+      "enabled": "مفعّل",
+      "disabled": "معطّل"
+    },
+    "companyInfo": {
+      "title": "معلومات الشركة",
+      "description": "حدّث تفاصيل شركتك ومعلومات الاتصال"
+    },
+    "fields": {
+      "companyName": "اسم الشركة *",
+      "legalName": "الاسم القانوني",
+      "vatNumber": "رقم ض.ق.م",
+      "tradeLicense": "الرخصة التجارية",
+      "contactEmail": "البريد الإلكتروني *",
+      "phone": "الهاتف",
+      "website": "الموقع الإلكتروني",
+      "description": "وصف الشركة",
+      "street": "عنوان الشارع",
+      "city": "المدينة",
+      "region": "المنطقة/الولاية",
+      "country": "البلد"
+    },
+    "placeholders": {
+      "companyName": "شركة المنتجات الطازجة",
+      "legalName": "شركة المنتجات الطازجة ذ.م.م",
+      "vatNumber": "ض.ق.م-123456",
+      "tradeLicense": "TL-456789",
+      "contactEmail": "contact@example.com",
+      "phone": "+1 (555) 123-4567",
+      "website": "https://www.example.com",
+      "description": "أخبر المطاعم عن شركتك...",
+      "street": "123 الشارع الرئيسي",
+      "city": "اسم المدينة",
+      "region": "الولاية أو المنطقة",
+      "country": "البلد"
+    },
+    "saveChanges": "حفظ التغييرات",
+    "saving": "جارٍ الحفظ...",
+    "toast": {
+      "linkCopied": "تم نسخ رابط الكتالوج",
+      "copyFailed": "تعذّر نسخ الرابط",
+      "catalogEnabled": "تم تفعيل الكتالوج العام",
+      "catalogDisabled": "تم تعطيل الكتالوج العام",
+      "catalogUpdateFailed": "فشل تحديث إعداد الكتالوج",
+      "notLoaded": "لم يتم تحميل معلومات المورد",
+      "logoUploadFailed": "فشل رفع الشعار",
+      "updated": "تم تحديث الملف بنجاح!",
+      "updateFailed": "فشل تحديث الملف"
+    }
+  },
+  "business": {
+    "title": "ساعات العمل والسياسات",
+    "description": "حدّد ساعات التشغيل وسياسات عملك",
+    "operatingHours": "ساعات التشغيل",
+    "configureSchedule": "كوّن جدولك الأسبوعي",
+    "closed": "مغلق",
+    "to": "إلى",
+    "policies": "سياسات الأعمال",
+    "termsBadge": "الشروط والأحكام",
+    "minOrderValue": "الحد الأدنى لقيمة الطلب ($)",
+    "minOrderHint": "يجب على المطاعم طلب هذا المبلغ على الأقل",
+    "paymentTerms": "شروط الدفع",
+    "paymentTermsHint": "مثال: صافٍ 30 يوماً، الدفع عند التسليم",
+    "returnPolicy": "سياسة الإرجاع",
+    "returnPolicyPlaceholder": "نافذة إرجاع 7 أيام للبضائع التالفة...",
+    "termsConditions": "الشروط والأحكام",
+    "termsPlaceholder": "شروطك وأحكامك للطلبات...",
+    "paymentTermsPlaceholder": "صافٍ 30 يوماً",
+    "save": "حفظ إعدادات الأعمال",
+    "days": {
+      "monday": "الاثنين",
+      "tuesday": "الثلاثاء",
+      "wednesday": "الأربعاء",
+      "thursday": "الخميس",
+      "friday": "الجمعة",
+      "saturday": "السبت",
+      "sunday": "الأحد"
+    }
+  },
+  "notifications": {
+    "title": "تفضيلات الإشعارات",
+    "description": "اختر كيف تريد أن تتلقى الإشعارات",
+    "loading": "جارٍ تحميل تفضيلات الإشعارات…",
+    "browserPush": "إشعارات المتصفح",
+    "browserPushHint": "احصل على تنبيهات فورية حتى عندما يكون التطبيق في الخلفية.",
+    "blockedTitle": "الإشعارات محظورة من متصفحك",
+    "blockedSteps": {
+      "step1": "انقر على أيقونة القفل/الضبط يسار شريط العنوان",
+      "step2": "افتح الأذونات → اضبط الإشعارات على السماح",
+      "step3": "أعد تحميل هذه الصفحة، ثم انقر تفعيل أدناه"
+    },
+    "blockedEdgeHint": "في متصفح إيدج: الإعدادات ← ملفات تعريف الارتباط وأذونات الموقع ← جميع الأذونات ← الإشعارات ← أزل هذا الموقع إن كان محظوراً.",
+    "enablePush": "تفعيل إشعارات الدفع",
+    "enable": "تفعيل",
+    "disable": "تعطيل",
+    "pushNotConfigured": "الإشعارات الفورية غير مهيأة على هذا الخادم. اطلب من المسؤول تعيين مفاتيح VAPID على واجهة البرمجة.",
+    "pushNotOnPlan": "إشعارات المتصفح غير مشمولة في خطتك. قم بالترقية لتفعيل التنبيهات الفورية.",
+    "savePreferences": "حفظ التفضيلات",
+    "saving": "جارٍ الحفظ…",
+    "fields": {
+      "emailEnabled": {
+        "label": "إشعارات البريد الإلكتروني",
+        "description": "تلقي التحديثات المهمة عبر البريد الإلكتروني."
+      },
+      "whatsappEnabled": {
+        "label": "إشعارات واتساب",
+        "description": "احصل على تنبيهات على واتساب عند تسجيل هاتفك."
+      },
+      "inAppEnabled": {
+        "label": "إشعارات داخل التطبيق",
+        "description": "عرض التنبيهات داخل التطبيق."
+      },
+      "notifyOrderNew": {
+        "label": "طلبات جديدة",
+        "description": "تلقي إشعاراً عند قيام المطاعم بتقديم الطلبات."
+      },
+      "notifyMessageReceived": {
+        "label": "رسائل الدردشة",
+        "description": "تلقي تنبيهات للرسائل الجديدة."
+      },
+      "notifyInvoiceIssued": {
+        "label": "الفواتير",
+        "description": "تذكيرات الفواتير والمدفوعات."
+      },
+      "notifyLowStock": {
+        "label": "مخزون منخفض",
+        "description": "تحذيرات انخفاض مخزون المستودع."
+      }
+    },
+    "toast": {
+      "saved": "تم حفظ تفضيلات الإشعارات!",
+      "saveFailed": "فشل حفظ تفضيلات الإشعارات",
+      "pushUpdateFailed": "تعذر تحديث إشعارات الدفع"
+    }
+  },
+  "warehouses": {
+    "upgradeRequired": "إدارة المستودعات تتطلب الخطة الفضية أو أعلى. الحسابات المجانية لا تشمل مواقع المستودعات؛ أي مستودع افتراضي قديم من بيانات سابقة غير قابل للاستخدام حتى الترقية.",
+    "viewPlans": "عرض الخطط",
+    "title": "المستودعات",
+    "description": "إدارة مواقع مستودعاتك",
+    "addWarehouse": "إضافة مستودع",
+    "noWarehouses": "لا توجد مستودعات بعد",
+    "noWarehousesHint": "أضف مستودعاً لإدارة مواقع متعددة",
+    "default": "افتراضي",
+    "manageZones": "إدارة المناطق",
+    "sheetTitle": "مناطق التوصيل",
+    "sheetDescriptionWarehouse": "التغطية والرسوم لـ {{name}}",
+    "sheetDescriptionDefault": "مناطق توصيل المستودع",
+    "addDialog": {
+      "title": "إضافة مستودع جديد",
+      "description": "إنشاء موقع مستودع جديد لعملك",
+      "name": "اسم المستودع *",
+      "code": "رمز المستودع *",
+      "address": "عنوان الشارع",
+      "city": "المدينة",
+      "country": "البلد",
+      "setMain": "تعيين كمستودع رئيسي",
+      "cancel": "إلغاء",
+      "namePlaceholder": "المستودع الرئيسي",
+      "codePlaceholder": "WH-001",
+      "addressPlaceholder": "123 طريق المزرعة",
+      "cityPlaceholder": "المدينة الزراعية",
+      "countryPlaceholder": "الولايات المتحدة"
+    },
+    "toast": {
+      "planLimit": "المستودعات الإضافية غير مشمولة في خطتك الحالية. قم بالترقية لإضافة المزيد.",
+      "nameRequired": "اسم المستودع مطلوب",
+      "added": "تمت إضافة المستودع بنجاح!",
+      "addFailed": "فشلت إضافة المستودع",
+      "noPermission": "ليس لديك إذن لإدارة المستودعات"
+    }
+  },
+  "zones": {
+    "noPermission": "ليس لديك إذن لإدارة مناطق التوصيل",
+    "nameRequired": "اسم المنطقة مطلوب",
+    "updated": "تم تحديث المنطقة",
+    "created": "تم إنشاء المنطقة",
+    "saveFailed": "فشل حفظ المنطقة",
+    "deleted": "تم حذف المنطقة",
+    "deleteFailed": "فشل حذف المنطقة",
+    "deleteConfirm": "حذف المنطقة \"{{name}}\"؟",
+    "editTitle": "تعديل منطقة التوصيل",
+    "addTitle": "إضافة منطقة توصيل",
+    "cancelEdit": "إلغاء التعديل",
+    "name": "الاسم *",
+    "postalCodes": "الرموز البريدية",
+    "postalCodesHint": "بادئات أو رموز مفصولة بفواصل",
+    "minOrder": "الحد الأدنى للطلب",
+    "deliveryFee": "رسوم التوصيل",
+    "radius": "نصف القطر (كم)",
+    "centerLat": "خط عرض المركز",
+    "centerLng": "خط طول المركز",
+    "saveChanges": "حفظ التغييرات",
+    "addZone": "إضافة منطقة",
+    "listTitle": "مناطق التوصيل",
+    "loading": "جارٍ تحميل المناطق…",
+    "loadFailed": "تعذر تحميل مناطق التوصيل.",
+    "empty": "لا توجد مناطق توصيل بعد. أضف منطقة لتحديد التغطية والرسوم لهذا المستودع.",
+    "inactive": "غير نشط",
+    "minOrderFee": "الحد الأدنى {{min}} · الرسوم {{fee}}",
+    "radiusSummary": "نصف قطر {{km}} كم",
+    "namePlaceholder": "توصيل وسط المدينة",
+    "postalCodesPlaceholder": "SW1, SW2, E1",
+    "editAriaLabel": "تعديل {{name}}",
+    "deleteAriaLabel": "حذف {{name}}"
+  },
+  "pushBanner": {
+    "title": "تفعيل إشعارات الدفع؟",
+    "description": "ابقَ على اطلاع بالطلبات والرسائل.",
+    "enable": "تفعيل",
+    "notNow": "ليس الآن",
+    "enableFailed": "تعذر تفعيل الإشعارات"
+  },
+  "team": {
+    "inviteHint": "استخدم دعوات الفروع أدناه لدعوة الموظفين بدور. كل شخص يمكن أن ينتمي لحساب مورد واحد فقط."
+  },
+  "branches": {
+    "entityLabel": "موقع المورد"
+  },
+  "receivables": {
+    "loadError": "تعذّر تحميل المستحقات.",
+    "empty": "لا توجد مستحقات مفتوحة — جميع الفواتير محدّثة.",
+    "title": "المستحقات المفتوحة",
+    "remindOverdue": "تذكير المتأخرين",
+    "sending": "جارٍ الإرسال…",
+    "stats": {
+      "unpaidTotal": "إجمالي غير المدفوع",
+      "overdue": "متأخر",
+      "partialPayments": "مدفوعات جزئية",
+      "whoOwesMe": "من يدين لي"
+    },
+    "aging": "التقادم:",
+    "agingBuckets": {
+      "current": "حالي",
+      "0_7": "متأخر 1–7 أيام",
+      "8_30": "8–30 يوماً",
+      "31_60": "31–60 يوماً",
+      "60_plus": "أكثر من 60 يوماً"
+    },
+    "status": {
+      "partial": "جزئي",
+      "overdue": "متأخر",
+      "unpaid": "غير مدفوع"
+    },
+    "topDebtors": "أكبر المدينين",
+    "sendReminder": "إرسال تذكير",
+    "table": {
+      "invoice": "الفاتورة",
+      "restaurant": "المطعم",
+      "due": "الاستحقاق",
+      "balance": "الرصيد",
+      "status": "الحالة"
+    }
+  },
+  "followUp": {
+    "loadError": "تعذّر تحميل اقتراحات المتابعة",
+    "title": "متابعة العملاء",
+    "description": "مطاعم فاتتها طلبات متوقعة أو قد تحتاج تذكيراً بإعادة الطلب",
+    "empty": "لا توجد اقتراحات متابعة حالياً",
+    "churnRisk": "خطر فقدان العميل",
+    "urgency": {
+      "HIGH": "عالي",
+      "MEDIUM": "متوسط",
+      "LOW": "منخفض"
+    },
+    "history": "السجل",
+    "reminder": "تذكير",
+    "message": "رسالة",
+    "toast": {
+      "createFailed": "تعذّر إنشاء التذكير",
+      "openingChat": "جارٍ فتح الدردشة — الصق رسالتك عند الجاهزية",
+      "prepareFailed": "فشل تحضير الرسالة"
+    }
+  },
+  "fulfillmentIssue": {
+    "selectLine": "اختر بنداً من الطلب",
+    "messageSent": "تم إرسال الرسالة إلى المطعم",
+    "sendFailed": "تعذّر الإرسال",
+    "title": "النقص والاستبدال",
+    "description": "أبلغ عن النقص أو افتح دردشة منظمة. يجب أن يقبل المطعم قبل تغيير بنود الطلب.",
+    "openIssues_one": "{{count}} مشكلة مفتوحة في هذا الطلب.",
+    "openIssues_other": "{{count}} مشاكل مفتوحة في هذا الطلب.",
+    "affectedLine": "البند المتأثر",
+    "unit": "وحدة",
+    "shortageQty": "كمية النقص",
+    "availableQty": "الكمية المتاحة",
+    "replacementQty": "كمية البديل",
+    "replacementUnit": "وحدة البديل",
+    "noteOptional": "ملاحظة (اختياري)",
+    "notePlaceholder": "سياق إضافي للمطعم",
+    "reportShortage": "الإبلاغ عن نقص",
+    "suggestSubstitution": "اقتراح استبدال",
+    "openChat": "فتح الدردشة",
+    "viewConversation": "عرض المحادثة ←"
+  },
+  "substitution": {
+    "proposeDescription": "اقتراح بديل: {{name}}",
+    "proposeSuccess": "تم اقتراح البديل — في انتظار قبول المطعم",
+    "proposeFailed": "تعذّر اقتراح البديل",
+    "loadError": "تعذّر تحميل خيارات البديل.",
+    "empty": "لا توجد تعيينات بديل لبنود هذا الطلب. أضف البدائل من صفحة تفاصيل المنتج أولاً.",
+    "title": "اقتراح بدائل",
+    "description": "اقترح بديلاً معتمداً مسبقاً. يجب أن يقبل المطعم قبل تحديث بند الطلب (يظهر في الجدول الزمني).",
+    "pending_one": "{{count}} طلب استبدال في انتظار رد المطعم.",
+    "pending_other": "{{count}} طلبات استبدال في انتظار رد المطعم.",
+    "orderLine": "بند الطلب",
+    "propose": "اقتراح"
+  }
+}

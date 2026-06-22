@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import { Building2, Clock, MessageSquare, Pin, Plus, Search, Store, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Building2, MessageSquare, Pin, Plus, Search, Store, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -49,6 +50,7 @@ export function ChatConversationList({
   onNewMessage,
   className = '',
 }: Props) {
+  const { t } = useTranslation('chat')
   const hasConversations = conversations.length > 0
   const filtered = listFilter.trim()
     ? conversations.filter((c) =>
@@ -68,7 +70,7 @@ export function ChatConversationList({
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-base font-semibold text-[var(--text)]">
             <MessageSquare className="h-5 w-5 text-[var(--brand-mid)]" aria-hidden />
-            Inbox
+            {t('list.inbox')}
           </CardTitle>
           {onNewMessage ? (
             <Button
@@ -79,7 +81,7 @@ export function ChatConversationList({
               onClick={onNewMessage}
             >
               <Plus className="mr-1 h-3.5 w-3.5" />
-              New
+              {t('list.new')}
             </Button>
           ) : null}
         </div>
@@ -90,18 +92,18 @@ export function ChatConversationList({
               aria-hidden
             />
             <Input
-              placeholder="Search people…"
+              placeholder={t('list.searchPeople')}
               value={listFilter}
               onChange={(e) => onListFilterChange(e.target.value)}
               className="h-9 pl-8 pr-8"
-              aria-label="Search conversations"
+              aria-label={t('list.searchConversationsAria')}
             />
             {listFilter ? (
               <button
                 type="button"
                 onClick={() => onListFilterChange('')}
                 className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--text-muted)] hover:text-[var(--text)]"
-                aria-label="Clear search"
+                aria-label={t('list.clearSearchAria')}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -117,36 +119,32 @@ export function ChatConversationList({
               <MessageSquare className="h-6 w-6" aria-hidden />
             </div>
             <p className="text-sm font-medium text-[var(--text)]">
-              {listFilter ? 'No matching conversations' : 'No conversations yet'}
+              {listFilter ? t('list.noMatching') : t('list.noConversations')}
             </p>
             {!listFilter && userRole === 'RESTAURANT' && (
               <>
-                <p className="text-sm text-[var(--text-mid)]">
-                  Message a supplier to coordinate orders and pricing.
-                </p>
+                <p className="text-sm text-[var(--text-mid)]">{t('list.restaurantEmptyHint')}</p>
                 <Button variant="outline" size="sm" asChild>
                   <Link to="/app/suppliers">
                     <Building2 className="mr-2 h-4 w-4" />
-                    Browse suppliers
+                    {t('list.browseSuppliers')}
                   </Link>
                 </Button>
               </>
             )}
             {!listFilter && userRole === 'SUPPLIER' && (
               <>
-                <p className="text-sm text-[var(--text-mid)]">
-                  Reach out to restaurants or start from your customer list.
-                </p>
+                <p className="text-sm text-[var(--text-mid)]">{t('list.supplierEmptyHint')}</p>
                 {onNewMessage ? (
                   <Button variant="outline" size="sm" onClick={onNewMessage}>
                     <Plus className="mr-2 h-4 w-4" />
-                    New message
+                    {t('list.newMessage')}
                   </Button>
                 ) : (
                   <Button variant="outline" size="sm" asChild>
                     <Link to="/app/restaurants">
                       <Store className="mr-2 h-4 w-4" />
-                      Browse restaurants
+                      {t('list.browseRestaurants')}
                     </Link>
                   </Button>
                 )}
@@ -169,14 +167,16 @@ export function ChatConversationList({
                       !selected && conv.is_pinned && 'bg-[var(--brand-ultra)]/80'
                     )}
                   >
-                    <ParticipantAvatar name={conv.participant_name || 'Chat'} />
+                    <ParticipantAvatar
+                      name={conv.participant_name || t('page.defaultParticipant')}
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="mb-0.5 flex items-start justify-between gap-2">
                         <div className="flex min-w-0 items-center gap-1.5">
                           {conv.is_pinned ? (
                             <Pin
                               className="h-3 w-3 shrink-0 fill-current text-[var(--brand-mid)]"
-                              aria-label="Pinned"
+                              aria-label={t('list.pinnedAria')}
                             />
                           ) : null}
                           <span
@@ -202,7 +202,7 @@ export function ChatConversationList({
                           unread ? 'font-medium text-[var(--text-mid)]' : 'text-[var(--text-muted)]'
                         )}
                       >
-                        {conv.last_message_preview || 'No messages yet'}
+                        {conv.last_message_preview || t('list.noMessagesYet')}
                       </p>
                       {unread ? (
                         <span className="mt-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--brand-mid)] px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white">

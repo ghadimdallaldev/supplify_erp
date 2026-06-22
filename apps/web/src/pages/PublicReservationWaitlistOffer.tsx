@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ensureNamespace } from '../i18n'
 import { Button } from '../components/ui/button'
 import { useAcceptWaitlistOfferMutation, useDeclineWaitlistOfferMutation } from '../services/api'
 import { PublicPageLayout, PublicPanel } from '../components/public/PublicPageLayout'
@@ -16,10 +18,15 @@ function extractApiError(error: unknown, fallback: string) {
 }
 
 export function PublicReservationWaitlistOffer({ action }: { action: OfferAction }) {
+  const { t } = useTranslation('reservations')
   const { token = '' } = useParams<{ token: string }>()
   const navigate = useNavigate()
   const [completed, setCompleted] = useState(false)
   const [expired, setExpired] = useState(false)
+
+  useEffect(() => {
+    void ensureNamespace('reservations')
+  }, [])
 
   const [acceptOffer, { isLoading: accepting }] = useAcceptWaitlistOfferMutation()
   const [declineOffer, { isLoading: declining }] = useDeclineWaitlistOfferMutation()
@@ -29,8 +36,8 @@ export function PublicReservationWaitlistOffer({ action }: { action: OfferAction
       <PublicPageLayout
         centered
         narrow
-        title="Link required"
-        subtitle="Open this page from the waitlist offer in your email or text message."
+        title={t('waitlistOffer.linkRequiredTitle')}
+        subtitle={t('waitlistOffer.linkRequiredSubtitle')}
       />
     )
   }
@@ -40,15 +47,15 @@ export function PublicReservationWaitlistOffer({ action }: { action: OfferAction
       <PublicPageLayout
         centered
         narrow
-        title="Offer expired"
-        subtitle="This table offer is no longer active. You may still be on the waitlist — the restaurant will contact you if another table opens."
+        title={t('waitlistOffer.expiredTitle')}
+        subtitle={t('waitlistOffer.expiredSubtitle')}
       >
         <Button
           variant="outline"
           className="consumer-pressable w-full"
           onClick={() => navigate('/reserve')}
         >
-          Return to booking
+          {t('waitlistOffer.returnToBooking')}
         </Button>
       </PublicPageLayout>
     )
@@ -59,11 +66,15 @@ export function PublicReservationWaitlistOffer({ action }: { action: OfferAction
       <PublicPageLayout
         centered
         narrow
-        title={action === 'accept' ? 'Table confirmed' : 'Offer declined'}
+        title={
+          action === 'accept'
+            ? t('waitlistOffer.tableConfirmedTitle')
+            : t('waitlistOffer.offerDeclinedTitle')
+        }
         subtitle={
           action === 'accept'
-            ? 'Your reservation is confirmed. Use your management link to view or change your booking.'
-            : 'You declined this table offer. The restaurant may offer the next guest in line.'
+            ? t('waitlistOffer.acceptedSubtitle')
+            : t('waitlistOffer.declinedSubtitle')
         }
       >
         <Button
@@ -71,7 +82,7 @@ export function PublicReservationWaitlistOffer({ action }: { action: OfferAction
           className="consumer-pressable w-full"
           onClick={() => navigate('/reserve')}
         >
-          Return to booking
+          {t('waitlistOffer.returnToBooking')}
         </Button>
       </PublicPageLayout>
     )
@@ -86,7 +97,7 @@ export function PublicReservationWaitlistOffer({ action }: { action: OfferAction
           : result.manageUrl != null
             ? new URL(result.manageUrl).pathname
             : null
-      toast.success('Table confirmed!')
+      toast.success(t('waitlistOffer.tableConfirmedToast'))
       if (managePath) {
         navigate(managePath, { replace: true })
         return
@@ -98,14 +109,14 @@ export function PublicReservationWaitlistOffer({ action }: { action: OfferAction
         setExpired(true)
         return
       }
-      toast.error(extractApiError(error, 'Could not accept this offer'))
+      toast.error(extractApiError(error, t('waitlistOffer.acceptFailed')))
     }
   }
 
   const handleDecline = async () => {
     try {
       await declineOffer(token).unwrap()
-      toast.success('Offer declined')
+      toast.success(t('waitlistOffer.offerDeclinedToast'))
       setCompleted(true)
     } catch (error: unknown) {
       const err = error as { status?: number }
@@ -113,7 +124,7 @@ export function PublicReservationWaitlistOffer({ action }: { action: OfferAction
         setExpired(true)
         return
       }
-      toast.error(extractApiError(error, 'Could not decline offer'))
+      toast.error(extractApiError(error, t('waitlistOffer.declineFailed')))
     }
   }
 
@@ -121,11 +132,13 @@ export function PublicReservationWaitlistOffer({ action }: { action: OfferAction
     <PublicPageLayout
       centered
       narrow
-      title={action === 'accept' ? 'Table available' : 'Decline table offer'}
-      subtitle={
+      title={
         action === 'accept'
-          ? 'A table has opened for your party. Accept within 2 hours to confirm your reservation.'
-          : 'Let the restaurant know you no longer want this table so they can offer it to the next guest.'
+          ? t('waitlistOffer.tableAvailableTitle')
+          : t('waitlistOffer.declineOfferTitle')
+      }
+      subtitle={
+        action === 'accept' ? t('waitlistOffer.acceptSubtitle') : t('waitlistOffer.declineSubtitle')
       }
     >
       <PublicPanel className="w-full space-y-3">
@@ -135,7 +148,7 @@ export function PublicReservationWaitlistOffer({ action }: { action: OfferAction
             disabled={accepting}
             onClick={handleAccept}
           >
-            {accepting ? 'Confirming…' : 'Accept table'}
+            {accepting ? t('waitlistOffer.confirming') : t('waitlistOffer.acceptTable')}
           </Button>
         ) : (
           <Button
@@ -144,7 +157,7 @@ export function PublicReservationWaitlistOffer({ action }: { action: OfferAction
             disabled={declining}
             onClick={handleDecline}
           >
-            {declining ? 'Declining…' : 'Decline offer'}
+            {declining ? t('waitlistOffer.declining') : t('waitlistOffer.declineOffer')}
           </Button>
         )}
         <Button
@@ -152,7 +165,7 @@ export function PublicReservationWaitlistOffer({ action }: { action: OfferAction
           className="consumer-pressable w-full"
           onClick={() => navigate('/reserve')}
         >
-          Back to booking
+          {t('waitlistOffer.backToBooking')}
         </Button>
       </PublicPanel>
     </PublicPageLayout>

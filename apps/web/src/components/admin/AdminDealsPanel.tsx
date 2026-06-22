@@ -1,4 +1,5 @@
 import React, { Fragment, Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Input } from '../ui/input'
@@ -42,6 +43,7 @@ const LazyAdminDealsBoostSection = lazy(() =>
 )
 
 export function AdminDealsPanel() {
+  const { t } = useTranslation('admin')
   const [statusFilter, setStatusFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [searchInput, setSearchInput] = useState('')
@@ -80,7 +82,7 @@ export function AdminDealsPanel() {
   const [rejectDeal] = useRejectAdminDealMutation()
   const [pauseDeal] = usePauseAdminDealMutation()
 
-  const deals = data?.deals || []
+  const deals = useMemo(() => data?.deals || [], [data?.deals])
   const insights = insightsData?.insights
 
   const hasActiveFilters = Boolean(
@@ -122,43 +124,43 @@ export function AdminDealsPanel() {
   const handleApprove = async (id: string) => {
     try {
       await approveDeal(id).unwrap()
-      toast.success('Deal approved')
+      toast.success(t('deals.toasts.approved'))
       refetch()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to approve deal')
+      toast.error(err?.data?.error?.message || t('deals.toasts.approveFailed'))
     }
   }
 
   const handleReject = async (id: string) => {
     try {
       await rejectDeal({ id, rejectionReason: rejectReason || undefined }).unwrap()
-      toast.success('Deal rejected')
+      toast.success(t('deals.toasts.rejected'))
       setRejectingId(null)
       setRejectReason('')
       refetch()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to reject deal')
+      toast.error(err?.data?.error?.message || t('deals.toasts.rejectFailed'))
     }
   }
 
   const handlePause = async (id: string) => {
     try {
       await pauseDeal(id).unwrap()
-      toast.success('Deal paused')
+      toast.success(t('deals.toasts.paused'))
       refetch()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to pause deal')
+      toast.error(err?.data?.error?.message || t('deals.toasts.pauseFailed'))
     }
   }
 
   return (
     <div className="space-y-6">
       <AdminSectionHeader
-        title="Deals & Boosts"
-        description="Review supplier deals (offers and discounts), boost purchases (paid sponsored placement), and platform-wide deal insights."
+        title={t('deals.title')}
+        description={t('deals.description')}
         action={
           <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
             {isFetching ? (
@@ -166,7 +168,7 @@ export function AdminDealsPanel() {
             ) : (
               <RefreshCw className="h-4 w-4" />
             )}
-            <span className="ml-2 hidden sm:inline">Refresh</span>
+            <span className="ml-2 hidden sm:inline">{t('common.refresh')}</span>
           </Button>
         }
       />
@@ -174,18 +176,18 @@ export function AdminDealsPanel() {
       {insights && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { label: 'Total deals', value: insights.total_deals },
-            { label: 'Active', value: insights.active_deals },
-            { label: 'Pending approval', value: insights.pending_approval },
-            { label: 'Pending payment', value: insights.pending_payment },
-            { label: 'Total views', value: insights.total_views },
-            { label: 'Deal redemptions', value: insights.orders_from_deals },
+            { label: t('deals.insights.totalDeals'), value: insights.total_deals },
+            { label: t('deals.insights.activeDeals'), value: insights.active_deals },
+            { label: t('deals.insights.pendingApproval'), value: insights.pending_approval },
+            { label: t('deals.insights.pendingPayment'), value: insights.pending_payment },
+            { label: t('deals.insights.totalViews'), value: insights.total_views },
+            { label: t('deals.insights.dealRedemptions'), value: insights.orders_from_deals },
             {
-              label: 'Boost revenue',
+              label: t('deals.insights.boostRevenue'),
               value: `$${Number(insights.total_revenue || 0).toFixed(0)}`,
             },
             {
-              label: 'Discount amount',
+              label: t('deals.insights.discountAmount'),
               value: `$${Number(insights.total_discount_given || 0).toFixed(0)}`,
             },
           ].map(({ label, value }) => (
@@ -202,7 +204,7 @@ export function AdminDealsPanel() {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle className="text-base">All deals</CardTitle>
+            <CardTitle className="text-base">{t('deals.allDeals')}</CardTitle>
             {hasActiveFilters && (
               <Button
                 type="button"
@@ -212,14 +214,14 @@ export function AdminDealsPanel() {
                 onClick={clearFilters}
               >
                 <FilterX className="h-3.5 w-3.5 mr-1" />
-                Clear filters
+                {t('common.clearFilters')}
               </Button>
             )}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
-            {DEAL_QUICK_STATUS_FILTERS.map(({ value, label }) => (
+            {DEAL_QUICK_STATUS_FILTERS.map(({ value, labelKey }) => (
               <button
                 key={value || 'all'}
                 type="button"
@@ -231,20 +233,20 @@ export function AdminDealsPanel() {
                     : 'bg-[var(--surface)] text-[var(--text-muted)] border-[var(--app-border)] hover:border-[var(--brand-mid)] hover:text-[var(--text)]'
                 )}
               >
-                {label}
+                {t(labelKey)}
               </button>
             ))}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <div className="space-y-1.5">
-              <Label className="text-xs">Status</Label>
+              <Label className="text-xs">{t('common.table.status')}</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9" placeholder="All statuses">
+                <SelectTrigger className="h-9" placeholder={t('common.allStatuses')}>
                   <SelectContent>
-                    {DEAL_STATUS_OPTIONS.map((s) => (
-                      <SelectItem key={s.value || 'all'} value={s.value}>
-                        {s.label}
+                    {DEAL_STATUS_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value || 'all'} value={opt.value}>
+                        {t(opt.labelKey)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -252,13 +254,13 @@ export function AdminDealsPanel() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Deal type</Label>
+              <Label className="text-xs">{t('common.table.type')}</Label>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="h-9" placeholder="All types">
+                <SelectTrigger className="h-9" placeholder={t('common.allTypes')}>
                   <SelectContent>
-                    {DEAL_TYPE_OPTIONS.map((t) => (
-                      <SelectItem key={t.value || 'all'} value={t.value}>
-                        {t.label}
+                    {DEAL_TYPE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value || 'all'} value={opt.value}>
+                        {t(opt.labelKey)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -289,7 +291,7 @@ export function AdminDealsPanel() {
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--text-muted)]" />
                 <Input
                   className="pl-8 h-9"
-                  placeholder="Title or supplier…"
+                  placeholder={t('deals.searchPlaceholder')}
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                 />
@@ -298,7 +300,7 @@ export function AdminDealsPanel() {
           </div>
 
           {isLoading ? (
-            <AdminLoadingState label="Loading deals…" />
+            <AdminLoadingState label={t('deals.loading')} />
           ) : sortedDeals.length === 0 ? (
             <AdminEmptyState
               title={ADMIN_EMPTY_STATE.title}
@@ -321,30 +323,30 @@ export function AdminDealsPanel() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-[var(--app-bg-subtle)]/80 text-left text-xs">
-                      <th className="w-8 px-2 py-2.5" aria-label="Expand row" />
+                      <th className="w-8 px-2 py-2.5" aria-label={t('common.expandRowAriaLabel')} />
                       <DealSortableHeader
-                        label="Deal"
+                        label={t('common.table.deal')}
                         sortKey="name"
                         activeKey={sortKey}
                         direction={sortDir}
                         onSort={handleSort}
                       />
                       <DealSortableHeader
-                        label="Supplier"
+                        label={t('common.table.supplier')}
                         sortKey="supplier"
                         activeKey={sortKey}
                         direction={sortDir}
                         onSort={handleSort}
                       />
                       <DealSortableHeader
-                        label="Type"
+                        label={t('common.table.type')}
                         sortKey="type"
                         activeKey={sortKey}
                         direction={sortDir}
                         onSort={handleSort}
                       />
                       <DealSortableHeader
-                        label="Status"
+                        label={t('common.table.status')}
                         sortKey="status"
                         activeKey={sortKey}
                         direction={sortDir}
@@ -352,21 +354,21 @@ export function AdminDealsPanel() {
                       />
                       <th className="px-3 py-2.5 font-medium text-[var(--text-muted)]">Payment</th>
                       <DealSortableHeader
-                        label="Start"
+                        label={t('common.table.start')}
                         sortKey="starts_at"
                         activeKey={sortKey}
                         direction={sortDir}
                         onSort={handleSort}
                       />
                       <DealSortableHeader
-                        label="End"
+                        label={t('common.table.end')}
                         sortKey="ends_at"
                         activeKey={sortKey}
                         direction={sortDir}
                         onSort={handleSort}
                       />
                       <DealSortableHeader
-                        label="Created"
+                        label={t('common.table.created')}
                         sortKey="created_at"
                         activeKey={sortKey}
                         direction={sortDir}
@@ -566,7 +568,7 @@ export function AdminDealsPanel() {
                                       className="mt-1 h-9 bg-[var(--surface)]"
                                       value={rejectReason}
                                       onChange={(e) => setRejectReason(e.target.value)}
-                                      placeholder="Optional reason shown to supplier"
+                                      placeholder={t('deals.rejectionReasonPlaceholder')}
                                     />
                                   </div>
                                   <Button

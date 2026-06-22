@@ -1,0 +1,189 @@
+{
+  "page": {
+    "title": "Reports",
+    "purchasingTitle": "Purchasing reports",
+    "analyticsTitle": "Reports & Analytics",
+    "purchasingDescription": "Track order volume, supplier spend, and top products across your locations.",
+    "analyticsDescription": "Supplier revenue and fulfillment insights",
+    "planUnavailable": "Reports are not available on your current plan. Contact support if this looks wrong."
+  },
+  "reports": {
+    "orderVolume": {
+      "label": "Order volume",
+      "columns": {
+        "period": "Period",
+        "orderCount": "Orders",
+        "totalAmount": "Total",
+        "revenue": "Revenue"
+      }
+    },
+    "spendBySupplier": {
+      "label": "Spend by supplier",
+      "columns": {
+        "supplierName": "Supplier",
+        "totalSpend": "Spend",
+        "orderCount": "Orders"
+      }
+    },
+    "topProducts": {
+      "label": "Top products",
+      "columns": {
+        "productName": "Product",
+        "totalSpend": "Spend",
+        "quantity": "Qty"
+      }
+    },
+    "revenueTrend": {
+      "label": "Revenue trend",
+      "columns": {
+        "period": "Period",
+        "revenue": "Revenue",
+        "orderCount": "Orders"
+      }
+    },
+    "topRestaurants": {
+      "label": "Top restaurants",
+      "columns": {
+        "restaurantName": "Restaurant",
+        "revenue": "Revenue",
+        "orderCount": "Orders"
+      }
+    }
+  },
+  "filters": {
+    "title": "Date range & filters",
+    "presets": {
+      "days7": "7 days",
+      "days30": "30 days",
+      "days90": "90 days"
+    },
+    "lastPreset": "Last {{period}}",
+    "from": "From",
+    "to": "To",
+    "granularity": "Granularity",
+    "granularityOptions": {
+      "day": "Day",
+      "week": "Week",
+      "month": "Month"
+    },
+    "branch": "Branch",
+    "allBranches": "All branches"
+  },
+  "panel": {
+    "updating": "Updating…",
+    "exportCsv": "Export CSV",
+    "tryAgain": "Try again",
+    "emptyTitle": "No data for this period",
+    "emptyDescription": "Try widening the date range, changing granularity, or placing orders in this window."
+  },
+  "summary": {
+    "totalOrders": "Total orders",
+    "totalSpend": "Total spend",
+    "periods": "Periods",
+    "suppliers": "Suppliers",
+    "orders": "Orders",
+    "productSpend": "Product spend",
+    "products": "Products",
+    "quantity": "Quantity",
+    "revenue": "Revenue",
+    "restaurants": "Restaurants",
+    "total": "Total",
+    "rows": "Rows"
+  },
+  "table": {
+    "showingRows": "Showing 20 of {{total}} rows. Export CSV for the full dataset."
+  },
+  "disputes": {
+    "title": "Disputes",
+    "supplierDescription": "Incoming disputes from restaurants",
+    "restaurantDescription": "Open and track order disputes",
+    "unavailableTitle": "Disputes unavailable",
+    "unavailableDescription": "Disputes & returns are not on your plan. Upgrade to manage delivery issues and credits.",
+    "openDispute": "Open dispute",
+    "eligibilityMessage": "Disputes can only be opened after the supplier has delivered the order (delivered, received, or completed).",
+    "filterTitle": "Filter disputes",
+    "statusFilter": "Status filter",
+    "statusAll": "All",
+    "statusOpen": "Open",
+    "statusUnderReview": "Under review",
+    "statusResolved": "Resolved",
+    "statusRejected": "Rejected",
+    "incomingTitle": "Incoming disputes",
+    "myDisputesTitle": "My disputes",
+    "emptyTitle": "No disputes found",
+    "emptyFiltered": "Try clearing the status filter to see more results.",
+    "emptyDefault": "Disputes opened from receiving or order issues will appear here.",
+    "table": {
+      "order": "Order",
+      "restaurant": "Restaurant",
+      "type": "Type",
+      "status": "Status",
+      "amount": "Amount",
+      "actions": "Actions"
+    },
+    "actions": {
+      "review": "Review",
+      "resolve": "Resolve",
+      "reject": "Reject"
+    },
+    "createDialog": {
+      "title": "Open dispute",
+      "description": "Report delivery, quality, or billing issues for an order that has been delivered or received.",
+      "order": "Order",
+      "loadingOrders": "Loading orders…",
+      "noEligibleOrders": "No eligible delivered orders",
+      "selectOrder": "Select an order",
+      "supplier": "Supplier",
+      "selectOrderFirst": "Select an order first",
+      "noSuppliersOnOrder": "No suppliers on this order",
+      "selectSupplier": "Select supplier",
+      "lineItemsHint": "Next you can select specific line items and quantities (e.g. received 1 of 3 products).",
+      "cancel": "Cancel",
+      "continue": "Continue"
+    },
+    "resolveDialog": {
+      "title": "Resolve dispute",
+      "resolution": "Resolution",
+      "creditNote": "Credit note",
+      "replacement": "Replacement",
+      "refund": "Refund",
+      "noAction": "No action",
+      "creditAmount": "Credit amount",
+      "notes": "Notes",
+      "confirm": "Confirm"
+    },
+    "rejectDialog": {
+      "title": "Reject dispute",
+      "placeholder": "Reason for rejection (required)",
+      "reject": "Reject"
+    },
+    "toasts": {
+      "markedUnderReview": "Marked under review",
+      "updateFailed": "Failed to update dispute",
+      "resolved": "Dispute resolved",
+      "resolveFailed": "Failed to resolve",
+      "rejected": "Dispute rejected",
+      "rejectFailed": "Failed to reject",
+      "notesRequired": "Notes are required when rejecting",
+      "orderRequired": "Order is required",
+      "supplierRequired": "Supplier is required"
+    },
+    "supplierFallback": "Supplier {{id}}"
+  },
+  "org": {
+    "title": "Organization",
+    "upgradeDescription": "Multi-branch accounts are available on Gold and above. Upgrade your plan to add locations.",
+    "viewSubscription": "View subscription",
+    "loadingBranches": "Loading branches…",
+    "addBranchAccount": "Add branch account",
+    "addBranch": "Add Branch",
+    "branchCount_one": "{{count}} branch · {{role}}",
+    "branchCount_other": "{{count}} branches · {{role}}",
+    "main": "Main",
+    "inactive": "Inactive",
+    "staffOrders": "{{staff}} staff · {{orders}} orders",
+    "staffOrdersThisMonth": "{{staff}} staff · {{orders}} orders this month",
+    "openBranch": "Open branch",
+    "invitations": "Invitations"
+  }
+}

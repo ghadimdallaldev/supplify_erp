@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   useGetSupplierQuoteRequestDetailQuery,
   useSubmitSupplierQuoteResponseMutation,
@@ -15,6 +16,7 @@ import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { toast } from 'sonner'
 import { ArrowLeft, Send } from 'lucide-react'
+import { ensureNamespace } from '../i18n'
 
 type LineDraft = {
   quoteRequestItemId: string
@@ -26,6 +28,12 @@ type LineDraft = {
 }
 
 export function SupplierQuoteResponsePage() {
+  const { t } = useTranslation('quotes')
+
+  useEffect(() => {
+    void ensureNamespace('quotes')
+  }, [])
+
   const { quoteRequestSupplierId } = useParams<{ quoteRequestSupplierId: string }>()
   const navigate = useNavigate()
   const { data, isLoading, isError, refetch } = useGetSupplierQuoteRequestDetailQuery(
@@ -80,10 +88,10 @@ export function SupplierQuoteResponsePage() {
         note: note || undefined,
         items,
       }).unwrap()
-      toast.success('Response sent')
+      toast.success(t('response.sentSuccess'))
       navigate('/app/quote-requests/supplier')
     } catch (err: any) {
-      toast.error(err?.data?.error?.message || 'Failed to send response')
+      toast.error(err?.data?.error?.message || t('response.sendFailed'))
     }
   }
 
@@ -100,10 +108,10 @@ export function SupplierQuoteResponsePage() {
     return (
       <PageShell data-testid="supplier-quote-response-page">
         <EmptyState
-          title="Quote request not found"
+          title={t('response.notFoundTitle')}
           action={
             <Button variant="outline" onClick={() => refetch()}>
-              Retry
+              {t('common.retry')}
             </Button>
           }
         />
@@ -113,7 +121,7 @@ export function SupplierQuoteResponsePage() {
 
   const headerDescription = [
     data.restaurantName,
-    data.neededBy ? `Needed by ${data.neededBy}` : null,
+    data.neededBy ? t('response.neededBy', { date: data.neededBy }) : null,
   ]
     .filter(Boolean)
     .join(' · ')
@@ -121,13 +129,13 @@ export function SupplierQuoteResponsePage() {
   return (
     <PageShell className="space-y-6" data-testid="supplier-quote-response-page">
       <PageHeader
-        title="Supplier response"
+        title={t('response.title')}
         description={headerDescription}
         breadcrumb={
           <Button variant="ghost" size="sm" className="-ml-2" asChild>
             <Link to="/app/quote-requests/supplier">
               <ArrowLeft className="h-4 w-4 mr-1" />
-              Back to inbox
+              {t('response.backToInbox')}
             </Link>
           </Button>
         }
@@ -146,7 +154,11 @@ export function SupplierQuoteResponsePage() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">{item.productName}</CardTitle>
                 <CardDescription>
-                  {item.productSku} · Requested {item.quantity} {item.productUnit || ''}
+                  {t('response.productLine', {
+                    sku: item.productSku,
+                    quantity: item.quantity,
+                    unit: item.productUnit || '',
+                  })}
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -158,10 +170,10 @@ export function SupplierQuoteResponsePage() {
                     onChange={(e) => updateLine(item.id, { isAvailable: e.target.checked })}
                     className="rounded"
                   />
-                  <Label htmlFor={`avail-${item.id}`}>Available</Label>
+                  <Label htmlFor={`avail-${item.id}`}>{t('response.available')}</Label>
                 </div>
                 <div className="space-y-2">
-                  <Label>Unit price</Label>
+                  <Label>{t('response.unitPrice')}</Label>
                   <Input
                     type="number"
                     min={0}
@@ -172,7 +184,7 @@ export function SupplierQuoteResponsePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Quantity</Label>
+                  <Label>{t('response.quantity')}</Label>
                   <Input
                     type="number"
                     min={0}
@@ -183,7 +195,7 @@ export function SupplierQuoteResponsePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Delivery date</Label>
+                  <Label>{t('response.deliveryDate')}</Label>
                   <Input
                     type="date"
                     value={line.deliveryDate}
@@ -192,12 +204,12 @@ export function SupplierQuoteResponsePage() {
                   />
                 </div>
                 <div className="md:col-span-2 space-y-2">
-                  <Label>Note / substitution</Label>
+                  <Label>{t('response.lineNoteLabel')}</Label>
                   <Textarea
                     rows={2}
                     value={line.note}
                     onChange={(e) => updateLine(item.id, { note: e.target.value })}
-                    placeholder="Substitution suggestion or availability note"
+                    placeholder={t('response.lineNotePlaceholder')}
                     disabled={!line.isAvailable}
                   />
                 </div>
@@ -209,18 +221,18 @@ export function SupplierQuoteResponsePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Overall note</CardTitle>
+          <CardTitle className="text-base">{t('response.overallNoteTitle')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <Textarea
             rows={3}
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Optional message to the restaurant"
+            placeholder={t('response.overallNotePlaceholder')}
           />
           <Button disabled={submitting} onClick={handleSubmit}>
             <Send className="h-4 w-4 mr-2" />
-            {submitting ? 'Sending…' : 'Send response'}
+            {submitting ? t('common.sending') : t('response.sendResponse')}
           </Button>
         </CardContent>
       </Card>

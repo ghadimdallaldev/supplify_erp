@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useGetOrdersQuery, useGetRestaurantsQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
@@ -6,7 +7,6 @@ import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { useAppSelector } from '../hooks/redux'
 import {
-  Building2,
   Mail,
   Phone,
   MapPin,
@@ -26,8 +26,10 @@ import { formatPrice } from '../utils/format'
 import { CardAddressBlock } from '../components/ui/card-layout'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
+import { ensureNamespace } from '../i18n'
 
 export function RestaurantDetailPage() {
+  const { t } = useTranslation('restaurants')
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
@@ -37,6 +39,10 @@ export function RestaurantDetailPage() {
   const { data: ordersData } = useGetOrdersQuery({ limit: 1000, offset: 0 })
 
   const restaurant = restaurantsData?.restaurants.find((r) => r.id === id)
+
+  useEffect(() => {
+    void ensureNamespace('restaurants')
+  }, [])
 
   // Get all orders for this restaurant
   const restaurantOrders = useMemo(() => {
@@ -66,7 +72,7 @@ export function RestaurantDetailPage() {
       order.items?.forEach((item: any) => {
         if (!productCount.has(item.product_id)) {
           productCount.set(item.product_id, {
-            name: item.product_name || 'Unknown Product',
+            name: item.product_name || t('detail.unknownProduct'),
             sku: item.product_sku || 'N/A',
             totalQuantity: 0,
             totalRevenue: 0,
@@ -102,20 +108,20 @@ export function RestaurantDetailPage() {
       mostPurchasedProducts,
       recentOrders,
     }
-  }, [restaurantOrders])
+  }, [restaurantOrders, t])
 
   const handlePinToggle = () => {
     setIsPinned(!isPinned)
-    toast.success(!isPinned ? 'Restaurant pinned' : 'Restaurant unpinned')
+    toast.success(!isPinned ? t('detail.pinnedToast') : t('detail.unpinnedToast'))
   }
 
   if (!restaurant) {
     return (
       <div className="text-center py-12">
-        <p className="text-[var(--text-muted)]">Restaurant not found</p>
+        <p className="text-[var(--text-muted)]">{t('detail.notFound')}</p>
         <Button onClick={() => navigate('/app/restaurants')} className="mt-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Restaurants
+          {t('detail.backToList')}
         </Button>
       </div>
     )
@@ -129,7 +135,7 @@ export function RestaurantDetailPage() {
         breadcrumb={
           <Button variant="outline" size="sm" onClick={() => navigate('/app/restaurants')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+            {t('detail.back')}
           </Button>
         }
         actions={
@@ -141,12 +147,12 @@ export function RestaurantDetailPage() {
                 onClick={() => navigate(`/app/chat?restaurant=${restaurant.id}`)}
               >
                 <MessageSquare className="h-4 w-4 mr-2" />
-                Message
+                {t('detail.message')}
               </Button>
             )}
             <Button variant={isPinned ? 'default' : 'outline'} size="sm" onClick={handlePinToggle}>
               <Pin className="h-4 w-4 mr-2" />
-              {isPinned ? 'Pinned' : 'Pin Restaurant'}
+              {isPinned ? t('detail.pinned') : t('detail.pinRestaurant')}
             </Button>
           </div>
         }
@@ -155,7 +161,7 @@ export function RestaurantDetailPage() {
       {/* Contact Information */}
       <Card>
         <CardHeader>
-          <CardTitle>Contact Information</CardTitle>
+          <CardTitle>{t('detail.contactInfo')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -177,7 +183,7 @@ export function RestaurantDetailPage() {
             {restaurant.trade_license_no && (
               <div className="flex items-center space-x-2">
                 <Activity className="h-4 w-4 text-[var(--text-muted)]" />
-                <span>License: {restaurant.trade_license_no}</span>
+                <span>{t('detail.license', { number: restaurant.trade_license_no })}</span>
               </div>
             )}
           </div>
@@ -188,49 +194,53 @@ export function RestaurantDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('detail.stats.totalOrders')}</CardTitle>
             <ShoppingCart className="h-4 w-4 text-[var(--text-muted)]" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalOrders}</div>
             <p className="text-xs text-[var(--text-muted)] mt-1">
-              {stats.recentOrders} in last 6 months
+              {t('detail.stats.recentOrders', { count: stats.recentOrders })}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('detail.stats.totalRevenue')}</CardTitle>
             <DollarSign className="h-4 w-4 text-[var(--text-muted)]" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatPrice(stats.totalSpent)}</div>
-            <p className="text-xs text-[var(--text-muted)] mt-1">Lifetime value</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">
+              {t('detail.stats.lifetimeValue')}
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Average Order</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('detail.stats.averageOrder')}</CardTitle>
             <TrendingUp className="h-4 w-4 text-[var(--text-muted)]" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatPrice(stats.averageOrderValue)}</div>
-            <p className="text-xs text-[var(--text-muted)] mt-1">Per order</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">{t('detail.stats.perOrder')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Member Since</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('detail.stats.memberSince')}</CardTitle>
             <Calendar className="h-4 w-4 text-[var(--text-muted)]" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-base">
               {format(new Date(restaurant.created_at), 'MMM yyyy')}
             </div>
-            <p className="text-xs text-[var(--text-muted)] mt-1">Customer since</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">
+              {t('detail.stats.customerSince')}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -238,8 +248,8 @@ export function RestaurantDetailPage() {
       {/* Most Purchased Products */}
       <Card>
         <CardHeader>
-          <CardTitle>Top Products</CardTitle>
-          <CardDescription>Most frequently purchased products</CardDescription>
+          <CardTitle>{t('detail.topProducts.title')}</CardTitle>
+          <CardDescription>{t('detail.topProducts.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -255,12 +265,17 @@ export function RestaurantDetailPage() {
                     </div>
                     <div>
                       <p className="font-medium">{product.name}</p>
-                      <p className="text-sm text-[var(--text-muted)]">SKU: {product.sku}</p>
+                      <p className="text-sm text-[var(--text-muted)]">
+                        {t('detail.topProducts.sku', { sku: product.sku })}
+                      </p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold">
-                      {typeof product.totalQuantity === 'number' ? product.totalQuantity : 0} units
+                      {t('detail.topProducts.units', {
+                        count:
+                          typeof product.totalQuantity === 'number' ? product.totalQuantity : 0,
+                      })}
                     </p>
                     <p className="text-sm text-[var(--text-muted)]">
                       {formatPrice(product.totalRevenue)}
@@ -269,7 +284,9 @@ export function RestaurantDetailPage() {
                 </div>
               ))
             ) : (
-              <p className="text-[var(--text-muted)] text-center py-4">No products purchased yet</p>
+              <p className="text-[var(--text-muted)] text-center py-4">
+                {t('detail.topProducts.empty')}
+              </p>
             )}
           </div>
         </CardContent>
@@ -280,11 +297,11 @@ export function RestaurantDetailPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Recent Orders</CardTitle>
-              <CardDescription>Latest orders from this restaurant</CardDescription>
+              <CardTitle>{t('detail.recentOrders.title')}</CardTitle>
+              <CardDescription>{t('detail.recentOrders.description')}</CardDescription>
             </div>
             <Button size="sm" onClick={() => navigate(`/app/orders?restaurant=${restaurant.id}`)}>
-              View All Orders
+              {t('detail.recentOrders.viewAll')}
             </Button>
           </div>
         </CardHeader>
@@ -296,7 +313,9 @@ export function RestaurantDetailPage() {
                 className="flex items-center justify-between p-3 border rounded-lg"
               >
                 <div>
-                  <p className="font-medium">Order #{order.id.substring(0, 8)}</p>
+                  <p className="font-medium">
+                    {t('detail.recentOrders.orderNumber', { id: order.id.substring(0, 8) })}
+                  </p>
                   <p className="text-sm text-[var(--text-muted)]">
                     {format(new Date(order.placed_at || order.created_at), 'MMM dd, yyyy')}
                   </p>
@@ -310,7 +329,9 @@ export function RestaurantDetailPage() {
               </div>
             ))}
             {restaurantOrders.length === 0 && (
-              <p className="text-[var(--text-muted)] text-center py-4">No orders yet</p>
+              <p className="text-[var(--text-muted)] text-center py-4">
+                {t('detail.recentOrders.empty')}
+              </p>
             )}
           </div>
         </CardContent>

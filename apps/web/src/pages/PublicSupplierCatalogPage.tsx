@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   useGetPublicSupplierQuery,
@@ -29,6 +30,7 @@ import {
   UserPlus,
 } from 'lucide-react'
 import type { PublicSupplierProduct } from '../types'
+import { ensureNamespace } from '../i18n'
 
 function ProductCard({
   product,
@@ -45,6 +47,7 @@ function ProductCard({
   canOrder: boolean
   loginHref: string
 }) {
+  const { t } = useTranslation('public')
   const initial = product.name.charAt(0).toUpperCase()
 
   return (
@@ -70,14 +73,14 @@ function ProductCard({
           <h3 className="text-base font-medium leading-snug text-[var(--text)]">{product.name}</h3>
           {product.inStock === false ? (
             <Badge variant="secondary" className="shrink-0">
-              Out of stock
+              {t('catalog.product.outOfStock')}
             </Badge>
           ) : product.inStock ? (
             <Badge
               variant="outline"
               className="shrink-0 border-[var(--mint)]/30 text-[var(--mint)]"
             >
-              In stock
+              {t('catalog.product.inStock')}
             </Badge>
           ) : null}
         </div>
@@ -112,7 +115,7 @@ function ProductCard({
               className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--brand-mid)] hover:text-[var(--brand)]"
             >
               <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Sign in for pricing
+              {t('catalog.product.signInForPricing')}
             </Link>
           )}
 
@@ -120,7 +123,7 @@ function ProductCard({
             {canOrder && onAdd && product.inStock !== false && (
               <Button size="sm" className="consumer-pressable" onClick={() => onAdd(product)}>
                 <ShoppingCart className="mr-1 h-4 w-4" />
-                Add to cart
+                {t('catalog.product.addToCart')}
               </Button>
             )}
             {canOrder && onRequestQuote && (
@@ -130,7 +133,7 @@ function ProductCard({
                 className="consumer-pressable"
                 onClick={() => onRequestQuote(product)}
               >
-                Request best price
+                {t('catalog.product.requestBestPrice')}
               </Button>
             )}
           </div>
@@ -149,6 +152,7 @@ function CatalogStats({
   paymentTerms?: string | null
   minimumOrderAmount?: number | null
 }) {
+  const { t } = useTranslation('public')
   const columns =
     1 + (paymentTerms ? 1 : 0) + (minimumOrderAmount != null && minimumOrderAmount > 0 ? 1 : 0)
   const gridClass =
@@ -159,20 +163,26 @@ function CatalogStats({
       className={`mb-6 grid grid-cols-1 divide-y divide-[var(--app-border)] overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--brand-ultra)] ${gridClass} sm:divide-x sm:divide-y-0`}
     >
       <div className="px-4 py-3 text-center sm:text-left">
-        <dt className="text-xs font-medium text-[var(--text-muted)]">Catalog</dt>
+        <dt className="text-xs font-medium text-[var(--text-muted)]">
+          {t('catalog.stats.catalog')}
+        </dt>
         <dd className="mt-1 text-sm font-semibold tabular-nums text-[var(--text)]">
-          {productCount} product{productCount === 1 ? '' : 's'}
+          {t('catalog.stats.product', { count: productCount })}
         </dd>
       </div>
       {paymentTerms && (
         <div className="px-4 py-3 text-center sm:text-left">
-          <dt className="text-xs font-medium text-[var(--text-muted)]">Payment terms</dt>
+          <dt className="text-xs font-medium text-[var(--text-muted)]">
+            {t('catalog.stats.paymentTerms')}
+          </dt>
           <dd className="mt-1 text-sm font-semibold text-[var(--text)]">{paymentTerms}</dd>
         </div>
       )}
       {minimumOrderAmount != null && minimumOrderAmount > 0 && (
         <div className="px-4 py-3 text-center sm:text-left">
-          <dt className="text-xs font-medium text-[var(--text-muted)]">Minimum order</dt>
+          <dt className="text-xs font-medium text-[var(--text-muted)]">
+            {t('catalog.stats.minimumOrder')}
+          </dt>
           <dd className="mt-1 text-sm font-semibold tabular-nums text-[var(--text)]">
             {formatPrice(minimumOrderAmount)}
           </dd>
@@ -183,14 +193,15 @@ function CatalogStats({
 }
 
 function GuestAccessPanel({ loginHref }: { loginHref: string }) {
+  const { t } = useTranslation('public')
+
   return (
     <PublicPanel className="mb-6 border-[var(--brand-light)]/25 bg-[color-mix(in_srgb,var(--brand-pale)_45%,var(--surface))]">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="font-medium text-[var(--text)]">Restaurant ordering on Supplify</p>
+          <p className="font-medium text-[var(--text)]">{t('catalog.guestPanel.title')}</p>
           <p className="mt-1 text-sm leading-relaxed text-[var(--text-mid)]">
-            Sign in to see contract pricing, add items to your cart, and place orders with this
-            supplier.
+            {t('catalog.guestPanel.description')}
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
@@ -201,13 +212,13 @@ function GuestAccessPanel({ loginHref }: { loginHref: string }) {
           >
             <Link to={loginHref}>
               <LogIn className="mr-1.5 h-4 w-4" />
-              Log in to order
+              {t('catalog.logInToOrder')}
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline" className="consumer-pressable">
             <Link to="/register">
               <UserPlus className="mr-1.5 h-4 w-4" />
-              Request access
+              {t('catalog.requestAccess')}
             </Link>
           </Button>
         </div>
@@ -217,6 +228,7 @@ function GuestAccessPanel({ loginHref }: { loginHref: string }) {
 }
 
 export function PublicSupplierCatalogPage() {
+  const { t } = useTranslation('public')
   const { idOrSlug } = useParams<{ idOrSlug: string }>()
   const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
@@ -227,6 +239,10 @@ export function PublicSupplierCatalogPage() {
   const [category, setCategory] = useState('')
   const [page, setPage] = useState(1)
   const [linkCopied, setLinkCopied] = useState(false)
+
+  useEffect(() => {
+    void ensureNamespace('public')
+  }, [])
 
   const catalogPath =
     typeof window !== 'undefined' ? window.location.pathname : `/supplier/${idOrSlug ?? ''}`
@@ -272,8 +288,8 @@ export function PublicSupplierCatalogPage() {
   const categoryNavItems = useMemo(() => {
     const list = (catalog?.categories ?? []).map((name) => ({ id: name, name }))
     if (list.length === 0) return []
-    return [{ id: '', name: 'All' }, ...list]
-  }, [catalog?.categories])
+    return [{ id: '', name: t('catalog.categoryAll') }, ...list]
+  }, [catalog?.categories, t])
 
   const handleAddToCart = (product: PublicSupplierProduct) => {
     if (!supplier) return
@@ -297,7 +313,7 @@ export function PublicSupplierCatalogPage() {
         updated_at: '',
       },
     })
-    toast.success('Added to cart')
+    toast.success(t('catalog.toast.addedToCart'))
   }
 
   const handleRequestQuote = (product: PublicSupplierProduct) => {
@@ -317,16 +333,16 @@ export function PublicSupplierCatalogPage() {
     const ok = await copyToClipboard(url)
     if (ok) {
       setLinkCopied(true)
-      toast.success('Catalog link copied')
+      toast.success(t('catalog.toast.linkCopied'))
       window.setTimeout(() => setLinkCopied(false), 2000)
     } else {
-      toast.error('Could not copy link')
+      toast.error(t('catalog.toast.copyFailed'))
     }
   }
 
   if (loadingSupplier) {
     return (
-      <PublicPageLayout wide title="Supplier catalog">
+      <PublicPageLayout wide title={t('catalog.loadingTitle')}>
         <Skeleton className="mb-6 h-16 w-full rounded-xl" />
         <Skeleton className="mb-6 h-11 w-full rounded-lg" />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -343,16 +359,16 @@ export function PublicSupplierCatalogPage() {
       <PublicPageLayout
         wide
         centered
-        title="Catalog not found"
-        subtitle="This supplier catalog is unavailable or has been disabled."
+        title={t('catalog.notFoundTitle')}
+        subtitle={t('catalog.notFoundSubtitle')}
       >
         <EmptyState
-          title="Nothing to show"
-          description="The link may be wrong or the supplier has disabled public access."
+          title={t('catalog.emptyTitle')}
+          description={t('catalog.emptyDescription')}
           icon={<Package className="h-6 w-6" />}
           action={
             <Button asChild variant="outline" className="consumer-pressable">
-              <Link to="/login">Log in</Link>
+              <Link to="/login">{t('catalog.logIn')}</Link>
             </Button>
           }
         />
@@ -375,19 +391,19 @@ export function PublicSupplierCatalogPage() {
       >
         <Link to={loginHref}>
           <LogIn className="mr-1.5 h-4 w-4" />
-          Log in to order
+          {t('catalog.logInToOrder')}
         </Link>
       </Button>
       <Button asChild size="sm" variant="outline" className="consumer-pressable">
         <Link to="/register">
           <UserPlus className="mr-1.5 h-4 w-4" />
-          Request access
+          {t('catalog.requestAccess')}
         </Link>
       </Button>
     </>
   ) : isRestaurant ? (
     <Button asChild size="sm" variant="outline" className="consumer-pressable">
-      <Link to={`/app/suppliers/${supplier.id}`}>View in app</Link>
+      <Link to={`/app/suppliers/${supplier.id}`}>{t('catalog.viewInApp')}</Link>
     </Button>
   ) : null
 
@@ -397,8 +413,8 @@ export function PublicSupplierCatalogPage() {
       title={displayName}
       subtitle={
         supplier.paymentTerms
-          ? `Wholesale catalog · ${supplier.paymentTerms}`
-          : 'Wholesale catalog · browse products and request pricing'
+          ? t('catalog.subtitleWithTerms', { terms: supplier.paymentTerms })
+          : t('catalog.subtitleDefault')
       }
       logoUrl={supplier.logoUrl}
       logoInitial={displayName.charAt(0).toUpperCase()}
@@ -422,13 +438,13 @@ export function PublicSupplierCatalogPage() {
           />
           <Input
             className="h-11 pl-9 shadow-none"
-            placeholder="Search by name, SKU, or category…"
+            placeholder={t('catalog.searchPlaceholder')}
             value={search}
             onChange={(e) => {
               setSearch(e.target.value)
               setPage(1)
             }}
-            aria-label="Search products"
+            aria-label={t('catalog.searchAriaLabel')}
           />
         </div>
       </div>
@@ -437,7 +453,7 @@ export function PublicSupplierCatalogPage() {
         <CategoryNav
           className="-mx-4 mb-4 sm:-mx-6 sm:px-6"
           sticky={false}
-          ariaLabel="Product categories"
+          ariaLabel={t('catalog.categoryAriaLabel')}
           categories={categoryNavItems}
           activeCategoryId={category}
           onSelect={(id) => {
@@ -456,9 +472,9 @@ export function PublicSupplierCatalogPage() {
               setCategory(e.target.value)
               setPage(1)
             }}
-            aria-label="Filter by category"
+            aria-label={t('catalog.filterCategoryAriaLabel')}
           >
-            <option value="">All categories</option>
+            <option value="">{t('catalog.allCategories')}</option>
             {categories.map((cat) => (
               <option key={cat} value={cat}>
                 {cat}
@@ -476,11 +492,13 @@ export function PublicSupplierCatalogPage() {
         </div>
       ) : products.length === 0 ? (
         <EmptyState
-          title={search || category ? 'No matching products' : 'No products yet'}
+          title={
+            search || category ? t('catalog.emptyFilteredTitle') : t('catalog.emptyDefaultTitle')
+          }
           description={
             search || category
-              ? 'Try a different search term or category.'
-              : 'This supplier has not published any products to their catalog.'
+              ? t('catalog.emptyFilteredDescription')
+              : t('catalog.emptyDefaultDescription')
           }
           icon={<Package className="h-6 w-6" />}
           action={
@@ -494,7 +512,7 @@ export function PublicSupplierCatalogPage() {
                   setPage(1)
                 }}
               >
-                Clear filters
+                {t('catalog.clearFilters')}
               </Button>
             ) : undefined
           }
@@ -502,8 +520,8 @@ export function PublicSupplierCatalogPage() {
       ) : (
         <>
           <p className="mb-4 text-sm text-[var(--text-muted)]">
-            Showing {products.length} of {total}
-            {isFetching ? ' · Updating…' : ''}
+            {t('catalog.showing', { shown: products.length, total })}
+            {isFetching ? ` ${t('catalog.updating')}` : ''}
           </p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {products.map((product) => (
@@ -519,7 +537,10 @@ export function PublicSupplierCatalogPage() {
             ))}
           </div>
           {totalPages > 1 && (
-            <nav className="flex justify-center gap-2 pt-8" aria-label="Product catalog pagination">
+            <nav
+              className="flex justify-center gap-2 pt-8"
+              aria-label={t('catalog.paginationAriaLabel')}
+            >
               <Button
                 variant="outline"
                 size="sm"
@@ -527,10 +548,10 @@ export function PublicSupplierCatalogPage() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                Previous
+                {t('catalog.previous')}
               </Button>
               <span className="self-center text-sm text-[var(--text-muted)]">
-                Page {page} of {totalPages}
+                {t('catalog.pageOf', { page, total: totalPages })}
               </span>
               <Button
                 variant="outline"
@@ -539,7 +560,7 @@ export function PublicSupplierCatalogPage() {
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Next
+                {t('catalog.next')}
               </Button>
             </nav>
           )}
@@ -553,9 +574,9 @@ export function PublicSupplierCatalogPage() {
               <Link2 className="h-5 w-5" aria-hidden />
             </span>
             <div className="min-w-0">
-              <p className="font-medium text-[var(--text)]">Share this catalog</p>
+              <p className="font-medium text-[var(--text)]">{t('catalog.share.title')}</p>
               <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-                Send the link to buyers on your team so they can browse and request access.
+                {t('catalog.share.description')}
               </p>
             </div>
           </div>
@@ -569,12 +590,12 @@ export function PublicSupplierCatalogPage() {
               {linkCopied ? (
                 <>
                   <Check className="mr-1.5 h-4 w-4 text-[var(--mint)]" />
-                  Copied
+                  {t('catalog.share.copied')}
                 </>
               ) : (
                 <>
                   <ClipboardCopy className="mr-1.5 h-4 w-4" />
-                  Copy link
+                  {t('catalog.share.copyLink')}
                 </>
               )}
             </Button>
@@ -584,7 +605,7 @@ export function PublicSupplierCatalogPage() {
                 size="sm"
                 className="consumer-pressable flex-1 bg-[var(--brand-mid)] hover:bg-[var(--brand)] sm:flex-none"
               >
-                <Link to={loginHref}>Log in to order</Link>
+                <Link to={loginHref}>{t('catalog.logInToOrder')}</Link>
               </Button>
             )}
           </div>

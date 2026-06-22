@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../ui/card'
 import { Button } from '../../../ui/button'
 import { Input } from '../../../ui/input'
@@ -33,8 +34,10 @@ import {
   useCreateWarehouseMutation,
   useGetSupplierFulfillmentQuery,
 } from '../../../../services/api'
+import { ensureNamespace } from '../../../../i18n'
 
 export function SupplierWarehousesTab() {
+  const { t } = useTranslation('suppliers')
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
   const { canAny } = usePermissions()
@@ -67,11 +70,13 @@ export function SupplierWarehousesTab() {
     isMain: false,
   })
 
+  useEffect(() => {
+    void ensureNamespace('suppliers')
+  }, [])
+
   const handleAddWarehouse = async () => {
     if (!canAddWarehouse) {
-      toast.error(
-        'Additional warehouses are not included on your current plan. Upgrade to add more.'
-      )
+      toast.error(t('warehouses.toast.planLimit'))
       openBrowseUpgrade(dispatch, {
         currentPlan: entitlements?.plan?.name ?? null,
         upgradeUrl: '/app/settings?tab=plan',
@@ -79,7 +84,7 @@ export function SupplierWarehousesTab() {
       return
     }
     if (!warehouseForm.name.trim()) {
-      toast.error('Warehouse name is required')
+      toast.error(t('warehouses.toast.nameRequired'))
       return
     }
     try {
@@ -91,12 +96,12 @@ export function SupplierWarehousesTab() {
         code: warehouseForm.code || undefined,
         address: address || undefined,
       }).unwrap()
-      toast.success('Warehouse added successfully!')
+      toast.success(t('warehouses.toast.added'))
       await refetchWarehouses()
       setShowAddWarehouse(false)
       setWarehouseForm({ name: '', code: '', address: '', city: '', country: '', isMain: false })
     } catch (err: any) {
-      toast.error(err?.data?.error?.message || 'Failed to add warehouse')
+      toast.error(err?.data?.error?.message || t('warehouses.toast.addFailed'))
     }
   }
 
@@ -105,11 +110,7 @@ export function SupplierWarehousesTab() {
       <div className="space-y-4">
         <Card>
           <CardContent className="py-8 text-center">
-            <p className="text-[var(--text-muted)] mb-3">
-              Warehouse management requires Silver or higher. Free accounts do not include warehouse
-              locations; any legacy default warehouse from older data is not usable until you
-              upgrade.
-            </p>
+            <p className="text-[var(--text-muted)] mb-3">{t('warehouses.upgradeRequired')}</p>
             <Button
               variant="outline"
               onClick={() =>
@@ -119,7 +120,7 @@ export function SupplierWarehousesTab() {
                 })
               }
             >
-              View plans
+              {t('warehouses.viewPlans')}
             </Button>
           </CardContent>
         </Card>
@@ -136,15 +137,15 @@ export function SupplierWarehousesTab() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Warehouse className="h-5 w-5" />
-                Warehouses
+                {t('warehouses.title')}
               </CardTitle>
-              <CardDescription>Manage your warehouse locations</CardDescription>
+              <CardDescription>{t('warehouses.description')}</CardDescription>
             </div>
             <Button
               disabled={!canAddWarehouse || !canWriteWarehouses}
               onClick={() => {
                 if (!canWriteWarehouses) {
-                  toast.error('You do not have permission to manage warehouses')
+                  toast.error(t('warehouses.toast.noPermission'))
                   return
                 }
                 if (!canAddWarehouse) {
@@ -158,7 +159,7 @@ export function SupplierWarehousesTab() {
               }}
             >
               <Warehouse className="h-4 w-4 mr-2" />
-              Add Warehouse
+              {t('warehouses.addWarehouse')}
             </Button>
           </div>
         </CardHeader>
@@ -172,9 +173,9 @@ export function SupplierWarehousesTab() {
             {(warehousesData?.warehouses ?? []).length === 0 ? (
               <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
                 <Warehouse className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
-                <p className="text-[var(--text-muted)]">No warehouses yet</p>
+                <p className="text-[var(--text-muted)]">{t('warehouses.noWarehouses')}</p>
                 <p className="text-sm text-[var(--text-muted)] mt-1">
-                  Add a warehouse to manage multiple locations
+                  {t('warehouses.noWarehousesHint')}
                 </p>
               </div>
             ) : (
@@ -189,7 +190,7 @@ export function SupplierWarehousesTab() {
                         <h4 className="font-semibold">{wh.name}</h4>
                         {wh.code && <Badge variant="outline">{wh.code}</Badge>}
                         {(wh.is_default || wh.is_main) && (
-                          <Badge variant="secondary">Default</Badge>
+                          <Badge variant="secondary">{t('warehouses.default')}</Badge>
                         )}
                       </div>
                       {formatAddressLine(wh.address) && (
@@ -205,7 +206,7 @@ export function SupplierWarehousesTab() {
                       onClick={() => setZonesWarehouse({ id: wh.id, name: wh.name })}
                     >
                       <MapPinned className="h-4 w-4 mr-2" />
-                      Manage zones
+                      {t('warehouses.manageZones')}
                     </Button>
                   </div>
                 </div>
@@ -226,11 +227,11 @@ export function SupplierWarehousesTab() {
           className="flex w-full flex-col gap-4 overflow-hidden sm:max-w-lg"
         >
           <SheetHeader className="shrink-0 text-left">
-            <SheetTitle>Delivery zones</SheetTitle>
+            <SheetTitle>{t('warehouses.sheetTitle')}</SheetTitle>
             <SheetDescription>
               {zonesWarehouse
-                ? `Coverage and fees for ${zonesWarehouse.name}`
-                : 'Warehouse delivery zones'}
+                ? t('warehouses.sheetDescriptionWarehouse', { name: zonesWarehouse.name })
+                : t('warehouses.sheetDescriptionDefault')}
             </SheetDescription>
           </SheetHeader>
           <div className="min-h-0 flex-1 overflow-y-auto">
@@ -244,52 +245,52 @@ export function SupplierWarehousesTab() {
       <Dialog open={showAddWarehouse} onOpenChange={setShowAddWarehouse}>
         <DialogContent size="lg">
           <DialogHeader>
-            <DialogTitle>Add New Warehouse</DialogTitle>
-            <DialogDescription>Create a new warehouse location for your business</DialogDescription>
+            <DialogTitle>{t('warehouses.addDialog.title')}</DialogTitle>
+            <DialogDescription>{t('warehouses.addDialog.description')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="warehouse-name">Warehouse Name *</Label>
+                <Label htmlFor="warehouse-name">{t('warehouses.addDialog.name')}</Label>
                 <Input
                   id="warehouse-name"
-                  placeholder="Main Warehouse"
+                  placeholder={t('warehouses.addDialog.namePlaceholder')}
                   value={warehouseForm.name}
                   onChange={(e) => setWarehouseForm({ ...warehouseForm, name: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="warehouse-code">Warehouse Code *</Label>
+                <Label htmlFor="warehouse-code">{t('warehouses.addDialog.code')}</Label>
                 <Input
                   id="warehouse-code"
-                  placeholder="WH-001"
+                  placeholder={t('warehouses.addDialog.codePlaceholder')}
                   value={warehouseForm.code}
                   onChange={(e) => setWarehouseForm({ ...warehouseForm, code: e.target.value })}
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="warehouse-address">Street Address</Label>
+                <Label htmlFor="warehouse-address">{t('warehouses.addDialog.address')}</Label>
                 <Input
                   id="warehouse-address"
-                  placeholder="123 Farm Road"
+                  placeholder={t('warehouses.addDialog.addressPlaceholder')}
                   value={warehouseForm.address}
                   onChange={(e) => setWarehouseForm({ ...warehouseForm, address: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="warehouse-city">City</Label>
+                <Label htmlFor="warehouse-city">{t('warehouses.addDialog.city')}</Label>
                 <Input
                   id="warehouse-city"
-                  placeholder="Agricultural City"
+                  placeholder={t('warehouses.addDialog.cityPlaceholder')}
                   value={warehouseForm.city}
                   onChange={(e) => setWarehouseForm({ ...warehouseForm, city: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="warehouse-country">Country</Label>
+                <Label htmlFor="warehouse-country">{t('warehouses.addDialog.country')}</Label>
                 <Input
                   id="warehouse-country"
-                  placeholder="USA"
+                  placeholder={t('warehouses.addDialog.countryPlaceholder')}
                   value={warehouseForm.country}
                   onChange={(e) => setWarehouseForm({ ...warehouseForm, country: e.target.value })}
                 />
@@ -303,18 +304,18 @@ export function SupplierWarehousesTab() {
                   className="rounded"
                 />
                 <Label htmlFor="isMain" className="text-sm font-medium">
-                  Set as main warehouse
+                  {t('warehouses.addDialog.setMain')}
                 </Label>
               </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddWarehouse(false)}>
-              Cancel
+              {t('warehouses.addDialog.cancel')}
             </Button>
             <Button onClick={handleAddWarehouse} disabled={isCreatingWarehouse}>
               {isCreatingWarehouse ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Add Warehouse
+              {t('warehouses.addWarehouse')}
             </Button>
           </DialogFooter>
         </DialogContent>

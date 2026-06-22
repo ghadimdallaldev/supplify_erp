@@ -26,6 +26,7 @@ export function useDriverLocationTracking(activeDeliveries: ActiveDelivery[]) {
   const [permissionDenied, setPermissionDenied] = useState(false)
 
   const trackable = activeDeliveries.filter((d) => isTrackableDeliveryStatus(d.deliveryStatus))
+  const trackableKey = trackable.map((t) => `${t.orderId}:${t.deliveryStatus}`).join('|')
 
   useEffect(() => {
     if (!isGpsTrackingEnabledClient() || trackable.length === 0) {
@@ -93,7 +94,9 @@ export function useDriverLocationTracking(activeDeliveries: ActiveDelivery[]) {
       }
       setTrackingActive(false)
     }
-  }, [trackable.map((t) => `${t.orderId}:${t.deliveryStatus}`).join('|'), sendLocation])
+    // trackableKey serializes trackable; raw trackable array is a new reference each render
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- trackableKey captures trackable contents for stable deps
+  }, [trackableKey, sendLocation])
 
   return { trackingActive, gpsError, permissionDenied, trackableCount: trackable.length }
 }

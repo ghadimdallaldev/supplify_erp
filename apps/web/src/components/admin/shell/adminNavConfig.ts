@@ -23,13 +23,18 @@ export type AdminPortal = 'platform' | 'suppliers' | 'restaurants'
 
 export type AdminNavItem = {
   tab: AdminTabKey
-  label: string
+  labelKey: string
   icon: LucideIcon
 }
 
 export type AdminNavGroup = {
-  label: string
+  labelKey: string
   items: AdminNavItem[]
+}
+
+export type AdminNavGroupResolved = {
+  label: string
+  items: Array<{ tab: AdminTabKey; label: string; icon: LucideIcon }>
 }
 
 const ADMIN_TAB_KEYS: AdminTabKey[] = [
@@ -89,7 +94,6 @@ export const ADMIN_PORTAL_LINKS = [
   {
     id: 'platform' as const,
     href: '/app/admin',
-    label: 'Platform',
     icon: Shield,
     match: (path: string) => {
       if (path === '/app/admin') return true
@@ -102,21 +106,18 @@ export const ADMIN_PORTAL_LINKS = [
   {
     id: 'suppliers' as const,
     href: '/app/admin/suppliers',
-    label: 'Suppliers',
     icon: Building2,
     match: (path: string) => path.startsWith('/app/admin/suppliers'),
   },
   {
     id: 'restaurants' as const,
     href: '/app/admin/restaurants',
-    label: 'Restaurants',
     icon: Users,
     match: (path: string) => path.startsWith('/app/admin/restaurants'),
   },
   {
     id: 'settings' as const,
     href: '/app/settings',
-    label: 'Settings',
     icon: Settings,
     match: (path: string) => path.startsWith('/app/settings'),
   },
@@ -124,52 +125,53 @@ export const ADMIN_PORTAL_LINKS = [
 
 export const ADMIN_PLATFORM_NAV: AdminNavGroup[] = [
   {
-    label: 'Monitor',
+    labelKey: 'monitor',
     items: [
-      { tab: 'overview', label: 'Overview', icon: LayoutDashboard },
-      { tab: 'activity', label: 'Activity', icon: Activity },
-      { tab: 'health', label: 'Health', icon: HeartPulse },
-      { tab: 'operations', label: 'Operations', icon: Wrench },
-      { tab: 'audit', label: 'Audit log', icon: Shield },
+      { tab: 'overview', labelKey: 'overview', icon: LayoutDashboard },
+      { tab: 'activity', labelKey: 'activity', icon: Activity },
+      { tab: 'health', labelKey: 'health', icon: HeartPulse },
+      { tab: 'operations', labelKey: 'operations', icon: Wrench },
+      { tab: 'audit', labelKey: 'audit', icon: Shield },
     ],
   },
   {
-    label: 'Accounts',
+    labelKey: 'accounts',
     items: [
-      { tab: 'tenants', label: 'All tenants', icon: Building2 },
-      { tab: 'users', label: 'Users', icon: Users },
+      { tab: 'tenants', labelKey: 'tenants', icon: Building2 },
+      { tab: 'users', labelKey: 'users', icon: Users },
     ],
   },
   {
-    label: 'Billing',
+    labelKey: 'billing',
     items: [
-      { tab: 'plans', label: 'Plans', icon: CreditCard },
-      { tab: 'subscriptions', label: 'Subscriptions', icon: Repeat },
-      { tab: 'finance', label: 'Finance', icon: DollarSign },
-      { tab: 'usage', label: 'Usage', icon: BarChart3 },
-      { tab: 'limits', label: 'Limits', icon: Gauge },
+      { tab: 'plans', labelKey: 'plans', icon: CreditCard },
+      { tab: 'subscriptions', labelKey: 'subscriptions', icon: Repeat },
+      { tab: 'finance', labelKey: 'finance', icon: DollarSign },
+      { tab: 'usage', labelKey: 'usage', icon: BarChart3 },
+      { tab: 'limits', labelKey: 'limits', icon: Gauge },
     ],
   },
   {
-    label: 'Growth',
+    labelKey: 'growth',
     items: [
-      { tab: 'features', label: 'Features', icon: Flag },
-      { tab: 'deals', label: 'Deals & boosts', icon: Sparkles },
+      { tab: 'features', labelKey: 'features', icon: Flag },
+      { tab: 'deals', labelKey: 'deals', icon: Sparkles },
     ],
   },
 ]
 
 export const ADMIN_TENANT_PORTAL_NAV: AdminNavGroup[] = [
   {
-    label: 'Manage',
+    labelKey: 'manage',
     items: [
-      { tab: 'tenants', label: 'Directory', icon: List },
-      { tab: 'usage', label: 'Usage & quotas', icon: BarChart3 },
-      { tab: 'audit', label: 'Audit log', icon: Shield },
+      { tab: 'tenants', labelKey: 'directory', icon: List },
+      { tab: 'usage', labelKey: 'usage', icon: BarChart3 },
+      { tab: 'audit', labelKey: 'audit', icon: Shield },
     ],
   },
 ]
 
+/** @deprecated Use useAdminTabLabels() for translated labels */
 export const ADMIN_TAB_LABELS: Record<AdminTabKey, string> = {
   overview: 'Overview',
   activity: 'Activity',

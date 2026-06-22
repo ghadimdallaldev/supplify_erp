@@ -1,5 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Upload, Users, Link2, Gift, AlertTriangle, Download } from 'lucide-react'
+import { ensureNamespace } from '../i18n'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -61,6 +63,12 @@ function MetricsSkeleton() {
 }
 
 export function SupplierCustomerGrowthPage() {
+  const { t } = useTranslation('supplierOps')
+
+  useEffect(() => {
+    void ensureNamespace('supplierOps')
+  }, [])
+
   const { user } = useAppSelector((state) => state.auth)
   const { can } = usePermissions()
   const { data: entitlementsData } = useGetEntitlementsQuery()
@@ -123,36 +131,40 @@ export function SupplierCustomerGrowthPage() {
         errorCount: preview.errorCount ?? 0,
       })
       if ((preview.validCount ?? 0) === 0) {
-        toast.error('No valid rows to import — fix errors below')
+        toast.error(t('customerGrowth.toasts.noValidRows'))
       } else {
         toast.success(
-          `Preview: ${preview.validCount} valid, ${preview.errorCount} with issues (${preview.totalRows} rows)`
+          t('customerGrowth.toasts.previewSuccess', {
+            valid: preview.validCount,
+            errors: preview.errorCount,
+            total: preview.totalRows,
+          })
         )
       }
     } catch {
-      toast.error('Could not preview CSV')
+      toast.error(t('customerGrowth.toasts.previewFailed'))
     }
   }
 
   const runImport = async () => {
     if (!csvText.trim()) {
-      toast.error('Upload a CSV file first')
+      toast.error(t('customerGrowth.toasts.uploadFirst'))
       return
     }
     if (importPreviewMeta && importPreviewMeta.validCount === 0) {
-      toast.error('Fix validation errors before importing')
+      toast.error(t('customerGrowth.toasts.fixErrors'))
       return
     }
     try {
       const result = await executeImport({ csv: csvText }).unwrap()
-      toast.success(`Imported ${result.created} customers`)
+      toast.success(t('customerGrowth.toasts.importSuccess', { count: result.created }))
       setImportPreview([])
       setImportPreviewMeta(null)
       setCsvText('')
       refetchProspects()
       refetchMetrics()
     } catch {
-      toast.error('Import failed')
+      toast.error(t('customerGrowth.toasts.importFailed'))
     }
   }
 
@@ -174,10 +186,10 @@ export function SupplierCustomerGrowthPage() {
   if (!supplierGrowthEnabled) {
     return (
       <PageShell maxWidth="wide" data-testid="customer-growth-page">
-        <PageHeader title="Customer Growth" />
+        <PageHeader title={t('customerGrowth.title')} />
         <FeatureLockedCard
           featureKey="supplier_growth"
-          featureName="Customer growth & referrals"
+          featureName={t('customerGrowth.lockedFeature')}
           currentPlan={entitlementsData?.entitlements?.plan?.name ?? null}
         />
       </PageShell>
@@ -186,34 +198,57 @@ export function SupplierCustomerGrowthPage() {
 
   return (
     <PageShell maxWidth="wide" data-testid="customer-growth-page">
-      <PageHeader
-        title="Customer Growth"
-        description="Bring your existing restaurant customers onto Supplify. Upload a customer list, see who is already on the platform, then invite new restaurants or gift them a paid plan to get them started."
-      />
+      <PageHeader title={t('customerGrowth.title')} description={t('customerGrowth.description')} />
 
       {metricsLoading ? (
         <MetricsSkeleton />
       ) : metricsError ? (
         <EmptyState
-          title="Could not load growth metrics"
-          description="Check your connection and try again."
+          title={t('customerGrowth.metricsError.title')}
+          description={t('customerGrowth.metricsError.description')}
           icon={<AlertTriangle className="h-10 w-10" aria-hidden />}
           action={
             <Button onClick={() => refetchMetrics()} data-testid="growth-metrics-retry">
-              Retry
+              {t('customerGrowth.metricsError.retry')}
             </Button>
           }
         />
       ) : metrics ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3" data-testid="growth-metrics">
-          <MetricTile label="Imported" value={metrics.importedCustomers} />
-          <MetricTile label="On Supplify" value={metrics.existingSupplifyCustomers} />
-          <MetricTile label="Invited" value={metrics.invitedCustomers} />
-          <MetricTile label="Converted" value={metrics.convertedCustomers} />
-          <MetricTile label="Sponsored" value={metrics.sponsoredCustomers} />
-          <MetricTile label="Registered" value={metrics.registeredCustomers} />
-          <MetricTile label="Revenue generated" value={`$${metrics.revenueGenerated}`} />
-          <MetricTile label="Rewards earned" value={`${metrics.rewardsEarned.freeMonths} mo`} />
+          <MetricTile
+            label={t('customerGrowth.metrics.imported')}
+            value={metrics.importedCustomers}
+          />
+          <MetricTile
+            label={t('customerGrowth.metrics.onSupplify')}
+            value={metrics.existingSupplifyCustomers}
+          />
+          <MetricTile
+            label={t('customerGrowth.metrics.invited')}
+            value={metrics.invitedCustomers}
+          />
+          <MetricTile
+            label={t('customerGrowth.metrics.converted')}
+            value={metrics.convertedCustomers}
+          />
+          <MetricTile
+            label={t('customerGrowth.metrics.sponsored')}
+            value={metrics.sponsoredCustomers}
+          />
+          <MetricTile
+            label={t('customerGrowth.metrics.registered')}
+            value={metrics.registeredCustomers}
+          />
+          <MetricTile
+            label={t('customerGrowth.metrics.revenueGenerated')}
+            value={`$${metrics.revenueGenerated}`}
+          />
+          <MetricTile
+            label={t('customerGrowth.metrics.rewardsEarned')}
+            value={t('customerGrowth.metrics.rewardsMonths', {
+              months: metrics.rewardsEarned.freeMonths,
+            })}
+          />
         </div>
       ) : null}
 
@@ -221,37 +256,32 @@ export function SupplierCustomerGrowthPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Import customers
+            {t('customerGrowth.import.title')}
           </CardTitle>
-          <CardDescription>
-            Upload a spreadsheet of restaurants you already supply. We match each row to Supplify
-            accounts automatically so you can connect, invite, or sponsor them from the list below.
-          </CardDescription>
+          <CardDescription>{t('customerGrowth.import.description')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] p-3 text-xs text-[var(--text-mid)]">
-            <p className="font-medium text-[var(--text)]">How it works</p>
+            <p className="font-medium text-[var(--text)]">
+              {t('customerGrowth.import.howItWorks')}
+            </p>
             <ol className="mt-1.5 list-decimal list-inside space-y-1 text-[var(--text-muted)]">
-              <li>Download the example CSV or use your own file with the columns below.</li>
-              <li>Choose a file — we validate rows and show a preview before anything is saved.</li>
-              <li>
-                Run import — matched restaurants appear in Imported customers for your next step.
-              </li>
+              <li>{t('customerGrowth.import.step1')}</li>
+              <li>{t('customerGrowth.import.step2')}</li>
+              <li>{t('customerGrowth.import.step3')}</li>
             </ol>
-            <p className="mt-3 font-medium text-[var(--text)]">CSV columns</p>
+            <p className="mt-3 font-medium text-[var(--text)]">
+              {t('customerGrowth.import.csvColumns')}
+            </p>
             <p className="mt-1 font-mono text-[11px] leading-relaxed">
-              Restaurant Name, Contact Person, Phone, Email, Address, Area/Region, Credit Limit,
-              Payment Terms, Sales Representative, Notes
+              {t('customerGrowth.import.csvColumnList')}
             </p>
-            <p className="mt-2 text-[var(--text-muted)]">
-              Restaurant Name is required. Email or phone helps us match existing Supplify accounts.
-              All other columns are optional but useful for your records.
-            </p>
+            <p className="mt-2 text-[var(--text-muted)]">{t('customerGrowth.import.csvHelp')}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" onClick={handleDownloadTemplate}>
               <Download className="mr-1.5 h-4 w-4" aria-hidden />
-              Download example CSV
+              {t('customerGrowth.import.downloadTemplate')}
             </Button>
           </div>
           <div className="flex flex-wrap gap-3 items-end">
@@ -265,7 +295,9 @@ export function SupplierCustomerGrowthPage() {
               className="max-w-xs"
             />
             <Button onClick={runImport} disabled={importing || !csvText.trim()}>
-              {importing ? 'Importing…' : 'Run import'}
+              {importing
+                ? t('customerGrowth.import.importing')
+                : t('customerGrowth.import.runImport')}
             </Button>
           </div>
 
@@ -274,24 +306,28 @@ export function SupplierCustomerGrowthPage() {
               data-testid="customer-import-preview-summary"
               className="rounded-md border border-[var(--app-border)] px-3 py-2 text-sm"
             >
-              <strong>{importPreviewMeta.validCount}</strong> valid ·{' '}
-              <strong className="text-[var(--red)]">{importPreviewMeta.errorCount}</strong> with
-              issues · {importPreviewMeta.totalRows} total rows
+              {t('customerGrowth.import.previewSummary', {
+                valid: importPreviewMeta.validCount,
+                errors: importPreviewMeta.errorCount,
+                total: importPreviewMeta.totalRows,
+              })}
             </div>
           )}
 
           {importPreview.length > 0 && (
             <div className="space-y-2">
-              <Label>Import preview</Label>
+              <Label>{t('customerGrowth.import.previewLabel')}</Label>
               <div className="border rounded-md overflow-x-auto max-h-48">
                 <table className="w-full text-sm" data-testid="customer-import-preview-table">
                   <thead>
                     <tr className="bg-[var(--brand-ultra)] border-b">
-                      <th className="px-3 py-2 text-left">Row</th>
-                      <th className="px-3 py-2 text-left">Status</th>
-                      <th className="px-3 py-2 text-left">Restaurant</th>
-                      <th className="px-3 py-2 text-left">Email</th>
-                      <th className="px-3 py-2 text-left">Issues</th>
+                      <th className="px-3 py-2 text-left">{t('customerGrowth.import.row')}</th>
+                      <th className="px-3 py-2 text-left">{t('customerGrowth.import.status')}</th>
+                      <th className="px-3 py-2 text-left">
+                        {t('customerGrowth.import.restaurant')}
+                      </th>
+                      <th className="px-3 py-2 text-left">{t('customerGrowth.import.email')}</th>
+                      <th className="px-3 py-2 text-left">{t('customerGrowth.import.issues')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -323,7 +359,9 @@ export function SupplierCustomerGrowthPage() {
             importPreviewMeta &&
             importPreviewMeta.errorCount > 0 && (
               <p className="text-sm text-[var(--red)]">
-                {importPreviewMeta.errorCount} row(s) need attention before import
+                {t('customerGrowth.import.rowsNeedAttention', {
+                  count: importPreviewMeta.errorCount,
+                })}
               </p>
             )}
         </CardContent>
@@ -333,18 +371,14 @@ export function SupplierCustomerGrowthPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Imported customers
+            {t('customerGrowth.prospects.title')}
           </CardTitle>
-          <CardDescription>
-            Restaurants from your import, with their match status on Supplify. For restaurants
-            already on the platform, send a connection request. For everyone else, share an invite
-            link or sponsor them with a one-month gift subscription.
-          </CardDescription>
+          <CardDescription>{t('customerGrowth.prospects.description')}</CardDescription>
           {eligibleSponsorPlans.length > 0 && (
             <div className="mt-3 space-y-2 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] p-3 text-sm">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-[var(--text)]">
-                  Default gift plan for Sponsor
+                  {t('customerGrowth.prospects.defaultGiftPlan')}
                 </span>
                 <Select
                   value={sponsorPlanCode}
@@ -353,7 +387,7 @@ export function SupplierCustomerGrowthPage() {
                   <SelectTrigger
                     className="h-8 w-[160px]"
                     data-testid="growth-sponsor-plan-picker"
-                    aria-label="Sponsorship gift plan"
+                    aria-label={t('customerGrowth.prospects.sponsorPlanAria')}
                   >
                     {eligibleSponsorPlans.map((planKey) => (
                       <option key={planKey} value={planKey}>
@@ -364,16 +398,16 @@ export function SupplierCustomerGrowthPage() {
                 </Select>
                 {metrics?.sponsorshipLimit != null && (
                   <span className="text-xs text-[var(--text-muted)]">
-                    Up to {metrics.sponsorshipLimit} gift
-                    {metrics.sponsorshipLimit === 1 ? '' : 's'} per year on your supplier plan
+                    {t('customerGrowth.prospects.sponsorLimit', {
+                      count: metrics.sponsorshipLimit,
+                    })}
                   </span>
                 )}
               </div>
               <p className="text-xs text-[var(--text-muted)]">
-                Sponsoring gives a restaurant one free month of Supplify{' '}
-                {SPONSORSHIP_PLAN_LABELS[sponsorPlanCode]} — they can order from you on the platform
-                with full plan features. After the gift month they choose whether to subscribe; they
-                may still qualify for your referral discount.
+                {t('customerGrowth.prospects.sponsorHelp', {
+                  plan: SPONSORSHIP_PLAN_LABELS[sponsorPlanCode],
+                })}
               </p>
             </div>
           )}
@@ -387,38 +421,34 @@ export function SupplierCustomerGrowthPage() {
             </div>
           ) : prospectsError ? (
             <EmptyState
-              title="Could not load imported customers"
-              description="Check your connection and try again."
+              title={t('customerGrowth.prospects.errorTitle')}
+              description={t('customerGrowth.prospects.errorDescription')}
               icon={<AlertTriangle className="h-10 w-10" aria-hidden />}
               action={
                 <Button onClick={() => refetchProspects()} data-testid="prospects-retry">
-                  Retry
+                  {t('customerGrowth.prospects.retry')}
                 </Button>
               }
             />
           ) : prospects.length === 0 ? (
             <p className="text-sm text-[var(--text-muted)]">
-              No customers imported yet. Upload a CSV above — after import, each restaurant will
-              show here with options to connect, invite, or sponsor.
+              {t('customerGrowth.prospects.empty')}
             </p>
           ) : (
             <div className="space-y-3">
               <p className="text-xs text-[var(--text-muted)]">
-                <strong className="font-medium text-[var(--text)]">Connect</strong> — already on
-                Supplify; sends a follow request they must accept.{' '}
-                <strong className="font-medium text-[var(--text)]">Invite</strong> — copies a signup
-                link with your referral benefits.{' '}
-                <strong className="font-medium text-[var(--text)]">Sponsor</strong> — starts their
-                one-month {SPONSORSHIP_PLAN_LABELS[sponsorPlanCode]} gift immediately.
+                {t('customerGrowth.prospects.actionsHelp', {
+                  plan: SPONSORSHIP_PLAN_LABELS[sponsorPlanCode],
+                })}
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-[var(--text-muted)] border-b">
-                      <th className="py-2 pr-4">Restaurant</th>
-                      <th className="py-2 pr-4">Match</th>
-                      <th className="py-2 pr-4">Status</th>
-                      <th className="py-2">Actions</th>
+                      <th className="py-2 pr-4">{t('customerGrowth.import.restaurant')}</th>
+                      <th className="py-2 pr-4">{t('customerGrowth.prospects.match')}</th>
+                      <th className="py-2 pr-4">{t('customerGrowth.prospects.status')}</th>
+                      <th className="py-2">{t('customerGrowth.prospects.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -448,14 +478,14 @@ export function SupplierCustomerGrowthPage() {
                                 onClick={async () => {
                                   try {
                                     await connectProspect({ prospectId: p.id }).unwrap()
-                                    toast.success('Connection request sent')
+                                    toast.success(t('customerGrowth.toasts.connectionSent'))
                                     refetchProspects()
                                   } catch {
-                                    toast.error('Could not send connection request')
+                                    toast.error(t('customerGrowth.toasts.connectionFailed'))
                                   }
                                 }}
                               >
-                                Connect
+                                {t('customerGrowth.prospects.connect')}
                               </Button>
                             )}
                             {p.match_status === 'import_only' && (
@@ -470,14 +500,14 @@ export function SupplierCustomerGrowthPage() {
                                         channel: 'link',
                                       }).unwrap()
                                       await navigator.clipboard.writeText(res.inviteUrl)
-                                      toast.success('Invite link copied')
+                                      toast.success(t('customerGrowth.toasts.inviteCopied'))
                                     } catch {
-                                      toast.error('Invite failed')
+                                      toast.error(t('customerGrowth.toasts.inviteFailed'))
                                     }
                                   }}
                                 >
                                   <Link2 className="h-3 w-3 mr-1" />
-                                  Invite
+                                  {t('customerGrowth.prospects.invite')}
                                 </Button>
                                 <Button
                                   size="sm"
@@ -488,18 +518,19 @@ export function SupplierCustomerGrowthPage() {
                                         prospectId: p.id,
                                         planCode: sponsorPlanCode,
                                       }).unwrap()
-                                      toast.success('Sponsorship started')
+                                      toast.success(t('customerGrowth.toasts.sponsorStarted'))
                                       refetchProspects()
                                     } catch (e: unknown) {
                                       const msg =
                                         (e as { data?: { error?: { message?: string } } })?.data
-                                          ?.error?.message || 'Sponsor failed'
+                                          ?.error?.message ||
+                                        t('customerGrowth.toasts.sponsorFailed')
                                       toast.error(msg)
                                     }
                                   }}
                                 >
                                   <Gift className="h-3 w-3 mr-1" />
-                                  Sponsor
+                                  {t('customerGrowth.prospects.sponsor')}
                                 </Button>
                               </>
                             )}

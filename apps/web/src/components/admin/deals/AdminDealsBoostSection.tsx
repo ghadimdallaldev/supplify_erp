@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '../../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card'
@@ -11,6 +12,7 @@ import { ADMIN_BOOST_PACKAGES_EMPTY } from '../../../lib/dealDisplayLabels'
 import { AdminEmptyState, AdminSectionHeader } from '../adminUi'
 
 export function AdminDealsBoostSection() {
+  const { t } = useTranslation('admin')
   const { data: pricingData, refetch: refetchPricing } = useGetAdminPromotionPricingQuery()
   const [updatePricing, { isLoading: savingPricing }] = useUpdateAdminPromotionPricingMutation()
   const [editingKey, setEditingKey] = useState<string | null>(null)
@@ -60,26 +62,26 @@ export function AdminDealsBoostSection() {
         isRecommended: editForm.isRecommended,
         isActive: editForm.isActive,
       }).unwrap()
-      toast.success('Boost package updated')
+      toast.success(t('deals.boost.packageUpdated'))
       setEditingKey(null)
       refetchPricing()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to update pricing')
+      toast.error(err?.data?.error?.message || t('deals.boost.updateFailed'))
     }
   }
 
   return (
     <>
       <AdminSectionHeader
-        title="Boost packages & activation"
-        description="Configure boost packages suppliers see when boosting deals for sponsored placement. Price changes apply to new purchases only — existing boosts keep the amount paid at checkout."
+        title={t('deals.boost.title')}
+        description={t('deals.boost.description')}
       />
 
       {activationPricing ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Deal activation</CardTitle>
+            <CardTitle className="text-base">{t('deals.boost.activationTitle')}</CardTitle>
           </CardHeader>
           <CardContent className="text-sm">
             <p className="font-medium">{String(activationPricing.display_name)}</p>
@@ -90,7 +92,7 @@ export function AdminDealsBoostSection() {
               ${Number(activationPricing.amount).toFixed(2)}
               {Number(activationPricing.amount) === 0 ? (
                 <span className="ml-2 text-xs font-normal text-emerald-700">
-                  · {String(activationPricing.badge_label || 'Free after admin approval')}
+                  · {String(activationPricing.badge_label || t('deals.boost.freeAfterApproval'))}
                 </span>
               ) : null}
             </p>
@@ -100,7 +102,7 @@ export function AdminDealsBoostSection() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Boost packages</CardTitle>
+          <CardTitle className="text-base">{t('deals.boost.packagesTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
           {boostPackages.length === 0 ? (
@@ -118,7 +120,9 @@ export function AdminDealsBoostSection() {
                     {isEditing ? (
                       <div className="grid gap-3 sm:grid-cols-2">
                         <label className="space-y-1 text-sm">
-                          <span className="text-[var(--text-muted)]">Display name</span>
+                          <span className="text-[var(--text-muted)]">
+                            {t('deals.boost.displayName')}
+                          </span>
                           <Input
                             value={editForm.displayName}
                             onChange={(e) =>
@@ -127,7 +131,7 @@ export function AdminDealsBoostSection() {
                           />
                         </label>
                         <label className="space-y-1 text-sm">
-                          <span className="text-[var(--text-muted)]">Price ($)</span>
+                          <span className="text-[var(--text-muted)]">{t('deals.boost.price')}</span>
                           <Input
                             type="number"
                             min={0}
@@ -137,7 +141,9 @@ export function AdminDealsBoostSection() {
                           />
                         </label>
                         <label className="space-y-1 text-sm">
-                          <span className="text-[var(--text-muted)]">Duration (days)</span>
+                          <span className="text-[var(--text-muted)]">
+                            {t('deals.boost.duration')}
+                          </span>
                           <Input
                             type="number"
                             min={1}
@@ -148,17 +154,21 @@ export function AdminDealsBoostSection() {
                           />
                         </label>
                         <label className="space-y-1 text-sm">
-                          <span className="text-[var(--text-muted)]">Badge label</span>
+                          <span className="text-[var(--text-muted)]">
+                            {t('deals.boost.badgeLabel')}
+                          </span>
                           <Input
                             value={editForm.badgeLabel}
                             onChange={(e) =>
                               setEditForm((f) => ({ ...f, badgeLabel: e.target.value }))
                             }
-                            placeholder="Most popular"
+                            placeholder={t('deals.boost.badgePlaceholder')}
                           />
                         </label>
                         <label className="space-y-1 text-sm sm:col-span-2">
-                          <span className="text-[var(--text-muted)]">Description</span>
+                          <span className="text-[var(--text-muted)]">
+                            {t('deals.boost.descriptionLabel')}
+                          </span>
                           <Input
                             value={editForm.description}
                             onChange={(e) =>
@@ -167,13 +177,15 @@ export function AdminDealsBoostSection() {
                           />
                         </label>
                         <label className="space-y-1 text-sm sm:col-span-2">
-                          <span className="text-[var(--text-muted)]">Estimated reach label</span>
+                          <span className="text-[var(--text-muted)]">
+                            {t('deals.boost.reachLabel')}
+                          </span>
                           <Input
                             value={editForm.estimatedReachLabel}
                             onChange={(e) =>
                               setEditForm((f) => ({ ...f, estimatedReachLabel: e.target.value }))
                             }
-                            placeholder="Higher placement for 7 days"
+                            placeholder={t('deals.boost.descriptionPlaceholder')}
                           />
                         </label>
                         <label className="flex items-center gap-2 text-sm">
@@ -184,7 +196,7 @@ export function AdminDealsBoostSection() {
                               setEditForm((f) => ({ ...f, isRecommended: e.target.checked }))
                             }
                           />
-                          Recommended package
+                          {t('deals.boost.recommendedPackage')}
                         </label>
                         <label className="flex items-center gap-2 text-sm">
                           <input
@@ -194,7 +206,7 @@ export function AdminDealsBoostSection() {
                               setEditForm((f) => ({ ...f, isActive: e.target.checked }))
                             }
                           />
-                          Active (available for purchase)
+                          {t('deals.boost.activeForPurchase')}
                         </label>
                         <div className="flex gap-2 sm:col-span-2">
                           <Button
@@ -202,10 +214,10 @@ export function AdminDealsBoostSection() {
                             onClick={() => savePricing(key)}
                             disabled={savingPricing}
                           >
-                            Save package
+                            {t('deals.boost.savePackage')}
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => setEditingKey(null)}>
-                            Cancel
+                            {t('common.cancel')}
                           </Button>
                         </div>
                       </div>
@@ -220,16 +232,20 @@ export function AdminDealsBoostSection() {
                               </span>
                             ) : null}
                             {tier.is_recommended ? (
-                              <span className="text-xs text-[var(--brand)]">Recommended</span>
+                              <span className="text-xs text-[var(--brand)]">
+                                {t('common.recommended')}
+                              </span>
                             ) : null}
                             {tier.is_active === false ? (
-                              <span className="text-xs text-[var(--red)]">Inactive</span>
+                              <span className="text-xs text-[var(--red)]">
+                                {t('common.inactive')}
+                              </span>
                             ) : null}
                           </div>
                           <p className="mt-1 text-xs text-[var(--text-muted)]">
                             {tier.duration_days
-                              ? `${tier.duration_days} day(s)`
-                              : 'No fixed duration'}
+                              ? t('deals.boost.dayCount', { count: tier.duration_days })
+                              : t('deals.boost.noFixedDuration')}
                             {tier.estimated_reach_label
                               ? ` · ${String(tier.estimated_reach_label)}`
                               : ''}
@@ -250,7 +266,7 @@ export function AdminDealsBoostSection() {
                             variant="outline"
                             onClick={() => startEditPricing(tier)}
                           >
-                            Edit
+                            {t('deals.boost.edit')}
                           </Button>
                         </div>
                       </div>

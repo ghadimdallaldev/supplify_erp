@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react'
 import { format } from 'date-fns'
+import type { TFunction } from 'i18next'
+import { useTranslation } from 'react-i18next'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
 import { SummaryStrip } from '../ui/app-panel'
 import { cn } from '../../lib/utils'
-import type { StaffMember, StaffPtoRequest, StaffShiftSwap } from '../../types'
+import type { StaffMember } from '../../types'
 
 export interface StaffFormState {
   firstName: string
@@ -57,22 +59,11 @@ export const wageTypeOptions: StaffFormState['wageType'][] = [
   'OTHER',
 ]
 
-export const ptoStatusLabels: Record<StaffPtoRequest['status'], string> = {
-  PENDING: 'Pending',
-  APPROVED: 'Approved',
-  DECLINED: 'Declined',
-  CANCELLED: 'Cancelled',
-}
-
-export const swapStatusLabels: Record<StaffShiftSwap['status'], string> = {
-  REQUESTED: 'Requested',
-  APPROVED: 'Approved',
-  DECLINED: 'Declined',
-  CANCELLED: 'Cancelled',
-  COMPLETED: 'Completed',
-}
-
 export const defaultAvailabilityBlocks = { blocks: [] as Array<{ start: string; end: string }> }
+
+export function getWeekdayLabels(t: TFunction<'staff'>): string[] {
+  return t('shared.weekdaysShort', { returnObjects: true }) as string[]
+}
 
 export type StaffTabKey =
   | 'today'
@@ -84,6 +75,8 @@ export type StaffTabKey =
   | 'reports'
 
 export function StaffTabLoading({ className }: { className?: string }) {
+  const { t } = useTranslation('staff')
+
   return (
     <section
       className={cn(
@@ -91,7 +84,7 @@ export function StaffTabLoading({ className }: { className?: string }) {
         className
       )}
       aria-busy="true"
-      aria-label="Loading tab"
+      aria-label={t('shared.loadingTab')}
     >
       <div className="divide-y divide-[var(--app-border)]">
         {Array.from({ length: 4 }).map((_, i) => (
@@ -156,14 +149,24 @@ export function toDatetimeLocalValue(date: Date) {
   return format(date, "yyyy-MM-dd'T'HH:mm")
 }
 
-export function renderStaffStatus(status: StaffMember['status']) {
+export function renderStaffStatus(status: StaffMember['status'], t: TFunction<'staff'>) {
   switch (status) {
     case 'ACTIVE':
-      return <Badge className="bg-[var(--mint-pale)] text-[var(--mint)]">Active</Badge>
+      return (
+        <Badge className="bg-[var(--mint-pale)] text-[var(--mint)]">
+          {t('shared.staffStatus.ACTIVE')}
+        </Badge>
+      )
     case 'INACTIVE':
-      return <Badge className="bg-amber-100 text-amber-700">Inactive</Badge>
+      return (
+        <Badge className="bg-amber-100 text-amber-700">{t('shared.staffStatus.INACTIVE')}</Badge>
+      )
     case 'ARCHIVED':
-      return <Badge className="bg-[var(--app-border-mid)] text-[var(--text-mid)]">Archived</Badge>
+      return (
+        <Badge className="bg-[var(--app-border-mid)] text-[var(--text-mid)]">
+          {t('shared.staffStatus.ARCHIVED')}
+        </Badge>
+      )
     default:
       return null
   }

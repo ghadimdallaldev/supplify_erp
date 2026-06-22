@@ -1,15 +1,10 @@
 import { useState } from 'react'
-
+import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
-
 import { toast } from 'sonner'
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
-
 import { Button } from '../../ui/button'
-
 import { Badge } from '../../ui/badge'
-
 import { Input } from '../../ui/input'
 
 import { Label } from '../../ui/label'
@@ -38,9 +33,11 @@ import type { StaffPtoRequest } from '../../../types'
 
 import { getApiErrorMessage } from '../../../lib/apiError'
 
-import { defaultAvailabilityBlocks, ptoStatusLabels } from '../staffShared'
+import { defaultAvailabilityBlocks, getWeekdayLabels } from '../staffShared'
 
 export function StaffPtoTab() {
+  const { t } = useTranslation('staff')
+  const weekdays = getWeekdayLabels(t)
   const [ptoForm, setPtoForm] = useState({
     staffId: '',
 
@@ -89,7 +86,7 @@ export function StaffPtoTab() {
 
   const handleCreatePto = async () => {
     if (!ptoForm.staffId || !ptoForm.startDate || !ptoForm.endDate) {
-      toast.error('Please select staff and date range')
+      toast.error(t('pto.validationPtoFields'))
 
       return
     }
@@ -109,7 +106,7 @@ export function StaffPtoTab() {
         reason: ptoForm.reason || undefined,
       }).unwrap()
 
-      toast.success('PTO request recorded')
+      toast.success(t('pto.ptoRecorded'))
 
       setPtoForm({
         staffId: '',
@@ -125,7 +122,7 @@ export function StaffPtoTab() {
         reason: '',
       })
     } catch {
-      toast.error('Unable to record PTO request')
+      toast.error(t('pto.ptoRecordFailed'))
     }
   }
 
@@ -147,19 +144,19 @@ export function StaffPtoTab() {
         managerNote: decisionNote.trim() || undefined,
       }).unwrap()
 
-      toast.success(`PTO ${decisionDialog.status.toLowerCase()}`)
+      toast.success(t('pto.ptoUpdated', { status: decisionDialog.status.toLowerCase() }))
 
       setDecisionDialog(null)
 
       setDecisionNote('')
     } catch {
-      toast.error('Unable to update PTO request')
+      toast.error(t('pto.ptoUpdateFailed'))
     }
   }
 
   const handleSaveAvailability = async () => {
     if (!availabilityForm.staffId || !availabilityForm.start || !availabilityForm.end) {
-      toast.error('Provide staff and time window')
+      toast.error(t('pto.validationAvailability'))
 
       return
     }
@@ -183,11 +180,11 @@ export function StaffPtoTab() {
         notes: availabilityForm.notes || undefined,
       }).unwrap()
 
-      toast.success('Availability recorded')
+      toast.success(t('pto.availabilityRecorded'))
 
       setAvailabilityForm({ staffId: '', weekday: '0', start: '', end: '', notes: '' })
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Unable to save availability'))
+      toast.error(getApiErrorMessage(error, t('pto.availabilitySaveFailed')))
     }
   }
 
@@ -200,30 +197,32 @@ export function StaffPtoTab() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {decisionDialog?.status === 'APPROVED' ? 'Approve PTO' : 'Decline PTO'}
+              {decisionDialog?.status === 'APPROVED'
+                ? t('pto.approveTitle')
+                : t('pto.declineTitle')}
             </DialogTitle>
 
-            <DialogDescription>Optional note for the team member.</DialogDescription>
+            <DialogDescription>{t('pto.decisionDescription')}</DialogDescription>
           </DialogHeader>
 
           <div>
-            <Label htmlFor="ptoDecisionNote">Manager note</Label>
+            <Label htmlFor="ptoDecisionNote">{t('shared.managerNote')}</Label>
 
             <Input
               id="ptoDecisionNote"
               value={decisionNote}
               onChange={(event) => setDecisionNote(event.target.value)}
-              placeholder="Optional context for your decision"
+              placeholder={t('pto.managerNotePlaceholder')}
             />
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDecisionDialog(null)}>
-              Cancel
+              {t('shared.cancel')}
             </Button>
 
             <Button onClick={handlePtoDecision} disabled={updatingPto}>
-              {updatingPto ? 'Saving…' : 'Confirm'}
+              {updatingPto ? t('shared.saving') : t('shared.confirm')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -231,19 +230,17 @@ export function StaffPtoTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle>PTO & leave requests</CardTitle>
+          <CardTitle>{t('pto.requestsTitle')}</CardTitle>
 
-          <CardDescription>
-            Approve vacation, sick days, or unpaid leave. This is not a full HR policy engine.
-          </CardDescription>
+          <CardDescription>{t('pto.requestsDescription')}</CardDescription>
         </CardHeader>
 
         <CardContent>
           {ptoLoading ? (
-            <p className="text-sm text-[var(--text-muted)]">Loading PTO requests…</p>
+            <p className="text-sm text-[var(--text-muted)]">{t('pto.loadingRequests')}</p>
           ) : ptoRequests.length === 0 ? (
             <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">
-              <p>No requests yet. Encourage staff to submit time off from the Staff App.</p>
+              <p>{t('pto.noRequests')}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -255,8 +252,8 @@ export function StaffPtoTab() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold text-[var(--text)]">
-                        {request.staff?.name || 'Team member'} ·{' '}
-                        {request.type.charAt(0) + request.type.slice(1).toLowerCase()}
+                        {request.staff?.name || t('shared.teamMember')} ·{' '}
+                        {t(`shared.ptoType.${request.type}`)}
                       </p>
 
                       <p className="text-xs text-[var(--text-muted)]">
@@ -274,19 +271,19 @@ export function StaffPtoTab() {
                             : 'bg-[var(--app-border-mid)] text-[var(--text-mid)]'
                       }
                     >
-                      {ptoStatusLabels[request.status]}
+                      {t(`shared.ptoStatus.${request.status}`)}
                     </Badge>
                   </div>
 
                   {request.reason ? (
                     <p className="mt-2 text-xs text-[var(--text-muted)]">
-                      Reason: {request.reason}
+                      {t('shared.reasonPrefix', { reason: request.reason })}
                     </p>
                   ) : null}
 
                   {request.managerNote ? (
                     <p className="mt-1 text-xs text-[var(--text-muted)]">
-                      Manager note: {request.managerNote}
+                      {t('shared.managerNotePrefix', { note: request.managerNote })}
                     </p>
                   ) : null}
 
@@ -298,7 +295,7 @@ export function StaffPtoTab() {
                         onClick={() => openDecisionDialog(request.id, 'APPROVED')}
                         disabled={updatingPto}
                       >
-                        Approve
+                        {t('shared.approve')}
                       </Button>
 
                       <Button
@@ -307,7 +304,7 @@ export function StaffPtoTab() {
                         onClick={() => openDecisionDialog(request.id, 'DECLINED')}
                         disabled={updatingPto}
                       >
-                        Decline
+                        {t('shared.decline')}
                       </Button>
                     </div>
                   ) : null}
@@ -320,21 +317,21 @@ export function StaffPtoTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Record new PTO</CardTitle>
+          <CardTitle>{t('pto.recordTitle')}</CardTitle>
 
-          <CardDescription>Capture staff requests directly in Supplify.</CardDescription>
+          <CardDescription>{t('pto.recordDescription')}</CardDescription>
         </CardHeader>
 
         <CardContent className="grid gap-3 sm:grid-cols-2">
           <div>
-            <Label htmlFor="ptoStaff">Staff</Label>
+            <Label htmlFor="ptoStaff">{t('shared.staff')}</Label>
 
             <Select
               value={ptoForm.staffId}
               onValueChange={(value) => setPtoForm((prev) => ({ ...prev, staffId: value }))}
             >
               <SelectTrigger id="ptoStaff" className="mt-1 w-full">
-                <option value="">Select staff</option>
+                <option value="">{t('shared.selectStaff')}</option>
 
                 {staffMembers.map((member) => (
                   <option key={member.id} value={member.id}>
@@ -346,28 +343,24 @@ export function StaffPtoTab() {
           </div>
 
           <div>
-            <Label htmlFor="ptoType">Type</Label>
+            <Label htmlFor="ptoType">{t('shared.type')}</Label>
 
             <Select
               value={ptoForm.type}
               onValueChange={(value) => setPtoForm((prev) => ({ ...prev, type: value }))}
             >
               <SelectTrigger id="ptoType" className="mt-1 w-full">
-                <option value="VACATION">Vacation</option>
-
-                <option value="SICK">Sick</option>
-
-                <option value="PERSONAL">Personal</option>
-
-                <option value="UNPAID">Unpaid</option>
-
-                <option value="OTHER">Other</option>
+                {(['VACATION', 'SICK', 'PERSONAL', 'UNPAID', 'OTHER'] as const).map((type) => (
+                  <option key={type} value={type}>
+                    {t(`shared.ptoType.${type}`)}
+                  </option>
+                ))}
               </SelectTrigger>
             </Select>
           </div>
 
           <div>
-            <Label htmlFor="ptoStart">Start date</Label>
+            <Label htmlFor="ptoStart">{t('pto.startDate')}</Label>
 
             <Input
               id="ptoStart"
@@ -380,7 +373,7 @@ export function StaffPtoTab() {
           </div>
 
           <div>
-            <Label htmlFor="ptoEnd">End date</Label>
+            <Label htmlFor="ptoEnd">{t('pto.endDate')}</Label>
 
             <Input
               id="ptoEnd"
@@ -391,7 +384,7 @@ export function StaffPtoTab() {
           </div>
 
           <div>
-            <Label htmlFor="ptoHours">Hours (optional)</Label>
+            <Label htmlFor="ptoHours">{t('pto.hoursOptional')}</Label>
 
             <Input
               id="ptoHours"
@@ -406,7 +399,7 @@ export function StaffPtoTab() {
           </div>
 
           <div className="sm:col-span-2">
-            <Label htmlFor="ptoReason">Reason</Label>
+            <Label htmlFor="ptoReason">{t('shared.reason')}</Label>
 
             <Input
               id="ptoReason"
@@ -417,7 +410,7 @@ export function StaffPtoTab() {
 
           <div className="sm:col-span-2 flex justify-end">
             <Button onClick={handleCreatePto} disabled={creatingPto}>
-              {creatingPto ? 'Recording…' : 'Record PTO'}
+              {creatingPto ? t('pto.recording') : t('pto.recordPto')}
             </Button>
           </div>
         </CardContent>
@@ -425,15 +418,15 @@ export function StaffPtoTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Availability</CardTitle>
+          <CardTitle>{t('pto.availabilityTitle')}</CardTitle>
 
-          <CardDescription>Recurring preferences keep schedule conflicts minimal.</CardDescription>
+          <CardDescription>{t('pto.availabilityDescription')}</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-4">
             <div>
-              <Label htmlFor="availabilityStaff">Staff</Label>
+              <Label htmlFor="availabilityStaff">{t('shared.staff')}</Label>
 
               <Select
                 value={availabilityForm.staffId}
@@ -442,7 +435,7 @@ export function StaffPtoTab() {
                 }
               >
                 <SelectTrigger id="availabilityStaff" className="mt-1 w-full">
-                  <option value="">Select staff</option>
+                  <option value="">{t('shared.selectStaff')}</option>
 
                   {staffMembers.map((member) => (
                     <option key={member.id} value={member.id}>
@@ -454,7 +447,7 @@ export function StaffPtoTab() {
             </div>
 
             <div>
-              <Label htmlFor="availabilityDay">Weekday</Label>
+              <Label htmlFor="availabilityDay">{t('pto.weekday')}</Label>
 
               <Select
                 value={availabilityForm.weekday}
@@ -463,25 +456,17 @@ export function StaffPtoTab() {
                 }
               >
                 <SelectTrigger id="availabilityDay" className="mt-1 w-full">
-                  <option value="0">Sunday</option>
-
-                  <option value="1">Monday</option>
-
-                  <option value="2">Tuesday</option>
-
-                  <option value="3">Wednesday</option>
-
-                  <option value="4">Thursday</option>
-
-                  <option value="5">Friday</option>
-
-                  <option value="6">Saturday</option>
+                  {weekdays.map((day, index) => (
+                    <option key={day} value={String(index)}>
+                      {day}
+                    </option>
+                  ))}
                 </SelectTrigger>
               </Select>
             </div>
 
             <div>
-              <Label htmlFor="availabilityStart">Start</Label>
+              <Label htmlFor="availabilityStart">{t('pto.start')}</Label>
 
               <Input
                 id="availabilityStart"
@@ -494,7 +479,7 @@ export function StaffPtoTab() {
             </div>
 
             <div>
-              <Label htmlFor="availabilityEnd">End</Label>
+              <Label htmlFor="availabilityEnd">{t('pto.end')}</Label>
 
               <Input
                 id="availabilityEnd"
@@ -507,7 +492,7 @@ export function StaffPtoTab() {
             </div>
 
             <div className="sm:col-span-4">
-              <Label htmlFor="availabilityNotes">Notes</Label>
+              <Label htmlFor="availabilityNotes">{t('shared.notes')}</Label>
 
               <Input
                 id="availabilityNotes"
@@ -521,7 +506,7 @@ export function StaffPtoTab() {
 
           <div className="flex justify-end">
             <Button onClick={handleSaveAvailability} disabled={savingAvailability}>
-              {savingAvailability ? 'Saving…' : 'Save availability'}
+              {savingAvailability ? t('shared.saving') : t('pto.saveAvailability')}
             </Button>
           </div>
 
@@ -531,19 +516,19 @@ export function StaffPtoTab() {
                 <thead className="bg-[var(--brand-ultra)]">
                   <tr>
                     <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">
-                      Staff
+                      {t('shared.staff')}
                     </th>
 
                     <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">
-                      Day
+                      {t('shared.day')}
                     </th>
 
                     <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">
-                      Window
+                      {t('shared.window')}
                     </th>
 
                     <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">
-                      Notes
+                      {t('shared.notes')}
                     </th>
                   </tr>
                 </thead>
@@ -553,9 +538,7 @@ export function StaffPtoTab() {
                     <tr key={item.id}>
                       <td className="px-4 py-2 text-[var(--text-mid)]">{item.staffName}</td>
 
-                      <td className="px-4 py-2 text-[var(--text-mid)]">
-                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][item.weekday]}
-                      </td>
+                      <td className="px-4 py-2 text-[var(--text-mid)]">{weekdays[item.weekday]}</td>
 
                       <td className="px-4 py-2 text-[var(--text-mid)]">
                         {(item.availability?.blocks || defaultAvailabilityBlocks.blocks)
@@ -565,7 +548,9 @@ export function StaffPtoTab() {
                           .join(', ')}
                       </td>
 
-                      <td className="px-4 py-2 text-[var(--text-muted)]">{item.notes || '—'}</td>
+                      <td className="px-4 py-2 text-[var(--text-muted)]">
+                        {item.notes || t('shared.emDash')}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

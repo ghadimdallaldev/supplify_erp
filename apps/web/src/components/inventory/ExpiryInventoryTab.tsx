@@ -55,7 +55,7 @@ export function ExpiryInventoryTab() {
   const [createLot, { isLoading: creating }] = useCreateExpiryLotMutation()
   const [deleteLot] = useDeleteExpiryLotMutation()
 
-  const lots = data?.lots || []
+  const lots = useMemo(() => data?.lots ?? [], [data?.lots])
   const suppliers = useMemo(() => {
     const map = new Map<string, string>()
     for (const lot of lots) {

@@ -1,5 +1,7 @@
-import { useState, type ReactNode } from 'react'
+import { useState, useEffect, useMemo, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
+import { ensureNamespace } from '../i18n'
 import {
   useGetSupplierCommandCenterQuery,
   useCreateReorderReminderDraftMutation,
@@ -40,50 +42,135 @@ import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { EmptyState } from '../components/ui/empty-state'
 
-const OPS_QUICK_ACTIONS = [
-  { label: 'Run sheet', href: '/app/run-sheet', icon: ClipboardList, testId: 'qa-run-sheet' },
-  { label: 'Deliveries', href: '/app/fulfillment', icon: Truck, testId: 'qa-deliveries' },
-  { label: 'Receivables', href: '/app/invoices', icon: DollarSign, testId: 'qa-invoices' },
-  { label: 'Reorder', href: '#reorder', icon: Users, testId: 'qa-reorder' },
-  { label: 'Low stock', href: '/app/inventory', icon: Warehouse, testId: 'qa-inventory' },
-  { label: 'Disputes', href: '/app/disputes', icon: Scale, testId: 'qa-disputes' },
-  { label: 'Deals', href: '/app/promotions', icon: Tag, testId: 'qa-deals' },
-]
-
-const SALES_QUICK_ACTIONS = [
-  { label: 'Deals', href: '/app/promotions', icon: Tag, testId: 'qa-deals' },
-  { label: 'Restaurants', href: '/app/restaurants', icon: Users, testId: 'qa-restaurants' },
-  { label: 'Reorder leads', href: '#reorder', icon: Users, testId: 'qa-reorder' },
-]
-
-const FULFILLMENT_QUICK_ACTIONS = [
-  { label: 'Fulfillment board', href: '/app/fulfillment', icon: Truck, testId: 'qa-deliveries' },
-  { label: 'Orders', href: '/app/orders', icon: Package, testId: 'qa-orders' },
-  { label: 'Low stock', href: '/app/inventory', icon: Warehouse, testId: 'qa-inventory' },
-]
-
-const CATALOG_QUICK_ACTIONS = [
-  { label: 'Products', href: '/app/products', icon: Package, testId: 'qa-products' },
+const OPS_QUICK_ACTION_KEYS = [
   {
-    label: 'Contract pricing',
+    labelKey: 'commandCenter.quickActions.runSheet',
+    href: '/app/run-sheet',
+    icon: ClipboardList,
+    testId: 'qa-run-sheet',
+  },
+  {
+    labelKey: 'commandCenter.quickActions.deliveries',
+    href: '/app/fulfillment',
+    icon: Truck,
+    testId: 'qa-deliveries',
+  },
+  {
+    labelKey: 'commandCenter.quickActions.receivables',
+    href: '/app/invoices',
+    icon: DollarSign,
+    testId: 'qa-invoices',
+  },
+  {
+    labelKey: 'commandCenter.quickActions.reorder',
+    href: '#reorder',
+    icon: Users,
+    testId: 'qa-reorder',
+  },
+  {
+    labelKey: 'commandCenter.quickActions.lowStock',
+    href: '/app/inventory',
+    icon: Warehouse,
+    testId: 'qa-inventory',
+  },
+  {
+    labelKey: 'commandCenter.quickActions.disputes',
+    href: '/app/disputes',
+    icon: Scale,
+    testId: 'qa-disputes',
+  },
+  {
+    labelKey: 'commandCenter.quickActions.deals',
+    href: '/app/promotions',
+    icon: Tag,
+    testId: 'qa-deals',
+  },
+] as const
+
+const SALES_QUICK_ACTION_KEYS = [
+  {
+    labelKey: 'commandCenter.quickActions.deals',
+    href: '/app/promotions',
+    icon: Tag,
+    testId: 'qa-deals',
+  },
+  {
+    labelKey: 'commandCenter.quickActions.restaurants',
+    href: '/app/restaurants',
+    icon: Users,
+    testId: 'qa-restaurants',
+  },
+  {
+    labelKey: 'commandCenter.quickActions.reorderLeads',
+    href: '#reorder',
+    icon: Users,
+    testId: 'qa-reorder',
+  },
+] as const
+
+const FULFILLMENT_QUICK_ACTION_KEYS = [
+  {
+    labelKey: 'commandCenter.quickActions.fulfillmentBoard',
+    href: '/app/fulfillment',
+    icon: Truck,
+    testId: 'qa-deliveries',
+  },
+  {
+    labelKey: 'commandCenter.quickActions.orders',
+    href: '/app/orders',
+    icon: Package,
+    testId: 'qa-orders',
+  },
+  {
+    labelKey: 'commandCenter.quickActions.lowStock',
+    href: '/app/inventory',
+    icon: Warehouse,
+    testId: 'qa-inventory',
+  },
+] as const
+
+const CATALOG_QUICK_ACTION_KEYS = [
+  {
+    labelKey: 'commandCenter.quickActions.products',
+    href: '/app/products',
+    icon: Package,
+    testId: 'qa-products',
+  },
+  {
+    labelKey: 'commandCenter.quickActions.contractPricing',
     href: '/app/contract-pricing',
     icon: Percent,
     testId: 'qa-pricing',
   },
-  { label: 'Low stock', href: '/app/inventory', icon: Warehouse, testId: 'qa-inventory' },
-]
+  {
+    labelKey: 'commandCenter.quickActions.lowStock',
+    href: '/app/inventory',
+    icon: Warehouse,
+    testId: 'qa-inventory',
+  },
+] as const
 
-const FINANCE_QUICK_ACTIONS = [
-  { label: 'Invoices', href: '/app/invoices', icon: FileText, testId: 'qa-invoices' },
-  { label: 'Restaurants', href: '/app/restaurants', icon: Users, testId: 'qa-restaurants' },
-]
+const FINANCE_QUICK_ACTION_KEYS = [
+  {
+    labelKey: 'commandCenter.quickActions.invoices',
+    href: '/app/invoices',
+    icon: FileText,
+    testId: 'qa-invoices',
+  },
+  {
+    labelKey: 'commandCenter.quickActions.restaurants',
+    href: '/app/restaurants',
+    icon: Users,
+    testId: 'qa-restaurants',
+  },
+] as const
 
-const QUICK_ACTION_SETS = {
-  ops: OPS_QUICK_ACTIONS,
-  sales: SALES_QUICK_ACTIONS,
-  fulfillment: FULFILLMENT_QUICK_ACTIONS,
-  catalog: CATALOG_QUICK_ACTIONS,
-  finance: FINANCE_QUICK_ACTIONS,
+const QUICK_ACTION_KEY_SETS = {
+  ops: OPS_QUICK_ACTION_KEYS,
+  sales: SALES_QUICK_ACTION_KEYS,
+  fulfillment: FULFILLMENT_QUICK_ACTION_KEYS,
+  catalog: CATALOG_QUICK_ACTION_KEYS,
+  finance: FINANCE_QUICK_ACTION_KEYS,
 } as const
 
 function KpiCard({
@@ -158,23 +245,25 @@ function formatOrderDate(iso: string | undefined) {
 }
 
 export function SupplierCommandCenterPage() {
+  const { t } = useTranslation('supplierOps')
+
+  useEffect(() => {
+    void ensureNamespace('supplierOps')
+  }, [])
+
   const { can } = usePermissions()
   const { persona } = useWorkspaceRole()
   const hubMode = persona.commandCenterMode ?? 'full'
   const layout = getCommandCenterLayout(hubMode, can)
-  const hubTitle = persona.overviewNav?.label ?? 'Command Center'
-  const hubDescription =
-    hubMode === 'sales'
-      ? 'Deals, reorder leads, and restaurant follow-ups'
-      : hubMode === 'fulfillment'
-        ? 'Orders to pick, deliveries in progress, and stock alerts'
-        : hubMode === 'catalog'
-          ? 'Catalog health, pricing, and low-stock items'
-          : hubMode === 'finance'
-            ? 'Receivables, overdue accounts, and collections'
-            : persona.readOnly
-              ? 'Read-only snapshot of supplier priorities'
-              : "Today's priorities — action items, not just charts"
+  const hubTitle = persona.overviewNav?.label ?? t('commandCenter.title')
+  const hubDescription = useMemo(() => {
+    if (hubMode === 'sales') return t('commandCenter.descriptions.sales')
+    if (hubMode === 'fulfillment') return t('commandCenter.descriptions.fulfillment')
+    if (hubMode === 'catalog') return t('commandCenter.descriptions.catalog')
+    if (hubMode === 'finance') return t('commandCenter.descriptions.finance')
+    if (persona.readOnly) return t('commandCenter.descriptions.readOnly')
+    return t('commandCenter.descriptions.full')
+  }, [hubMode, persona.readOnly, t])
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const smartReorderEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.smart_reorder
@@ -195,7 +284,7 @@ export function SupplierCommandCenterPage() {
       const result = await createDraft({ restaurantId, openChat: false }).unwrap()
       const draft = result.draft ?? result
       if (draft?.autoSent) {
-        toast.error('Unexpected: reminder was marked as sent')
+        toast.error(t('commandCenter.toasts.unexpectedSent'))
         return
       }
       setReminderDraft({
@@ -205,16 +294,16 @@ export function SupplierCommandCenterPage() {
         status: draft.status,
         autoSent: false,
       })
-      toast.success('Draft saved — review before sending')
+      toast.success(t('commandCenter.toasts.draftSaved'))
     } catch (err: unknown) {
       const msg = (err as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Could not create reminder draft')
+      toast.error(msg || t('commandCenter.toasts.draftFailed'))
     }
   }
 
   const gateProps =
     hubMode === 'sales'
-      ? { anyOf: ['PROMOTIONS_VIEW'] as const, title: 'sales hub' }
+      ? { anyOf: ['PROMOTIONS_VIEW'] as const, title: t('commandCenter.gateTitle.sales') }
       : {
           anyOf: [
             'ORDERS_MANAGE',
@@ -224,9 +313,16 @@ export function SupplierCommandCenterPage() {
             'PROMOTIONS_MANAGE',
             'PROMOTIONS_VIEW',
           ] as const,
-          title: 'command center',
+          title: t('commandCenter.gateTitle.default'),
         }
-  const quickActions = QUICK_ACTION_SETS[layout.quickActions]
+  const quickActions = useMemo(
+    () =>
+      QUICK_ACTION_KEY_SETS[layout.quickActions].map((action) => ({
+        ...action,
+        label: t(action.labelKey),
+      })),
+    [layout.quickActions, t]
+  )
 
   if (isLoading) {
     return (
@@ -259,13 +355,13 @@ export function SupplierCommandCenterPage() {
           role="alert"
         >
           <AlertTriangle size={32} className="text-[var(--brand)] mx-auto mb-3" />
-          <p className="font-bold text-[var(--text)]">Failed to load command center</p>
+          <p className="font-bold text-[var(--text)]">{t('commandCenter.error.title')}</p>
           <p className="text-sm text-[var(--text-muted)] mt-2 max-w-md mx-auto">
             {(error as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-              'Check your connection and try again.'}
+              t('commandCenter.error.description')}
           </p>
           <Button onClick={() => refetch()} className="mt-4" data-testid="command-center-retry">
-            Retry
+            {t('commandCenter.error.retry')}
           </Button>
         </div>
       </RequirePermission>
@@ -280,14 +376,15 @@ export function SupplierCommandCenterPage() {
             className="rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-3 py-2 text-xs text-[var(--text-muted)]"
             role="status"
           >
-            Read-only workspace · {persona.roleLabel} — you can view priorities but cannot take
-            actions.
+            {t('commandCenter.readOnlyBanner', { role: persona.roleLabel })}
           </p>
         )}
         <PageHeader
           title={hubTitle}
           description={
-            isFetching && !isLoading ? `${hubDescription} (Refreshing...)` : hubDescription
+            isFetching && !isLoading
+              ? `${hubDescription} ${t('commandCenter.refreshing')}`
+              : hubDescription
           }
           actions={
             layout.showAnalyticsLink ? (
@@ -300,7 +397,7 @@ export function SupplierCommandCenterPage() {
               >
                 <Link to="/app/dashboard">
                   <BarChart3 className="h-4 w-4 mr-1.5" />
-                  Analytics dashboard
+                  {t('commandCenter.analyticsDashboard')}
                 </Link>
               </Button>
             ) : undefined
@@ -309,7 +406,7 @@ export function SupplierCommandCenterPage() {
 
         <nav
           className="-mx-1 flex gap-2 overflow-x-auto overscroll-x-contain rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-2.5 sm:mx-0 sm:flex-wrap"
-          aria-label="Quick actions"
+          aria-label={t('commandCenter.quickActionsAria')}
           data-testid="command-center-quick-actions"
         >
           {quickActions.map(({ label, href, icon: Icon, testId }) => (
@@ -335,14 +432,14 @@ export function SupplierCommandCenterPage() {
               <>
                 <KpiCard
                   testId="kpi-orders-prepare"
-                  label="Orders to prepare today"
+                  label={t('commandCenter.kpis.ordersToPrepare')}
                   value={kpis?.ordersToPrepareToday ?? 0}
                   icon={Package}
                   href="/app/orders"
                 />
                 <KpiCard
                   testId="kpi-deliveries-pending"
-                  label="Deliveries pending"
+                  label={t('commandCenter.kpis.deliveriesPending')}
                   value={kpis?.deliveriesPendingToday ?? 0}
                   icon={Truck}
                   href="/app/fulfillment"
@@ -352,38 +449,40 @@ export function SupplierCommandCenterPage() {
                         data-testid="delivery-gps-summary"
                         className="mt-1 border-t border-[var(--app-border)] pt-2 text-xs"
                       >
-                        <p className="mb-1.5 font-semibold text-[var(--text-muted)]">GPS today</p>
+                        <p className="mb-1.5 font-semibold text-[var(--text-muted)]">
+                          {t('commandCenter.kpis.gpsToday')}
+                        </p>
                         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[var(--text)]">
                           <span>
                             <span className="font-bold text-[var(--mint)]">
                               {previews.deliveryGpsSummary.live ?? 0}
                             </span>{' '}
-                            Live
+                            {t('commandCenter.kpis.live')}
                           </span>
                           <span>
                             <span className="font-bold text-amber-600">
                               {previews.deliveryGpsSummary.stale ?? 0}
                             </span>{' '}
-                            Stale
+                            {t('commandCenter.kpis.stale')}
                           </span>
                           <span>
                             <span className="font-bold">
                               {previews.deliveryGpsSummary.noGps ?? 0}
                             </span>{' '}
-                            No GPS
+                            {t('commandCenter.kpis.noGps')}
                           </span>
                           <span>
                             <span className="font-bold text-[var(--red)]">
                               {previews.deliveryGpsSummary.failed ?? 0}
                             </span>{' '}
-                            Failed
+                            {t('commandCenter.kpis.failed')}
                           </span>
                         </div>
                         <Link
                           to="/app/fulfillment?tab=tracking"
                           className="mt-2 inline-flex items-center gap-1 font-semibold text-[var(--brand-mid)] hover:underline"
                         >
-                          Open tracking
+                          {t('commandCenter.kpis.openTracking')}
                           <ArrowRight className="h-3 w-3" aria-hidden />
                         </Link>
                       </div>
@@ -395,7 +494,7 @@ export function SupplierCommandCenterPage() {
             {layout.showFinanceKpi && (
               <KpiCard
                 testId="kpi-unpaid-balance"
-                label="Unpaid balance"
+                label={t('commandCenter.kpis.unpaidBalance')}
                 value={formatCurrency(kpis?.unpaidBalance ?? 0)}
                 icon={DollarSign}
                 href="/app/invoices"
@@ -404,7 +503,7 @@ export function SupplierCommandCenterPage() {
             {layout.showSalesKpi && (
               <KpiCard
                 testId="kpi-reorder-due"
-                label="Restaurants due to reorder"
+                label={t('commandCenter.kpis.reorderDue')}
                 value={kpis?.customersDueReorder ?? 0}
                 icon={Users}
                 href="#reorder"
@@ -420,13 +519,13 @@ export function SupplierCommandCenterPage() {
           >
             <h2 className="text-[15px] font-extrabold mb-2.5 flex items-center gap-2 text-[var(--text)]">
               <ClipboardList size={16} />
-              Today&apos;s priorities
+              {t('commandCenter.priorities.title')}
             </h2>
             {(data?.todaysPriorities || []).length === 0 ? (
               <div data-testid="priorities-empty">
                 <EmptyState
-                  title="No urgent items"
-                  description="You're caught up for now."
+                  title={t('commandCenter.priorities.emptyTitle')}
+                  description={t('commandCenter.priorities.emptyDescription')}
                   icon={<ClipboardList className="h-5 w-5" />}
                 />
               </div>
@@ -454,9 +553,14 @@ export function SupplierCommandCenterPage() {
           layout.showLowStockPreview) && (
           <div className="dashboard-content-grid">
             {layout.showDeliveryPreview && (
-              <PreviewCard title="Deliveries" testId="preview-deliveries" href="/app/fulfillment">
+              <PreviewCard
+                title={t('commandCenter.previews.deliveries')}
+                testId="preview-deliveries"
+                href="/app/fulfillment"
+                viewAllLabel={t('commandCenter.previews.viewAll')}
+              >
                 {(previews?.deliveries || []).length === 0 ? (
-                  <EmptyInline>No active deliveries right now.</EmptyInline>
+                  <EmptyInline>{t('commandCenter.previews.noActiveDeliveries')}</EmptyInline>
                 ) : (
                   previews!.deliveries.map(
                     (d: {
@@ -488,15 +592,26 @@ export function SupplierCommandCenterPage() {
             )}
 
             {layout.showReceivablesPreview && (
-              <PreviewCard title="Who owes me" testId="preview-receivables" href="/app/invoices">
+              <PreviewCard
+                title={t('commandCenter.previews.receivables')}
+                testId="preview-receivables"
+                href="/app/invoices"
+                viewAllLabel={t('commandCenter.previews.viewAll')}
+              >
                 <div className="text-[13px] font-bold">
-                  {formatCurrency(previews?.receivables?.unpaidTotal ?? 0)} unpaid
+                  {t('commandCenter.previews.unpaid', {
+                    amount: formatCurrency(previews?.receivables?.unpaidTotal ?? 0),
+                  })}
                 </div>
                 <div className="text-xs text-[var(--text-muted)] mt-0.5">
-                  Overdue: {formatCurrency(previews?.receivables?.overdueTotal ?? 0)}
+                  {t('commandCenter.previews.overdue', {
+                    amount: formatCurrency(previews?.receivables?.overdueTotal ?? 0),
+                  })}
                 </div>
                 {(previews?.receivables?.topDebtors || []).length === 0 ? (
-                  <EmptyInline className="mt-2">No open balances.</EmptyInline>
+                  <EmptyInline className="mt-2">
+                    {t('commandCenter.previews.noOpenBalances')}
+                  </EmptyInline>
                 ) : (
                   (previews?.receivables?.topDebtors || [])
                     .slice(0, 3)
@@ -517,9 +632,14 @@ export function SupplierCommandCenterPage() {
             )}
 
             {layout.showLowStockPreview && (
-              <PreviewCard title="Low stock" testId="preview-low-stock" href="/app/inventory">
+              <PreviewCard
+                title={t('commandCenter.previews.lowStock')}
+                testId="preview-low-stock"
+                href="/app/inventory"
+                viewAllLabel={t('commandCenter.previews.viewAll')}
+              >
                 {(previews?.lowStock || []).length === 0 ? (
-                  <EmptyInline>Stock levels look healthy.</EmptyInline>
+                  <EmptyInline>{t('commandCenter.previews.stockHealthy')}</EmptyInline>
                 ) : (
                   previews!.lowStock.map(
                     (p: {
@@ -533,7 +653,7 @@ export function SupplierCommandCenterPage() {
                         to={`/app/products/${p.productId}`}
                         className="block text-xs py-1 text-[var(--text)] hover:text-[var(--brand)]"
                       >
-                        {p.name} — {p.availableQty} left
+                        {t('commandCenter.previews.left', { name: p.name, qty: p.availableQty })}
                       </Link>
                     )
                   )
@@ -553,18 +673,18 @@ export function SupplierCommandCenterPage() {
           >
             <h2 className="text-[15px] font-extrabold mb-2.5 flex items-center gap-2 text-[var(--text)]">
               <Users size={16} />
-              Reorder opportunities
+              {t('commandCenter.reorder.title')}
               {(kpis?.customersDueReorder ?? 0) > 0 && (
                 <span className="text-xs font-normal text-[var(--text-muted)]">
-                  ({kpis!.customersDueReorder} due)
+                  {t('commandCenter.reorder.due', { count: kpis!.customersDueReorder })}
                 </span>
               )}
             </h2>
             {(previews?.reorderOpportunities || []).length === 0 ? (
               <div data-testid="reorder-empty">
                 <EmptyState
-                  title="No reorder opportunities"
-                  description="No restaurants are past their usual reorder window right now."
+                  title={t('commandCenter.reorder.emptyTitle')}
+                  description={t('commandCenter.reorder.emptyDescription')}
                   icon={<Users className="h-5 w-5" />}
                 />
               </div>
@@ -587,18 +707,25 @@ export function SupplierCommandCenterPage() {
                     >
                       <div className="font-bold text-[13px]">{c.restaurantName}</div>
                       <ul className="mt-2 text-xs text-[var(--text-muted)] space-y-1 list-disc pl-4">
-                        <li>Usually orders every ~{c.avgDaysBetween ?? '—'} days</li>
                         <li>
-                          Last order: {formatOrderDate(c.lastOrderAt)} (
-                          {c.daysSinceLastOrder ?? '—'} days ago)
+                          {t('commandCenter.reorder.usuallyOrdersEvery', {
+                            days: c.avgDaysBetween ?? '—',
+                          })}
+                        </li>
+                        <li>
+                          {t('commandCenter.reorder.lastOrder', {
+                            date: formatOrderDate(c.lastOrderAt),
+                            days: c.daysSinceLastOrder ?? '—',
+                          })}
                         </li>
                         {c.suggestedProducts && c.suggestedProducts.length > 0 && (
                           <li>
-                            Often orders:{' '}
-                            {c.suggestedProducts
-                              .slice(0, 3)
-                              .map((p) => p.productName)
-                              .join(', ')}
+                            {t('commandCenter.reorder.oftenOrders', {
+                              products: c.suggestedProducts
+                                .slice(0, 3)
+                                .map((p) => p.productName)
+                                .join(', '),
+                            })}
                           </li>
                         )}
                       </ul>
@@ -611,11 +738,13 @@ export function SupplierCommandCenterPage() {
                             className="w-full sm:w-auto"
                             onClick={() => handleDraftReminder(c.restaurantId)}
                           >
-                            Review reminder
+                            {t('commandCenter.reorder.reviewReminder')}
                           </Button>
                         )}
                         <Button size="sm" variant="outline" asChild className="w-full sm:w-auto">
-                          <Link to={`/app/restaurants/${c.restaurantId}`}>View customer</Link>
+                          <Link to={`/app/restaurants/${c.restaurantId}`}>
+                            {t('commandCenter.reorder.viewCustomer')}
+                          </Link>
                         </Button>
                       </div>
                     </div>
@@ -633,7 +762,7 @@ export function SupplierCommandCenterPage() {
           >
             <h2 className="text-[15px] font-extrabold mb-2.5 flex items-center gap-2 text-[var(--text)]">
               <AlertTriangle size={16} className="text-amber-600" />
-              At-risk expected orders today
+              {t('commandCenter.atRisk.title')}
             </h2>
             <ul className="text-sm space-y-2">
               {atRiskData.atRisk.map(
@@ -644,8 +773,11 @@ export function SupplierCommandCenterPage() {
                   dayName: string
                 }) => (
                   <li key={r.cadenceId} className="border-b border-[var(--app-border)] pb-2">
-                    <span className="font-semibold">{r.restaurantName}</span> — usually orders{' '}
-                    {r.label} on {r.dayName}s but has not ordered yet.
+                    {t('commandCenter.atRisk.item', {
+                      restaurant: r.restaurantName,
+                      label: r.label,
+                      day: r.dayName,
+                    })}
                   </li>
                 )
               )}
@@ -660,24 +792,26 @@ export function SupplierCommandCenterPage() {
           >
             <h2 className="text-[15px] font-extrabold mb-2 flex items-center gap-2">
               <Tag size={16} />
-              Boosted deals (30 days)
+              {t('commandCenter.boostedDeals.title')}
             </h2>
             {previews?.boostedDeals ? (
               <>
                 <p className="text-[13px] m-0">
-                  {previews.boostedDeals.activeBoostedDeals} active ·{' '}
-                  {previews.boostedDeals.totalViews} impressions ·{' '}
-                  {previews.boostedDeals.totalClicks} clicks
+                  {t('commandCenter.boostedDeals.summary', {
+                    active: previews.boostedDeals.activeBoostedDeals,
+                    views: previews.boostedDeals.totalViews,
+                    clicks: previews.boostedDeals.totalClicks,
+                  })}
                 </p>
                 <Link
                   to="/app/promotions"
                   className="text-xs text-[var(--brand)] font-semibold mt-2 inline-block"
                 >
-                  Manage deals →
+                  {t('commandCenter.boostedDeals.manageDeals')}
                 </Link>
               </>
             ) : (
-              <EmptyInline>No boosted deal activity in the last 30 days.</EmptyInline>
+              <EmptyInline>{t('commandCenter.boostedDeals.empty')}</EmptyInline>
             )}
           </section>
         )}
@@ -689,7 +823,7 @@ export function SupplierCommandCenterPage() {
             className="text-[13px] flex items-center gap-2 text-[var(--red)] font-semibold"
           >
             <Scale size={14} />
-            {kpis!.openDisputes} dispute(s) need your response
+            {t('commandCenter.alerts.disputes', { count: kpis!.openDisputes })}
           </Link>
         )}
         {layout.showFulfillmentAlerts && (kpis?.fulfillmentAlerts ?? 0) > 0 && (
@@ -699,7 +833,7 @@ export function SupplierCommandCenterPage() {
             className="text-[13px] flex items-center gap-2 text-amber-700 font-semibold"
           >
             <Warehouse size={14} />
-            {kpis!.fulfillmentAlerts} fulfillment alert(s)
+            {t('commandCenter.alerts.fulfillment', { count: kpis!.fulfillmentAlerts })}
           </Link>
         )}
 
@@ -718,11 +852,13 @@ function PreviewCard({
   children,
   href,
   testId,
+  viewAllLabel,
 }: {
   title: string
   children: ReactNode
   href: string
   testId: string
+  viewAllLabel: string
 }) {
   return (
     <div
@@ -732,7 +868,7 @@ function PreviewCard({
       <div className="flex justify-between items-center mb-2">
         <span className="text-[13px] font-extrabold">{title}</span>
         <Link to={href} className="text-[11px] text-[var(--brand)] font-semibold no-underline">
-          View all
+          {viewAllLabel}
         </Link>
       </div>
       {children}

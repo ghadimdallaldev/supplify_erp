@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import {
   useGetAdminTenantOperationalSnapshotQuery,
@@ -27,6 +28,7 @@ export function AdminTenantDiagnosticsDrawer({
   onNavigateLimits,
   onNavigateFeatures,
 }: Props) {
+  const { t } = useTranslation('admin')
   const { data: snapData, isLoading: snapLoading } = useGetAdminTenantOperationalSnapshotQuery(
     { tenantType, tenantId },
     { skip: !open || !tenantId }
@@ -51,48 +53,52 @@ export function AdminTenantDiagnosticsDrawer({
       <SheetContent side="right" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{tenantName}</SheetTitle>
-          <SheetDescription>Read-only operational diagnostics · {tenantType}</SheetDescription>
+          <SheetDescription>{t('diagnostics.description', { tenantType })}</SheetDescription>
         </SheetHeader>
 
         {snapLoading ? (
-          <AdminLoadingState label="Loading diagnostics…" />
+          <AdminLoadingState label={t('diagnostics.loading')} />
         ) : (
           <div className="space-y-4 text-sm">
-            <Section title="Subscription">
+            <Section title={t('diagnostics.subscription')}>
               <p>
-                Plan:{' '}
+                {t('diagnostics.planLabel')}{' '}
                 {formatPlanDisplayName(
                   snapshot?.subscription?.planCode,
-                  snapshot?.subscription?.planName || '—'
+                  snapshot?.subscription?.planName || t('common.emDash')
                 )}
               </p>
-              <p>Status: {snapshot?.subscription?.status ?? '—'}</p>
+              <p>
+                {t('diagnostics.statusLabel')}{' '}
+                {snapshot?.subscription?.status ?? t('common.emDash')}
+              </p>
               {snapshot?.subscription?.trialEndsAt && (
                 <p>
-                  Trial ends: {new Date(snapshot.subscription.trialEndsAt).toLocaleDateString()}
+                  {t('diagnostics.trialEnds')}{' '}
+                  {new Date(snapshot.subscription.trialEndsAt).toLocaleDateString()}
                 </p>
               )}
               {snapshot?.writeBlocked && (
                 <p className="flex flex-wrap items-center gap-2">
                   <AdminStatusBadge status="blocked" />
-                  <span className="text-red-600">Write access blocked</span>
+                  <span className="text-red-600">{t('diagnostics.writeBlocked')}</span>
                 </p>
               )}
             </Section>
 
-            <Section title="Feature flags (effective)">
+            <Section title={t('diagnostics.featureFlags')}>
               <ul className="text-[var(--text-muted)] space-y-0.5">
                 {Object.entries(snapshot?.featureFlags ?? {}).map(([k, v]) => (
                   <li key={k}>
                     {k}: {String(v)}
                   </li>
                 ))}
-                {!Object.keys(snapshot?.featureFlags ?? {}).length && <li>—</li>}
+                {!Object.keys(snapshot?.featureFlags ?? {}).length && <li>{t('common.emDash')}</li>}
               </ul>
             </Section>
 
             {tenantType === 'SUPPLIER' && snapshot?.supplier && (
-              <Section title="Supplier operations">
+              <Section title={t('diagnostics.supplierOperations')}>
                 <p>Drivers: {snapshot.supplier.driverCount}</p>
                 <p>
                   GPS today — live {snapshot.supplier.gpsToday?.live ?? 0}, stale{' '}
@@ -106,7 +112,7 @@ export function AdminTenantDiagnosticsDrawer({
             )}
 
             {tenantType === 'RESTAURANT' && snapshot?.restaurant && (
-              <Section title="Restaurant operations">
+              <Section title={t('diagnostics.restaurantOperations')}>
                 <p>Expiring (7d): {snapshot.restaurant.expiry?.expiring7d ?? 0}</p>
                 <p>Expired lots: {snapshot.restaurant.expiry?.expiredLots ?? 0}</p>
                 <p>Reorder cadence patterns: {snapshot.restaurant.reorderCadenceAtRisk}</p>
@@ -130,7 +136,7 @@ export function AdminTenantDiagnosticsDrawer({
               </Section>
             )}
 
-            <Section title="Email">
+            <Section title={t('diagnostics.email')}>
               <p>
                 Provider: {snapshot?.emailConfig?.providerLabel} (
                 {snapshot?.emailConfig?.providerConfigured ? 'configured' : 'missing'})
@@ -146,12 +152,12 @@ export function AdminTenantDiagnosticsDrawer({
                   )}
                 </ul>
               ) : (
-                <p className="text-[var(--text-muted)]">No recent failures</p>
+                <p className="text-[var(--text-muted)]">{t('diagnostics.noRecentFailures')}</p>
               )}
             </Section>
 
             {usage && (
-              <Section title="Usage meters">
+              <Section title={t('diagnostics.usageMeters')}>
                 <pre className="text-xs bg-[var(--surface-mid)] p-2 rounded overflow-x-auto max-h-32">
                   {JSON.stringify(usage, null, 2)}
                 </pre>
@@ -159,7 +165,7 @@ export function AdminTenantDiagnosticsDrawer({
             )}
 
             {entitlements?.plan && (
-              <Section title="Entitlements">
+              <Section title={t('diagnostics.entitlements')}>
                 <p className="text-[var(--text-muted)]">
                   Plan code: {entitlements.plan.code} · overrides:{' '}
                   {(entitlements.overrides ?? []).length}
@@ -174,7 +180,7 @@ export function AdminTenantDiagnosticsDrawer({
                   className="text-sm text-[var(--brand)] underline"
                   onClick={onNavigateLimits}
                 >
-                  Manage limits
+                  {t('diagnostics.manageLimits')}
                 </button>
               )}
               {onNavigateFeatures && (
@@ -183,7 +189,7 @@ export function AdminTenantDiagnosticsDrawer({
                   className="text-sm text-[var(--brand)] underline"
                   onClick={onNavigateFeatures}
                 >
-                  Feature overrides
+                  {t('diagnostics.featureOverrides')}
                 </button>
               )}
             </div>

@@ -28,7 +28,7 @@ export function PageShell({
   return (
     <div
       className={cn(
-        'page-stack mx-auto w-full min-w-0',
+        'page-stack mx-auto w-full min-w-0 overflow-x-hidden',
         maxWidthClass,
         padding && 'content-padding-x',
         className

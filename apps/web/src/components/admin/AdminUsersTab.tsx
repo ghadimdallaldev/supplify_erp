@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { AppPanel } from '../ui/app-panel'
@@ -44,6 +45,7 @@ function roleTone(role: string): string {
 }
 
 export function AdminUsersTab() {
+  const { t } = useTranslation('admin')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
@@ -59,7 +61,7 @@ export function AdminUsersTab() {
     { skip: false }
   )
 
-  const users = data?.users ?? []
+  const users = useMemo(() => data?.users ?? [], [data?.users])
 
   const roleOptions = useMemo(() => {
     const roles = new Set<string>()
@@ -78,10 +80,7 @@ export function AdminUsersTab() {
 
   return (
     <>
-      <AdminSectionHeader
-        title="Users"
-        description="Search platform accounts, review tenant access, and reset sign-in passwords."
-      />
+      <AdminSectionHeader title={t('users.title')} description={t('users.description')} />
 
       <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -92,18 +91,18 @@ export function AdminUsersTab() {
             />
             <Input
               className="h-10 pl-9"
-              placeholder="Search by email or display name…"
+              placeholder={t('users.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              aria-label="Search users"
+              aria-label={t('users.searchAriaLabel')}
             />
           </div>
           <Select value={roleFilter} onValueChange={setRoleFilter}>
             <SelectTrigger
               className="h-10 w-full min-w-[160px] sm:w-auto"
-              aria-label="Filter by role"
+              aria-label={t('users.filterRoleAriaLabel')}
             >
-              <option value="all">All roles</option>
+              <option value="all">{t('common.allRoles')}</option>
               {roleOptions.map((role) => (
                 <option key={role} value={role}>
                   {role.replace(/_/g, ' ')}
@@ -126,24 +125,30 @@ export function AdminUsersTab() {
             }}
           >
             <X className="mr-1.5 h-4 w-4" />
-            Clear filters
+            {t('common.clearFilters')}
           </Button>
         )}
       </div>
 
       <AppPanel
-        title="Platform users"
+        title={t('users.platformUsers')}
         description={
           isLoading
-            ? 'Loading directory…'
-            : `${filteredUsers.length} user${filteredUsers.length === 1 ? '' : 's'} shown${users.length !== filteredUsers.length ? ` of ${users.length}` : ''}`
+            ? t('common.loadingDirectory')
+            : users.length !== filteredUsers.length
+              ? t('users.usersShownOf', {
+                  filtered: filteredUsers.length,
+                  total: users.length,
+                  count: filteredUsers.length,
+                })
+              : t('users.usersShown', { count: filteredUsers.length })
         }
         testId="admin-users-panel"
         footer={
           isFetching && !isLoading ? (
             <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Updating results…
+              {t('common.updatingResults')}
             </p>
           ) : undefined
         }
@@ -153,11 +158,11 @@ export function AdminUsersTab() {
         ) : filteredUsers.length === 0 ? (
           <AdminEmptyState
             icon={<Users className="h-8 w-8 text-[var(--text-muted)]" />}
-            title={hasActiveFilters ? 'No users match your filters' : 'No users found'}
+            title={hasActiveFilters ? t('users.emptyFilteredTitle') : t('users.emptyDefaultTitle')}
             description={
               hasActiveFilters
-                ? 'Try a different search term or role filter.'
-                : 'Users appear here after they register or are invited to a tenant.'
+                ? t('users.emptyFilteredDescription')
+                : t('users.emptyDefaultDescription')
             }
             action={
               hasActiveFilters ? (
@@ -171,21 +176,23 @@ export function AdminUsersTab() {
                     setRoleFilter('all')
                   }}
                 >
-                  Clear filters
+                  {t('common.clearFilters')}
                 </Button>
               ) : undefined
             }
           />
         ) : (
-          <TableScroll aria-label="Platform users">
+          <TableScroll aria-label={t('users.platformUsersTableAriaLabel')}>
             <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                  <th className="px-4 py-3">User</th>
-                  <th className="px-4 py-3">Role</th>
-                  <th className="hidden px-4 py-3 md:table-cell">Tenant access</th>
-                  <th className="hidden px-4 py-3 lg:table-cell">Joined</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3">{t('common.table.user')}</th>
+                  <th className="px-4 py-3">{t('common.table.role')}</th>
+                  <th className="hidden px-4 py-3 md:table-cell">
+                    {t('common.table.tenantAccess')}
+                  </th>
+                  <th className="hidden px-4 py-3 lg:table-cell">{t('common.table.joined')}</th>
+                  <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--app-border)]">
@@ -226,18 +233,20 @@ export function AdminUsersTab() {
                               variant="outline"
                               className="text-[11px] font-normal"
                             >
-                              {tr.roleName || 'Member'}
+                              {tr.roleName || t('common.member')}
                               {tr.tenantType ? ` · ${tr.tenantType}` : ''}
                             </Badge>
                           ))}
                           {user.tenant_roles.length > 4 && (
                             <Badge variant="outline" className="text-[11px] font-normal">
-                              +{user.tenant_roles.length - 4} more
+                              {t('common.more', { count: user.tenant_roles.length - 4 })}
                             </Badge>
                           )}
                         </div>
                       ) : (
-                        <span className="text-xs text-[var(--text-muted)]">No tenant links</span>
+                        <span className="text-xs text-[var(--text-muted)]">
+                          {t('common.noTenantLinks')}
+                        </span>
                       )}
                     </td>
                     <td className="hidden px-4 py-3.5 text-xs text-[var(--text-muted)] lg:table-cell">
@@ -257,7 +266,7 @@ export function AdminUsersTab() {
                         }
                       >
                         <KeyRound className="mr-1.5 h-4 w-4" />
-                        Reset password
+                        {t('users.resetPassword')}
                       </Button>
                     </td>
                   </tr>

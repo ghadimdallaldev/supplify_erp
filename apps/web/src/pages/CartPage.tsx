@@ -36,6 +36,7 @@ import {
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { toast } from 'sonner'
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { formatPrice } from '../utils/format'
 import { usePermissions } from '../hooks/usePermissions'
@@ -43,6 +44,7 @@ import { useImpersonation } from '../hooks/useImpersonation'
 import { RequirePermission } from '../components/RequirePermission'
 
 export function CartPage() {
+  const { t } = useTranslation('cart')
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
@@ -50,9 +52,8 @@ export function CartPage() {
   const { user } = useAppSelector((state) => state.auth)
   const { shouldLoadTenantEntitlements } = useImpersonation()
   const { persona } = useWorkspaceRole()
-  const cartTitle = persona.pageCopy?.cart?.title ?? 'Shopping Cart'
-  const cartDescription =
-    persona.pageCopy?.cart?.description ?? 'Review your order before placing it'
+  const cartTitle = persona.pageCopy?.cart?.title ?? t('page.title')
+  const cartDescription = persona.pageCopy?.cart?.description ?? t('page.description')
   const { can } = usePermissions()
   const canPlaceOrders = can('ORDERS_CREATE')
   const { data: dealsData } = useGetActivePromotionsQuery()
@@ -80,9 +81,13 @@ export function CartPage() {
   const checkoutTotal = Math.max(0, total - estimatedPromoDiscount)
   const supplierOrderCount = groups.length
   const placeOrderLabel =
-    supplierOrderCount > 1 ? `Place ${supplierOrderCount} orders` : 'Place order'
+    supplierOrderCount > 1
+      ? t('page.placeOrders', { count: supplierOrderCount })
+      : t('page.placeOrder')
   const confirmOrderLabel =
-    supplierOrderCount > 1 ? `Place ${supplierOrderCount} orders` : 'Confirm order'
+    supplierOrderCount > 1
+      ? t('page.placeOrders', { count: supplierOrderCount })
+      : t('page.confirmOrder')
   const {
     updateQuantity,
     removeItem,
@@ -164,34 +169,34 @@ export function CartPage() {
 
   const handleRemoveItem = (productId: string) => {
     removeItem(productId)
-    toast.success('Item removed from cart')
+    toast.success(t('toast.itemRemoved'))
   }
 
   const handleSaveDraft = () => {
     if (!draftName.trim()) {
-      toast.error('Please enter a name for your draft')
+      toast.error(t('toast.draftNameRequired'))
       return
     }
     saveDraft(draftName)
     setShowSaveDraft(false)
     setDraftName('')
-    toast.success('Cart saved as draft!')
+    toast.success(t('toast.cartSavedDraft'))
   }
 
   const handleLoadDraft = (draftId: string) => {
     loadDraft(draftId)
     setShowLoadDraft(false)
-    toast.success('Draft loaded into cart')
+    toast.success(t('toast.draftLoaded'))
   }
 
   const handleDeleteDraft = (draftId: string) => {
     deleteDraft(draftId)
-    toast.success('Draft deleted')
+    toast.success(t('toast.draftDeleted'))
   }
 
   const handlePlaceOrder = async () => {
     if (groups.length === 0) {
-      toast.error('Cart is empty')
+      toast.error(t('toast.cartEmpty'))
       return
     }
 
@@ -249,14 +254,14 @@ export function CartPage() {
       setDeliveryDate('')
       setDeliveryNotes('')
       if (supplierOrderCount > 1) {
-        toast.success(`${supplierOrderCount} orders placed successfully!`)
+        toast.success(t('toast.ordersPlaced', { count: supplierOrderCount }))
         navigate('/app/orders')
       } else {
-        toast.success('Order placed successfully!')
+        toast.success(t('toast.orderPlaced'))
       }
     } catch (error: any) {
-      // Show the actual error message from the API
-      const errorMessage = error?.data?.error?.message || error?.message || 'Failed to place order'
+      const errorMessage =
+        error?.data?.error?.message || error?.message || t('toast.placeOrderFailed')
       const errorName = error?.data?.error?.name
 
       // For limit exceeded errors, show a more helpful message with upgrade suggestion
@@ -270,7 +275,7 @@ export function CartPage() {
           toast.custom(
             (id) => (
               <div className="flex items-center gap-3">
-                <span>💡 Want more orders? Upgrade your subscription!</span>
+                <span>{t('toast.upgradeHint')}</span>
                 <button
                   onClick={() => {
                     toast.dismiss(id)
@@ -278,7 +283,7 @@ export function CartPage() {
                   }}
                   className="px-3 py-1 text-sm font-medium text-white bg-[var(--brand)] rounded-md hover:bg-[var(--brand)]/90 erp-pressable"
                 >
-                  View Plans
+                  {t('toast.viewPlans')}
                 </button>
               </div>
             ),
@@ -298,14 +303,14 @@ export function CartPage() {
   if (groups.length === 0) {
     return (
       <PageShell data-testid="cart-page">
-        <PageHeader title={cartTitle} description="Your cart is empty" />
+        <PageHeader title={cartTitle} description={t('page.emptyDescription')} />
         <EmptyState
-          title="No items in your cart"
-          description="Browse products from your suppliers to start an order."
+          title={t('page.emptyTitle')}
+          description={t('page.emptyBody')}
           icon={<ShoppingCart className="h-6 w-6" aria-hidden />}
           action={
             <Button asChild>
-              <a href="/app/products">Browse Products</a>
+              <a href="/app/products">{t('page.browseProducts')}</a>
             </Button>
           }
         />
@@ -314,7 +319,7 @@ export function CartPage() {
   }
 
   return (
-    <RequirePermission permission="ORDERS_CREATE" title="cart">
+    <RequirePermission permission="ORDERS_CREATE" title={t('page.title')}>
       <PageShell className="pb-28 lg:pb-6" data-testid="cart-page">
         <PageHeader
           title={cartTitle}
@@ -323,7 +328,7 @@ export function CartPage() {
             <>
               {drafts.length > 0 && (
                 <Button variant="outline" onClick={() => setShowLoadDraft(true)}>
-                  Load Draft
+                  {t('page.loadDraft')}
                 </Button>
               )}
               <Button
@@ -332,10 +337,10 @@ export function CartPage() {
                 disabled={groups.length === 0}
               >
                 <Save className="h-4 w-4 mr-2" />
-                Save Draft
+                {t('page.saveDraft')}
               </Button>
               <Button variant="outline" onClick={() => clearCart()}>
-                Clear Cart
+                {t('page.clearCart')}
               </Button>
             </>
           }
@@ -375,7 +380,7 @@ export function CartPage() {
                       </Badge>
                     </div>
                     <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-                      {group.items.length} item{group.items.length !== 1 ? 's' : ''}
+                      {t('page.itemsCount', { count: group.items.length })}
                     </p>
                   </div>
                   {group.items.map((item) => {
@@ -401,20 +406,22 @@ export function CartPage() {
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium truncate">{item.product.name}</h4>
                           <p className="text-sm text-[var(--text-muted)]">
-                            SKU: {item.product.sku}
+                            {t('page.sku')} {item.product.sku}
                           </p>
                           <p className="text-sm text-[var(--text-muted)]">
-                            {formatPrice(item.product.current_price)} per{' '}
-                            {item.product.unit || 'unit'}
+                            {formatPrice(item.product.current_price)}{' '}
+                            {t('page.perUnit', {
+                              unit: item.product.unit || t('page.defaultUnit'),
+                            })}
                             {item.quoteResponseItemId && (
                               <Badge variant="secondary" className="ml-2 text-xs">
-                                Quoted price locked
+                                {t('page.quotedPriceLocked')}
                               </Badge>
                             )}
                             {item.product.pricing_source === 'CONTRACT_PRICE' &&
                               !item.quoteResponseItemId && (
                                 <Badge variant="secondary" className="ml-2 text-xs">
-                                  Your price
+                                  {t('page.yourPrice')}
                                 </Badge>
                               )}
                           </p>
@@ -459,7 +466,7 @@ export function CartPage() {
                             onClick={() => {
                               if (item.productId) handleRemoveItem(item.productId)
                             }}
-                            aria-label="Remove item"
+                            aria-label={t('page.removeItem')}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -476,7 +483,7 @@ export function CartPage() {
             <Card>
               <CardContent className="space-y-4 pt-6">
                 <h3 className="text-base font-semibold text-[var(--text)]">
-                  {supplierOrderCount > 1 ? 'Checkout preview' : 'Order summary'}
+                  {supplierOrderCount > 1 ? t('page.checkoutPreview') : t('page.orderSummary')}
                 </h3>
                 {supplierOrderCount > 1 && (
                   <div
@@ -484,7 +491,7 @@ export function CartPage() {
                     data-testid="cart-multi-supplier-preview"
                   >
                     <p className="font-medium text-[var(--text)]">
-                      {supplierOrderCount} separate orders will be placed:
+                      {t('page.separateOrders', { count: supplierOrderCount })}
                     </p>
                     <ul className="space-y-1.5">
                       {groups.map((group) => (
@@ -494,63 +501,69 @@ export function CartPage() {
                         >
                           <span className="truncate">{group.supplierName}</span>
                           <span className="shrink-0 tabular-nums">
-                            ${formatPrice(group.subtotal)} · {group.items.length} item
-                            {group.items.length !== 1 ? 's' : ''}
+                            {t('page.groupLine', {
+                              amount: formatPrice(group.subtotal),
+                              count: group.items.length,
+                            })}
                           </span>
                         </li>
                       ))}
                     </ul>
                     {orderGate.limit != null && (
                       <p className="text-xs text-[var(--text-muted)] pt-1 border-t border-[var(--app-border)]">
-                        Daily order limit uses {supplierOrderCount} of your allowance (
-                        {orderGate.current}/{orderGate.limit} used today).
+                        {t('page.dailyLimitHint', {
+                          count: supplierOrderCount,
+                          current: orderGate.current,
+                          limit: orderGate.limit,
+                        })}
                       </p>
                     )}
                   </div>
                 )}
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">Subtotal</span>
+                  <span className="text-[var(--text-muted)]">{t('page.subtotal')}</span>
                   <span>${formatPrice(total)}</span>
                 </div>
                 {estimatedPromoDiscount > 0 ? (
                   <div className="flex items-center justify-between text-sm text-[var(--mint)]">
-                    <span>Est. deal savings</span>
+                    <span>{t('page.estDealSavings')}</span>
                     <span>-${formatPrice(estimatedPromoDiscount)}</span>
                   </div>
                 ) : dealRedeemGate.limit != null ? (
                   <p className="text-xs text-[var(--text-muted)]">
-                    Deal redemptions today: {dealRedeemGate.current}/{dealRedeemGate.limit}
+                    {t('page.dealRedemptions', {
+                      current: dealRedeemGate.current,
+                      limit: dealRedeemGate.limit,
+                    })}
                     {!canRedeemDeals && dealRedeemGate.message
                       ? ` — ${dealRedeemGate.message}`
                       : ''}
                   </p>
                 ) : null}
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">Tax</span>
+                  <span className="text-[var(--text-muted)]">{t('page.tax')}</span>
                   <span>$0.00</span>
                 </div>
                 <div className="border-t pt-4">
                   <div className="flex items-center justify-between font-semibold text-lg">
-                    <span>{supplierOrderCount > 1 ? 'Combined total' : 'Total'}</span>
+                    <span>
+                      {supplierOrderCount > 1 ? t('page.combinedTotal') : t('page.total')}
+                    </span>
                     <span>${formatPrice(checkoutTotal)}</span>
                   </div>
                 </div>
                 {estimatedPromoDiscount > 0 ? (
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Final discount applied at checkout based on eligible supplier deals.
-                  </p>
+                  <p className="text-xs text-[var(--text-muted)]">{t('page.finalDiscountHint')}</p>
                 ) : null}
                 {couponCode.trim() ? (
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Coupon from deal will be applied at checkout when eligible.
-                  </p>
+                  <p className="text-xs text-[var(--text-muted)]">{t('page.couponHint')}</p>
                 ) : null}
               </CardContent>
             </Card>
 
             {!canPlaceOrders ? (
               <p className="text-sm text-[var(--text-muted)] text-center">
-                Your role does not have permission to place orders. Contact your workspace admin.
+                {t('page.noPlacePermission')}
               </p>
             ) : null}
             <Button
@@ -561,11 +574,11 @@ export function CartPage() {
               data-testid="cart-place-order"
             >
               {isPlacingOrder
-                ? 'Placing…'
+                ? t('page.placing')
                 : !canPlaceOrders
-                  ? 'Cannot place orders'
+                  ? t('page.cannotPlaceOrders')
                   : !orderGate.canPlace
-                    ? 'Daily order limit reached'
+                    ? t('page.dailyLimitReached')
                     : placeOrderLabel}
             </Button>
             {!orderGate.canPlace && (
@@ -580,7 +593,7 @@ export function CartPage() {
                   })
                 }
               >
-                Upgrade to place more orders
+                {t('page.upgradeForMore')}
               </Button>
             )}
           </div>
@@ -592,7 +605,7 @@ export function CartPage() {
         >
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs text-[var(--text-muted)]">Total</p>
+              <p className="text-xs text-[var(--text-muted)]">{t('page.total')}</p>
               <p className="text-lg font-semibold tabular-nums">${formatPrice(checkoutTotal)}</p>
             </div>
             {canPlaceOrders ? (
@@ -603,10 +616,14 @@ export function CartPage() {
                 className="shrink-0"
                 data-testid="cart-mobile-place-order"
               >
-                {isPlacingOrder ? 'Placing…' : !orderGate.canPlace ? 'Limit reached' : 'Checkout'}
+                {isPlacingOrder
+                  ? t('page.placing')
+                  : !orderGate.canPlace
+                    ? t('page.limitReached')
+                    : t('page.checkout')}
               </Button>
             ) : (
-              <p className="text-xs text-[var(--text-muted)]">View-only access</p>
+              <p className="text-xs text-[var(--text-muted)]">{t('page.viewOnlyAccess')}</p>
             )}
           </div>
         </div>
@@ -615,15 +632,15 @@ export function CartPage() {
         <Dialog open={showSaveDraft} onOpenChange={setShowSaveDraft}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Save Cart as Draft</DialogTitle>
-              <DialogDescription>Save your current cart to load it later</DialogDescription>
+              <DialogTitle>{t('page.saveDraftDialogTitle')}</DialogTitle>
+              <DialogDescription>{t('page.saveDraftDialogDescription')}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="draft-name">Draft Name</Label>
+                <Label htmlFor="draft-name">{t('page.draftName')}</Label>
                 <Input
                   id="draft-name"
-                  placeholder="e.g., Weekly Order"
+                  placeholder={t('page.draftNamePlaceholder')}
                   value={draftName}
                   onChange={(e) => setDraftName(e.target.value)}
                 />
@@ -631,9 +648,9 @@ export function CartPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowSaveDraft(false)}>
-                Cancel
+                {t('page.cancel')}
               </Button>
-              <Button onClick={handleSaveDraft}>Save Draft</Button>
+              <Button onClick={handleSaveDraft}>{t('page.saveDraft')}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -642,12 +659,12 @@ export function CartPage() {
         <Dialog open={showLoadDraft} onOpenChange={setShowLoadDraft}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Load Draft</DialogTitle>
-              <DialogDescription>Select a saved draft to load into your cart</DialogDescription>
+              <DialogTitle>{t('page.loadDraftDialogTitle')}</DialogTitle>
+              <DialogDescription>{t('page.loadDraftDialogDescription')}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               {drafts.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)]">No saved drafts</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('page.noSavedDrafts')}</p>
               ) : (
                 drafts.map((draft) => (
                   <div
@@ -657,13 +674,13 @@ export function CartPage() {
                     <div>
                       <p className="font-medium">{draft.name}</p>
                       <p className="text-sm text-[var(--text-muted)]">
-                        {draft.items.length} items •{' '}
+                        {t('page.draftItems', { count: draft.items.length })} •{' '}
                         {new Date(draft.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="flex space-x-2">
                       <Button size="sm" onClick={() => handleLoadDraft(draft.id)}>
-                        Load
+                        {t('page.load')}
                       </Button>
                       <Button
                         size="sm"
@@ -679,7 +696,7 @@ export function CartPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowLoadDraft(false)}>
-                Close
+                {t('page.close')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -690,12 +707,12 @@ export function CartPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {supplierOrderCount > 1 ? 'Confirm checkout' : 'Order details'}
+                {supplierOrderCount > 1 ? t('page.confirmCheckout') : t('page.orderDetails')}
               </DialogTitle>
               <DialogDescription>
                 {supplierOrderCount > 1
-                  ? `You are placing ${supplierOrderCount} separate supplier orders in one checkout.`
-                  : 'Add delivery information and notes'}
+                  ? t('page.confirmCheckoutDescription', { count: supplierOrderCount })
+                  : t('page.orderDetailsDescription')}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -713,7 +730,7 @@ export function CartPage() {
                     </div>
                   ))}
                   <div className="flex justify-between gap-2 pt-2 border-t border-[var(--app-border)] font-semibold">
-                    <span>Combined total</span>
+                    <span>{t('page.combinedTotal')}</span>
                     <span>${formatPrice(checkoutTotal)}</span>
                   </div>
                 </div>
@@ -721,7 +738,7 @@ export function CartPage() {
               <div className="space-y-2">
                 <Label htmlFor="delivery-date">
                   <Calendar className="h-4 w-4 inline mr-2" />
-                  Preferred Delivery Date
+                  {t('page.preferredDeliveryDate')}
                 </Label>
                 <Input
                   id="delivery-date"
@@ -733,11 +750,11 @@ export function CartPage() {
               <div className="space-y-2">
                 <Label htmlFor="delivery-notes">
                   <FileText className="h-4 w-4 inline mr-2" />
-                  Order Notes
+                  {t('page.orderNotes')}
                 </Label>
                 <Textarea
                   id="delivery-notes"
-                  placeholder="Special instructions, delivery window, etc."
+                  placeholder={t('page.orderNotesPlaceholder')}
                   rows={4}
                   value={deliveryNotes}
                   onChange={(e) => setDeliveryNotes(e.target.value)}
@@ -746,10 +763,10 @@ export function CartPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowOrderDetails(false)}>
-                Cancel
+                {t('page.cancel')}
               </Button>
               <Button onClick={handleConfirmOrder} disabled={isPlacingOrder}>
-                {isPlacingOrder ? 'Placing…' : confirmOrderLabel}
+                {isPlacingOrder ? t('page.placing') : confirmOrderLabel}
               </Button>
             </DialogFooter>
           </DialogContent>

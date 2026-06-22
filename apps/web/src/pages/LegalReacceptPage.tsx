@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
@@ -19,8 +20,10 @@ import { refetchAppSession } from '../lib/refetchAppSession'
 import { useAppDispatch } from '../hooks/redux'
 import { LegalFooterLinks } from '../components/legal/LegalFooterLinks'
 import { getRegisterCompletePath } from '../lib/referralToken'
+import { ensureNamespace } from '../i18n'
 
 export function LegalReacceptPage() {
+  const { t } = useTranslation('legal')
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const {
@@ -47,6 +50,10 @@ export function LegalReacceptPage() {
   )
 
   useEffect(() => {
+    void ensureNamespace('legal')
+  }, [])
+
+  useEffect(() => {
     if (isLoading || !user) return
     if (user.role === 'PENDING') {
       navigate(getRegisterCompletePath(), { replace: true })
@@ -60,7 +67,7 @@ export function LegalReacceptPage() {
   const handleSubmit = async () => {
     setError(null)
     if (!legalComplete) {
-      setError('Please accept all required legal agreements before continuing.')
+      setError(t('reaccept.acceptRequired'))
       return
     }
     try {
@@ -69,7 +76,7 @@ export function LegalReacceptPage() {
       navigate(user?.role === 'STAFF_PORTAL' ? '/staff/dashboard' : '/app', { replace: true })
     } catch (err: unknown) {
       const apiErr = err as { data?: { error?: { message?: string } } }
-      setError(apiErr?.data?.error?.message || 'Could not save your acceptance. Try again.')
+      setError(apiErr?.data?.error?.message || t('reaccept.saveError'))
     }
   }
 
@@ -86,7 +93,7 @@ export function LegalReacceptPage() {
       <div className="min-h-screen flex items-center justify-center bg-[var(--bg)] px-4">
         <Card className="max-w-md w-full">
           <CardContent className="py-8 text-center text-sm text-[var(--text-muted)]">
-            Please sign in to review updated legal agreements.
+            {t('reaccept.signInRequired')}
           </CardContent>
         </Card>
       </div>
@@ -99,12 +106,13 @@ export function LegalReacceptPage() {
         <Card className="w-full max-w-2xl">
           <CardContent className="space-y-6 pt-6">
             <PageHeader
-              title="Updated legal agreements"
-              description={`Our legal documents were updated (pack ${LEGAL_PACK_VERSION}${
-                legalStatus?.acceptedPackVersion
-                  ? ` · you previously accepted ${legalStatus.acceptedPackVersion}`
-                  : ''
-              }). Review and accept the current agreements to continue using Supplify.`}
+              title={t('reaccept.title')}
+              description={t('reaccept.description', {
+                version: LEGAL_PACK_VERSION,
+                previous: legalStatus?.acceptedPackVersion
+                  ? t('reaccept.previousAccepted', { version: legalStatus.acceptedPackVersion })
+                  : '',
+              })}
             />
             {error ? (
               <Alert variant="destructive">
@@ -131,10 +139,10 @@ export function LegalReacceptPage() {
               {submitting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving…
+                  {t('reaccept.saving')}
                 </>
               ) : (
-                'Accept and continue'
+                t('reaccept.acceptContinue')
               )}
             </Button>
           </CardContent>

@@ -1,4 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { Link, useParams } from 'react-router-dom'
 import {
   useTrackPublicConsumerOrderMutation,
@@ -15,6 +17,7 @@ import { PageHeader } from '../../components/ui/page-header'
 import { PageShell } from '../../components/ui/page-shell'
 import { ArrowLeft, Search } from 'lucide-react'
 import { toast } from 'sonner'
+import { ensureNamespace } from '../../i18n'
 
 function formatModifiers(line: ConsumerOrderLine): string | null {
   const modifiers = line.modifiers ?? []
@@ -25,7 +28,17 @@ function formatModifiers(line: ConsumerOrderLine): string | null {
     .join(', ')
 }
 
+function fulfillmentLabel(type: string, t: TFunction<'consumer'>) {
+  return t(`fulfillment.${type}`, { defaultValue: type.replace('_', ' ') })
+}
+
 export function ConsumerTrackOrderPage() {
+  const { t } = useTranslation('consumer')
+
+  useEffect(() => {
+    void ensureNamespace('consumer')
+  }, [])
+
   const { restaurantSlug } = useParams<{ restaurantSlug: string }>()
   const slug = restaurantSlug ?? ''
 
@@ -60,11 +73,11 @@ export function ConsumerTrackOrderPage() {
     event.preventDefault()
     if (!slug) return
     if (!orderNumber.trim()) {
-      toast.error('Enter your order number')
+      toast.error(t('track.orderNumberRequired'))
       return
     }
     if (!email.trim() && !phone.trim()) {
-      toast.error('Enter the email or phone used at checkout')
+      toast.error(t('track.contactRequired'))
       return
     }
 
@@ -78,7 +91,7 @@ export function ConsumerTrackOrderPage() {
       setTracked(result)
     } catch (error: any) {
       setTracked(null)
-      toast.error(error?.data?.error?.message || 'Order not found')
+      toast.error(error?.data?.error?.message || t('track.orderNotFound'))
     }
   }
 
@@ -87,57 +100,54 @@ export function ConsumerTrackOrderPage() {
       <Button asChild variant="ghost" size="sm" className="-ml-2">
         <Link to={`/order/${slug}`}>
           <ArrowLeft className="mr-1 h-4 w-4" />
-          Back to store
+          {t('common.backToStore')}
         </Link>
       </Button>
 
-      <PageHeader
-        title="Track your order"
-        description="Enter your order number and the email or phone from checkout."
-      />
+      <PageHeader title={t('track.title')} description={t('track.description')} />
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Lookup</CardTitle>
-          <CardDescription>We will show live status updates every few seconds.</CardDescription>
+          <CardTitle className="text-base">{t('track.lookup')}</CardTitle>
+          <CardDescription>{t('track.lookupDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-2">
-              <Label htmlFor="orderNumber">Order number</Label>
+              <Label htmlFor="orderNumber">{t('track.orderNumber')}</Label>
               <Input
                 id="orderNumber"
                 value={orderNumber}
                 onChange={(e) => setOrderNumber(e.target.value)}
-                placeholder="CO-20260612-0001"
+                placeholder={t('track.orderNumberPlaceholder')}
                 autoComplete="off"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('common.email')}</Label>
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder={t('track.emailPlaceholder')}
                 autoComplete="email"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">{t('common.phone')}</Label>
               <Input
                 id="phone"
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+44 ..."
+                placeholder={t('track.phonePlaceholder')}
                 autoComplete="tel"
               />
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               <Search className="mr-2 h-4 w-4" />
-              {isLoading ? 'Looking up…' : 'Track order'}
+              {isLoading ? t('track.lookingUp') : t('track.trackOrder')}
             </Button>
           </form>
         </CardContent>
@@ -148,7 +158,7 @@ export function ConsumerTrackOrderPage() {
           <CardHeader>
             <CardTitle className="text-base">{tracked.order.order_number}</CardTitle>
             <CardDescription>
-              {tracked.order.fulfillment_type.replace('_', ' ')} ·{' '}
+              {fulfillmentLabel(tracked.order.fulfillment_type, t)} ·{' '}
               {new Date(tracked.order.created_at).toLocaleString()}
             </CardDescription>
           </CardHeader>
@@ -175,14 +185,14 @@ export function ConsumerTrackOrderPage() {
                 )
               })}
               <div className="flex justify-between border-t pt-2 font-medium">
-                <span>Total</span>
+                <span>{t('common.total')}</span>
                 <span>{formatPrice(Number(tracked.order.total_amount))}</span>
               </div>
             </div>
             {tracked.order.receipt_token && (
               <Button asChild variant="outline" className="w-full">
                 <Link to={`/order/${slug}/receipt/${tracked.order.receipt_token}`}>
-                  View full receipt
+                  {t('track.viewFullReceipt')}
                 </Link>
               </Button>
             )}

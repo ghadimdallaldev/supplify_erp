@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
 import {
   useGetDisputeQuery,
@@ -34,6 +35,7 @@ import {
 import { TableScroll } from '../../components/ui/table-scroll'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { ensureNamespace } from '../../i18n'
 
 function statusBadge(status: string) {
   const s = status?.toLowerCase()
@@ -44,6 +46,7 @@ function statusBadge(status: string) {
 }
 
 export function DisputeDetailPage() {
+  const { t } = useTranslation('disputes')
   const { id } = useParams<{ id: string }>()
   const { isEffectiveSupplier: isSupplier } = useImpersonation()
   const { can } = usePermissions()
@@ -67,13 +70,17 @@ export function DisputeDetailPage() {
   const [resolutionNotes, setResolutionNotes] = useState('')
   const [creditAmount, setCreditAmount] = useState('')
 
+  useEffect(() => {
+    void ensureNamespace('disputes')
+  }, [])
+
   if (!disputesEnabled) {
     return (
       <PageShell className="space-y-4" data-testid="dispute-detail-page">
-        <PageHeader title="Dispute" />
+        <PageHeader title={t('detail.title')} />
         <Card>
           <CardContent className="py-8 text-sm text-[var(--text-muted)]">
-            Disputes are not on your plan.
+            {t('detail.notOnPlan')}
           </CardContent>
         </Card>
       </PageShell>
@@ -94,17 +101,17 @@ export function DisputeDetailPage() {
     return (
       <PageShell className="space-y-4" data-testid="dispute-detail-page">
         <PageHeader
-          title="Dispute"
+          title={t('detail.title')}
           breadcrumb={
             <Button variant="outline" size="sm" asChild>
               <Link to="/app/disputes">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to disputes
+                {t('detail.backToDisputes')}
               </Link>
             </Button>
           }
         />
-        <p className="text-[var(--red)]">Dispute not found or you do not have access.</p>
+        <p className="text-[var(--red)]">{t('detail.notFound')}</p>
       </PageShell>
     )
   }
@@ -123,10 +130,10 @@ export function DisputeDetailPage() {
   const handleReview = async () => {
     try {
       await reviewDispute(id!).unwrap()
-      toast.success('Marked under review')
+      toast.success(t('detail.toast.markedUnderReview'))
       refetch()
     } catch {
-      toast.error('Failed to update dispute')
+      toast.error(t('detail.toast.updateFailed'))
     }
   }
 
@@ -140,40 +147,40 @@ export function DisputeDetailPage() {
           creditNoteAmount: creditAmount ? Number(creditAmount) : undefined,
         },
       }).unwrap()
-      toast.success('Dispute resolved')
+      toast.success(t('detail.toast.resolved'))
       setResolveOpen(false)
       refetch()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to resolve')
+      toast.error(err?.data?.error?.message || t('detail.toast.resolveFailed'))
     }
   }
 
   const handleReject = async () => {
     if (!resolutionNotes.trim()) {
-      toast.error('Notes are required when rejecting')
+      toast.error(t('detail.toast.rejectNotesRequired'))
       return
     }
     try {
       await rejectDispute({ id: id!, resolutionNotes }).unwrap()
-      toast.success('Dispute rejected')
+      toast.success(t('detail.toast.rejected'))
       setRejectOpen(false)
       setResolutionNotes('')
       refetch()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to reject')
+      toast.error(err?.data?.error?.message || t('detail.toast.rejectFailed'))
     }
   }
 
   const handleCancel = async () => {
     try {
       await cancelDispute(id!).unwrap()
-      toast.success('Dispute cancelled')
+      toast.success(t('detail.toast.cancelled'))
       refetch()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to cancel')
+      toast.error(err?.data?.error?.message || t('detail.toast.cancelFailed'))
     }
   }
 
@@ -184,13 +191,13 @@ export function DisputeDetailPage() {
     >
       <PageShell className="space-y-6" data-testid="dispute-detail-page">
         <PageHeader
-          title="Dispute details"
+          title={t('detail.titleDetails')}
           description={`${String(dispute.type || '').replace(/_/g, ' ')} · ${status.replace(/_/g, ' ')}`}
           breadcrumb={
             <Button variant="outline" size="sm" asChild>
               <Link to="/app/disputes">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to disputes
+                {t('detail.backToDisputes')}
               </Link>
             </Button>
           }
@@ -198,7 +205,7 @@ export function DisputeDetailPage() {
             <div className="flex flex-wrap gap-2">
               {isSupplier && canManageSupplierDisputes && status === 'open' && (
                 <Button size="sm" variant="outline" onClick={handleReview}>
-                  Mark under review
+                  {t('detail.markUnderReview')}
                 </Button>
               )}
               {isSupplier &&
@@ -206,16 +213,16 @@ export function DisputeDetailPage() {
                 (status === 'open' || status === 'under_review') && (
                   <>
                     <Button size="sm" onClick={() => setResolveOpen(true)}>
-                      Resolve
+                      {t('detail.resolve')}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setRejectOpen(true)}>
-                      Reject
+                      {t('detail.reject')}
                     </Button>
                   </>
                 )}
               {!isSupplier && status === 'open' && (
                 <Button size="sm" variant="outline" onClick={handleCancel} disabled={cancelling}>
-                  Cancel dispute
+                  {t('detail.cancelDispute')}
                 </Button>
               )}
             </div>
@@ -225,15 +232,15 @@ export function DisputeDetailPage() {
         {replacementOrderId && (
           <Card className="border-sky-300 bg-sky-50/50 dark:border-sky-800 dark:bg-sky-950/20">
             <CardHeader>
-              <CardTitle className="text-base">Replacement order created</CardTitle>
+              <CardTitle className="text-base">{t('detail.replacementTitle')}</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-wrap items-center justify-between gap-3 text-sm">
-              <p className="text-[var(--text-muted)]">
-                The supplier resolved this dispute by shipping replacement goods on a new order.
-              </p>
+              <p className="text-[var(--text-muted)]">{t('detail.replacementDescription')}</p>
               <Button size="sm" asChild>
                 <Link to={`/app/orders/${replacementOrderId}`}>
-                  View replacement order {formatOrderRef(replacementOrderId)}
+                  {t('detail.viewReplacementOrder', {
+                    ref: formatOrderRef(replacementOrderId),
+                  })}
                 </Link>
               </Button>
             </CardContent>
@@ -243,15 +250,15 @@ export function DisputeDetailPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Summary</CardTitle>
+              <CardTitle className="text-base">{t('detail.summary')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div className="flex justify-between gap-4">
-                <span className="text-[var(--text-muted)]">Status</span>
+                <span className="text-[var(--text-muted)]">{t('detail.status')}</span>
                 <Badge variant={statusBadge(status)}>{status}</Badge>
               </div>
               <div className="flex justify-between gap-4">
-                <span className="text-[var(--text-muted)]">Order</span>
+                <span className="text-[var(--text-muted)]">{t('detail.order')}</span>
                 {orderId ? (
                   <Link
                     to={`/app/orders/${orderId}`}
@@ -265,25 +272,25 @@ export function DisputeDetailPage() {
               </div>
               {isSupplier && (
                 <div className="flex justify-between gap-4">
-                  <span className="text-[var(--text-muted)]">Restaurant</span>
+                  <span className="text-[var(--text-muted)]">{t('detail.restaurant')}</span>
                   <span>{String(dispute.restaurantName ?? dispute.restaurant_name ?? '—')}</span>
                 </div>
               )}
               {!isSupplier && (
                 <div className="flex justify-between gap-4">
-                  <span className="text-[var(--text-muted)]">Supplier</span>
+                  <span className="text-[var(--text-muted)]">{t('detail.supplier')}</span>
                   <span>{String(dispute.supplierName ?? dispute.supplier_name ?? '—')}</span>
                 </div>
               )}
               {disputedAmount != null && Number(disputedAmount) > 0 && (
                 <div className="flex justify-between gap-4">
-                  <span className="text-[var(--text-muted)]">Disputed amount</span>
+                  <span className="text-[var(--text-muted)]">{t('detail.disputedAmount')}</span>
                   <span>${formatPrice(Number(disputedAmount))}</span>
                 </div>
               )}
               {dispute.orderStatus != null && (
                 <div className="flex justify-between gap-4">
-                  <span className="text-[var(--text-muted)]">Order status</span>
+                  <span className="text-[var(--text-muted)]">{t('detail.orderStatus')}</span>
                   <span>
                     {String(dispute.orderStatus ?? dispute.order_status).replace(/_/g, ' ')}
                   </span>
@@ -294,13 +301,15 @@ export function DisputeDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Description</CardTitle>
+              <CardTitle className="text-base">{t('detail.description')}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm whitespace-pre-wrap">{String(dispute.description || '—')}</p>
               {dispute.resolutionNotes != null || dispute.resolution_notes != null ? (
                 <div className="mt-4 pt-4 border-t">
-                  <p className="text-xs text-[var(--text-muted)] mb-1">Resolution notes</p>
+                  <p className="text-xs text-[var(--text-muted)] mb-1">
+                    {t('detail.resolutionNotes')}
+                  </p>
                   <p className="text-sm whitespace-pre-wrap">
                     {String(dispute.resolutionNotes ?? dispute.resolution_notes)}
                   </p>
@@ -313,7 +322,7 @@ export function DisputeDetailPage() {
         {items.length > 0 && (
           <Card className="overflow-visible">
             <CardHeader>
-              <CardTitle className="text-base">Disputed line items</CardTitle>
+              <CardTitle className="text-base">{t('detail.lineItems')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 p-4 sm:p-6 sm:pt-0">
               <div className="space-y-2 md:hidden">
@@ -327,10 +336,14 @@ export function DisputeDetailPage() {
                     </p>
                     <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-[var(--text-muted)]">
                       <span>
-                        Ordered: {String(item.quantity_ordered ?? item.quantityOrdered ?? '—')}
+                        {t('detail.orderedQty', {
+                          qty: String(item.quantity_ordered ?? item.quantityOrdered ?? '—'),
+                        })}
                       </span>
                       <span>
-                        Received: {String(item.quantity_received ?? item.quantityReceived ?? '—')}
+                        {t('detail.receivedQty', {
+                          qty: String(item.quantity_received ?? item.quantityReceived ?? '—'),
+                        })}
                       </span>
                     </div>
                     <p className="mt-2 text-xs text-[var(--text-muted)]">
@@ -339,14 +352,14 @@ export function DisputeDetailPage() {
                   </div>
                 ))}
               </div>
-              <TableScroll aria-label="Disputed line items" className="hidden md:block">
+              <TableScroll aria-label={t('detail.lineItemsAriaLabel')} className="hidden md:block">
                 <table className="w-full min-w-[520px] text-sm">
                   <thead>
                     <tr className="border-b bg-[var(--brand-ultra)]/40 text-left text-[var(--text-muted)]">
-                      <th className="px-4 py-3 pl-5 font-medium">Product</th>
-                      <th className="px-4 py-3 font-medium">Ordered</th>
-                      <th className="px-4 py-3 font-medium">Received</th>
-                      <th className="px-4 py-3 pr-5 font-medium">Issue</th>
+                      <th className="px-4 py-3 pl-5 font-medium">{t('detail.product')}</th>
+                      <th className="px-4 py-3 font-medium">{t('detail.ordered')}</th>
+                      <th className="px-4 py-3 font-medium">{t('detail.received')}</th>
+                      <th className="px-4 py-3 pr-5 font-medium">{t('detail.issue')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -376,7 +389,7 @@ export function DisputeDetailPage() {
         {creditNotes.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Credit notes</CardTitle>
+              <CardTitle className="text-base">{t('detail.creditNotes')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               {creditNotes.map((cn) => (
@@ -395,26 +408,24 @@ export function DisputeDetailPage() {
         <Dialog open={resolveOpen} onOpenChange={setResolveOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Resolve dispute</DialogTitle>
-              <DialogDescription>
-                Choose how to close this dispute for the restaurant.
-              </DialogDescription>
+              <DialogTitle>{t('detail.resolveDialog.title')}</DialogTitle>
+              <DialogDescription>{t('detail.resolveDialog.description')}</DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
               <div>
-                <Label>Resolution</Label>
+                <Label>{t('detail.resolveDialog.resolution')}</Label>
                 <Select value={resolutionType} onValueChange={setResolutionType}>
                   <SelectTrigger>
-                    <option value="credit_note">Credit note</option>
-                    <option value="replacement">Replacement</option>
-                    <option value="refund">Refund</option>
-                    <option value="no_action">No action</option>
+                    <option value="credit_note">{t('detail.resolveDialog.creditNote')}</option>
+                    <option value="replacement">{t('detail.resolveDialog.replacement')}</option>
+                    <option value="refund">{t('detail.resolveDialog.refund')}</option>
+                    <option value="no_action">{t('detail.resolveDialog.noAction')}</option>
                   </SelectTrigger>
                 </Select>
               </div>
               {resolutionType === 'credit_note' && (
                 <div>
-                  <Label>Credit amount</Label>
+                  <Label>{t('detail.resolveDialog.creditAmount')}</Label>
                   <Input
                     type="number"
                     value={creditAmount}
@@ -423,7 +434,7 @@ export function DisputeDetailPage() {
                 </div>
               )}
               <div>
-                <Label>Notes</Label>
+                <Label>{t('detail.resolveDialog.notes')}</Label>
                 <Textarea
                   value={resolutionNotes}
                   onChange={(e) => setResolutionNotes(e.target.value)}
@@ -432,7 +443,7 @@ export function DisputeDetailPage() {
             </div>
             <DialogFooter>
               <Button onClick={handleResolve} disabled={resolving}>
-                Confirm
+                {t('detail.resolveDialog.confirm')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -441,17 +452,17 @@ export function DisputeDetailPage() {
         <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Reject dispute</DialogTitle>
-              <DialogDescription>Explain why this dispute is rejected.</DialogDescription>
+              <DialogTitle>{t('detail.rejectDialog.title')}</DialogTitle>
+              <DialogDescription>{t('detail.rejectDialog.description')}</DialogDescription>
             </DialogHeader>
             <Textarea
-              placeholder="Reason for rejection (required)"
+              placeholder={t('detail.rejectDialog.placeholder')}
               value={resolutionNotes}
               onChange={(e) => setResolutionNotes(e.target.value)}
             />
             <DialogFooter>
               <Button variant="destructive" onClick={handleReject} disabled={rejecting}>
-                Reject
+                {t('detail.reject')}
               </Button>
             </DialogFooter>
           </DialogContent>

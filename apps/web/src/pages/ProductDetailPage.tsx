@@ -1,4 +1,5 @@
 import { useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useGetProductQuery } from '../services/api'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
@@ -15,6 +16,7 @@ import { useImpersonation } from '../hooks/useImpersonation'
 import { ProductSubstitutesSection } from '../components/supplier/ProductSubstitutesSection'
 
 export function ProductDetailPage() {
+  const { t } = useTranslation('products')
   const { id } = useParams<{ id: string }>()
   const { addItem } = useCartActions()
   const { isEffectiveSupplier } = useImpersonation()
@@ -28,7 +30,7 @@ export function ProductDetailPage() {
         product: data.product,
         quantity: 1,
       })
-      toast.success('Added to cart')
+      toast.success(t('toast.addedToCart'))
     }
   }
 
@@ -40,17 +42,17 @@ export function ProductDetailPage() {
     return (
       <PageShell data-testid="product-detail-page">
         <PageHeader
-          title="Product"
+          title={t('detail.title')}
           breadcrumb={
             <Button variant="outline" size="sm" asChild>
               <Link to="/app/products">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Products
+                {t('detail.backToProducts')}
               </Link>
             </Button>
           }
         />
-        <p className="text-center text-[var(--red)]">Product not found</p>
+        <p className="text-center text-[var(--red)]">{t('detail.notFound')}</p>
       </PageShell>
     )
   }
@@ -66,7 +68,7 @@ export function ProductDetailPage() {
           <Button variant="outline" size="sm" asChild>
             <Link to="/app/products">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Products
+              {t('detail.backToProducts')}
             </Link>
           </Button>
         }
@@ -95,26 +97,26 @@ export function ProductDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Product Details</CardTitle>
+              <CardTitle>{t('detail.productDetails')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                 <div>
-                  <p className="font-medium text-[var(--text-muted)]">SKU</p>
+                  <p className="font-medium text-[var(--text-muted)]">{t('detail.sku')}</p>
                   <p>{product.sku}</p>
                 </div>
                 <div>
-                  <p className="font-medium text-[var(--text-muted)]">Supplier</p>
+                  <p className="font-medium text-[var(--text-muted)]">{t('detail.supplier')}</p>
                   <p>{product.supplier_name}</p>
                 </div>
                 <div>
-                  <p className="font-medium text-[var(--text-muted)]">Unit</p>
-                  <p>{product.unit || 'N/A'}</p>
+                  <p className="font-medium text-[var(--text-muted)]">{t('detail.unit')}</p>
+                  <p>{product.unit || t('detail.notAvailable')}</p>
                 </div>
                 <div>
-                  <p className="font-medium text-[var(--text-muted)]">Stock</p>
+                  <p className="font-medium text-[var(--text-muted)]">{t('detail.stock')}</p>
                   <p>
-                    {product.available_qty || 0} {product.unit || 'units'}
+                    {product.available_qty || 0} {product.unit || t('detail.units')}
                   </p>
                 </div>
               </div>
@@ -123,7 +125,7 @@ export function ProductDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Pricing</CardTitle>
+              <CardTitle>{t('detail.pricing')}</CardTitle>
             </CardHeader>
             <CardContent>
               <ContractPriceDisplay
@@ -142,10 +144,10 @@ export function ProductDetailPage() {
               disabled={!product.available_qty || product.available_qty <= 0}
               className="flex-1"
             >
-              Add to Cart
+              {t('detail.addToCart')}
             </Button>
             <Button variant="outline" asChild>
-              <Link to="/app/cart">View Cart</Link>
+              <Link to="/app/cart">{t('detail.viewCart')}</Link>
             </Button>
           </div>
 

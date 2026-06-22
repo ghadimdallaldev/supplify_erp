@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useGetSupplierReceivablesQuery } from '../../services/api'
 import {
   useSendInvoiceReminderMutation,
@@ -9,23 +10,22 @@ import { Button } from '../ui/button'
 import { formatCurrency } from '../../utils/format'
 import { AlertTriangle, Bell } from 'lucide-react'
 
-const AGING_LABELS: Record<string, string> = {
-  current: 'Current',
-  '0_7': '1–7 days overdue',
-  '8_30': '8–30 days',
-  '31_60': '31–60 days',
-  '60_plus': '60+ days',
-}
+const AGING_BUCKET_KEYS = ['current', '0_7', '8_30', '31_60', '60_plus'] as const
 
-function statusBadge(status: string, isOverdue: boolean) {
+function statusBadge(
+  status: string,
+  isOverdue: boolean,
+  t: (key: string) => string
+): { label: string; className: string } {
   if (status === 'PARTIALLY_PAID')
-    return { label: 'Partial', className: 'bg-amber-100 text-amber-800' }
+    return { label: t('receivables.status.partial'), className: 'bg-amber-100 text-amber-800' }
   if (isOverdue || status === 'OVERDUE')
-    return { label: 'Overdue', className: 'bg-red-100 text-red-800' }
-  return { label: 'Unpaid', className: 'bg-slate-100 text-slate-700' }
+    return { label: t('receivables.status.overdue'), className: 'bg-red-100 text-red-800' }
+  return { label: t('receivables.status.unpaid'), className: 'bg-slate-100 text-slate-700' }
 }
 
 export function SupplierReceivablesPanel() {
+  const { t } = useTranslation('suppliers')
   const { data, isLoading, isError, refetch } = useGetSupplierReceivablesQuery()
   const [sendReminder, { isLoading: sendingReminder }] = useSendInvoiceReminderMutation()
   const [remindOverdue, { isLoading: remindingOverdue }] = useRemindOverdueInvoicesMutation()
@@ -47,9 +47,9 @@ export function SupplierReceivablesPanel() {
         role="alert"
       >
         <AlertTriangle className="h-5 w-5 mx-auto text-[var(--brand)] mb-2" />
-        <p className="text-sm text-[var(--text-muted)]">Could not load receivables.</p>
+        <p className="text-sm text-[var(--text-muted)]">{t('receivables.loadError')}</p>
         <Button size="sm" variant="outline" className="mt-2" onClick={() => refetch()}>
-          Retry
+          {t('common:actions.retry')}
         </Button>
       </div>
     )
@@ -67,7 +67,7 @@ export function SupplierReceivablesPanel() {
         data-testid="supplier-receivables-empty"
         className="rounded-xl border border-dashed border-[var(--app-border)] px-4 py-5 mb-4 text-sm text-[var(--text-muted)]"
       >
-        No open receivables — all caught up on invoices.
+        {t('receivables.empty')}
       </div>
     )
   }
@@ -92,7 +92,7 @@ export function SupplierReceivablesPanel() {
   return (
     <div data-testid="supplier-receivables-panel" className="mb-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-bold text-[var(--text)]">Open receivables</h3>
+        <h3 className="text-sm font-bold text-[var(--text)]">{t('receivables.title')}</h3>
         {overdueTotal > 0 && (
           <Button
             size="sm"
@@ -102,29 +102,29 @@ export function SupplierReceivablesPanel() {
             onClick={() => handleBulkRemindOverdue()}
           >
             <Bell className="h-3.5 w-3.5 mr-1.5" />
-            {remindingOverdue ? 'Sending…' : 'Remind overdue'}
+            {remindingOverdue ? t('receivables.sending') : t('receivables.remindOverdue')}
           </Button>
         )}
       </div>
 
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
         <Stat
-          label="Unpaid total"
+          label={t('receivables.stats.unpaidTotal')}
           value={formatCurrency(summary.unpaidTotal ?? 0)}
           testId="receivables-unpaid"
         />
         <Stat
-          label="Overdue"
+          label={t('receivables.stats.overdue')}
           value={formatCurrency(summary.overdueTotal ?? 0)}
           testId="receivables-overdue"
         />
         <Stat
-          label="Partial payments"
+          label={t('receivables.stats.partialPayments')}
           value={String(summary.partialCount ?? 0)}
           testId="receivables-partial"
         />
         <Stat
-          label="Who owes me"
+          label={t('receivables.stats.whoOwesMe')}
           value={formatCurrency(summary.whoOwesMeTotal ?? 0)}
           testId="receivables-who-owes"
         />
@@ -134,11 +134,11 @@ export function SupplierReceivablesPanel() {
         data-testid="receivables-aging"
         className="rounded-lg bg-[var(--brand-pale)] border border-[var(--brand-light)] px-3 py-2 text-xs"
       >
-        <span className="font-bold text-[var(--text)]">Aging: </span>
-        {Object.entries(AGING_LABELS).map(([key, label], i) => (
+        <span className="font-bold text-[var(--text)]">{t('receivables.aging')} </span>
+        {AGING_BUCKET_KEYS.map((key, i) => (
           <span key={key}>
             {i > 0 ? ' · ' : ''}
-            {label} {formatCurrency(aging[key] ?? 0)}
+            {t(`receivables.agingBuckets.${key}`)} {formatCurrency(aging[key] ?? 0)}
           </span>
         ))}
       </div>
@@ -148,7 +148,9 @@ export function SupplierReceivablesPanel() {
           data-testid="receivables-top-debtors"
           className="rounded-lg border border-[var(--app-border)] px-3 py-2"
         >
-          <div className="text-xs font-bold text-[var(--text-muted)] mb-2">Top debtors</div>
+          <div className="text-xs font-bold text-[var(--text-muted)] mb-2">
+            {t('receivables.topDebtors')}
+          </div>
           <ul className="space-y-1.5">
             {topDebtors
               .slice(0, 5)
@@ -181,7 +183,7 @@ export function SupplierReceivablesPanel() {
                         disabled={sendingReminder}
                         onClick={() => handleDebtorReminder(debtor.oldestInvoiceId)}
                       >
-                        Send reminder
+                        {t('receivables.sendReminder')}
                       </Button>
                     )}
                   </li>
@@ -196,11 +198,11 @@ export function SupplierReceivablesPanel() {
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-[var(--brand-ultra)] text-left text-[var(--text-muted)]">
-                <th className="px-3 py-2 font-semibold">Invoice</th>
-                <th className="px-3 py-2 font-semibold">Restaurant</th>
-                <th className="px-3 py-2 font-semibold">Due</th>
-                <th className="px-3 py-2 font-semibold">Balance</th>
-                <th className="px-3 py-2 font-semibold">Status</th>
+                <th className="px-3 py-2 font-semibold">{t('receivables.table.invoice')}</th>
+                <th className="px-3 py-2 font-semibold">{t('receivables.table.restaurant')}</th>
+                <th className="px-3 py-2 font-semibold">{t('receivables.table.due')}</th>
+                <th className="px-3 py-2 font-semibold">{t('receivables.table.balance')}</th>
+                <th className="px-3 py-2 font-semibold">{t('receivables.table.status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -217,7 +219,7 @@ export function SupplierReceivablesPanel() {
                     status: string
                     isOverdue: boolean
                   }) => {
-                    const badge = statusBadge(inv.status, inv.isOverdue)
+                    const badge = statusBadge(inv.status, inv.isOverdue, t)
                     return (
                       <tr key={inv.id} className="border-t border-[var(--app-border)]">
                         <td className="px-3 py-2">
