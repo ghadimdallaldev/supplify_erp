@@ -69,7 +69,7 @@ function ctaLabel(deal: DealRecord) {
 }
 
 function CtaIcon({ cta }: { cta: string }) {
-  const cls = 'h-4 w-4 mr-2'
+  const cls = 'h-4 w-4 me-2'
   switch (cta) {
     case 'use_coupon':
       return <Copy className={cls} />
@@ -283,7 +283,7 @@ export function DealCard({
             disabled={messaging}
           >
             {!canRedeem && ctaNeedsRedeem(deal) ? (
-              <Lock className="h-4 w-4 mr-2" />
+              <Lock className="h-4 w-4 me-2" />
             ) : (
               <CtaIcon cta={String(deal.cta_type || 'order_now')} />
             )}

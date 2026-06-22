@@ -133,7 +133,7 @@ export function ActiveDeliveriesMap({
           type="button"
           size="sm"
           variant="secondary"
-          className="absolute right-2 top-2 z-[500] h-8 gap-1 px-2 text-xs shadow"
+          className="absolute end-2 top-2 z-[500] h-8 gap-1 px-2 text-xs shadow"
           data-testid="active-deliveries-map-recenter"
           onClick={() => fitToMarkers()}
         >
@@ -146,23 +146,23 @@ export function ActiveDeliveriesMap({
           data-testid="active-deliveries-map-canvas"
         />
         <div
-          className="pointer-events-none absolute bottom-2 left-2 z-[500] flex flex-wrap gap-2 text-[10px]"
+          className="pointer-events-none absolute bottom-2 start-2 z-[500] flex flex-wrap gap-2 text-[10px]"
           data-testid="active-deliveries-map-legend"
         >
           <span className="rounded bg-white/90 px-1.5 py-0.5 shadow dark:bg-black/70">
-            <span className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-500 align-middle" />
+            <span className="me-1 inline-block h-2 w-2 rounded-full bg-emerald-500 align-middle" />
             Live driver
           </span>
           <span className="rounded bg-white/90 px-1.5 py-0.5 shadow dark:bg-black/70">
-            <span className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-500 align-middle" />
+            <span className="me-1 inline-block h-2 w-2 rounded-full bg-amber-500 align-middle" />
             Stale driver
           </span>
           <span className="rounded bg-white/90 px-1.5 py-0.5 shadow dark:bg-black/70">
-            <span className="mr-1 inline-block h-2 w-2 rounded-full bg-orange-500 align-middle" />
+            <span className="me-1 inline-block h-2 w-2 rounded-full bg-orange-500 align-middle" />
             Destination
           </span>
           <span className="rounded bg-white/90 px-1.5 py-0.5 shadow dark:bg-black/70">
-            <span className="mr-1 inline-block h-2 w-2 rounded-full bg-gray-400 align-middle" />
+            <span className="me-1 inline-block h-2 w-2 rounded-full bg-gray-400 align-middle" />
             No GPS
           </span>
         </div>

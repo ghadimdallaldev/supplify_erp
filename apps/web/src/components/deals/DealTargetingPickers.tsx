@@ -125,9 +125,9 @@ export function DealTargetingPickers({ value, onChange }: Props) {
             </div>
           ) : null}
           <div className="relative">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-[var(--text-muted)]" />
+            <Search className="absolute start-2 top-2.5 h-4 w-4 text-[var(--text-muted)]" />
             <Input
-              className="pl-8"
+              className="ps-8"
               placeholder={t('targeting.searchProducts')}
               value={productSearch}
               onChange={(e) => setProductSearch(e.target.value)}
@@ -146,14 +146,14 @@ export function DealTargetingPickers({ value, onChange }: Props) {
                   <button
                     key={id}
                     type="button"
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-[var(--app-muted)] ${
+                    className={`w-full text-start px-3 py-2 text-sm hover:bg-[var(--app-muted)] ${
                       selected ? 'bg-[var(--brand)]/10 font-medium' : ''
                     }`}
                     onClick={() => toggleProduct(id)}
                   >
                     {String(p.name)}
                     {p.sku ? (
-                      <span className="text-xs text-[var(--text-muted)] ml-2">{String(p.sku)}</span>
+                      <span className="text-xs text-[var(--text-muted)] ms-2">{String(p.sku)}</span>
                     ) : null}
                   </button>
                 )

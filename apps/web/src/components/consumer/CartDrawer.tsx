@@ -26,10 +26,10 @@ export function CartDrawer({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="fixed inset-y-0 right-0 left-auto top-0 flex h-full max-h-none w-full max-w-md translate-x-0 translate-y-0 flex-col rounded-none border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:rounded-none"
+        className="fixed inset-y-0 end-0 start-auto top-0 flex h-full max-h-none w-full max-w-md translate-x-0 translate-y-0 flex-col rounded-none border-s data-[state=closed]:translate-x-full data-[state=closed]:rtl:-translate-x-full data-[state=open]:translate-x-0 sm:rounded-none"
         aria-describedby="cart-drawer-description"
       >
-        <DialogHeader className="text-left">
+        <DialogHeader className="text-start">
           <DialogTitle>Your cart</DialogTitle>
           <DialogDescription id="cart-drawer-description">
             Review items before checkout.
@@ -83,7 +83,7 @@ export function CartDrawer({
                   className="h-8 text-destructive"
                   onClick={() => onRemoveLine(line.cartKey)}
                 >
-                  <Trash2 className="mr-1 h-3 w-3" />
+                  <Trash2 className="me-1 h-3 w-3" />
                   Remove
                 </Button>
               </div>
@@ -97,7 +97,7 @@ export function CartDrawer({
             <span className="text-lg font-semibold">{formatPrice(total)}</span>
           </div>
           <Button type="button" className="w-full" disabled={!lines.length} onClick={onCheckout}>
-            <ShoppingCart className="mr-2 h-4 w-4" />
+            <ShoppingCart className="me-2 h-4 w-4" />
             Checkout
           </Button>
         </div>

@@ -3,6 +3,7 @@ import { DEFAULT_LOCALE, isSupportedLocale } from './config'
 import type { I18nNamespace } from './config'
 
 const loaded = new Set<string>()
+const activeNamespaces = new Set<I18nNamespace>()
 
 type LocaleModule = { default: ResourceKey }
 
@@ -38,12 +39,18 @@ export async function loadNamespace(i18n: I18nInstance, lng: string, ns: I18nNam
   if (loaded.has(key)) return
   if (i18n.hasResourceBundle(locale, ns)) {
     loaded.add(key)
+    activeNamespaces.add(ns)
     return
   }
 
   const resource = await loadLocaleResource(locale, ns)
   i18n.addResourceBundle(locale, ns, resource, true, true)
   loaded.add(key)
+  activeNamespaces.add(ns)
+}
+
+export function getActiveNamespaces(): I18nNamespace[] {
+  return [...activeNamespaces]
 }
 
 export async function loadNamespaces(i18n: I18nInstance, lng: string, namespaces: I18nNamespace[]) {
@@ -63,4 +70,5 @@ export const lazyLocaleBackend: BackendModule = {
 /** Reset loaded cache - for tests only */
 export function resetNamespaceCache() {
   loaded.clear()
+  activeNamespaces.clear()
 }

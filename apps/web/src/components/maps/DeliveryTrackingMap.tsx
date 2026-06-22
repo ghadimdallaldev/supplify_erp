@@ -107,7 +107,7 @@ export function DeliveryTrackingMap({
       <div className="relative overflow-hidden rounded-lg border border-[var(--app-border)]">
         {live && (
           <span
-            className="absolute left-2 top-2 z-[500] inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow"
+            className="absolute start-2 top-2 z-[500] inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow"
             data-testid="delivery-tracking-map-live"
           >
             <Radio className="h-3 w-3" aria-hidden />
@@ -118,7 +118,7 @@ export function DeliveryTrackingMap({
           type="button"
           size="sm"
           variant="secondary"
-          className="absolute right-2 top-2 z-[500] min-h-[44px] gap-1.5 px-3 text-sm font-semibold shadow"
+          className="absolute end-2 top-2 z-[500] min-h-[44px] gap-1.5 px-3 text-sm font-semibold shadow"
           data-testid="delivery-tracking-map-recenter"
           onClick={() => fitToMarkers()}
           aria-label={t('tracking.map.recenterAriaLabel')}
@@ -134,18 +134,18 @@ export function DeliveryTrackingMap({
           aria-label={t('tracking.map.mapAriaLabel')}
         />
         <div
-          className="pointer-events-none absolute bottom-1 left-1 z-[500] flex flex-wrap gap-2 px-1 text-[10px]"
+          className="pointer-events-none absolute bottom-1 start-1 z-[500] flex flex-wrap gap-2 px-1 text-[10px]"
           data-testid="delivery-tracking-map-legend"
         >
           {hasDriver ? (
             <span className="rounded bg-white/90 px-1.5 py-0.5 shadow dark:bg-black/70">
-              <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 align-middle mr-1" />
+              <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 align-middle me-1" />
               {t('tracking.map.driver')}
             </span>
           ) : null}
           {hasDestination ? (
             <span className="rounded bg-white/90 px-1.5 py-0.5 shadow dark:bg-black/70">
-              <span className="inline-block h-2 w-2 rounded-full bg-orange-500 align-middle mr-1" />
+              <span className="inline-block h-2 w-2 rounded-full bg-orange-500 align-middle me-1" />
               {deliveryLocationLabel}
             </span>
           ) : null}
