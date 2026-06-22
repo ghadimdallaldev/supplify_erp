@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { beforeAll, describe, it, expect } from 'vitest'
+import i18n from 'i18next'
+import enFulfillment from '../i18n/locales/en/fulfillment.json'
 import {
   formatDistanceKm,
   formatEtaRange,
@@ -11,6 +13,9 @@ import {
   shouldShowEtaConfidence,
 } from './deliveryEtaDisplay'
 import type { RestaurantOrderTrackingResponse, SupplierOrderTrackingResponse } from '../types'
+
+const t = (key: string, options?: Record<string, unknown>) =>
+  i18n.t(key, { ns: 'fulfillment', ...options })
 
 const restaurantBase: RestaurantOrderTrackingResponse = {
   orderId: 'o1',
@@ -29,11 +34,21 @@ const supplierBase: SupplierOrderTrackingResponse = {
   assignment: { id: 'a1', status: 'out_for_delivery' },
 }
 
+beforeAll(async () => {
+  await i18n.init({
+    lng: 'en',
+    fallbackLng: 'en',
+    ns: ['fulfillment'],
+    resources: { en: { fulfillment: enFulfillment } },
+    interpolation: { escapeValue: false },
+  })
+})
+
 describe('deliveryEtaDisplay', () => {
   it('formats ETA range and distance', () => {
-    expect(formatEtaRange(12, 18)).toBe('12–18 min')
-    expect(formatDistanceKm(4.2)).toBe('4.2 km away')
-    expect(formatSupplierDistanceKm(7.8)).toBe('Distance 7.8 km')
+    expect(formatEtaRange(12, 18)).toBe(t('tracking.eta.minRange', { min: 12, max: 18 }))
+    expect(formatDistanceKm(4.2)).toBe(t('tracking.eta.distanceKm', { km: '4.2' }))
+    expect(formatSupplierDistanceKm(7.8)).toBe(t('tracking.eta.supplierDistance', { km: '7.8' }))
   })
 
   it('shows restaurant primary ETA text when available', () => {
@@ -44,7 +59,11 @@ describe('deliveryEtaDisplay', () => {
         etaMinutesMin: 12,
         etaMinutesMax: 18,
       })
-    ).toBe('Arriving in about 12–18 minutes')
+    ).toBe(
+      t('tracking.eta.restaurant.arrivingIn', {
+        range: t('tracking.eta.minutesRange', { min: 12, max: 18 }),
+      })
+    )
   })
 
   it('shows supplier primary ETA text when available', () => {
@@ -55,14 +74,18 @@ describe('deliveryEtaDisplay', () => {
         etaMinutesMin: 12,
         etaMinutesMax: 18,
       })
-    ).toBe('ETA 12–18 min')
+    ).toBe(
+      t('tracking.eta.supplier.eta', {
+        range: t('tracking.eta.minRange', { min: 12, max: 18 }),
+      })
+    )
     expect(
       getSupplierEtaSecondaryText({
         ...supplierBase,
         etaAvailable: true,
         distanceKm: 7.8,
       })
-    ).toBe('Distance 7.8 km')
+    ).toBe(t('tracking.eta.supplierDistance', { km: '7.8' }))
   })
 
   it('shows missing destination warning', () => {
@@ -71,7 +94,7 @@ describe('deliveryEtaDisplay', () => {
         ...restaurantBase,
         destinationCoordinatesAvailable: false,
       })
-    ).toBe('ETA unavailable — restaurant delivery location is not set.')
+    ).toBe(t('tracking.eta.unavailable.destinationMissing'))
   })
 
   it('shows start delivery message for assigned status', () => {
@@ -80,7 +103,7 @@ describe('deliveryEtaDisplay', () => {
         ...restaurantBase,
         delivery: { status: 'assigned', label: 'Assigned' },
       })
-    ).toBe('ETA will appear once the driver starts delivery.')
+    ).toBe(t('tracking.eta.unavailable.startDelivery'))
   })
 
   it('shows restaurant copy when delivery is later on route', () => {
@@ -93,7 +116,7 @@ describe('deliveryEtaDisplay', () => {
         nextStop: false,
         stopsBefore: 2,
       })
-    ).toBe('Your delivery is planned after 2 stops')
+    ).toBe(t('tracking.eta.restaurant.plannedAfterStops', { count: 2 }))
     expect(
       getRestaurantEtaSecondaryText({
         ...restaurantBase,
@@ -103,7 +126,11 @@ describe('deliveryEtaDisplay', () => {
         nextStop: false,
         stopsBefore: 2,
       })
-    ).toBe('Estimated arrival: 35–50 minutes')
+    ).toBe(
+      t('tracking.eta.restaurant.estimatedArrival', {
+        range: t('tracking.eta.minutesRange', { min: 35, max: 50 }),
+      })
+    )
   })
 
   it('shows supplier route position hints', () => {
@@ -116,7 +143,13 @@ describe('deliveryEtaDisplay', () => {
         routePosition: 3,
         routePositionTotal: 10,
       })
-    ).toBe('2 stops before this order · Route position 3 of 10 · Distance 7.8 km')
+    ).toBe(
+      [
+        t('tracking.eta.supplier.stopsBefore', { count: 2 }),
+        t('tracking.eta.supplier.routePosition', { position: 3, total: 10 }),
+        t('tracking.eta.supplierDistance', { km: '7.8' }),
+      ].join(' · ')
+    )
   })
 
   it('shows low confidence badge hint for supplier', () => {

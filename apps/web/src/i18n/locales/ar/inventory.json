@@ -94,5 +94,171 @@
     "exportedCsv": "تم تصدير المخزون إلى CSV",
     "processingCsv": "جارٍ معالجة {{count}} عنصر مخزون من CSV...",
     "addingToCart": "جارٍ الإضافة إلى السلة..."
+  },
+  "reorder": {
+    "suggested": "مقترح",
+    "order": "اطلب"
+  },
+  "trend": {
+    "title": "تحليل اتجاه المخزون",
+    "description": "نظرة مرئية على حركات المخزون",
+    "totalMovements": "إجمالي الحركات",
+    "recentAdditions": "الإضافات الأخيرة",
+    "recentSubtractions": "الخصومات الأخيرة"
+  },
+  "summary": {
+    "totalProducts": "إجمالي المنتجات",
+    "inStock": "متوفر",
+    "lowStock": "مخزون منخفض",
+    "outOfStock": "نفد المخزون"
+  },
+  "filters": {
+    "search": "بحث",
+    "searchPlaceholder": "ابحث بالاسم أو رمز SKU أو الفئة...",
+    "clearSearch": "مسح البحث",
+    "category": "الفئة",
+    "allCategories": "كل الفئات",
+    "supplier": "المورد",
+    "allSuppliers": "كل الموردين",
+    "status": "الحالة",
+    "allStatus": "كل الحالات",
+    "sortBy": "ترتيب حسب",
+    "sort": "ترتيب",
+    "clearFilters": "مسح الفلاتر",
+    "showingPrefix": "عرض",
+    "showingSuffix": "من {{total}} عنصر",
+    "removeStatus": "إزالة فلتر الحالة",
+    "removeCategory": "إزالة فلتر الفئة",
+    "removeSupplier": "إزالة فلتر المورد"
+  },
+  "sort": {
+    "updated_desc": "الأحدث تحديثا",
+    "name_asc": "الاسم (أ-ي)",
+    "name_desc": "الاسم (ي-أ)",
+    "quantity_asc": "الكمية (الأقل أولا)",
+    "quantity_desc": "الكمية (الأعلى أولا)",
+    "status": "حالة المخزون"
+  },
+  "items": {
+    "title": "عناصر المخزون",
+    "description": "اعرض مستويات المخزون وأدرها",
+    "exportCsv": "تصدير CSV",
+    "importCsv": "استيراد CSV"
+  },
+  "empty": {
+    "noInventory": "لا يوجد مخزون بعد",
+    "noMatches": "لا توجد عناصر مطابقة",
+    "noInventoryDescription": "أنشئ طلبا واستلم البضائع ليظهر المخزون هنا.",
+    "noMatchesDescription": "حاول تعديل البحث أو الفلاتر.",
+    "createFirstOrder": "إنشاء أول طلب"
+  },
+  "table": {
+    "product": "المنتج",
+    "category": "الفئة",
+    "supplier": "المورد",
+    "quantity": "الكمية",
+    "onHand": "في المخزون",
+    "suggestedReorder": "إعادة طلب مقترحة",
+    "status": "الحالة",
+    "lastUpdated": "آخر تحديث",
+    "actions": "الإجراءات",
+    "add": "إضافة",
+    "reduce": "تقليل",
+    "pin": "تثبيت",
+    "pinned": "مثبت",
+    "unpinItem": "إلغاء تثبيت العنصر",
+    "pinToTop": "تثبيت في الأعلى",
+    "addInventory": "إضافة مخزون",
+    "countCorrection": "تصحيح العد (تقليل المخزون)",
+    "logWaste": "تسجيل هدر أو تلف",
+    "waste": "هدر",
+    "daysLeft_one": "(حوالي {{count}} يوم متبق)",
+    "daysLeft_other": "(حوالي {{count}} يوم متبق)"
+  },
+  "csv": {
+    "productName": "اسم المنتج",
+    "sku": "SKU",
+    "category": "الفئة",
+    "supplier": "المورد",
+    "quantity": "الكمية",
+    "unit": "الوحدة",
+    "status": "الحالة",
+    "lastUpdated": "آخر تحديث"
+  },
+  "supplierPage": {
+    "title": "المخزون",
+    "description": "إدارة مستويات المخزون والتعديلات عبر جميع المستودعات",
+    "gateTitle": "المخزون",
+    "byWarehouse": "حسب المستودع",
+    "tableView": "عرض الجدول",
+    "summary": {
+      "totalProducts": "إجمالي المنتجات",
+      "reserved": "محجوز",
+      "lowStock": "مخزون منخفض",
+      "available": "متاح"
+    },
+    "empty": {
+      "title": "لا توجد عناصر مخزون",
+      "description": "أضف منتجات واضبط مستويات المخزون لبدء التتبع."
+    },
+    "table": {
+      "product": "المنتج",
+      "warehouse": "المستودع",
+      "onHand": "في المخزن",
+      "reserved": "محجوز",
+      "available": "متاح",
+      "status": "الحالة",
+      "actions": "الإجراءات",
+      "productCount_one": "{{count}} منتج",
+      "productCount_other": "{{count}} منتجات",
+      "adjust": "تعديل"
+    },
+    "warehouseView": {
+      "emptyTitle": "لم يتم العثور على مستودعات",
+      "emptyDescription": "لم تنشئ أي مستودعات بعد. أنشئ المستودعات من الإعدادات.",
+      "returnToTable": "العودة إلى عرض الجدول",
+      "productCount": "{{count}} منتجات",
+      "totalAvailable": "{{count}} إجمالي المتاح",
+      "availableLabel": "متاح: {{count}}",
+      "reservedLabel": "محجوز: {{count}}",
+      "noInventory": "لا مخزون في هذا المستودع"
+    },
+    "adjustDialog": {
+      "title": "تعديل المخزون",
+      "description": "تسجيل تعديل مخزون لـ {{product}}",
+      "type": "نوع التعديل *",
+      "addStock": "إضافة مخزون",
+      "removeStock": "إزالة مخزون",
+      "quantity": "الكمية *",
+      "quantityPlaceholder": "أدخل الكمية",
+      "reason": "السبب *",
+      "reasonPlaceholder": "أدخل سبب التعديل",
+      "notes": "ملاحظات",
+      "cancel": "إلغاء",
+      "record": "تسجيل التعديل"
+    },
+    "settingsDialog": {
+      "title": "إعدادات المخزون",
+      "description": "ضبط إعدادات المخزون لـ {{product}}",
+      "moq": "الحد الأدنى لكمية الطلب (MOQ)",
+      "orderMultiple": "مضاعف الطلب",
+      "leadTime": "مهلة التوريد (أيام)",
+      "lowStockThreshold": "حد المخزون المنخفض",
+      "backordersAllowed": "السماح بالطلبات المؤجلة",
+      "cancel": "إلغاء",
+      "save": "حفظ الإعدادات"
+    },
+    "error": {
+      "title": "فشل تحميل المخزون",
+      "description": "حدثت مشكلة أثناء جلب بيانات المخزون.",
+      "retry": "حاول مرة أخرى"
+    },
+    "toasts": {
+      "validQuantity": "أدخل كمية صالحة",
+      "reasonRequired": "السبب مطلوب",
+      "adjustmentRecorded": "تم تسجيل تعديل المخزون",
+      "adjustmentFailed": "فشل تسجيل التعديل",
+      "settingsSaved": "تم حفظ الإعدادات"
+    }
   }
 }

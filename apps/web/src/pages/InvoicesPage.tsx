@@ -1,44 +1,18 @@
-import { Suspense, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Suspense, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { ensureNamespace } from '../i18n'
 import { Button } from '../components/ui/button'
-import { StatusBadge } from '../components/ui/status-badge'
-import {
-  FileText,
-  Clock,
-  CheckCircle,
-  Search,
-  Download,
-  Loader2,
-  TrendingUp,
-  TrendingDown,
-  Calendar,
-  CreditCard,
-  AlertTriangle,
-  ArrowRightLeft,
-  Receipt,
-} from 'lucide-react'
+import { Download, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../components/ui/dialog'
-import { Select, SelectItem, SelectTrigger } from '../components/ui/select'
+import { Select, SelectTrigger } from '../components/ui/select'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
-import { Textarea } from '../components/ui/textarea'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { usePermissions } from '../hooks/usePermissions'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
-import { formatPrice } from '../utils/format'
-import { splitRowClass } from '../components/ui/card-layout'
 import {
   useGetRestaurantInvoicesQuery,
   useGetRestaurantInvoiceQuery,
@@ -49,17 +23,16 @@ import {
   useGetOverdueInvoicesQuery,
   useGetSupplierInvoicesQuery,
   useGetCreditNotesQuery,
-  useApplyCreditNoteMutation,
   useGetEntitlementsQuery,
 } from '../services/api'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { canUseFinanceInvoices } from '../lib/planFeatureGates'
-import { Link } from 'react-router-dom'
 import { SupplierReceivablesPanel } from '../components/supplier/SupplierReceivablesPanel'
 import { RestaurantPayablesPanel } from '../components/restaurant/RestaurantPayablesPanel'
 import { InvoiceCreditNotesCard } from '../components/invoices/InvoiceCreditNotesCard'
 import { InvoiceStatsCards } from '../components/invoices/InvoiceStatsCards'
 import { InvoiceListPanel } from '../components/invoices/InvoiceListPanel'
+import { SupplierStatementPanel } from '../components/invoices/SupplierStatementPanel'
 import {
   LazyInvoiceDetailDialog,
   LazyInvoicePaymentDialog,
@@ -74,6 +47,12 @@ function defaultExportRange() {
 }
 
 export function InvoicesPage() {
+  const { t } = useTranslation('invoices')
+
+  useEffect(() => {
+    void ensureNamespace('invoices')
+  }, [])
+
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [supplierFilter, setSupplierFilter] = useState('ALL')
@@ -102,13 +81,8 @@ export function InvoicesPage() {
   const canRecordPayments = canAny('INVOICES_MANAGE', 'INVOICES_EDIT', 'PAYMENTS_MANAGE')
   const { isEffectiveRestaurant: isRestaurant } = useImpersonation()
   const { persona } = useWorkspaceRole()
-  const invoicesTitle = isRestaurant
-    ? (persona.pageCopy?.invoices?.title ?? 'Invoice Dashboard')
-    : 'Invoice Dashboard'
-  const invoicesDescription = isRestaurant
-    ? (persona.pageCopy?.invoices?.description ??
-      'Manage billing, payments, and financial analytics')
-    : 'Manage billing, payments, and financial analytics'
+  const invoicesTitle = persona.pageCopy?.invoices?.title ?? t('page.title')
+  const invoicesDescription = persona.pageCopy?.invoices?.description ?? t('page.description')
 
   // Fetch invoices from database
   const {
@@ -153,7 +127,6 @@ export function InvoicesPage() {
       skip: !disputesEnabled,
     }
   )
-  const [applyCreditNote] = useApplyCreditNoteMutation()
   const tenantCreditNotes = tenantCreditNotesData?.creditNotes || []
 
   const invoices = invoicesData?.invoices || []
@@ -222,24 +195,24 @@ export function InvoicesPage() {
     if (paymentMode === 'full') {
       finalPaymentAmount = remainingBalance
     } else if (paymentMode === 'partial' && paymentAmount <= 0) {
-      toast.error('Please enter a valid payment amount')
+      toast.error(t('toasts.invalidPaymentAmount'))
       return
     }
 
     if (paymentMode === 'credit' && creditAmount <= 0) {
-      toast.error('Please select and apply a credit note')
+      toast.error(t('toasts.selectCreditNote'))
       return
     }
 
     if (finalPaymentAmount + creditAmount > remainingBalance) {
-      toast.error('Total payment amount exceeds remaining balance')
+      toast.error(t('toasts.exceedsBalance'))
       return
     }
 
     try {
       if (!isRestaurant) {
         if (paymentMode === 'credit') {
-          toast.error('Credit notes can only be applied by the restaurant')
+          toast.error(t('toasts.creditOnlyRestaurant'))
           return
         }
         await recordSupplierPayment({
@@ -269,14 +242,14 @@ export function InvoicesPage() {
         }).unwrap()
       }
 
-      toast.success('Payment recorded successfully!')
+      toast.success(t('toasts.paymentRecorded'))
       setShowPaymentDialog(false)
       setShowInvoiceDetail(false)
       setSelectedInvoice(null)
       refetch()
       refetchDetail()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to record payment')
+      toast.error(error?.data?.error?.message || t('toasts.paymentFailed'))
     }
   }
 
@@ -300,7 +273,7 @@ export function InvoicesPage() {
         a.download = `invoices-${new Date().toISOString().slice(0, 10)}.csv`
         a.click()
         URL.revokeObjectURL(url)
-        toast.success('Invoices exported')
+        toast.success(t('toasts.invoicesExported'))
       } else {
         const params = new URLSearchParams()
         params.set('from', exportFrom)
@@ -330,10 +303,10 @@ export function InvoicesPage() {
         a.download = `${prefix}-${new Date().toISOString().slice(0, 10)}.csv`
         a.click()
         URL.revokeObjectURL(url)
-        toast.success('Export downloaded')
+        toast.success(t('toasts.exportDownloaded'))
       }
     } catch {
-      toast.error('Could not export invoices')
+      toast.error(t('toasts.exportFailed'))
     } finally {
       setExportingCsv(false)
     }
@@ -366,13 +339,13 @@ export function InvoicesPage() {
                 ) : (
                   <Download className="h-4 w-4 mr-2" />
                 )}
-                Export CSV
+                {t('page.exportCsv')}
               </Button>
             ) : (
               <div className="flex flex-wrap items-end gap-2">
                 <div>
                   <Label htmlFor="export-from" className="text-xs text-[var(--text-mid)]">
-                    From
+                    {t('page.from')}
                   </Label>
                   <Input
                     id="export-from"
@@ -384,7 +357,7 @@ export function InvoicesPage() {
                 </div>
                 <div>
                   <Label htmlFor="export-to" className="text-xs text-[var(--text-mid)]">
-                    To
+                    {t('page.to')}
                   </Label>
                   <Input
                     id="export-to"
@@ -396,16 +369,16 @@ export function InvoicesPage() {
                 </div>
                 <div>
                   <Label htmlFor="export-type" className="text-xs text-[var(--text-mid)]">
-                    Export
+                    {t('page.export')}
                   </Label>
                   <Select
                     value={supplierExportType}
                     onValueChange={(v) => setSupplierExportType(v as SupplierExportType)}
                   >
                     <SelectTrigger id="export-type" className="mt-1 w-[160px]">
-                      <option value="standard">Standard CSV</option>
-                      <option value="quickbooks">QuickBooks</option>
-                      <option value="payments">Payments</option>
+                      <option value="standard">{t('page.exportTypes.standard')}</option>
+                      <option value="quickbooks">{t('page.exportTypes.quickbooks')}</option>
+                      <option value="payments">{t('page.exportTypes.payments')}</option>
                     </SelectTrigger>
                   </Select>
                 </div>
@@ -415,7 +388,7 @@ export function InvoicesPage() {
                   ) : (
                     <Download className="h-4 w-4 mr-2" />
                   )}
-                  Export
+                  {t('page.export')}
                 </Button>
               </div>
             )
@@ -424,6 +397,7 @@ export function InvoicesPage() {
 
         {!isRestaurant && financeInvoicesEnabled && <SupplierReceivablesPanel />}
         {isRestaurant && financeInvoicesEnabled && <RestaurantPayablesPanel />}
+        {isRestaurant && financeInvoicesEnabled && <SupplierStatementPanel />}
 
         {disputesEnabled && tenantCreditNotes.length > 0 && (
           <InvoiceCreditNotesCard

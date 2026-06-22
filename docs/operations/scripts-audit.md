@@ -2,7 +2,7 @@
 
 Last updated: 2026-06-15. Covers `apps/api/scripts/` (~49 active files), repo `scripts/` (~25), and `deploy/scripts/` (2 local Docker helpers).
 
-**Cleanup done:** 71 one-off scripts moved to `docs/archive/scripts/one-off/`; `generate-openapi.js` restored as discover-routes shim; `seed:tier-catalog` aligned to `.mjs`; `prune-release-tree` keeps `migrate-suppliers-to-orgs.js`; see `apps/api/scripts/README.md`.
+**Cleanup done (2026-06-19):** 71 one-off API scripts in `docs/archive/scripts/one-off/`; admin i18n codemods archived to `apps-web/`; docs consolidated — `cache-audit/`, `performance/`, and `performance-audit/` merged under `docs/audits/`; Keycloak incident doc moved to `docs/operations/keycloak-railway-memory-fix.md`; completed June 2026 audits archived; root `scripts/README.md` added.
 
 ## What actually runs in production
 
@@ -158,11 +158,7 @@ Nothing is safe to hard-delete **today** without a quick grep — many orphans a
 
 ### ARCHIVE
 
-Historical **monolith split** tooling — do not run on current tree:
-
-- `wave3-split.mjs`, `wave3-split-sidebar.mjs`, `wave3-split-workspace.mjs`
-- `split-wave2.mjs`, `split-wave2-rest.mjs`, `split-wave2-dashboard-quicklists.mjs`
-- `fix-api-paths.mjs`, `clean-endpoint-imports.mjs`
+Historical **monolith split** tooling — archived under `docs/archive/scripts/one-off/repo-scripts/`; do not run on current tree.
 
 ### KEEP (optional diagnostics)
 
@@ -188,7 +184,7 @@ EC2/VM deploy scripts were removed; production deploys use **Railway** (`deploy/
 | **1** | Fix `openapi:gen` broken script; align `seed:tier-catalog` entrypoint                                    | Low                                                   |
 | **2** | Move ARCHIVE batch (~45 files) to `docs/archive/scripts/one-off/` with README listing original purpose   | Low                                                   |
 | **3** | Grep-delete archived files with zero references                                                          | Medium — verify with team                             |
-| **4** | Add `scripts/README.md` in `apps/api/scripts/` documenting KEEP list + dev-only warnings on wipes        | Low                                                   |
+| **4** | Add `scripts/README.md` at repo root documenting KEEP list + dev-only warnings on wipes                  | Done                                                  |
 | **5** | Consider `prune-release-tree.mjs` adding `migrate-suppliers-to-orgs.js` to keep set (startup imports it) | Low — release branches may need supplier org backfill |
 
 ---

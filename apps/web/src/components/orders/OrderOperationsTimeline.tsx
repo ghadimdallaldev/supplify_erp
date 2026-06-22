@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -17,7 +18,6 @@ import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import type { TimelineEvent, TimelineEventState, TimelineViewerRole } from '../../lib/orderTimeline'
-import { RESTAURANT_LIFECYCLE_LABELS, SUPPLIER_LIFECYCLE_LABELS } from '../../lib/orderTimeline'
 
 function eventIcon(title: string) {
   const key = title.toLowerCase()
@@ -79,32 +79,64 @@ function formatEventTime(timestamp?: string | null): string | null {
   })
 }
 
+const RESTAURANT_LIFECYCLE_KEYS = [
+  'orderPlaced',
+  'supplierConfirmed',
+  'substitutions',
+  'processing',
+  'shipped',
+  'delivered',
+  'goodsReceived',
+  'dispute',
+  'creditNote',
+  'invoiceClosed',
+] as const
+
+const SUPPLIER_LIFECYCLE_KEYS = [
+  'orderReceived',
+  'acknowledged',
+  'substitutions',
+  'picking',
+  'shipped',
+  'delivered',
+  'restaurantReceipt',
+  'dispute',
+] as const
+
 const LIFECYCLE_EVENT_IDS: Record<string, string[]> = {
-  'Order placed': ['placed'],
-  'Order received': ['placed'],
-  'Supplier confirmed': ['confirmed'],
-  Acknowledged: ['confirmed'],
-  Substitutions: ['substitution'],
-  Processing: ['processing'],
-  Picking: ['processing'],
-  Shipped: ['shipped'],
-  Delivered: ['delivered'],
-  'Goods received': ['received'],
-  'Restaurant receipt': ['restaurant-received'],
-  Dispute: ['dispute'],
-  'Credit note': ['credit'],
-  'Invoice closed': ['invoice'],
+  orderPlaced: ['placed'],
+  orderReceived: ['placed'],
+  supplierConfirmed: ['confirmed'],
+  acknowledged: ['confirmed'],
+  substitutions: ['substitution'],
+  processing: ['processing'],
+  picking: ['processing'],
+  shipped: ['shipped'],
+  delivered: ['delivered'],
+  goodsReceived: ['received'],
+  restaurantReceipt: ['restaurant-received'],
+  dispute: ['dispute'],
+  creditNote: ['credit'],
+  invoiceClosed: ['invoice'],
 }
 
-function lifecycleHit(events: TimelineEvent[], label: string): boolean {
-  const ids = LIFECYCLE_EVENT_IDS[label]
+function lifecycleHit(events: TimelineEvent[], key: string): boolean {
+  const ids = LIFECYCLE_EVENT_IDS[key]
   if (!ids) return false
   return events.some(
     (e) => ids.some((id) => e.id === id || e.id.startsWith(`${id}-`)) && e.state !== 'upcoming'
   )
 }
 
-function TimelineStep({ event, isLast }: { event: TimelineEvent; isLast: boolean }) {
+function TimelineStep({
+  event,
+  isLast,
+  t,
+}: {
+  event: TimelineEvent
+  isLast: boolean
+  t: (key: string, options?: Record<string, unknown>) => string
+}) {
   const [expanded, setExpanded] = useState(false)
   const Icon = eventIcon(event.title)
   const styles = stateStyles(event.state)
@@ -133,7 +165,7 @@ function TimelineStep({ event, isLast }: { event: TimelineEvent; isLast: boolean
             )}
             {event.state === 'current' && (
               <Badge variant="secondary" className="text-xs">
-                In progress
+                {t('timeline.inProgress')}
               </Badge>
             )}
           </div>
@@ -153,7 +185,7 @@ function TimelineStep({ event, isLast }: { event: TimelineEvent; isLast: boolean
               className="h-auto px-0 text-[var(--brand)]"
               onClick={() => setExpanded((v) => !v)}
             >
-              {expanded ? 'Hide details' : 'View substitution details'}
+              {expanded ? t('timeline.hideDetails') : t('timeline.viewSubstitutionDetails')}
             </Button>
             {expanded && (
               <div className="mt-2 space-y-2 rounded-lg border border-[var(--app-border)] p-3 text-sm">
@@ -165,7 +197,9 @@ function TimelineStep({ event, isLast }: { event: TimelineEvent; isLast: boolean
                     <span className="text-[var(--text-muted)]">→</span>
                     <span className="font-medium">{sub.substituteName}</span>
                     {sub.quantity != null && (
-                      <span className="text-[var(--text-muted)]">· qty {sub.quantity}</span>
+                      <span className="text-[var(--text-muted)]">
+                        · {t('timeline.qty', { count: sub.quantity })}
+                      </span>
                     )}
                   </div>
                 ))}
@@ -191,27 +225,33 @@ export function OrderOperationsTimeline({
   events: TimelineEvent[]
   viewerRole?: TimelineViewerRole
 }) {
-  const lifecycleLabels =
-    viewerRole === 'SUPPLIER' ? SUPPLIER_LIFECYCLE_LABELS : RESTAURANT_LIFECYCLE_LABELS
+  const { t } = useTranslation('orders')
+  const lifecycleKeys =
+    viewerRole === 'SUPPLIER' ? SUPPLIER_LIFECYCLE_KEYS : RESTAURANT_LIFECYCLE_KEYS
   const description =
     viewerRole === 'SUPPLIER'
-      ? 'Fulfillment progress from order receipt through dispatch and delivery.'
-      : 'Order progress from placement through delivery, receiving, and billing.'
+      ? t('timeline.supplierDescription')
+      : t('timeline.restaurantDescription')
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_220px]">
       <Card className="xl:order-1">
         <CardHeader>
-          <CardTitle>Operations timeline</CardTitle>
+          <CardTitle>{t('timeline.title')}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>
           {events.length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)]">No timeline events yet.</p>
+            <p className="text-sm text-[var(--text-muted)]">{t('timeline.noEvents')}</p>
           ) : (
             <div className="mt-2">
               {events.map((event, index) => (
-                <TimelineStep key={event.id} event={event} isLast={index === events.length - 1} />
+                <TimelineStep
+                  key={event.id}
+                  event={event}
+                  isLast={index === events.length - 1}
+                  t={t}
+                />
               ))}
             </div>
           )}
@@ -221,15 +261,15 @@ export function OrderOperationsTimeline({
       <Card className="h-fit xl:order-2">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
-            Order lifecycle
+            {t('timeline.lifecycleTitle')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {lifecycleLabels.map((label) => {
-            const hit = lifecycleHit(events, label)
+          {lifecycleKeys.map((key) => {
+            const hit = lifecycleHit(events, key)
             return (
               <div
-                key={label}
+                key={key}
                 className={`flex items-center gap-2 text-sm ${
                   hit ? 'text-[var(--text)]' : 'text-[var(--text-muted)]'
                 }`}
@@ -239,7 +279,7 @@ export function OrderOperationsTimeline({
                     hit ? 'bg-[var(--mint)]' : 'bg-[var(--app-border)]'
                   }`}
                 />
-                {label}
+                {t(`timeline.lifecycle.${key}`)}
               </div>
             )
           })}

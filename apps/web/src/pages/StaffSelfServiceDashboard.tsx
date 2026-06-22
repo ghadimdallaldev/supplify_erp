@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -43,16 +44,10 @@ import { PublicPanel } from '../components/public/PublicPageLayout'
 import { StaffPortalShell, type StaffPortalTab } from '../components/staff/portal/StaffPortalShell'
 import { AlertCircle, ChevronRight } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { ensureNamespace } from '../i18n'
+import { getWeekdayLabels } from '../components/staff/staffShared'
 
-const PTO_TYPES = [
-  { value: 'VACATION', label: 'Vacation' },
-  { value: 'SICK', label: 'Sick' },
-  { value: 'PERSONAL', label: 'Personal' },
-  { value: 'UNPAID', label: 'Unpaid' },
-  { value: 'OTHER', label: 'Other' },
-]
-
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const PTO_TYPE_VALUES = ['VACATION', 'SICK', 'PERSONAL', 'UNPAID', 'OTHER'] as const
 
 function useStaffToken() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -78,6 +73,7 @@ function formatShiftTime(iso: string) {
 }
 
 export function StaffSelfServiceDashboard() {
+  const { t } = useTranslation('staff')
   const navigate = useNavigate()
   const token = useStaffToken()
   const magicLinkMode = Boolean(token)
@@ -166,6 +162,11 @@ export function StaffSelfServiceDashboard() {
   const [setPortalAvailability, { isLoading: savingPortalAvailability }] =
     useSetStaffPortalAvailabilityMutation()
   const savingAvailability = magicLinkMode ? savingPortalAvailability : savingSelfAvailability
+  const weekdays = getWeekdayLabels(t)
+
+  useEffect(() => {
+    void ensureNamespace('staff')
+  }, [])
 
   useEffect(() => {
     if (!magicLinkMode && me && !accountMode) {
@@ -186,13 +187,13 @@ export function StaffSelfServiceDashboard() {
     event.preventDefault()
     if (!magicLinkMode && !accountMode) return
     if (new Date(ptoForm.endDate) < new Date(ptoForm.startDate)) {
-      toast.error('End date cannot be before start date')
+      toast.error(t('portal.dashboard.endDateBeforeStart'))
       return
     }
 
     try {
       const body = {
-        type: ptoForm.type as (typeof PTO_TYPES)[number]['value'],
+        type: ptoForm.type as (typeof PTO_TYPE_VALUES)[number],
         startDate: ptoForm.startDate,
         endDate: ptoForm.endDate,
         hoursRequested: ptoForm.hoursRequested ? Number(ptoForm.hoursRequested) : undefined,
@@ -203,18 +204,18 @@ export function StaffSelfServiceDashboard() {
       } else {
         await accountSubmitPto(body).unwrap()
       }
-      toast.success('Time-off request submitted')
+      toast.success(t('portal.dashboard.ptoSubmitted'))
       setPtoForm((prev) => ({ ...prev, reason: '' }))
       refetch()
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Unable to submit PTO request'))
+      toast.error(getApiErrorMessage(error, t('portal.dashboard.ptoSubmitFailed')))
     }
   }
 
   const handleSubmitSwap = async (event: React.FormEvent) => {
     event.preventDefault()
     if ((!magicLinkMode && !accountMode) || !swapForm.shiftId) {
-      toast.error('Select a shift to request a swap')
+      toast.error(t('portal.dashboard.selectShiftForSwap'))
       return
     }
 
@@ -229,11 +230,11 @@ export function StaffSelfServiceDashboard() {
       } else {
         await accountSubmitSwap(body).unwrap()
       }
-      toast.success('Shift swap request sent')
+      toast.success(t('portal.dashboard.swapSent'))
       setSwapForm((prev) => ({ ...prev, reason: '' }))
       refetch()
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Unable to submit shift swap request'))
+      toast.error(getApiErrorMessage(error, t('portal.dashboard.swapSubmitFailed')))
     }
   }
 
@@ -258,10 +259,10 @@ export function StaffSelfServiceDashboard() {
       } else {
         await ackSelfAnnouncement(announcementId).unwrap()
       }
-      toast.success('Announcement acknowledged')
+      toast.success(t('portal.dashboard.announcementAcknowledged'))
       refetch()
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Unable to acknowledge announcement'))
+      toast.error(getApiErrorMessage(error, t('portal.dashboard.announcementAckFailed')))
     }
   }
 
@@ -280,9 +281,9 @@ export function StaffSelfServiceDashboard() {
       } else {
         await setSelfAvailability(body).unwrap()
       }
-      toast.success('Availability saved')
+      toast.success(t('portal.dashboard.availabilitySaved'))
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Unable to save availability'))
+      toast.error(getApiErrorMessage(error, t('portal.dashboard.availabilitySaveFailed')))
     }
   }
 
@@ -294,10 +295,10 @@ export function StaffSelfServiceDashboard() {
       } else {
         await accountCheckIn({}).unwrap()
       }
-      toast.success('Clocked in')
+      toast.success(t('portal.dashboard.clockedIn'))
       refetchTimeEntries()
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Unable to clock in'))
+      toast.error(getApiErrorMessage(error, t('portal.dashboard.clockInFailed')))
     }
   }
 
@@ -309,10 +310,10 @@ export function StaffSelfServiceDashboard() {
       } else {
         await accountCheckOut({ id: openEntry.id }).unwrap()
       }
-      toast.success('Clocked out')
+      toast.success(t('portal.dashboard.clockedOut'))
       refetchTimeEntries()
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Unable to clock out'))
+      toast.error(getApiErrorMessage(error, t('portal.dashboard.clockOutFailed')))
     }
   }
 
@@ -325,10 +326,10 @@ export function StaffSelfServiceDashboard() {
       <div className="flex min-h-dvh flex-col items-center justify-center bg-[var(--brand-ultra)] px-4 py-12">
         <AlertCircle className="h-10 w-10 text-[var(--red)]" />
         <p className="mt-4 max-w-sm text-center text-sm text-[var(--text-muted)]">
-          {getApiErrorMessage(loadErrorDetail, 'Unable to load your staff dashboard.')}
+          {getApiErrorMessage(loadErrorDetail, t('portal.dashboard.loadFailed'))}
         </p>
         <Button variant="outline" className="consumer-pressable mt-4" onClick={() => refetch()}>
-          Try again
+          {t('portal.dashboard.tryAgain')}
         </Button>
       </div>
     )
@@ -358,8 +359,8 @@ export function StaffSelfServiceDashboard() {
   const nextShift = upcomingShifts[0]
 
   const clockLabel = openEntry
-    ? `Clocked in since ${formatShiftTime(openEntry.clockInAt)}`
-    : "You're off the clock"
+    ? t('portal.shell.clockedInSince', { time: formatShiftTime(openEntry.clockInAt) })
+    : t('portal.shell.offTheClock')
 
   return (
     <StaffPortalShell
@@ -372,7 +373,7 @@ export function StaffSelfServiceDashboard() {
       onClockIn={handleClockIn}
       onClockOut={handleClockOut}
       onSignOut={handleEndSession}
-      signOutLabel={magicLinkMode ? 'End session' : 'Sign out'}
+      signOutLabel={magicLinkMode ? t('portal.shell.endSession') : t('portal.shell.signOut')}
       activeTab={activeTab}
       onTabChange={setActiveTab}
       tabBadges={{ home: unreadAnnouncements }}
@@ -380,7 +381,7 @@ export function StaffSelfServiceDashboard() {
       {activeTab === 'home' && (
         <div className="space-y-5">
           {nextShift ? (
-            <PublicPanel title="Next shift">
+            <PublicPanel title={t('portal.dashboard.nextShift')}>
               <p className="text-lg font-semibold text-[var(--text)]">{nextShift.role}</p>
               <p className="mt-1 text-sm text-[var(--text-muted)]">
                 {new Date(nextShift.shift_date).toLocaleDateString(undefined, {
@@ -395,27 +396,32 @@ export function StaffSelfServiceDashboard() {
                 className="consumer-pressable mt-2 h-auto p-0 text-[var(--brand-mid)]"
                 onClick={() => setActiveTab('schedule')}
               >
-                View all shifts
+                {t('portal.dashboard.viewAllShifts')}
                 <ChevronRight className="ml-0.5 h-4 w-4" />
               </Button>
             </PublicPanel>
           ) : (
-            <PublicPanel title="Next shift">
+            <PublicPanel title={t('portal.dashboard.nextShift')}>
               <EmptyState
-                title="No shifts scheduled"
-                description="Check back when your manager publishes the schedule."
+                title={t('portal.dashboard.noShiftsTitle')}
+                description={t('portal.dashboard.noShiftsDescription')}
               />
             </PublicPanel>
           )}
 
           <PublicPanel
-            title="Announcements"
+            title={t('portal.dashboard.announcements')}
             description={
-              unreadAnnouncements > 0 ? `${unreadAnnouncements} unread` : "You're all caught up."
+              unreadAnnouncements > 0
+                ? t('portal.dashboard.unreadCount', { count: unreadAnnouncements })
+                : t('portal.dashboard.allCaughtUp')
             }
           >
             {announcements.length === 0 ? (
-              <EmptyState title="No announcements" description="Nothing new from your team." />
+              <EmptyState
+                title={t('portal.dashboard.noAnnouncementsTitle')}
+                description={t('portal.dashboard.noAnnouncementsDescription')}
+              />
             ) : (
               <div className="divide-y divide-[var(--app-border)]">
                 {announcements.map(
@@ -424,7 +430,9 @@ export function StaffSelfServiceDashboard() {
                       <div className="flex items-start justify-between gap-2">
                         <p className="font-medium text-[var(--text)]">{announcement.title}</p>
                         <Badge variant={announcement.acknowledged ? 'secondary' : 'default'}>
-                          {announcement.acknowledged ? 'Read' : 'New'}
+                          {announcement.acknowledged
+                            ? t('portal.dashboard.read')
+                            : t('portal.dashboard.new')}
                         </Badge>
                       </div>
                       <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-muted)]">
@@ -436,7 +444,7 @@ export function StaffSelfServiceDashboard() {
                           className="consumer-pressable mt-3 w-full sm:w-auto"
                           onClick={() => handleAckAnnouncement(announcement.id)}
                         >
-                          Acknowledge
+                          {t('portal.dashboard.acknowledge')}
                         </Button>
                       ) : null}
                     </div>
@@ -450,11 +458,14 @@ export function StaffSelfServiceDashboard() {
 
       {activeTab === 'schedule' && (
         <div className="space-y-5">
-          <PublicPanel title="My shifts" description="Tap a shift to select it for a swap request.">
+          <PublicPanel
+            title={t('portal.dashboard.myShifts')}
+            description={t('portal.dashboard.myShiftsDescription')}
+          >
             {upcomingShifts.length === 0 ? (
               <EmptyState
-                title="No shifts scheduled"
-                description="Check back when your manager publishes the schedule."
+                title={t('portal.dashboard.noShiftsTitle')}
+                description={t('portal.dashboard.noShiftsDescription')}
               />
             ) : (
               <div className="divide-y divide-[var(--app-border)]">
@@ -485,10 +496,10 @@ export function StaffSelfServiceDashboard() {
             )}
           </PublicPanel>
 
-          <PublicPanel title="Request shift swap">
+          <PublicPanel title={t('portal.dashboard.requestShiftSwap')}>
             <form className="space-y-3" onSubmit={handleSubmitSwap}>
               <div>
-                <Label>Preferred cover (optional)</Label>
+                <Label>{t('portal.dashboard.preferredCover')}</Label>
                 <Select
                   value={swapForm.proposedCoverId || '__none__'}
                   onValueChange={(value) =>
@@ -499,10 +510,10 @@ export function StaffSelfServiceDashboard() {
                   }
                 >
                   <SelectTrigger className="mt-1.5 min-h-11 w-full">
-                    <SelectValue placeholder="Select teammate" />
+                    <SelectValue placeholder={t('portal.dashboard.selectTeammate')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">No preference</SelectItem>
+                    <SelectItem value="__none__">{t('portal.dashboard.noPreference')}</SelectItem>
                     {teammates.map((mate) => (
                       <SelectItem key={mate.id} value={mate.id}>
                         {mate.displayName}
@@ -512,11 +523,11 @@ export function StaffSelfServiceDashboard() {
                 </Select>
               </div>
               <div>
-                <Label>Reason</Label>
+                <Label>{t('portal.dashboard.reason')}</Label>
                 <Textarea
                   className="mt-1.5"
                   value={swapForm.reason}
-                  placeholder="Why do you need a swap?"
+                  placeholder={t('portal.dashboard.swapReasonPlaceholder')}
                   onChange={(event) =>
                     setSwapForm((prev) => ({ ...prev, reason: event.target.value }))
                   }
@@ -527,7 +538,9 @@ export function StaffSelfServiceDashboard() {
                 className="consumer-pressable min-h-11 w-full bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
                 disabled={submittingSwap || !swapForm.shiftId}
               >
-                {submittingSwap ? 'Submitting…' : 'Send swap request'}
+                {submittingSwap
+                  ? t('portal.dashboard.submitting')
+                  : t('portal.dashboard.sendSwapRequest')}
               </Button>
             </form>
           </PublicPanel>
@@ -536,21 +549,21 @@ export function StaffSelfServiceDashboard() {
 
       {activeTab === 'requests' && (
         <div className="space-y-5">
-          <PublicPanel title="Request time off">
+          <PublicPanel title={t('portal.dashboard.requestTimeOff')}>
             <form className="space-y-3" onSubmit={handleSubmitPto}>
               <div>
-                <Label>Type</Label>
+                <Label>{t('portal.dashboard.type')}</Label>
                 <Select
                   value={ptoForm.type}
                   onValueChange={(value) => setPtoForm((prev) => ({ ...prev, type: value }))}
                 >
                   <SelectTrigger className="mt-1.5 min-h-11 w-full">
-                    <SelectValue placeholder="Select type" />
+                    <SelectValue placeholder={t('portal.dashboard.selectType')} />
                   </SelectTrigger>
                   <SelectContent>
-                    {PTO_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
+                    {PTO_TYPE_VALUES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {t(`shared.ptoType.${type}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -558,7 +571,7 @@ export function StaffSelfServiceDashboard() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <Label>Start date</Label>
+                  <Label>{t('portal.dashboard.startDate')}</Label>
                   <Input
                     type="date"
                     className="mt-1.5 min-h-11 w-full"
@@ -569,7 +582,7 @@ export function StaffSelfServiceDashboard() {
                   />
                 </div>
                 <div>
-                  <Label>End date</Label>
+                  <Label>{t('portal.dashboard.endDate')}</Label>
                   <Input
                     type="date"
                     className="mt-1.5 min-h-11 w-full"
@@ -581,7 +594,7 @@ export function StaffSelfServiceDashboard() {
                 </div>
               </div>
               <div>
-                <Label>Hours (optional)</Label>
+                <Label>{t('portal.dashboard.hoursOptional')}</Label>
                 <Input
                   type="number"
                   min={0}
@@ -594,11 +607,11 @@ export function StaffSelfServiceDashboard() {
                 />
               </div>
               <div>
-                <Label>Reason (optional)</Label>
+                <Label>{t('portal.dashboard.reasonOptional')}</Label>
                 <Textarea
                   className="mt-1.5"
                   value={ptoForm.reason}
-                  placeholder="Tell your manager why you need time off."
+                  placeholder={t('portal.dashboard.ptoReasonPlaceholder')}
                   onChange={(event) =>
                     setPtoForm((prev) => ({ ...prev, reason: event.target.value }))
                   }
@@ -609,19 +622,21 @@ export function StaffSelfServiceDashboard() {
                 className="consumer-pressable min-h-11 w-full bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
                 disabled={submittingPto}
               >
-                {submittingPto ? 'Submitting…' : 'Submit request'}
+                {submittingPto
+                  ? t('portal.dashboard.submitting')
+                  : t('portal.dashboard.submitRequest')}
               </Button>
             </form>
           </PublicPanel>
 
           <PublicPanel
-            title="My availability"
-            description="Let managers know when you prefer to work."
+            title={t('portal.dashboard.myAvailability')}
+            description={t('portal.dashboard.myAvailabilityDescription')}
           >
             <form className="space-y-3" onSubmit={handleSaveAvailability}>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
-                  <Label>Weekday</Label>
+                  <Label>{t('portal.dashboard.weekday')}</Label>
                   <Select
                     value={availabilityForm.weekday}
                     onValueChange={(value) =>
@@ -632,7 +647,7 @@ export function StaffSelfServiceDashboard() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {WEEKDAYS.map((day, index) => (
+                      {weekdays.map((day, index) => (
                         <SelectItem key={day} value={String(index)}>
                           {day}
                         </SelectItem>
@@ -641,7 +656,7 @@ export function StaffSelfServiceDashboard() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Start</Label>
+                  <Label>{t('portal.dashboard.start')}</Label>
                   <Input
                     type="time"
                     className="mt-1.5 min-h-11"
@@ -652,7 +667,7 @@ export function StaffSelfServiceDashboard() {
                   />
                 </div>
                 <div>
-                  <Label>End</Label>
+                  <Label>{t('portal.dashboard.end')}</Label>
                   <Input
                     type="time"
                     className="mt-1.5 min-h-11"
@@ -669,28 +684,30 @@ export function StaffSelfServiceDashboard() {
                 variant="outline"
                 disabled={savingAvailability}
               >
-                {savingAvailability ? 'Saving…' : 'Save availability'}
+                {savingAvailability
+                  ? t('portal.dashboard.saving')
+                  : t('portal.dashboard.saveAvailability')}
               </Button>
             </form>
             {availability.length > 0 ? (
               <ul className="mt-4 divide-y divide-[var(--app-border)] text-sm text-[var(--text-muted)]">
                 {availability.map((row, index) => (
                   <li key={`${row.weekday}-${index}`} className="py-2 first:pt-0 last:pb-0">
-                    {WEEKDAYS[row.weekday]}:{' '}
+                    {weekdays[row.weekday]}:{' '}
                     {(row.availability?.blocks || [])
                       .map((b) => `${b.start}–${b.end}`)
-                      .join(', ') || '—'}
+                      .join(', ') || t('shared.emDash')}
                   </li>
                 ))}
               </ul>
             ) : null}
           </PublicPanel>
 
-          <PublicPanel title="Recent PTO requests">
+          <PublicPanel title={t('portal.dashboard.recentPto')}>
             {ptoRequests.length === 0 ? (
               <EmptyState
-                title="No PTO requests"
-                description="Submit time off above when needed."
+                title={t('portal.dashboard.noPtoTitle')}
+                description={t('portal.dashboard.noPtoDescription')}
               />
             ) : (
               <div className="divide-y divide-[var(--app-border)]">
@@ -719,11 +736,11 @@ export function StaffSelfServiceDashboard() {
 
       {activeTab === 'more' && (
         <div className="space-y-5">
-          <PublicPanel title="Time entries">
+          <PublicPanel title={t('portal.dashboard.timeEntries')}>
             {timeEntries.length === 0 ? (
               <EmptyState
-                title="No time entries yet"
-                description="Clock in to start tracking time."
+                title={t('portal.dashboard.noTimeEntriesTitle')}
+                description={t('portal.dashboard.noTimeEntriesDescription')}
               />
             ) : (
               <ul className="divide-y divide-[var(--app-border)]">
@@ -733,12 +750,14 @@ export function StaffSelfServiceDashboard() {
                     className="flex items-center justify-between py-3 text-sm first:pt-0 last:pb-0"
                   >
                     <span className="text-[var(--text-muted)]">
-                      {new Date(entry.clockInAt).toLocaleDateString()} · In{' '}
-                      {formatShiftTime(entry.clockInAt)}
-                      {entry.clockOutAt ? ` → Out ${formatShiftTime(entry.clockOutAt)}` : ' (open)'}
+                      {new Date(entry.clockInAt).toLocaleDateString()} ·{' '}
+                      {t('portal.dashboard.timeEntryIn')} {formatShiftTime(entry.clockInAt)}
+                      {entry.clockOutAt
+                        ? ` → ${t('portal.dashboard.timeEntryOut', { time: formatShiftTime(entry.clockOutAt) })}`
+                        : ` ${t('portal.dashboard.timeEntryOpen')}`}
                     </span>
                     <Badge variant={entry.clockOutAt ? 'secondary' : 'default'} className="text-xs">
-                      {entry.clockOutAt ? 'Closed' : 'Open'}
+                      {entry.clockOutAt ? t('shared.closed') : t('shared.open')}
                     </Badge>
                   </li>
                 ))}
@@ -746,9 +765,12 @@ export function StaffSelfServiceDashboard() {
             )}
           </PublicPanel>
 
-          <PublicPanel title="Documents & resources">
+          <PublicPanel title={t('portal.dashboard.documentsResources')}>
             {documents.length === 0 ? (
-              <EmptyState title="No documents" description="Nothing assigned right now." />
+              <EmptyState
+                title={t('portal.dashboard.noDocumentsTitle')}
+                description={t('portal.dashboard.noDocumentsDescription')}
+              />
             ) : (
               <div className="divide-y divide-[var(--app-border)]">
                 {documents.map((document: StaffPortalDashboard['documents'][number]) => (
@@ -761,7 +783,9 @@ export function StaffSelfServiceDashboard() {
                         {document.title ?? document.doc_type}
                       </p>
                       <p className="text-xs text-[var(--text-muted)]">
-                        Uploaded {new Date(document.uploaded_at).toLocaleDateString()}
+                        {t('portal.dashboard.uploaded', {
+                          date: new Date(document.uploaded_at).toLocaleDateString(),
+                        })}
                       </p>
                     </div>
                     <a
@@ -770,7 +794,7 @@ export function StaffSelfServiceDashboard() {
                       rel="noreferrer"
                       className="consumer-pressable shrink-0 text-sm font-medium text-[var(--brand-mid)] hover:text-[var(--brand)]"
                     >
-                      View
+                      {t('portal.dashboard.view')}
                     </a>
                   </div>
                 ))}
@@ -778,11 +802,11 @@ export function StaffSelfServiceDashboard() {
             )}
           </PublicPanel>
 
-          <PublicPanel title="Swap history">
+          <PublicPanel title={t('portal.dashboard.swapHistory')}>
             {swapRequests.length === 0 ? (
               <EmptyState
-                title="No swap activity"
-                description="Request a swap from the Shifts tab."
+                title={t('portal.dashboard.noSwapTitle')}
+                description={t('portal.dashboard.noSwapDescription')}
               />
             ) : (
               <div className="divide-y divide-[var(--app-border)]">
@@ -793,7 +817,7 @@ export function StaffSelfServiceDashboard() {
                   >
                     <div>
                       <p className="font-medium text-[var(--text)]">
-                        {swap.reason || 'Shift swap request'}
+                        {swap.reason || t('portal.dashboard.defaultSwapReason')}
                       </p>
                       <p className="text-xs text-[var(--text-muted)]">
                         {new Date(swap.created_at).toLocaleString()}
@@ -813,7 +837,7 @@ export function StaffSelfServiceDashboard() {
             className="consumer-pressable pwa-touch-target w-full sm:hidden"
             onClick={handleEndSession}
           >
-            {magicLinkMode ? 'End session' : 'Sign out'}
+            {magicLinkMode ? t('portal.shell.endSession') : t('portal.shell.signOut')}
           </Button>
         </div>
       )}

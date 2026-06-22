@@ -183,7 +183,7 @@ Each environment can run a Railway Keycloak service that **builds** `deploy/rail
 | [`deploy/railway/keycloak/RAILWAY_SETUP.md`](../../deploy/railway/keycloak/RAILWAY_SETUP.md)               | Per-env config, realms, verify URLs |
 | [`deploy/railway/KEYCLOAK_RAILWAY_DB_NOTES.md`](../../deploy/railway/KEYCLOAK_RAILWAY_DB_NOTES.md)         | Postgres `keycloak` DB              |
 | [`deploy/railway/KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](../../deploy/railway/KEYCLOAK_RAILWAY_MEMORY_NOTES.md) | JVM caps, start modes               |
-| [`docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`](../infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md)                     | OOM / H2 fix write-up               |
+| [`keycloak-railway-memory-fix.md`](./keycloak-railway-memory-fix.md)                                       | OOM / H2 fix write-up               |
 
 Sync: `pnpm railway:keycloak:sync -- <env>`. Non-prod: `KEYCLOAK_USE_OPTIMIZED=false`. Prod: `true`.
 

@@ -1,10 +1,25 @@
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
+import i18n from 'i18next'
+import enFulfillment from '../i18n/locales/en/fulfillment.json'
 import {
   formatFulfillmentRouteStatus,
   formatFulfillmentStopStatus,
   getFulfillmentStopPrimaryAction,
   getStopEtaLabel,
 } from './fulfillmentRouteLabels'
+
+const t = (key: string, options?: Record<string, unknown>) =>
+  i18n.t(key, { ns: 'fulfillment', ...options })
+
+beforeAll(async () => {
+  await i18n.init({
+    lng: 'en',
+    fallbackLng: 'en',
+    ns: ['fulfillment'],
+    resources: { en: { fulfillment: enFulfillment } },
+    interpolation: { escapeValue: false },
+  })
+})
 
 describe('fulfillmentRouteLabels', () => {
   it('maps route statuses to plain labels', () => {
@@ -30,8 +45,9 @@ describe('fulfillmentRouteLabels', () => {
   })
 
   it('formats ETA when available on stop', () => {
+    const range = t('tracking.eta.minRange', { min: 12, max: 18 })
     expect(getStopEtaLabel({ etaAvailable: true, etaMinutesMin: 12, etaMinutesMax: 18 })).toBe(
-      'ETA 12–18 min'
+      `ETA ${range}`
     )
     expect(getStopEtaLabel({ etaAvailable: false })).toBeNull()
   })

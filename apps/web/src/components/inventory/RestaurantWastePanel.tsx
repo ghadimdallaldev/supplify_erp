@@ -67,7 +67,7 @@ export function RestaurantWastePanel({
 
   const analytics = data?.analytics || []
   const summary = (data?.summary || {}) as Record<string, unknown>
-  const trend = data?.trend || []
+  const trend = useMemo(() => data?.trend ?? [], [data?.trend])
 
   const totalCost = Number(summary.total_waste_cost || 0)
   const totalQty = Number(summary.total_waste_qty || 0)

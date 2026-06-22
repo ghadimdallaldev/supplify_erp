@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
-import { StatusBadge } from '../../ui/status-badge'
+import { StatusBadge, getTranslatedStatusLabel } from '../../ui/status-badge'
 import { Input } from '../../ui/input'
 import {
   Dialog,
@@ -32,7 +32,7 @@ import {
   Search,
   X,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   useGetRestaurantInventoryQuery,
   useGetRestaurantInventoryHistoryQuery,
@@ -75,7 +75,9 @@ export function InventoryTab({
   showBulkDialog = false,
   onShowBulkDialogChange,
 }: InventoryTabProps) {
-  const { t } = useTranslation('inventory')
+  const { t, i18n } = useTranslation('inventory')
+  const { t: tCommon } = useTranslation('common')
+  const navigate = useNavigate()
 
   useEffect(() => {
     void ensureNamespace('inventory')
@@ -104,7 +106,7 @@ export function InventoryTab({
   const [addInventory, { isLoading: isAddingInventory }] = useAddRestaurantInventoryMutation()
   const [adjustInventory] = useAdjustRestaurantInventoryMutation()
 
-  const inventory = data?.inventory || []
+  const inventory = useMemo(() => data?.inventory ?? [], [data?.inventory])
   const history = historyData?.history || []
   const trackedProductIds = useMemo(
     () => new Set(inventory.map((item: { product_id: string }) => item.product_id)),
@@ -264,7 +266,16 @@ export function InventoryTab({
 
   const handleExportCSV = () => {
     const csv = [
-      ['Product Name', 'SKU', 'Category', 'Supplier', 'Quantity', 'Unit', 'Status', 'Last Updated'],
+      [
+        t('csv.productName'),
+        t('csv.sku'),
+        t('csv.category'),
+        t('csv.supplier'),
+        t('csv.quantity'),
+        t('csv.unit'),
+        t('csv.status'),
+        t('csv.lastUpdated'),
+      ],
       ...inventory.map((item: any) => {
         const status = getStockStatus(item.quantity, item.low_stock_threshold)
         return [
@@ -274,8 +285,8 @@ export function InventoryTab({
           item.supplier_name,
           item.quantity,
           item.product_unit,
-          status,
-          new Date(item.updated_at).toLocaleDateString(),
+          getTranslatedStatusLabel(status, tCommon),
+          new Date(item.updated_at).toLocaleDateString(i18n.language),
         ]
       }),
     ]
@@ -387,8 +398,10 @@ export function InventoryTab({
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-[var(--red)] text-lg font-semibold mb-2">Failed to load inventory</p>
-        <p className="text-[var(--text-muted)] text-sm">{error?.message || 'An error occurred'}</p>
+        <p className="text-[var(--red)] text-lg font-semibold mb-2">{t('error.title')}</p>
+        <p className="text-[var(--text-muted)] text-sm">
+          {error?.message || t('error.description')}
+        </p>
       </div>
     )
   }
@@ -398,14 +411,14 @@ export function InventoryTab({
       {/* Inventory Trend Visualization */}
       <Card>
         <CardHeader>
-          <CardTitle>Stock Trend Analysis</CardTitle>
-          <CardDescription>Visual overview of your inventory movements</CardDescription>
+          <CardTitle>{t('trend.title')}</CardTitle>
+          <CardDescription>{t('trend.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--brand-pale)] bg-[var(--brand-pale)]/40 p-4">
               <div className="min-w-0">
-                <p className="text-sm text-[var(--text-muted)]">Total Movements</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('trend.totalMovements')}</p>
                 <p className="text-2xl font-bold text-[var(--text)]">{history.length}</p>
               </div>
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)] shadow-sm">
@@ -414,7 +427,7 @@ export function InventoryTab({
             </div>
             <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--mint-pale)] bg-[var(--mint-pale)]/40 p-4">
               <div className="min-w-0">
-                <p className="text-sm text-[var(--text-muted)]">Recent Additions</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('trend.recentAdditions')}</p>
                 <p className="text-2xl font-bold text-[var(--mint)]">
                   {
                     history.filter(
@@ -431,7 +444,7 @@ export function InventoryTab({
             </div>
             <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--red-pale)] bg-[var(--red-pale)]/40 p-4">
               <div className="min-w-0">
-                <p className="text-sm text-[var(--text-muted)]">Recent Subtractions</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('trend.recentSubtractions')}</p>
                 <p className="text-2xl font-bold text-[var(--red)]">
                   {
                     history.filter(
@@ -463,7 +476,7 @@ export function InventoryTab({
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <p className="truncate text-xs text-[var(--text-muted)] sm:text-sm">
-                  Total Products
+                  {t('summary.totalProducts')}
                 </p>
                 <p className="text-xl font-bold sm:text-2xl">{summary.total}</p>
               </div>
@@ -483,7 +496,9 @@ export function InventoryTab({
           <CardContent className="p-4 sm:pt-6">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-xs text-[var(--text-muted)] sm:text-sm">In Stock</p>
+                <p className="truncate text-xs text-[var(--text-muted)] sm:text-sm">
+                  {t('summary.inStock')}
+                </p>
                 <p className="text-xl font-bold text-[var(--mint)] sm:text-2xl">
                   {summary.inStock}
                 </p>
@@ -504,7 +519,9 @@ export function InventoryTab({
           <CardContent className="p-4 sm:pt-6">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-xs text-[var(--text-muted)] sm:text-sm">Low Stock</p>
+                <p className="truncate text-xs text-[var(--text-muted)] sm:text-sm">
+                  {t('summary.lowStock')}
+                </p>
                 <p className="text-xl font-bold text-[var(--amber)] sm:text-2xl">
                   {summary.lowStock}
                 </p>
@@ -525,7 +542,9 @@ export function InventoryTab({
           <CardContent className="p-4 sm:pt-6">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-xs text-[var(--text-muted)] sm:text-sm">Out of Stock</p>
+                <p className="truncate text-xs text-[var(--text-muted)] sm:text-sm">
+                  {t('summary.outOfStock')}
+                </p>
                 <p className="text-xl font-bold text-[var(--red)] sm:text-2xl">
                   {summary.outOfStock}
                 </p>
@@ -547,13 +566,13 @@ export function InventoryTab({
                 htmlFor="inventory-search"
                 className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]"
               >
-                Search
+                {t('filters.search')}
               </label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
                 <Input
                   id="inventory-search"
-                  placeholder="Search by name, SKU, or category..."
+                  placeholder={t('filters.searchPlaceholder')}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="h-10 pl-10 pr-9"
@@ -563,7 +582,7 @@ export function InventoryTab({
                     type="button"
                     onClick={() => setSearch('')}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text)]"
-                    aria-label="Clear search"
+                    aria-label={t('filters.clearSearch')}
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -573,14 +592,14 @@ export function InventoryTab({
 
             <div className="min-w-0">
               <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                Category
+                {t('filters.category')}
               </span>
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                 <SelectTrigger id="inventory-category-filter" className="w-full">
-                  <SelectValue placeholder="All Categories" />
+                  <SelectValue placeholder={t('filters.allCategories')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">All Categories</SelectItem>
+                  <SelectItem value="ALL">{t('filters.allCategories')}</SelectItem>
                   {uniqueCategories.map((category) => (
                     <SelectItem key={category} value={category}>
                       {category}
@@ -592,14 +611,14 @@ export function InventoryTab({
 
             <div className="min-w-0">
               <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                Supplier
+                {t('filters.supplier')}
               </span>
               <Select value={supplierFilter} onValueChange={setSupplierFilter}>
                 <SelectTrigger id="inventory-supplier-filter" className="w-full">
-                  <SelectValue placeholder="All Suppliers" />
+                  <SelectValue placeholder={t('filters.allSuppliers')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">All Suppliers</SelectItem>
+                  <SelectItem value="ALL">{t('filters.allSuppliers')}</SelectItem>
                   {uniqueSuppliers.map((supplier) => (
                     <SelectItem key={supplier} value={supplier}>
                       {supplier}
@@ -611,33 +630,39 @@ export function InventoryTab({
 
             <div className="min-w-0">
               <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                Status
+                {t('filters.status')}
               </span>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger id="inventory-status-filter" className="w-full">
-                  <SelectValue placeholder="All Status" />
+                  <SelectValue placeholder={t('filters.allStatus')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">All Status</SelectItem>
-                  <SelectItem value="IN_STOCK">In Stock</SelectItem>
-                  <SelectItem value="LOW_STOCK">Low Stock</SelectItem>
-                  <SelectItem value="OUT_OF_STOCK">Out of Stock</SelectItem>
+                  <SelectItem value="ALL">{t('filters.allStatus')}</SelectItem>
+                  <SelectItem value="IN_STOCK">
+                    {getTranslatedStatusLabel('IN_STOCK', tCommon)}
+                  </SelectItem>
+                  <SelectItem value="LOW_STOCK">
+                    {getTranslatedStatusLabel('LOW_STOCK', tCommon)}
+                  </SelectItem>
+                  <SelectItem value="OUT_OF_STOCK">
+                    {getTranslatedStatusLabel('OUT_OF_STOCK', tCommon)}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="min-w-0">
               <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                Sort by
+                {t('filters.sortBy')}
               </span>
               <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
                 <SelectTrigger id="inventory-sort" className="w-full">
-                  <SelectValue placeholder="Sort" />
+                  <SelectValue placeholder={t('filters.sort')} />
                 </SelectTrigger>
                 <SelectContent>
                   {SORT_OPTIONS.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
+                      {t(`sort.${opt.value}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -653,25 +678,25 @@ export function InventoryTab({
                 onClick={clearFilters}
                 disabled={!hasActiveFilters}
               >
-                Clear filters
+                {t('filters.clearFilters')}
               </Button>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 border-t border-[var(--app-border)] pt-3 text-sm">
             <span className="text-[var(--text-muted)]">
-              Showing{' '}
+              {t('filters.showingPrefix')}{' '}
               <span className="font-semibold text-[var(--text)]">{filteredInventory.length}</span>{' '}
-              of {inventory.length} items
+              {t('filters.showingSuffix', { total: inventory.length })}
             </span>
             {statusFilter !== 'ALL' ? (
               <Badge variant="secondary" className="gap-1">
-                {statusFilter.replace(/_/g, ' ')}
+                {getTranslatedStatusLabel(statusFilter, tCommon)}
                 <button
                   type="button"
                   onClick={() => setStatusFilter('ALL')}
                   className="ml-0.5 rounded-sm hover:bg-[var(--app-border)]"
-                  aria-label="Remove status filter"
+                  aria-label={t('filters.removeStatus')}
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -684,7 +709,7 @@ export function InventoryTab({
                   type="button"
                   onClick={() => setCategoryFilter('ALL')}
                   className="ml-0.5 rounded-sm hover:bg-[var(--app-border)]"
-                  aria-label="Remove category filter"
+                  aria-label={t('filters.removeCategory')}
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -697,7 +722,7 @@ export function InventoryTab({
                   type="button"
                   onClick={() => setSupplierFilter('ALL')}
                   className="ml-0.5 rounded-sm hover:bg-[var(--app-border)]"
-                  aria-label="Remove supplier filter"
+                  aria-label={t('filters.removeSupplier')}
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -712,17 +737,17 @@ export function InventoryTab({
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <CardTitle>Inventory Items</CardTitle>
-              <CardDescription>View and manage your stock levels</CardDescription>
+              <CardTitle>{t('items.title')}</CardTitle>
+              <CardDescription>{t('items.description')}</CardDescription>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={handleExportCSV}>
                 <Download className="h-4 w-4 mr-2" />
-                Export CSV
+                {t('items.exportCsv')}
               </Button>
               <Button variant="outline" size="sm" onClick={() => onShowBulkDialogChange?.(true)}>
                 <Upload className="h-4 w-4 mr-2" />
-                Import CSV
+                {t('items.importCsv')}
               </Button>
             </div>
           </div>
@@ -731,23 +756,23 @@ export function InventoryTab({
           {filteredInventory.length === 0 ? (
             <EmptyState
               icon={<Package className="h-6 w-6" />}
-              title={inventory.length === 0 ? 'No inventory yet' : 'No matching items'}
+              title={inventory.length === 0 ? t('empty.noInventory') : t('empty.noMatches')}
               description={
                 inventory.length === 0
-                  ? 'Place an order and receive goods to see inventory here.'
-                  : 'Try adjusting your search or filters.'
+                  ? t('empty.noInventoryDescription')
+                  : t('empty.noMatchesDescription')
               }
               action={
                 inventory.length === 0 ? (
                   <Button asChild>
                     <Link to="/app/cart">
                       <ShoppingCart className="mr-2 h-4 w-4" />
-                      Create first order
+                      {t('empty.createFirstOrder')}
                     </Link>
                   </Button>
                 ) : (
                   <Button variant="outline" onClick={clearFilters}>
-                    Clear filters
+                    {t('filters.clearFilters')}
                   </Button>
                 )
               }
@@ -782,7 +807,7 @@ export function InventoryTab({
                       <div className="mt-3 flex items-end justify-between gap-3">
                         <div>
                           <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                            On hand
+                            {t('table.onHand')}
                           </p>
                           <p className="text-lg font-bold text-[var(--text)]">
                             {item.quantity}{' '}
@@ -794,7 +819,7 @@ export function InventoryTab({
                         {reorderQty > 0 ? (
                           <div className="text-right">
                             <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                              Suggested reorder
+                              {t('table.suggestedReorder')}
                             </p>
                             <p className="text-lg font-bold text-[var(--amber)]">
                               {reorderQty}{' '}
@@ -813,7 +838,7 @@ export function InventoryTab({
                           onClick={() => handleOpenAdjustDialog(item, 'ADD')}
                         >
                           <Plus className="mr-1.5 h-4 w-4" />
-                          Add
+                          {t('table.add')}
                         </Button>
                         <Button
                           variant="outline"
@@ -821,7 +846,7 @@ export function InventoryTab({
                           onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
                         >
                           <Minus className="mr-1.5 h-4 w-4" />
-                          Reduce
+                          {t('table.reduce')}
                         </Button>
                         <Button
                           variant={isPinned ? 'default' : 'outline'}
@@ -829,7 +854,7 @@ export function InventoryTab({
                           onClick={() => handlePinToggle(item.product_id)}
                         >
                           <Pin className={`mr-1.5 h-4 w-4 ${isPinned ? 'fill-current' : ''}`} />
-                          {isPinned ? 'Pinned' : 'Pin'}
+                          {isPinned ? t('table.pinned') : t('table.pin')}
                         </Button>
                         {wasteTrackingEnabled ? (
                           <Button
@@ -841,7 +866,7 @@ export function InventoryTab({
                             }}
                           >
                             <Recycle className="mr-1.5 h-4 w-4" />
-                            Waste
+                            {t('table.waste')}
                           </Button>
                         ) : null}
                       </div>
@@ -856,28 +881,28 @@ export function InventoryTab({
                   <thead className="bg-[var(--brand-ultra)]">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                        Product
+                        {t('table.product')}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                        Category
+                        {t('table.category')}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                        Supplier
+                        {t('table.supplier')}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                        Quantity
+                        {t('table.quantity')}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                        Suggested Reorder
+                        {t('table.suggestedReorder')}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                        Status
+                        {t('table.status')}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                        Last Updated
+                        {t('table.lastUpdated')}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                        Actions
+                        {t('table.actions')}
                       </th>
                     </tr>
                   </thead>
@@ -894,7 +919,7 @@ export function InventoryTab({
                             </div>
                           </td>
                           <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                            {getItemCategory(item) || '—'}
+                            {getItemCategory(item) || '-'}
                           </td>
                           <td className="px-4 py-4 text-sm text-[var(--text)]">
                             {item.supplier_name}
@@ -907,7 +932,9 @@ export function InventoryTab({
                               </span>
                               {item.days_of_stock != null ? (
                                 <span className="text-xs text-[var(--text-muted)]">
-                                  (~{Math.round(Number(item.days_of_stock))}d left)
+                                  {t('table.daysLeft', {
+                                    count: Math.round(Number(item.days_of_stock)),
+                                  })}
                                 </span>
                               ) : null}
                             </div>
@@ -919,20 +946,18 @@ export function InventoryTab({
                                   {reorderQty}
                                 </span>
                                 <Badge variant="outline" className="text-xs">
-                                  Suggested
+                                  {t('reorder.suggested')}
                                 </Badge>
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="text-xs"
                                   onClick={() => {
-                                    toast.success(t('toasts.addingToCart'), {
-                                      duration: 2000,
-                                    })
-                                    // TODO: Navigate to products page with search pre-filled
+                                    const query = item.product_sku || item.product_name
+                                    navigate(`/app/products?q=${encodeURIComponent(query)}`)
                                   }}
                                 >
-                                  Order
+                                  {t('reorder.order')}
                                 </Button>
                               </div>
                             ) : (
@@ -943,7 +968,7 @@ export function InventoryTab({
                             <StatusBadge status={status} />
                           </td>
                           <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                            {new Date(item.updated_at).toLocaleDateString()}
+                            {new Date(item.updated_at).toLocaleDateString(i18n.language)}
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex gap-2">
@@ -952,7 +977,9 @@ export function InventoryTab({
                                 size="sm"
                                 onClick={() => handlePinToggle(item.product_id)}
                                 title={
-                                  pinnedItems.has(item.product_id) ? 'Unpin item' : 'Pin to top'
+                                  pinnedItems.has(item.product_id)
+                                    ? t('table.unpinItem')
+                                    : t('table.pinToTop')
                                 }
                               >
                                 <Pin
@@ -963,7 +990,7 @@ export function InventoryTab({
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleOpenAdjustDialog(item, 'ADD')}
-                                title="Add inventory"
+                                title={t('table.addInventory')}
                               >
                                 <Plus className="h-4 w-4" />
                               </Button>
@@ -971,7 +998,7 @@ export function InventoryTab({
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
-                                title="Count correction (reduce stock)"
+                                title={t('table.countCorrection')}
                               >
                                 <Minus className="h-4 w-4" />
                               </Button>
@@ -983,7 +1010,7 @@ export function InventoryTab({
                                   onClick={() => {
                                     onNavigateToWaste(item.product_id)
                                   }}
-                                  title="Log waste or spoilage"
+                                  title={t('table.logWaste')}
                                 >
                                   <Recycle className="h-4 w-4" />
                                 </Button>

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Building2, Plus, Settings } from 'lucide-react'
 import { RestaurantOrgOverviewPage } from './RestaurantOrgOverviewPage'
 import { Link, useNavigate } from 'react-router-dom'
@@ -11,8 +12,15 @@ import { multiBranchEnabled } from '../lib/planLimits'
 import { AddBranchModal } from '../components/org/AddBranchModal'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
+import { ensureNamespace } from '../i18n'
 
 export function OrgOverviewPage() {
+  const { t } = useTranslation('reports')
+
+  useEffect(() => {
+    void ensureNamespace('reports')
+  }, [])
+
   const { isEffectiveRestaurant, isEffectiveSupplier } = useImpersonation()
   const { can } = usePermissions()
   const navigate = useNavigate()
@@ -52,12 +60,9 @@ export function OrgOverviewPage() {
     return (
       <RequirePermission permission="SETTINGS_VIEW" title="organization">
         <PageShell data-testid="org-overview-page">
-          <PageHeader
-            title="Organization"
-            description="Multi-branch accounts are available on Gold and above. Upgrade your plan to add locations."
-          />
+          <PageHeader title={t('org.title')} description={t('org.upgradeDescription')} />
           <Link to="/app/settings?tab=subscription" className="text-sm underline inline-block">
-            View subscription
+            {t('org.viewSubscription')}
           </Link>
         </PageShell>
       </RequirePermission>
@@ -68,8 +73,11 @@ export function OrgOverviewPage() {
     <RequirePermission permission="SETTINGS_VIEW" title="organization">
       <PageShell data-testid="org-overview-page">
         <PageHeader
-          title={data?.organization?.name ?? 'Organization'}
-          description={`${branches.length} branch${branches.length === 1 ? '' : 'es'} · ${orgRole}`}
+          title={data?.organization?.name ?? t('org.title')}
+          description={t('org.branchCount', {
+            count: branches.length,
+            role: orgRole ?? '',
+          })}
           actions={
             canManageOrg ? (
               <button
@@ -78,13 +86,15 @@ export function OrgOverviewPage() {
                 className="inline-flex items-center gap-2 rounded-md bg-[var(--primary)] text-white px-3 py-2 text-sm"
               >
                 <Plus className="h-4 w-4" />
-                Add branch account
+                {t('org.addBranchAccount')}
               </button>
             ) : undefined
           }
         />
 
-        {isLoading && <p className="text-sm text-[var(--text-muted)]">Loading branches…</p>}
+        {isLoading && (
+          <p className="text-sm text-[var(--text-muted)]">{t('org.loadingBranches')}</p>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           {branches.map((branch) => {
@@ -108,17 +118,20 @@ export function OrgOverviewPage() {
                       {b.name}
                       {b.is_main_branch && (
                         <span className="text-xs rounded bg-[var(--surface-muted)] px-1.5 py-0.5">
-                          Main
+                          {t('org.main')}
                         </span>
                       )}
                       {b.is_branch_active === false && (
                         <span className="text-xs rounded bg-amber-100 text-amber-900 px-1.5 py-0.5">
-                          Inactive
+                          {t('org.inactive')}
                         </span>
                       )}
                     </div>
                     <p className="text-sm text-[var(--text-muted)] mt-1">
-                      {b.staff_count ?? 0} staff · {b.order_count ?? 0} orders
+                      {t('org.staffOrders', {
+                        staff: b.staff_count ?? 0,
+                        orders: b.order_count ?? 0,
+                      })}
                     </p>
                     <div className="flex flex-wrap gap-3 mt-3 text-sm">
                       <button
@@ -126,7 +139,7 @@ export function OrgOverviewPage() {
                         className="text-[var(--brand)] hover:underline"
                         onClick={() => handleOpenBranch(b.id).catch(() => {})}
                       >
-                        Open branch
+                        {t('org.openBranch')}
                       </button>
                       {canManageOrg && (
                         <Link
@@ -134,7 +147,7 @@ export function OrgOverviewPage() {
                           className="inline-flex items-center gap-1 text-[var(--text-muted)] hover:text-[var(--brand)]"
                         >
                           <Settings className="h-3.5 w-3.5" />
-                          Invitations
+                          {t('org.invitations')}
                         </Link>
                       )}
                     </div>

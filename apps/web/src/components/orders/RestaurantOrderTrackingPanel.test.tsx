@@ -1,7 +1,18 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { I18nextProvider } from 'react-i18next'
 import { RestaurantOrderTrackingPanel } from './RestaurantOrderTrackingPanel'
+import { testI18n, resetTestI18n } from '../../test/i18n'
+
+vi.mock('../maps/LazyDeliveryTrackingMap', () => ({
+  LazyDeliveryTrackingMap: ({ beforeFooter, liveStatusLine }: any) => (
+    <div data-testid="delivery-tracking-map">
+      {beforeFooter}
+      <span data-testid="delivery-tracking-map-status">{liveStatusLine ?? ''}</span>
+    </div>
+  ),
+}))
 
 vi.mock('../../services/api', () => ({
   useGetOrderTrackingQuery: () => ({
@@ -33,25 +44,47 @@ vi.mock('../../services/api', () => ({
   }),
 }))
 
-describe('RestaurantOrderTrackingPanel', () => {
-  it('renders live tracking with positive ETA', async () => {
-    render(
+const ft = (key: string, options?: Record<string, unknown>) =>
+  testI18n.t(key, { ns: 'fulfillment', ...options })
+
+const ot = (key: string, options?: Record<string, unknown>) =>
+  testI18n.t(key, { ns: 'orders', ...options })
+
+function renderPanel() {
+  return render(
+    <I18nextProvider i18n={testI18n}>
       <MemoryRouter>
         <RestaurantOrderTrackingPanel orderId="order-1" orderStatus="SHIPPED" />
       </MemoryRouter>
-    )
+    </I18nextProvider>
+  )
+}
+
+describe('RestaurantOrderTrackingPanel', () => {
+  beforeEach(async () => {
+    await resetTestI18n()
+  })
+
+  it('renders live tracking with positive ETA', async () => {
+    renderPanel()
     expect(screen.getByTestId('restaurant-order-tracking-panel')).toBeInTheDocument()
-    expect(screen.getByTestId('restaurant-tracking-message')).toHaveTextContent(/on the way/i)
-    await waitFor(() => expect(screen.getByTestId('delivery-tracking-map')).toBeInTheDocument())
+    expect(screen.getByTestId('restaurant-tracking-message')).toHaveTextContent(
+      ot('tracking.messages.liveWithTime', { time: '1 minute ago' })
+    )
+    expect(screen.getByTestId('delivery-tracking-map')).toBeInTheDocument()
     expect(screen.getByTestId('restaurant-tracking-eta-primary')).toHaveTextContent(
-      /Arriving in about 12–18 minutes/i
+      ft('tracking.eta.restaurant.arrivingIn', {
+        range: ft('tracking.eta.minutesRange', { min: 12, max: 18 }),
+      })
     )
     expect(screen.getByTestId('restaurant-tracking-eta-secondary')).toHaveTextContent(
-      /4\.2 km away/i
+      ft('tracking.eta.distanceKm', { km: '4.2' })
     )
     expect(screen.getByTestId('delivery-tracking-map-status')).toHaveTextContent(
-      /On the way · Live now/i
+      ft('tracking.gps.onTheWayLive')
     )
-    expect(screen.getByTestId('restaurant-gps-status')).toHaveTextContent(/Live now/i)
+    expect(screen.getByTestId('restaurant-gps-status')).toHaveTextContent(
+      ft('tracking.gps.liveNowWithTime', { time: '1 minute ago' })
+    )
   })
 })

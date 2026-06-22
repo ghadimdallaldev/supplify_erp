@@ -1,10 +1,16 @@
-import { describe, it, expect } from 'vitest'
+import { beforeAll, describe, it, expect } from 'vitest'
+import i18n from 'i18next'
+import enOrders from '../i18n/locales/en/orders.json'
+import enFulfillment from '../i18n/locales/en/fulfillment.json'
 import {
   getRestaurantTrackingMessage,
   shouldPollRestaurantTracking,
   canShowRestaurantReceiveCta,
 } from './restaurantTrackingMessages'
 import type { RestaurantOrderTrackingResponse } from '../types'
+
+const ot = (key: string, options?: Record<string, unknown>) =>
+  i18n.t(key, { ns: 'orders', ...options })
 
 const base: RestaurantOrderTrackingResponse = {
   orderId: 'o1',
@@ -25,6 +31,18 @@ const base: RestaurantOrderTrackingResponse = {
   },
 }
 
+beforeAll(async () => {
+  await i18n.init({
+    lng: 'en',
+    fallbackLng: 'en',
+    ns: ['orders', 'fulfillment'],
+    resources: {
+      en: { orders: enOrders, fulfillment: enFulfillment },
+    },
+    interpolation: { escapeValue: false },
+  })
+})
+
 describe('restaurantTrackingMessages', () => {
   it('returns no driver message when pending', () => {
     expect(
@@ -32,11 +50,13 @@ describe('restaurantTrackingMessages', () => {
         ...base,
         delivery: null,
       })
-    ).toContain('assigns a driver')
+    ).toBe(ot('tracking.messages.pendingDriver'))
   })
 
   it('returns live message', () => {
-    expect(getRestaurantTrackingMessage(base)).toContain('on the way')
+    expect(getRestaurantTrackingMessage(base)).toBe(
+      ot('tracking.messages.liveWithTime', { time: '1 minute ago' })
+    )
   })
 
   it('returns stale message', () => {
@@ -45,7 +65,7 @@ describe('restaurantTrackingMessages', () => {
         ...base,
         tracking: { ...base.tracking!, isStale: true },
       })
-    ).toContain('not updated recently')
+    ).toBe(ot('tracking.messages.staleWithTime', { time: '1 minute ago' }))
   })
 
   it('polls only for active delivery', () => {
@@ -64,7 +84,7 @@ describe('restaurantTrackingMessages', () => {
         ...base,
         delivery: { status: 'failed', label: 'Failed' },
       })
-    ).toContain('could not be completed')
+    ).toBe(ot('tracking.messages.failed'))
   })
 
   it('does not poll when delivery failed', () => {

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Receipt } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
@@ -17,6 +18,7 @@ export function InvoiceCreditNotesCard({
   refetchCreditNotes,
   refetch,
 }: InvoiceCreditNotesCardProps) {
+  const { t } = useTranslation('invoices')
   const [applyCreditNote] = useApplyCreditNoteMutation()
 
   return (
@@ -24,19 +26,19 @@ export function InvoiceCreditNotesCard({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Receipt className="h-5 w-5" />
-          Credit notes
+          {t('creditNotes.title')}
         </CardTitle>
-        <CardDescription>Issued from resolved disputes — apply to open invoices</CardDescription>
+        <CardDescription>{t('creditNotes.description')}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-[var(--text-muted)]">
-                <th className="py-2">Number</th>
-                <th className="py-2">Amount</th>
-                <th className="py-2">Status</th>
-                <th className="py-2 text-right">Action</th>
+                <th className="py-2">{t('creditNotes.number')}</th>
+                <th className="py-2">{t('creditNotes.amount')}</th>
+                <th className="py-2">{t('creditNotes.status')}</th>
+                <th className="py-2 text-right">{t('creditNotes.action')}</th>
               </tr>
             </thead>
             <tbody>
@@ -57,16 +59,16 @@ export function InvoiceCreditNotesCard({
                         onClick={async () => {
                           try {
                             await applyCreditNote({ id: String(cn.id) }).unwrap()
-                            toast.success('Credit note applied')
+                            toast.success(t('toasts.creditNoteApplied'))
                             refetchCreditNotes()
                             refetch()
                           } catch (e: unknown) {
                             const err = e as { data?: { error?: { message?: string } } }
-                            toast.error(err?.data?.error?.message || 'Failed to apply')
+                            toast.error(err?.data?.error?.message || t('toasts.creditNoteFailed'))
                           }
                         }}
                       >
-                        Apply
+                        {t('creditNotes.apply')}
                       </Button>
                     )}
                   </td>

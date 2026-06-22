@@ -1,0 +1,39 @@
+{
+  "detail": {
+    "title": "الفرع",
+    "settingsDescription": "إعدادات الفرع",
+    "notEnabled": "الفروع المتعددة غير مفعّلة في خطتك.",
+    "viewSubscription": "عرض الاشتراك",
+    "loading": "جارٍ تحميل الفرع…",
+    "notFound": "الفرع غير موجود.",
+    "backToOrg": "العودة إلى المؤسسة",
+    "organization": "← المؤسسة"
+  },
+  "invite": {
+    "missingToken": "رمز الدعوة مفقود.",
+    "validating": "جارٍ التحقق من دعوتك…",
+    "validateError": "تعذّر التحقق من الدعوة.",
+    "expiredTitle": "انتهت صلاحية رابط الدعوة.",
+    "expiredDescription": "تواصل مع مسؤول مؤسستك للحصول على رابط جديد.",
+    "invalidTitle": "رابط الدعوة لم يعد صالحاً.",
+    "invalidDescription": "إذا كان لديك حساب بالفعل، سجّل الدخول.",
+    "signIn": "تسجيل الدخول",
+    "acceptTitle": "قبول دعوة الفرع",
+    "loggedInAs": "أنت مسجّل الدخول كـ {{name}}. هذه الدعوة لـ {{branch}} ({{org}}) بصفة {{role}}.",
+    "acceptJoin": "قبول والانضمام للفرع",
+    "signInDifferent": "تسجيل الدخول بحساب مختلف",
+    "welcomeTitle": "مرحباً بك في Supplify",
+    "invitedToJoin": "تمت دعوتك للانضمام إلى {{branch}} ({{org}}) بصفة {{role}}.",
+    "fullName": "الاسم الكامل",
+    "password": "كلمة المرور",
+    "confirmPassword": "تأكيد كلمة المرور",
+    "createJoin": "إنشاء حساب والانضمام للفرع",
+    "alreadyHaveAccount": "لديك حساب بالفعل؟",
+    "signInLink": "تسجيل الدخول",
+    "acceptRequired": "يرجى قبول جميع الاتفاقيات القانونية المطلوبة قبل المتابعة.",
+    "passwordMismatch": "كلمتا المرور غير متطابقتين",
+    "passwordMinLength": "يجب أن تكون كلمة المرور 8 أحرف على الأقل",
+    "acceptFailed": "تعذّر قبول الدعوة. حاول تسجيل الدخول بحساب مختلف.",
+    "createFailed": "تعذّر إنشاء حسابك. قد يكون الرابط منتهي الصلاحية."
+  }
+}

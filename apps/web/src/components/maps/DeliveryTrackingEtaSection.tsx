@@ -1,3 +1,4 @@
+import i18n from 'i18next'
 import type { OrderTrackingResponse } from '../../types'
 import { isRestaurantOrderTracking } from '../../types'
 import {
@@ -6,9 +7,16 @@ import {
   getRestaurantEtaSecondaryText,
   getSupplierEtaPrimaryText,
   getSupplierEtaSecondaryText,
+  isDestinationMissingEtaUnavailable,
   shouldShowEtaConfidence,
 } from '../../lib/deliveryEtaDisplay'
 import { DeliveryEtaCard } from './DeliveryEtaCard'
+
+const NS = 'fulfillment'
+
+function ft(key: string, options?: Record<string, unknown>): string {
+  return i18n.t(key, { ns: NS, ...options })
+}
 
 type Audience = 'restaurant' | 'supplier'
 
@@ -18,7 +26,9 @@ export function getDestinationLabelText(
 ): string | null {
   const label = data?.destinationLabel?.trim()
   if (!label) return null
-  return audience === 'supplier' ? `Delivering to: ${label}` : `Destination: ${label}`
+  return audience === 'supplier'
+    ? ft('tracking.eta.deliveringTo', { label })
+    : ft('tracking.eta.destination', { label })
 }
 
 type EtaSectionProps = {
@@ -53,6 +63,7 @@ export function DeliveryTrackingEtaSection({
   }
 
   const unavailableMessage = primary ? null : getEtaUnavailableMessage(data)
+  const unavailableIsDestinationMissing = isDestinationMissingEtaUnavailable(data)
 
   if (!primary && !unavailableMessage) return null
 
@@ -61,6 +72,7 @@ export function DeliveryTrackingEtaSection({
       primary={primary ?? ''}
       secondary={secondary}
       unavailableMessage={unavailableMessage}
+      unavailableIsDestinationMissing={unavailableIsDestinationMissing}
       showLowConfidence={showLowConfidence}
       testId={testId}
     />

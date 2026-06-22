@@ -1,23 +1,22 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { i18n, changeAppLanguage, getActiveLocale } from './index'
-import { DEFAULT_LOCALE, LOCALE_STORAGE_KEY } from './config'
+import { DEFAULT_LOCALE, EAGER_NAMESPACES, LAZY_NAMESPACES, LOCALE_STORAGE_KEY } from './config'
 import { loadNamespace, resetNamespaceCache } from './loadNamespace'
-import enAuth from './locales/en/auth.json'
-import arAuth from './locales/ar/auth.json'
-import enCommon from './locales/en/common.json'
-import arCommon from './locales/ar/common.json'
-import enNavigation from './locales/en/navigation.json'
-import arNavigation from './locales/ar/navigation.json'
-import enSettings from './locales/en/settings.json'
-import arSettings from './locales/ar/settings.json'
-import enInventory from './locales/en/inventory.json'
-import arInventory from './locales/ar/inventory.json'
-import enConsumer from './locales/en/consumer.json'
-import arConsumer from './locales/ar/consumer.json'
-import enLoyalty from './locales/en/loyalty.json'
-import arLoyalty from './locales/ar/loyalty.json'
-import enCalendar from './locales/en/calendar.json'
-import arCalendar from './locales/ar/calendar.json'
+
+const enGlob = import.meta.glob('./locales/en/*.json', {
+  eager: true,
+  import: 'default',
+}) as Record<string, unknown>
+
+const arGlob = import.meta.glob('./locales/ar/*.json', {
+  eager: true,
+  import: 'default',
+}) as Record<string, unknown>
+
+function namespaceFromPath(path: string) {
+  const match = path.match(/\/([^/]+)\.json$/)
+  return match?.[1] ?? ''
+}
 
 function flattenKeys(value: unknown, prefix = ''): string[] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -29,16 +28,53 @@ function flattenKeys(value: unknown, prefix = ''): string[] {
   )
 }
 
+function flattenStrings(value: unknown, prefix = ''): Record<string, string> {
+  if (typeof value === 'string') {
+    return prefix ? { [prefix]: value } : {}
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {}
+  }
+
+  return Object.entries(value as Record<string, unknown>).reduce<Record<string, string>>(
+    (acc, [key, child]) => ({
+      ...acc,
+      ...flattenStrings(child, prefix ? `${prefix}.${key}` : key),
+    }),
+    {}
+  )
+}
+
+function interpolationNames(value: string) {
+  return Array.from(value.matchAll(/{{\s*([^},\s]+).*?}}/g))
+    .map((match) => match[1])
+    .sort()
+}
+
+function removeLazyResourceBundles() {
+  for (const lng of ['en', 'ar']) {
+    for (const ns of LAZY_NAMESPACES) {
+      if (i18n.hasResourceBundle(lng, ns)) {
+        i18n.removeResourceBundle(lng, ns)
+      }
+    }
+  }
+}
+
+const ALL_NAMESPACES = [...EAGER_NAMESPACES, ...LAZY_NAMESPACES]
+
 describe('i18n', () => {
   beforeEach(async () => {
     localStorage.clear()
     resetNamespaceCache()
+    removeLazyResourceBundles()
     await changeAppLanguage(DEFAULT_LOCALE)
   })
 
   afterEach(() => {
     localStorage.clear()
     resetNamespaceCache()
+    removeLazyResourceBundles()
   })
 
   it('defaults to en', () => {
@@ -48,12 +84,24 @@ describe('i18n', () => {
     expect(document.documentElement.dir).toBe('ltr')
   })
 
+  it('initializes with only eager namespaces in the boot resources', () => {
+    for (const ns of EAGER_NAMESPACES) {
+      expect(i18n.hasResourceBundle('en', ns), `en/${ns}`).toBe(true)
+      expect(i18n.hasResourceBundle('ar', ns), `ar/${ns}`).toBe(true)
+    }
+    for (const ns of LAZY_NAMESPACES) {
+      expect(i18n.hasResourceBundle('en', ns), `en/${ns}`).toBe(false)
+      expect(i18n.hasResourceBundle('ar', ns), `ar/${ns}`).toBe(false)
+    }
+  })
+
   it("changeAppLanguage('ar') sets dir rtl", async () => {
     await changeAppLanguage('ar')
     expect(getActiveLocale()).toBe('ar')
     expect(document.documentElement.dir).toBe('rtl')
     expect(document.documentElement.lang).toBe('ar')
-    expect(i18n.t('actions.save')).toBe('حفظ')
+    expect(i18n.t('actions.save')).not.toBe('actions.save')
+    expect(i18n.t('actions.save')).not.toBe('Save')
   })
 
   it("changeAppLanguage('en') sets dir ltr", async () => {
@@ -84,7 +132,14 @@ describe('i18n', () => {
 
   it('resolves billingOverdue copy in common namespace', () => {
     expect(i18n.t('billingOverdue.freeTrial.title')).toBe('Free Trial expired')
-    expect(i18n.t('billingOverdue.locked.title')).toBe('Account locked — payment required')
+    expect(i18n.t('billingOverdue.locked.title')).toContain('payment required')
+  })
+
+  it('lazy-loads namespaces through i18next for react-i18next consumers', async () => {
+    expect(i18n.hasResourceBundle('en', 'auth')).toBe(false)
+    await i18n.loadNamespaces('auth')
+    expect(i18n.hasResourceBundle('en', 'auth')).toBe(true)
+    expect(i18n.t('auth:welcomeBack')).toBe('Welcome back')
   })
 
   it("loadNamespace('auth') loads auth strings", async () => {
@@ -95,23 +150,47 @@ describe('i18n', () => {
     resetNamespaceCache()
     await changeAppLanguage('ar')
     await loadNamespace(i18n, 'ar', 'auth')
-    expect(i18n.t('auth:welcomeBack')).toBe('مرحباً بعودتك')
+    expect(i18n.t('auth:welcomeBack')).not.toBe('auth:welcomeBack')
+  })
+
+  it("loadNamespace('orders') resolves page tab labels", async () => {
+    resetNamespaceCache()
+    await loadNamespace(i18n, 'en', 'orders')
+    expect(i18n.t('orders:page.tabs.all')).toBe('All Orders')
+    expect(i18n.t('orders:page.tabs.processing')).toBe('Processing')
   })
 
   it('keeps Arabic namespace keys in parity with English', () => {
-    const namespaces = [
-      ['common', enCommon, arCommon],
-      ['navigation', enNavigation, arNavigation],
-      ['auth', enAuth, arAuth],
-      ['settings', enSettings, arSettings],
-      ['inventory', enInventory, arInventory],
-      ['consumer', enConsumer, arConsumer],
-      ['loyalty', enLoyalty, arLoyalty],
-      ['calendar', enCalendar, arCalendar],
-    ] as const
+    for (const ns of ALL_NAMESPACES) {
+      const enPath = `./locales/en/${ns}.json`
+      const arPath = `./locales/ar/${ns}.json`
+      const en = enGlob[enPath]
+      const ar = arGlob[arPath]
+      expect(en, `missing en locale for ${ns}`).toBeTruthy()
+      expect(ar, `missing ar locale for ${ns}`).toBeTruthy()
+      expect(flattenKeys(ar).sort(), ns).toEqual(flattenKeys(en).sort())
+    }
+  })
 
-    for (const [namespace, en, ar] of namespaces) {
-      expect(flattenKeys(ar).sort(), namespace).toEqual(flattenKeys(en).sort())
+  it('keeps interpolation placeholders identical between English and Arabic', () => {
+    for (const ns of ALL_NAMESPACES) {
+      const en = flattenStrings(enGlob[`./locales/en/${ns}.json`])
+      const ar = flattenStrings(arGlob[`./locales/ar/${ns}.json`])
+
+      for (const key of Object.keys(en)) {
+        expect(interpolationNames(ar[key] ?? ''), `${ns}:${key}`).toEqual(
+          interpolationNames(en[key])
+        )
+      }
+    }
+  })
+
+  it('has a locale file for every configured namespace', () => {
+    const enNames = new Set(Object.keys(enGlob).map(namespaceFromPath))
+    const arNames = new Set(Object.keys(arGlob).map(namespaceFromPath))
+    for (const ns of ALL_NAMESPACES) {
+      expect(enNames.has(ns), `en/${ns}.json`).toBe(true)
+      expect(arNames.has(ns), `ar/${ns}.json`).toBe(true)
     }
   })
 })

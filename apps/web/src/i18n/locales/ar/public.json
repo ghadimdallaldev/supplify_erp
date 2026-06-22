@@ -1,0 +1,61 @@
+{
+  "catalog": {
+    "loadingTitle": "كتالوج المورد",
+    "notFoundTitle": "الكتالوج غير موجود",
+    "notFoundSubtitle": "كتالوج هذا المورد غير متاح أو تم تعطيله.",
+    "emptyTitle": "لا يوجد شيء لعرضه",
+    "emptyDescription": "قد يكون الرابط خاطئاً أو قام المورد بتعطيل الوصول العام.",
+    "logIn": "تسجيل الدخول",
+    "logInToOrder": "سجّل الدخول للطلب",
+    "requestAccess": "طلب الوصول",
+    "viewInApp": "عرض في التطبيق",
+    "subtitleWithTerms": "كتالوج الجملة · {{terms}}",
+    "subtitleDefault": "كتالوج الجملة · تصفّح المنتجات واطلب التسعير",
+    "stats": {
+      "catalog": "الكتالوج",
+      "product_one": "{{count}} منتج",
+      "product_other": "{{count}} منتجات",
+      "paymentTerms": "شروط الدفع",
+      "minimumOrder": "الحد الأدنى للطلب"
+    },
+    "guestPanel": {
+      "title": "طلب المطاعم على Supplify",
+      "description": "سجّل الدخول لرؤية أسعار العقود وإضافة المنتجات إلى سلتك وتقديم الطلبات من هذا المورد."
+    },
+    "searchPlaceholder": "ابحث بالاسم أو رمز المنتج أو الفئة…",
+    "searchAriaLabel": "البحث عن المنتجات",
+    "categoryAll": "الكل",
+    "categoryAriaLabel": "فئات المنتجات",
+    "filterCategoryAriaLabel": "تصفية حسب الفئة",
+    "allCategories": "كل الفئات",
+    "emptyFilteredTitle": "لا توجد منتجات مطابقة",
+    "emptyDefaultTitle": "لا توجد منتجات بعد",
+    "emptyFilteredDescription": "جرّب مصطلح بحث أو فئة مختلفة.",
+    "emptyDefaultDescription": "لم ينشر هذا المورد أي منتجات في كتالوجه.",
+    "clearFilters": "مسح عوامل التصفية",
+    "showing": "عرض {{shown}} من {{total}}",
+    "updating": "جارٍ التحديث…",
+    "paginationAriaLabel": "ترقيم صفحات كتالوج المنتجات",
+    "previous": "السابق",
+    "next": "التالي",
+    "pageOf": "صفحة {{page}} من {{total}}",
+    "share": {
+      "title": "شارك هذا الكتالوج",
+      "description": "أرسل الرابط لأعضاء فريق الشراء لديك ليتمكنوا من التصفح وطلب الوصول.",
+      "copied": "تم النسخ",
+      "copyLink": "نسخ الرابط"
+    },
+    "product": {
+      "outOfStock": "غير متوفر",
+      "inStock": "متوفر",
+      "signInForPricing": "سجّل الدخول لرؤية الأسعار",
+      "addToCart": "أضف إلى السلة",
+      "requestBestPrice": "اطلب أفضل سعر"
+    },
+    "toast": {
+      "addedToCart": "تمت الإضافة إلى السلة",
+      "linkCopied": "تم نسخ رابط الكتالوج",
+      "copyFailed": "تعذّر نسخ الرابط"
+    }
+  }
+}

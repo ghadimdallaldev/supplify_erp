@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { ensureNamespace } from '../i18n'
 import { getApiErrorMessage } from '../lib/apiError'
 import {
   useGetReservationBoardQuery,
@@ -36,11 +38,16 @@ import { EmptyState } from '../components/ui/empty-state'
 import { Skeleton } from '../components/ui/skeleton'
 
 export function ReservationsPage() {
+  const { t } = useTranslation('reservations')
   const { persona } = useWorkspaceRole()
-  const reservationsTitle = persona.pageCopy?.reservations?.title ?? 'Reservations cockpit'
+
+  useEffect(() => {
+    void ensureNamespace('reservations')
+  }, [])
+
+  const reservationsTitle = persona.pageCopy?.reservations?.title ?? t('page.title')
   const reservationsDescription =
-    persona.pageCopy?.reservations?.description ??
-    'Track bookings, optimise capacity, and wow every guest from one unified view.'
+    persona.pageCopy?.reservations?.description ?? t('page.description')
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [range, setRange] = useState<'day' | 'week' | 'month'>('week')
   const [branchId, setBranchId] = useState('')
@@ -105,7 +112,7 @@ export function ReservationsPage() {
   }, [restaurantMe?.restaurant, branchId])
 
   const tables = boardData?.tables ?? []
-  const reservations = boardData?.reservations ?? []
+  const reservations = useMemo(() => boardData?.reservations ?? [], [boardData?.reservations])
   const waitlist = boardData?.waitlist ?? []
 
   const summary = useMemo(() => {
@@ -139,9 +146,9 @@ export function ReservationsPage() {
     if (!bookingLink) return
     const copied = await copyToClipboard(bookingLink)
     if (copied) {
-      toast.success('Booking link copied to clipboard')
+      toast.success(t('toasts.bookingLinkCopied'))
     } else {
-      toast.error('Could not copy link — try selecting and copying manually')
+      toast.error(t('toasts.bookingLinkCopyFailed'))
     }
   }
 
@@ -168,13 +175,13 @@ export function ReservationsPage() {
                   className="h-8 shrink-0 text-xs"
                   onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}
                 >
-                  Today
+                  {t('page.today')}
                 </Button>
               </div>
               {branches.length > 1 ? (
                 <Select value={branchId} onValueChange={setBranchId}>
-                  <SelectTrigger className="min-w-[140px]" aria-label="Branch">
-                    <option value="">All branches</option>
+                  <SelectTrigger className="min-w-[140px]" aria-label={t('page.branchAriaLabel')}>
+                    <option value="">{t('page.allBranches')}</option>
                     {branches.map((branch: { id: string; name: string }) => (
                       <option key={branch.id} value={branch.id}>
                         {branch.name}
@@ -199,12 +206,9 @@ export function ReservationsPage() {
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Link2 className="h-4 w-4 text-[var(--brand-mid)]" />
-                Booking link for guests
+                {t('page.bookingLinkTitle')}
               </CardTitle>
-              <CardDescription>
-                Share this link so clients can book a table online. They’ll see availability and get
-                a confirmation by email or WhatsApp when contact details are provided.
-              </CardDescription>
+              <CardDescription>{t('page.bookingLinkDescription')}</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div
@@ -220,7 +224,7 @@ export function ReservationsPage() {
                 className="min-h-[44px] w-full shrink-0 sm:w-auto"
               >
                 <Copy className="mr-2 h-4 w-4" />
-                Copy link
+                {t('page.copyLink')}
               </Button>
             </CardContent>
           </Card>
@@ -230,10 +234,10 @@ export function ReservationsPage() {
           <Card className="border border-red-200 bg-red-50">
             <CardContent className="flex flex-col gap-3 py-6 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-red-900">
-                {getApiErrorMessage(boardQueryError, 'Could not load the reservation board.')}
+                {getApiErrorMessage(boardQueryError, t('page.loadBoardError'))}
               </p>
               <Button variant="outline" size="sm" onClick={() => refetch()}>
-                Retry
+                {t('page.retry')}
               </Button>
             </CardContent>
           </Card>
@@ -242,41 +246,39 @@ export function ReservationsPage() {
         <SummaryStrip
           testId="reservations-summary"
           metrics={[
-            { label: 'Covers today', value: summary.coversToday },
-            { label: 'Confirmed', value: summary.confirmed, tone: 'mint' },
+            { label: t('page.summary.coversToday'), value: summary.coversToday },
+            { label: t('page.summary.confirmed'), value: summary.confirmed, tone: 'mint' },
             {
-              label: 'Waitlist',
+              label: t('page.summary.waitlist'),
               value: summary.waitlisted,
               tone: summary.waitlisted ? 'amber' : 'default',
             },
-            { label: 'Currently seated', value: summary.seated, tone: 'brand' },
+            { label: t('page.summary.currentlySeated'), value: summary.seated, tone: 'brand' },
           ]}
         />
 
         <AppPanel
-          title="Waitlist queue"
-          description="Offer status and manual promotion for guests waiting for a table"
+          title={t('page.waitlistQueue.title')}
+          description={t('page.waitlistQueue.description')}
         >
           {!waitlistAutoPromoEnabled ? (
             <p className="mb-4 rounded-xl border border-[var(--amber)]/25 bg-[var(--amber-pale)] px-3 py-2 text-xs text-[var(--text)]">
-              Automatic waitlist offers when a table frees up are not on your plan. You can still
-              promote guests manually. Upgrade to enable auto-promotion.
+              {t('page.waitlistQueue.autoPromoDisabled')}
             </p>
           ) : (
             <p className="mb-4 rounded-xl border border-[var(--mint)]/25 bg-[var(--mint-pale)]/50 px-3 py-2 text-xs text-[var(--text)]">
-              Auto-promotion is on: when a reservation is cancelled, the next waitlisted guest may
-              receive a timed table offer.
+              {t('page.waitlistQueue.autoPromoEnabled')}
             </p>
           )}
           {waitlistLoading ? (
             <div className="flex items-center gap-2 py-6 text-sm text-[var(--text-muted)]">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              Loading waitlist…
+              {t('page.waitlistQueue.loading')}
             </div>
           ) : (waitlistData?.waitlist || []).length === 0 ? (
             <EmptyState
-              title="Waitlist is empty"
-              description="Guests waiting for a table will appear here."
+              title={t('page.waitlistQueue.emptyTitle')}
+              description={t('page.waitlistQueue.emptyDescription')}
               icon={<Users className="h-6 w-6" aria-hidden />}
             />
           ) : (
@@ -289,13 +291,20 @@ export function ReservationsPage() {
                   <div>
                     <p className="font-medium">{String(entry.customer_name)}</p>
                     <p className="text-xs text-[var(--text-muted)]">
-                      {String(entry.party_size)} guests · #{String(entry.position ?? '—')} in queue
+                      {t('page.waitlistQueue.guestsInQueue', {
+                        count: Number(entry.party_size),
+                        position: String(entry.position ?? '—'),
+                      })}
                     </p>
                     {entry.offer_status && String(entry.offer_status) !== 'none' ? (
                       <Badge variant="outline" className="mt-1 capitalize">
-                        Offer: {String(entry.offer_status)}
+                        {t('page.waitlistQueue.offerStatus', {
+                          status: String(entry.offer_status),
+                        })}
                         {entry.offer_expires_at
-                          ? ` · expires ${new Date(String(entry.offer_expires_at)).toLocaleString()}`
+                          ? t('page.waitlistQueue.offerExpires', {
+                              date: new Date(String(entry.offer_expires_at)).toLocaleString(),
+                            })
                           : ''}
                       </Badge>
                     ) : null}
@@ -308,15 +317,15 @@ export function ReservationsPage() {
                     onClick={async () => {
                       try {
                         await promoteWaitlist(String(entry.id)).unwrap()
-                        toast.success('Offer sent to guest')
+                        toast.success(t('toasts.offerSent'))
                         refetchWaitlist()
                         refetch()
                       } catch {
-                        toast.error('Could not promote guest')
+                        toast.error(t('toasts.promoteFailed'))
                       }
                     }}
                   >
-                    Promote
+                    {t('page.waitlistQueue.promote')}
                   </Button>
                 </li>
               ))}
@@ -363,16 +372,14 @@ export function ReservationsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Guest intelligence</CardTitle>
-              <CardDescription>
-                Repeat guests, loyalty moments, and smart follow-ups for your location.
-              </CardDescription>
+              <CardTitle>{t('page.guestIntelligence.title')}</CardTitle>
+              <CardDescription>{t('page.guestIntelligence.description')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-[var(--text-muted)]">
               {guestIntelLoading ? (
                 <div className="flex items-center gap-2 text-[var(--text-muted)]">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading guest insights…
+                  {t('page.guestIntelligence.loading')}
                 </div>
               ) : (
                 <>
@@ -380,7 +387,7 @@ export function ReservationsPage() {
                     <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--brand-ultra)] p-4">
                       <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                         <Users className="h-4 w-4" />
-                        Recent guests
+                        {t('page.guestIntelligence.recentGuests')}
                       </p>
                       <p className="mt-2 text-2xl font-semibold text-[var(--text)]">
                         {guestIntel?.recentGuests?.length ?? 0}
@@ -389,7 +396,7 @@ export function ReservationsPage() {
                     <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--brand-ultra)] p-4">
                       <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                         <Sparkles className="h-4 w-4" />
-                        Repeat guests
+                        {t('page.guestIntelligence.repeatGuests')}
                       </p>
                       <p className="mt-2 text-2xl font-semibold text-[var(--text)]">
                         {guestIntel?.repeatGuests?.length ?? 0}
@@ -398,7 +405,7 @@ export function ReservationsPage() {
                     <div className="rounded-2xl border border-[var(--amber-mid)]/35 bg-[var(--amber-pale)] p-4">
                       <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--amber)]">
                         <Star className="h-4 w-4" />
-                        VIP guests
+                        {t('page.guestIntelligence.vipGuests')}
                       </p>
                       <p className="mt-2 text-2xl font-semibold text-[var(--text)]">
                         {guestIntel?.vipGuests?.length ?? 0}
@@ -408,7 +415,9 @@ export function ReservationsPage() {
 
                   {(guestIntel?.followUps?.length ?? 0) > 0 ? (
                     <div className="space-y-2">
-                      <p className="font-medium text-[var(--text)]">Suggested follow-ups</p>
+                      <p className="font-medium text-[var(--text)]">
+                        {t('page.guestIntelligence.suggestedFollowUps')}
+                      </p>
                       {guestIntel?.followUps?.map((guest, index) => (
                         <div
                           key={`${guest.customer_name}-${index}`}
@@ -419,10 +428,12 @@ export function ReservationsPage() {
                               {String(guest.customer_name)}
                             </p>
                             <p className="text-xs text-[var(--text-muted)]">
-                              {Number(guest.visit_count)} visits · last{' '}
-                              {guest.last_visit
-                                ? new Date(String(guest.last_visit)).toLocaleDateString()
-                                : '—'}
+                              {t('page.guestIntelligence.visitSummary', {
+                                count: Number(guest.visit_count),
+                                date: guest.last_visit
+                                  ? new Date(String(guest.last_visit)).toLocaleDateString()
+                                  : '—',
+                              })}
                             </p>
                           </div>
                           <Badge variant="secondary" className="w-fit">
@@ -433,14 +444,12 @@ export function ReservationsPage() {
                     </div>
                   ) : (
                     <p className="text-[var(--text-muted)]">
-                      Book more reservations to unlock repeat-guest and VIP insights.
+                      {t('page.guestIntelligence.emptyHint')}
                     </p>
                   )}
 
                   <div className="rounded-2xl border border-dashed border-[var(--mint)]/35 bg-[var(--mint-pale)] p-4 text-xs text-[var(--mint)]">
-                    Email and WhatsApp confirmations are sent automatically for confirmed seats when
-                    guests provide contact details. Configure your channels in Settings →
-                    Notifications.
+                    {t('page.guestIntelligence.confirmationsNote')}
                   </div>
                 </>
               )}

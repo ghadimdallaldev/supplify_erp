@@ -16,4 +16,4 @@ See the full multi-environment guide: [`deploy/railway/keycloak/RAILWAY_SETUP.md
 
 - Memory / JVM: [`deploy/railway/KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](../../KEYCLOAK_RAILWAY_MEMORY_NOTES.md)
 - Database: [`deploy/railway/KEYCLOAK_RAILWAY_DB_NOTES.md`](../../KEYCLOAK_RAILWAY_DB_NOTES.md)
-- Fix narrative: [`docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`](../../../docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md)
+- Fix narrative: [`docs/operations/keycloak-railway-memory-fix.md`](../../../docs/operations/keycloak-railway-memory-fix.md)

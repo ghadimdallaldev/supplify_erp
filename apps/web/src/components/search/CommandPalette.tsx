@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Settings } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   CommandDialog,
   CommandEmpty,
@@ -11,12 +12,17 @@ import {
 } from '../ui/command'
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard, keywords: 'home overview' },
-  { label: 'Products', href: '/app/products', icon: Package, keywords: 'catalog search' },
-  { label: 'Orders', href: '/app/orders', icon: ShoppingCart, keywords: 'purchase' },
-  { label: 'Fulfillment', href: '/app/fulfillment', icon: Truck, keywords: 'delivery shipping' },
-  { label: 'Staff', href: '/app/staff', icon: Users, keywords: 'team employees' },
-  { label: 'Settings', href: '/app/settings', icon: Settings, keywords: 'preferences account' },
+  {
+    labelKey: 'dashboard',
+    href: '/app/dashboard',
+    icon: LayoutDashboard,
+    keywordsKey: 'dashboard',
+  },
+  { labelKey: 'products', href: '/app/products', icon: Package, keywordsKey: 'products' },
+  { labelKey: 'orders', href: '/app/orders', icon: ShoppingCart, keywordsKey: 'orders' },
+  { labelKey: 'fulfillment', href: '/app/fulfillment', icon: Truck, keywordsKey: 'fulfillment' },
+  { labelKey: 'staff', href: '/app/staff', icon: Users, keywordsKey: 'staff' },
+  { labelKey: 'settings', href: '/app/settings', icon: Settings, keywordsKey: 'settings' },
 ] as const
 
 type CommandPaletteProps = {
@@ -26,6 +32,7 @@ type CommandPaletteProps = {
 
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const navigate = useNavigate()
+  const { t } = useTranslation('navigation')
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -49,20 +56,25 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <CommandInput placeholder="Search pages…" />
+      <CommandInput placeholder={t('command.searchPages')} />
       <CommandList>
-        <CommandEmpty>No results found.</CommandEmpty>
-        <CommandGroup heading="Navigate">
-          {NAV_ITEMS.map(({ label, href, icon: Icon, keywords }) => (
-            <CommandItem
-              key={href}
-              value={`${label} ${keywords}`}
-              onSelect={() => runCommand(href)}
-            >
-              <Icon className="h-4 w-4 shrink-0" aria-hidden />
-              {label}
-            </CommandItem>
-          ))}
+        <CommandEmpty>{t('command.noResults')}</CommandEmpty>
+        <CommandGroup heading={t('command.navigate')}>
+          {NAV_ITEMS.map(({ labelKey, href, icon: Icon, keywordsKey }) => {
+            const label = t(labelKey)
+            const keywords = t(`command.keywords.${keywordsKey}`)
+
+            return (
+              <CommandItem
+                key={href}
+                value={`${label} ${keywords}`}
+                onSelect={() => runCommand(href)}
+              >
+                <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                {label}
+              </CommandItem>
+            )
+          })}
         </CommandGroup>
       </CommandList>
     </CommandDialog>

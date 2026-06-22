@@ -96,4 +96,4 @@ Never on production without backup and maintenance window.
 
 - Setup: [`keycloak/RAILWAY_SETUP.md`](keycloak/RAILWAY_SETUP.md)
 - Memory / JVM: [`KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](KEYCLOAK_RAILWAY_MEMORY_NOTES.md)
-- Full fix narrative: [`docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`](../../docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md)
+- Full fix narrative: [`docs/operations/keycloak-railway-memory-fix.md`](../../docs/operations/keycloak-railway-memory-fix.md)

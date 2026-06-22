@@ -1,7 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { I18nextProvider } from 'react-i18next'
 import { DriverDeliveriesPage } from '../pages/DriverDeliveriesPage'
+import { ensureTestI18n, testI18n } from '../test/i18n'
 
 vi.mock('../hooks/redux', () => ({
   useAppSelector: (fn: (s: unknown) => unknown) =>
@@ -52,7 +54,8 @@ vi.mock('../services/api', () => ({
   useSendDriverLocationMutation: () => [vi.fn(), { isLoading: false }],
 }))
 
-beforeEach(() => {
+beforeEach(async () => {
+  await ensureTestI18n()
   Object.defineProperty(global.navigator, 'geolocation', {
     value: {
       watchPosition: vi.fn(),
@@ -68,11 +71,13 @@ describe('DriverDeliveriesPage mobile', () => {
     Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 320 })
 
     render(
-      <MemoryRouter>
-        <div style={{ width: 320 }}>
-          <DriverDeliveriesPage />
-        </div>
-      </MemoryRouter>
+      <I18nextProvider i18n={testI18n}>
+        <MemoryRouter>
+          <div style={{ width: 320 }}>
+            <DriverDeliveriesPage />
+          </div>
+        </MemoryRouter>
+      </I18nextProvider>
     )
 
     expect(screen.getByTestId('driver-deliveries-page')).toBeInTheDocument()

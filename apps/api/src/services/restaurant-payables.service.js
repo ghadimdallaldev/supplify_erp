@@ -199,3 +199,52 @@ export async function getRestaurantStatementOpeningBalance(restaurantId, supplie
 
   return parseFloat(rows[0]?.opening_balance) || 0
 }
+
+/**
+ * Credit notes issued in the statement period (reduce amount owed).
+ */
+export async function getRestaurantStatementAdjustments(
+  restaurantId,
+  supplierId,
+  startDate,
+  endDate
+) {
+  const params = [restaurantId, supplierId]
+  let dateFilters = ''
+
+  if (startDate) {
+    params.push(startDate)
+    dateFilters += ` AND cn.issue_date >= $${params.length}::date`
+  }
+  if (endDate) {
+    params.push(endDate)
+    dateFilters += ` AND cn.issue_date <= $${params.length}::date`
+  }
+
+  const { rows } = await query(
+    `
+    SELECT COALESCE(SUM(cn.credit_amount), 0)::numeric AS total_adjustments
+    FROM credit_note cn
+    WHERE cn.restaurant_id = $1
+      AND cn.supplier_id = $2
+      AND cn.status != 'VOID'
+      ${dateFilters}
+    `,
+    params
+  )
+
+  return parseFloat(rows[0]?.total_adjustments) || 0
+}
+
+/**
+ * closingBalance = opening + charges - payments - adjustments
+ * (adjustments are positive credit note amounts that reduce balance owed)
+ */
+export function computeRestaurantStatementClosingBalance({
+  openingBalance,
+  totalCharges,
+  totalPayments,
+  totalAdjustments,
+}) {
+  return openingBalance + totalCharges - totalPayments - totalAdjustments
+}

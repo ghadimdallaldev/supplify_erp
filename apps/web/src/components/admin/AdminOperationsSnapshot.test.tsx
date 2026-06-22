@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
+import { renderWithProviders } from '../../test/utils'
 import { AdminOperationsSnapshot } from './AdminOperationsSnapshot'
 import type { AdminOverview } from '../../lib/adminOverview'
 
@@ -10,14 +11,14 @@ describe('AdminOperationsSnapshot', () => {
       tenantsNearLimit: 7,
       orders: { today: 1, week: 2, month: 3 },
     }
-    render(<AdminOperationsSnapshot overview={overview} />)
+    renderWithProviders(<AdminOperationsSnapshot overview={overview} />)
     expect(screen.getByText('Tenants over limit')).toBeInTheDocument()
     expect(screen.getByText('9')).toBeInTheDocument()
     expect(screen.getByText('7 near limit')).toBeInTheDocument()
   })
 
   it('shows Not available when tenantsOverLimit is missing', () => {
-    render(<AdminOperationsSnapshot overview={{ orders: { today: 0 } }} />)
+    renderWithProviders(<AdminOperationsSnapshot overview={{ orders: { today: 0 } }} />)
     expect(screen.getByText('Not available')).toBeInTheDocument()
   })
 })

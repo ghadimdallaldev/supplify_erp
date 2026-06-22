@@ -46,7 +46,10 @@ export function DealTargetingPickers({ value, onChange }: Props) {
   )
 
   const categories = categoriesData?.categories || []
-  const products: Product[] = productsData?.products ?? []
+  const products = useMemo(
+    () => (productsData?.products ?? []) as Product[],
+    [productsData?.products]
+  )
 
   const selectedProducts = useMemo(() => {
     const map = new Map(products.map((p) => [String(p.id), p]))

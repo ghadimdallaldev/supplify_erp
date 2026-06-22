@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation, Trans } from 'react-i18next'
 import { ChevronDown, ChevronUp, Download, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -134,10 +135,11 @@ function PreviewDetailSection({
 }
 
 export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImportDialogProps) {
+  const { t } = useTranslation('products')
   const [tab, setTab] = useState<ImportTab>('zip_sku')
   const [uploadSessionId, setUploadSessionId] = useState<string | null>(null)
   const [zipFile, setZipFile] = useState<File | null>(null)
-  const [mappingFile, setMappingFile] = useState<File | null>(null)
+  const [, setMappingFile] = useState<File | null>(null)
   const [zipFileKey, setZipFileKey] = useState<string | null>(null)
   const [mappingFileKey, setMappingFileKey] = useState<string | null>(null)
   const [replaceExisting, setReplaceExisting] = useState(false)
@@ -178,9 +180,7 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen && isProgressPhase) {
-      const confirmed = window.confirm(
-        'Image import is still running. Close this dialog? The import will continue in the background.'
-      )
+      const confirmed = window.confirm(t('imageImport.closeWhileRunningConfirm'))
       if (!confirmed) return
     }
     if (!nextOpen) resetState()
@@ -208,9 +208,9 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
     }).unwrap()
     setPreview(result)
     if ((result.summary?.matched ?? 0) === 0) {
-      toast.error('No images matched — review the summary below')
+      toast.error(t('toast.noImagesMatched'))
     } else {
-      toast.success(`Preview ready: ${result.summary.matched} image(s) matched`)
+      toast.success(t('toast.previewReady', { count: result.summary.matched }))
     }
   }
 
@@ -234,7 +234,7 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
     const file = event.target.files?.[0]
     if (!file) return
     if (!file.name.toLowerCase().endsWith('.zip')) {
-      toast.error('Please upload a .zip file')
+      toast.error(t('toast.uploadZipFile'))
       return
     }
 
@@ -258,7 +258,7 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
         })
       }
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || error?.message || 'Failed to upload ZIP')
+      toast.error(error?.data?.error?.message || error?.message || t('toast.zipUploadFailed'))
       setZipFile(null)
       setZipFileKey(null)
     } finally {
@@ -270,7 +270,7 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
     const file = event.target.files?.[0]
     if (!file) return
     if (!file.name.toLowerCase().endsWith('.csv')) {
-      toast.error('Please upload a .csv mapping file')
+      toast.error(t('toast.uploadMappingCsv'))
       return
     }
 
@@ -292,7 +292,7 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
         })
       }
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || error?.message || 'Failed to upload mapping CSV')
+      toast.error(error?.data?.error?.message || error?.message || t('toast.mappingUploadFailed'))
       setMappingFile(null)
       setMappingFileKey(null)
     } finally {
@@ -315,14 +315,14 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
         replace: checked,
       })
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to refresh preview')
+      toast.error(error?.data?.error?.message || t('toast.previewRefreshFailed'))
     }
   }
 
   const handleConfirmImport = async () => {
     if (!preview || !zipFileKey) return
     if (tab === 'zip_mapping' && !mappingFileKey) {
-      toast.error('Upload both ZIP and mapping CSV before importing')
+      toast.error(t('toast.uploadBothFiles'))
       return
     }
 
@@ -335,9 +335,9 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
         preview,
       }).unwrap()
       setJobId(result.job.id)
-      toast.success('Image import started')
+      toast.success(t('toast.imageImportStarted'))
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to start import')
+      toast.error(error?.data?.error?.message || t('toast.importStartFailed'))
     }
   }
 
@@ -345,9 +345,9 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
     if (!jobId) return
     try {
       await cancelImageImport(jobId).unwrap()
-      toast.success('Import cancelled')
+      toast.success(t('toast.importCancelled'))
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to cancel import')
+      toast.error(error?.data?.error?.message || t('toast.cancelImportFailed'))
     }
   }
 
@@ -367,7 +367,7 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {
-      toast.error('Could not download failure report')
+      toast.error(t('toast.downloadFailed'))
     }
   }
 
@@ -383,12 +383,16 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
 
     if (job.status === 'completed') {
       toast.success(
-        `Import complete: ${job.matched} matched, ${job.failed} failed, ${job.skipped} skipped`
+        t('toast.importComplete', {
+          matched: job.matched,
+          failed: job.failed,
+          skipped: job.skipped,
+        })
       )
     } else if (job.status === 'failed') {
-      toast.error(job.error_message || 'Image import failed')
+      toast.error(job.error_message || t('toast.imageImportFailed'))
     }
-  }, [job, isJobTerminal])
+  }, [job, isJobTerminal, t])
 
   const missingCount = useMemo(() => {
     if (!preview?.summary) return 0
@@ -412,11 +416,8 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent size="xl" data-testid="image-import-dialog">
         <DialogHeader>
-          <DialogTitle>Import Product Images</DialogTitle>
-          <DialogDescription>
-            Bulk attach catalog images from a ZIP archive. Match by SKU filename or upload a mapping
-            CSV when filenames differ.
-          </DialogDescription>
+          <DialogTitle>{t('imageImport.title')}</DialogTitle>
+          <DialogDescription>{t('imageImport.description')}</DialogDescription>
         </DialogHeader>
 
         <Tabs
@@ -428,14 +429,14 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
           }}
         >
           <TabsList className="w-full">
-            <TabsTrigger value="zip_sku">ZIP by SKU</TabsTrigger>
-            <TabsTrigger value="zip_mapping">ZIP + mapping CSV</TabsTrigger>
-            <TabsTrigger value="url_csv">URL via product CSV</TabsTrigger>
+            <TabsTrigger value="zip_sku">{t('imageImport.tabs.zipSku')}</TabsTrigger>
+            <TabsTrigger value="zip_mapping">{t('imageImport.tabs.zipMapping')}</TabsTrigger>
+            <TabsTrigger value="url_csv">{t('imageImport.tabs.urlCsv')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="zip_sku" className="space-y-4 pt-2">
             <div className="space-y-2">
-              <Label htmlFor="image-import-zip-sku">ZIP archive</Label>
+              <Label htmlFor="image-import-zip-sku">{t('imageImport.zipArchive')}</Label>
               <Input
                 id="image-import-zip-sku"
                 type="file"
@@ -445,12 +446,14 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
                 className="cursor-pointer"
               />
               <p className="text-sm text-[var(--text-muted)]">
-                Name each image file after the product SKU (e.g. <code>SKU-001.jpg</code>).
+                <Trans i18nKey="imageImport.zipSkuHint" ns="products" />
               </p>
               {zipFile && (
                 <p className="text-sm text-[var(--text-muted)]">
-                  {zipFile.name} · {formatNumber(zipFile.size / 1024, { maximumFractionDigits: 1 })}{' '}
-                  KB
+                  {t('imageImport.fileInfo', {
+                    name: zipFile.name,
+                    size: formatNumber(zipFile.size / 1024, { maximumFractionDigits: 1 }),
+                  })}
                 </p>
               )}
             </div>
@@ -458,7 +461,7 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
 
           <TabsContent value="zip_mapping" className="space-y-4 pt-2">
             <div className="space-y-2">
-              <Label htmlFor="image-import-zip-mapping">ZIP archive</Label>
+              <Label htmlFor="image-import-zip-mapping">{t('imageImport.zipArchive')}</Label>
               <Input
                 id="image-import-zip-mapping"
                 type="file"
@@ -469,7 +472,7 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="image-import-mapping-csv">Mapping CSV</Label>
+              <Label htmlFor="image-import-mapping-csv">{t('imageImport.mappingCsv')}</Label>
               <Input
                 id="image-import-mapping-csv"
                 type="file"
@@ -479,19 +482,16 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
                 className="cursor-pointer"
               />
               <p className="text-sm text-[var(--text-muted)]">
-                CSV columns: <strong>SKU</strong> (or product_code/barcode) and{' '}
-                <strong>ImageFile</strong> (or image_file/file).
+                <Trans i18nKey="imageImport.mappingHint" ns="products" />
               </p>
             </div>
           </TabsContent>
 
           <TabsContent value="url_csv" className="pt-2">
             <div className="rounded-md border border-[var(--app-border)] bg-[var(--brand-ultra)] p-4 text-sm text-[var(--brand-mid)]">
-              <p className="font-medium text-[var(--text)]">Use product bulk upload instead</p>
+              <p className="font-medium text-[var(--text)]">{t('imageImport.urlCsvTitle')}</p>
               <p className="mt-2">
-                To import images from URLs, include an <strong>image_url</strong> column in your
-                product CSV and run <strong>Bulk Upload Products</strong>. Remote images are fetched
-                during product import.
+                <Trans i18nKey="imageImport.urlCsvDescription" ns="products" />
               </p>
             </div>
           </TabsContent>
@@ -500,9 +500,9 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
         {tab !== 'url_csv' && (
           <div className="flex items-center justify-between rounded-md border border-[var(--app-border)] px-3 py-2">
             <div>
-              <p className="text-sm font-medium">Replace existing images</p>
+              <p className="text-sm font-medium">{t('imageImport.replaceExisting')}</p>
               <p className="text-xs text-[var(--text-muted)]">
-                When off, products that already have an image are skipped.
+                {t('imageImport.replaceExistingHint')}
               </p>
             </div>
             <Switch
@@ -517,65 +517,67 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
         {(uploading || isPreviewing) && (
           <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
             <Loader2 className="h-4 w-4 animate-spin" />
-            {uploading ? 'Uploading files…' : 'Building preview…'}
+            {uploading ? t('imageImport.uploading') : t('imageImport.buildingPreview')}
           </div>
         )}
 
         {preview && !isProgressPhase && !isCompletePhase && (
           <div className="space-y-3" data-testid="image-import-preview">
-            <Label>Review</Label>
+            <Label>{t('imageImport.review')}</Label>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <SummaryCard label="Total in ZIP" value={preview.summary.totalZipFiles} />
-              <SummaryCard label="Matched" value={preview.summary.matched} />
               <SummaryCard
-                label="Missing"
+                label={t('imageImport.stats.totalInZip')}
+                value={preview.summary.totalZipFiles}
+              />
+              <SummaryCard label={t('imageImport.stats.matched')} value={preview.summary.matched} />
+              <SummaryCard
+                label={t('imageImport.stats.missing')}
                 value={missingCount}
                 tone={missingCount ? 'warn' : 'default'}
               />
               <SummaryCard
-                label="Duplicates"
+                label={t('imageImport.stats.duplicates')}
                 value={preview.summary.duplicates}
                 tone={preview.summary.duplicates ? 'warn' : 'default'}
               />
               <SummaryCard
-                label="Invalid"
+                label={t('imageImport.stats.invalid')}
                 value={preview.summary.invalidRows}
                 tone={preview.summary.invalidRows ? 'warn' : 'default'}
               />
               <SummaryCard
-                label="Without images"
+                label={t('imageImport.stats.withoutImages')}
                 value={preview.summary.productsWithoutImages}
                 tone="muted"
               />
             </div>
             {preview.summary.skippedExisting > 0 && (
               <p className="text-sm text-[var(--text-muted)]">
-                {preview.summary.skippedExisting} product(s) skipped because they already have
-                images.
+                {t('imageImport.skippedExisting', { count: preview.summary.skippedExisting })}
               </p>
             )}
             {(preview.unmatchedFiles?.length ?? 0) > 0 && (
               <PreviewDetailSection
-                title="Unmatched files"
+                title={t('imageImport.unmatchedFiles')}
                 rows={preview.unmatchedFiles ?? []}
                 columns={[
-                  { key: 'fileName', label: 'File' },
-                  { key: 'sku', label: 'SKU' },
-                  { key: 'stem', label: 'Stem' },
-                  { key: 'reason', label: 'Reason' },
+                  { key: 'fileName', label: t('imageImport.columns.file') },
+                  { key: 'sku', label: t('imageImport.columns.sku') },
+                  { key: 'stem', label: t('imageImport.columns.stem') },
+                  { key: 'reason', label: t('imageImport.columns.reason') },
                 ]}
                 testId="image-import-unmatched-files"
               />
             )}
             {(preview.duplicates?.length ?? 0) > 0 && (
               <PreviewDetailSection
-                title="Duplicates"
+                title={t('imageImport.duplicates')}
                 rows={preview.duplicates ?? []}
                 columns={[
-                  { key: 'type', label: 'Type' },
-                  { key: 'fileName', label: 'File' },
-                  { key: 'sku', label: 'SKU' },
-                  { key: 'reason', label: 'Reason' },
+                  { key: 'type', label: t('imageImport.columns.type') },
+                  { key: 'fileName', label: t('imageImport.columns.file') },
+                  { key: 'sku', label: t('imageImport.columns.sku') },
+                  { key: 'reason', label: t('imageImport.columns.reason') },
                 ]}
                 testId="image-import-duplicates"
               />
@@ -588,7 +590,10 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium capitalize">{job.status}…</span>
               <span className="text-[var(--text-muted)]">
-                {job.processed} / {job.total_files} files
+                {t('imageImport.filesProgress', {
+                  processed: job.processed,
+                  total: job.total_files,
+                })}
               </span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-[var(--app-border)]">
@@ -606,9 +611,12 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
             data-testid="image-import-summary"
           >
             <p>
-              <strong>{job.matched}</strong> matched ·{' '}
-              <strong className="text-[var(--red)]">{job.failed}</strong> failed ·{' '}
-              <strong>{job.skipped}</strong> skipped
+              <Trans
+                i18nKey="imageImport.summary"
+                ns="products"
+                values={{ matched: job.matched, failed: job.failed, skipped: job.skipped }}
+                components={{ strong: <strong /> }}
+              />
             </p>
             {job.error_message && <p className="text-[var(--red)]">{job.error_message}</p>}
             {job.failed > 0 && (
@@ -621,7 +629,7 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
                 className="flex items-center gap-2"
               >
                 <Download className="h-4 w-4" />
-                Download failure report
+                {t('imageImport.downloadFailureReport')}
               </Button>
             )}
           </div>
@@ -635,7 +643,7 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
                 onClick={() => handleOpenChange(false)}
                 disabled={isCancelling}
               >
-                Close
+                {t('imageImport.close')}
               </Button>
               <Button
                 variant="destructive"
@@ -643,24 +651,26 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
                 disabled={isCancelling}
                 data-testid="image-import-cancel-job"
               >
-                {isCancelling ? 'Cancelling…' : 'Cancel import'}
+                {isCancelling ? t('imageImport.cancelling') : t('imageImport.cancelImport')}
               </Button>
             </>
           ) : isCompletePhase ? (
             <Button onClick={() => handleOpenChange(false)} data-testid="image-import-done">
-              Done
+              {t('imageImport.done')}
             </Button>
           ) : (
             <>
               <Button variant="outline" onClick={() => handleOpenChange(false)}>
-                Cancel
+                {t('imageImport.cancel')}
               </Button>
               <Button
                 onClick={handleConfirmImport}
                 disabled={!canConfirm || isStarting}
                 data-testid="image-import-confirm"
               >
-                {isStarting ? 'Starting…' : `Import ${preview?.summary.matched ?? 0} image(s)`}
+                {isStarting
+                  ? t('imageImport.starting')
+                  : t('imageImport.importImages', { count: preview?.summary.matched ?? 0 })}
               </Button>
             </>
           )}

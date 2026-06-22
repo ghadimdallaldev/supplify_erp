@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   useGetSupplierReorderAssistanceQuery,
   useCreateReorderReminderDraftMutation,
@@ -23,6 +24,7 @@ const URGENCY_STYLES: Record<string, string> = {
 }
 
 export function SupplierFollowUpPanel({ className }: { className?: string }) {
+  const { t } = useTranslation('suppliers')
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const smartReorderEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.smart_reorder
@@ -43,18 +45,18 @@ export function SupplierFollowUpPanel({ className }: { className?: string }) {
       const result = await createDraft({ restaurantId, openChat }).unwrap()
       const d = result?.draft
       if (!d) {
-        toast.error('Could not create reminder')
+        toast.error(t('followUp.toast.createFailed'))
         return
       }
       if (openChat && d.chatUrl) {
         window.location.href = d.chatUrl
-        toast.success('Opening chat — paste your message when ready')
+        toast.success(t('followUp.toast.openingChat'))
         return
       }
       setDraft(d)
       setDraftOpen(true)
     } catch (e: any) {
-      toast.error(e?.data?.error?.message || 'Failed to prepare message')
+      toast.error(e?.data?.error?.message || t('followUp.toast.prepareFailed'))
     } finally {
       setBusyRestaurantId(null)
     }
@@ -82,10 +84,10 @@ export function SupplierFollowUpPanel({ className }: { className?: string }) {
       <Card className={className}>
         <CardContent className="py-6">
           <EmptyState
-            title="Could not load follow-up suggestions"
+            title={t('followUp.loadError')}
             action={
               <Button variant="outline" size="sm" onClick={() => refetch()}>
-                Retry
+                {t('common:actions.retry')}
               </Button>
             }
           />
@@ -100,16 +102,14 @@ export function SupplierFollowUpPanel({ className }: { className?: string }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Users className="h-4 w-4 text-[var(--brand-mid)]" />
-            Customer follow-up
+            {t('followUp.title')}
           </CardTitle>
-          <CardDescription>
-            Restaurants that missed expected orders or may need a reorder nudge
-          </CardDescription>
+          <CardDescription>{t('followUp.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           {suggestions.length === 0 ? (
             <p className="text-sm text-[var(--text-muted)] text-center py-4">
-              No follow-up suggestions right now
+              {t('followUp.empty')}
             </p>
           ) : (
             <ul className="divide-y divide-[var(--app-border)]">
@@ -125,7 +125,11 @@ export function SupplierFollowUpPanel({ className }: { className?: string }) {
                             URGENCY_STYLES[item.urgency] || URGENCY_STYLES.MEDIUM
                           )}
                         >
-                          {item.reasonCode === 'churn_risk' ? 'Churn risk' : item.urgency}
+                          {item.reasonCode === 'churn_risk'
+                            ? t('followUp.churnRisk')
+                            : t(`followUp.urgency.${item.urgency}`, {
+                                defaultValue: item.urgency,
+                              })}
                         </Badge>
                       </div>
                       <p className="text-xs text-[var(--text-muted)] mt-1">{item.reasonLabel}</p>
@@ -137,7 +141,7 @@ export function SupplierFollowUpPanel({ className }: { className?: string }) {
                       <Button variant="outline" size="sm" asChild>
                         <Link to={`/app/orders?restaurantId=${item.restaurantId}`}>
                           <History className="h-3.5 w-3.5 mr-1" />
-                          History
+                          {t('followUp.history')}
                         </Link>
                       </Button>
                       <Button
@@ -147,7 +151,7 @@ export function SupplierFollowUpPanel({ className }: { className?: string }) {
                         onClick={() => handleMessage(item.restaurantId, false)}
                       >
                         <Bell className="h-3.5 w-3.5 mr-1" />
-                        Reminder
+                        {t('followUp.reminder')}
                       </Button>
                       <Button
                         size="sm"
@@ -159,7 +163,7 @@ export function SupplierFollowUpPanel({ className }: { className?: string }) {
                         ) : (
                           <>
                             <MessageCircle className="h-3.5 w-3.5 mr-1" />
-                            Message
+                            {t('followUp.message')}
                           </>
                         )}
                       </Button>

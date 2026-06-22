@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { FulfillmentRoutesTab } from './FulfillmentRoutesTab'
+import { renderWithFulfillmentI18n } from './test-utils'
 
 vi.mock('../../services/api', () => ({
   useGetFulfillmentRoutesQuery: () => ({
@@ -21,7 +22,7 @@ vi.mock('../../services/api', () => ({
 
 describe('FulfillmentRoutesTab', () => {
   it('shows empty state pointing to Driver Dispatch', () => {
-    render(
+    renderWithFulfillmentI18n(
       <MemoryRouter>
         <FulfillmentRoutesTab />
       </MemoryRouter>

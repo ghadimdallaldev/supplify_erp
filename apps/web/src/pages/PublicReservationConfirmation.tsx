@@ -1,4 +1,7 @@
+import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
+import { ensureNamespace } from '../i18n'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Skeleton } from '../components/ui/skeleton'
@@ -20,8 +23,13 @@ function formatWhen(iso: string) {
 }
 
 export function PublicReservationConfirmation() {
+  const { t } = useTranslation('reservations')
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') ?? ''
+
+  useEffect(() => {
+    void ensureNamespace('reservations')
+  }, [])
 
   const { data, isLoading, isError } = useGetPublicReservationDetailsQuery(token, {
     skip: !token,
@@ -40,11 +48,11 @@ export function PublicReservationConfirmation() {
     <PublicPageLayout
       centered
       narrow
-      title="You're booked"
+      title={t('confirmation.title')}
       subtitle={
         restaurantName
-          ? `Your table at ${restaurantName} is confirmed.`
-          : 'Thanks for booking with us.'
+          ? t('confirmation.subtitleWithRestaurant', { name: restaurantName })
+          : t('confirmation.subtitleGeneric')
       }
     >
       <PublicPanel className="w-full">
@@ -55,9 +63,7 @@ export function PublicReservationConfirmation() {
           </div>
         ) : isError || !reservation ? (
           <p className="py-4 text-center text-sm leading-relaxed text-[var(--text-muted)]">
-            {token
-              ? 'We could not load your reservation. Use the link from your confirmation email or contact the restaurant.'
-              : 'Your reservation is confirmed. Check your email for the manage link.'}
+            {token ? t('confirmation.loadErrorWithToken') : t('confirmation.loadErrorNoToken')}
           </p>
         ) : (
           <div className="space-y-4">
@@ -68,7 +74,7 @@ export function PublicReservationConfirmation() {
             </div>
             <dl className="divide-y divide-[var(--app-border)] text-sm">
               <div className="flex items-center justify-between gap-3 py-2.5">
-                <dt className="text-[var(--text-muted)]">Status</dt>
+                <dt className="text-[var(--text-muted)]">{t('confirmation.status')}</dt>
                 <dd>
                   <Badge variant="outline" className="capitalize">
                     {reservation.status?.toLowerCase()}
@@ -78,21 +84,23 @@ export function PublicReservationConfirmation() {
               {when ? (
                 <>
                   <div className="flex justify-between gap-4 py-2.5">
-                    <dt className="text-[var(--text-muted)]">Date</dt>
+                    <dt className="text-[var(--text-muted)]">{t('confirmation.date')}</dt>
                     <dd className="text-right font-medium text-[var(--text)]">{when.date}</dd>
                   </div>
                   <div className="flex justify-between gap-4 py-2.5">
-                    <dt className="text-[var(--text-muted)]">Time</dt>
+                    <dt className="text-[var(--text-muted)]">{t('confirmation.time')}</dt>
                     <dd className="font-medium tabular-nums text-[var(--text)]">{when.time}</dd>
                   </div>
                 </>
               ) : null}
               <div className="flex justify-between gap-4 py-2.5">
-                <dt className="text-[var(--text-muted)]">Party size</dt>
-                <dd className="font-medium text-[var(--text)]">{partySize} guests</dd>
+                <dt className="text-[var(--text-muted)]">{t('confirmation.partySize')}</dt>
+                <dd className="font-medium text-[var(--text)]">
+                  {t('confirmation.guests', { count: partySize ?? 0 })}
+                </dd>
               </div>
               <div className="flex justify-between gap-4 py-2.5">
-                <dt className="text-[var(--text-muted)]">Name</dt>
+                <dt className="text-[var(--text-muted)]">{t('confirmation.name')}</dt>
                 <dd className="font-medium text-[var(--text)]">{customerName}</dd>
               </div>
             </dl>
@@ -106,17 +114,17 @@ export function PublicReservationConfirmation() {
                 asChild
                 className="consumer-pressable w-full bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
               >
-                <Link to={manageHref}>Manage or cancel</Link>
+                <Link to={manageHref}>{t('confirmation.manageOrCancel')}</Link>
               </Button>
               <p className="text-center text-xs text-[var(--text-muted)]">
-                Reschedule or cancel using your private manage link.
+                {t('confirmation.manageHint')}
               </p>
             </>
           ) : null}
 
           <Button asChild variant="outline" className="consumer-pressable w-full">
             <Link to={restaurantSlug ? `/reserve/${restaurantSlug}` : '/reserve'}>
-              Book another table
+              {t('confirmation.bookAnotherTable')}
             </Link>
           </Button>
         </div>

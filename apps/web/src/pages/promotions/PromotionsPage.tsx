@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
@@ -38,42 +39,60 @@ import { DealsPerformanceSummary } from '../../components/promotions/DealsPerfor
 import { useWorkspaceRole } from '../../hooks/useWorkspaceRole'
 import { Plus, Send } from 'lucide-react'
 import { EmptyState } from '../../components/ui/empty-state'
-import {
-  COUPON_FIELD_HELPER,
-  DEAL_SCHEDULE_ENDS_HELPER,
-  DEAL_SCHEDULE_SECTION_HELPER,
-  SUPPLIER_CTA_TYPES,
-  SUPPLIER_DEAL_TYPES,
-  SUPPLIER_EMPTY_STATE,
-  formatDealTypeLabel,
-  getCtaHelperText,
-  getDealTypeHelperText,
-} from '../../lib/dealDisplayLabels'
-
-const STORE_WIDE_DEAL_PRESETS = [
-  {
-    label: '10% store-wide',
-    name: 'Store-wide 10% off',
-    type: 'percentage_discount' as const,
-    discountValue: '10',
-  },
-  {
-    label: '15% store-wide',
-    name: 'Store-wide 15% off',
-    type: 'percentage_discount' as const,
-    discountValue: '15',
-  },
-  {
-    label: '$25 off store-wide',
-    name: 'Store-wide $25 off',
-    type: 'fixed_discount' as const,
-    discountValue: '25',
-  },
-] as const
+import { SUPPLIER_CTA_TYPES, SUPPLIER_DEAL_TYPES } from '../../lib/dealDisplayLabels'
 
 export function PromotionsPage() {
+  const { t } = useTranslation('cart')
   const { persona } = useWorkspaceRole()
-  const copy = persona.promotionsCopy
+  const copy = {
+    title: persona.promotionsCopy?.title ?? t('promotions.title'),
+    subtitle: persona.promotionsCopy?.subtitle ?? t('promotions.subtitle'),
+    listTitle: persona.promotionsCopy?.listTitle ?? t('promotions.listTitle'),
+    newButton: persona.promotionsCopy?.newButton ?? t('promotions.newButton'),
+    performanceTitle: persona.promotionsCopy?.performanceTitle ?? t('promotions.performanceTitle'),
+  }
+
+  const storeWideDealPresets = useMemo(
+    () =>
+      [
+        {
+          label: t('promotions.preset10Percent'),
+          name: t('promotions.preset10PercentName'),
+          type: 'percentage_discount' as const,
+          discountValue: '10',
+        },
+        {
+          label: t('promotions.preset15Percent'),
+          name: t('promotions.preset15PercentName'),
+          type: 'percentage_discount' as const,
+          discountValue: '15',
+        },
+        {
+          label: t('promotions.preset25Off'),
+          name: t('promotions.preset25OffName'),
+          type: 'fixed_discount' as const,
+          discountValue: '25',
+        },
+      ] as const,
+    [t]
+  )
+
+  const formatDealTypeLabel = (type: string) =>
+    t(`promotions.dealTypes.${type}`, { defaultValue: type })
+
+  const getDealTypeHelperText = (type: string) => {
+    const key = `promotions.dealTypeHelper.${type}`
+    const text = t(key, { defaultValue: '' })
+    return text || undefined
+  }
+
+  const getCtaHelperText = (cta: string) => {
+    const key = `promotions.ctaHelper.${cta}`
+    const text = t(key, { defaultValue: '' })
+    return text || undefined
+  }
+
+  const getCtaLabel = (value: string) => t(`promotions.ctaTypes.${value}`, { defaultValue: value })
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const promotionsEnabled = isEntitlementFeatureEnabled(
     entitlementsData?.entitlements,
@@ -117,10 +136,10 @@ export function PromotionsPage() {
   if (!promotionsEnabled) {
     return (
       <PageShell data-testid="promotions-page">
-        <PageHeader title="Deals" />
+        <PageHeader title={t('promotions.title')} />
         <FeatureLockedCard
           featureKey="promotions"
-          featureName="Deals"
+          featureName={t('promotions.title')}
           currentPlan={entitlementsData?.entitlements?.plan?.name ?? null}
         />
       </PageShell>
@@ -145,21 +164,21 @@ export function PromotionsPage() {
 
   const validateForm = () => {
     if (!form.name.trim()) {
-      toast.error('Name is required')
+      toast.error(t('promotions.toastNameRequired'))
       return false
     }
     if (targeting.appliesTo === 'specific_products' && targeting.productIds.length === 0) {
-      toast.error('Select at least one product')
+      toast.error(t('promotions.toastSelectProduct'))
       return false
     }
     if (targeting.appliesTo === 'specific_categories' && targeting.categoryIds.length === 0) {
-      toast.error('Select at least one category')
+      toast.error(t('promotions.toastSelectCategory'))
       return false
     }
     return true
   }
 
-  const applyStoreWidePreset = (preset: (typeof STORE_WIDE_DEAL_PRESETS)[number]) => {
+  const applyStoreWidePreset = (preset: (typeof storeWideDealPresets)[number]) => {
     setForm((f) => ({
       ...f,
       name: preset.name,
@@ -173,38 +192,41 @@ export function PromotionsPage() {
     if (!validateForm()) return
     try {
       await createPromotion(buildCreatePayload(false)).unwrap()
-      toast.success('Draft saved')
+      toast.success(t('promotions.toastDraftSaved'))
       setShowCreate(false)
       setCreatePricingKey('')
       setTargeting({ appliesTo: 'all', productIds: [], categoryIds: [] })
       refetch()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to save draft')
+      toast.error(err?.data?.error?.message || t('promotions.toastDraftSaveFailed'))
     }
   }
 
   const handleCreateAndSubmit = async () => {
     if (!validateForm()) return
     if (!createPricingKey) {
-      toast.error('Select a boost package before submitting')
+      toast.error(t('promotions.toastSelectBoost'))
       return
     }
     try {
       await createPromotion(buildCreatePayload(true)).unwrap()
-      toast.success('Deal and boost submitted for admin approval')
+      toast.success(t('promotions.toastSubmitted'))
       setShowCreate(false)
       setCreatePricingKey('')
       setTargeting({ appliesTo: 'all', productIds: [], categoryIds: [] })
       refetch()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to submit deal')
+      toast.error(err?.data?.error?.message || t('promotions.toastSubmitFailed'))
     }
   }
 
   return (
-    <RequirePermission anyOf={['PROMOTIONS_VIEW', 'PROMOTIONS_MANAGE']} title="deals">
+    <RequirePermission
+      anyOf={['PROMOTIONS_VIEW', 'PROMOTIONS_MANAGE']}
+      title={t('promotions.permissionTitle')}
+    >
       <PageShell data-testid="promotions-page">
         <PageHeader
           title={copy.title}
@@ -213,7 +235,7 @@ export function PromotionsPage() {
             !persona.readOnly ? (
               <Button onClick={() => setShowCreate(true)} disabled={!promotionGate.canCreate}>
                 <Plus className="h-4 w-4 mr-2" />
-                {promotionGate.canCreate ? copy.newButton : 'Deal limit reached'}
+                {promotionGate.canCreate ? copy.newButton : t('promotions.dealLimitReached')}
               </Button>
             ) : undefined
           }
@@ -230,7 +252,7 @@ export function PromotionsPage() {
           </div>
         ) : promotionGate.limit != null ? (
           <p className="text-sm text-[var(--text-mid)]">
-            Active deals on your plan:{' '}
+            {t('promotions.activeDealsOnPlan')}{' '}
             <span className="font-medium tabular-nums text-[var(--text)]">
               {promotionGate.current}/{promotionGate.limit}
             </span>
@@ -243,7 +265,7 @@ export function PromotionsPage() {
               <h2 className="text-sm font-semibold text-[var(--text)]">{copy.listTitle}</h2>
               {!isLoading && promotions.length > 0 ? (
                 <p className="text-xs text-[var(--text-muted)] tabular-nums">
-                  {promotions.length} deal{promotions.length === 1 ? '' : 's'}
+                  {t('promotions.dealCount', { count: promotions.length })}
                 </p>
               ) : null}
             </div>
@@ -252,7 +274,7 @@ export function PromotionsPage() {
 
           {error ? (
             <p className="px-4 py-8 text-sm text-[var(--red)] sm:px-5">
-              Could not load deals. Refresh the page or check your plan permissions.
+              {t('promotions.loadError')}
             </p>
           ) : isLoading ? (
             <div className="divide-y divide-[var(--app-border)]">
@@ -270,13 +292,13 @@ export function PromotionsPage() {
           ) : promotions.length === 0 ? (
             <div className="px-4 py-8 sm:px-5">
               <EmptyState
-                title={SUPPLIER_EMPTY_STATE.title}
-                description={SUPPLIER_EMPTY_STATE.description}
+                title={t('promotions.emptyTitle')}
+                description={t('promotions.emptyDescription')}
                 action={
                   !persona.readOnly && promotionGate.canCreate ? (
                     <Button onClick={() => setShowCreate(true)}>
                       <Plus className="h-4 w-4 mr-2" />
-                      {SUPPLIER_EMPTY_STATE.cta}
+                      {t('promotions.newButton')}
                     </Button>
                   ) : undefined
                 }
@@ -295,17 +317,17 @@ export function PromotionsPage() {
                   }}
                   onDelete={async (id) => {
                     await deletePromotion(id).unwrap()
-                    toast.success('Deleted')
+                    toast.success(t('promotions.toastDeleted'))
                     refetch()
                   }}
                   onPause={async (id) => {
                     await pausePromotion(id).unwrap()
-                    toast.success('Paused')
+                    toast.success(t('promotions.toastPaused'))
                     refetch()
                   }}
                   onResume={async (id) => {
                     await resumePromotion(id).unwrap()
-                    toast.success('Resumed')
+                    toast.success(t('promotions.toastResumed'))
                     refetch()
                   }}
                   onAnalytics={setAnalyticsId}
@@ -322,13 +344,12 @@ export function PromotionsPage() {
             </DialogHeader>
             <div className="space-y-3">
               <div>
-                <Label>Store-wide presets</Label>
+                <Label>{t('promotions.storeWidePresets')}</Label>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  Quick-start a deal that applies to your entire catalog — shown as an on-sale badge
-                  on your supplier profile.
+                  {t('promotions.storeWidePresetsHint')}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {STORE_WIDE_DEAL_PRESETS.map((preset) => (
+                  {storeWideDealPresets.map((preset) => (
                     <Button
                       key={preset.label}
                       type="button"
@@ -342,14 +363,14 @@ export function PromotionsPage() {
                 </div>
               </div>
               <div>
-                <Label>Name</Label>
+                <Label>{t('promotions.name')}</Label>
                 <Input
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 />
               </div>
               <div>
-                <Label>Deal type</Label>
+                <Label>{t('promotions.dealType')}</Label>
                 <Select
                   value={form.type}
                   onValueChange={(value) =>
@@ -374,7 +395,7 @@ export function PromotionsPage() {
                 ) : null}
               </div>
               <div>
-                <Label>Discount value</Label>
+                <Label>{t('promotions.discountValue')}</Label>
                 <Input
                   type="number"
                   value={form.discountValue}
@@ -382,7 +403,7 @@ export function PromotionsPage() {
                 />
               </div>
               <div>
-                <Label>Min order (optional)</Label>
+                <Label>{t('promotions.minOrderOptional')}</Label>
                 <Input
                   type="number"
                   value={form.minOrderAmount}
@@ -390,15 +411,15 @@ export function PromotionsPage() {
                 />
               </div>
               <div>
-                <Label>CTA type</Label>
+                <Label>{t('promotions.ctaType')}</Label>
                 <Select
                   value={form.ctaType}
                   onValueChange={(value) => setForm((f) => ({ ...f, ctaType: value }))}
                 >
                   <SelectTrigger>
-                    {SUPPLIER_CTA_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
+                    {SUPPLIER_CTA_TYPES.map((cta) => (
+                      <option key={cta.value} value={cta.value}>
+                        {getCtaLabel(cta.value)}
                       </option>
                     ))}
                   </SelectTrigger>
@@ -411,27 +432,26 @@ export function PromotionsPage() {
               </div>
               {form.ctaType === 'use_coupon' ? (
                 <div>
-                  <Label>Coupon code</Label>
+                  <Label>{t('promotions.couponCode')}</Label>
                   <Input
                     value={form.couponCode}
                     onChange={(e) => setForm((f) => ({ ...f, couponCode: e.target.value }))}
                   />
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">{COUPON_FIELD_HELPER}</p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    {t('promotions.couponFieldHelper')}
+                  </p>
                 </div>
               ) : null}
               <div>
-                <Label className="text-base font-semibold">Deal targeting</Label>
+                <Label className="text-base font-semibold">{t('promotions.dealTargeting')}</Label>
                 <div className="mt-2">
                   <DealTargetingPickers value={targeting} onChange={setTargeting} />
                 </div>
               </div>
               <div className="border-t pt-3">
-                <Label className="text-base font-semibold">Boost this deal</Label>
-                <p className="text-xs text-[var(--text-muted)] mb-2">
-                  Optional paid sponsored placement. Required when submitting for approval —
-                  restaurants only see live boosted deals in their feed.
-                </p>
-                <Label className="text-sm font-medium">Boost package</Label>
+                <Label className="text-base font-semibold">{t('promotions.boostThisDeal')}</Label>
+                <p className="text-xs text-[var(--text-muted)] mb-2">{t('promotions.boostHint')}</p>
+                <Label className="text-sm font-medium">{t('promotions.boostPackage')}</Label>
                 <div className="mt-2">
                   <DealBoostPackagePicker
                     selectedPricingKey={createPricingKey}
@@ -440,16 +460,14 @@ export function PromotionsPage() {
                 </div>
               </div>
               <div>
-                <Label className="text-base font-semibold">Deal schedule</Label>
+                <Label className="text-base font-semibold">{t('promotions.dealSchedule')}</Label>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  {DEAL_SCHEDULE_SECTION_HELPER}
+                  {t('promotions.dealScheduleHelper')}
                 </p>
                 <div className="mt-2 space-y-3">
                   <div>
-                    <Label>Starts</Label>
-                    <p className="text-xs text-[var(--text-muted)]">
-                      When the discount or coupon becomes redeemable.
-                    </p>
+                    <Label>{t('promotions.starts')}</Label>
+                    <p className="text-xs text-[var(--text-muted)]">{t('promotions.startsHint')}</p>
                     <Input
                       type="datetime-local"
                       value={form.startsAt}
@@ -458,8 +476,8 @@ export function PromotionsPage() {
                     />
                   </div>
                   <div>
-                    <Label>Ends (optional)</Label>
-                    <p className="text-xs text-[var(--text-muted)]">{DEAL_SCHEDULE_ENDS_HELPER}</p>
+                    <Label>{t('promotions.endsOptional')}</Label>
+                    <p className="text-xs text-[var(--text-muted)]">{t('promotions.endsHint')}</p>
                     <Input
                       type="datetime-local"
                       value={form.endsAt}
@@ -472,11 +490,11 @@ export function PromotionsPage() {
             </div>
             <DialogFooter className="flex-col sm:flex-row gap-2">
               <Button variant="outline" onClick={handleSaveDraft} disabled={creating}>
-                Save draft
+                {t('promotions.saveDraft')}
               </Button>
               <Button onClick={handleCreateAndSubmit} disabled={creating || !createPricingKey}>
                 <Send className="h-4 w-4 mr-2" />
-                Submit for approval
+                {t('promotions.submitForApproval')}
               </Button>
             </DialogFooter>
           </DialogContent>

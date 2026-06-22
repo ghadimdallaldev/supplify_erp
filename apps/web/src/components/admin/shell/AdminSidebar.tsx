@@ -1,15 +1,14 @@
 import { Link, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../../lib/utils'
 import { SupplifyLogo } from '../../SupplifyLogo'
-import {
-  ADMIN_PLATFORM_NAV,
-  ADMIN_PORTAL_LINKS,
-  ADMIN_TENANT_PORTAL_NAV,
-  adminTabPath,
-  resolveAdminPortal,
-  type AdminNavGroup,
-} from './adminNavConfig'
+import { adminTabPath, resolveAdminPortal, type AdminNavGroupResolved } from './adminNavConfig'
 import type { AdminShellNavState } from './adminShellContext'
+import {
+  useAdminPlatformNav,
+  useAdminPortalLinks,
+  useAdminTenantPortalNav,
+} from './useAdminNavLabels'
 
 type AdminSidebarProps = {
   sectionNav?: AdminShellNavState | null
@@ -23,7 +22,7 @@ function NavGroups({
   portal,
   onMobileClose,
 }: {
-  groups: AdminNavGroup[]
+  groups: AdminNavGroupResolved[]
   sectionNav: AdminShellNavState
   portal: ReturnType<typeof resolveAdminPortal>
   onMobileClose?: () => void
@@ -66,27 +65,29 @@ function NavGroups({
 }
 
 export function AdminSidebar({ sectionNav, mobileOpen = false, onMobileClose }: AdminSidebarProps) {
+  const { t } = useTranslation('admin')
   const { pathname } = useLocation()
   const portal = resolveAdminPortal(pathname)
   const showSectionNav = Boolean(sectionNav && pathname.startsWith('/app/admin'))
+  const platformNav = useAdminPlatformNav()
+  const tenantPortalNav = useAdminTenantPortalNav()
+  const portalLinks = useAdminPortalLinks()
   const navGroups =
-    portal === 'suppliers' || portal === 'restaurants'
-      ? ADMIN_TENANT_PORTAL_NAV
-      : ADMIN_PLATFORM_NAV
+    portal === 'suppliers' || portal === 'restaurants' ? tenantPortalNav : platformNav
 
   return (
     <aside
       data-testid="admin-sidebar"
-      aria-label="Admin navigation"
+      aria-label={t('nav.aria.navigation')}
       className={cn('admin-sidebar', mobileOpen ? 'admin-sidebar-open' : 'admin-sidebar-closed')}
     >
       <div className="admin-sidebar-brand">
         <SupplifyLogo size={30} variant="lockup" theme="light" tagline={false} />
-        <span className="admin-sidebar-brand-badge">Admin</span>
+        <span className="admin-sidebar-brand-badge">{t('nav.brand')}</span>
       </div>
 
       <div className="admin-sidebar-portals" data-testid="admin-portal-nav">
-        {ADMIN_PORTAL_LINKS.map(({ href, label, icon: Icon, match }) => {
+        {portalLinks.map(({ href, label, icon: Icon, match }) => {
           const active = match(pathname)
           return (
             <Link
@@ -107,7 +108,7 @@ export function AdminSidebar({ sectionNav, mobileOpen = false, onMobileClose }: 
       </div>
 
       {showSectionNav && sectionNav && (
-        <nav className="admin-sidebar-nav" aria-label="Admin sections">
+        <nav className="admin-sidebar-nav" aria-label={t('nav.aria.sections')}>
           <NavGroups
             groups={navGroups}
             sectionNav={sectionNav}

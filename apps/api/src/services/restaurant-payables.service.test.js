@@ -96,4 +96,70 @@ describe('restaurant-payables.service', () => {
     const balance = await getRestaurantStatementOpeningBalance('rest-1', 'sup-1', null)
     expect(balance).toBe(0)
   })
+
+  it('getRestaurantStatementAdjustments sums credit notes in date range', async () => {
+    const db = await import('../lib/db.js')
+    vi.mocked(db.query).mockResolvedValueOnce({
+      rows: [{ total_adjustments: '175.25' }],
+    })
+
+    const { getRestaurantStatementAdjustments } = await import('./restaurant-payables.service.js')
+    const adjustments = await getRestaurantStatementAdjustments(
+      'rest-1',
+      'sup-1',
+      '2026-06-01',
+      '2026-06-30'
+    )
+
+    expect(adjustments).toBe(175.25)
+    expect(db.query).toHaveBeenCalledWith(expect.stringContaining('FROM credit_note cn'), [
+      'rest-1',
+      'sup-1',
+      '2026-06-01',
+      '2026-06-30',
+    ])
+    expect(db.query).toHaveBeenCalledWith(
+      expect.stringContaining("cn.status != 'VOID'"),
+      expect.any(Array)
+    )
+    expect(db.query).toHaveBeenCalledWith(
+      expect.stringContaining('issue_date >='),
+      expect.any(Array)
+    )
+    expect(db.query).toHaveBeenCalledWith(
+      expect.stringContaining('issue_date <='),
+      expect.any(Array)
+    )
+  })
+
+  it('getRestaurantStatementAdjustments returns all non-void credits without date filters', async () => {
+    const db = await import('../lib/db.js')
+    vi.mocked(db.query).mockResolvedValueOnce({
+      rows: [{ total_adjustments: '50' }],
+    })
+
+    const { getRestaurantStatementAdjustments } = await import('./restaurant-payables.service.js')
+    const adjustments = await getRestaurantStatementAdjustments('rest-1', 'sup-1', null, null)
+
+    expect(adjustments).toBe(50)
+    expect(db.query).toHaveBeenCalledWith(expect.not.stringContaining('issue_date >='), [
+      'rest-1',
+      'sup-1',
+    ])
+  })
+
+  it('computeRestaurantStatementClosingBalance subtracts adjustments from balance owed', async () => {
+    const { computeRestaurantStatementClosingBalance } = await import(
+      './restaurant-payables.service.js'
+    )
+
+    expect(
+      computeRestaurantStatementClosingBalance({
+        openingBalance: 1000,
+        totalCharges: 500,
+        totalPayments: 300,
+        totalAdjustments: 75,
+      })
+    ).toBe(1125)
+  })
 })

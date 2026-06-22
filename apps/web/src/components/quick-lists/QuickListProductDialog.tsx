@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogContent,
@@ -8,17 +9,11 @@ import {
 } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
-import { Label } from '../ui/label'
-import { Textarea } from '../ui/textarea'
-import { Select, SelectTrigger } from '../ui/select'
-import { Badge } from '../ui/badge'
-import { Search, Package, Plus, X, Clock, Calendar, CheckCircle, ShoppingCart } from 'lucide-react'
+import { Search, Plus } from 'lucide-react'
 import { formatPrice } from '../../utils/format'
-import { formatDaysOfWeekLabel, parseDaysOfWeek } from '../../utils/parseDaysOfWeek'
-import { cn } from '../../lib/utils'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function QuickListProductDialog(props: any) {
+  const { t } = useTranslation('cart')
   const {
     showProductDialog,
     setShowProductDialog,
@@ -32,10 +27,8 @@ export function QuickListProductDialog(props: any) {
     <Dialog open={showProductDialog} onOpenChange={setShowProductDialog}>
       <DialogContent size="xl">
         <DialogHeader>
-          <DialogTitle>Add Products to List</DialogTitle>
-          <DialogDescription>
-            Search and select products to add to your quick list
-          </DialogDescription>
+          <DialogTitle>{t('quickLists.productDialog.title')}</DialogTitle>
+          <DialogDescription>{t('quickLists.productDialog.description')}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -43,7 +36,7 @@ export function QuickListProductDialog(props: any) {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
             <Input
-              placeholder="Search products..."
+              placeholder={t('quickLists.productDialog.searchPlaceholder')}
               value={productSearch}
               onChange={(e) => setProductSearch(e.target.value)}
               className="pl-10"
@@ -66,20 +59,22 @@ export function QuickListProductDialog(props: any) {
                 </div>
                 <Button size="sm" onClick={() => handleAddProductToList(product)}>
                   <Plus className="h-4 w-4 mr-1" />
-                  Add
+                  {t('quickLists.productDialog.add')}
                 </Button>
               </div>
             ))}
 
             {(!filteredProducts || filteredProducts.length === 0) && (
-              <div className="text-center py-8 text-[var(--text-muted)]">No products found</div>
+              <div className="text-center py-8 text-[var(--text-muted)]">
+                {t('quickLists.productDialog.noProducts')}
+              </div>
             )}
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setShowProductDialog(false)}>
-            Done
+            {t('quickLists.productDialog.done')}
           </Button>
         </DialogFooter>
       </DialogContent>

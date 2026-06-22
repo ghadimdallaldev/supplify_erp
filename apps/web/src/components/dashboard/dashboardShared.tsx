@@ -13,7 +13,11 @@ export const DASHBOARD_CALENDAR_EXTRA_GAP = 12
 
 export const SPEND_TREND_DAYS = 30
 
-export function buildOrderSpendTrend(orders: any[], days = SPEND_TREND_DAYS) {
+export type SpendTrendPeriodDays = 7 | 30 | 90
+
+export const SPEND_TREND_PERIOD_OPTIONS: SpendTrendPeriodDays[] = [7, 30, 90]
+
+export function buildOrderSpendTrend(orders: any[], days: number = SPEND_TREND_DAYS) {
   const cutoff = new Date()
   cutoff.setHours(0, 0, 0, 0)
   cutoff.setDate(cutoff.getDate() - days)

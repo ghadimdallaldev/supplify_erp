@@ -1,4 +1,5 @@
 import { useMemo, useState, type ComponentType } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Activity,
   CreditCard,
@@ -30,23 +31,23 @@ import { cn } from '../../../lib/utils'
 
 const ACTIVITY_PAGE_SIZE = 30
 
-const ACTIVITY_TYPE_OPTIONS = [
-  { value: 'all', label: 'All events' },
-  { value: 'order_placed', label: 'Order placed' },
-  { value: 'order_confirmed', label: 'Order acknowledged' },
-  { value: 'order_completed', label: 'Order completed' },
-  { value: 'deal_activity', label: 'Deal activity' },
-  { value: 'cart_updated', label: 'Cart updated' },
-  { value: 'new_tenant', label: 'New registration' },
-  { value: 'plan_changed', label: 'Plan changed' },
-  { value: 'subscription_status', label: 'Subscription status' },
-  { value: 'staff_added', label: 'Staff added' },
-  { value: 'reservation', label: 'Reservation' },
-  { value: 'invoice_issued', label: 'Invoice issued' },
-  { value: 'payment_received', label: 'Payment received' },
-  { value: 'quick_list', label: 'Quick list' },
-  { value: 'receiving', label: 'Receiving' },
-  { value: 'chat_started', label: 'Chat started' },
+const ACTIVITY_TYPE_OPTION_KEYS = [
+  { value: 'all', labelKey: 'activity.types.all' },
+  { value: 'order_placed', labelKey: 'activity.types.order_placed' },
+  { value: 'order_confirmed', labelKey: 'activity.types.order_confirmed' },
+  { value: 'order_completed', labelKey: 'activity.types.order_completed' },
+  { value: 'deal_activity', labelKey: 'activity.types.deal_activity' },
+  { value: 'cart_updated', labelKey: 'activity.types.cart_updated' },
+  { value: 'new_tenant', labelKey: 'activity.types.new_tenant' },
+  { value: 'plan_changed', labelKey: 'activity.types.plan_changed' },
+  { value: 'subscription_status', labelKey: 'activity.types.subscription_status' },
+  { value: 'staff_added', labelKey: 'activity.types.staff_added' },
+  { value: 'reservation', labelKey: 'activity.types.reservation' },
+  { value: 'invoice_issued', labelKey: 'activity.types.invoice_issued' },
+  { value: 'payment_received', labelKey: 'activity.types.payment_received' },
+  { value: 'quick_list', labelKey: 'activity.types.quick_list' },
+  { value: 'receiving', labelKey: 'activity.types.receiving' },
+  { value: 'chat_started', labelKey: 'activity.types.chat_started' },
 ] as const
 
 type ActivityEvent = {
@@ -64,96 +65,101 @@ type EventVisual = {
   label: string
 }
 
-const EVENT_VISUALS: Record<string, EventVisual> = {
+const EVENT_VISUAL_KEYS: Record<
+  string,
+  { icon: ComponentType<{ className?: string }>; badgeClass: string; labelKey: string }
+> = {
   order_placed: {
     icon: Package,
     badgeClass: 'bg-[var(--brand-pale)] text-[var(--brand)] border-[var(--brand)]/20',
-    label: 'Order',
+    labelKey: 'activity.badges.order',
   },
   order_confirmed: {
     icon: Package,
     badgeClass: 'bg-sky-50 text-sky-800 border-sky-200',
-    label: 'Acknowledged',
+    labelKey: 'activity.badges.acknowledged',
   },
   order_completed: {
     icon: Truck,
     badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    label: 'Completed',
+    labelKey: 'activity.badges.completed',
   },
   deal_activity: {
     icon: Activity,
     badgeClass: 'bg-violet-50 text-violet-700 border-violet-200',
-    label: 'Deal',
+    labelKey: 'activity.badges.deal',
   },
   cart_updated: {
     icon: ShoppingCart,
     badgeClass: 'bg-slate-100 text-slate-700 border-slate-200',
-    label: 'Cart',
+    labelKey: 'activity.badges.cart',
   },
   new_tenant: {
     icon: Users,
     badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    label: 'Registration',
+    labelKey: 'activity.badges.registration',
   },
   plan_changed: {
     icon: CreditCard,
     badgeClass: 'bg-violet-50 text-violet-700 border-violet-200',
-    label: 'Plan change',
+    labelKey: 'activity.badges.planChange',
   },
   subscription_status: {
     icon: Shield,
     badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
-    label: 'Subscription',
+    labelKey: 'activity.badges.subscription',
   },
   staff_added: {
     icon: Users,
     badgeClass: 'bg-cyan-50 text-cyan-800 border-cyan-200',
-    label: 'Staff',
+    labelKey: 'activity.badges.staff',
   },
   reservation: {
     icon: Activity,
     badgeClass: 'bg-pink-50 text-pink-700 border-pink-200',
-    label: 'Reservation',
+    labelKey: 'activity.badges.reservation',
   },
   invoice_issued: {
     icon: Receipt,
     badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
-    label: 'Invoice',
+    labelKey: 'activity.badges.invoice',
   },
   payment_received: {
     icon: CreditCard,
     badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    label: 'Payment',
+    labelKey: 'activity.badges.payment',
   },
   quick_list: {
     icon: Package,
     badgeClass: 'bg-sky-50 text-sky-800 border-sky-200',
-    label: 'Quick list',
+    labelKey: 'activity.badges.quickList',
   },
   receiving: {
     icon: Truck,
     badgeClass: 'bg-teal-50 text-teal-800 border-teal-200',
-    label: 'Receiving',
+    labelKey: 'activity.badges.receiving',
   },
   chat_started: {
     icon: MessageSquare,
     badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-    label: 'Chat',
+    labelKey: 'activity.badges.chat',
   },
 }
 
-function eventVisual(eventType: string): EventVisual {
-  return (
-    EVENT_VISUALS[eventType] ?? {
-      icon: Activity,
-      badgeClass: 'bg-[var(--app-bg-subtle)] text-[var(--text-mid)] border-[var(--app-border)]',
-      label: eventType.replace(/_/g, ' '),
-    }
-  )
+function eventVisual(eventType: string, t: (key: string) => string): EventVisual {
+  const cfg = EVENT_VISUAL_KEYS[eventType]
+  if (cfg) {
+    return { icon: cfg.icon, badgeClass: cfg.badgeClass, label: t(cfg.labelKey) }
+  }
+  return {
+    icon: Activity,
+    badgeClass: 'bg-[var(--app-bg-subtle)] text-[var(--text-mid)] border-[var(--app-border)]',
+    label: eventType.replace(/_/g, ' '),
+  }
 }
 
-function ActivityEventBadge({ eventType }: { eventType: string }) {
-  const cfg = eventVisual(eventType)
+function ActivityEventBadge({ eventType, t }: { eventType: string; t: (key: string) => string }) {
+  const cfg = eventVisual(eventType, t)
   return (
     <Badge
       variant="outline"
@@ -169,6 +175,11 @@ export type AdminActivityTabProps = {
 }
 
 export function AdminActivityTab({ active }: AdminActivityTabProps) {
+  const { t } = useTranslation('admin')
+  const activityTypeOptions = useMemo(
+    () => ACTIVITY_TYPE_OPTION_KEYS.map((opt) => ({ ...opt, label: t(opt.labelKey) })),
+    [t]
+  )
   const [activityType, setActivityType] = useState('all')
   const [activityOffset, setActivityOffset] = useState(0)
 
@@ -188,7 +199,10 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
     { skip: !active }
   )
 
-  const events = (activityData?.events ?? []) as ActivityEvent[]
+  const events = useMemo(
+    () => (activityData?.events ?? []) as ActivityEvent[],
+    [activityData?.events]
+  )
   const total = activityData?.total ?? events.length
   const page = Math.floor(activityOffset / ACTIVITY_PAGE_SIZE) + 1
   const pageCount = Math.max(1, Math.ceil(total / ACTIVITY_PAGE_SIZE))
@@ -224,8 +238,8 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
   return (
     <>
       <AdminSectionHeader
-        title="Platform activity"
-        description="Real-time stream of orders, registrations, plan changes, and billing events."
+        title={t('activity.title')}
+        description={t('activity.description')}
         action={
           <Button
             variant="outline"
@@ -245,7 +259,7 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
       <div className="mb-4 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4">
         <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
           <Filter className="h-3.5 w-3.5" />
-          Filters
+          {t('common.filters')}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Select
@@ -257,9 +271,9 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
           >
             <SelectTrigger
               className="h-10 w-full min-w-[200px] sm:w-auto"
-              aria-label="Filter by event type"
+              aria-label={t('activity.filterEventTypeAriaLabel')}
             >
-              {ACTIVITY_TYPE_OPTIONS.map((opt) => (
+              {activityTypeOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
@@ -276,30 +290,32 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
       </div>
 
       <AppPanel
-        title="Activity feed"
+        title={t('activity.feedTitle')}
         description={
           activityLoading
-            ? 'Loading activity…'
-            : `${total} event${total === 1 ? '' : 's'}${total > 0 ? ` · page ${page} of ${pageCount}` : ''}`
+            ? t('common.loadingActivity')
+            : total > 0
+              ? t('activity.eventsPage', { total, page, pageCount })
+              : t('activity.eventsCount', { count: total })
         }
         testId="admin-activity-panel"
         footer={
           activityFetching && !activityLoading ? (
             <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Updating feed…
+              {t('common.updatingFeed')}
             </p>
           ) : undefined
         }
       >
         {activityLoading ? (
-          <AdminLoadingState label="Loading activity feed…" />
+          <AdminLoadingState label={t('activity.loadingFeed')} />
         ) : activityError ? (
           <AdminErrorState
-            title="Activity feed unavailable"
+            title={t('activity.unavailableTitle')}
             message={
               (activityQueryError as { data?: { message?: string } })?.data?.message ||
-              'The activity API request failed.'
+              t('activity.apiFailed')
             }
             onRetry={() => refetchActivity()}
           />
@@ -307,17 +323,17 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
           <AdminEmptyState
             icon={<Activity className="h-8 w-8 text-[var(--text-muted)]" />}
             title={
-              hasActiveFilters ? 'No activity matches your filter' : 'No platform activity yet'
+              hasActiveFilters ? t('activity.emptyFilteredTitle') : t('activity.emptyDefaultTitle')
             }
             description={
               hasActiveFilters
-                ? 'Try “All events” or choose a different event type.'
-                : 'Create tenants, place orders, or change subscriptions to populate this feed.'
+                ? t('activity.emptyFilteredDescription')
+                : t('activity.emptyDefaultDescription')
             }
             action={
               hasActiveFilters ? (
                 <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
-                  Clear filter
+                  {t('common.clearFilter')}
                 </Button>
               ) : undefined
             }
@@ -326,9 +342,9 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
           <>
             {partial && (
               <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Some activity sources could not be loaded
-                {failedSources?.length ? ` (${failedSources.join(', ')})` : ''}. Showing partial
-                results.
+                {t('activity.partialSources')}
+                {failedSources?.length ? ` (${failedSources.join(', ')})` : ''}.{' '}
+                {t('activity.partialResults')}
               </p>
             )}
 
@@ -344,7 +360,7 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
 
                   <ul className="divide-y divide-[var(--app-border)] rounded-lg border border-[var(--app-border)]">
                     {group.events.map((event, idx) => {
-                      const cfg = eventVisual(event.event_type)
+                      const cfg = eventVisual(event.event_type, t)
                       const Icon = cfg.icon
                       return (
                         <li
@@ -363,7 +379,7 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
 
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <ActivityEventBadge eventType={event.event_type} />
+                              <ActivityEventBadge eventType={event.event_type} t={t} />
                               <p className="truncate text-sm font-medium text-[var(--text)]">
                                 {event.title}
                               </p>
@@ -399,8 +415,11 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
             {total > ACTIVITY_PAGE_SIZE && (
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--app-border)] pt-4">
                 <p className="text-xs text-[var(--text-muted)]">
-                  Showing {activityOffset + 1}–
-                  {Math.min(activityOffset + ACTIVITY_PAGE_SIZE, total)} of {total}
+                  {t('activity.showingRange', {
+                    from: activityOffset + 1,
+                    to: Math.min(activityOffset + ACTIVITY_PAGE_SIZE, total),
+                    total,
+                  })}
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
@@ -411,10 +430,10 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
                       setActivityOffset(Math.max(0, activityOffset - ACTIVITY_PAGE_SIZE))
                     }
                   >
-                    Previous
+                    {t('common.previous')}
                   </Button>
                   <span className="text-sm text-[var(--text-muted)]">
-                    Page {page} of {pageCount}
+                    {t('activity.pageOf', { page, pageCount })}
                   </span>
                   <Button
                     variant="outline"
@@ -422,7 +441,7 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
                     disabled={activityOffset + ACTIVITY_PAGE_SIZE >= total}
                     onClick={() => setActivityOffset(activityOffset + ACTIVITY_PAGE_SIZE)}
                   >
-                    Next
+                    {t('common.next')}
                   </Button>
                 </div>
               </div>

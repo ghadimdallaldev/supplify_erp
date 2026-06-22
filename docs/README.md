@@ -47,7 +47,9 @@ docs/
   api/                      API route index
   diagrams/                 Canonical Mermaid diagrams
   sales/                    Sales / enterprise narrative
-  archive/                  Historical audits and old plans
+  audits/                   Route inventories, feature audits, performance & cache
+  archive/                  Historical audits, old plans, archived scripts
+  onboarding/               Onboarding library, handbooks, generated PDF/PPTX
 ```
 
 ## Repo root

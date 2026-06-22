@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { Loader2, Download } from 'lucide-react'
+import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -11,18 +14,17 @@ import {
 } from '../services/api'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { downloadCsv } from '../utils/csvExport'
-import { Loader2, Download } from 'lucide-react'
-import { toast } from 'sonner'
-
 import { getApiBase } from '../lib/env'
 
 const API_URL = getApiBase()
+const AUDIT_BACKFILL_COMMAND = 'pnpm run seed:audit-backfill'
 
 type ActivityLogTabProps = {
   canExport?: boolean
 }
 
 export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
+  const { t, i18n } = useTranslation('settings')
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const tenantAuditEnabled = isEntitlementFeatureEnabled(
     entitlementsData?.entitlements,
@@ -56,13 +58,13 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
     skip: !tenantAuditEnabled,
   })
   const logs = data?.logs || []
+  const emptyValue = t('activityLog.emptyValue')
 
   if (!tenantAuditEnabled) {
     return (
       <Card>
         <CardContent className="py-8 text-sm text-[var(--text-muted)]">
-          Activity log is not on your plan. Upgrade to Gold or Platinum to view tenant audit history
-          and exports.
+          {t('activityLog.locked')}
         </CardContent>
       </Card>
     )
@@ -79,7 +81,7 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
         credentials: 'include',
         headers: { 'X-Requested-With': 'Supplify' },
       })
-      if (!res.ok) throw new Error('Export failed')
+      if (!res.ok) throw new Error(t('activityLog.errors.exportFailed'))
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -87,9 +89,9 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
       link.download = 'audit-log.csv'
       link.click()
       URL.revokeObjectURL(url)
-      toast.success('Audit log exported')
+      toast.success(t('activityLog.toasts.exported'))
     } catch {
-      toast.error('Failed to export audit log')
+      toast.error(t('activityLog.toasts.exportFailed'))
     }
   }
 
@@ -105,7 +107,13 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
   const handleQuickCsv = () => {
     downloadCsv(
       'activity-log.csv',
-      ['Time', 'Action', 'Resource', 'User', 'Email'],
+      [
+        t('activityLog.csv.time'),
+        t('activityLog.csv.action'),
+        t('activityLog.csv.resource'),
+        t('activityLog.csv.user'),
+        t('activityLog.csv.email'),
+      ],
       logs.map((row) => [
         String(row.created_at || ''),
         String(row.action_label || row.action || ''),
@@ -119,14 +127,14 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <CardTitle>Activity log</CardTitle>
+        <CardTitle>{t('activityLog.title')}</CardTitle>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => refetch()}>
-            Refresh
+            {t('activityLog.refresh')}
           </Button>
           {hasFilters && (
             <Button variant="ghost" size="sm" onClick={clearFilters}>
-              Clear filters
+              {t('activityLog.clearFilters')}
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={handleQuickCsv}>
@@ -135,7 +143,7 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
           </Button>
           {canExport && (
             <Button variant="outline" size="sm" onClick={handleExport}>
-              Export (server)
+              {t('activityLog.exportServer')}
             </Button>
           )}
         </div>
@@ -143,11 +151,11 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
-            <Label>Action</Label>
+            <Label>{t('activityLog.labels.action')}</Label>
             <Select value={action} onValueChange={setAction}>
-              <SelectTrigger placeholder="All actions">
+              <SelectTrigger placeholder={t('activityLog.filters.allActions')}>
                 <SelectContent>
-                  <SelectItem value="">All actions</SelectItem>
+                  <SelectItem value="">{t('activityLog.filters.allActions')}</SelectItem>
                   {actionOptions.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
@@ -158,11 +166,11 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
             </Select>
           </div>
           <div>
-            <Label>Resource type</Label>
+            <Label>{t('activityLog.labels.resourceType')}</Label>
             <Select value={resourceType} onValueChange={setResourceType}>
-              <SelectTrigger placeholder="All resources">
+              <SelectTrigger placeholder={t('activityLog.filters.allResources')}>
                 <SelectContent>
-                  <SelectItem value="">All resources</SelectItem>
+                  <SelectItem value="">{t('activityLog.filters.allResources')}</SelectItem>
                   {resourceOptions.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
@@ -173,11 +181,11 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
             </Select>
           </div>
           <div>
-            <Label>From</Label>
+            <Label>{t('activityLog.labels.from')}</Label>
             <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
           </div>
           <div>
-            <Label>To</Label>
+            <Label>{t('activityLog.labels.to')}</Label>
             <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
         </div>
@@ -186,26 +194,26 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
           <Loader2 className="h-6 w-6 animate-spin" />
         ) : logs.length === 0 ? (
           <div className="text-sm text-[var(--text-muted)] space-y-2 py-2">
-            <p>No activity recorded for these filters.</p>
+            <p>{t('activityLog.empty.title')}</p>
             {hasFilters ? (
               <p>
-                Try{' '}
+                {t('activityLog.empty.filteredPrefix')}{' '}
                 <button
                   type="button"
                   className="underline text-[var(--brand-mid)]"
                   onClick={clearFilters}
                 >
-                  clearing filters
+                  {t('activityLog.empty.clearFiltersLink')}
                 </button>{' '}
-                or widening the date range. Seeded demo orders do not appear until you run{' '}
-                <code className="text-xs">pnpm run seed:audit-backfill</code> or place a new order
-                in the app.
+                {t('activityLog.empty.filteredSuffix', {
+                  command: AUDIT_BACKFILL_COMMAND,
+                })}
               </p>
             ) : (
               <p>
-                The log only records actions through the app (e.g. placing an order). For tier demo
-                data, run <code className="text-xs">pnpm run seed:audit-backfill</code> once, then
-                refresh.
+                {t('activityLog.empty.defaultPrefix', {
+                  command: AUDIT_BACKFILL_COMMAND,
+                })}
               </p>
             )}
           </div>
@@ -214,21 +222,23 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-[var(--text-muted)]">
-                  <th className="py-2 pr-4">Time</th>
-                  <th className="py-2 pr-4">Action</th>
-                  <th className="py-2 pr-4">Resource</th>
-                  <th className="py-2">User</th>
+                  <th className="py-2 pr-4">{t('activityLog.table.time')}</th>
+                  <th className="py-2 pr-4">{t('activityLog.table.action')}</th>
+                  <th className="py-2 pr-4">{t('activityLog.table.resource')}</th>
+                  <th className="py-2">{t('activityLog.table.user')}</th>
                 </tr>
               </thead>
               <tbody>
                 {logs.map((row) => (
                   <tr key={String(row.id)} className="border-b border-[var(--app-border)]">
                     <td className="py-2 pr-4 whitespace-nowrap">
-                      {row.created_at ? new Date(String(row.created_at)).toLocaleString() : '—'}
+                      {row.created_at
+                        ? new Date(String(row.created_at)).toLocaleString(i18n.language)
+                        : emptyValue}
                     </td>
                     <td className="py-2 pr-4">{String(row.action_label || row.action || '')}</td>
                     <td className="py-2 pr-4">
-                      {String(row.resource_type_label || row.resource_type || '—')}
+                      {String(row.resource_type_label || row.resource_type || emptyValue)}
                       {row.resource_id ? (
                         <span className="block text-xs text-[var(--text-muted)] truncate max-w-[140px]">
                           {String(row.resource_id)}
@@ -236,7 +246,7 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
                       ) : null}
                     </td>
                     <td className="py-2">
-                      <span className="font-medium">{String(row.user_name || '—')}</span>
+                      <span className="font-medium">{String(row.user_name || emptyValue)}</span>
                       {row.user_email ? (
                         <span className="block text-xs text-[var(--text-muted)]">
                           {String(row.user_email)}
@@ -251,8 +261,7 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
         )}
         {data?.total != null && data.total > logs.length ? (
           <p className="text-xs text-[var(--text-muted)]">
-            Showing {logs.length} of {data.total} entries. Refine filters or use server export for
-            more.
+            {t('activityLog.pagination', { shown: logs.length, total: data.total })}
           </p>
         ) : null}
       </CardContent>

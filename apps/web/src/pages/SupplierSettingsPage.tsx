@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, lazy } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { KpiCard } from '../components/ui/kpi-card'
 import { SettingsHubLayout } from '../components/settings/SettingsHubLayout'
@@ -36,8 +37,22 @@ import {
   LazySupplierDriversTab,
   LazySupplierActivityTab,
 } from '../components/supplier/settings/lazySupplierSettingsTabs'
+import { ensureNamespace } from '../i18n'
+
+const LazySupplierDeliveryZonesTab = lazy(() =>
+  import('../components/supplier/settings/tabs/SupplierDeliveryZonesTab').then((m) => ({
+    default: m.SupplierDeliveryZonesTab,
+  }))
+)
+
+const LazySupplierContactsTab = lazy(() =>
+  import('../components/supplier/settings/tabs/SupplierContactsTab').then((m) => ({
+    default: m.SupplierContactsTab,
+  }))
+)
 
 export function SupplierSettingsPage() {
+  const { t } = useTranslation('suppliers')
   const { user } = useAppSelector((state) => state.auth)
   const { can } = usePermissions()
   const [searchParams] = useSearchParams()
@@ -63,12 +78,12 @@ export function SupplierSettingsPage() {
   )
 
   useEffect(() => {
+    void ensureNamespace('suppliers')
+  }, [])
+
+  useEffect(() => {
     const tab = searchParams.get('tab')
     if (!tab) return
-    if (tab === 'contacts' || tab === 'delivery') {
-      setActiveTab('profile')
-      return
-    }
     if ((SUPPLIER_SETTINGS_URL_TABS as readonly string[]).includes(tab)) {
       setActiveTab(tab)
     }
@@ -101,37 +116,39 @@ export function SupplierSettingsPage() {
   }
 
   return (
-    <RequirePermission permission="SETTINGS_VIEW" title="supplier settings">
+    <RequirePermission permission="SETTINGS_VIEW" title={t('settings.permissionTitle')}>
       <SettingsHubLayout
-        title="Supplier Settings"
-        description="Manage your business profile and settings"
+        title={t('settings.title')}
+        description={t('settings.description')}
         stats={
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             <KpiCard
-              label="Total Products"
+              label={t('settings.stats.totalProducts')}
               value={statistics.totalProducts}
-              description={`${statistics.activeProducts} active`}
+              description={t('settings.stats.activeProducts', { count: statistics.activeProducts })}
               icon={Package}
               tone="brand"
             />
             <KpiCard
-              label="Total Orders"
+              label={t('settings.stats.totalOrders')}
               value={statistics.totalOrders}
-              description={`${statistics.completedOrders} completed`}
+              description={t('settings.stats.completedOrders', {
+                count: statistics.completedOrders,
+              })}
               icon={ShoppingCart}
               tone="success"
             />
             <KpiCard
-              label="Pending Orders"
+              label={t('settings.stats.pendingOrders')}
               value={statistics.pendingOrders}
-              description="Awaiting fulfillment"
+              description={t('settings.stats.pendingDescription')}
               icon={Clock}
               tone="warning"
             />
             <KpiCard
-              label="Total Revenue"
+              label={t('settings.stats.totalRevenue')}
               value={formatCurrency(statistics.totalRevenue)}
-              description="All-time"
+              description={t('settings.stats.allTime')}
               icon={DollarSign}
               tone="brand"
             />
@@ -140,20 +157,26 @@ export function SupplierSettingsPage() {
       >
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="justify-start">
-            <TabsTrigger value="profile">Profile</TabsTrigger>
-            {CONTACTS_TAB_ENABLED && <TabsTrigger value="contacts">Contacts</TabsTrigger>}
-            {(can('STAFF_VIEW') || can('SETTINGS_VIEW')) && (
-              <TabsTrigger value="team">Team & roles</TabsTrigger>
+            <TabsTrigger value="profile">{t('settings.tabs.profile')}</TabsTrigger>
+            {CONTACTS_TAB_ENABLED && (
+              <TabsTrigger value="contacts">{t('settings.tabs.contacts')}</TabsTrigger>
             )}
-            <TabsTrigger value="business">Business</TabsTrigger>
-            {can('WAREHOUSES_VIEW') && <TabsTrigger value="warehouses">Warehouses</TabsTrigger>}
-            {DELIVERY_ZONES_ENABLED && <TabsTrigger value="delivery">Delivery Zones</TabsTrigger>}
-            <TabsTrigger value="drivers">Drivers</TabsTrigger>
-            <TabsTrigger value="branches">Branches</TabsTrigger>
-            <TabsTrigger value="notifications">Notifications</TabsTrigger>
-            <TabsTrigger value="plan">Plan & usage</TabsTrigger>
+            {(can('STAFF_VIEW') || can('SETTINGS_VIEW')) && (
+              <TabsTrigger value="team">{t('settings.tabs.team')}</TabsTrigger>
+            )}
+            <TabsTrigger value="business">{t('settings.tabs.business')}</TabsTrigger>
+            {can('WAREHOUSES_VIEW') && (
+              <TabsTrigger value="warehouses">{t('settings.tabs.warehouses')}</TabsTrigger>
+            )}
+            {DELIVERY_ZONES_ENABLED && (
+              <TabsTrigger value="delivery">{t('settings.tabs.delivery')}</TabsTrigger>
+            )}
+            <TabsTrigger value="drivers">{t('settings.tabs.drivers')}</TabsTrigger>
+            <TabsTrigger value="branches">{t('settings.tabs.branches')}</TabsTrigger>
+            <TabsTrigger value="notifications">{t('settings.tabs.notifications')}</TabsTrigger>
+            <TabsTrigger value="plan">{t('settings.tabs.plan')}</TabsTrigger>
             {can('SETTINGS_VIEW') && tenantAuditEnabled && (
-              <TabsTrigger value="activity">Activity</TabsTrigger>
+              <TabsTrigger value="activity">{t('settings.tabs.activity')}</TabsTrigger>
             )}
           </TabsList>
 
@@ -167,6 +190,19 @@ export function SupplierSettingsPage() {
               <LazySupplierProfileTab />
             </LazyTabMount>
           </TabsContent>
+
+          {CONTACTS_TAB_ENABLED && (
+            <TabsContent value="contacts" className="space-y-4">
+              <LazyTabMount
+                tab="contacts"
+                selectedTab={activeTab}
+                className="space-y-4"
+                fallback={<SupplierSettingsTabLoading />}
+              >
+                <LazySupplierContactsTab />
+              </LazyTabMount>
+            </TabsContent>
+          )}
 
           <TabsContent value="business" className="space-y-4">
             <LazyTabMount
@@ -188,6 +224,19 @@ export function SupplierSettingsPage() {
                 fallback={<SupplierSettingsTabLoading />}
               >
                 <LazySupplierWarehousesTab />
+              </LazyTabMount>
+            </TabsContent>
+          )}
+
+          {DELIVERY_ZONES_ENABLED && (
+            <TabsContent value="delivery" className="space-y-4">
+              <LazyTabMount
+                tab="delivery"
+                selectedTab={activeTab}
+                className="space-y-4"
+                fallback={<SupplierSettingsTabLoading />}
+              >
+                <LazySupplierDeliveryZonesTab />
               </LazyTabMount>
             </TabsContent>
           )}

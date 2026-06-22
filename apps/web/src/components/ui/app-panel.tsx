@@ -85,7 +85,7 @@ export function SummaryMetric({
 
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className={cn(shellClass, 'w-full text-left')}>
+      <button type="button" onClick={onClick} className={cn(shellClass, 'w-full text-start')}>
         {content}
       </button>
     )

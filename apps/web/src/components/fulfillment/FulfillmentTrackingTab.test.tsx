@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { screen, fireEvent, cleanup } from '@testing-library/react'
 import { FulfillmentTrackingTab } from './FulfillmentTrackingTab'
+import { renderWithFulfillmentI18n } from './test-utils'
 
 vi.mock('../../services/api', () => ({
   useGetOrderTrackingQuery: () => ({ data: undefined, isLoading: false, isError: false }),
@@ -56,14 +57,14 @@ describe('FulfillmentTrackingTab', () => {
   })
 
   it('renders GPS column and opens tracking drawer from board', () => {
-    render(<FulfillmentTrackingTab />)
+    renderWithFulfillmentI18n(<FulfillmentTrackingTab />)
     expect(screen.getByTestId('tracking-gps-status')).toHaveTextContent(/Live/i)
     fireEvent.click(screen.getByTestId('tracking-view-order-abc-1234'))
     expect(screen.getByTestId('delivery-tracking-drawer')).toBeInTheDocument()
   })
 
   it('switches to map view and opens drawer from map selection', () => {
-    render(<FulfillmentTrackingTab />)
+    renderWithFulfillmentI18n(<FulfillmentTrackingTab />)
     fireEvent.click(screen.getByTestId('fulfillment-tracking-map-view'))
     fireEvent.click(screen.getByTestId('active-deliveries-map-mock'))
     expect(screen.getByTestId('delivery-tracking-drawer')).toBeInTheDocument()

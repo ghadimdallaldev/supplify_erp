@@ -94,5 +94,171 @@
     "exportedCsv": "Inventory exported to CSV",
     "processingCsv": "Processing {{count}} inventory items from CSV...",
     "addingToCart": "Adding to cart..."
+  },
+  "reorder": {
+    "suggested": "Suggested",
+    "order": "Order"
+  },
+  "trend": {
+    "title": "Stock Trend Analysis",
+    "description": "Visual overview of your inventory movements",
+    "totalMovements": "Total Movements",
+    "recentAdditions": "Recent Additions",
+    "recentSubtractions": "Recent Subtractions"
+  },
+  "summary": {
+    "totalProducts": "Total Products",
+    "inStock": "In Stock",
+    "lowStock": "Low Stock",
+    "outOfStock": "Out of Stock"
+  },
+  "filters": {
+    "search": "Search",
+    "searchPlaceholder": "Search by name, SKU, or category...",
+    "clearSearch": "Clear search",
+    "category": "Category",
+    "allCategories": "All Categories",
+    "supplier": "Supplier",
+    "allSuppliers": "All Suppliers",
+    "status": "Status",
+    "allStatus": "All Status",
+    "sortBy": "Sort by",
+    "sort": "Sort",
+    "clearFilters": "Clear filters",
+    "showingPrefix": "Showing",
+    "showingSuffix": "of {{total}} items",
+    "removeStatus": "Remove status filter",
+    "removeCategory": "Remove category filter",
+    "removeSupplier": "Remove supplier filter"
+  },
+  "sort": {
+    "updated_desc": "Recently updated",
+    "name_asc": "Name (A-Z)",
+    "name_desc": "Name (Z-A)",
+    "quantity_asc": "Quantity (low first)",
+    "quantity_desc": "Quantity (high first)",
+    "status": "Stock status"
+  },
+  "items": {
+    "title": "Inventory Items",
+    "description": "View and manage your stock levels",
+    "exportCsv": "Export CSV",
+    "importCsv": "Import CSV"
+  },
+  "empty": {
+    "noInventory": "No inventory yet",
+    "noMatches": "No matching items",
+    "noInventoryDescription": "Place an order and receive goods to see inventory here.",
+    "noMatchesDescription": "Try adjusting your search or filters.",
+    "createFirstOrder": "Create first order"
+  },
+  "table": {
+    "product": "Product",
+    "category": "Category",
+    "supplier": "Supplier",
+    "quantity": "Quantity",
+    "onHand": "On hand",
+    "suggestedReorder": "Suggested reorder",
+    "status": "Status",
+    "lastUpdated": "Last Updated",
+    "actions": "Actions",
+    "add": "Add",
+    "reduce": "Reduce",
+    "pin": "Pin",
+    "pinned": "Pinned",
+    "unpinItem": "Unpin item",
+    "pinToTop": "Pin to top",
+    "addInventory": "Add inventory",
+    "countCorrection": "Count correction (reduce stock)",
+    "logWaste": "Log waste or spoilage",
+    "waste": "Waste",
+    "daysLeft_one": "(~{{count}}d left)",
+    "daysLeft_other": "(~{{count}}d left)"
+  },
+  "csv": {
+    "productName": "Product Name",
+    "sku": "SKU",
+    "category": "Category",
+    "supplier": "Supplier",
+    "quantity": "Quantity",
+    "unit": "Unit",
+    "status": "Status",
+    "lastUpdated": "Last Updated"
+  },
+  "supplierPage": {
+    "title": "Inventory",
+    "description": "Manage stock levels and adjustments across all warehouses",
+    "gateTitle": "inventory",
+    "byWarehouse": "By warehouse",
+    "tableView": "Table view",
+    "summary": {
+      "totalProducts": "Total products",
+      "reserved": "Reserved",
+      "lowStock": "Low stock",
+      "available": "Available"
+    },
+    "empty": {
+      "title": "No inventory items",
+      "description": "Add products and configure stock levels to start tracking inventory."
+    },
+    "table": {
+      "product": "Product",
+      "warehouse": "Warehouse",
+      "onHand": "On Hand",
+      "reserved": "Reserved",
+      "available": "Available",
+      "status": "Status",
+      "actions": "Actions",
+      "productCount_one": "{{count}} product",
+      "productCount_other": "{{count}} products",
+      "adjust": "Adjust"
+    },
+    "warehouseView": {
+      "emptyTitle": "No warehouses found",
+      "emptyDescription": "You haven't created any warehouses yet. Create warehouses in your settings.",
+      "returnToTable": "Return to table view",
+      "productCount": "{{count}} products",
+      "totalAvailable": "{{count}} total available",
+      "availableLabel": "Available: {{count}}",
+      "reservedLabel": "Reserved: {{count}}",
+      "noInventory": "No inventory in this warehouse"
+    },
+    "adjustDialog": {
+      "title": "Adjust Inventory",
+      "description": "Record an inventory adjustment for {{product}}",
+      "type": "Adjustment Type *",
+      "addStock": "Add Stock",
+      "removeStock": "Remove Stock",
+      "quantity": "Quantity *",
+      "quantityPlaceholder": "Enter quantity",
+      "reason": "Reason *",
+      "reasonPlaceholder": "Enter reason for adjustment",
+      "notes": "Notes",
+      "cancel": "Cancel",
+      "record": "Record Adjustment"
+    },
+    "settingsDialog": {
+      "title": "Inventory Settings",
+      "description": "Configure inventory settings for {{product}}",
+      "moq": "MOQ (Minimum Order Quantity)",
+      "orderMultiple": "Order Multiple",
+      "leadTime": "Lead Time (days)",
+      "lowStockThreshold": "Low Stock Threshold",
+      "backordersAllowed": "Backorders Allowed",
+      "cancel": "Cancel",
+      "save": "Save Settings"
+    },
+    "error": {
+      "title": "Failed to load inventory",
+      "description": "There was a problem fetching inventory data.",
+      "retry": "Try again"
+    },
+    "toasts": {
+      "validQuantity": "Enter a valid quantity",
+      "reasonRequired": "Reason is required",
+      "adjustmentRecorded": "Inventory adjustment recorded",
+      "adjustmentFailed": "Failed to record adjustment",
+      "settingsSaved": "Settings saved"
+    }
   }
 }

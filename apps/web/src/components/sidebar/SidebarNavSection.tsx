@@ -85,6 +85,7 @@ function SidebarNavLink({
   showOrderUsage: boolean
   onNavigate?: () => void
 }) {
+  const { t } = useTranslation('navigation')
   const showPendingBadge = item.badge === 'pending' && pendingOrders > 0
   const showUnreadBadge = item.badge === 'unread' && unreadCount > 0
   const showDisputesBadge = item.badge === 'disputes' && activeDisputeCount > 0
@@ -124,14 +125,27 @@ function SidebarNavLink({
         />
       </span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      {showPendingBadge && <NavCountBadge count={pendingOrders} variant="amber" />}
-      {showDisputesBadge && (
-        <NavCountBadge count={activeDisputeCount} variant="amber" title="Active disputes" />
+      {showPendingBadge && (
+        <NavCountBadge count={pendingOrders} variant="amber" title={t('badge.pendingOrders')} />
       )}
-      {showUnreadBadge && <NavCountBadge count={unreadCount} variant="red" cap={9} />}
+      {showDisputesBadge && (
+        <NavCountBadge
+          count={activeDisputeCount}
+          variant="amber"
+          title={t('badge.activeDisputes')}
+        />
+      )}
+      {showUnreadBadge && (
+        <NavCountBadge
+          count={unreadCount}
+          variant="red"
+          cap={9}
+          title={t('badge.unreadNotifications')}
+        />
+      )}
       {showOrderUsage && orderUsageBadge && (
         <span
-          title="Daily orders used today"
+          title={t('badge.dailyOrdersUsed')}
           className={cn(
             'min-w-[18px] rounded-lg px-1.5 py-px text-center text-[10px] font-bold',
             orderUsageBadge.atLimit

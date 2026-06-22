@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
+import i18n from 'i18next'
+import enOrders from '../i18n/locales/en/orders.json'
 import { buildOrderTimeline } from './orderTimeline'
+
+const t = (key: string, options?: Record<string, unknown>) =>
+  i18n.t(key, { ns: 'orders', ...options })
 
 const baseOrder = {
   id: 'order-1',
@@ -9,6 +14,16 @@ const baseOrder = {
   updated_at: '2026-05-25T10:00:00.000Z',
   items: [{ supplier_name: 'Test Supplier', product_name: 'Item A' }],
 }
+
+beforeAll(async () => {
+  await i18n.init({
+    lng: 'en',
+    fallbackLng: 'en',
+    ns: ['orders'],
+    resources: { en: { orders: enOrders } },
+    interpolation: { escapeValue: false },
+  })
+})
 
 describe('buildOrderTimeline', () => {
   it('marks fulfillment steps completed for DELIVERED (restaurant)', () => {
@@ -30,8 +45,8 @@ describe('buildOrderTimeline', () => {
     const delivered = events.find((e) => e.id === 'delivered')
     const received = events.find((e) => e.id === 'received')
 
-    expect(placed?.title).toBe('Order received')
-    expect(delivered?.title).toBe('Marked delivered')
+    expect(placed?.title).toBe(t('timeline.events.placed.titleSupplier'))
+    expect(delivered?.title).toBe(t('timeline.events.delivered.titleSupplier'))
     expect(delivered?.state).toBe('completed')
     expect(received).toBeUndefined()
   })
@@ -67,7 +82,9 @@ describe('buildOrderTimeline', () => {
     })
     expect(events.find((e) => e.id === 'driver-assigned')).toBeDefined()
     expect(events.find((e) => e.id === 'driver-out-for-delivery')).toBeDefined()
-    expect(events.filter((e) => e.title === 'Delivered').length).toBeLessThanOrEqual(1)
+    expect(
+      events.filter((e) => e.title === t('timeline.lifecycle.delivered')).length
+    ).toBeLessThanOrEqual(1)
   })
 
   it('does not show a separate approval step for legacy PENDING_APPROVAL', () => {

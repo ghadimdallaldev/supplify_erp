@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '../../ui/button'
 import {
@@ -55,6 +56,7 @@ function AdminChangePlanDialogContent({
   modal: ChangePlanModalState
   onClose: () => void
 }) {
+  const { t } = useTranslation('admin')
   const [targetPlanId, setTargetPlanId] = useState(modal.targetPlanId)
   const [changePlanPreview, setChangePlanPreview] = useState<ChangePlanPreview | null>(null)
   const [changePlanForce, setChangePlanForce] = useState(false)
@@ -83,7 +85,7 @@ function AdminChangePlanDialogContent({
       }).unwrap()
       setChangePlanPreview(result)
     } catch {
-      toast.error('Failed to load preview')
+      toast.error(t('changePlanToasts.previewFailed'))
     }
   }
 
@@ -118,7 +120,7 @@ function AdminChangePlanDialogContent({
       }
       const details = e?.data?.error?.details
       if (e?.data?.error?.name === 'LIMIT_EXCEEDED' && details?.willExceed) {
-        toast.error('Usage exceeds target plan. Check preview or force change.')
+        toast.error(t('changePlanToasts.usageExceeds'))
         setChangePlanPreview({
           willExceed: details.willExceed as Array<{
             limitKey: string
@@ -138,7 +140,7 @@ function AdminChangePlanDialogContent({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>Change plan — {modal.tenantName}</DialogTitle>
+          <DialogTitle>{t('changePlan.title', { name: modal.tenantName })}</DialogTitle>
           <DialogDescription>
             Select a target plan and preview limits or feature changes before applying.
           </DialogDescription>

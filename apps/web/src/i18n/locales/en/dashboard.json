@@ -1,0 +1,109 @@
+{
+  "greeting": {
+    "morning": "Good morning",
+    "afternoon": "Good afternoon",
+    "evening": "Good evening",
+    "fallbackName": "there"
+  },
+  "error": {
+    "loadFailed": "Failed to load dashboard",
+    "refreshHint": "Please try refreshing the page"
+  },
+  "readOnlyWorkspace": "Read-only workspace · {{roleLabel}}",
+  "kpi": {
+    "zeroCurrency": "$0",
+    "supplier": {
+      "revenue": { "label": "Revenue", "meta": "All-time" },
+      "orders": { "label": "Orders", "meta": "All orders" },
+      "pending": { "label": "Pending", "meta": "Awaiting fulfillment" },
+      "counterpart": { "label": "Restaurants", "meta": "Active customers" }
+    },
+    "restaurant": {
+      "revenue": { "label": "Total Spent", "meta": "All-time" },
+      "orders": { "label": "My Orders", "meta": "All orders" },
+      "pending": { "label": "Pending", "meta": "In progress" },
+      "counterpart": { "label": "Suppliers", "meta": "Active vendors" }
+    }
+  },
+  "onboarding": {
+    "allSet": "You're all set",
+    "restaurant": {
+      "description": "Create your first order to start receiving from suppliers.",
+      "cta": "Create first order"
+    },
+    "supplier": {
+      "description": "Add your first product so restaurants can order from you.",
+      "cta": "Add first product"
+    }
+  },
+  "widgets": {
+    "recentOrders": {
+      "title": "Recent Orders",
+      "viewAll": "View all →",
+      "empty": "No recent orders",
+      "customerFallback": "Customer",
+      "fromSupplier": "From: {{name}}",
+      "supplierFallback": "Supplier"
+    },
+    "orderStatus": {
+      "title": "Order Status",
+      "completed": "Completed",
+      "pending": "Pending",
+      "processing": "Processing",
+      "totalAllTime": "Total orders (all time)"
+    },
+    "spendTrend": {
+      "title": "Spend Trend",
+      "periodAriaLabel": "Spend trend period",
+      "periodDays": "{{days}}d",
+      "loadingAriaLabel": "Loading spend trend",
+      "emptyNoRecent": "No spend in the last {{days}} days. Your all-time order total is in the KPI above.",
+      "emptyNoData": "No spend data yet",
+      "footerLastDays": "Last {{days}} days",
+      "footerLastDaysOrders": "Last {{days}} days (orders)",
+      "footerAllTimeOrders": "All-time (orders)",
+      "tooltipLabel": "Spend"
+    },
+    "stockAlerts": {
+      "lowStockTitle": "Low Stock",
+      "reorderTitle": "Reorder Alerts",
+      "allAboveThreshold": "All products are above their stock thresholds",
+      "productFallback": "Product",
+      "available": "Available: {{qty}}",
+      "threshold": "Threshold: {{threshold}}",
+      "availableWithThreshold": "Available: {{qty}} · Threshold: {{threshold}}",
+      "noSuggestions": "No reorder suggestions",
+      "currentSuggest": "Current: {{current}} · Suggest: {{suggest}}",
+      "addButton": "+ Add"
+    },
+    "expiry": {
+      "title": "Inventory expiry",
+      "expiringSoon": "Expiring soon",
+      "expired": "Expired"
+    },
+    "reorderReminders": {
+      "title": "Suggested reorder reminders",
+      "orderingLists": "Ordering lists →",
+      "pattern": "You usually order {{label}} on {{dayName}}s."
+    },
+    "atRisk": {
+      "title": "At-risk expected orders",
+      "commandCenter": "Command center →",
+      "pattern": "{{restaurantName}} — usually orders {{label}} on {{dayName}}s."
+    },
+    "customerGrowth": {
+      "title": "Customer Growth",
+      "manage": "Manage →",
+      "imported": "Imported",
+      "converted": "Converted",
+      "invited": "Invited",
+      "rewards": "Rewards",
+      "freeMonths": "{{count}} mo"
+    }
+  },
+  "toast": {
+    "createQuickListFirst": "Create a quick list first",
+    "addedToQuickList": "Added {{productName}} ({{qty}}) to {{listName}}",
+    "addToQuickListFailed": "Failed to add to quick list"
+  }
+}

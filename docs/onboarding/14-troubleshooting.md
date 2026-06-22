@@ -78,7 +78,7 @@ pnpm run seed:demo-users
 ### Escalation
 
 - Production: verify Keycloak realm client redirect URIs include exact API callback URL.
-- Railway: check `KEYCLOAK_USE_OPTIMIZED` and memory (`docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`).
+- Railway: check `KEYCLOAK_USE_OPTIMIZED` and memory (`docs/operations/keycloak-railway-memory-fix.md`).
 
 ---
 
@@ -317,7 +317,7 @@ curl http://localhost:3000/api/health
 1. Restart API container.
 2. Verify `DATABASE_URL` connectivity.
 3. Run pending migrations (`pnpm db:migrate`).
-4. Check disk/memory (Keycloak OOM — `KEYCLOAK_RAILWAY_MEMORY_FIX.md`).
+4. Check disk/memory (Keycloak OOM — `docs/operations/keycloak-railway-memory-fix.md`).
 
 ### Escalation
 

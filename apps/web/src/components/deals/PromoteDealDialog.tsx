@@ -34,7 +34,10 @@ export function PromoteDealDialog({
     skip: !open,
   })
   const [promoteDeal, { isLoading }] = usePromoteDealMutation()
-  const pricingOptions = (pricingData?.pricing || []) as PricingOption[]
+  const pricingOptions = useMemo(
+    () => (pricingData?.pricing || []) as PricingOption[],
+    [pricingData?.pricing]
+  )
 
   const defaultKey = useMemo(() => {
     const recommended = pricingOptions.find((o) => o.is_recommended)

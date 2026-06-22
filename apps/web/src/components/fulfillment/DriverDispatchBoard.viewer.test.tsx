@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { DriverDispatchBoard } from './DriverDispatchBoard'
+import { renderWithFulfillmentI18n } from './test-utils'
 import type { DispatchOrderCard } from '../../types'
 
 vi.mock('../../hooks/usePermissions', () => ({
@@ -35,7 +36,7 @@ const order: DispatchOrderCard = {
 
 describe('DriverDispatchBoard viewer role', () => {
   it('does not show assign driver action', () => {
-    render(
+    renderWithFulfillmentI18n(
       <MemoryRouter>
         <DriverDispatchBoard
           data={{

@@ -118,7 +118,7 @@
 
 | Step | Action                                                                                 |
 | ---- | -------------------------------------------------------------------------------------- |
-| 6.1  | Add `docs/cache-audit/INVALIDATION_CHECKLIST.md` for PR authors                        |
+| 6.1  | Add `docs/audits/cache/INVALIDATION_CHECKLIST.md` for PR authors                       |
 | 6.2  | Fix incorrect TTL comments (rbac 180s not 60s; feature-flags 180s not 60s)             |
 | 6.3  | Add lint rule or CI grep: new `setCache(` must pair with invalidator export or comment |
 | 6.4  | Update QA regression checklist with cache-sensitive flows                              |

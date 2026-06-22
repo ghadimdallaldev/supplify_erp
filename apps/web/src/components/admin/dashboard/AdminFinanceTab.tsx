@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { AlertCircle, DollarSign, Loader2, RefreshCw, TrendingUp } from 'lucide-react'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
@@ -40,6 +41,7 @@ function tenantTypeTone(type?: string): string {
 }
 
 export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
+  const { t } = useTranslation('admin')
   const {
     data: financeData,
     isLoading: financeLoading,
@@ -57,8 +59,8 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
   return (
     <>
       <AdminSectionHeader
-        title="Finance"
-        description="GMV, recurring revenue, outstanding invoices, and top tenants by revenue."
+        title={t('finance.title')}
+        description={t('finance.description')}
         action={
           <Button
             variant="outline"
@@ -79,7 +81,7 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
         <AdminLoadingSkeleton rows={8} />
       ) : financeError ? (
         <AdminErrorState
-          title="Finance data unavailable"
+          title={t('finance.unavailableTitle')}
           message={
             (financeQueryError as { data?: { message?: string } })?.data?.message ||
             'The finance API request failed. Figures are not shown as zero to avoid misleading data.'
@@ -128,7 +130,7 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
 
           <div className="grid gap-4 lg:grid-cols-2">
             <AppPanel
-              title="Revenue by plan"
+              title={t('finance.revenueByPlan')}
               description={`${revenueByPlan.length} plan${revenueByPlan.length === 1 ? '' : 's'} with active subscriptions`}
               testId="admin-finance-revenue-by-plan"
               footer={
@@ -143,8 +145,8 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
               {revenueByPlan.length === 0 ? (
                 <AdminEmptyState
                   icon={<TrendingUp className="h-8 w-8 text-[var(--text-muted)]" />}
-                  title="No plan revenue yet"
-                  description="Revenue breakdown appears when tenants subscribe to paid plans."
+                  title={t('finance.noPlanRevenueTitle')}
+                  description={t('finance.noPlanRevenueDescription')}
                 />
               ) : (
                 <div className="space-y-4">
@@ -187,15 +189,15 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
             </AppPanel>
 
             <AppPanel
-              title="Top tenants by revenue"
+              title={t('finance.topTenantsByRevenue')}
               description={`Top ${Math.min(8, topTenants.length)} of ${topTenants.length} tenant${topTenants.length === 1 ? '' : 's'}`}
               testId="admin-finance-top-tenants"
             >
               {topTenants.length === 0 ? (
                 <AdminEmptyState
                   icon={<DollarSign className="h-8 w-8 text-[var(--text-muted)]" />}
-                  title="No tenant revenue yet"
-                  description="Invoice and payment activity will rank tenants here."
+                  title={t('finance.noTenantRevenueTitle')}
+                  description={t('finance.noTenantRevenueDescription')}
                 />
               ) : (
                 <ul className="divide-y divide-[var(--app-border)]">
@@ -239,15 +241,15 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
           {overdueTenants.length > 0 && (
             <div className="mt-4">
               <AppPanel
-                title="Overdue balances"
+                title={t('finance.overdueBalances')}
                 description={`${overdueTenants.length} tenant${overdueTenants.length === 1 ? '' : 's'} with past-due invoices`}
                 testId="admin-finance-overdue"
               >
-                <TableScroll aria-label="Overdue tenant balances">
+                <TableScroll aria-label={t('finance.overdueBalancesTableAriaLabel')}>
                   <table className="w-full min-w-[480px] text-sm">
                     <thead>
                       <tr className="border-b border-[var(--app-border)] bg-[var(--red-pale)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--red)]">
-                        <th className="px-4 py-3">Tenant</th>
+                        <th className="px-4 py-3">{t('common.table.tenant')}</th>
                         <th className="hidden px-4 py-3 sm:table-cell">Type</th>
                         <th className="px-4 py-3 text-right">Overdue</th>
                       </tr>

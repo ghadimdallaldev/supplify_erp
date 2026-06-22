@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { CreditCard, Filter, Loader2, RefreshCw, Search, X } from 'lucide-react'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
@@ -62,6 +63,7 @@ function needsAttention(sub: SubscriptionRow): boolean {
 }
 
 export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscriptionsTabProps) {
+  const { t } = useTranslation('admin')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -142,8 +144,8 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
   return (
     <>
       <AdminSectionHeader
-        title="Subscriptions"
-        description="Review tenant plans, activation state, and billing status across the platform."
+        title={t('subscriptions.title')}
+        description={t('subscriptions.description')}
         action={
           <Button
             variant="outline"
@@ -214,16 +216,19 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
             />
             <Input
               className="h-10 pl-9"
-              placeholder="Search tenant, email, or plan…"
+              placeholder={t('subscriptions.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              aria-label="Search subscriptions"
+              aria-label={t('subscriptions.searchAriaLabel')}
             />
           </div>
 
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-10 w-full" aria-label="Filter by status">
-              <option value="all">All statuses</option>
+            <SelectTrigger
+              className="h-10 w-full"
+              aria-label={t('subscriptions.filterStatusAriaLabel')}
+            >
+              <option value="all">{t('common.allStatuses')}</option>
               {statusOptions.map((status) => (
                 <option key={status} value={status}>
                   {status.replace(/_/g, ' ')}
@@ -233,35 +238,43 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
           </Select>
 
           <Select value={tenantTypeFilter} onValueChange={setTenantTypeFilter}>
-            <SelectTrigger className="h-10 w-full" aria-label="Filter by tenant type">
-              <option value="all">All tenant types</option>
-              <option value="RESTAURANT">Restaurant</option>
-              <option value="SUPPLIER">Supplier</option>
+            <SelectTrigger
+              className="h-10 w-full"
+              aria-label={t('subscriptions.filterTenantTypeAriaLabel')}
+            >
+              <option value="all">{t('common.allTenantTypes')}</option>
+              <option value="RESTAURANT">{t('common.restaurant')}</option>
+              <option value="SUPPLIER">{t('common.supplier')}</option>
             </SelectTrigger>
           </Select>
 
           {hasActiveFilters && (
             <Button type="button" variant="ghost" size="sm" className="h-10" onClick={clearFilters}>
               <X className="mr-1.5 h-4 w-4" />
-              Clear
+              {t('common.clear')}
             </Button>
           )}
         </div>
       </div>
 
       <AppPanel
-        title="Tenant subscriptions"
+        title={t('subscriptions.tenantSubscriptions')}
         description={
           subscriptionsLoading
-            ? 'Loading subscriptions…'
-            : `${filteredSubscriptions.length} subscription${filteredSubscriptions.length === 1 ? '' : 's'} shown${filteredSubscriptions.length !== subscriptions.length ? ` of ${subscriptions.length}` : ''}`
+            ? t('subscriptions.loading')
+            : filteredSubscriptions.length !== subscriptions.length
+              ? t('subscriptions.shownCountOf', {
+                  filtered: filteredSubscriptions.length,
+                  total: subscriptions.length,
+                })
+              : t('subscriptions.shownCount', { count: filteredSubscriptions.length })
         }
         testId="admin-subscriptions-panel"
         footer={
           subscriptionsFetching && !subscriptionsLoading ? (
             <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Updating results…
+              {t('common.updatingResults')}
             </p>
           ) : undefined
         }
@@ -272,32 +285,34 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
           <AdminEmptyState
             icon={<CreditCard className="h-8 w-8 text-[var(--text-muted)]" />}
             title={
-              hasActiveFilters ? 'No subscriptions match your filters' : 'No subscriptions yet'
+              hasActiveFilters
+                ? t('subscriptions.emptyFilteredTitle')
+                : t('subscriptions.emptyDefaultTitle')
             }
             description={
               hasActiveFilters
-                ? 'Adjust search, status, or tenant type filters and try again.'
-                : 'Subscriptions appear here when tenants register and select a plan.'
+                ? t('subscriptions.emptyFilteredDescription')
+                : t('subscriptions.emptyDefaultDescription')
             }
             action={
               hasActiveFilters ? (
                 <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
-                  Clear filters
+                  {t('common.clearFilters')}
                 </Button>
               ) : undefined
             }
           />
         ) : (
-          <TableScroll aria-label="Tenant subscriptions">
+          <TableScroll aria-label={t('subscriptions.tenantSubscriptionsTableAriaLabel')}>
             <table className="w-full min-w-[880px] text-sm">
               <thead>
                 <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                  <th className="px-4 py-3">Tenant</th>
-                  <th className="px-4 py-3">Plan</th>
-                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">{t('common.table.tenant')}</th>
+                  <th className="px-4 py-3">{t('common.table.plan')}</th>
+                  <th className="px-4 py-3">{t('common.table.status')}</th>
                   <th className="hidden px-4 py-3 md:table-cell">Type</th>
                   <th className="hidden px-4 py-3 lg:table-cell">Created</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--app-border)]">
@@ -306,7 +321,7 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
                     <td className="px-4 py-3.5">
                       <div className="min-w-0">
                         <p className="truncate font-medium text-[var(--text)]">
-                          {sub.tenant_name || 'Unknown tenant'}
+                          {sub.tenant_name || t('subscriptions.unknownTenant')}
                         </p>
                         <p className="truncate text-xs text-[var(--text-muted)]">
                           {sub.tenant_email || '—'}
@@ -350,9 +365,9 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
                             onClick={async () => {
                               try {
                                 await extendFreeTrial({ id: sub.id }).unwrap()
-                                toast.success('Free Trial extended')
+                                toast.success(t('subscriptionsToasts.trialExtended'))
                               } catch {
-                                toast.error('Failed to extend Free Trial')
+                                toast.error(t('subscriptionsToasts.trialExtendFailed'))
                               }
                             }}
                           >
@@ -369,9 +384,9 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
                                   id: sub.id,
                                   reason: 'admin_activation',
                                 }).unwrap()
-                                toast.success('Account activated')
+                                toast.success(t('subscriptionsToasts.activated'))
                               } catch {
-                                toast.error('Failed to activate account')
+                                toast.error(t('subscriptionsToasts.activateFailed'))
                               }
                             }}
                           >

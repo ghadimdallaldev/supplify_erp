@@ -52,7 +52,7 @@ Build from `deploy/railway/development/keycloak/railway.json` — realm **Suppli
 Sync vars: `pnpm railway:keycloak:sync -- development` (includes JVM caps, `KEYCLOAK_USE_OPTIMIZED=false`).  
 Set `KEYCLOAK_ADMIN_PASSWORD` on **Keycloak** and **API** (same value).
 
-Remove legacy dashboard vars: `KC_PROXY`, `KC_DB`. See [`../keycloak/RAILWAY_SETUP.md`](../keycloak/RAILWAY_SETUP.md), [`../KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](../KEYCLOAK_RAILWAY_MEMORY_NOTES.md), [`../../docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`](../../docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md).
+Remove legacy dashboard vars: `KC_PROXY`, `KC_DB`. See [`../keycloak/RAILWAY_SETUP.md`](../keycloak/RAILWAY_SETUP.md), [`../KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](../KEYCLOAK_RAILWAY_MEMORY_NOTES.md), [`../../docs/operations/keycloak-railway-memory-fix.md`](../../docs/operations/keycloak-railway-memory-fix.md).
 
 ## Wrong values that break login (not 502)
 

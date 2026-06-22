@@ -18,6 +18,7 @@ Deploy, runtime configuration, performance, and platform jobs.
 | [production-readiness.md](./production-readiness.md)                                             | Launch readiness status                       |
 | [../releases/2026-06-09-pre-deploy-checklist.md](../releases/2026-06-09-pre-deploy-checklist.md) | June 2026 coordinated release                 |
 | [performance-local-dev.md](./performance-local-dev.md)                                           | Local startup & indexes                       |
+| [keycloak-railway-memory-fix.md](./keycloak-railway-memory-fix.md)                               | Keycloak OOM incident write-up                |
 | [email-system.md](./email-system.md)                                                             | Transactional email (SMTP; see also features) |
 
 Historical audits: [../archive/audits/](../archive/audits/).

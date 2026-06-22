@@ -7,6 +7,7 @@ Moved from active script folders on 2026-06-12. **Do not run** on current databa
 | Folder | Source | Contents |
 |--------|--------|----------|
 | `apps-api/` | `apps/api/scripts/` | Schema patches, wave-2/4 refactor tools, ad-hoc data backfills, debug scripts |
+| `apps-web/` | `apps/web/scripts/` | Admin i18n codemods (completed 2026-06) |
 | `repo-scripts/` | `scripts/` | Monolith split utilities (wave2/wave3) |
 
 ## Restore

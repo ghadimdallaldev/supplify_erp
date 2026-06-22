@@ -3,7 +3,7 @@
 **Date:** 2026-06-04  
 **Scope:** Full inventory of performance-related mechanisms across API, web, database, Redis, compression, and deployment.  
 **Purpose:** Preserve speed gains (~6s → &lt;1.5s on many APIs) while guiding safe invalidation, guardrails, and observability.  
-**Related docs:** [`docs/operations/railway-performance-report.md`](../operations/railway-performance-report.md), [`docs/cache-audit/CACHE_AUDIT_CURRENT_STATE.md`](../cache-audit/CACHE_AUDIT_CURRENT_STATE.md)
+**Related docs:** [`docs/operations/railway-performance-report.md`](../../operations/railway-performance-report.md), [`docs/audits/cache/CACHE_AUDIT_CURRENT_STATE.md`](../cache/CACHE_AUDIT_CURRENT_STATE.md)
 
 **Do not remove mechanisms listed here without re-measuring latency and load.**
 
@@ -589,8 +589,8 @@ Browser RTK Query (120–300s) ──► API ──► Redis/Memory (cache.js)
 | Document                                            | Content                                |
 | --------------------------------------------------- | -------------------------------------- |
 | `docs/operations/railway-performance-report.md`     | Phases 1–7, 9 with before/after tables |
-| `docs/cache-audit/CACHE_AUDIT_CURRENT_STATE.md`     | Full cache inventory and conflicts     |
-| `docs/cache-audit/CACHE_FIX_PLAN.md`                | Phased cache correctness plan          |
+| `docs/audits/cache/CACHE_AUDIT_CURRENT_STATE.md`    | Full cache inventory and conflicts     |
+| `docs/audits/cache/CACHE_FIX_PLAN.md`               | Phased cache correctness plan          |
 | `docs/archive/audits/performance-audit.md`          | Earlier audit                          |
 | `docs/archive/audits/production-readiness-audit.md` | EXPLAIN recommendations                |
 

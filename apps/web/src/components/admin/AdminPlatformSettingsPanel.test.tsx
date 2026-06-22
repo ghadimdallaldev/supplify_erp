@@ -1,11 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { cleanup, render, screen, fireEvent } from '@testing-library/react'
+import { cleanup, screen, fireEvent } from '@testing-library/react'
+import { renderWithProviders } from '../../test/utils'
 import { AdminPlatformSettingsPanel } from './AdminPlatformSettingsPanel'
 
-vi.mock('../../services/api', () => ({
-  useGetAdminPlatformSettingsQuery: () => ({ data: { freeSandboxDays: 30 }, isLoading: false }),
-  useUpdateAdminPlatformSettingsMutation: () => [vi.fn(), { isLoading: false }],
-}))
+vi.mock('../../services/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../services/api')>()
+  return {
+    ...actual,
+    useGetAdminPlatformSettingsQuery: () => ({ data: { freeSandboxDays: 30 }, isLoading: false }),
+    useUpdateAdminPlatformSettingsMutation: () => [vi.fn(), { isLoading: false }],
+  }
+})
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -21,7 +26,7 @@ describe('AdminPlatformSettingsPanel', () => {
   })
 
   it('renders trial length input with allowed range', () => {
-    render(<AdminPlatformSettingsPanel variant="compact" />)
+    renderWithProviders(<AdminPlatformSettingsPanel variant="compact" />)
     expect(screen.getByTestId('admin-platform-settings-panel')).toBeInTheDocument()
     expect(screen.getByLabelText(/Trial length/i)).toHaveAttribute('min', '7')
     expect(screen.getByLabelText(/Trial length/i)).toHaveAttribute('max', '90')
@@ -30,7 +35,7 @@ describe('AdminPlatformSettingsPanel', () => {
 
   it('shows validation error for out-of-range value', async () => {
     const { toast } = await import('sonner')
-    render(<AdminPlatformSettingsPanel />)
+    renderWithProviders(<AdminPlatformSettingsPanel />)
     const input = screen.getAllByLabelText(/Trial length/i)[0]
     fireEvent.change(input, { target: { value: '5' } })
     fireEvent.click(screen.getAllByRole('button', { name: /Save/i })[0])

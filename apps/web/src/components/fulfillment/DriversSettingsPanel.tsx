@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Loader2, Truck, Plus, Link2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
@@ -42,6 +43,7 @@ const emptyForm = (): DriverForm => ({
 })
 
 export function DriversSettingsPanel() {
+  const { t } = useTranslation('fulfillment')
   const { data, isLoading, refetch } = useGetDriversQuery()
   const { data: warehousesData } = useGetWarehousesQuery()
   const { data: teamUsersData } = useGetTenantRoleUsersQuery()
@@ -79,7 +81,7 @@ export function DriversSettingsPanel() {
 
   const handleSave = async () => {
     if (!form.full_name.trim()) {
-      toast.error('Name is required')
+      toast.error(t('drivers.toast.nameRequired'))
       return
     }
     try {
@@ -94,32 +96,32 @@ export function DriversSettingsPanel() {
       }
       if (editing) {
         await updateDriver({ id: editing.id, data: body }).unwrap()
-        toast.success('Driver updated')
+        toast.success(t('drivers.toast.updated'))
       } else {
         await createDriver(body).unwrap()
-        toast.success('Driver added')
+        toast.success(t('drivers.toast.added'))
       }
       setModalOpen(false)
       refetch()
     } catch (err: unknown) {
       const msg = (err as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Failed to save driver')
+      toast.error(msg || t('drivers.toast.saveFailed'))
     }
   }
 
   const handleDeactivate = async (driver: DriverRecord) => {
-    if (!confirm(`Deactivate ${driver.full_name}?`)) return
+    if (!confirm(t('drivers.deactivateConfirm', { name: driver.full_name }))) return
     try {
       await deactivateDriver(driver.id).unwrap()
-      toast.success('Driver deactivated')
+      toast.success(t('drivers.toast.deactivated'))
       refetch()
     } catch (err: unknown) {
       const message =
         (err as { data?: { error?: { message?: string } } })?.data?.error?.message ===
         'ACTIVE_DELIVERIES'
-          ? 'Reassign active deliveries first'
-          : 'Cannot deactivate driver'
-      toast.error(message || 'Cannot deactivate driver')
+          ? t('drivers.toast.reassignFirst')
+          : t('drivers.toast.deactivateFailed')
+      toast.error(message || t('drivers.toast.deactivateFailed'))
     }
   }
 
@@ -134,15 +136,13 @@ export function DriversSettingsPanel() {
         <div>
           <CardTitle className="flex items-center gap-2">
             <Truck className="h-5 w-5" />
-            Drivers
+            {t('drivers.title')}
           </CardTitle>
-          <CardDescription>
-            Manage delivery drivers and link them to login accounts for the Driver role.
-          </CardDescription>
+          <CardDescription>{t('drivers.description')}</CardDescription>
         </div>
         <Button type="button" size="sm" onClick={openCreate}>
           <Plus className="h-4 w-4 mr-1" />
-          Add driver
+          {t('drivers.addDriver')}
         </Button>
       </CardHeader>
       <CardContent>
@@ -151,9 +151,7 @@ export function DriversSettingsPanel() {
             <Loader2 className="h-6 w-6 animate-spin text-[var(--text-muted)]" />
           </div>
         ) : drivers.length === 0 ? (
-          <p className="text-sm text-[var(--text-muted)]">
-            No drivers yet. Add your first driver to start assigning deliveries.
-          </p>
+          <p className="text-sm text-[var(--text-muted)]">{t('drivers.empty')}</p>
         ) : (
           <div className="space-y-3">
             {drivers.map((driver) => (
@@ -176,7 +174,7 @@ export function DriversSettingsPanel() {
                       data-testid={`driver-linked-${driver.id}`}
                     >
                       <Link2 className="h-3 w-3" aria-hidden />
-                      Linked:{' '}
+                      {t('drivers.linked')}{' '}
                       {driver.linked_user_name || driver.linked_user_email || driver.user_id}
                     </p>
                   ) : (
@@ -184,7 +182,7 @@ export function DriversSettingsPanel() {
                       className="text-xs text-amber-700 mt-1"
                       data-testid={`driver-unlinked-${driver.id}`}
                     >
-                      No login linked — assign Driver role or link below
+                      {t('drivers.noLoginLinked')}
                     </p>
                   )}
                 </div>
@@ -193,10 +191,10 @@ export function DriversSettingsPanel() {
                     <Badge variant="outline">{driver.warehouse_name}</Badge>
                   )}
                   <Button size="sm" variant="outline" onClick={() => openEdit(driver)}>
-                    Edit
+                    {t('common:actions.edit')}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => handleDeactivate(driver)}>
-                    Deactivate
+                    {t('drivers.deactivate')}
                   </Button>
                 </div>
               </div>
@@ -208,11 +206,13 @@ export function DriversSettingsPanel() {
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? 'Edit driver' : 'Add driver'}</DialogTitle>
+            <DialogTitle>
+              {editing ? t('drivers.editDriver') : t('drivers.addDriverDialog')}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label htmlFor="full_name">Full name</Label>
+              <Label htmlFor="full_name">{t('drivers.fullName')}</Label>
               <Input
                 id="full_name"
                 value={form.full_name}
@@ -220,26 +220,24 @@ export function DriversSettingsPanel() {
               />
             </div>
             <div>
-              <Label htmlFor="link_user">Link to app user (Driver role)</Label>
+              <Label htmlFor="link_user">{t('drivers.linkUser')}</Label>
               <Select
                 value={form.user_id}
                 onValueChange={(value) => setForm({ ...form, user_id: value })}
               >
                 <SelectTrigger id="link_user" data-testid="driver-link-user-select">
-                  <option value="">— No login (dispatch-only profile) —</option>
+                  <option value="">{t('drivers.noLoginOption')}</option>
                   {linkableUsers.map((u) => (
                     <option key={u.id} value={u.id}>
-                      {u.display_name || u.email} ({u.role_name || 'no role'})
+                      {u.display_name || u.email} ({u.role_name || t('drivers.noRole')})
                     </option>
                   ))}
                 </SelectTrigger>
               </Select>
-              <p className="text-xs text-[var(--text-muted)] mt-1">
-                Invite team members with the Driver role under Settings → Team, then link them here.
-              </p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">{t('drivers.linkHint')}</p>
             </div>
             <div>
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">{t('drivers.phone')}</Label>
               <Input
                 id="phone"
                 value={form.phone}
@@ -247,7 +245,7 @@ export function DriversSettingsPanel() {
               />
             </div>
             <div>
-              <Label htmlFor="vehicle_type">Vehicle type</Label>
+              <Label htmlFor="vehicle_type">{t('drivers.vehicleType')}</Label>
               <Select
                 value={form.vehicle_type}
                 onValueChange={(value) => setForm({ ...form, vehicle_type: value })}
@@ -262,7 +260,7 @@ export function DriversSettingsPanel() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="vehicle_plate">Plate</Label>
+              <Label htmlFor="vehicle_plate">{t('drivers.plate')}</Label>
               <Input
                 id="vehicle_plate"
                 value={form.vehicle_plate}
@@ -271,13 +269,13 @@ export function DriversSettingsPanel() {
             </div>
             {warehouses.length > 0 && (
               <div>
-                <Label htmlFor="warehouse_id">Home warehouse</Label>
+                <Label htmlFor="warehouse_id">{t('drivers.homeWarehouse')}</Label>
                 <Select
                   value={form.warehouse_id}
                   onValueChange={(value) => setForm({ ...form, warehouse_id: value })}
                 >
                   <SelectTrigger id="warehouse_id">
-                    <option value="">— None —</option>
+                    <option value="">{t('drivers.none')}</option>
                     {warehouses.map((w: { id: string; name: string }) => (
                       <option key={w.id} value={w.id}>
                         {w.name}
@@ -288,7 +286,7 @@ export function DriversSettingsPanel() {
               </div>
             )}
             <div>
-              <Label htmlFor="notes">Notes</Label>
+              <Label htmlFor="notes">{t('drivers.notes')}</Label>
               <Textarea
                 id="notes"
                 value={form.notes}
@@ -299,11 +297,11 @@ export function DriversSettingsPanel() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setModalOpen(false)}>
-              Cancel
+              {t('common:actions.cancel')}
             </Button>
             <Button onClick={handleSave} disabled={creating || updating}>
               {(creating || updating) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save
+              {t('common:actions.save')}
             </Button>
           </DialogFooter>
         </DialogContent>

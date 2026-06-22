@@ -51,7 +51,7 @@ export function PaymentModal() {
   const [cardName, setCardName] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  const methods = methodsData?.paymentMethods ?? []
+  const methods = useMemo(() => methodsData?.paymentMethods ?? [], [methodsData?.paymentMethods])
   const isPayOverdue = paymentModalMode === 'pay_overdue'
   const plan = paymentModalPlan
 
@@ -206,7 +206,7 @@ export function PaymentModal() {
                 <button
                   type="button"
                   onClick={() => setBillingCycle('MONTHLY')}
-                  className={`rounded-lg border p-3 text-left transition-colors ${
+                  className={`rounded-lg border p-3 text-start transition-colors ${
                     billingCycle === 'MONTHLY'
                       ? 'border-[var(--brand-mid)] bg-[var(--brand-ultra)] ring-1 ring-[var(--brand-mid)]'
                       : 'border-[var(--app-border)] hover:bg-[var(--bg)]'
@@ -219,7 +219,7 @@ export function PaymentModal() {
                 <button
                   type="button"
                   onClick={() => setBillingCycle('YEARLY')}
-                  className={`rounded-lg border p-3 text-left transition-colors ${
+                  className={`rounded-lg border p-3 text-start transition-colors ${
                     billingCycle === 'YEARLY'
                       ? 'border-[var(--brand-mid)] bg-[var(--brand-ultra)] ring-1 ring-[var(--brand-mid)]'
                       : 'border-[var(--app-border)] hover:bg-[var(--bg)]'
@@ -278,7 +278,7 @@ export function PaymentModal() {
                     <span className="text-sm capitalize">
                       {m.brand || m.type} •••• {m.last4}
                       {m.is_default && (
-                        <span className="ml-2 text-xs text-[var(--text-muted)]">(default)</span>
+                        <span className="ms-2 text-xs text-[var(--text-muted)]">(default)</span>
                       )}
                     </span>
                   </label>
@@ -378,7 +378,7 @@ export function PaymentModal() {
             >
               {busy ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  <Loader2 className="h-4 w-4 animate-spin me-2" />
                   Processing…
                 </>
               ) : isPayOverdue ? (

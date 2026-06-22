@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Input } from '../ui/input'
@@ -93,6 +94,7 @@ function effectiveStatusLabel(enabled: unknown): string {
 }
 
 export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeatureFlagsPanelProps) {
+  const { t } = useTranslation('admin')
   const {
     data: flagsData,
     isLoading: flagsLoading,
@@ -213,9 +215,9 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
     if (!selectedTenantId) return
     try {
       await clearTenantOverride({ tenantType, tenantId: selectedTenantId, featureKey }).unwrap()
-      toast.success('Override cleared')
+      toast.success(t('featuresToasts.overrideCleared'))
     } catch {
-      toast.error('Failed to clear override')
+      toast.error(t('featuresToasts.clearFailed'))
     }
   }
 
@@ -228,8 +230,8 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
   return (
     <>
       <AdminSectionHeader
-        title="Features"
-        description="Manage all platform feature flags globally and per tenant. Every canonical feature key is listed below."
+        title={t('features.title')}
+        description={t('features.description')}
         action={
           <Button
             variant="outline"
@@ -304,17 +306,17 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
               />
               <Input
                 className="h-10 pl-9"
-                placeholder="Search features by name or key…"
+                placeholder={t('features.searchGlobalPlaceholder')}
                 value={globalSearch}
                 onChange={(e) => setGlobalSearch(e.target.value)}
-                aria-label="Search global feature flags"
+                aria-label={t('features.searchGlobalAriaLabel')}
               />
             </div>
             <select
               className="h-10 w-full min-w-[160px] cursor-pointer appearance-none rounded-lg border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 py-2 text-sm sm:w-auto"
               value={globalModeFilter}
               onChange={(e) => setGlobalModeFilter(e.target.value as GlobalModeFilter)}
-              aria-label="Filter by global mode"
+              aria-label={t('features.filterGlobalModeAriaLabel')}
             >
               <option value="all">All modes</option>
               <option value="inherit">Inherit from plans</option>
@@ -338,7 +340,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
       </div>
 
       <AppPanel
-        title="Global feature flags"
+        title={t('features.globalFlagsTitle')}
         description={
           flagsLoading
             ? 'Loading platform flags…'
@@ -359,7 +361,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
           <AdminLoadingSkeleton rows={6} />
         ) : flagsError ? (
           <AdminErrorState
-            title="Could not load feature flags"
+            title={t('features.loadFailedTitle')}
             message="Check your connection and try again."
             onRetry={() => refetchFlags()}
           />
@@ -381,13 +383,13 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
             }
           />
         ) : (
-          <TableScroll aria-label="Global feature flags">
+          <TableScroll aria-label={t('features.globalTableAriaLabel')}>
             <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                   <th className="px-4 py-3">Feature</th>
                   <th className="px-4 py-3">Global mode</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--app-border)]">
@@ -466,10 +468,10 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
             />
             <Input
               className="h-10 pl-9"
-              placeholder="Search tenant features…"
+              placeholder={t('features.searchTenantPlaceholder')}
               value={tenantFeatureSearch}
               onChange={(e) => setTenantFeatureSearch(e.target.value)}
-              aria-label="Search tenant feature overrides"
+              aria-label={t('features.searchTenantAriaLabel')}
               disabled={!selectedTenantId}
             />
           </div>
@@ -477,7 +479,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
       </div>
 
       <AppPanel
-        title="Per-tenant overrides"
+        title={t('features.tenantOverridesTitle')}
         description={
           !selectedTenantId
             ? 'Select a tenant to review effective features.'
@@ -498,14 +500,14 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
         {!selectedTenantId ? (
           <AdminEmptyState
             icon={<Flag className="h-8 w-8 text-[var(--text-muted)]" />}
-            title="No tenant selected"
-            description="Choose a restaurant or supplier to inspect and override feature access."
+            title={t('features.noTenantSelectedTitle')}
+            description={t('features.noTenantSelectedDescription')}
           />
         ) : tenantLoading ? (
           <AdminLoadingSkeleton rows={6} />
         ) : tenantError ? (
           <AdminErrorState
-            title="Could not load tenant overrides"
+            title={t('features.tenantLoadFailedTitle')}
             message="The tenant may have been removed or you may lack permission."
             onRetry={() => refetchTenant()}
           />
@@ -539,14 +541,14 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
             }
           />
         ) : (
-          <TableScroll aria-label="Tenant feature overrides">
+          <TableScroll aria-label={t('features.tenantTableAriaLabel')}>
             <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                   <th className="px-4 py-3">Feature</th>
                   <th className="px-4 py-3">Effective</th>
                   <th className="px-4 py-3">Source</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--app-border)]">

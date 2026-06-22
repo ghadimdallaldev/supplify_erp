@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
+import { renderWithProviders } from '../../test/utils'
 import { AdminOverviewExtras } from './AdminOverviewExtras'
 
 vi.mock('../../services/api', async (importOriginal) => {
@@ -48,7 +49,7 @@ beforeEach(() => {
 
 describe('AdminOverviewExtras', () => {
   it('renders overview panels and quick actions', () => {
-    render(
+    renderWithProviders(
       <AdminOverviewExtras
         overview={{ alerts: {} }}
         onNavigateTab={vi.fn()}
@@ -66,7 +67,7 @@ describe('AdminOverviewExtras', () => {
   })
 
   it('shows operational email failure attention item', () => {
-    render(
+    renderWithProviders(
       <AdminOverviewExtras
         overview={{
           alerts: {},
@@ -79,14 +80,14 @@ describe('AdminOverviewExtras', () => {
   })
 
   it('shows healthy empty state when no issues', () => {
-    render(<AdminOverviewExtras overview={{ alerts: {} }} onNavigateTab={vi.fn()} />)
+    renderWithProviders(<AdminOverviewExtras overview={{ alerts: {} }} onNavigateTab={vi.fn()} />)
     expect(
       screen.getByText(/All clear. No critical platform issues right now/i)
     ).toBeInTheDocument()
   })
 
   it('shows recent activity empty state', () => {
-    render(<AdminOverviewExtras overview={{ alerts: {} }} onNavigateTab={vi.fn()} />)
+    renderWithProviders(<AdminOverviewExtras overview={{ alerts: {} }} onNavigateTab={vi.fn()} />)
     expect(screen.getByText(/No recent platform activity yet/i)).toBeInTheDocument()
   })
 
@@ -96,7 +97,7 @@ describe('AdminOverviewExtras', () => {
       isLoading: false,
     } as ReturnType<typeof useGetAdminPendingDealsQuery>)
 
-    render(<AdminOverviewExtras overview={{ alerts: {} }} onNavigateTab={vi.fn()} />)
+    renderWithProviders(<AdminOverviewExtras overview={{ alerts: {} }} onNavigateTab={vi.fn()} />)
 
     expect(screen.getByTestId('admin-overview-panels')).toBeInTheDocument()
   })

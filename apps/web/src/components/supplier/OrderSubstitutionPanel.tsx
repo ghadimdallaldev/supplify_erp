@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import {
   useGetOrderSubstitutionsQuery,
   useProposeOrderSubstitutionMutation,
@@ -8,6 +9,7 @@ import { toast } from 'sonner'
 import { AlertTriangle } from 'lucide-react'
 
 export function OrderSubstitutionPanel({ orderId }: { orderId: string }) {
+  const { t } = useTranslation('suppliers')
   const { data, isLoading, isError, refetch } = useGetOrderSubstitutionsQuery(orderId)
   const [propose, { isLoading: proposing }] = useProposeOrderSubstitutionMutation()
 
@@ -19,13 +21,13 @@ export function OrderSubstitutionPanel({ orderId }: { orderId: string }) {
         orderId,
         orderItemId,
         substituteProductId,
-        description: `Propose substitute: ${name}`,
+        description: t('substitution.proposeDescription', { name }),
       }).unwrap()
-      toast.success('Substitute proposed — awaiting restaurant acceptance')
+      toast.success(t('substitution.proposeSuccess'))
       refetch()
     } catch (err: unknown) {
       const msg = (err as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Could not propose substitute')
+      toast.error(msg || t('substitution.proposeFailed'))
     }
   }
 
@@ -44,7 +46,7 @@ export function OrderSubstitutionPanel({ orderId }: { orderId: string }) {
         className="mt-4 rounded-xl border border-[var(--app-border)] p-4 text-center text-sm text-[var(--text-muted)]"
       >
         <AlertTriangle className="h-4 w-4 mx-auto mb-2 text-[var(--brand)]" />
-        Could not load substitute options.
+        {t('substitution.loadError')}
       </div>
     )
   }
@@ -55,8 +57,7 @@ export function OrderSubstitutionPanel({ orderId }: { orderId: string }) {
         data-testid="order-substitution-empty"
         className="text-xs text-[var(--text-muted)] mt-4 rounded-lg border border-dashed border-[var(--app-border)] px-3 py-3"
       >
-        No substitute mappings for items on this order. Add substitutes on the product detail page
-        first.
+        {t('substitution.empty')}
       </p>
     )
   }
@@ -70,15 +71,12 @@ export function OrderSubstitutionPanel({ orderId }: { orderId: string }) {
       data-testid="order-substitution-panel"
       className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5"
     >
-      <h3 className="text-sm font-extrabold mb-1">Suggest substitutes</h3>
-      <p className="text-xs text-[var(--text-muted)] mb-3">
-        Propose a pre-approved alternative. The restaurant must accept before the order line updates
-        (shown on the timeline).
-      </p>
+      <h3 className="text-sm font-extrabold mb-1">{t('substitution.title')}</h3>
+      <p className="text-xs text-[var(--text-muted)] mb-3">{t('substitution.description')}</p>
 
       {pendingAmendments && pendingAmendments.length > 0 && (
         <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 mb-3">
-          {pendingAmendments.length} substitution request(s) awaiting restaurant response.
+          {t('substitution.pending', { count: pendingAmendments.length })}
         </p>
       )}
 
@@ -99,7 +97,7 @@ export function OrderSubstitutionPanel({ orderId }: { orderId: string }) {
             className="mb-3 last:mb-0 pb-3 last:pb-0 border-b last:border-0 border-[var(--app-border)]"
           >
             <div className="text-xs font-bold text-[var(--text)] mb-2">
-              {block.productName || 'Order line'}
+              {block.productName || t('substitution.orderLine')}
             </div>
             {block.substitutes.map((sub) => (
               <div key={sub.id} className="flex justify-between items-center gap-2 text-xs py-1.5">
@@ -121,7 +119,7 @@ export function OrderSubstitutionPanel({ orderId }: { orderId: string }) {
                     handlePropose(block.orderItemId, sub.substituteProductId, sub.substituteName)
                   }
                 >
-                  Propose
+                  {t('substitution.propose')}
                 </Button>
               </div>
             ))}

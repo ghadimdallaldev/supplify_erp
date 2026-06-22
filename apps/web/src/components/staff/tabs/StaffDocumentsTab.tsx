@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 import { Button } from '../../ui/button'
@@ -20,6 +21,7 @@ import {
 import { toDatetimeLocalValue } from '../staffShared'
 
 export function StaffDocumentsTab() {
+  const { t } = useTranslation('staff')
   const [documentForm, setDocumentForm] = useState({
     staffId: '',
     docType: '',
@@ -53,7 +55,7 @@ export function StaffDocumentsTab() {
 
   const handleCreateDocument = async () => {
     if (!documentForm.staffId || !documentForm.docType || !documentForm.fileUrl) {
-      toast.error('Please provide staff, type, and file URL')
+      toast.error(t('documents.validationDocument'))
       return
     }
     try {
@@ -64,16 +66,16 @@ export function StaffDocumentsTab() {
         fileUrl: documentForm.fileUrl,
         expiresAt: documentForm.expiresAt || undefined,
       }).unwrap()
-      toast.success('Document stored')
+      toast.success(t('documents.documentStored'))
       setDocumentForm({ staffId: '', docType: '', title: '', fileUrl: '', expiresAt: '' })
     } catch {
-      toast.error('Unable to store document')
+      toast.error(t('documents.documentStoreFailed'))
     }
   }
 
   const handleCreateIncident = async () => {
     if (!incidentForm.category || !incidentForm.occurredAt) {
-      toast.error('Incident requires a category and time')
+      toast.error(t('documents.validationIncident'))
       return
     }
     try {
@@ -84,7 +86,7 @@ export function StaffDocumentsTab() {
         occurredAt: new Date(incidentForm.occurredAt).toISOString(),
         notes: incidentForm.notes || undefined,
       }).unwrap()
-      toast.success('Incident logged')
+      toast.success(t('documents.incidentLogged'))
       setIncidentForm({
         staffId: '',
         category: '',
@@ -93,13 +95,13 @@ export function StaffDocumentsTab() {
         notes: '',
       })
     } catch {
-      toast.error('Unable to log incident')
+      toast.error(t('documents.incidentLogFailed'))
     }
   }
 
   const handleCreatePerformanceNote = async () => {
     if (!performanceNoteForm.staffId || !performanceNoteForm.body) {
-      toast.error('Performance note requires staff and message')
+      toast.error(t('documents.validationPerformance'))
       return
     }
     try {
@@ -108,10 +110,10 @@ export function StaffDocumentsTab() {
         noteType: performanceNoteForm.noteType as 'COACHING' | 'KUDOS' | 'GENERAL',
         body: performanceNoteForm.body,
       }).unwrap()
-      toast.success('Performance note saved')
+      toast.success(t('documents.noteSaved'))
       setPerformanceNoteForm({ staffId: '', noteType: 'KUDOS', body: '' })
     } catch {
-      toast.error('Unable to save performance note')
+      toast.error(t('documents.noteSaveFailed'))
     }
   }
 
@@ -119,19 +121,19 @@ export function StaffDocumentsTab() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Documents & certifications</CardTitle>
-          <CardDescription>Store staff paperwork and track expirations.</CardDescription>
+          <CardTitle>{t('documents.docsTitle')}</CardTitle>
+          <CardDescription>{t('documents.docsDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <Label htmlFor="docStaff">Staff</Label>
+              <Label htmlFor="docStaff">{t('shared.staff')}</Label>
               <Select
                 value={documentForm.staffId}
                 onValueChange={(value) => setDocumentForm((prev) => ({ ...prev, staffId: value }))}
               >
                 <SelectTrigger id="docStaff" className="mt-1 w-full">
-                  <option value="">Select staff</option>
+                  <option value="">{t('shared.selectStaff')}</option>
                   {staffMembers.map((member) => (
                     <option key={member.id} value={member.id}>
                       {member.displayName}
@@ -141,29 +143,29 @@ export function StaffDocumentsTab() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="docType">Type</Label>
+              <Label htmlFor="docType">{t('documents.type')}</Label>
               <Input
                 id="docType"
                 value={documentForm.docType}
                 onChange={(event) =>
                   setDocumentForm((prev) => ({ ...prev, docType: event.target.value }))
                 }
-                placeholder="e.g. Food handler cert"
+                placeholder={t('documents.typePlaceholder')}
               />
             </div>
             <div>
-              <Label htmlFor="docUrl">File URL</Label>
+              <Label htmlFor="docUrl">{t('documents.fileUrl')}</Label>
               <Input
                 id="docUrl"
                 value={documentForm.fileUrl}
                 onChange={(event) =>
                   setDocumentForm((prev) => ({ ...prev, fileUrl: event.target.value }))
                 }
-                placeholder="https://"
+                placeholder={t('documents.fileUrlPlaceholder')}
               />
             </div>
             <div>
-              <Label htmlFor="docExpires">Expires</Label>
+              <Label htmlFor="docExpires">{t('documents.expires')}</Label>
               <Input
                 id="docExpires"
                 type="date"
@@ -174,7 +176,7 @@ export function StaffDocumentsTab() {
               />
             </div>
             <div className="sm:col-span-2">
-              <Label htmlFor="docTitle">Title</Label>
+              <Label htmlFor="docTitle">{t('documents.titleLabel')}</Label>
               <Input
                 id="docTitle"
                 value={documentForm.title}
@@ -186,14 +188,14 @@ export function StaffDocumentsTab() {
           </div>
           <div className="flex justify-end">
             <Button onClick={handleCreateDocument} disabled={creatingDocument}>
-              {creatingDocument ? 'Uploading…' : 'Store document'}
+              {creatingDocument ? t('documents.uploading') : t('documents.storeDocument')}
             </Button>
           </div>
           {documentsLoading ? (
-            <p className="text-sm text-[var(--text-muted)]">Loading documents…</p>
+            <p className="text-sm text-[var(--text-muted)]">{t('documents.loadingDocuments')}</p>
           ) : documents.length === 0 ? (
             <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">
-              <p>No documents uploaded yet.</p>
+              <p>{t('documents.noDocuments')}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -209,8 +211,10 @@ export function StaffDocumentsTab() {
                       </p>
                       <p className="text-xs text-[var(--text-muted)]">
                         {doc.expiresAt
-                          ? `Expires ${format(new Date(doc.expiresAt), 'MMM d, yyyy')}`
-                          : 'No expiry'}
+                          ? t('documents.expiresDate', {
+                              date: format(new Date(doc.expiresAt), 'MMM d, yyyy'),
+                            })
+                          : t('documents.noExpiry')}
                       </p>
                     </div>
                     <a
@@ -219,7 +223,7 @@ export function StaffDocumentsTab() {
                       rel="noreferrer"
                       className="text-xs font-medium text-[var(--brand-mid)] hover:underline"
                     >
-                      View file
+                      {t('documents.viewFile')}
                     </a>
                   </div>
                 </div>
@@ -231,16 +235,18 @@ export function StaffDocumentsTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Incidents & performance</CardTitle>
-          <CardDescription>Track coaching, kudos, and follow-up tasks.</CardDescription>
+          <CardTitle>{t('documents.incidentsTitle')}</CardTitle>
+          <CardDescription>{t('documents.incidentsDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 lg:grid-cols-2">
           <div className="space-y-3">
             <div className="rounded-lg border border-[var(--app-border)] bg-white p-4 shadow-sm">
-              <h3 className="text-sm font-semibold text-[var(--text)]">Log incident</h3>
+              <h3 className="text-sm font-semibold text-[var(--text)]">
+                {t('documents.logIncident')}
+              </h3>
               <div className="mt-3 space-y-2 text-sm">
                 <div>
-                  <Label htmlFor="incidentStaff">Staff</Label>
+                  <Label htmlFor="incidentStaff">{t('shared.staff')}</Label>
                   <Select
                     value={incidentForm.staffId}
                     onValueChange={(value) =>
@@ -248,7 +254,7 @@ export function StaffDocumentsTab() {
                     }
                   >
                     <SelectTrigger id="incidentStaff" className="mt-1 w-full">
-                      <option value="">Unassigned</option>
+                      <option value="">{t('shared.unassigned')}</option>
                       {staffMembers.map((member) => (
                         <option key={member.id} value={member.id}>
                           {member.displayName}
@@ -258,7 +264,7 @@ export function StaffDocumentsTab() {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="incidentCategory">Category</Label>
+                  <Label htmlFor="incidentCategory">{t('documents.category')}</Label>
                   <Input
                     id="incidentCategory"
                     value={incidentForm.category}
@@ -268,7 +274,7 @@ export function StaffDocumentsTab() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="incidentSeverity">Severity</Label>
+                  <Label htmlFor="incidentSeverity">{t('documents.severity')}</Label>
                   <Select
                     value={incidentForm.severity}
                     onValueChange={(value) =>
@@ -276,15 +282,16 @@ export function StaffDocumentsTab() {
                     }
                   >
                     <SelectTrigger id="incidentSeverity" className="mt-1 w-full">
-                      <option value="LOW">Low</option>
-                      <option value="MEDIUM">Medium</option>
-                      <option value="HIGH">High</option>
-                      <option value="CRITICAL">Critical</option>
+                      {(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const).map((level) => (
+                        <option key={level} value={level}>
+                          {t(`shared.severity.${level}`)}
+                        </option>
+                      ))}
                     </SelectTrigger>
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="incidentDate">Occurred at</Label>
+                  <Label htmlFor="incidentDate">{t('documents.occurredAt')}</Label>
                   <Input
                     id="incidentDate"
                     type="datetime-local"
@@ -295,7 +302,7 @@ export function StaffDocumentsTab() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="incidentNotes">Notes</Label>
+                  <Label htmlFor="incidentNotes">{t('shared.notes')}</Label>
                   <Textarea
                     id="incidentNotes"
                     rows={2}
@@ -307,7 +314,7 @@ export function StaffDocumentsTab() {
                 </div>
                 <div className="flex justify-end">
                   <Button onClick={handleCreateIncident} disabled={creatingIncident}>
-                    {creatingIncident ? 'Saving…' : 'Log incident'}
+                    {creatingIncident ? t('shared.saving') : t('documents.logIncidentButton')}
                   </Button>
                 </div>
               </div>
@@ -315,9 +322,11 @@ export function StaffDocumentsTab() {
 
             <div className="space-y-2">
               {incidentsLoading ? (
-                <p className="text-sm text-[var(--text-muted)]">Loading incidents…</p>
+                <p className="text-sm text-[var(--text-muted)]">
+                  {t('documents.loadingIncidents')}
+                </p>
               ) : incidents.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)]">No incidents recorded.</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('documents.noIncidents')}</p>
               ) : (
                 incidents.slice(0, 5).map((incident) => (
                   <div
@@ -326,7 +335,7 @@ export function StaffDocumentsTab() {
                   >
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold text-[var(--text)]">
-                        {incident.category} · {incident.staff?.name || 'Unassigned'}
+                        {incident.category} · {incident.staff?.name || t('shared.unassigned')}
                       </p>
                       <Badge className="bg-[var(--red-pale)] text-[var(--red)]">
                         {incident.severity.toLowerCase()}
@@ -346,10 +355,12 @@ export function StaffDocumentsTab() {
 
           <div className="space-y-3">
             <div className="rounded-lg border border-[var(--app-border)] bg-white p-4 shadow-sm">
-              <h3 className="text-sm font-semibold text-[var(--text)]">Performance notes</h3>
+              <h3 className="text-sm font-semibold text-[var(--text)]">
+                {t('documents.performanceNotes')}
+              </h3>
               <div className="mt-3 space-y-2 text-sm">
                 <div>
-                  <Label htmlFor="performanceStaff">Staff</Label>
+                  <Label htmlFor="performanceStaff">{t('shared.staff')}</Label>
                   <Select
                     value={performanceNoteForm.staffId}
                     onValueChange={(value) =>
@@ -360,7 +371,7 @@ export function StaffDocumentsTab() {
                     }
                   >
                     <SelectTrigger id="performanceStaff" className="mt-1 w-full">
-                      <option value="">Select staff</option>
+                      <option value="">{t('shared.selectStaff')}</option>
                       {staffMembers.map((member) => (
                         <option key={member.id} value={member.id}>
                           {member.displayName}
@@ -370,7 +381,7 @@ export function StaffDocumentsTab() {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="performanceType">Type</Label>
+                  <Label htmlFor="performanceType">{t('shared.type')}</Label>
                   <Select
                     value={performanceNoteForm.noteType}
                     onValueChange={(value) =>
@@ -381,14 +392,16 @@ export function StaffDocumentsTab() {
                     }
                   >
                     <SelectTrigger id="performanceType" className="mt-1 w-full">
-                      <option value="KUDOS">Kudos</option>
-                      <option value="COACHING">Coaching</option>
-                      <option value="GENERAL">General</option>
+                      {(['KUDOS', 'COACHING', 'GENERAL'] as const).map((type) => (
+                        <option key={type} value={type}>
+                          {t(`shared.performanceNoteType.${type}`)}
+                        </option>
+                      ))}
                     </SelectTrigger>
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="performanceBody">Note</Label>
+                  <Label htmlFor="performanceBody">{t('documents.note')}</Label>
                   <Textarea
                     id="performanceBody"
                     rows={2}
@@ -403,7 +416,7 @@ export function StaffDocumentsTab() {
                 </div>
                 <div className="flex justify-end">
                   <Button onClick={handleCreatePerformanceNote} disabled={creatingPerformance}>
-                    {creatingPerformance ? 'Saving…' : 'Save note'}
+                    {creatingPerformance ? t('shared.saving') : t('documents.saveNote')}
                   </Button>
                 </div>
               </div>
@@ -411,9 +424,9 @@ export function StaffDocumentsTab() {
 
             <div className="space-y-2">
               {notesLoading ? (
-                <p className="text-sm text-[var(--text-muted)]">Loading notes…</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('documents.loadingNotes')}</p>
               ) : performanceNotes.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)]">No notes recorded.</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('documents.noNotes')}</p>
               ) : (
                 performanceNotes.slice(0, 5).map((note) => (
                   <div
@@ -421,7 +434,7 @@ export function StaffDocumentsTab() {
                     className="rounded-lg border border-[var(--app-border)] bg-white p-3 shadow-sm"
                   >
                     <p className="text-sm font-semibold text-[var(--text)]">
-                      {note.staff?.name} · {note.noteType.toLowerCase()}
+                      {note.staff?.name} · {t(`shared.performanceNoteType.${note.noteType}`)}
                     </p>
                     <p className="mt-1 text-xs text-[var(--text-muted)]">{note.body}</p>
                     <p className="mt-1 text-xs text-[var(--text-muted)]">

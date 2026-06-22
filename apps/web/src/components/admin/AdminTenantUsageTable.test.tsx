@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
+import { renderWithProviders } from '../../test/utils'
 import { AdminTenantUsageTable } from './AdminTenantUsageTable'
 
 afterEach(() => {
@@ -49,7 +50,7 @@ const restaurantPlans = [
 
 describe('AdminTenantUsageTable', () => {
   it('renders supplier usage table with status badges', () => {
-    render(
+    renderWithProviders(
       <AdminTenantUsageTable
         mode="supplier"
         suppliers={[
@@ -71,7 +72,7 @@ describe('AdminTenantUsageTable', () => {
   })
 
   it('renders supplier active deals progress when available', () => {
-    render(
+    renderWithProviders(
       <AdminTenantUsageTable
         mode="supplier"
         suppliers={[
@@ -92,7 +93,7 @@ describe('AdminTenantUsageTable', () => {
   })
 
   it('shows Not available for missing supplier storage', () => {
-    render(
+    renderWithProviders(
       <AdminTenantUsageTable
         mode="supplier"
         suppliers={[
@@ -112,7 +113,7 @@ describe('AdminTenantUsageTable', () => {
   })
 
   it('renders restaurant orders today against daily limit', () => {
-    render(
+    renderWithProviders(
       <AdminTenantUsageTable
         mode="restaurant"
         restaurants={[
@@ -135,7 +136,7 @@ describe('AdminTenantUsageTable', () => {
   })
 
   it('shows unlimited for restaurant with -1 daily limit', () => {
-    render(
+    renderWithProviders(
       <AdminTenantUsageTable
         mode="restaurant"
         restaurants={[
@@ -154,7 +155,7 @@ describe('AdminTenantUsageTable', () => {
   })
 
   it('shows Not available when orders_today is missing', () => {
-    render(
+    renderWithProviders(
       <AdminTenantUsageTable
         mode="restaurant"
         restaurants={[
@@ -172,7 +173,7 @@ describe('AdminTenantUsageTable', () => {
   })
 
   it('shows empty state when no tenants match', () => {
-    render(<AdminTenantUsageTable mode="restaurant" restaurants={[]} plans={[]} />)
+    renderWithProviders(<AdminTenantUsageTable mode="restaurant" restaurants={[]} plans={[]} />)
     expect(screen.getByText('No matching tenants')).toBeInTheDocument()
   })
 })

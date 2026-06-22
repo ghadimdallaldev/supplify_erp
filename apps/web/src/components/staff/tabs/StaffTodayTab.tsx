@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import type { ComponentProps } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   AlertCircle,
   AlertTriangle,
@@ -28,8 +29,8 @@ interface StaffTodayTabProps {
   onTabChange: (tab: StaffTabKey) => void
 }
 
-function metricCount(value: number | null | undefined) {
-  if (value == null) return '—'
+function metricCount(value: number | null | undefined, emptyLabel: string) {
+  if (value == null) return emptyLabel
   return String(value)
 }
 
@@ -54,6 +55,7 @@ function StaffMetricCard({
 }
 
 export function StaffTodayTab({ onTabChange }: StaffTodayTabProps) {
+  const { t } = useTranslation('staff')
   const today = clampToISODate(new Date())
   const { data, isLoading, isError, error, refetch } = useGetStaffLabourSummaryQuery({
     date: today,
@@ -62,12 +64,12 @@ export function StaffTodayTab({ onTabChange }: StaffTodayTabProps) {
   if (isError) {
     return (
       <EmptyState
-        title="Unable to load labour summary"
-        description={getApiErrorMessage(error, 'Try again in a moment.')}
+        title={t('today.loadFailedTitle')}
+        description={getApiErrorMessage(error, t('today.loadFailedDescription'))}
         icon={<AlertCircle className="h-6 w-6" />}
         action={
           <Button variant="outline" size="sm" onClick={() => refetch()}>
-            Try again
+            {t('shared.tryAgain')}
           </Button>
         }
       />
@@ -93,79 +95,82 @@ export function StaffTodayTab({ onTabChange }: StaffTodayTabProps) {
   const overtimeCount =
     counts.overtimeRiskCount ?? (overtimeRisk?.length ? overtimeRisk.length : null)
 
+  const emDash = t('shared.emDash')
   const coverageMetrics = [
     {
-      label: 'Scheduled today',
+      label: t('today.metrics.scheduledToday'),
       value: counts.scheduledToday,
       icon: CalendarDays,
       tone: 'brand' as const,
-      description: 'Shifts on the roster',
+      description: t('today.metrics.scheduledTodayDesc'),
       onClick: () => onTabChange('schedule'),
     },
     {
-      label: 'Clocked in now',
+      label: t('today.metrics.clockedInNow'),
       value: counts.clockedInNow,
       icon: UserCheck,
       tone: 'success' as const,
-      description: 'Currently on the clock',
+      description: t('today.metrics.clockedInNowDesc'),
       onClick: () => onTabChange('team'),
     },
     {
-      label: 'Late arrivals',
-      value: metricCount(counts.lateArrivals),
+      label: t('today.metrics.lateArrivals'),
+      value: metricCount(counts.lateArrivals, emDash),
       icon: Clock,
       tone:
         counts.lateArrivals != null && counts.lateArrivals > 0
           ? ('warning' as const)
           : ('neutral' as const),
       description:
-        counts.lateArrivals == null ? 'Not tracked on this plan' : 'Behind scheduled start',
+        counts.lateArrivals == null
+          ? t('today.metrics.lateArrivalsNotTracked')
+          : t('today.metrics.lateArrivalsDesc'),
       onClick: () => onTabChange('schedule'),
     },
     {
-      label: 'Missed clock-outs',
+      label: t('today.metrics.missedClockOuts'),
       value: counts.missedClockOuts,
       icon: LogOut,
       tone: counts.missedClockOuts > 0 ? ('warning' as const) : ('neutral' as const),
-      description: 'Still open from prior shifts',
+      description: t('today.metrics.missedClockOutsDesc'),
       onClick: () => onTabChange('team'),
     },
   ]
 
   const opsMetrics = [
     {
-      label: 'Pending PTO',
+      label: t('today.metrics.pendingPto'),
       value: counts.pendingPto,
       icon: Palmtree,
       tone: counts.pendingPto > 0 ? ('info' as const) : ('neutral' as const),
-      description: 'Awaiting manager review',
+      description: t('today.metrics.pendingPtoDesc'),
       onClick: () => onTabChange('pto'),
     },
     {
-      label: 'Pending swaps',
+      label: t('today.metrics.pendingSwaps'),
       value: counts.pendingSwaps,
       icon: ArrowLeftRight,
       tone: counts.pendingSwaps > 0 ? ('info' as const) : ('neutral' as const),
-      description: 'Shift change requests',
+      description: t('today.metrics.pendingSwapsDesc'),
       onClick: () => onTabChange('schedule'),
     },
     {
-      label: 'Est. labour cost',
-      value: labourCostToday.available ? formatPrice(counts.estimatedLabourCostToday ?? 0) : '—',
+      label: t('today.metrics.estLabourCost'),
+      value: labourCostToday.available ? formatPrice(counts.estimatedLabourCostToday ?? 0) : emDash,
       icon: DollarSign,
       tone: labourCostToday.available ? ('brand' as const) : ('neutral' as const),
       description: labourCostToday.available
-        ? 'Today’s hours × wage rates'
-        : 'Add wage rates to estimate',
+        ? t('today.metrics.estLabourCostDesc')
+        : t('today.metrics.estLabourCostUnavailable'),
       onClick: () => onTabChange('reports'),
     },
     {
-      label: 'Overtime risk',
-      value: metricCount(overtimeCount),
+      label: t('today.metrics.overtimeRisk'),
+      value: metricCount(overtimeCount, emDash),
       icon: AlertTriangle,
       tone:
         overtimeCount != null && overtimeCount > 0 ? ('warning' as const) : ('neutral' as const),
-      description: 'Staff over 8 hours today',
+      description: t('today.metrics.overtimeRiskDesc'),
       onClick: () => onTabChange('reports'),
     },
   ]
@@ -184,30 +189,27 @@ export function StaffTodayTab({ onTabChange }: StaffTodayTabProps) {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--brand-mid)]">
-              Labour today
+              {t('today.heroEyebrow')}
             </p>
             <h2 className="text-xl font-bold text-[var(--text)] sm:text-2xl">{formattedDate}</h2>
             <p className="max-w-xl text-sm text-[var(--text-muted)]">
-              Coverage, attendance, and approvals at a glance. Estimates only — not legal payroll or
-              overtime compliance.
+              {t('today.heroDescription')}
             </p>
             {data.meta?.openEntriesIncluded ? (
-              <p className="text-xs text-[var(--text-mid)]">
-                Open time entries count toward today&apos;s hours until staff clock out.
-              </p>
+              <p className="text-xs text-[var(--text-mid)]">{t('today.openEntriesNote')}</p>
             ) : null}
           </div>
           <div className="flex flex-wrap gap-2 shrink-0">
             <Button size="sm" onClick={() => onTabChange('schedule')}>
               <CalendarDays className="mr-1.5 h-4 w-4" aria-hidden />
-              Schedule
+              {t('today.schedule')}
             </Button>
             <Button size="sm" variant="outline" onClick={() => onTabChange('team')}>
-              Team roster
+              {t('today.teamRoster')}
             </Button>
             {pendingActions > 0 ? (
               <Button size="sm" variant="outline" onClick={() => onTabChange('pto')}>
-                {pendingActions} pending approval{pendingActions === 1 ? '' : 's'}
+                {t('today.pendingApprovals', { count: pendingActions })}
               </Button>
             ) : null}
           </div>
@@ -216,8 +218,8 @@ export function StaffTodayTab({ onTabChange }: StaffTodayTabProps) {
 
       <div className="space-y-3">
         <div className="flex items-baseline justify-between gap-2">
-          <h3 className="text-sm font-semibold text-[var(--text)]">Coverage & attendance</h3>
-          <p className="text-xs text-[var(--text-muted)]">Tap a card to open the related tab</p>
+          <h3 className="text-sm font-semibold text-[var(--text)]">{t('today.coverageHeading')}</h3>
+          <p className="text-xs text-[var(--text-muted)]">{t('today.coverageHint')}</p>
         </div>
         <div
           data-testid="staff-labour-summary"
@@ -230,7 +232,7 @@ export function StaffTodayTab({ onTabChange }: StaffTodayTabProps) {
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-[var(--text)]">Requests & labour cost</h3>
+        <h3 className="text-sm font-semibold text-[var(--text)]">{t('today.requestsHeading')}</h3>
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           {opsMetrics.map((metric) => (
             <StaffMetricCard key={metric.label} {...metric} />
@@ -240,11 +242,11 @@ export function StaffTodayTab({ onTabChange }: StaffTodayTabProps) {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <StaffPanel
-          title="Needs attention"
+          title={t('today.attention.title')}
           description={
             attentionCount > 0
-              ? `${attentionCount} item${attentionCount === 1 ? '' : 's'} need a manager look`
-              : 'Operational alerts for your team today'
+              ? t('today.attention.itemsNeedReview', { count: attentionCount })
+              : t('today.attention.defaultDescription')
           }
         >
           {alerts.length === 0 ? (
@@ -253,14 +255,16 @@ export function StaffTodayTab({ onTabChange }: StaffTodayTabProps) {
                 <CheckCircle2 className="h-5 w-5 text-[var(--mint)]" aria-hidden />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-[var(--text)]">All clear</p>
+                <p className="text-sm font-semibold text-[var(--text)]">
+                  {t('today.attention.allClear')}
+                </p>
                 <p className="mt-0.5 text-sm text-[var(--text-muted)]">
                   {attendanceIssues === 0 && pendingActions === 0
-                    ? 'No late arrivals, open approvals, or overtime flags right now.'
-                    : 'No critical alerts — review the metrics above for follow-ups.'}
+                    ? t('today.attention.noIssues')
+                    : t('today.attention.noCritical')}
                 </p>
               </div>
-              <StatusBadge status="healthy" label="Healthy" className="shrink-0" />
+              <StatusBadge status="healthy" label={t('shared.healthy')} className="shrink-0" />
             </div>
           ) : (
             <ul className="-mx-4 -mb-4 divide-y divide-[var(--app-border)] sm:-mx-5 sm:-mb-5">
@@ -292,7 +296,7 @@ export function StaffTodayTab({ onTabChange }: StaffTodayTabProps) {
                       className="shrink-0"
                       onClick={() => onTabChange(alert.deepLinkTab as StaffTabKey)}
                     >
-                      View
+                      {t('shared.view')}
                     </Button>
                   ) : null}
                 </li>
@@ -303,8 +307,8 @@ export function StaffTodayTab({ onTabChange }: StaffTodayTabProps) {
 
         {overtimeRisk && overtimeRisk.length > 0 ? (
           <StaffPanel
-            title="Overtime risk today"
-            description="Staff over 8 hours worked — simple heuristic, not compliance advice."
+            title={t('today.overtime.title')}
+            description={t('today.overtime.description')}
           >
             <ul className="-mx-4 -mb-4 divide-y divide-[var(--app-border)] sm:-mx-5 sm:-mb-5">
               {overtimeRisk.map((row) => (
@@ -326,7 +330,10 @@ export function StaffTodayTab({ onTabChange }: StaffTodayTabProps) {
             </ul>
           </StaffPanel>
         ) : (
-          <StaffPanel title="Quick actions" description="Common manager workflows for today.">
+          <StaffPanel
+            title={t('today.quickActions.title')}
+            description={t('today.quickActions.description')}
+          >
             <div className="grid gap-2 sm:grid-cols-2">
               <Button
                 variant="outline"
@@ -335,9 +342,11 @@ export function StaffTodayTab({ onTabChange }: StaffTodayTabProps) {
               >
                 <CalendarDays className="mr-2 h-4 w-4 shrink-0 text-[var(--brand-mid)]" />
                 <span>
-                  <span className="block text-sm font-medium">Adjust today&apos;s schedule</span>
+                  <span className="block text-sm font-medium">
+                    {t('today.quickActions.adjustSchedule')}
+                  </span>
                   <span className="block text-xs text-[var(--text-muted)]">
-                    Shifts, swaps, and time entries
+                    {t('today.quickActions.adjustScheduleDesc')}
                   </span>
                 </span>
               </Button>
@@ -348,9 +357,11 @@ export function StaffTodayTab({ onTabChange }: StaffTodayTabProps) {
               >
                 <Palmtree className="mr-2 h-4 w-4 shrink-0 text-[var(--brand-mid)]" />
                 <span>
-                  <span className="block text-sm font-medium">Review time off</span>
+                  <span className="block text-sm font-medium">
+                    {t('today.quickActions.reviewTimeOff')}
+                  </span>
                   <span className="block text-xs text-[var(--text-muted)]">
-                    Approve or decline PTO requests
+                    {t('today.quickActions.reviewTimeOffDesc')}
                   </span>
                 </span>
               </Button>
@@ -361,9 +372,11 @@ export function StaffTodayTab({ onTabChange }: StaffTodayTabProps) {
               >
                 <UserCheck className="mr-2 h-4 w-4 shrink-0 text-[var(--brand-mid)]" />
                 <span>
-                  <span className="block text-sm font-medium">Check who&apos;s working</span>
+                  <span className="block text-sm font-medium">
+                    {t('today.quickActions.checkWorking')}
+                  </span>
                   <span className="block text-xs text-[var(--text-muted)]">
-                    Live clock-in status by team member
+                    {t('today.quickActions.checkWorkingDesc')}
                   </span>
                 </span>
               </Button>
@@ -374,9 +387,11 @@ export function StaffTodayTab({ onTabChange }: StaffTodayTabProps) {
               >
                 <DollarSign className="mr-2 h-4 w-4 shrink-0 text-[var(--brand-mid)]" />
                 <span>
-                  <span className="block text-sm font-medium">Payroll preview</span>
+                  <span className="block text-sm font-medium">
+                    {t('today.quickActions.payrollPreview')}
+                  </span>
                   <span className="block text-xs text-[var(--text-muted)]">
-                    Hours and estimated labour cost
+                    {t('today.quickActions.payrollPreviewDesc')}
                   </span>
                 </span>
               </Button>

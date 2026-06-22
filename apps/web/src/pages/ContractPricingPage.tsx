@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -27,6 +28,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import { formatPrice } from '../utils/format'
 import { toast } from 'sonner'
 import { Loader2, Plus, Pencil, Ban, Search } from 'lucide-react'
+import { ensureNamespace } from '../i18n'
 
 const AGREEMENT_TYPES = ['CUSTOM', 'VOLUME', 'RELATIONSHIP', 'SPECIAL'] as const
 
@@ -55,6 +57,7 @@ const emptyForm: FormState = {
 }
 
 export function ContractPricingPage() {
+  const { t } = useTranslation('contracts')
   const { can } = usePermissions()
   const canManage = can('CATALOG_MANAGE') || can('CATALOG_EDIT')
   const [statusFilter, setStatusFilter] = useState('active')
@@ -63,6 +66,10 @@ export function ContractPricingPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm)
+
+  useEffect(() => {
+    void ensureNamespace('contracts')
+  }, [])
 
   const queryParams = useMemo(
     () => ({
@@ -112,7 +119,7 @@ export function ContractPricingPage() {
   const handleSave = async () => {
     const price = parseFloat(form.price)
     if (!form.restaurantId || !form.productId || Number.isNaN(price) || price <= 0) {
-      toast.error('Restaurant, product, and a valid price are required')
+      toast.error(t('pricing.toast.requiredFields'))
       return
     }
 
@@ -136,10 +143,10 @@ export function ContractPricingPage() {
           id: editingId,
           ...payload,
         }).unwrap()
-        toast.success('Contract price updated')
+        toast.success(t('pricing.toast.updated'))
       } else {
         await createPricing(payload).unwrap()
-        toast.success('Contract price saved')
+        toast.success(t('pricing.toast.saved'))
       }
       setDialogOpen(false)
       refetch()
@@ -147,18 +154,18 @@ export function ContractPricingPage() {
       const message =
         err && typeof err === 'object' && 'data' in err
           ? String((err as { data?: { error?: { message?: string } } }).data?.error?.message)
-          : 'Failed to save contract price'
-      toast.error(message || 'Failed to save contract price')
+          : t('pricing.toast.saveFailed')
+      toast.error(message || t('pricing.toast.saveFailed'))
     }
   }
 
   const handleDeactivate = async (id: string) => {
     try {
       await deactivatePricing(id).unwrap()
-      toast.success('Contract price deactivated')
+      toast.success(t('pricing.toast.deactivated'))
       refetch()
     } catch {
-      toast.error('Failed to deactivate')
+      toast.error(t('pricing.toast.deactivateFailed'))
     }
   }
 
@@ -166,13 +173,13 @@ export function ContractPricingPage() {
     <RequirePermission permission="CATALOG_VIEW">
       <PageShell maxWidth="wide" data-testid="contract-pricing-page">
         <PageHeader
-          title="Contract Pricing"
-          description="Set customer-specific prices per restaurant and product."
+          title={t('pricing.title')}
+          description={t('pricing.description')}
           actions={
             canManage ? (
               <Button onClick={openCreate}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add contract price
+                {t('pricing.addContractPrice')}
               </Button>
             ) : undefined
           }
@@ -180,27 +187,27 @@ export function ContractPricingPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Filters</CardTitle>
+            <CardTitle className="text-base">{t('pricing.filters')}</CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:flex lg:flex-wrap">
             <div className="w-full lg:min-w-[200px] lg:flex-1">
-              <Label htmlFor="search">Search</Label>
+              <Label htmlFor="search">{t('pricing.search')}</Label>
               <div className="relative mt-1">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-[var(--text-muted)]" />
                 <Input
                   id="search"
                   className="pl-8"
-                  placeholder="Restaurant, product, SKU…"
+                  placeholder={t('pricing.searchPlaceholder')}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
             </div>
             <div className="w-full sm:max-w-none lg:min-w-[180px]">
-              <Label htmlFor="restaurant">Restaurant</Label>
+              <Label htmlFor="restaurant">{t('pricing.restaurant')}</Label>
               <Select value={restaurantFilter} onValueChange={setRestaurantFilter}>
                 <SelectTrigger id="restaurant" className="mt-1">
-                  <option value="">All restaurants</option>
+                  <option value="">{t('pricing.allRestaurants')}</option>
                   {restaurants.map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.name}
@@ -210,13 +217,13 @@ export function ContractPricingPage() {
               </Select>
             </div>
             <div className="w-full sm:max-w-none lg:min-w-[140px]">
-              <Label htmlFor="status">Status</Label>
+              <Label htmlFor="status">{t('pricing.status')}</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger id="status" className="mt-1">
-                  <option value="all">All</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="expired">Expired</option>
+                  <option value="all">{t('pricing.statusAll')}</option>
+                  <option value="active">{t('pricing.statusActive')}</option>
+                  <option value="inactive">{t('pricing.statusInactive')}</option>
+                  <option value="expired">{t('pricing.statusExpired')}</option>
                 </SelectTrigger>
               </Select>
             </div>
@@ -230,9 +237,7 @@ export function ContractPricingPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-[var(--brand)]" />
               </div>
             ) : pricing.length === 0 ? (
-              <p className="text-center py-12 text-[var(--text-muted)]">
-                No contract prices match your filters.
-              </p>
+              <p className="text-center py-12 text-[var(--text-muted)]">{t('pricing.empty')}</p>
             ) : (
               <>
                 <div className="divide-y md:hidden">
@@ -247,12 +252,14 @@ export function ContractPricingPage() {
                             <p className="mt-1 text-sm">{String(row.restaurant_name)}</p>
                           </div>
                           <Badge variant={active ? 'default' : 'secondary'}>
-                            {active ? 'Active' : 'Inactive'}
+                            {active ? t('pricing.statusActive') : t('pricing.statusInactive')}
                           </Badge>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div>
-                            <p className="text-xs text-[var(--text-muted)]">Catalog</p>
+                            <p className="text-xs text-[var(--text-muted)]">
+                              {t('pricing.catalog')}
+                            </p>
                             <p>
                               {row.catalog_price != null
                                 ? formatPrice(Number(row.catalog_price))
@@ -260,7 +267,9 @@ export function ContractPricingPage() {
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs text-[var(--text-muted)]">Contract</p>
+                            <p className="text-xs text-[var(--text-muted)]">
+                              {t('pricing.contract')}
+                            </p>
                             <p className="font-semibold">{formatPrice(Number(row.price))}</p>
                           </div>
                         </div>
@@ -273,7 +282,7 @@ export function ContractPricingPage() {
                               onClick={() => openEdit(row)}
                             >
                               <Pencil className="mr-1 h-3 w-3" />
-                              Edit
+                              {t('pricing.edit')}
                             </Button>
                             {active && (
                               <Button
@@ -283,7 +292,7 @@ export function ContractPricingPage() {
                                 onClick={() => handleDeactivate(String(row.id))}
                               >
                                 <Ban className="mr-1 h-3 w-3" />
-                                Deactivate
+                                {t('pricing.deactivate')}
                               </Button>
                             )}
                           </div>
@@ -296,13 +305,13 @@ export function ContractPricingPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-[var(--app-border)] text-left text-[var(--text-muted)]">
-                        <th className="px-4 py-3 font-medium">Restaurant</th>
-                        <th className="px-4 py-3 font-medium">Product</th>
-                        <th className="px-4 py-3 font-medium">Catalog</th>
-                        <th className="px-4 py-3 font-medium">Contract</th>
-                        <th className="px-4 py-3 font-medium">Valid</th>
-                        <th className="px-4 py-3 font-medium">Status</th>
-                        <th className="px-4 py-3 font-medium">Actions</th>
+                        <th className="px-4 py-3 font-medium">{t('pricing.restaurant')}</th>
+                        <th className="px-4 py-3 font-medium">{t('pricing.product')}</th>
+                        <th className="px-4 py-3 font-medium">{t('pricing.catalog')}</th>
+                        <th className="px-4 py-3 font-medium">{t('pricing.contract')}</th>
+                        <th className="px-4 py-3 font-medium">{t('pricing.valid')}</th>
+                        <th className="px-4 py-3 font-medium">{t('pricing.status')}</th>
+                        <th className="px-4 py-3 font-medium">{t('pricing.actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -326,7 +335,9 @@ export function ContractPricingPage() {
                               {formatPrice(Number(row.price))}
                               {row.contract_discount_percentage != null && (
                                 <Badge variant="outline" className="ml-2 text-xs">
-                                  {row.contract_discount_percentage}% off
+                                  {t('pricing.discountOff', {
+                                    percent: row.contract_discount_percentage,
+                                  })}
                                 </Badge>
                               )}
                             </td>
@@ -341,7 +352,7 @@ export function ContractPricingPage() {
                             </td>
                             <td className="px-4 py-3">
                               <Badge variant={active ? 'default' : 'secondary'}>
-                                {active ? 'Active' : 'Inactive'}
+                                {active ? t('pricing.statusActive') : t('pricing.statusInactive')}
                               </Badge>
                             </td>
                             <td className="px-4 py-3">
@@ -373,25 +384,24 @@ export function ContractPricingPage() {
           </CardContent>
         </Card>
 
-        <p className="text-xs text-[var(--text-muted)]">
-          Bulk CSV import/export and copy price list between restaurants are planned for a future
-          release.
-        </p>
+        <p className="text-xs text-[var(--text-muted)]">{t('pricing.futureNote')}</p>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent size="md">
             <DialogHeader>
-              <DialogTitle>{editingId ? 'Edit contract price' : 'Add contract price'}</DialogTitle>
+              <DialogTitle>
+                {editingId ? t('pricing.dialog.editTitle') : t('pricing.dialog.addTitle')}
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-2">
               <div>
-                <Label>Restaurant</Label>
+                <Label>{t('pricing.restaurant')}</Label>
                 <Select
                   value={form.restaurantId}
                   onValueChange={(value) => setForm({ ...form, restaurantId: value })}
                 >
                   <SelectTrigger className="mt-1" disabled={!!editingId}>
-                    <option value="">Select restaurant</option>
+                    <option value="">{t('pricing.dialog.selectRestaurant')}</option>
                     {restaurants.map((r) => (
                       <option key={r.id} value={r.id}>
                         {r.name}
@@ -401,13 +411,13 @@ export function ContractPricingPage() {
                 </Select>
               </div>
               <div>
-                <Label>Product</Label>
+                <Label>{t('pricing.product')}</Label>
                 <Select
                   value={form.productId}
                   onValueChange={(value) => setForm({ ...form, productId: value })}
                 >
                   <SelectTrigger className="mt-1" disabled={!!editingId}>
-                    <option value="">Select product</option>
+                    <option value="">{t('pricing.dialog.selectProduct')}</option>
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} ({p.sku})
@@ -417,7 +427,7 @@ export function ContractPricingPage() {
                 </Select>
               </div>
               <div>
-                <Label>Contract price</Label>
+                <Label>{t('pricing.dialog.contractPrice')}</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -428,7 +438,7 @@ export function ContractPricingPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Discount % (optional)</Label>
+                  <Label>{t('pricing.dialog.discountOptional')}</Label>
                   <Input
                     type="number"
                     min="0"
@@ -440,7 +450,7 @@ export function ContractPricingPage() {
                   />
                 </div>
                 <div>
-                  <Label>Min order qty</Label>
+                  <Label>{t('pricing.dialog.minOrderQty')}</Label>
                   <Input
                     type="number"
                     min="0"
@@ -451,7 +461,7 @@ export function ContractPricingPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Start date</Label>
+                  <Label>{t('pricing.dialog.startDate')}</Label>
                   <Input
                     type="date"
                     value={form.contractStartDate}
@@ -459,7 +469,7 @@ export function ContractPricingPage() {
                   />
                 </div>
                 <div>
-                  <Label>End date</Label>
+                  <Label>{t('pricing.dialog.endDate')}</Label>
                   <Input
                     type="date"
                     value={form.contractEndDate}
@@ -468,7 +478,7 @@ export function ContractPricingPage() {
                 </div>
               </div>
               <div>
-                <Label>Agreement type</Label>
+                <Label>{t('pricing.dialog.agreementType')}</Label>
                 <Select
                   value={form.agreementType}
                   onValueChange={(value) =>
@@ -488,7 +498,7 @@ export function ContractPricingPage() {
                 </Select>
               </div>
               <div>
-                <Label>Notes</Label>
+                <Label>{t('pricing.dialog.notes')}</Label>
                 <Input
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -497,12 +507,12 @@ export function ContractPricingPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
+                {t('pricing.dialog.cancel')}
               </Button>
               {canManage && (
                 <Button onClick={handleSave} disabled={creating || updating}>
                   {(creating || updating) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Save
+                  {t('pricing.dialog.save')}
                 </Button>
               )}
             </DialogFooter>

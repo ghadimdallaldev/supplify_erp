@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { FulfillmentRouteDetailPanel } from './FulfillmentRouteDetailPanel'
+import { renderWithFulfillmentI18n } from './test-utils'
 import type { DeliveryRouteDetail } from '../../types'
 
 vi.mock('../../hooks/usePermissions', () => ({
@@ -87,7 +88,7 @@ afterEach(() => {
 
 describe('FulfillmentRouteDetailPanel mobile polish', () => {
   it('shows plain route and stop labels with ETA and GPS', () => {
-    render(
+    renderWithFulfillmentI18n(
       <MemoryRouter>
         <FulfillmentRouteDetailPanel route={route} onClose={vi.fn()} />
       </MemoryRouter>
@@ -105,7 +106,7 @@ describe('FulfillmentRouteDetailPanel mobile polish', () => {
   })
 
   it('expands secondary stop details on demand', () => {
-    render(
+    renderWithFulfillmentI18n(
       <MemoryRouter>
         <FulfillmentRouteDetailPanel route={route} onClose={vi.fn()} />
       </MemoryRouter>
@@ -117,7 +118,7 @@ describe('FulfillmentRouteDetailPanel mobile polish', () => {
   })
 
   it('renders touch-friendly primary action on mobile stops', () => {
-    render(
+    renderWithFulfillmentI18n(
       <MemoryRouter>
         <FulfillmentRouteDetailPanel route={route} onClose={vi.fn()} />
       </MemoryRouter>

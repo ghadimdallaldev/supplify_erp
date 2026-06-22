@@ -12,6 +12,7 @@ import {
 import { STAFF_PORTAL_APP_ROLE, STAFF_PORTAL_KEYCLOAK_ROLE } from '../lib/staff-portal-auth.js'
 import {
   buildStaffPortalLoginPageUrl,
+  buildStaffPortalLoginUrl,
   sendStaffPortalAccountInvite,
   sendStaffPortalMagicLink,
 } from './staff-portal-mail.service.js'
@@ -20,6 +21,60 @@ import { isEmailConfigured } from './email/email.service.js'
 
 function generateTemporaryPassword() {
   return `${randomBytes(9).toString('base64url')}Aa1!`
+}
+
+const MAGIC_LINK_TTL_MS = 12 * 60 * 60 * 1000
+
+export async function createStaffPortalMagicLinkSession(staffId) {
+  const expiresAt = new Date(Date.now() + MAGIC_LINK_TTL_MS)
+  const session = await query(
+    `
+      INSERT INTO staff_portal_session (staff_id, expires_at)
+      VALUES ($1, $2)
+      RETURNING session_token, expires_at
+    `,
+    [staffId, expiresAt.toISOString()]
+  )
+  return {
+    sessionToken: session.rows[0].session_token,
+    expiresAt: session.rows[0].expires_at,
+  }
+}
+
+/** Link managers can copy/share — login page for password accounts, magic URL otherwise. */
+export async function resolveStaffPortalCopyLink(staffId, restaurantId) {
+  const staff = await getStaffPortalAccessRow(staffId, restaurantId)
+  if (!staff) {
+    const err = new Error('Staff member not found')
+    err.name = 'STAFF_NOT_FOUND'
+    err.status = 404
+    throw err
+  }
+  if (!staff.portal_access_enabled) {
+    const err = new Error('Enable staff portal access before copying a link')
+    err.name = 'PORTAL_ACCESS_DISABLED'
+    err.status = 400
+    throw err
+  }
+
+  const base = mapPortalAccessInfo(staff)
+
+  if (staff.user_id) {
+    return {
+      ...base,
+      loginUrl: buildStaffPortalLoginPageUrl(),
+      linkType: 'login',
+    }
+  }
+
+  await assertStaffEmail(staff)
+  const { sessionToken, expiresAt } = await createStaffPortalMagicLinkSession(staffId)
+  return {
+    ...base,
+    loginUrl: buildStaffPortalLoginUrl(sessionToken),
+    linkType: 'magic',
+    expiresAt,
+  }
 }
 
 export async function getStaffPortalAccessRow(staffId, restaurantId) {
@@ -206,17 +261,8 @@ export async function sendStaffPortalInviteEmail(staffId, restaurantId) {
   }
 
   if (!staff.user_id) {
-    const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000)
-    const session = await query(
-      `
-        INSERT INTO staff_portal_session (staff_id, expires_at)
-        VALUES ($1, $2)
-        RETURNING session_token, expires_at
-      `,
-      [staffId, expiresAt.toISOString()]
-    )
-    const sessionToken = session.rows[0].session_token
-    const sessionExpiresAt = session.rows[0].expires_at
+    const { sessionToken, expiresAt: sessionExpiresAt } =
+      await createStaffPortalMagicLinkSession(staffId)
 
     await sendStaffPortalMagicLink({
       to: email,

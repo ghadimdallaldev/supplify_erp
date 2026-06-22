@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   useValidateInviteQuery,
@@ -24,8 +25,10 @@ import {
   isLegalAcceptanceComplete,
 } from '../components/legal/LegalAcceptancePanel'
 import { buildLegalAcceptancePayload, type LegalDocumentSlug } from '../lib/legalDocuments'
+import { ensureNamespace } from '../i18n'
 
 export function InviteAcceptPage() {
+  const { t } = useTranslation('onboarding')
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') || ''
   const type = normalizeInviteTypeParam(searchParams.get('type'))
@@ -56,7 +59,7 @@ export function InviteAcceptPage() {
   const legalPayload = legalComplete ? buildLegalAcceptancePayload(acceptedLegal) : undefined
 
   const invite = data
-  const branchLabel = invite?.restaurant_name || invite?.branch_name || 'this branch'
+  const branchLabel = invite?.restaurant_name || invite?.branch_name || t('invite.thisBranch')
   const orgLabel = invite?.org_name
   const isRestaurantMember = type === 'rm'
   const isRestaurantBranch = type === 'rb'
@@ -66,15 +69,38 @@ export function InviteAcceptPage() {
   const requiredInviteEmail = invite?.invited_email?.trim() || ''
 
   useEffect(() => {
+    void ensureNamespace('onboarding')
+  }, [])
+
+  useEffect(() => {
     if (requiredInviteEmail) setEmail(requiredInviteEmail)
     else if (invite?.invited_email) setEmail((prev) => prev || invite.invited_email || '')
     if (invite?.invited_name) setFullName((prev) => prev || invite.invited_name || '')
   }, [requiredInviteEmail, invite?.invited_email, invite?.invited_name])
 
+  const headline = invite
+    ? isRestaurantMember
+      ? t('invite.headline.restaurantMember', {
+          branch: branchLabel,
+          role: invite.role_name,
+        })
+      : isRestaurantBranch
+        ? orgLabel
+          ? t('invite.headline.restaurantBranchWithOrg', { branch: branchLabel, org: orgLabel })
+          : t('invite.headline.restaurantBranch', { branch: branchLabel })
+        : orgLabel
+          ? t('invite.headline.defaultWithOrg', {
+              branch: branchLabel,
+              org: orgLabel,
+              role: invite.role_name,
+            })
+          : t('invite.headline.default', { branch: branchLabel, role: invite.role_name })
+    : ''
+
   if (!token || !type) {
     return (
       <InvitePageLayout>
-        <p className="text-[var(--text-muted)]">Missing invitation token or type.</p>
+        <p className="text-[var(--text-muted)]">{t('invite.errors.missingToken')}</p>
       </InvitePageLayout>
     )
   }
@@ -82,7 +108,7 @@ export function InviteAcceptPage() {
   if (isLoading || sessionLoading) {
     return (
       <InvitePageLayout>
-        <p>Validating your invitation…</p>
+        <p>{t('invite.validating')}</p>
       </InvitePageLayout>
     )
   }
@@ -90,7 +116,7 @@ export function InviteAcceptPage() {
   if (isError || !invite) {
     return (
       <InvitePageLayout>
-        <p className="text-[var(--text-muted)]">Unable to validate invitation.</p>
+        <p className="text-[var(--text-muted)]">{t('invite.errors.validateFailed')}</p>
       </InvitePageLayout>
     )
   }
@@ -98,10 +124,8 @@ export function InviteAcceptPage() {
   if (!invite.valid && invite.reason === 'expired') {
     return (
       <InvitePageLayout className="max-w-md text-center space-y-2">
-        <h1 className="text-xl font-semibold">This invite link has expired.</h1>
-        <p className="text-[var(--text-muted)]">
-          Contact your organization admin to get a new one.
-        </p>
+        <h1 className="text-xl font-semibold">{t('invite.expired.title')}</h1>
+        <p className="text-[var(--text-muted)]">{t('invite.expired.description')}</p>
       </InvitePageLayout>
     )
   }
@@ -109,25 +133,19 @@ export function InviteAcceptPage() {
   if (!invite.valid) {
     return (
       <InvitePageLayout className="max-w-md text-center space-y-3">
-        <h1 className="text-xl font-semibold">This invite link is no longer valid.</h1>
-        <p className="text-[var(--text-muted)]">If you already have an account, sign in.</p>
+        <h1 className="text-xl font-semibold">{t('invite.invalid.title')}</h1>
+        <p className="text-[var(--text-muted)]">{t('invite.invalid.description')}</p>
         <Link to={loginHref} className="text-[var(--brand)] underline">
-          Sign In
+          {t('invite.signIn')}
         </Link>
       </InvitePageLayout>
     )
   }
 
-  const headline = isRestaurantMember
-    ? `You've been invited to join ${branchLabel} as ${invite.role_name}`
-    : isRestaurantBranch
-      ? `You've been invited to manage ${branchLabel}${orgLabel ? ` — ${orgLabel}` : ''}`
-      : `You've been invited to join ${branchLabel}${orgLabel ? ` (${orgLabel})` : ''} as ${invite.role_name}`
-
   const handleAcceptLoggedIn = async () => {
     setError(null)
     if (!legalPayload) {
-      setError('Please accept all required legal agreements before continuing.')
+      setError(t('invite.errors.legalRequired'))
       return
     }
     try {
@@ -146,12 +164,7 @@ export function InviteAcceptPage() {
       if (isInvitationSessionExpiredError(err)) {
         setSessionExpired(true)
       }
-      setError(
-        invitationAcceptErrorMessage(
-          err,
-          'Could not accept invitation. Try signing in with a different account.'
-        )
-      )
+      setError(invitationAcceptErrorMessage(err, t('invite.errors.acceptFailed')))
     }
   }
 
@@ -159,11 +172,11 @@ export function InviteAcceptPage() {
     e.preventDefault()
     setError(null)
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
+      setError(t('invite.errors.passwordMismatch'))
       return
     }
     if (password.length < 8) {
-      setError('Password must be at least 8 characters')
+      setError(t('invite.errors.passwordTooShort'))
       return
     }
     const signupEmail = (requiredInviteEmail || email).trim()
@@ -172,7 +185,7 @@ export function InviteAcceptPage() {
       return
     }
     if (!legalPayload) {
-      setError('Please accept all required legal agreements before continuing.')
+      setError(t('invite.errors.legalRequired'))
       return
     }
     try {
@@ -189,12 +202,7 @@ export function InviteAcceptPage() {
       await refetchAppSession(dispatch)
       finishInviteAcceptNavigation(result, navigate, searchParams)
     } catch (err) {
-      setError(
-        invitationAcceptErrorMessage(
-          err,
-          'Could not create your account. The link may have expired.'
-        )
-      )
+      setError(invitationAcceptErrorMessage(err, t('invite.errors.createFailed')))
     }
   }
 
@@ -205,7 +213,7 @@ export function InviteAcceptPage() {
     return (
       <InvitePageLayout>
         <Card>
-          <h1 className="text-xl font-semibold">Accept invitation</h1>
+          <h1 className="text-xl font-semibold">{t('invite.acceptTitle')}</h1>
           {emailMismatch && invite.invited_email ? (
             <InviteEmailMismatchCard
               invitedEmail={invite.invited_email}
@@ -215,7 +223,10 @@ export function InviteAcceptPage() {
           ) : (
             <>
               <p className="text-sm text-[var(--text-muted)]">
-                You&apos;re logged in as {sessionUser.displayName || sessionUser.email}. {headline}.
+                {t('invite.loggedInAs', {
+                  name: sessionUser.displayName || sessionUser.email,
+                  headline,
+                })}
               </p>
               <LegalAcceptancePanel
                 variant="invite"
@@ -232,13 +243,13 @@ export function InviteAcceptPage() {
                 disabled={accepting || !legalComplete}
                 onClick={() => handleAcceptLoggedIn()}
               >
-                Accept & Join
+                {t('invite.acceptJoin')}
               </Button>
               <Link
                 to={loginHref}
                 className="block text-center text-sm text-[var(--brand)] underline"
               >
-                Sign in with a different account
+                {t('invite.signInDifferent')}
               </Link>
             </>
           )}
@@ -250,11 +261,11 @@ export function InviteAcceptPage() {
   return (
     <InvitePageLayout>
       <Card>
-        <h1 className="text-xl font-semibold">Welcome to Supplify</h1>
+        <h1 className="text-xl font-semibold">{t('invite.welcome')}</h1>
         <p className="text-sm text-[var(--text-muted)]">{headline}.</p>
         <form className="space-y-3" onSubmit={(e) => handleCreateAccount(e)}>
           <label className="block text-sm">
-            Full name
+            {t('invite.fullName')}
             <input
               className="mt-1 w-full rounded-md border border-[var(--app-border)] px-3 py-2"
               value={fullName}
@@ -268,7 +279,7 @@ export function InviteAcceptPage() {
             onChange={setEmail}
           />
           <label className="block text-sm">
-            Password
+            {t('invite.password')}
             <input
               type="password"
               className="mt-1 w-full rounded-md border border-[var(--app-border)] px-3 py-2"
@@ -279,7 +290,7 @@ export function InviteAcceptPage() {
             />
           </label>
           <label className="block text-sm">
-            Confirm password
+            {t('invite.confirmPassword')}
             <input
               type="password"
               className="mt-1 w-full rounded-md border border-[var(--app-border)] px-3 py-2"
@@ -299,13 +310,13 @@ export function InviteAcceptPage() {
           />
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button type="submit" className="w-full" disabled={accepting || !legalComplete}>
-            Create Account & Join
+            {t('invite.createAndJoin')}
           </Button>
         </form>
         <p className="text-xs text-center text-[var(--text-muted)]">
-          Already have an account?{' '}
+          {t('invite.alreadyHaveAccount')}{' '}
           <Link to={loginHref} className="underline">
-            Sign in
+            {t('invite.signInLink')}
           </Link>
         </p>
       </Card>

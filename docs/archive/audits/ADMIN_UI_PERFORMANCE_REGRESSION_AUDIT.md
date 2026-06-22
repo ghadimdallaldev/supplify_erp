@@ -132,7 +132,7 @@ Plan PATCH still uses `invalidatesTags: ['Admin']` — intentional so edits stay
 
 1. **`AdminDashboardPage` shell (~119 kB)** — still monolithic; further split would be a larger refactor (out of scope).
 2. **Tenant list `limit=50` vs `100`** — visiting Usage then Limits may fetch two supplier/restaurant pages; acceptable for correctness.
-3. **Railway cold start** — API idle + first admin load still depends on backend pool warmup (documented in `docs/performance/GLOBAL_PERFORMANCE_AUDIT_AND_FIXES.md`).
+3. **Railway cold start** — API idle + first admin load still depends on backend pool warmup (documented in `docs/audits/performance/GLOBAL_PERFORMANCE_AUDIT_AND_FIXES.md`).
 4. **No automated Lighthouse** — manual check recommended after deploy.
 5. **Picsum product images on dev** — network latency for images is external to app bundle.
 

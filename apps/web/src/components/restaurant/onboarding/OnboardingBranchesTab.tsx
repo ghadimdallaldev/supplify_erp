@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
@@ -34,6 +35,7 @@ import { openBrowseUpgrade } from '../../../lib/openBrowseUpgrade'
 import { OnboardingTabLoading } from './onboardingShared'
 
 export function OnboardingBranchesTab() {
+  const { t } = useTranslation('onboarding')
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
   const [showAddBranchDialog, setShowAddBranchDialog] = useState(false)
@@ -75,7 +77,7 @@ export function OnboardingBranchesTab() {
       return
     }
     if (!newBranch.name) {
-      toast.error('Please fill in branch name')
+      toast.error(t('restaurantBranches.toasts.nameRequired'))
       return
     }
 
@@ -88,9 +90,9 @@ export function OnboardingBranchesTab() {
       setNewBranch({ name: '', phone: '', address: '', deliveryInstructions: '' })
       setShowAddBranchDialog(false)
       refetchBranches()
-      toast.success('Branch added!')
+      toast.success(t('restaurantBranches.toasts.added'))
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to add branch')
+      toast.error(error?.data?.error?.message || t('restaurantBranches.toasts.addFailed'))
     }
   }
 
@@ -105,11 +107,8 @@ export function OnboardingBranchesTab() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Branch accounts</CardTitle>
-                <CardDescription>
-                  Each branch is a separate account with its own orders, inventory, and settings.
-                  Switch between them from the header after creating one.
-                </CardDescription>
+                <CardTitle>{t('restaurantBranches.title')}</CardTitle>
+                <CardDescription>{t('restaurantBranches.description')}</CardDescription>
               </div>
               <Button
                 disabled={!canAddBranch}
@@ -125,7 +124,7 @@ export function OnboardingBranchesTab() {
                 }}
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Add Branch
+                {t('restaurantBranches.actions.addBranch')}
               </Button>
             </div>
           </CardHeader>
@@ -138,9 +137,9 @@ export function OnboardingBranchesTab() {
             {branches.length === 0 ? (
               <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
                 <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
-                <p className="text-[var(--text-muted)]">No branch accounts yet</p>
+                <p className="text-[var(--text-muted)]">{t('restaurantBranches.empty.title')}</p>
                 <p className="text-sm text-[var(--text-muted)] mt-2">
-                  Add a new account for each additional location (paid plans only)
+                  {t('restaurantBranches.empty.description')}
                 </p>
               </div>
             ) : (
@@ -180,11 +179,16 @@ export function OnboardingBranchesTab() {
                             await deleteBranch(String(branch.id)).unwrap()
                           }
                           refetchBranchesList()
-                          toast.success('Branch removed')
+                          toast.success(t('restaurantBranches.toasts.removed'))
                         } catch (error: any) {
-                          toast.error(error?.data?.error?.message || 'Failed to remove branch')
+                          toast.error(
+                            error?.data?.error?.message ||
+                              t('restaurantBranches.toasts.removeFailed')
+                          )
                         }
                       }}
+                      aria-label={t('restaurantBranches.actions.removeBranch')}
+                      title={t('restaurantBranches.actions.removeBranch')}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -196,49 +200,51 @@ export function OnboardingBranchesTab() {
         </Card>
       </div>
 
-      <Dialog open={showAddBranchDialog} onOpenChange={setShowAddBranchDialog}>
+      <Dialog open={!useRestaurantOrg && showAddBranchDialog} onOpenChange={setShowAddBranchDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Branch</DialogTitle>
-            <DialogDescription>Add a new branch location</DialogDescription>
+            <DialogTitle>{t('restaurantBranches.dialog.title')}</DialogTitle>
+            <DialogDescription>{t('restaurantBranches.dialog.description')}</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="branchName">Branch Name *</Label>
+              <Label htmlFor="branchName">{t('restaurantBranches.dialog.name')} *</Label>
               <Input
                 id="branchName"
-                placeholder="e.g., Downtown Branch"
+                placeholder={t('restaurantBranches.dialog.namePlaceholder')}
                 value={newBranch.name}
                 onChange={(e) => setNewBranch({ ...newBranch, name: e.target.value })}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="branchPhone">Phone</Label>
+              <Label htmlFor="branchPhone">{t('restaurantBranches.dialog.phone')}</Label>
               <Input
                 id="branchPhone"
-                placeholder="Enter phone"
+                placeholder={t('restaurantBranches.dialog.phonePlaceholder')}
                 value={newBranch.phone}
                 onChange={(e) => setNewBranch({ ...newBranch, phone: e.target.value })}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="branchAddress">Address</Label>
+              <Label htmlFor="branchAddress">{t('restaurantBranches.dialog.address')}</Label>
               <Input
                 id="branchAddress"
-                placeholder="Enter address"
+                placeholder={t('restaurantBranches.dialog.addressPlaceholder')}
                 value={newBranch.address}
                 onChange={(e) => setNewBranch({ ...newBranch, address: e.target.value })}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="branchDeliveryInstructions">Delivery Instructions</Label>
+              <Label htmlFor="branchDeliveryInstructions">
+                {t('restaurantBranches.dialog.deliveryInstructions')}
+              </Label>
               <Textarea
                 id="branchDeliveryInstructions"
-                placeholder="Special instructions for deliveries..."
+                placeholder={t('restaurantBranches.dialog.deliveryInstructionsPlaceholder')}
                 rows={3}
                 value={newBranch.deliveryInstructions}
                 onChange={(e) =>
@@ -250,9 +256,9 @@ export function OnboardingBranchesTab() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddBranchDialog(false)}>
-              Cancel
+              {t('restaurantBranches.actions.cancel')}
             </Button>
-            <Button onClick={handleAddBranch}>Add Branch</Button>
+            <Button onClick={handleAddBranch}>{t('restaurantBranches.actions.addBranch')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

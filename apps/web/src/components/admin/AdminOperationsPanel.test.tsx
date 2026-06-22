@@ -1,18 +1,23 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
+import { renderWithProviders } from '../../test/utils'
 import { AdminOperationsPanel } from './AdminOperationsPanel'
 
 const defaultSkipQuery = { data: undefined, isLoading: false, refetch: vi.fn() }
 
-vi.mock('../../services/api', () => ({
-  useGetAdminOperationalSummaryQuery: vi.fn(),
-  useGetAdminEmailDeliveryLogsQuery: vi.fn(() => defaultSkipQuery),
-  useGetAdminFulfillmentIssuesQuery: vi.fn(() => defaultSkipQuery),
-  useGetAdminActiveDeliveriesQuery: vi.fn(() => defaultSkipQuery),
-  useGetAdminSuppliersQuery: vi.fn(),
-  useGetAdminRestaurantsQuery: vi.fn(),
-  useGetAdminSupportConversationsQuery: vi.fn(() => defaultSkipQuery),
-}))
+vi.mock('../../services/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../services/api')>()
+  return {
+    ...actual,
+    useGetAdminOperationalSummaryQuery: vi.fn(),
+    useGetAdminEmailDeliveryLogsQuery: vi.fn(() => defaultSkipQuery),
+    useGetAdminFulfillmentIssuesQuery: vi.fn(() => defaultSkipQuery),
+    useGetAdminActiveDeliveriesQuery: vi.fn(() => defaultSkipQuery),
+    useGetAdminSuppliersQuery: vi.fn(),
+    useGetAdminRestaurantsQuery: vi.fn(),
+    useGetAdminSupportConversationsQuery: vi.fn(() => defaultSkipQuery),
+  }
+})
 
 vi.mock('./AdminTenantDiagnosticsDrawer', () => ({
   AdminTenantDiagnosticsDrawer: () => null,
@@ -56,7 +61,7 @@ describe('AdminOperationsPanel', () => {
       refetch: vi.fn(),
     } as never)
 
-    render(<AdminOperationsPanel />)
+    renderWithProviders(<AdminOperationsPanel />)
     expect(screen.getByText('Email provider missing')).toBeInTheDocument()
   })
 
@@ -70,7 +75,7 @@ describe('AdminOperationsPanel', () => {
       refetch: vi.fn(),
     } as never)
 
-    render(<AdminOperationsPanel />)
+    renderWithProviders(<AdminOperationsPanel />)
     expect(screen.getByText('No warnings')).toBeInTheDocument()
   })
 })

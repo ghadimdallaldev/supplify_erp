@@ -1,9 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { DriverDispatchBoard } from './DriverDispatchBoard'
 import { FulfillmentDispatchFilters } from './FulfillmentDispatchFilters'
 import { DISPATCH_FILTER_ALL } from './fulfillmentDispatchUtils'
+import { renderWithFulfillmentI18n } from './test-utils'
 import type { DispatchOrderCard } from '../../types'
 
 vi.mock('../../hooks/usePermissions', () => ({
@@ -73,8 +74,8 @@ describe('DriverDispatchBoard UI', () => {
     vi.clearAllMocks()
   })
 
-  it('renders filter bar with native status select (not expanded option list)', () => {
-    render(
+  it('renders filter bar with status filter control', () => {
+    renderWithFulfillmentI18n(
       <FulfillmentDispatchFilters
         filters={{
           date: '',
@@ -88,12 +89,11 @@ describe('DriverDispatchBoard UI', () => {
       />
     )
     expect(screen.getByTestId('fulfillment-dispatch-filters')).toBeInTheDocument()
-    const statusSelect = screen.getByTestId('delivery-filter-status')
-    expect(statusSelect.tagName).toBe('SELECT')
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(screen.getByTestId('delivery-filter-status')).toBeInTheDocument()
   })
 
-  const renderBoard = (ui: React.ReactElement) => render(<MemoryRouter>{ui}</MemoryRouter>)
+  const renderBoard = (ui: React.ReactElement) =>
+    renderWithFulfillmentI18n(<MemoryRouter>{ui}</MemoryRouter>)
 
   it('renders summary stats and order card with status badge', () => {
     renderBoard(

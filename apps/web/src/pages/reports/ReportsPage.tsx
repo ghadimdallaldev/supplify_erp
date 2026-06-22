@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { Navigate } from 'react-router-dom'
 import { BarChart3, Package, Store, TrendingUp } from 'lucide-react'
 import { Card, CardContent } from '../../components/ui/card'
@@ -17,93 +19,98 @@ import {
 import { applyReportDatePreset, ReportFiltersBar } from '../../components/reports/ReportFiltersBar'
 import { ReportPanel } from '../../components/reports/ReportPanel'
 import type { ReportDef } from '../../components/reports/reportSummary'
+import { ensureNamespace } from '../../i18n'
 
 function defaultRange() {
   return applyReportDatePreset(30)
 }
 
-const RESTAURANT_REPORTS: ReportDef[] = [
-  {
-    key: 'order-volume',
-    label: 'Order volume',
-    path: 'order-volume',
-    chart: 'line',
-    xKey: 'period',
-    yKey: 'order_count',
-    columns: [
-      { key: 'period', label: 'Period' },
-      { key: 'order_count', label: 'Orders' },
-      { key: 'total_amount', label: 'Total' },
-    ],
-  },
-  {
-    key: 'spend-supplier',
-    label: 'Spend by supplier',
-    path: 'spend-by-supplier',
-    chart: 'bar',
-    xKey: 'supplier_name',
-    yKey: 'total_spend',
-    columns: [
-      { key: 'supplier_name', label: 'Supplier' },
-      { key: 'total_spend', label: 'Spend' },
-      { key: 'order_count', label: 'Orders' },
-    ],
-  },
-  {
-    key: 'top-products',
-    label: 'Top products',
-    path: 'top-products',
-    chart: 'bar',
-    xKey: 'product_name',
-    yKey: 'total_spend',
-    columns: [
-      { key: 'product_name', label: 'Product' },
-      { key: 'total_spend', label: 'Spend' },
-      { key: 'quantity', label: 'Qty' },
-    ],
-  },
-]
+function buildRestaurantReports(t: TFunction<'reports'>): ReportDef[] {
+  return [
+    {
+      key: 'order-volume',
+      label: t('reports.orderVolume.label'),
+      path: 'order-volume',
+      chart: 'line',
+      xKey: 'period',
+      yKey: 'order_count',
+      columns: [
+        { key: 'period', label: t('reports.orderVolume.columns.period') },
+        { key: 'order_count', label: t('reports.orderVolume.columns.orderCount') },
+        { key: 'total_amount', label: t('reports.orderVolume.columns.totalAmount') },
+      ],
+    },
+    {
+      key: 'spend-supplier',
+      label: t('reports.spendBySupplier.label'),
+      path: 'spend-by-supplier',
+      chart: 'bar',
+      xKey: 'supplier_name',
+      yKey: 'total_spend',
+      columns: [
+        { key: 'supplier_name', label: t('reports.spendBySupplier.columns.supplierName') },
+        { key: 'total_spend', label: t('reports.spendBySupplier.columns.totalSpend') },
+        { key: 'order_count', label: t('reports.spendBySupplier.columns.orderCount') },
+      ],
+    },
+    {
+      key: 'top-products',
+      label: t('reports.topProducts.label'),
+      path: 'top-products',
+      chart: 'bar',
+      xKey: 'product_name',
+      yKey: 'total_spend',
+      columns: [
+        { key: 'product_name', label: t('reports.topProducts.columns.productName') },
+        { key: 'total_spend', label: t('reports.topProducts.columns.totalSpend') },
+        { key: 'quantity', label: t('reports.topProducts.columns.quantity') },
+      ],
+    },
+  ]
+}
 
-const SUPPLIER_REPORTS: ReportDef[] = [
-  {
-    key: 'revenue',
-    label: 'Revenue trend',
-    path: 'revenue-trend',
-    chart: 'line',
-    xKey: 'period',
-    yKey: 'revenue',
-    columns: [
-      { key: 'period', label: 'Period' },
-      { key: 'revenue', label: 'Revenue' },
-      { key: 'order_count', label: 'Orders' },
-    ],
-  },
-  {
-    key: 'top-restaurants',
-    label: 'Top restaurants',
-    path: 'top-restaurants',
-    chart: 'bar',
-    xKey: 'restaurant_name',
-    yKey: 'revenue',
-    columns: [
-      { key: 'restaurant_name', label: 'Restaurant' },
-      { key: 'revenue', label: 'Revenue' },
-      { key: 'order_count', label: 'Orders' },
-    ],
-  },
-  {
-    key: 'order-volume',
-    label: 'Order volume',
-    path: 'order-volume',
-    chart: 'line',
-    xKey: 'period',
-    yKey: 'order_count',
-    columns: [
-      { key: 'period', label: 'Period' },
-      { key: 'order_count', label: 'Orders' },
-    ],
-  },
-]
+function buildSupplierReports(t: TFunction<'reports'>): ReportDef[] {
+  return [
+    {
+      key: 'revenue',
+      label: t('reports.revenueTrend.label'),
+      path: 'revenue-trend',
+      chart: 'line',
+      xKey: 'period',
+      yKey: 'revenue',
+      columns: [
+        { key: 'period', label: t('reports.revenueTrend.columns.period') },
+        { key: 'revenue', label: t('reports.revenueTrend.columns.revenue') },
+        { key: 'order_count', label: t('reports.revenueTrend.columns.orderCount') },
+      ],
+    },
+    {
+      key: 'top-restaurants',
+      label: t('reports.topRestaurants.label'),
+      path: 'top-restaurants',
+      chart: 'bar',
+      xKey: 'restaurant_name',
+      yKey: 'revenue',
+      columns: [
+        { key: 'restaurant_name', label: t('reports.topRestaurants.columns.restaurantName') },
+        { key: 'revenue', label: t('reports.topRestaurants.columns.revenue') },
+        { key: 'order_count', label: t('reports.topRestaurants.columns.orderCount') },
+      ],
+    },
+    {
+      key: 'order-volume',
+      label: t('reports.orderVolume.label'),
+      path: 'order-volume',
+      chart: 'line',
+      xKey: 'period',
+      yKey: 'order_count',
+      columns: [
+        { key: 'period', label: t('reports.orderVolume.columns.period') },
+        { key: 'order_count', label: t('reports.orderVolume.columns.orderCount') },
+      ],
+    },
+  ]
+}
 
 const RESTAURANT_REPORT_ICONS: Record<string, typeof TrendingUp> = {
   'order-volume': TrendingUp,
@@ -112,6 +119,12 @@ const RESTAURANT_REPORT_ICONS: Record<string, typeof TrendingUp> = {
 }
 
 export function ReportsPage() {
+  const { t } = useTranslation('reports')
+
+  useEffect(() => {
+    void ensureNamespace('reports')
+  }, [])
+
   const { isEffectiveRestaurant } = useImpersonation()
   const { persona } = useWorkspaceRole()
   const isRestaurant = isEffectiveRestaurant
@@ -120,15 +133,17 @@ export function ReportsPage() {
   const [to, setTo] = useState(range.to)
   const [branchId, setBranchId] = useState('')
   const [granularity, setGranularity] = useState('day')
-  const [activeReport, setActiveReport] = useState(
-    isRestaurant ? RESTAURANT_REPORTS[0].key : SUPPLIER_REPORTS[0].key
-  )
+
+  const restaurantReports = useMemo(() => buildRestaurantReports(t), [t])
+  const supplierReports = useMemo(() => buildSupplierReports(t), [t])
+  const defs = isRestaurant ? restaurantReports : supplierReports
+
+  const [activeReport, setActiveReport] = useState(defs[0]?.key ?? 'order-volume')
 
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const reportsEnabled = canUseGlobalReports(entitlementsData?.entitlements)
   const { data: branchesData } = useGetBranchesQuery(undefined, { skip: !isRestaurant })
   const branches = branchesData?.branches || []
-  const defs = isRestaurant ? RESTAURANT_REPORTS : SUPPLIER_REPORTS
   const current = defs.find((d) => d.key === activeReport) || defs[0]
   const reportsPermissionGate = isRestaurant
     ? { anyOf: [...RESTAURANT_REPORTS_ANY_OF] }
@@ -148,10 +163,10 @@ export function ReportsPage() {
     return (
       <RequirePermission {...reportsPermissionGate} title="reports">
         <PageShell data-testid="reports-page">
-          <PageHeader title="Reports" />
+          <PageHeader title={t('page.title')} />
           <Card>
             <CardContent className="py-8 text-sm text-[var(--text-mid)]">
-              Reports are not available on your current plan. Contact support if this looks wrong.
+              {t('page.planUnavailable')}
             </CardContent>
           </Card>
         </PageShell>
@@ -163,11 +178,9 @@ export function ReportsPage() {
     <RequirePermission {...reportsPermissionGate} title="reports">
       <PageShell data-testid="reports-page">
         <PageHeader
-          title={isRestaurant ? 'Purchasing reports' : 'Reports & Analytics'}
+          title={isRestaurant ? t('page.purchasingTitle') : t('page.analyticsTitle')}
           description={
-            isRestaurant
-              ? 'Track order volume, supplier spend, and top products across your locations.'
-              : 'Supplier revenue and fulfillment insights'
+            isRestaurant ? t('page.purchasingDescription') : t('page.analyticsDescription')
           }
         />
 
@@ -199,17 +212,19 @@ export function ReportsPage() {
               )
             })}
           </TabsList>
-          <TabsContent value={current.key}>
-            <ReportPanel
-              key={`${current.key}-${from}-${to}-${branchId}-${granularity}`}
-              def={current}
-              isRestaurant={isRestaurant}
-              from={from}
-              to={to}
-              branchId={branchId}
-              granularity={granularity}
-            />
-          </TabsContent>
+          {current ? (
+            <TabsContent value={current.key}>
+              <ReportPanel
+                key={`${current.key}-${from}-${to}-${branchId}-${granularity}`}
+                def={current}
+                isRestaurant={isRestaurant}
+                from={from}
+                to={to}
+                branchId={branchId}
+                granularity={granularity}
+              />
+            </TabsContent>
+          ) : null}
         </Tabs>
       </PageShell>
     </RequirePermission>

@@ -1,12 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { I18nextProvider } from 'react-i18next'
 import { StaffTodayTab } from './StaffTodayTab'
+import { testI18n } from '../../../test/i18n'
+import enStaff from '../../../i18n/locales/en/staff.json'
 
 vi.mock('../../../services/staffApi', () => ({
   useGetStaffLabourSummaryQuery: vi.fn(),
 }))
 
 import { useGetStaffLabourSummaryQuery } from '../../../services/staffApi'
+
+function renderTab() {
+  testI18n.addResourceBundle('en', 'staff', enStaff, true, true)
+  return render(
+    <I18nextProvider i18n={testI18n}>
+      <StaffTodayTab onTabChange={vi.fn()} />
+    </I18nextProvider>
+  )
+}
 
 describe('StaffTodayTab', () => {
   beforeEach(() => {
@@ -36,7 +48,7 @@ describe('StaffTodayTab', () => {
       refetch: vi.fn(),
     } as any)
 
-    render(<StaffTodayTab onTabChange={vi.fn()} />)
+    renderTab()
 
     expect(screen.getByText('Scheduled today')).toBeInTheDocument()
     expect(screen.getByText('5')).toBeInTheDocument()
@@ -66,7 +78,7 @@ describe('StaffTodayTab', () => {
       refetch: vi.fn(),
     } as any)
 
-    render(<StaffTodayTab onTabChange={vi.fn()} />)
+    renderTab()
     expect(screen.getAllByText('All clear').length).toBeGreaterThan(0)
   })
 })

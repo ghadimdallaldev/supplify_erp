@@ -1,18 +1,48 @@
-import type { i18n as I18nInstance } from 'i18next'
+import type { BackendModule, ResourceKey, i18n as I18nInstance } from 'i18next'
+import { DEFAULT_LOCALE, isSupportedLocale } from './config'
 import type { I18nNamespace } from './config'
 
 const loaded = new Set<string>()
+
+type LocaleModule = { default: ResourceKey }
+
+const localeModules = import.meta.glob('./locales/{en,ar}/*.json') as Record<
+  string,
+  () => Promise<LocaleModule>
+>
 
 function cacheKey(lng: string, ns: string) {
   return `${lng}:${ns}`
 }
 
-export async function loadNamespace(i18n: I18nInstance, lng: string, ns: I18nNamespace) {
-  const key = cacheKey(lng, ns)
-  if (loaded.has(key)) return
+function normalizeLocale(lng: string) {
+  const base = lng.split('-')[0]
+  return isSupportedLocale(base) ? base : DEFAULT_LOCALE
+}
 
-  const module = await import(`./locales/${lng}/${ns}.json`)
-  i18n.addResourceBundle(lng, ns, module.default, true, true)
+async function loadLocaleResource(lng: string, ns: string) {
+  const locale = normalizeLocale(lng)
+  const importer = localeModules[`./locales/${locale}/${ns}.json`]
+
+  if (!importer) {
+    throw new Error(`Missing i18n namespace ${locale}/${ns}`)
+  }
+
+  const module = await importer()
+  return module.default
+}
+
+export async function loadNamespace(i18n: I18nInstance, lng: string, ns: I18nNamespace) {
+  const locale = normalizeLocale(lng)
+  const key = cacheKey(locale, ns)
+  if (loaded.has(key)) return
+  if (i18n.hasResourceBundle(locale, ns)) {
+    loaded.add(key)
+    return
+  }
+
+  const resource = await loadLocaleResource(locale, ns)
+  i18n.addResourceBundle(locale, ns, resource, true, true)
   loaded.add(key)
 }
 
@@ -20,7 +50,17 @@ export async function loadNamespaces(i18n: I18nInstance, lng: string, namespaces
   await Promise.all(namespaces.map((ns) => loadNamespace(i18n, lng, ns)))
 }
 
-/** Reset loaded cache — for tests only */
+export const lazyLocaleBackend: BackendModule = {
+  type: 'backend',
+  init() {},
+  read(language, namespace, callback) {
+    loadLocaleResource(language, namespace)
+      .then((resource) => callback(null, resource))
+      .catch((error) => callback(error, null))
+  },
+}
+
+/** Reset loaded cache - for tests only */
 export function resetNamespaceCache() {
   loaded.clear()
 }

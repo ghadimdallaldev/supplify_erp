@@ -156,18 +156,18 @@ These domains have **UI + API + RBAC + plan gates + meaningful tests**:
 
 ## Deployment risks
 
-| Risk                            | Why it hurts                                   | Mitigation                                             |
-| ------------------------------- | ---------------------------------------------- | ------------------------------------------------------ |
-| **Keycloak OOM on Railway**     | Historical 7–10 GB spikes                      | `KEYCLOAK_RAILWAY_MEMORY_FIX.md`, JVM caps             |
-| **In-process crons**            | Duplicate runs if API scaled horizontally      | `CRONS_ENABLED` + single replica or external scheduler |
-| **Redis optional**              | Socket.IO / perm cache inconsistent multi-node | Mandate Redis prod                                     |
-| **Migration partial failure**   | Compose migrate continues on error (`WARN`)    | CI fresh-DB migration gate                             |
-| **Public Redis URL on Railway** | Egress fees / wrong host                       | `resolve-redis-url.js`                                 |
-| **Session store in Postgres**   | Load on auth                                   | Acceptable at current scale; watch pool                |
-| **Lint max 0 warnings**         | 46 warnings remain — CI may fail               | demo audit §6                                          |
-| **Destructive seed on staging** | `seed:full` wipes tenants                      | Process guard                                          |
-| **GPS / Maps API keys**         | Tracking UI blank in prod                      | Env checklist                                          |
-| **SMTP not configured**         | Silent email failures                          | Mailpit dev; Resend prod                               |
+| Risk                            | Why it hurts                                   | Mitigation                                                 |
+| ------------------------------- | ---------------------------------------------- | ---------------------------------------------------------- |
+| **Keycloak OOM on Railway**     | Historical 7–10 GB spikes                      | `docs/operations/keycloak-railway-memory-fix.md`, JVM caps |
+| **In-process crons**            | Duplicate runs if API scaled horizontally      | `CRONS_ENABLED` + single replica or external scheduler     |
+| **Redis optional**              | Socket.IO / perm cache inconsistent multi-node | Mandate Redis prod                                         |
+| **Migration partial failure**   | Compose migrate continues on error (`WARN`)    | CI fresh-DB migration gate                                 |
+| **Public Redis URL on Railway** | Egress fees / wrong host                       | `resolve-redis-url.js`                                     |
+| **Session store in Postgres**   | Load on auth                                   | Acceptable at current scale; watch pool                    |
+| **Lint max 0 warnings**         | 46 warnings remain — CI may fail               | demo audit §6                                              |
+| **Destructive seed on staging** | `seed:full` wipes tenants                      | Process guard                                              |
+| **GPS / Maps API keys**         | Tracking UI blank in prod                      | Env checklist                                              |
+| **SMTP not configured**         | Silent email failures                          | Mailpit dev; Resend prod                                   |
 
 ---
 

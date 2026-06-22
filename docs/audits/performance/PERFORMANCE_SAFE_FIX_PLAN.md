@@ -185,7 +185,7 @@ Phases are **sequential but independently deployable**. Complete benchmark check
 | A.4  | Enable staging observability temporarily: `IDLE_PERF_LOG_MS=500`, monitor `http.request.slow_breakdown` and `db.query.slow`                           | Railway staging env                                       |
 | A.5  | Add `/health` field `redisCache: true/false` (if not present)                                                                                         | health route                                              |
 | A.6  | **Baseline benchmark run** — record p50/p95 for checklist endpoints (Section 5)                                                                       | Spreadsheet or doc appendix                               |
-| A.7  | Document “performance stack checklist” in PR template                                                                                                 | `.github` or `docs/performance-audit/`                    |
+| A.7  | Document “performance stack checklist” in PR template                                                                                                 | `.github` or `docs/audits/performance/`                   |
 
 **Exit criteria:** Staging logs show Redis connected; pool warmup on boot; baseline p95 documented; no env missing pool/Redis in production.
 
@@ -309,7 +309,7 @@ Phases are **sequential but independently deployable**. Complete benchmark check
 
 | Step | Action                                                                                                                                     |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| F.1  | Create `docs/cache-audit/INVALIDATION_CHECKLIST.md` for PR authors                                                                         |
+| F.1  | Create `docs/audits/cache/INVALIDATION_CHECKLIST.md` for PR authors                                                                        |
 | F.2  | PR checklist items: new `setCache(` → paired invalidator; auth mutation → hub; subscription mutation → `invalidateTenantSubscriptionCache` |
 | F.3  | Expand testing matrix (below) into CI-critical subset                                                                                      |
 | F.4  | Fix stale TTL comments in code (rbac 180s, feature-flags 180s) — docs only alignment                                                       |

@@ -197,7 +197,7 @@ export function UpgradeModal() {
         eventType: 'OPEN_UPGRADE',
         metadata: payload as Record<string, unknown>,
       }).catch(() => {})
-  }, [open, recordConversionEvent])
+  }, [open, payload, recordConversionEvent])
 
   useEffect(() => {
     if (open && recommendation?.recommendedPlanCode) {
@@ -341,7 +341,7 @@ export function UpgradeModal() {
     >
       <DialogContent size="wide" scroll="split">
         <DialogBody>
-          <DialogHeader className="pr-8">
+          <DialogHeader className="pe-8">
             <DialogTitle className="flex items-center gap-2">
               {type === 'limit' || (!isBrowseUpgrade && type === 'feature') ? (
                 <TrendingUp className="h-5 w-5 text-amber-600" />

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import { api } from '../../services/api'
+import { renderWithProviders } from '../../test/utils'
 import { AdminLimitsTab } from './AdminLimitsTab'
 
 vi.mock('../../services/api', async (importOriginal) => {
@@ -41,7 +42,7 @@ function renderTab() {
     reducer: { [api.reducerPath]: api.reducer },
     middleware: (gDM) => gDM().concat(api.middleware),
   })
-  return render(
+  return renderWithProviders(
     <Provider store={store}>
       <AdminLimitsTab />
     </Provider>

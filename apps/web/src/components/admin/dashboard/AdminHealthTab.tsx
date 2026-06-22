@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Activity,
   AlertCircle,
@@ -50,6 +51,7 @@ function statusCodeTone(code?: number): string {
 }
 
 export function AdminHealthTab({ active }: AdminHealthTabProps) {
+  const { t } = useTranslation('admin')
   const [errorSearch, setErrorSearch] = useState('')
 
   const {
@@ -82,7 +84,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
   const pastDueCount = alerts?.pastDueSubscriptions ?? subscriptionStats?.PAST_DUE ?? 0
   const trialsExpiring = alerts?.trialsExpiringSoon ?? 0
 
-  const apiErrors = healthData?.recentApiErrors ?? []
+  const apiErrors = useMemo(() => healthData?.recentApiErrors ?? [], [healthData?.recentApiErrors])
   const emailFailures = healthData?.emailFailures ?? []
 
   const filteredApiErrors = useMemo(() => {
@@ -123,8 +125,8 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
   return (
     <>
       <AdminSectionHeader
-        title="System health"
-        description="Subscription health, infrastructure metrics, and recent API or email failures."
+        title={t('health.title')}
+        description={t('health.description')}
         action={
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching}>
             {isFetching ? (
@@ -137,14 +139,14 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
       />
 
       {isLoading ? (
-        <AdminLoadingState label="Loading health metrics…" />
+        <AdminLoadingState label={t('health.loading')} />
       ) : (
         <>
           {overviewError && (
             <div className="mb-4">
               <AdminErrorState
-                title="Subscription health metrics unavailable"
-                message="Overview metrics failed to load. Infrastructure checks below may still apply."
+                title={t('health.subscriptionUnavailableTitle')}
+                message={t('health.subscriptionUnavailableMessage')}
                 onRetry={() => refetchOverview()}
               />
             </div>
@@ -187,7 +189,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
           {healthError && (
             <div className="mb-4">
               <AdminErrorState
-                title="Health checks unavailable"
+                title={t('health.checksUnavailableTitle')}
                 message={
                   (healthQueryError as { data?: { message?: string } })?.data?.message ||
                   'The health API request failed.'
@@ -200,7 +202,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
           {!healthError && (
             <div className="space-y-4">
               <AppPanel
-                title="Database pool"
+                title={t('health.dbPoolTitle')}
                 description={
                   healthData?.dbPool
                     ? `${poolUtilization}% utilization · ${healthData.dbPool.idle} idle of ${healthData.dbPool.total} connections`
@@ -262,23 +264,23 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                 ) : (
                   <AdminEmptyState
                     icon={<Database className="h-8 w-8 text-[var(--text-muted)]" />}
-                    title="Pool metrics unavailable"
-                    description="Database pool stats are not exposed in this environment."
+                    title={t('health.poolMetricsUnavailableTitle')}
+                    description={t('health.poolMetricsUnavailableDescription')}
                   />
                 )}
               </AppPanel>
 
               {emailFailures.length > 0 && (
                 <AppPanel
-                  title="Email failures (24h)"
+                  title={t('health.emailFailuresTitle')}
                   description={`${emailFailures.length} failed delivery attempt${emailFailures.length === 1 ? '' : 's'}`}
                   testId="admin-health-email-failures"
                 >
-                  <TableScroll aria-label="Recent email failures">
+                  <TableScroll aria-label={t('health.emailFailuresTableAriaLabel')}>
                     <table className="w-full min-w-[640px] text-sm">
                       <thead>
                         <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                          <th className="px-4 py-3">Time</th>
+                          <th className="px-4 py-3">{t('common.table.time')}</th>
                           <th className="px-4 py-3">Event</th>
                           <th className="hidden px-4 py-3 md:table-cell">Recipient</th>
                           <th className="px-4 py-3">Error</th>
@@ -322,7 +324,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
               )}
 
               <AppPanel
-                title="Recent API errors"
+                title={t('health.apiErrorsTitle')}
                 description={
                   apiErrors.length === 0
                     ? healthData
@@ -370,10 +372,10 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                         />
                         <Input
                           className="h-10 pl-9"
-                          placeholder="Search method, status, source, tenant, or message…"
+                          placeholder={t('health.searchPlaceholder')}
                           value={errorSearch}
                           onChange={(e) => setErrorSearch(e.target.value)}
-                          aria-label="Search API errors"
+                          aria-label={t('health.searchAriaLabel')}
                         />
                       </div>
                     </div>
@@ -381,8 +383,8 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                     {filteredApiErrors.length === 0 ? (
                       <AdminEmptyState
                         icon={<AlertCircle className="h-8 w-8 text-[var(--text-muted)]" />}
-                        title="No errors match your search"
-                        description="Try a different keyword or clear the filter."
+                        title={t('health.noSearchMatchTitle')}
+                        description={t('health.noSearchMatchDescription')}
                         action={
                           <Button
                             type="button"
@@ -395,17 +397,21 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                         }
                       />
                     ) : (
-                      <TableScroll aria-label="Recent API errors">
+                      <TableScroll aria-label={t('health.apiErrorsTableAriaLabel')}>
                         <table className="w-full min-w-[880px] text-sm">
                           <thead>
                             <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                              <th className="px-4 py-3">Time</th>
+                              <th className="px-4 py-3">{t('common.table.time')}</th>
                               <th className="px-4 py-3">Method</th>
-                              <th className="px-4 py-3">Status</th>
+                              <th className="px-4 py-3">{t('common.table.status')}</th>
                               <th className="hidden px-4 py-3 lg:table-cell">Source</th>
                               <th className="hidden px-4 py-3 md:table-cell">Request ID</th>
-                              <th className="hidden px-4 py-3 xl:table-cell">User</th>
-                              <th className="hidden px-4 py-3 lg:table-cell">Tenant</th>
+                              <th className="hidden px-4 py-3 xl:table-cell">
+                                {t('common.table.user')}
+                              </th>
+                              <th className="hidden px-4 py-3 lg:table-cell">
+                                {t('common.table.tenant')}
+                              </th>
                               <th className="px-4 py-3">Message</th>
                             </tr>
                           </thead>

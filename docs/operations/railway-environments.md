@@ -219,7 +219,7 @@ Port comes from `docker/.env` → `REDIS_PORT` (default `6379`).
 - **Start modes:** dev / preprod / staging → `KEYCLOAK_USE_OPTIMIZED=false`; prod → `true`
 - Memory / JVM: [`deploy/railway/KEYCLOAK_RAILWAY_MEMORY_NOTES.md`](../../deploy/railway/KEYCLOAK_RAILWAY_MEMORY_NOTES.md)
 - Postgres DB `keycloak`: [`deploy/railway/KEYCLOAK_RAILWAY_DB_NOTES.md`](../../deploy/railway/KEYCLOAK_RAILWAY_DB_NOTES.md)
-- Incident write-up: [`docs/infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md`](../infra/KEYCLOAK_RAILWAY_MEMORY_FIX.md)
+- Incident write-up: [`keycloak-railway-memory-fix.md`](./keycloak-railway-memory-fix.md)
 
 ## L. Storage per environment
 
