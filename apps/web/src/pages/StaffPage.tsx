@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   BarChart3,
   CalendarClock,
@@ -23,17 +24,20 @@ import {
   LazyStaffTeamTab,
   LazyStaffTodayTab,
 } from '../components/staff/lazyStaffTabs'
+import { ensureNamespace } from '../i18n'
 
 export function StaffPage() {
+  const { t } = useTranslation('staff')
   const [activeTab, setActiveTab] = useState<StaffTabKey>('today')
 
+  useEffect(() => {
+    void ensureNamespace('staff')
+  }, [])
+
   return (
-    <RequirePermission permission="STAFF_VIEW" title="staff management">
+    <RequirePermission permission="STAFF_VIEW" title={t('page.permissionTitle')}>
       <PageShell data-testid="staff-page">
-        <PageHeader
-          title="Staff"
-          description="Schedule shifts, track time, and keep your front-of-house and kitchen team aligned before service."
-        />
+        <PageHeader title={t('page.title')} description={t('page.description')} />
 
         <Tabs
           value={activeTab}
@@ -43,37 +47,37 @@ export function StaffPage() {
           <TabsList className="tabs-scroll h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
             <TabsTrigger value="today" className="gap-1.5 text-xs sm:text-sm">
               <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              <span className="hidden sm:inline">Labour today</span>
-              <span className="sm:hidden">Today</span>
+              <span className="hidden sm:inline">{t('page.tabs.today')}</span>
+              <span className="sm:hidden">{t('page.tabs.todayShort')}</span>
             </TabsTrigger>
             <TabsTrigger value="team" className="gap-1.5 text-xs sm:text-sm">
               <Users className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Team
+              {t('page.tabs.team')}
             </TabsTrigger>
             <TabsTrigger value="schedule" className="gap-1.5 text-xs sm:text-sm">
               <CalendarClock className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              <span className="hidden sm:inline">Schedule & time</span>
-              <span className="sm:hidden">Schedule</span>
+              <span className="hidden sm:inline">{t('page.tabs.schedule')}</span>
+              <span className="sm:hidden">{t('page.tabs.scheduleShort')}</span>
             </TabsTrigger>
             <TabsTrigger value="pto" className="gap-1.5 text-xs sm:text-sm">
               <Palmtree className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              <span className="hidden sm:inline">PTO & availability</span>
-              <span className="sm:hidden">PTO</span>
+              <span className="hidden sm:inline">{t('page.tabs.pto')}</span>
+              <span className="sm:hidden">{t('page.tabs.ptoShort')}</span>
             </TabsTrigger>
             <TabsTrigger value="announcements" className="gap-1.5 text-xs sm:text-sm">
               <Megaphone className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              <span className="hidden md:inline">Announcements</span>
-              <span className="md:hidden">News</span>
+              <span className="hidden md:inline">{t('page.tabs.announcements')}</span>
+              <span className="md:hidden">{t('page.tabs.announcementsShort')}</span>
             </TabsTrigger>
             <TabsTrigger value="documents" className="gap-1.5 text-xs sm:text-sm">
               <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              <span className="hidden md:inline">Docs & incidents</span>
-              <span className="md:hidden">Docs</span>
+              <span className="hidden md:inline">{t('page.tabs.documents')}</span>
+              <span className="md:hidden">{t('page.tabs.documentsShort')}</span>
             </TabsTrigger>
             <TabsTrigger value="reports" className="gap-1.5 text-xs sm:text-sm">
               <BarChart3 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              <span className="hidden sm:inline">Payroll & insights</span>
-              <span className="sm:hidden">Reports</span>
+              <span className="hidden sm:inline">{t('page.tabs.reports')}</span>
+              <span className="sm:hidden">{t('page.tabs.reportsShort')}</span>
             </TabsTrigger>
           </TabsList>
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ import {
 import { getQuantityUnitRules, normalizeReceivedQuantity } from '../../lib/quantityUnit'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
+import { ensureNamespace } from '../../i18n'
 
 const DISPUTE_TYPES = [
   'short_delivery',
@@ -55,6 +57,7 @@ export function OpenDisputeDialog({
   initialLineItems,
   onCreated,
 }: OpenDisputeDialogProps) {
+  const { t } = useTranslation('disputes')
   const [, setSearchParams] = useSearchParams()
   const { data: orderData, isLoading: loadingOrder } = useGetOrderQuery(orderId, {
     skip: !orderId || !open,
@@ -66,6 +69,10 @@ export function OpenDisputeDialog({
   const [description, setDescription] = useState('')
   const [lineItems, setLineItems] = useState<DisputeLineItemDraft[]>([])
 
+  useEffect(() => {
+    void ensureNamespace('disputes')
+  }, [])
+
   const order = orderData?.order
   const orderStatus = order?.status
 
@@ -74,10 +81,15 @@ export function OpenDisputeDialog({
     const map = new Map<string, string>()
     for (const item of items) {
       const sid = item.supplier_id
-      if (sid) map.set(sid, item.supplier_name || `Supplier ${sid.slice(0, 8)}`)
+      if (sid) {
+        map.set(
+          sid,
+          item.supplier_name || t('openDialog.supplierFallback', { id: sid.slice(0, 8) })
+        )
+      }
     }
     return [...map.entries()].map(([id, name]) => ({ id, name }))
-  }, [order?.items])
+  }, [order?.items, t])
 
   useEffect(() => {
     if (!open) return
@@ -105,11 +117,11 @@ export function OpenDisputeDialog({
 
   const handleSubmit = async () => {
     if (!supplierId) {
-      toast.error('Supplier is required')
+      toast.error(t('openDialog.toast.supplierRequired'))
       return
     }
     if (!description.trim()) {
-      toast.error('Description is required')
+      toast.error(t('openDialog.toast.descriptionRequired'))
       return
     }
     if (ineligible) {
@@ -118,9 +130,7 @@ export function OpenDisputeDialog({
     }
     const items = buildDisputeItemsPayload(lineItems)
     if (lineItems.length > 0 && items.length === 0) {
-      toast.error(
-        'Select at least one line item to dispute, or describe the issue in the description'
-      )
+      toast.error(t('openDialog.toast.lineItemRequired'))
       return
     }
 
@@ -133,13 +143,15 @@ export function OpenDisputeDialog({
         receivingReportId: receivingReportId || undefined,
         items: items.length ? items : undefined,
       }).unwrap()
-      toast.success('Dispute opened - the supplier has been notified')
+      toast.success(t('openDialog.toast.created'))
       onOpenChange(false)
       setSearchParams({})
       onCreated?.()
     } catch (e: unknown) {
       const err = e as { data?: { message?: string; error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || err?.data?.message || 'Failed to create dispute')
+      toast.error(
+        err?.data?.error?.message || err?.data?.message || t('openDialog.toast.createFailed')
+      )
     }
   }
 
@@ -147,11 +159,8 @@ export function OpenDisputeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="lg">
         <DialogHeader>
-          <DialogTitle>Open dispute</DialogTitle>
-          <DialogDescription>
-            Report missing, damaged, or incorrect items. The supplier will see this under Disputes
-            and on the order timeline. You can dispute part of an order (e.g. 1 of 3 lines).
-          </DialogDescription>
+          <DialogTitle>{t('openDialog.title')}</DialogTitle>
+          <DialogDescription>{t('openDialog.description')}</DialogDescription>
         </DialogHeader>
 
         {loadingOrder ? (
@@ -167,10 +176,10 @@ export function OpenDisputeDialog({
             )}
 
             <div>
-              <Label>Supplier</Label>
+              <Label>{t('openDialog.supplier')}</Label>
               <Select value={supplierId} onValueChange={setSupplierId}>
                 <SelectTrigger>
-                  <option value="">Select supplier</option>
+                  <option value="">{t('openDialog.selectSupplier')}</option>
                   {supplierOptions.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -181,15 +190,15 @@ export function OpenDisputeDialog({
             </div>
 
             <div>
-              <Label>Type</Label>
+              <Label>{t('openDialog.type')}</Label>
               <Select
                 value={type}
                 onValueChange={(value) => setType(value as (typeof DISPUTE_TYPES)[number])}
               >
                 <SelectTrigger>
-                  {DISPUTE_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t.replace(/_/g, ' ')}
+                  {DISPUTE_TYPES.map((disputeType) => (
+                    <option key={disputeType} value={disputeType}>
+                      {t(`types.${disputeType}`)}
                     </option>
                   ))}
                 </SelectTrigger>
@@ -198,7 +207,7 @@ export function OpenDisputeDialog({
 
             {lineItems.length > 0 && (
               <div>
-                <Label>Line items (optional — select what is disputed)</Label>
+                <Label>{t('openDialog.lineItems')}</Label>
                 <div className="mt-2 space-y-2 max-h-48 overflow-y-auto border rounded-md p-2">
                   {lineItems.map((item, index) => {
                     const unit =
@@ -219,12 +228,13 @@ export function OpenDisputeDialog({
                             setLineItems(next)
                           }}
                           className="mt-1"
-                          aria-label={`Include ${item.productName} in dispute`}
+                          aria-label={t('openDialog.includeInDispute', { name: item.productName })}
                         />
                         <div className="flex-1 min-w-[140px]">
                           <p className="font-medium">{item.productName}</p>
                           <p className="text-[var(--text-muted)] text-xs">
-                            Ordered: {item.quantityOrdered} {unit} · Received:{' '}
+                            {t('openDialog.ordered')}: {item.quantityOrdered} {unit} ·{' '}
+                            {t('openDialog.received')}:{' '}
                             <Input
                               type="number"
                               className="inline-block w-20 h-7 text-xs mx-1"
@@ -257,17 +267,17 @@ export function OpenDisputeDialog({
                   })}
                 </div>
                 <p className="text-xs text-[var(--text-muted)] mt-1">
-                  {includedCount} line(s) selected for dispute
+                  {t('openDialog.linesSelected', { count: includedCount })}
                 </p>
               </div>
             )}
 
             <div>
-              <Label>Description</Label>
+              <Label>{t('openDialog.descriptionLabel')}</Label>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="What went wrong? Include quantities and product names."
+                placeholder={t('openDialog.descriptionPlaceholder')}
               />
             </div>
           </div>
@@ -275,10 +285,10 @@ export function OpenDisputeDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('openDialog.cancel')}
           </Button>
           <Button onClick={handleSubmit} disabled={creating || ineligible || !supplierId}>
-            {creating ? 'Submitting…' : 'Submit dispute'}
+            {creating ? t('openDialog.submitting') : t('openDialog.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

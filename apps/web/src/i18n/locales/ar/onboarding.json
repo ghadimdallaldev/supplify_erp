@@ -1,0 +1,178 @@
+{
+  "register": {
+    "redirecting": "جاري إعادة التوجيه…"
+  },
+  "registerComplete": {
+    "title": "إعداد مؤسستك",
+    "description": "حساب Keycloak جاهز. أخبرنا كيف ستستخدم Supplify.",
+    "accountTypeLabel": "أنا",
+    "restaurant": "مطعم",
+    "supplier": "مورد",
+    "businessNameLabel": "اسم العمل",
+    "businessNamePlaceholder": "اسم شركتك أو منشأتك",
+    "phoneLabel": "الهاتف (اختياري)",
+    "phonePlaceholder": "+961 3 000 000",
+    "submit": "المتابعة إلى Supplify",
+    "creatingWorkspace": "جاري إنشاء مساحة العمل…",
+    "almostDone": "اقتربنا من الانتهاء…",
+    "errors": {
+      "chooseAccountType": "يرجى اختيار ما إذا كنت مطعماً أو مورداً.",
+      "legalRequired": "يرجى قبول جميع الاتفاقيات القانونية المطلوبة قبل المتابعة.",
+      "serverRestart": "أعاد الخادم التشغيل أثناء حفظ ملفك. قد يكون حسابك مُعداً بالفعل — حدّث الصفحة، أو حاول الإرسال مرة أخرى.",
+      "generic": "تعذّر إكمال التسجيل. يرجى المحاولة مرة أخرى.",
+      "statusVerify": "تعذّر التحقق من حالة التسجيل. حدّث الصفحة أو حاول مرة أخرى بعد لحظات."
+    }
+  },
+  "activation": {
+    "title": "تفعيل حسابك",
+    "descriptionSupplier": "تم إنشاء مساحة عمل المورد ولكنها غير نشطة بعد. ابدأ بالخطة المجانية، أو ترقّ إلى خطة مدفوعة، أو اطلب من مسؤول Supplify تفعيلك يدوياً.",
+    "descriptionRestaurant": "تم إنشاء مساحة عمل المطعم ولكنها غير نشطة بعد. ابدأ بالخطة المجانية، أو ترقّ إلى خطة مدفوعة، أو اطلب من مسؤول Supplify تفعيلك يدوياً.",
+    "paidPlanHint": "ادفع مقابل Silver أو Gold أو Platinum لفتح الطلبات والمخزون والتطبيق الكامل فوراً.",
+    "freeTierHint": "الخطة المجانية تفتح مساحة عملك فوراً بالميزات الأساسية. الخطط المدفوعة تضيف سعة ووحدات أكثر.",
+    "activateFree": "تفعيل الخطة المجانية",
+    "comparePlans": "مقارنة الخطط والدفع",
+    "freePlanActive": "خطتك المجانية نشطة.",
+    "pendingPlan": "الخطة الحالية في الملف: {{planName}} (في انتظار التفعيل)"
+  },
+  "restaurantSettings": {
+    "title": "الإعدادات",
+    "descriptionWithName": "إدارة الملف والفريق والفروع والخطة لـ {{name}}.",
+    "descriptionDefault": "إدارة ملف المطعم والفريق والفروع والخطة والإشعارات.",
+    "tabs": {
+      "profile": "الملف الشخصي",
+      "team": "الفريق",
+      "branches": "الفروع",
+      "subscription": "الاشتراك",
+      "plan": "الخطة",
+      "notifications": "الإشعارات",
+      "alerts": "التنبيهات",
+      "activity": "النشاط",
+      "reviews": "التقييمات"
+    }
+  },
+  "restaurantProfile": {
+    "fallbackName": "مطعم",
+    "title": "ملف العمل",
+    "description": "حدّث معلومات العمل وبيانات التواصل.",
+    "logo": {
+      "title": "شعار العمل",
+      "description": "ارفع شعار عملك ليظهر في ملفك وأمام الموردين."
+    },
+    "actions": {
+      "saving": "جارٍ الحفظ...",
+      "saveChanges": "حفظ التغييرات"
+    },
+    "fields": {
+      "businessName": "اسم العمل",
+      "businessType": "نوع العمل",
+      "registrationNumber": "رقم التسجيل",
+      "taxId": "الرقم الضريبي",
+      "vatNumber": "رقم VAT",
+      "contactEmail": "بريد التواصل",
+      "phone": "الهاتف",
+      "website": "الموقع الإلكتروني",
+      "description": "وصف العمل",
+      "street": "عنوان الشارع",
+      "city": "المدينة",
+      "region": "المنطقة/الولاية",
+      "country": "الدولة",
+      "deliveryInstructions": "تعليمات التسليم"
+    },
+    "placeholders": {
+      "businessName": "أدخل اسم العمل",
+      "registrationNumber": "أدخل رقم التسجيل",
+      "taxId": "أدخل الرقم الضريبي",
+      "vatNumber": "أدخل رقم VAT",
+      "description": "أخبر الموردين عن مطعمك...",
+      "street": "123 Main Street",
+      "city": "اسم المدينة",
+      "region": "الولاية أو المنطقة",
+      "country": "الدولة",
+      "deliveryInstructions": "مثال: البوابة A، الطابق 2، معلم قريب: بجانب محطة الوقود"
+    },
+    "businessTypes": {
+      "restaurant": "مطعم",
+      "cafe": "مقهى",
+      "hotel": "فندق",
+      "catering": "تموين"
+    },
+    "toasts": {
+      "notLoaded": "لم يتم تحميل معلومات المطعم",
+      "logoFailed": "فشل رفع الشعار",
+      "updated": "تم تحديث الملف بنجاح!",
+      "updateFailed": "فشل تحديث الملف"
+    }
+  },
+  "restaurantBranches": {
+    "title": "حسابات الفروع",
+    "description": "كل فرع هو حساب مستقل له طلباته ومخزونه وإعداداته. يمكنك التبديل بينها من الرأس بعد إنشاء فرع.",
+    "actions": {
+      "addBranch": "إضافة فرع",
+      "cancel": "إلغاء",
+      "removeBranch": "إزالة الفرع"
+    },
+    "empty": {
+      "title": "لا توجد حسابات فروع بعد",
+      "description": "أضف حسابا جديدا لكل موقع إضافي (للخطط المدفوعة فقط)"
+    },
+    "dialog": {
+      "title": "إضافة فرع",
+      "description": "أضف موقع فرع جديد",
+      "name": "اسم الفرع",
+      "namePlaceholder": "مثال: فرع وسط المدينة",
+      "phone": "الهاتف",
+      "phonePlaceholder": "أدخل الهاتف",
+      "address": "العنوان",
+      "addressPlaceholder": "أدخل العنوان",
+      "deliveryInstructions": "تعليمات التسليم",
+      "deliveryInstructionsPlaceholder": "تعليمات خاصة للتسليم..."
+    },
+    "toasts": {
+      "nameRequired": "يرجى إدخال اسم الفرع",
+      "added": "تمت إضافة الفرع!",
+      "addFailed": "فشل إضافة الفرع",
+      "removed": "تمت إزالة الفرع",
+      "removeFailed": "فشل إزالة الفرع"
+    }
+  },
+  "invite": {
+    "welcome": "مرحباً بك في Supplify",
+    "acceptTitle": "قبول الدعوة",
+    "validating": "جاري التحقق من دعوتك…",
+    "thisBranch": "هذا الفرع",
+    "fullName": "الاسم الكامل",
+    "password": "كلمة المرور",
+    "confirmPassword": "تأكيد كلمة المرور",
+    "acceptJoin": "قبول والانضمام",
+    "createAndJoin": "إنشاء حساب والانضمام",
+    "signIn": "تسجيل الدخول",
+    "signInLink": "تسجيل الدخول",
+    "signInDifferent": "تسجيل الدخول بحساب مختلف",
+    "alreadyHaveAccount": "لديك حساب بالفعل؟",
+    "loggedInAs": "أنت مسجّل الدخول كـ {{name}}. {{headline}}.",
+    "headline": {
+      "restaurantMember": "تمت دعوتك للانضمام إلى {{branch}} بصفة {{role}}",
+      "restaurantBranchWithOrg": "تمت دعوتك لإدارة {{branch}} — {{org}}",
+      "restaurantBranch": "تمت دعوتك لإدارة {{branch}}",
+      "defaultWithOrg": "تمت دعوتك للانضمام إلى {{branch}} ({{org}}) بصفة {{role}}",
+      "default": "تمت دعوتك للانضمام إلى {{branch}} بصفة {{role}}"
+    },
+    "expired": {
+      "title": "انتهت صلاحية رابط الدعوة.",
+      "description": "تواصل مع مسؤول مؤسستك للحصول على رابط جديد."
+    },
+    "invalid": {
+      "title": "رابط الدعوة لم يعد صالحاً.",
+      "description": "إذا كان لديك حساب بالفعل، سجّل الدخول."
+    },
+    "errors": {
+      "missingToken": "رمز الدعوة أو النوع مفقود.",
+      "validateFailed": "تعذّر التحقق من الدعوة.",
+      "legalRequired": "يرجى قبول جميع الاتفاقيات القانونية المطلوبة قبل المتابعة.",
+      "acceptFailed": "تعذّر قبول الدعوة. جرّب تسجيل الدخول بحساب مختلف.",
+      "passwordMismatch": "كلمتا المرور غير متطابقتين",
+      "passwordTooShort": "يجب أن تكون كلمة المرور 8 أحرف على الأقل",
+      "createFailed": "تعذّر إنشاء حسابك. قد يكون الرابط منتهي الصلاحية."
+    }
+  }
+}

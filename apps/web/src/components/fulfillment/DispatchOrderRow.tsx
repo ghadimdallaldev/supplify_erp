@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
@@ -54,12 +55,13 @@ export function DispatchOrderRow({
   selectDisabledReason,
   onViewTracking,
 }: Props) {
+  const { t } = useTranslation('fulfillment')
   const driver = order.assignment?.driver
   const assignmentStatus = order.assignment?.status ?? order.delivery_status ?? 'pending'
   const scheduledDeliveryDate = order.assignment?.scheduled_delivery_date ?? null
   const rolledOver = Boolean(order.assignment?.rolled_over_at)
   const area = order.delivery_area?.trim()
-  const areaLabel = area || 'Area not set'
+  const areaLabel = area || t('dispatch.orderRow.areaNotSet')
   const tracking = order.tracking ?? null
   const gpsLabel = getGpsStatusLabel(tracking)
   const driverLabel = driver
@@ -88,7 +90,7 @@ export function DispatchOrderRow({
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <h4 className="truncate text-sm font-semibold text-[var(--text)]">
-              {order.restaurant_name || 'Restaurant'}
+              {order.restaurant_name || t('dispatch.orderRow.restaurantFallback')}
             </h4>
             <Badge
               variant={deliveryStatusVariant(assignmentStatus)}
@@ -110,7 +112,7 @@ export function DispatchOrderRow({
               </Badge>
             ) : order.active_route_number && order.active_route_status === 'PLANNED' ? (
               <Badge variant="outline" data-testid="dispatch-planned-route-badge">
-                Planned route · {order.active_route_number}
+                {t('dispatch.orderRow.plannedRoute', { routeNumber: order.active_route_number })}
               </Badge>
             ) : null}
             {assignmentStatus === 'rescheduled' && rolledOver ? (
@@ -119,7 +121,7 @@ export function DispatchOrderRow({
                 className="border-[var(--amber)] text-[var(--amber)]"
                 data-testid="dispatch-rollover-badge"
               >
-                Moved to tomorrow
+                {t('dispatch.orderRow.movedToTomorrow')}
                 {scheduledDeliveryDate
                   ? ` · ${new Date(scheduledDeliveryDate).toLocaleDateString()}`
                   : ''}
@@ -137,7 +139,7 @@ export function DispatchOrderRow({
             <span className="mx-1.5 text-[var(--app-border)]">·</span>
             <span className="inline-flex items-center gap-1">
               <Package className="h-3 w-3 shrink-0" aria-hidden />
-              {order.item_count ?? 0} items
+              {t('dispatch.orderRow.items', { count: order.item_count ?? 0 })}
             </span>
             <span className="mx-1.5 text-[var(--app-border)]">·</span>
             {formatPrice(order.total_amount)}
@@ -148,7 +150,11 @@ export function DispatchOrderRow({
               <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--brand-mid)]" aria-hidden />
               <span>{areaLabel}</span>
             </p>
-            <p>Scheduled: {formatScheduledAt(order.scheduled_at ?? order.created_at)}</p>
+            <p>
+              {t('dispatch.orderRow.scheduled', {
+                date: formatScheduledAt(order.scheduled_at ?? order.created_at),
+              })}
+            </p>
           </div>
 
           {showDriver && (
@@ -170,7 +176,9 @@ export function DispatchOrderRow({
                   )}
                 </div>
               ) : (
-                <p className="font-medium text-[var(--amber)]">Unassigned</p>
+                <p className="font-medium text-[var(--amber)]">
+                  {t('dispatch.orderRow.unassigned')}
+                </p>
               )}
             </div>
           )}
@@ -188,11 +196,11 @@ export function DispatchOrderRow({
               onClick={() => onViewTracking(order.id)}
             >
               <Navigation className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-              Track delivery
+              {t('dispatch.orderRow.trackDelivery')}
             </Button>
           )}
           <Button variant="ghost" size="sm" className="whitespace-nowrap" asChild>
-            <Link to={`/app/orders/${order.id}`}>View order</Link>
+            <Link to={`/app/orders/${order.id}`}>{t('dispatch.orderRow.viewOrder')}</Link>
           </Button>
         </div>
       </div>

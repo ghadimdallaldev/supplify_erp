@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ComponentType, SVGProps } from 'react'
 import { Rnd } from 'react-rnd'
-import type {
-  Reservation,
-  ReservationTable,
-  ReservationTableShape,
-  ReservationTableZone,
-} from '../../../types'
 import { Button } from '../../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 import { Input } from '../../ui/input'
@@ -18,11 +11,6 @@ import { findReservationForTable, lookupTableAssignment } from '../../../lib/res
 import { useSaveReservationTablesMutation } from '../../../services/reservationsApi'
 import { toast } from 'sonner'
 import {
-  Circle,
-  RectangleHorizontal,
-  Square,
-  Armchair,
-  Sparkles,
   Copy,
   RotateCcw,
   Trash2,

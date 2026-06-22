@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
@@ -17,6 +18,7 @@ type Props = {
 }
 
 export function CreateRouteDialog({ open, onClose, selectedOrders }: Props) {
+  const { t } = useTranslation('fulfillment')
   const today = new Date().toISOString().slice(0, 10)
   const [driverId, setDriverId] = useState('')
   const [scheduledDate, setScheduledDate] = useState(today)
@@ -35,7 +37,7 @@ export function CreateRouteDialog({ open, onClose, selectedOrders }: Props) {
 
   const handleCreate = async () => {
     if (!driverId) {
-      toast.error('Select a driver')
+      toast.error(t('createRoute.toast.selectDriver'))
       return
     }
     try {
@@ -46,14 +48,14 @@ export function CreateRouteDialog({ open, onClose, selectedOrders }: Props) {
         route_label: routeLabel.trim() || undefined,
         area: area.trim() || undefined,
       }).unwrap()
-      toast.success('Planned route created')
+      toast.success(t('createRoute.toast.created'))
       onClose()
       setDriverId('')
       setRouteLabel('')
       setArea('')
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Failed to create route')
+      toast.error(msg || t('createRoute.toast.createFailed'))
     }
   }
 
@@ -61,12 +63,10 @@ export function CreateRouteDialog({ open, onClose, selectedOrders }: Props) {
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>Assign to planned route</DialogTitle>
+          <DialogTitle>{t('createRoute.title')}</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-[var(--text-muted)]">
-          {selectedOrders.length} order{selectedOrders.length === 1 ? '' : 's'} will be added to a{' '}
-          <strong>planned</strong> route and assigned to the selected driver. Activate the route
-          from Fulfillment → Routes when orders are ready for dispatch.
+          {t('createRoute.description', { count: selectedOrders.length })}
         </p>
         <ul className="max-h-32 overflow-y-auto rounded-md border border-[var(--app-border)] p-2 text-xs space-y-1">
           {selectedOrders.map((o) => (
@@ -77,13 +77,13 @@ export function CreateRouteDialog({ open, onClose, selectedOrders }: Props) {
         </ul>
         <div className="space-y-3">
           <div>
-            <Label htmlFor="route-driver">Driver</Label>
+            <Label htmlFor="route-driver">{t('createRoute.driverLabel')}</Label>
             {driversLoading ? (
               <p
                 className="mt-1 text-sm text-[var(--text-muted)]"
                 data-testid="create-route-drivers-loading"
               >
-                Loading drivers…
+                {t('createRoute.loadingDrivers')}
               </p>
             ) : driversError ? (
               <p
@@ -91,7 +91,7 @@ export function CreateRouteDialog({ open, onClose, selectedOrders }: Props) {
                 data-testid="create-route-drivers-error"
                 role="alert"
               >
-                Could not load drivers. Try again.
+                {t('createRoute.driversLoadFailed')}
               </p>
             ) : (
               <Select value={driverId} onValueChange={setDriverId}>
@@ -102,7 +102,9 @@ export function CreateRouteDialog({ open, onClose, selectedOrders }: Props) {
                   disabled={drivers.length === 0}
                 >
                   <option value="">
-                    {drivers.length === 0 ? 'No active drivers' : 'Select driver…'}
+                    {drivers.length === 0
+                      ? t('createRoute.noActiveDrivers')
+                      : t('createRoute.selectDriver')}
                   </option>
                   {drivers.map((d) => (
                     <option key={d.id} value={d.id}>
@@ -114,7 +116,7 @@ export function CreateRouteDialog({ open, onClose, selectedOrders }: Props) {
             )}
           </div>
           <div>
-            <Label htmlFor="route-date">Route date</Label>
+            <Label htmlFor="route-date">{t('createRoute.routeDateLabel')}</Label>
             <Input
               id="route-date"
               type="date"
@@ -123,19 +125,19 @@ export function CreateRouteDialog({ open, onClose, selectedOrders }: Props) {
             />
           </div>
           <div>
-            <Label htmlFor="route-label">Route name (optional)</Label>
+            <Label htmlFor="route-label">{t('createRoute.routeNameLabel')}</Label>
             <Input
               id="route-label"
-              placeholder="e.g. Downtown morning run"
+              placeholder={t('createRoute.routeNamePlaceholder')}
               value={routeLabel}
               onChange={(e) => setRouteLabel(e.target.value)}
             />
           </div>
           <div>
-            <Label htmlFor="route-area">Area (optional)</Label>
+            <Label htmlFor="route-area">{t('createRoute.areaLabel')}</Label>
             <Input
               id="route-area"
-              placeholder="e.g. Downtown"
+              placeholder={t('createRoute.areaPlaceholder')}
               value={area}
               onChange={(e) => setArea(e.target.value)}
             />
@@ -143,7 +145,7 @@ export function CreateRouteDialog({ open, onClose, selectedOrders }: Props) {
         </div>
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {t('common:actions.cancel')}
           </Button>
           <Button
             data-testid="create-route-submit"
@@ -151,7 +153,7 @@ export function CreateRouteDialog({ open, onClose, selectedOrders }: Props) {
             disabled={isLoading || !driverId}
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Create route
+            {t('createRoute.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

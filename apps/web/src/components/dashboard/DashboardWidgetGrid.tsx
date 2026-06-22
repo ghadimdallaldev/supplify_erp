@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
-import { Package, ShoppingCart, AlertTriangle, Loader2, Warehouse, Users } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Loader2, Warehouse, Users } from 'lucide-react'
 import { useGetSupplierGrowthMetricsQuery } from '../../services/api/endpoints/growth'
 import { useGetEntitlementsQuery } from '../../services/api'
 import { useAppSelector } from '../../hooks/redux'
@@ -8,13 +9,13 @@ import { usePermissions } from '../../hooks/usePermissions'
 import { canUseSupplierGrowth } from '../../lib/planFeatureGates'
 import { canViewSupplierGrowth } from '../../lib/tenantRoles'
 import { toast } from 'sonner'
-import { Button } from '../ui/button'
 import { Skeleton } from '../ui/skeleton'
 import { StatusBadge } from '../ui/status-badge'
 import { formatCurrency } from '../../utils/format'
 import {
   SectionCard,
-  SPEND_TREND_DAYS,
+  SPEND_TREND_PERIOD_OPTIONS,
+  type SpendTrendPeriodDays,
   DASHBOARD_GRID_GAP,
   DASHBOARD_STACK_GAP,
 } from './dashboardShared'
@@ -23,7 +24,6 @@ const SpendTrendChart = lazy(() =>
   import('./SpendTrendChart').then((m) => ({ default: m.SpendTrendChart }))
 )
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function DashboardWidgetGrid(props: any) {
   const {
     isRestaurant,
@@ -34,6 +34,8 @@ export function DashboardWidgetGrid(props: any) {
     spendTrend,
     spendTrendSource,
     spendTrendPeriodTotal,
+    periodDays = 30,
+    onPeriodDaysChange,
     lowStockItems,
     smartReorderEnabled,
     inventoryMgmtEnabled,
@@ -48,6 +50,7 @@ export function DashboardWidgetGrid(props: any) {
     restaurantLayout,
   } = props
 
+  const { t } = useTranslation('dashboard')
   const { can } = usePermissions()
   const { user } = useAppSelector((state) => state.auth)
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !isSupplier })
@@ -66,7 +69,7 @@ export function DashboardWidgetGrid(props: any) {
         {/* Col 1 — Recent Orders */}
         {showRestaurantSection('showRecentOrders') && (
           <SectionCard
-            title="Recent Orders"
+            title={t('widgets.recentOrders.title')}
             action={
               <Link
                 to="/app/orders"
@@ -77,7 +80,7 @@ export function DashboardWidgetGrid(props: any) {
                   fontWeight: 600,
                 }}
               >
-                View all →
+                {t('widgets.recentOrders.viewAll')}
               </Link>
             }
           >
@@ -92,7 +95,7 @@ export function DashboardWidgetGrid(props: any) {
                     padding: '16px 0',
                   }}
                 >
-                  No recent orders
+                  {t('widgets.recentOrders.empty')}
                 </p>
               ) : (
                 orders.slice(0, 3).map((o: any) => (
@@ -129,8 +132,15 @@ export function DashboardWidgetGrid(props: any) {
                         }}
                       >
                         {isSupplier
-                          ? o.restaurant_name || o.restaurantName || 'Customer'
-                          : `From: ${o.supplier_name || o.supplierName || 'Supplier'}`}
+                          ? o.restaurant_name ||
+                            o.restaurantName ||
+                            t('widgets.recentOrders.customerFallback')
+                          : t('widgets.recentOrders.fromSupplier', {
+                              name:
+                                o.supplier_name ||
+                                o.supplierName ||
+                                t('widgets.recentOrders.supplierFallback'),
+                            })}
                       </div>
                     </div>
                     <div
@@ -156,17 +166,21 @@ export function DashboardWidgetGrid(props: any) {
 
         {/* Col 2 — Supplier: order status bars | Restaurant: spend trend */}
         {isSupplier ? (
-          <SectionCard title="Order Status">
+          <SectionCard title={t('widgets.orderStatus.title')}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}>
               {[
                 {
-                  label: 'Completed',
+                  label: t('widgets.orderStatus.completed'),
                   value: stats?.completedOrders ?? 0,
                   color: 'var(--mint-mid)',
                 },
-                { label: 'Pending', value: stats?.pendingOrders ?? 0, color: 'var(--amber-mid)' },
                 {
-                  label: 'Processing',
+                  label: t('widgets.orderStatus.pending'),
+                  value: stats?.pendingOrders ?? 0,
+                  color: 'var(--amber-mid)',
+                },
+                {
+                  label: t('widgets.orderStatus.processing'),
                   value: Math.max(
                     0,
                     (stats?.totalOrders ?? 0) -
@@ -230,7 +244,7 @@ export function DashboardWidgetGrid(props: any) {
                 }}
               >
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                  Total orders (all time)
+                  {t('widgets.orderStatus.totalAllTime')}
                 </span>
                 <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--text)' }}>
                   {stats?.totalOrders ?? 0}
@@ -240,15 +254,48 @@ export function DashboardWidgetGrid(props: any) {
           </SectionCard>
         ) : showRestaurantSection('showSpendTrend') ? (
           <SectionCard
-            title="Spend Trend"
-            action={<span style={{ fontSize: 10, color: 'var(--text-muted)' }}>30 days</span>}
+            title={t('widgets.spendTrend.title')}
+            action={
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: 3 }}
+                role="group"
+                aria-label={t('widgets.spendTrend.periodAriaLabel')}
+                data-testid="spend-trend-period-toggle"
+              >
+                {SPEND_TREND_PERIOD_OPTIONS.map((days) => (
+                  <button
+                    key={days}
+                    type="button"
+                    data-testid={`spend-trend-period-${days}d`}
+                    aria-pressed={periodDays === days}
+                    onClick={() => onPeriodDaysChange?.(days as SpendTrendPeriodDays)}
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: '3px 6px',
+                      borderRadius: 5,
+                      border:
+                        periodDays === days
+                          ? '1px solid var(--brand-mid)'
+                          : '1px solid var(--app-border)',
+                      background: periodDays === days ? 'var(--brand-pale)' : 'var(--surface)',
+                      color: periodDays === days ? 'var(--brand)' : 'var(--text-muted)',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {t('widgets.spendTrend.periodDays', { days })}
+                  </button>
+                ))}
+              </div>
+            }
           >
             {spendTrend.length > 0 ? (
               <Suspense
                 fallback={
                   <Skeleton
                     className="h-[120px] w-full rounded-md"
-                    aria-label="Loading spend trend"
+                    aria-label={t('widgets.spendTrend.loadingAriaLabel')}
                   />
                 }
               >
@@ -264,8 +311,8 @@ export function DashboardWidgetGrid(props: any) {
                 }}
               >
                 {typeof stats?.totalSpent === 'number' && stats.totalSpent > 0
-                  ? `No spend in the last ${SPEND_TREND_DAYS} days. Your all-time order total is in the KPI above.`
-                  : 'No spend data yet'}
+                  ? t('widgets.spendTrend.emptyNoRecent', { days: periodDays })
+                  : t('widgets.spendTrend.emptyNoData')}
               </p>
             )}
             <div
@@ -281,8 +328,10 @@ export function DashboardWidgetGrid(props: any) {
             >
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                 {spendTrend.length > 0
-                  ? `Last ${SPEND_TREND_DAYS} days${spendTrendSource === 'orders' ? ' (orders)' : ''}`
-                  : 'All-time (orders)'}
+                  ? spendTrendSource === 'orders'
+                    ? t('widgets.spendTrend.footerLastDaysOrders', { days: periodDays })
+                    : t('widgets.spendTrend.footerLastDays', { days: periodDays })
+                  : t('widgets.spendTrend.footerAllTimeOrders')}
               </span>
               <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--text)' }}>
                 {formatCurrency(
@@ -300,7 +349,11 @@ export function DashboardWidgetGrid(props: any) {
         {/* Col 3 — Restaurant: reorder | Supplier: low stock */}
         {(isSupplier || showRestaurantSection('showReorderAlerts')) && (
           <SectionCard
-            title={isSupplier ? 'Low Stock' : 'Reorder Alerts'}
+            title={
+              isSupplier
+                ? t('widgets.stockAlerts.lowStockTitle')
+                : t('widgets.stockAlerts.reorderTitle')
+            }
             action={
               isSupplier && lowStockItems.length > 0 ? (
                 <Link
@@ -312,7 +365,7 @@ export function DashboardWidgetGrid(props: any) {
                     fontWeight: 600,
                   }}
                 >
-                  View all →
+                  {t('widgets.recentOrders.viewAll')}
                 </Link>
               ) : isRestaurant && smartReorderEnabled ? (
                 <Link
@@ -324,7 +377,7 @@ export function DashboardWidgetGrid(props: any) {
                     fontWeight: 600,
                   }}
                 >
-                  View all →
+                  {t('widgets.recentOrders.viewAll')}
                 </Link>
               ) : undefined
             }
@@ -340,7 +393,7 @@ export function DashboardWidgetGrid(props: any) {
                       padding: '16px 0',
                     }}
                   >
-                    All products are above their stock thresholds
+                    {t('widgets.stockAlerts.allAboveThreshold')}
                   </p>
                 ) : (
                   lowStockItems.map((item: any) => (
@@ -369,13 +422,19 @@ export function DashboardWidgetGrid(props: any) {
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          {item.product_name || item.name || 'Product'}
+                          {item.product_name ||
+                            item.name ||
+                            t('widgets.stockAlerts.productFallback')}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                          Available: {item.available_qty ?? 0}
                           {item.low_stock_threshold != null
-                            ? ` · Threshold: ${item.low_stock_threshold}`
-                            : ''}
+                            ? t('widgets.stockAlerts.availableWithThreshold', {
+                                qty: item.available_qty ?? 0,
+                                threshold: item.low_stock_threshold,
+                              })
+                            : t('widgets.stockAlerts.available', {
+                                qty: item.available_qty ?? 0,
+                              })}
                         </div>
                       </div>
                     </Link>
@@ -393,7 +452,7 @@ export function DashboardWidgetGrid(props: any) {
                       padding: '16px 0',
                     }}
                   >
-                    No reorder suggestions
+                    {t('widgets.stockAlerts.noSuggestions')}
                   </p>
                 ) : (
                   reorderSuggestions!.suggestions.slice(0, 3).map((s: any, idx: number) => {
@@ -406,7 +465,7 @@ export function DashboardWidgetGrid(props: any) {
                     const handleAdd = async () => {
                       const lists = quickListsData?.quickLists || []
                       if (lists.length === 0) {
-                        toast.error('Create a quick list first')
+                        toast.error(t('toast.createQuickListFirst'))
                         return
                       }
                       setAddingSuggestionId(s.id)
@@ -419,9 +478,15 @@ export function DashboardWidgetGrid(props: any) {
                             quantity: qty,
                           },
                         }).unwrap()
-                        toast.success(`Added ${s.product_name} (${qty}) to ${lists[0].name}`)
+                        toast.success(
+                          t('toast.addedToQuickList', {
+                            productName: s.product_name,
+                            qty,
+                            listName: lists[0].name,
+                          })
+                        )
                       } catch (e: any) {
-                        toast.error(e?.data?.error?.message || 'Failed to add to quick list')
+                        toast.error(e?.data?.error?.message || t('toast.addToQuickListFailed'))
                       } finally {
                         setAddingSuggestionId(null)
                       }
@@ -461,7 +526,10 @@ export function DashboardWidgetGrid(props: any) {
                             {s.product_name}
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                            Current: {s.current_qty} · Suggest: {qty}
+                            {t('widgets.stockAlerts.currentSuggest', {
+                              current: s.current_qty,
+                              suggest: qty,
+                            })}
                           </div>
                         </div>
                         <button
@@ -490,7 +558,11 @@ export function DashboardWidgetGrid(props: any) {
                             gap: 4,
                           }}
                         >
-                          {isAdding ? <Loader2 size={11} className="animate-spin" /> : '+ Add'}
+                          {isAdding ? (
+                            <Loader2 size={11} className="animate-spin" />
+                          ) : (
+                            t('widgets.stockAlerts.addButton')
+                          )}
                         </button>
                       </div>
                     )
@@ -521,25 +593,29 @@ export function DashboardWidgetGrid(props: any) {
         >
           {isRestaurant && inventoryMgmtEnabled && expirySummaryData?.summary ? (
             <SectionCard
-              title="Inventory expiry"
+              title={t('widgets.expiry.title')}
               action={
                 <Link
                   to="/app/inventory?tab=expiry"
                   style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}
                 >
-                  View all →
+                  {t('widgets.recentOrders.viewAll')}
                 </Link>
               }
             >
               <div style={{ display: 'flex', gap: 16, fontSize: 13 }}>
                 <div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Expiring soon</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                    {t('widgets.expiry.expiringSoon')}
+                  </div>
                   <div style={{ fontWeight: 800, fontSize: 20 }}>
                     {expirySummaryData.summary.expiringSoonCount ?? 0}
                   </div>
                 </div>
                 <div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Expired</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                    {t('widgets.expiry.expired')}
+                  </div>
                   <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--danger, #b91c1c)' }}>
                     {expirySummaryData.summary.expiredCount ?? 0}
                   </div>
@@ -566,13 +642,13 @@ export function DashboardWidgetGrid(props: any) {
           smartReorderEnabled &&
           (reorderRemindersData?.reminders?.length ?? 0) > 0 ? (
             <SectionCard
-              title="Suggested reorder reminders"
+              title={t('widgets.reorderReminders.title')}
               action={
                 <Link
                   to="/app/quick-lists"
                   style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}
                 >
-                  Ordering lists →
+                  {t('widgets.reorderReminders.orderingLists')}
                 </Link>
               }
             >
@@ -585,7 +661,10 @@ export function DashboardWidgetGrid(props: any) {
                         key={r.id}
                         style={{ padding: '6px 0', borderBottom: '1px solid var(--app-border)' }}
                       >
-                        You usually order {r.label} on {r.dayName}s.
+                        {t('widgets.reorderReminders.pattern', {
+                          label: r.label,
+                          dayName: r.dayName,
+                        })}
                       </li>
                     )
                   )}
@@ -595,13 +674,13 @@ export function DashboardWidgetGrid(props: any) {
 
           {isSupplier && (atRiskData?.atRisk?.length ?? 0) > 0 ? (
             <SectionCard
-              title="At-risk expected orders"
+              title={t('widgets.atRisk.title')}
               action={
                 <Link
                   to="/app/command-center"
                   style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}
                 >
-                  Command center →
+                  {t('widgets.atRisk.commandCenter')}
                 </Link>
               }
             >
@@ -619,7 +698,11 @@ export function DashboardWidgetGrid(props: any) {
                         key={r.cadenceId}
                         style={{ padding: '6px 0', borderBottom: '1px solid var(--app-border)' }}
                       >
-                        {r.restaurantName} — usually orders {r.label} on {r.dayName}s.
+                        {t('widgets.atRisk.pattern', {
+                          restaurantName: r.restaurantName,
+                          label: r.label,
+                          dayName: r.dayName,
+                        })}
                       </li>
                     )
                   )}
@@ -629,34 +712,44 @@ export function DashboardWidgetGrid(props: any) {
 
           {isSupplier && growthMetrics ? (
             <SectionCard
-              title="Customer Growth"
+              title={t('widgets.customerGrowth.title')}
               action={
                 <Link
                   to="/app/customer-growth"
                   style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}
                 >
-                  Manage →
+                  {t('widgets.customerGrowth.manage')}
                 </Link>
               }
             >
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
-                  <span className="text-[var(--text-muted)]">Imported</span>
+                  <span className="text-[var(--text-muted)]">
+                    {t('widgets.customerGrowth.imported')}
+                  </span>
                   <div className="font-semibold">{growthMetrics.importedCustomers}</div>
                 </div>
                 <div>
-                  <span className="text-[var(--text-muted)]">Converted</span>
+                  <span className="text-[var(--text-muted)]">
+                    {t('widgets.customerGrowth.converted')}
+                  </span>
                   <div className="font-semibold">{growthMetrics.convertedCustomers}</div>
                 </div>
                 <div>
-                  <span className="text-[var(--text-muted)]">Invited</span>
+                  <span className="text-[var(--text-muted)]">
+                    {t('widgets.customerGrowth.invited')}
+                  </span>
                   <div className="font-semibold">{growthMetrics.invitedCustomers}</div>
                 </div>
                 <div>
-                  <span className="text-[var(--text-muted)]">Rewards</span>
+                  <span className="text-[var(--text-muted)]">
+                    {t('widgets.customerGrowth.rewards')}
+                  </span>
                   <div className="font-semibold flex items-center gap-1">
                     <Users className="h-3 w-3" />
-                    {growthMetrics.rewardsEarned.freeMonths} mo
+                    {t('widgets.customerGrowth.freeMonths', {
+                      count: growthMetrics.rewardsEarned.freeMonths,
+                    })}
                   </div>
                 </div>
               </div>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Button } from '../ui/button'
@@ -35,6 +36,7 @@ export function AdminTenantPicker({
   onOrgMainOnlyChange,
   showTypeFilter = true,
 }: Props) {
+  const { t } = useTranslation('admin')
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -74,8 +76,8 @@ export function AdminTenantPicker({
               }}
             >
               <SelectTrigger className="mt-1 w-full">
-                <option value="RESTAURANT">Restaurant</option>
-                <option value="SUPPLIER">Supplier</option>
+                <option value="RESTAURANT">{t('common.restaurant')}</option>
+                <option value="SUPPLIER">{t('common.supplier')}</option>
               </SelectTrigger>
             </Select>
           </div>
@@ -86,7 +88,7 @@ export function AdminTenantPicker({
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--text-muted)]" />
             <Input
               className="pl-9 pr-9"
-              placeholder="Name, slug, email, plan, or ID…"
+              placeholder={t('tenantPicker.searchExtendedPlaceholder')}
               value={open ? query : selected ? selected.name : query}
               onChange={(e) => {
                 setQuery(e.target.value)
@@ -106,7 +108,7 @@ export function AdminTenantPicker({
                   onSelect(null)
                   setOpen(false)
                 }}
-                aria-label="Clear tenant"
+                aria-label={t('tenantPicker.clearTenantAriaLabel')}
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -135,7 +137,9 @@ export function AdminTenantPicker({
       {open && (
         <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg max-h-64 overflow-y-auto">
           {loading ? (
-            <p className="px-3 py-4 text-sm text-[var(--text-muted)]">Loading tenants…</p>
+            <p className="px-3 py-4 text-sm text-[var(--text-muted)]">
+              {t('tenantPicker.loadingTenants')}
+            </p>
           ) : filtered.length === 0 ? (
             <p className="px-3 py-4 text-sm text-[var(--text-muted)]">
               No tenants match your search.

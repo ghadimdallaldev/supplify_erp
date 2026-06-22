@@ -1,15 +1,17 @@
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { useGetAdminSupportConversationsQuery } from '../../services/api'
 import { AppPanel } from '../ui/app-panel'
 import { Skeleton } from '../ui/skeleton'
 
 export function AdminSupportChatPanel() {
+  const { t } = useTranslation('admin')
   const { data, isLoading } = useGetAdminSupportConversationsQuery()
 
   const conversations = data?.conversations ?? []
 
   return (
-    <AppPanel title="Support conversations" testId="admin-support-chat-panel">
+    <AppPanel title={t('supportChat.title')} testId="admin-support-chat-panel">
       {isLoading ? (
         <Skeleton className="h-20 w-full" />
       ) : conversations.length === 0 ? (

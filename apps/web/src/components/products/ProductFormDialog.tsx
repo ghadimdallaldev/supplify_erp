@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogContent,
@@ -46,48 +47,65 @@ export function ProductFormDialog({
   isCreating,
   isUploadingImage,
 }: ProductFormDialogProps) {
+  const { t } = useTranslation('products')
+  const unitOptions = [
+    'kg',
+    'g',
+    'lb',
+    'oz',
+    'liter',
+    'ml',
+    'pack',
+    'bottle',
+    'box',
+    'carton',
+    'bag',
+    'piece',
+    'can',
+    'jar',
+    'unit',
+  ] as const
+
   return (
     <Dialog open={showAddProduct} onOpenChange={setShowAddProduct}>
       <DialogContent size="lg">
         <DialogHeader>
-          <DialogTitle>Add New Product</DialogTitle>
-          <DialogDescription>
-            Add a new product to your catalog. Fill in all required fields.
-          </DialogDescription>
+          <DialogTitle>{t('form.title')}</DialogTitle>
+          <DialogDescription>{t('form.description')}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Product Name *</Label>
+              <Label htmlFor="name">{t('form.productName')}</Label>
               <Input
                 id="name"
-                placeholder="e.g., Fresh Tomatoes"
+                placeholder={t('form.productNamePlaceholder')}
                 value={productForm.name}
                 onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sku">SKU *</Label>
+              <Label htmlFor="sku">{t('form.sku')}</Label>
               <Input
                 id="sku"
-                placeholder="e.g., FT001"
+                placeholder={t('form.skuPlaceholder')}
                 value={productForm.sku}
                 onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
               />
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">{t('form.descriptionLabel')}</Label>
             <Input
               id="description"
-              placeholder="Product description"
+              placeholder={t('form.descriptionPlaceholder')}
               value={productForm.description}
               onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="category_id">Category *</Label>
+              <Label htmlFor="category_id">{t('form.category')}</Label>
               <Select
                 value={productForm.category_id}
                 onValueChange={(value) =>
@@ -95,7 +113,7 @@ export function ProductFormDialog({
                 }
               >
                 <SelectTrigger id="category_id">
-                  <option value="">Select category</option>
+                  <option value="">{t('form.selectCategory')}</option>
                   {categoriesData?.categories?.map((cat) => (
                     <option key={cat.id} value={cat.id}>
                       {cat.name}
@@ -105,62 +123,52 @@ export function ProductFormDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="unit">Unit *</Label>
+              <Label htmlFor="unit">{t('form.unit')}</Label>
               <Select
                 value={productForm.unit}
                 onValueChange={(value) => setProductForm({ ...productForm, unit: value })}
               >
                 <SelectTrigger id="unit">
-                  <option value="">Select unit</option>
-                  <option value="kg">Kilogram (kg)</option>
-                  <option value="g">Gram (g)</option>
-                  <option value="lb">Pound (lb)</option>
-                  <option value="oz">Ounce (oz)</option>
-                  <option value="liter">Liter (L)</option>
-                  <option value="ml">Milliliter (ml)</option>
-                  <option value="pack">Pack</option>
-                  <option value="bottle">Bottle</option>
-                  <option value="box">Box</option>
-                  <option value="carton">Carton</option>
-                  <option value="bag">Bag</option>
-                  <option value="piece">Piece</option>
-                  <option value="can">Can</option>
-                  <option value="jar">Jar</option>
-                  <option value="unit">Unit</option>
+                  <option value="">{t('form.selectUnit')}</option>
+                  {unitOptions.map((unit) => (
+                    <option key={unit} value={unit}>
+                      {t(`form.units.${unit}`)}
+                    </option>
+                  ))}
                 </SelectTrigger>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="price">Price (USD) *</Label>
+              <Label htmlFor="price">{t('form.price')}</Label>
               <Input
                 id="price"
                 type="number"
                 step="0.01"
-                placeholder="0.00"
+                placeholder={t('form.pricePlaceholder')}
                 value={productForm.price}
                 onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
               />
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="initialStock">Initial Stock Quantity *</Label>
+            <Label htmlFor="initialStock">{t('form.initialStock')}</Label>
             <Input
               id="initialStock"
               type="number"
               step="0.01"
-              placeholder="0"
+              placeholder={t('form.initialStockPlaceholder')}
               value={productForm.initialStock}
               onChange={(e) => setProductForm({ ...productForm, initialStock: e.target.value })}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="warehouse">Warehouse (Optional)</Label>
+            <Label htmlFor="warehouse">{t('form.warehouse')}</Label>
             <Select
               value={productForm.warehouse_id}
               onValueChange={(value) => setProductForm({ ...productForm, warehouse_id: value })}
             >
               <SelectTrigger id="warehouse">
-                <option value="">Select a warehouse (optional)</option>
+                <option value="">{t('form.selectWarehouse')}</option>
                 {warehousesData?.warehouses?.map((warehouse: any) => (
                   <option key={warehouse.id} value={warehouse.id}>
                     {warehouse.name} {warehouse.code ? `(${warehouse.code})` : ''}
@@ -172,11 +180,11 @@ export function ProductFormDialog({
 
           {/* Tags Input */}
           <div className="space-y-2">
-            <Label htmlFor="tags">Tags (comma-separated)</Label>
+            <Label htmlFor="tags">{t('form.tags')}</Label>
             <div className="flex gap-2">
               <Input
                 id="tags"
-                placeholder="e.g., organic, fresh, local"
+                placeholder={t('form.tagsPlaceholder')}
                 value={newTag}
                 onChange={(e) => setNewTag(e.target.value)}
                 onKeyDown={(e) => {
@@ -205,7 +213,7 @@ export function ProductFormDialog({
                   }
                 }}
               >
-                Add
+                {t('form.addTag')}
               </Button>
             </div>
             {productForm.tags.length > 0 && (
@@ -229,7 +237,7 @@ export function ProductFormDialog({
             )}
             {tagsData?.tags && tagsData.tags.length > 0 && (
               <div className="mt-2">
-                <p className="text-xs text-[var(--text-muted)] mb-1">Suggested tags:</p>
+                <p className="text-xs text-[var(--text-muted)] mb-1">{t('form.suggestedTags')}</p>
                 <div className="flex flex-wrap gap-1">
                   {tagsData.tags.slice(0, 10).map((tag) => (
                     <Badge
@@ -251,7 +259,7 @@ export function ProductFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="productImage">Product Image</Label>
+            <Label htmlFor="productImage">{t('form.productImage')}</Label>
             <div className="flex items-center gap-4">
               <Input
                 id="productImage"
@@ -262,21 +270,23 @@ export function ProductFormDialog({
               />
               {imagePreview && (
                 <div className="relative w-24 h-24 rounded-md overflow-hidden border">
-                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                  <img
+                    src={imagePreview}
+                    alt={t('form.imagePreviewAlt')}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
               )}
             </div>
-            <p className="text-sm text-[var(--text-muted)]">
-              Recommended: Square image, max 5MB. Formats: JPG, PNG, WebP
-            </p>
+            <p className="text-sm text-[var(--text-muted)]">{t('form.imageHint')}</p>
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setShowAddProduct(false)}>
-            Cancel
+            {t('form.cancel')}
           </Button>
           <Button onClick={handleSubmitProduct} disabled={isCreating || isUploadingImage}>
-            {isCreating || isUploadingImage ? 'Creating...' : 'Create Product'}
+            {isCreating || isUploadingImage ? t('form.creating') : t('form.createProduct')}
           </Button>
         </DialogFooter>
       </DialogContent>

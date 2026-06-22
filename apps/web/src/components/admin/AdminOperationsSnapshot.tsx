@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
 import {
   AlertCircle,
@@ -44,6 +45,7 @@ export function AdminOperationsSnapshot({
   onNavigateTab?: (tab: string) => void
   onOperationsSubTab?: (subTab: 'email' | 'fulfillment' | 'gps' | 'inventory') => void
 }) {
+  const { t } = useTranslation('admin')
   const navigateOps = (subTab: 'email' | 'fulfillment' | 'gps' | 'inventory') => {
     onOperationsSubTab?.(subTab)
     onNavigateTab?.('operations')
@@ -51,41 +53,41 @@ export function AdminOperationsSnapshot({
 
   return (
     <AppPanel
-      title="Operations snapshot"
-      description="Daily platform activity and operational health"
+      title={t('operationsSnapshot.title')}
+      description={t('operationsSnapshot.description')}
       testId="admin-operations-snapshot"
       className="mb-4"
     >
       <div>
-        <SnapshotGroup title="Orders & activity">
+        <SnapshotGroup title={t('operationsSnapshot.ordersActivity')}>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
             <AdminKpiCard
-              label="Orders today"
+              label={t('operationsSnapshot.ordersToday')}
               value={overview?.orders?.today ?? 0}
               icon={ListOrdered}
               tone="brand"
             />
             <AdminKpiCard
-              label="Orders this week"
+              label={t('operationsSnapshot.ordersWeek')}
               value={overview?.orders?.week ?? 0}
               icon={ListOrdered}
               tone="neutral"
             />
             <AdminKpiCard
-              label="Orders this month"
+              label={t('operationsSnapshot.ordersMonth')}
               value={overview?.orders?.month ?? 0}
               icon={ListOrdered}
               tone="neutral"
             />
             <AdminKpiCard
-              label="Active carts"
+              label={t('operationsSnapshot.activeCarts')}
               value={overview?.activeCarts ?? 0}
-              description="Draft orders with items"
+              description={t('operationsSnapshot.activeCartsDescription')}
               icon={ShoppingCart}
               tone="brand"
             />
             <AdminKpiCard
-              label="Chats 24h"
+              label={t('operationsSnapshot.chats24h')}
               value={overview?.chatsLast24h ?? 0}
               icon={MessageSquare}
               tone="success"
@@ -93,30 +95,30 @@ export function AdminOperationsSnapshot({
           </div>
         </SnapshotGroup>
 
-        <SnapshotGroup title="Reservations & catalog" divided>
+        <SnapshotGroup title={t('operationsSnapshot.reservationsCatalog')} divided>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <AdminKpiCard
-              label="Reservations today"
+              label={t('operationsSnapshot.reservationsToday')}
               value={overview?.reservations?.today ?? 0}
               icon={Calendar}
               tone="success"
             />
             <AdminKpiCard
-              label="Active products"
+              label={t('operationsSnapshot.activeProducts')}
               value={overview?.totalActiveProducts ?? 0}
               icon={Package}
               tone="brand"
             />
             <AdminKpiCard
-              label="Quick lists"
+              label={t('operationsSnapshot.quickLists')}
               value={overview?.totalQuickLists ?? 0}
               icon={ListOrdered}
               tone="neutral"
             />
             <AdminKpiCard
-              label="Pending deals"
+              label={t('operationsSnapshot.pendingDeals')}
               value={overview?.alerts?.pendingDealApprovals ?? 0}
-              description="Awaiting approval"
+              description={t('operationsSnapshot.pendingDealsDescription')}
               icon={Tag}
               tone="warning"
             />
@@ -124,20 +126,20 @@ export function AdminOperationsSnapshot({
         </SnapshotGroup>
 
         {overview?.aiReorder ? (
-          <SnapshotGroup title="AI reorder" divided>
+          <SnapshotGroup title={t('operationsSnapshot.aiReorder')} divided>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
               <AdminKpiCard
-                label="AI requests 24h"
+                label={t('operationsSnapshot.aiRequests24h')}
                 value={overview.aiReorder.requests24h ?? 0}
                 icon={Sparkles}
                 tone="brand"
               />
               <AdminKpiCard
-                label="Success rate"
+                label={t('operationsSnapshot.successRate')}
                 value={
                   overview.aiReorder.successRate != null
                     ? `${Math.round(overview.aiReorder.successRate)}%`
-                    : 'N/A'
+                    : t('operationsSnapshot.notAvailableShort')
                 }
                 icon={Sparkles}
                 tone={
@@ -147,9 +149,13 @@ export function AdminOperationsSnapshot({
                 }
               />
               <AdminKpiCard
-                label="AI enabled"
-                value={overview.aiReorder.aiEnabled ? 'On' : 'Off'}
-                description="Platform LLM kill switch"
+                label={t('operationsSnapshot.aiEnabled')}
+                value={
+                  overview.aiReorder.aiEnabled
+                    ? t('operationsSnapshot.on')
+                    : t('operationsSnapshot.off')
+                }
+                description={t('operationsSnapshot.aiEnabledDescription')}
                 icon={Sparkles}
                 tone={overview.aiReorder.aiEnabled ? 'success' : 'neutral'}
               />
@@ -157,11 +163,11 @@ export function AdminOperationsSnapshot({
           </SnapshotGroup>
         ) : null}
 
-        <SnapshotGroup title="Operational health" divided>
+        <SnapshotGroup title={t('operationsSnapshot.operationalHealth')} divided>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
             <button type="button" className="text-left" onClick={() => navigateOps('email')}>
               <AdminKpiCard
-                label="Failed emails 24h"
+                label={t('operationsSnapshot.failedEmails24h')}
                 value={overview?.operational?.emailFailed24h ?? 0}
                 icon={Mail}
                 tone={(overview?.operational?.emailFailed24h ?? 0) >= 5 ? 'warning' : 'neutral'}
@@ -170,7 +176,7 @@ export function AdminOperationsSnapshot({
             </button>
             <button type="button" className="text-left" onClick={() => navigateOps('fulfillment')}>
               <AdminKpiCard
-                label="Fulfillment issues"
+                label={t('operationsSnapshot.fulfillmentIssues')}
                 value={overview?.operational?.openFulfillmentIssues ?? 0}
                 icon={Package}
                 tone={
@@ -181,7 +187,7 @@ export function AdminOperationsSnapshot({
             </button>
             <button type="button" className="text-left" onClick={() => navigateOps('gps')}>
               <AdminKpiCard
-                label="Stale GPS"
+                label={t('operationsSnapshot.staleGps')}
                 value={overview?.operational?.staleGpsDeliveries ?? 0}
                 icon={MapPin}
                 tone={
@@ -192,7 +198,7 @@ export function AdminOperationsSnapshot({
             </button>
             <button type="button" className="text-left" onClick={() => onNavigateTab?.('health')}>
               <AdminKpiCard
-                label="System errors"
+                label={t('operationsSnapshot.systemErrors')}
                 value={recentErrorCount}
                 icon={AlertCircle}
                 tone={recentErrorCount > 0 ? 'danger' : 'success'}
@@ -200,16 +206,16 @@ export function AdminOperationsSnapshot({
               />
             </button>
             <AdminKpiCard
-              label="Tenants over limit"
+              label={t('operationsSnapshot.tenantsOverLimit')}
               value={
                 typeof overview?.tenantsOverLimit === 'number'
                   ? overview.tenantsOverLimit
-                  : 'Not available'
+                  : t('common.notAvailable')
               }
               description={
                 typeof overview?.tenantsNearLimit === 'number'
-                  ? `${overview.tenantsNearLimit} near limit`
-                  : 'From usage_meter aggregates'
+                  ? t('operationsSnapshot.tenantsNearLimit', { count: overview.tenantsNearLimit })
+                  : t('operationsSnapshot.fromUsageAggregates')
               }
               icon={AlertCircle}
               tone={

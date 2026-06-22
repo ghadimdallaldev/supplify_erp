@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
@@ -34,6 +35,7 @@ export function Sidebar({
   mobileOpen?: boolean
   onMobileClose?: () => void
 } = {}) {
+  const { t } = useTranslation('navigation')
   const location = useLocation()
   const { user } = useAppSelector((state) => state.auth)
   const { can, canAny } = usePermissions()
@@ -122,6 +124,9 @@ export function Sidebar({
     .toUpperCase()
     .slice(0, 2)
 
+  const roleKey = user?.role?.toLowerCase()
+  const roleLabel = roleKey ? t(`role.${roleKey}`, { defaultValue: roleKey }) : ''
+
   const badgeContext = {
     pendingOrders,
     unreadCount,
@@ -133,13 +138,13 @@ export function Sidebar({
   return (
     <aside
       data-testid="sidebar"
-      aria-label="Main navigation"
+      aria-label={t('sidebar.mainNavAriaLabel')}
       className={[
         'flex flex-col border-e border-[var(--app-border)]/40 bg-[var(--surface)] font-sans',
         'h-screen overflow-y-auto',
         'fixed inset-y-0 start-0 z-50 w-[min(100vw-3rem,14rem)] lg:sticky lg:w-56 lg:translate-x-0',
         'transition-transform duration-200',
-        mobileOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full lg:translate-x-0',
+        mobileOpen ? 'translate-x-0' : 'max-lg:-translate-x-full max-lg:rtl:translate-x-full',
       ].join(' ')}
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
@@ -149,7 +154,7 @@ export function Sidebar({
 
       <nav
         style={{ flex: 1, padding: '6px 10px', display: 'flex', flexDirection: 'column' }}
-        aria-label="Application sections"
+        aria-label={t('sidebar.sectionsAriaLabel')}
       >
         {sections.map((section) => (
           <SidebarNavSection
@@ -197,9 +202,7 @@ export function Sidebar({
           >
             {user?.displayName || user?.email}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-            {user?.role?.toLowerCase()}
-          </div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{roleLabel}</div>
         </div>
         {planLabel && (
           <span

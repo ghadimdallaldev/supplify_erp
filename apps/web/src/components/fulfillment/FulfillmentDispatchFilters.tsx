@@ -1,18 +1,10 @@
+import { useTranslation } from 'react-i18next'
 import { Filter } from 'lucide-react'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import type { DispatchFilters } from './fulfillmentDispatchUtils'
 import { DISPATCH_FILTER_ALL } from './fulfillmentDispatchUtils'
-
-const STATUS_OPTIONS = [
-  { value: DISPATCH_FILTER_ALL, label: 'All statuses' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'out_for_delivery', label: 'Out for delivery' },
-  { value: 'delivered', label: 'Delivered' },
-  { value: 'failed', label: 'Failed' },
-  { value: 'rescheduled', label: 'Rescheduled' },
-] as const
 
 type DriverOption = { id: string; full_name?: string; fullName?: string }
 
@@ -24,7 +16,17 @@ type Props = {
 }
 
 export function FulfillmentDispatchFilters({ filters, onChange, onClear, drivers }: Props) {
+  const { t } = useTranslation('fulfillment')
   const set = (patch: Partial<DispatchFilters>) => onChange({ ...filters, ...patch })
+
+  const statusOptions = [
+    { value: DISPATCH_FILTER_ALL, label: t('dispatch.filters.allStatuses') },
+    { value: 'pending', label: t('dispatch.filters.statusPending') },
+    { value: 'out_for_delivery', label: t('dispatch.filters.statusOutForDelivery') },
+    { value: 'delivered', label: t('dispatch.filters.statusDelivered') },
+    { value: 'failed', label: t('dispatch.filters.statusFailed') },
+    { value: 'rescheduled', label: t('dispatch.filters.statusRescheduled') },
+  ] as const
 
   return (
     <div
@@ -33,7 +35,7 @@ export function FulfillmentDispatchFilters({ filters, onChange, onClear, drivers
     >
       <div className="mb-3 flex items-center gap-2">
         <Filter className="h-4 w-4 text-[var(--brand-mid)]" aria-hidden />
-        <p className="text-sm font-semibold text-[var(--text)]">Filters</p>
+        <p className="text-sm font-semibold text-[var(--text)]">{t('dispatch.filters.title')}</p>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto] lg:items-end">
         <div className="min-w-0">
@@ -41,7 +43,7 @@ export function FulfillmentDispatchFilters({ filters, onChange, onClear, drivers
             htmlFor="dispatch-filter-date"
             className="mb-1 block text-xs font-medium text-[var(--text-mid)]"
           >
-            Date
+            {t('dispatch.filters.date')}
           </label>
           <Input
             id="dispatch-filter-date"
@@ -54,13 +56,15 @@ export function FulfillmentDispatchFilters({ filters, onChange, onClear, drivers
         </div>
 
         <div className="min-w-0">
-          <span className="mb-1 block text-xs font-medium text-[var(--text-mid)]">Status</span>
+          <span className="mb-1 block text-xs font-medium text-[var(--text-mid)]">
+            {t('dispatch.filters.status')}
+          </span>
           <Select value={filters.status} onValueChange={(status) => set({ status })}>
             <SelectTrigger data-testid="delivery-filter-status" className="w-full">
-              <SelectValue placeholder="Status" />
+              <SelectValue placeholder={t('dispatch.filters.status')} />
             </SelectTrigger>
             <SelectContent>
-              {STATUS_OPTIONS.map((o) => (
+              {statusOptions.map((o) => (
                 <SelectItem key={o.value} value={o.value}>
                   {o.label}
                 </SelectItem>
@@ -70,16 +74,20 @@ export function FulfillmentDispatchFilters({ filters, onChange, onClear, drivers
         </div>
 
         <div className="min-w-0">
-          <span className="mb-1 block text-xs font-medium text-[var(--text-mid)]">Driver</span>
+          <span className="mb-1 block text-xs font-medium text-[var(--text-mid)]">
+            {t('dispatch.filters.driver')}
+          </span>
           <Select value={filters.driverId} onValueChange={(driverId) => set({ driverId })}>
             <SelectTrigger data-testid="delivery-filter-driver" className="w-full">
-              <SelectValue placeholder="Driver" />
+              <SelectValue placeholder={t('dispatch.filters.driver')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={DISPATCH_FILTER_ALL}>All drivers</SelectItem>
+              <SelectItem value={DISPATCH_FILTER_ALL}>
+                {t('dispatch.filters.allDrivers')}
+              </SelectItem>
               {drivers.map((d) => (
                 <SelectItem key={d.id} value={d.id}>
-                  {d.full_name ?? d.fullName ?? 'Driver'}
+                  {d.full_name ?? d.fullName ?? t('dispatch.driverFallback')}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -91,12 +99,12 @@ export function FulfillmentDispatchFilters({ filters, onChange, onClear, drivers
             htmlFor="dispatch-filter-area"
             className="mb-1 block text-xs font-medium text-[var(--text-mid)]"
           >
-            Area
+            {t('dispatch.filters.area')}
           </label>
           <Input
             id="dispatch-filter-area"
             data-testid="delivery-filter-area"
-            placeholder="Delivery area"
+            placeholder={t('dispatch.filters.areaPlaceholder')}
             value={filters.area}
             onChange={(e) => set({ area: e.target.value })}
             className="w-full"
@@ -112,7 +120,7 @@ export function FulfillmentDispatchFilters({ filters, onChange, onClear, drivers
             data-testid="delivery-filter-clear"
             onClick={onClear}
           >
-            Clear filters
+            {t('dispatch.filters.clearFilters')}
           </Button>
         </div>
       </div>

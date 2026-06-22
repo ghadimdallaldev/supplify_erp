@@ -1,9 +1,11 @@
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Crosshair, ExternalLink, MapPin, Radio } from 'lucide-react'
 import { Button } from '../ui/button'
 import { googleMapsApiKey, mapProvider } from '../../lib/env'
 import { googleMapsSearchUrl, isValidCoord, toMapPoint } from '../../lib/deliveryMapUtils'
 import { useDeliveryLeafletMap, type DeliveryMapMarker } from './useDeliveryLeafletMap'
+import { ensureNamespace } from '../../i18n'
 
 type Props = {
   /** Driver latest GPS latitude */
@@ -43,11 +45,19 @@ export function DeliveryTrackingMap({
   liveStatusLine,
   showCoordinateDetails = false,
 }: Props) {
+  const { t } = useTranslation('fulfillment')
+
+  useEffect(() => {
+    void ensureNamespace('fulfillment')
+  }, [])
+
   const driverPoint = toMapPoint(latitude, longitude)
   const destinationPoint =
     showDestinationPin && isValidCoord(destinationLatitude, destinationLongitude)
       ? toMapPoint(destinationLatitude, destinationLongitude)
       : null
+
+  const deliveryLocationLabel = destinationLabel?.trim() || t('tracking.map.deliveryLocation')
 
   const markers = useMemo((): DeliveryMapMarker[] => {
     const list: DeliveryMapMarker[] = []
@@ -56,22 +66,21 @@ export function DeliveryTrackingMap({
         id: 'driver',
         point: driverPoint,
         kind: live ? 'driver-live' : gpsStale ? 'driver-stale' : 'driver-none',
-        label: 'Driver',
-        popupHtml: '<strong>Driver</strong><br/>Latest GPS',
+        label: t('tracking.map.driver'),
+        popupHtml: `<strong>${t('tracking.map.driver')}</strong><br/>${t('tracking.map.driverPopupGps')}`,
       })
     }
     if (destinationPoint) {
-      const label = destinationLabel?.trim() || 'Delivery location'
       list.push({
         id: 'destination',
         point: destinationPoint,
         kind: 'destination',
-        label,
-        popupHtml: `<strong>${label.replace(/</g, '&lt;')}</strong>`,
+        label: deliveryLocationLabel,
+        popupHtml: `<strong>${deliveryLocationLabel.replace(/</g, '&lt;')}</strong>`,
       })
     }
     return list
-  }, [driverPoint, destinationPoint, destinationLabel, live, gpsStale])
+  }, [driverPoint, destinationPoint, deliveryLocationLabel, live, gpsStale, t])
 
   const { containerRef, fitToMarkers } = useDeliveryLeafletMap({ markers })
 
@@ -81,7 +90,7 @@ export function DeliveryTrackingMap({
   if (!hasDriver && !hasDestination) {
     return (
       <p className="text-sm text-[var(--text-muted)]" data-testid="delivery-tracking-map-empty">
-        No GPS location received yet
+        {t('tracking.map.noGpsLocation')}
       </p>
     )
   }
@@ -89,7 +98,9 @@ export function DeliveryTrackingMap({
   const openMapsTarget = driverPoint ?? destinationPoint!
   const mapsUrl = googleMapsSearchUrl(openMapsTarget.lat, openMapsTarget.lng)
   const mapModeLabel =
-    mapProvider === 'google' && googleMapsApiKey ? 'Google Maps' : 'OpenStreetMap'
+    mapProvider === 'google' && googleMapsApiKey
+      ? t('tracking.map.googleMaps')
+      : t('tracking.map.openStreetMap')
 
   return (
     <div className={`space-y-2 ${className}`} data-testid="delivery-tracking-map">
@@ -100,7 +111,7 @@ export function DeliveryTrackingMap({
             data-testid="delivery-tracking-map-live"
           >
             <Radio className="h-3 w-3" aria-hidden />
-            Live now
+            {t('tracking.map.liveNow')}
           </span>
         )}
         <Button
@@ -110,17 +121,17 @@ export function DeliveryTrackingMap({
           className="absolute right-2 top-2 z-[500] min-h-[44px] gap-1.5 px-3 text-sm font-semibold shadow"
           data-testid="delivery-tracking-map-recenter"
           onClick={() => fitToMarkers()}
-          aria-label="Recenter map"
+          aria-label={t('tracking.map.recenterAriaLabel')}
         >
           <Crosshair className="h-4 w-4" aria-hidden />
-          Recenter
+          {t('tracking.map.recenter')}
         </Button>
         <div
           ref={containerRef}
           className={`block w-full ${heightClassName}`}
           data-testid="delivery-tracking-map-canvas"
           role="img"
-          aria-label="Delivery map"
+          aria-label={t('tracking.map.mapAriaLabel')}
         />
         <div
           className="pointer-events-none absolute bottom-1 left-1 z-[500] flex flex-wrap gap-2 px-1 text-[10px]"
@@ -129,13 +140,13 @@ export function DeliveryTrackingMap({
           {hasDriver ? (
             <span className="rounded bg-white/90 px-1.5 py-0.5 shadow dark:bg-black/70">
               <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 align-middle mr-1" />
-              Driver
+              {t('tracking.map.driver')}
             </span>
           ) : null}
           {hasDestination ? (
             <span className="rounded bg-white/90 px-1.5 py-0.5 shadow dark:bg-black/70">
               <span className="inline-block h-2 w-2 rounded-full bg-orange-500 align-middle mr-1" />
-              {destinationLabel?.trim() || 'Delivery location'}
+              {deliveryLocationLabel}
             </span>
           ) : null}
         </div>
@@ -146,7 +157,7 @@ export function DeliveryTrackingMap({
           className="text-sm text-[var(--text-muted)]"
           data-testid="delivery-tracking-map-waiting-gps"
         >
-          Waiting for driver location.
+          {t('tracking.map.waitingForDriver')}
         </p>
       ) : null}
 
@@ -155,7 +166,7 @@ export function DeliveryTrackingMap({
           className="text-sm text-[var(--text-muted)]"
           data-testid="delivery-tracking-map-no-destination"
         >
-          Delivery location not set
+          {t('tracking.map.deliveryLocationNotSet')}
         </p>
       ) : null}
 
@@ -180,7 +191,9 @@ export function DeliveryTrackingMap({
           )}
           {recordedAt ? (
             <span data-testid="delivery-tracking-map-updated">
-              Updated {new Date(recordedAt).toLocaleTimeString()}
+              {t('tracking.map.updated', {
+                time: new Date(recordedAt).toLocaleTimeString(),
+              })}
             </span>
           ) : null}
         </div>
@@ -192,10 +205,10 @@ export function DeliveryTrackingMap({
         rel="noreferrer"
         className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--brand-mid)] sm:w-auto sm:justify-start sm:border-0 sm:bg-transparent sm:px-0 sm:underline"
         data-testid="delivery-tracking-map-open"
-        aria-label="Open in maps"
+        aria-label={t('tracking.map.openInMapsAriaLabel')}
       >
         <MapPin className="h-4 w-4" aria-hidden />
-        Open in maps
+        {t('tracking.map.openInMaps')}
         <ExternalLink className="h-4 w-4" aria-hidden />
         <span className="sr-only">({mapModeLabel})</span>
       </a>
@@ -205,15 +218,23 @@ export function DeliveryTrackingMap({
           className="text-xs text-[var(--text-muted)]"
           data-testid="delivery-tracking-map-debug"
         >
-          <summary className="cursor-pointer select-none font-medium">Debug details</summary>
+          <summary className="cursor-pointer select-none font-medium">
+            {t('tracking.map.debugDetails')}
+          </summary>
           {driverPoint ? (
             <p className="mt-1 font-mono">
-              Driver: {driverPoint.lat.toFixed(5)}, {driverPoint.lng.toFixed(5)}
+              {t('tracking.map.driverCoordinates', {
+                lat: driverPoint.lat.toFixed(5),
+                lng: driverPoint.lng.toFixed(5),
+              })}
             </p>
           ) : null}
           {destinationPoint ? (
             <p className="font-mono">
-              Destination: {destinationPoint.lat.toFixed(5)}, {destinationPoint.lng.toFixed(5)}
+              {t('tracking.map.destinationCoordinates', {
+                lat: destinationPoint.lat.toFixed(5),
+                lng: destinationPoint.lng.toFixed(5),
+              })}
             </p>
           ) : null}
         </details>

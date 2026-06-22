@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Package, ShoppingCart } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 
 type Props = {
@@ -17,6 +18,8 @@ export function DashboardPostOnboardingBanners({
   totalOrders,
   totalProducts,
 }: Props) {
+  const { t } = useTranslation('dashboard')
+
   return (
     <>
       {isRestaurant && showRestaurantCta && totalOrders === 0 && (
@@ -32,10 +35,10 @@ export function DashboardPostOnboardingBanners({
         >
           <div className="min-w-0">
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-              You&apos;re all set
+              {t('onboarding.allSet')}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-              Create your first order to start receiving from suppliers.
+              {t('onboarding.restaurant.description')}
             </div>
           </div>
           <Button
@@ -49,7 +52,7 @@ export function DashboardPostOnboardingBanners({
           >
             <Link to="/app/cart">
               <ShoppingCart style={{ width: 14, height: 14, marginRight: 6 }} />
-              Create first order
+              {t('onboarding.restaurant.cta')}
             </Link>
           </Button>
         </div>
@@ -67,10 +70,10 @@ export function DashboardPostOnboardingBanners({
         >
           <div className="min-w-0">
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-              You&apos;re all set
+              {t('onboarding.allSet')}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-              Add your first product so restaurants can order from you.
+              {t('onboarding.supplier.description')}
             </div>
           </div>
           <Button
@@ -84,7 +87,7 @@ export function DashboardPostOnboardingBanners({
           >
             <Link to="/app/products">
               <Package style={{ width: 14, height: 14, marginRight: 6 }} />
-              Add first product
+              {t('onboarding.supplier.cta')}
             </Link>
           </Button>
         </div>

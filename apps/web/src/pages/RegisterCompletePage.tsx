@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader } from '../components/ui/card'
@@ -22,6 +23,7 @@ import {
 } from '../components/legal/LegalAcceptancePanel'
 import { buildLegalAcceptancePayload, type LegalDocumentSlug } from '../lib/legalDocuments'
 import { clearReferralToken } from '../lib/referralToken'
+import { ensureNamespace } from '../i18n'
 
 type AccountType = 'RESTAURANT' | 'SUPPLIER'
 
@@ -35,6 +37,7 @@ function isUnauthorized(error: unknown): boolean {
 }
 
 export function RegisterCompletePage() {
+  const { t } = useTranslation('onboarding')
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const referralToken = searchParams.get('ref') || undefined
@@ -65,7 +68,7 @@ export function RegisterCompletePage() {
   const [acceptedLegal, setAcceptedLegal] = useState<Set<LegalDocumentSlug>>(new Set())
   const [electronicSigned, setElectronicSigned] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [submitMessage, setSubmitMessage] = useState('Creating your workspace…')
+  const [submitMessage, setSubmitMessage] = useState('')
 
   const legalComplete = isLegalAcceptanceComplete(
     'registration',
@@ -73,6 +76,10 @@ export function RegisterCompletePage() {
     acceptedLegal,
     electronicSigned
   )
+
+  useEffect(() => {
+    void ensureNamespace('onboarding')
+  }, [])
 
   useEffect(() => {
     if (!user || user.role === 'ADMIN') return
@@ -95,23 +102,23 @@ export function RegisterCompletePage() {
 
   useEffect(() => {
     if (!submitting) {
-      setSubmitMessage('Creating your workspace…')
+      setSubmitMessage(t('registerComplete.creatingWorkspace'))
       return
     }
-    setSubmitMessage('Creating your workspace…')
-    const timer = window.setTimeout(() => setSubmitMessage('Almost done…'), 3000)
+    setSubmitMessage(t('registerComplete.creatingWorkspace'))
+    const timer = window.setTimeout(() => setSubmitMessage(t('registerComplete.almostDone')), 3000)
     return () => window.clearTimeout(timer)
-  }, [submitting])
+  }, [submitting, t])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     if (!accountType) {
-      setError('Please choose whether you are a restaurant or a supplier.')
+      setError(t('registerComplete.errors.chooseAccountType'))
       return
     }
     if (!legalComplete) {
-      setError('Please accept all required legal agreements before continuing.')
+      setError(t('registerComplete.errors.legalRequired'))
       return
     }
     try {
@@ -152,23 +159,19 @@ export function RegisterCompletePage() {
         } catch {
           // fall through to user-facing error
         }
-        setError(
-          'The server restarted while saving your profile. Your account may already be set up — refresh this page, or try submitting once more.'
-        )
+        setError(t('registerComplete.errors.serverRestart'))
         return
       }
 
       const message =
         (err as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Could not complete registration. Please try again.'
+        t('registerComplete.errors.generic')
       setError(message)
     }
   }
 
   const loadError =
-    statusIsError && !isUnauthorized(statusError)
-      ? 'Could not verify registration status. Refresh the page or try again in a moment.'
-      : null
+    statusIsError && !isUnauthorized(statusError) ? t('registerComplete.errors.statusVerify') : null
 
   const showSpinner = userLoading || !user || (statusLoading && !status)
 
@@ -185,8 +188,8 @@ export function RegisterCompletePage() {
       <Card className="w-full max-w-xl border-2 shadow-xl">
         <CardHeader className="pb-0">
           <PageHeader
-            title="Set up your organization"
-            description="Your Keycloak account is ready. Tell us how you will use Supplify."
+            title={t('registerComplete.title')}
+            description={t('registerComplete.description')}
             className="text-center sm:flex-col sm:items-center [&_p]:mx-auto"
           />
         </CardHeader>
@@ -199,7 +202,7 @@ export function RegisterCompletePage() {
             )}
 
             <div className="space-y-2">
-              <Label>I am a</Label>
+              <Label>{t('registerComplete.accountTypeLabel')}</Label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
@@ -211,7 +214,7 @@ export function RegisterCompletePage() {
                   }`}
                 >
                   <Store className="h-6 w-6" />
-                  <span className="text-sm font-medium">Restaurant</span>
+                  <span className="text-sm font-medium">{t('registerComplete.restaurant')}</span>
                 </button>
                 <button
                   type="button"
@@ -223,13 +226,13 @@ export function RegisterCompletePage() {
                   }`}
                 >
                   <Truck className="h-6 w-6" />
-                  <span className="text-sm font-medium">Supplier</span>
+                  <span className="text-sm font-medium">{t('registerComplete.supplier')}</span>
                 </button>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="businessName">Business name</Label>
+              <Label htmlFor="businessName">{t('registerComplete.businessNameLabel')}</Label>
               <div className="relative">
                 <Building2 className="absolute left-3 top-3 h-4 w-4 text-[var(--text-muted)]" />
                 <Input
@@ -237,7 +240,7 @@ export function RegisterCompletePage() {
                   className="pl-9"
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
-                  placeholder="Your company or venue name"
+                  placeholder={t('registerComplete.businessNamePlaceholder')}
                   required
                   minLength={2}
                 />
@@ -245,12 +248,12 @@ export function RegisterCompletePage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone (optional)</Label>
+              <Label htmlFor="phone">{t('registerComplete.phoneLabel')}</Label>
               <Input
                 id="phone"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+961 3 000 000"
+                placeholder={t('registerComplete.phonePlaceholder')}
               />
             </div>
 
@@ -275,7 +278,7 @@ export function RegisterCompletePage() {
                   {submitMessage}
                 </>
               ) : (
-                'Continue to Supplify'
+                t('registerComplete.submit')
               )}
             </Button>
           </form>

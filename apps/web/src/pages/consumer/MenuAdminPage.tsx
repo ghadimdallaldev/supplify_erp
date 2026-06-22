@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   useCreateConsumerMenuCategoryMutation,
   useCreateConsumerMenuItemMutation,
@@ -43,8 +44,15 @@ import {
 } from 'lucide-react'
 import { copyToClipboard } from '../../utils/clipboard'
 import { cn } from '../../lib/utils'
+import { ensureNamespace } from '../../i18n'
 
 export function MenuAdminPage() {
+  const { t } = useTranslation('consumer')
+
+  useEffect(() => {
+    void ensureNamespace('consumer')
+  }, [])
+
   const { data: me } = useGetRestaurantMeQuery()
   const [getPresignedUrl] = useGetPresignedUrlMutation()
   const { data, isLoading, refetch } = useGetConsumerMenuAdminQuery()
@@ -119,7 +127,10 @@ export function MenuAdminPage() {
   const [createZone, { isLoading: creatingZone }] = useCreateConsumerDeliveryZoneMutation()
   const [deleteZone] = useDeleteConsumerDeliveryZoneMutation()
 
-  const fulfillmentBranches = fulfillmentData?.branches ?? []
+  const fulfillmentBranches = useMemo(
+    () => fulfillmentData?.branches ?? [],
+    [fulfillmentData?.branches]
+  )
   const selectedFulfillmentBranch = useMemo(
     () =>
       fulfillmentBranches.find((b) => b.branchId === fulfillmentBranchId) ?? fulfillmentBranches[0],
@@ -164,10 +175,10 @@ export function MenuAdminPage() {
         liveOrderEnd: fulfillmentForm.liveOrderEnd,
         allowPreordersOutsideLiveHours: fulfillmentForm.allowPreordersOutsideLiveHours,
       }).unwrap()
-      toast.success('Fulfillment settings saved')
+      toast.success(t('menuAdmin.fulfillmentSaved'))
       refetchFulfillment()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to save fulfillment settings')
+      toast.error(error?.data?.error?.message || t('menuAdmin.unableSaveFulfillment'))
     }
   }
 
@@ -183,21 +194,21 @@ export function MenuAdminPage() {
         minOrderAmount: Number(zoneForm.minOrderAmount || 0),
       }).unwrap()
       setZoneForm({ name: '', postcodePrefix: '', deliveryFee: '0', minOrderAmount: '0' })
-      toast.success('Delivery zone created')
+      toast.success(t('menuAdmin.zoneCreated'))
       refetchFulfillment()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to create zone')
+      toast.error(error?.data?.error?.message || t('menuAdmin.unableCreateZone'))
     }
   }
 
   const handleDeleteZone = async (zoneId: string, zoneName: string) => {
-    if (!window.confirm(`Delete zone "${zoneName}"?`)) return
+    if (!window.confirm(t('menuAdmin.confirmDeleteZone', { name: zoneName }))) return
     try {
       await deleteZone(zoneId).unwrap()
-      toast.success('Zone deleted')
+      toast.success(t('menuAdmin.zoneDeleted'))
       refetchFulfillment()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to delete zone')
+      toast.error(error?.data?.error?.message || t('menuAdmin.unableDeleteZone'))
     }
   }
 
@@ -228,10 +239,10 @@ export function MenuAdminPage() {
         description: categoryForm.description.trim() || undefined,
       }).unwrap()
       setCategoryForm({ name: '', description: '' })
-      toast.success('Category created')
+      toast.success(t('menuAdmin.categoryCreated'))
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to create category')
+      toast.error(error?.data?.error?.message || t('menuAdmin.unableCreateCategory'))
     }
   }
 
@@ -253,10 +264,10 @@ export function MenuAdminPage() {
         description: '',
         imageUrl: null,
       })
-      toast.success('Item created')
+      toast.success(t('menuAdmin.itemCreated'))
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to create item')
+      toast.error(error?.data?.error?.message || t('menuAdmin.unableCreateItem'))
     }
   }
 
@@ -285,22 +296,22 @@ export function MenuAdminPage() {
         imageUrl: editForm.imageUrl,
       }).unwrap()
       setEditingItemId(null)
-      toast.success('Item updated')
+      toast.success(t('menuAdmin.itemUpdated'))
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to update item')
+      toast.error(error?.data?.error?.message || t('menuAdmin.unableUpdateItem'))
     }
   }
 
   const handleDeleteItem = async (itemId: string, itemName: string) => {
-    if (!window.confirm(`Delete "${itemName}"?`)) return
+    if (!window.confirm(t('menuAdmin.confirmDeleteItem', { name: itemName }))) return
     try {
       await deleteItem(itemId).unwrap()
       if (editingItemId === itemId) setEditingItemId(null)
-      toast.success('Item deleted')
+      toast.success(t('menuAdmin.itemDeleted'))
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to delete item')
+      toast.error(error?.data?.error?.message || t('menuAdmin.unableDeleteItem'))
     }
   }
 
@@ -322,21 +333,21 @@ export function MenuAdminPage() {
         maxSelections: '1',
         isRequired: false,
       })
-      toast.success('Modifier group created')
+      toast.success(t('menuAdmin.modifierGroupCreated'))
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to create modifier group')
+      toast.error(error?.data?.error?.message || t('menuAdmin.unableCreateModifierGroup'))
     }
   }
 
   const handleDeleteModifierGroup = async (groupId: string, groupName: string) => {
-    if (!window.confirm(`Delete modifier group "${groupName}"?`)) return
+    if (!window.confirm(t('menuAdmin.confirmDeleteModifierGroup', { name: groupName }))) return
     try {
       await deleteModifierGroup(groupId).unwrap()
-      toast.success('Modifier group deleted')
+      toast.success(t('menuAdmin.modifierGroupDeleted'))
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to delete modifier group')
+      toast.error(error?.data?.error?.message || t('menuAdmin.unableDeleteModifierGroup'))
     }
   }
 
@@ -350,21 +361,21 @@ export function MenuAdminPage() {
         priceDelta: Number(form.priceDelta || 0),
       }).unwrap()
       setOptionForms((prev) => ({ ...prev, [groupId]: { name: '', priceDelta: '0' } }))
-      toast.success('Option added')
+      toast.success(t('menuAdmin.optionAdded'))
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to add option')
+      toast.error(error?.data?.error?.message || t('menuAdmin.unableAddOption'))
     }
   }
 
   const handleDeleteModifierOption = async (optionId: string, optionName: string) => {
-    if (!window.confirm(`Delete option "${optionName}"?`)) return
+    if (!window.confirm(t('menuAdmin.confirmDeleteOption', { name: optionName }))) return
     try {
       await deleteModifierOption(optionId).unwrap()
-      toast.success('Option deleted')
+      toast.success(t('menuAdmin.optionDeleted'))
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to delete option')
+      toast.error(error?.data?.error?.message || t('menuAdmin.unableDeleteOption'))
     }
   }
 
@@ -408,19 +419,16 @@ export function MenuAdminPage() {
   return (
     <RequirePermission permission="CATALOG_VIEW">
       <PageShell>
-        <PageHeader
-          title="Consumer menu"
-          description="Manage your guest-facing menu for online ordering."
-        />
+        <PageHeader title={t('menuAdmin.title')} description={t('menuAdmin.description')} />
 
         {slug && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Link2 className="h-4 w-4" />
-                Public storefront
+                {t('menuAdmin.publicStorefront')}
               </CardTitle>
-              <CardDescription>Share this link with guests.</CardDescription>
+              <CardDescription>{t('menuAdmin.shareLink')}</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-2 sm:flex-row">
               <Input readOnly value={publicUrl} />
@@ -429,11 +437,11 @@ export function MenuAdminPage() {
                 variant="outline"
                 onClick={async () => {
                   const ok = await copyToClipboard(publicUrl)
-                  if (ok) toast.success('Link copied')
+                  if (ok) toast.success(t('menuAdmin.linkCopied'))
                 }}
               >
                 <Copy className="mr-2 h-4 w-4" />
-                Copy
+                {t('common.copy')}
               </Button>
             </CardContent>
           </Card>
@@ -441,17 +449,15 @@ export function MenuAdminPage() {
 
         <Tabs value={adminTab} onValueChange={setAdminTab}>
           <TabsList>
-            <TabsTrigger value="menu">Menu</TabsTrigger>
-            <TabsTrigger value="fulfillment">Fulfillment</TabsTrigger>
+            <TabsTrigger value="menu">{t('menuAdmin.tabMenu')}</TabsTrigger>
+            <TabsTrigger value="fulfillment">{t('menuAdmin.tabFulfillment')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="fulfillment" className="mt-6 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Fulfillment settings</CardTitle>
-                <CardDescription>
-                  Configure delivery, takeaway, dine-in, and prep times per branch.
-                </CardDescription>
+                <CardTitle>{t('menuAdmin.fulfillmentSettings')}</CardTitle>
+                <CardDescription>{t('menuAdmin.fulfillmentDescription')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {loadingFulfillment ? (
@@ -459,7 +465,7 @@ export function MenuAdminPage() {
                 ) : fulfillmentBranches.length ? (
                   <>
                     <div className="space-y-1">
-                      <Label htmlFor="fulfillmentBranch">Branch</Label>
+                      <Label htmlFor="fulfillmentBranch">{t('common.branch')}</Label>
                       <select
                         id="fulfillmentBranch"
                         className="w-full rounded-md border bg-background px-3 py-2 text-sm"
@@ -483,7 +489,7 @@ export function MenuAdminPage() {
                               setFulfillmentForm((f) => ({ ...f, deliveryEnabled: checked }))
                             }
                           />
-                          Delivery
+                          {t('fulfillment.DELIVERY')}
                         </label>
                         <label className="flex items-center gap-2 text-sm">
                           <Switch
@@ -492,7 +498,7 @@ export function MenuAdminPage() {
                               setFulfillmentForm((f) => ({ ...f, takeawayEnabled: checked }))
                             }
                           />
-                          Takeaway
+                          {t('fulfillment.TAKEAWAY')}
                         </label>
                         <label className="flex items-center gap-2 text-sm">
                           <Switch
@@ -501,13 +507,13 @@ export function MenuAdminPage() {
                               setFulfillmentForm((f) => ({ ...f, dineInEnabled: checked }))
                             }
                           />
-                          Dine-in
+                          {t('fulfillment.DINE_IN')}
                         </label>
                       </div>
 
                       <div className="grid gap-3 sm:grid-cols-3">
                         <div className="space-y-1">
-                          <Label htmlFor="minOrder">Min order amount</Label>
+                          <Label htmlFor="minOrder">{t('menuAdmin.minOrderAmount')}</Label>
                           <Input
                             id="minOrder"
                             type="number"
@@ -520,7 +526,7 @@ export function MenuAdminPage() {
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label htmlFor="deliveryFee">Default delivery fee</Label>
+                          <Label htmlFor="deliveryFee">{t('menuAdmin.defaultDeliveryFee')}</Label>
                           <Input
                             id="deliveryFee"
                             type="number"
@@ -533,7 +539,7 @@ export function MenuAdminPage() {
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label htmlFor="prepMinutes">Est. prep (minutes)</Label>
+                          <Label htmlFor="prepMinutes">{t('menuAdmin.estPrepMinutes')}</Label>
                           <Input
                             id="prepMinutes"
                             type="number"
@@ -551,16 +557,14 @@ export function MenuAdminPage() {
 
                       <div className="rounded-lg border p-4 space-y-3">
                         <div>
-                          <p className="font-medium">Online ordering hours</p>
+                          <p className="font-medium">{t('menuAdmin.orderingHours')}</p>
                           <p className="text-sm text-muted-foreground">
-                            Live (ASAP) orders between these times. Outside this window, diners can
-                            only place preorders scheduled for the next opening time (e.g. 12:00–
-                            midnight live, midnight–12:00 preorders).
+                            {t('menuAdmin.orderingHoursDescription')}
                           </p>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
                           <div className="space-y-1">
-                            <Label htmlFor="liveOrderStart">Live orders from</Label>
+                            <Label htmlFor="liveOrderStart">{t('menuAdmin.liveOrdersFrom')}</Label>
                             <Input
                               id="liveOrderStart"
                               type="time"
@@ -574,7 +578,7 @@ export function MenuAdminPage() {
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label htmlFor="liveOrderEnd">Live orders until</Label>
+                            <Label htmlFor="liveOrderEnd">{t('menuAdmin.liveOrdersUntil')}</Label>
                             <Input
                               id="liveOrderEnd"
                               type="time"
@@ -591,7 +595,7 @@ export function MenuAdminPage() {
                               }
                             />
                             <p className="text-xs text-muted-foreground">
-                              Use 00:00 for midnight (end of day).
+                              {t('menuAdmin.midnightHint')}
                             </p>
                           </div>
                         </div>
@@ -605,17 +609,17 @@ export function MenuAdminPage() {
                               }))
                             }
                           />
-                          Allow preorders outside live hours
+                          {t('menuAdmin.allowPreorders')}
                         </label>
                       </div>
 
                       <Button type="submit" disabled={savingFulfillment}>
-                        Save fulfillment settings
+                        {t('menuAdmin.saveFulfillment')}
                       </Button>
                     </form>
                   </>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No branches configured.</p>
+                  <p className="text-sm text-muted-foreground">{t('common.noBranches')}</p>
                 )}
               </CardContent>
             </Card>
@@ -623,10 +627,8 @@ export function MenuAdminPage() {
             {fulfillmentBranchId && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Delivery zones</CardTitle>
-                  <CardDescription>
-                    Optional zones with custom fees and minimums for this branch.
-                  </CardDescription>
+                  <CardTitle>{t('menuAdmin.deliveryZones')}</CardTitle>
+                  <CardDescription>{t('menuAdmin.zonesDescription')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <form
@@ -634,28 +636,28 @@ export function MenuAdminPage() {
                     className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5"
                   >
                     <div className="space-y-1 sm:col-span-2">
-                      <Label htmlFor="zoneName">Zone name</Label>
+                      <Label htmlFor="zoneName">{t('menuAdmin.zoneName')}</Label>
                       <Input
                         id="zoneName"
                         value={zoneForm.name}
                         onChange={(e) => setZoneForm((f) => ({ ...f, name: e.target.value }))}
-                        placeholder="Central London"
+                        placeholder={t('menuAdmin.zoneNamePlaceholder')}
                         required
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="zonePostcode">Postcode prefix</Label>
+                      <Label htmlFor="zonePostcode">{t('menuAdmin.postcodePrefix')}</Label>
                       <Input
                         id="zonePostcode"
                         value={zoneForm.postcodePrefix}
                         onChange={(e) =>
                           setZoneForm((f) => ({ ...f, postcodePrefix: e.target.value }))
                         }
-                        placeholder="SW1"
+                        placeholder={t('menuAdmin.postcodePrefixPlaceholder')}
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="zoneFee">Delivery fee</Label>
+                      <Label htmlFor="zoneFee">{t('menuAdmin.zoneDeliveryFee')}</Label>
                       <Input
                         id="zoneFee"
                         type="number"
@@ -668,7 +670,7 @@ export function MenuAdminPage() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="zoneMin">Min order</Label>
+                      <Label htmlFor="zoneMin">{t('menuAdmin.zoneMinOrder')}</Label>
                       <Input
                         id="zoneMin"
                         type="number"
@@ -682,7 +684,7 @@ export function MenuAdminPage() {
                     </div>
                     <div className="flex items-end sm:col-span-2 lg:col-span-5">
                       <Button type="submit" disabled={creatingZone}>
-                        Add zone
+                        {t('menuAdmin.addZone')}
                       </Button>
                     </div>
                   </form>
@@ -697,8 +699,13 @@ export function MenuAdminPage() {
                           <p className="font-medium">{zone.name}</p>
                           <p className="text-xs text-muted-foreground">
                             {zone.postcode_prefix ? `${zone.postcode_prefix} · ` : ''}
-                            Fee {formatPrice(Number(zone.delivery_fee))} · Min{' '}
-                            {formatPrice(Number(zone.min_order_amount))}
+                            {t('common.fee', {
+                              amount: formatPrice(Number(zone.delivery_fee)),
+                            })}{' '}
+                            ·{' '}
+                            {t('common.minOrder', {
+                              amount: formatPrice(Number(zone.min_order_amount)),
+                            })}
                           </p>
                         </div>
                         <Button
@@ -707,7 +714,7 @@ export function MenuAdminPage() {
                           size="icon"
                           className="text-destructive"
                           onClick={() => handleDeleteZone(zone.id, zone.name)}
-                          aria-label={`Delete ${zone.name}`}
+                          aria-label={t('menuAdmin.deleteZoneAria', { name: zone.name })}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -715,7 +722,7 @@ export function MenuAdminPage() {
                     ))}
                     {!selectedFulfillmentBranch?.deliveryZones?.length && (
                       <li className="px-3 py-4 text-center text-sm text-muted-foreground">
-                        No delivery zones yet.
+                        {t('menuAdmin.noZones')}
                       </li>
                     )}
                   </ul>
@@ -728,12 +735,12 @@ export function MenuAdminPage() {
             <div className="grid gap-6 lg:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle>Add category</CardTitle>
+                  <CardTitle>{t('menuAdmin.addCategory')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleCreateCategory} className="space-y-3">
                     <div className="space-y-1">
-                      <Label htmlFor="catName">Name</Label>
+                      <Label htmlFor="catName">{t('common.name')}</Label>
                       <Input
                         id="catName"
                         value={categoryForm.name}
@@ -742,7 +749,7 @@ export function MenuAdminPage() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="catDesc">Description</Label>
+                      <Label htmlFor="catDesc">{t('common.description')}</Label>
                       <Input
                         id="catDesc"
                         value={categoryForm.description}
@@ -752,7 +759,7 @@ export function MenuAdminPage() {
                       />
                     </div>
                     <Button type="submit" disabled={creatingCategory}>
-                      Create category
+                      {t('menuAdmin.createCategory')}
                     </Button>
                   </form>
                 </CardContent>
@@ -760,12 +767,12 @@ export function MenuAdminPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Add item</CardTitle>
+                  <CardTitle>{t('menuAdmin.addItem')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleCreateItem} className="space-y-3">
                     <div className="space-y-1">
-                      <Label htmlFor="itemCategory">Category</Label>
+                      <Label htmlFor="itemCategory">{t('common.category')}</Label>
                       <select
                         id="itemCategory"
                         className="w-full rounded-md border bg-background px-3 py-2 text-sm"
@@ -773,7 +780,7 @@ export function MenuAdminPage() {
                         onChange={(e) => setItemForm((f) => ({ ...f, categoryId: e.target.value }))}
                         required
                       >
-                        <option value="">Select category</option>
+                        <option value="">{t('menuAdmin.selectCategory')}</option>
                         {(data?.categories ?? []).map((cat) => (
                           <option key={cat.id} value={cat.id}>
                             {cat.name}
@@ -782,7 +789,7 @@ export function MenuAdminPage() {
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="itemName">Name</Label>
+                      <Label htmlFor="itemName">{t('common.name')}</Label>
                       <Input
                         id="itemName"
                         value={itemForm.name}
@@ -791,7 +798,7 @@ export function MenuAdminPage() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="itemPrice">Price</Label>
+                      <Label htmlFor="itemPrice">{t('common.price')}</Label>
                       <Input
                         id="itemPrice"
                         type="number"
@@ -803,26 +810,30 @@ export function MenuAdminPage() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label>Photo</Label>
+                      <Label>{t('common.photo')}</Label>
                       <LogoUpload
                         currentLogo={itemForm.imageUrl}
                         onUpload={handleCreateItemImageUpload}
                         entityId={restaurantId}
-                        entityName={itemForm.name || 'Menu item'}
+                        entityName={itemForm.name || t('menuAdmin.menuItem')}
                         getPresignedUrl={handleGetPresignedUrl}
-                        uploadLabel="Upload photo"
-                        changeLabel="Change photo"
-                        removeLabel="Remove photo"
-                        previewAlt={itemForm.name ? `${itemForm.name} photo` : 'Menu item photo'}
+                        uploadLabel={t('menuAdmin.uploadPhoto')}
+                        changeLabel={t('menuAdmin.changePhoto')}
+                        removeLabel={t('menuAdmin.removePhoto')}
+                        previewAlt={
+                          itemForm.name
+                            ? t('menuAdmin.menuItemPhotoNamed', { name: itemForm.name })
+                            : t('menuAdmin.menuItemPhoto')
+                        }
                         previewClassName="w-40 h-28"
-                        helperText="Recommended: landscape photo, at least 800px wide. Max size: 5MB."
+                        helperText={t('menuAdmin.photoHelper')}
                       />
                     </div>
                     <Button
                       type="submit"
                       disabled={creatingItem || !(data?.categories ?? []).length}
                     >
-                      Create item
+                      {t('menuAdmin.createItem')}
                     </Button>
                   </form>
                 </CardContent>
@@ -831,10 +842,8 @@ export function MenuAdminPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Add modifier group</CardTitle>
-                <CardDescription>
-                  Modifier groups let guests customize items (size, toppings, etc.).
-                </CardDescription>
+                <CardTitle>{t('menuAdmin.addModifierGroup')}</CardTitle>
+                <CardDescription>{t('menuAdmin.modifierDescription')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <form
@@ -842,7 +851,7 @@ export function MenuAdminPage() {
                   className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5"
                 >
                   <div className="space-y-1 sm:col-span-2">
-                    <Label htmlFor="modItem">Menu item</Label>
+                    <Label htmlFor="modItem">{t('menuAdmin.menuItem')}</Label>
                     <select
                       id="modItem"
                       className="w-full rounded-md border bg-background px-3 py-2 text-sm"
@@ -852,7 +861,7 @@ export function MenuAdminPage() {
                       }
                       required
                     >
-                      <option value="">Select item</option>
+                      <option value="">{t('menuAdmin.selectItem')}</option>
                       {allItems.map((item) => (
                         <option key={item.id} value={item.id}>
                           {item.name}
@@ -861,19 +870,19 @@ export function MenuAdminPage() {
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="modGroupName">Group name</Label>
+                    <Label htmlFor="modGroupName">{t('menuAdmin.groupName')}</Label>
                     <Input
                       id="modGroupName"
                       value={modifierGroupForm.name}
                       onChange={(e) =>
                         setModifierGroupForm((f) => ({ ...f, name: e.target.value }))
                       }
-                      placeholder="Size"
+                      placeholder={t('menuAdmin.groupNamePlaceholder')}
                       required
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="modMin">Min</Label>
+                    <Label htmlFor="modMin">{t('common.min')}</Label>
                     <Input
                       id="modMin"
                       type="number"
@@ -885,7 +894,7 @@ export function MenuAdminPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="modMax">Max</Label>
+                    <Label htmlFor="modMax">{t('common.max')}</Label>
                     <Input
                       id="modMax"
                       type="number"
@@ -904,10 +913,10 @@ export function MenuAdminPage() {
                           setModifierGroupForm((f) => ({ ...f, isRequired: checked }))
                         }
                       />
-                      Required
+                      {t('common.required')}
                     </label>
                     <Button type="submit" disabled={creatingGroup || !allItems.length}>
-                      Add group
+                      {t('menuAdmin.addGroup')}
                     </Button>
                   </div>
                 </form>
@@ -919,11 +928,15 @@ export function MenuAdminPage() {
             <Card>
               <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <CardTitle>Current menu</CardTitle>
+                  <CardTitle>{t('menuAdmin.currentMenu')}</CardTitle>
                   <CardDescription>
-                    {(data?.categories ?? []).length} categor
-                    {(data?.categories ?? []).length === 1 ? 'y' : 'ies'} · {totalMenuItems} item
-                    {totalMenuItems === 1 ? '' : 's'}
+                    {t('menuAdmin.categoryCount', {
+                      count: (data?.categories ?? []).length,
+                    })}{' '}
+                    ·{' '}
+                    {t('menuAdmin.itemCount', {
+                      count: totalMenuItems,
+                    })}
                   </CardDescription>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -933,7 +946,7 @@ export function MenuAdminPage() {
                     ) : (
                       <List className="h-4 w-4 text-muted-foreground" aria-hidden />
                     )}
-                    <span className="whitespace-nowrap">Compact view</span>
+                    <span className="whitespace-nowrap">{t('menuAdmin.compactView')}</span>
                     <Switch checked={compactView} onCheckedChange={handleCompactViewChange} />
                   </label>
                   {compactView ? (
@@ -944,7 +957,7 @@ export function MenuAdminPage() {
                         size="sm"
                         onClick={() => setAllCategoriesCollapsed(false)}
                       >
-                        Expand all
+                        {t('menuAdmin.expandAll')}
                       </Button>
                       <Button
                         type="button"
@@ -952,7 +965,7 @@ export function MenuAdminPage() {
                         size="sm"
                         onClick={() => setAllCategoriesCollapsed(true)}
                       >
-                        Collapse all
+                        {t('menuAdmin.collapseAll')}
                       </Button>
                     </>
                   ) : null}
@@ -979,7 +992,7 @@ export function MenuAdminPage() {
                           )}
                           <span className="font-medium">{category.name}</span>
                           <span className="text-xs text-muted-foreground">
-                            {category.items.length} item{category.items.length === 1 ? '' : 's'}
+                            {t('menuAdmin.itemsInCategory', { count: category.items.length })}
                           </span>
                         </button>
 
@@ -1009,7 +1022,7 @@ export function MenuAdminPage() {
                                         </span>
                                         {!item.is_available ? (
                                           <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                                            Off
+                                            {t('common.off')}
                                           </span>
                                         ) : null}
                                       </button>
@@ -1020,7 +1033,9 @@ export function MenuAdminPage() {
                                           size="icon"
                                           className="h-8 w-8"
                                           onClick={() => startEditItem(item)}
-                                          aria-label={`Edit ${item.name}`}
+                                          aria-label={t('menuAdmin.editItemAria', {
+                                            name: item.name,
+                                          })}
                                         >
                                           <Pencil className="h-3.5 w-3.5" />
                                         </Button>
@@ -1030,7 +1045,9 @@ export function MenuAdminPage() {
                                           size="icon"
                                           className="h-8 w-8 text-destructive"
                                           onClick={() => handleDeleteItem(item.id, item.name)}
-                                          aria-label={`Delete ${item.name}`}
+                                          aria-label={t('menuAdmin.deleteItemAria', {
+                                            name: item.name,
+                                          })}
                                         >
                                           <Trash2 className="h-3.5 w-3.5" />
                                         </Button>
@@ -1045,7 +1062,7 @@ export function MenuAdminPage() {
                                           onClick={() => toggleItemExpanded(item.id)}
                                         >
                                           <ChevronDown className="h-3.5 w-3.5" />
-                                          Collapse
+                                          {t('menuAdmin.collapse')}
                                         </button>
                                       ) : null}
                                       <div className="flex items-start justify-between gap-2">
@@ -1059,7 +1076,7 @@ export function MenuAdminPage() {
                                               />
                                             ) : (
                                               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-muted text-xs text-muted-foreground">
-                                                No photo
+                                                {t('menuAdmin.noPhoto')}
                                               </div>
                                             )
                                           ) : null}
@@ -1067,7 +1084,8 @@ export function MenuAdminPage() {
                                             <p className="font-medium">{item.name}</p>
                                             <p className="text-sm text-muted-foreground">
                                               {formatPrice(Number(item.base_price))}
-                                              {!item.is_available && ' · Unavailable'}
+                                              {!item.is_available &&
+                                                t('menuAdmin.unavailableSuffix')}
                                             </p>
                                           </div>
                                         </div>
@@ -1077,7 +1095,9 @@ export function MenuAdminPage() {
                                             variant="ghost"
                                             size="icon"
                                             onClick={() => startEditItem(item)}
-                                            aria-label={`Edit ${item.name}`}
+                                            aria-label={t('menuAdmin.editItemAria', {
+                                              name: item.name,
+                                            })}
                                           >
                                             <Pencil className="h-4 w-4" />
                                           </Button>
@@ -1087,7 +1107,9 @@ export function MenuAdminPage() {
                                             size="icon"
                                             className="text-destructive"
                                             onClick={() => handleDeleteItem(item.id, item.name)}
-                                            aria-label={`Delete ${item.name}`}
+                                            aria-label={t('menuAdmin.deleteItemAria', {
+                                              name: item.name,
+                                            })}
                                           >
                                             <Trash2 className="h-4 w-4" />
                                           </Button>
@@ -1127,22 +1149,24 @@ export function MenuAdminPage() {
                                                 description: e.target.value,
                                               }))
                                             }
-                                            placeholder="Description"
+                                            placeholder={t('common.description')}
                                           />
                                           <div className="space-y-1">
-                                            <Label>Photo</Label>
+                                            <Label>{t('common.photo')}</Label>
                                             <LogoUpload
                                               currentLogo={editForm.imageUrl}
                                               onUpload={handleEditItemImageUpload}
                                               entityId={restaurantId}
                                               entityName={editForm.name || item.name}
                                               getPresignedUrl={handleGetPresignedUrl}
-                                              uploadLabel="Upload photo"
-                                              changeLabel="Change photo"
-                                              removeLabel="Remove photo"
-                                              previewAlt={`${editForm.name || item.name} photo`}
+                                              uploadLabel={t('menuAdmin.uploadPhoto')}
+                                              changeLabel={t('menuAdmin.changePhoto')}
+                                              removeLabel={t('menuAdmin.removePhoto')}
+                                              previewAlt={t('menuAdmin.menuItemPhotoNamed', {
+                                                name: editForm.name || item.name,
+                                              })}
                                               previewClassName="w-40 h-28"
-                                              helperText="Recommended: landscape photo, at least 800px wide. Max size: 5MB."
+                                              helperText={t('menuAdmin.photoHelper')}
                                             />
                                           </div>
                                           <label className="flex items-center gap-2 text-sm">
@@ -1155,11 +1179,11 @@ export function MenuAdminPage() {
                                                 }))
                                               }
                                             />
-                                            Available
+                                            {t('menuAdmin.available')}
                                           </label>
                                           <div className="flex gap-2">
                                             <Button type="submit" size="sm" disabled={updatingItem}>
-                                              Save
+                                              {t('common.save')}
                                             </Button>
                                             <Button
                                               type="button"
@@ -1167,7 +1191,7 @@ export function MenuAdminPage() {
                                               variant="outline"
                                               onClick={() => setEditingItemId(null)}
                                             >
-                                              Cancel
+                                              {t('common.cancel')}
                                             </Button>
                                           </div>
                                         </form>
@@ -1176,7 +1200,7 @@ export function MenuAdminPage() {
                                       {(item.modifierGroups?.length ?? 0) > 0 && (
                                         <div className="mt-3 space-y-2 border-t pt-3">
                                           <p className="text-xs font-medium uppercase text-muted-foreground">
-                                            Modifiers
+                                            {t('common.modifiers')}
                                           </p>
                                           {item.modifierGroups!.map((group) => (
                                             <div
@@ -1233,7 +1257,7 @@ export function MenuAdminPage() {
                                               </ul>
                                               <div className="mt-2 flex gap-2">
                                                 <Input
-                                                  placeholder="Option name"
+                                                  placeholder={t('menuAdmin.optionName')}
                                                   className="h-8 text-xs"
                                                   value={optionForms[group.id]?.name ?? ''}
                                                   onChange={(e) =>
@@ -1250,7 +1274,7 @@ export function MenuAdminPage() {
                                                 <Input
                                                   type="number"
                                                   step="0.01"
-                                                  placeholder="Price +"
+                                                  placeholder={t('menuAdmin.pricePlus')}
                                                   className="h-8 w-24 text-xs"
                                                   value={optionForms[group.id]?.priceDelta ?? '0'}
                                                   onChange={(e) =>
@@ -1272,7 +1296,7 @@ export function MenuAdminPage() {
                                                     handleCreateModifierOption(group.id)
                                                   }
                                                 >
-                                                  Add
+                                                  {t('common.add')}
                                                 </Button>
                                               </div>
                                             </div>
@@ -1286,7 +1310,7 @@ export function MenuAdminPage() {
                             })}
                             {!category.items.length && (
                               <li className="px-3 py-4 text-sm text-muted-foreground">
-                                No items yet
+                                {t('menuAdmin.noItemsYet')}
                               </li>
                             )}
                           </ul>
@@ -1296,8 +1320,8 @@ export function MenuAdminPage() {
                   })}
                 {!isLoading && !(data?.categories ?? []).length && (
                   <EmptyState
-                    title="No menu yet"
-                    description="Create a category above, import from CSV, or add items one at a time."
+                    title={t('menuAdmin.emptyTitle')}
+                    description={t('menuAdmin.emptyDescription')}
                   />
                 )}
               </CardContent>

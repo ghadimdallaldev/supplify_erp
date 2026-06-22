@@ -1,6 +1,7 @@
 import { Skeleton } from '../ui/skeleton'
 import { Card, CardContent } from '../ui/card'
 import { toast } from 'sonner'
+import { i18n } from '../../i18n'
 
 export const EMPTY_PRODUCT_FORM = {
   name: '',
@@ -41,7 +42,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45,`
   link.click()
   document.body.removeChild(link)
 
-  toast.success('Example file downloaded!')
+  toast.success(i18n.t('products:shared.exampleDownloaded'))
 }
 
 export function ProductsPageLoading() {

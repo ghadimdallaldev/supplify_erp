@@ -76,7 +76,7 @@ function SortableReservationCard({
   useEffect(() => {
     const ids = reservationTableIds(reservation)
     if (ids[0]) setPickTableId(ids[0])
-  }, [reservation.id, reservation.updated_at, reservation.tables])
+  }, [reservation])
 
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import {
   useGetOrderQuery,
@@ -29,6 +30,7 @@ export interface OrderDetailsTabProps {
 }
 
 export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
+  const { t } = useTranslation('orders')
   const { isEffectiveSupplier: isSupplier } = useImpersonation()
   const { data, isLoading, refetch } = useGetOrderQuery(orderId)
   const { data: entitlementsData } = useGetEntitlementsQuery()
@@ -73,25 +75,27 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
       <div className="lg:col-span-2 space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Order Information</CardTitle>
+            <CardTitle>{t('detailsTab.orderInformation')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-[var(--text-muted)]">Order ID</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('detailsTab.orderId')}</p>
                 <p className="font-medium">{order.id}</p>
               </div>
               <div>
-                <p className="text-sm text-[var(--text-muted)]">Status</p>
-                <Badge variant={getOrderStatusColor(order.status)}>{order.status}</Badge>
+                <p className="text-sm text-[var(--text-muted)]">{t('detailsTab.status')}</p>
+                <Badge variant={getOrderStatusColor(order.status)}>
+                  {t(`status.${order.status}`, { defaultValue: order.status })}
+                </Badge>
               </div>
               <div>
-                <p className="text-sm text-[var(--text-muted)]">Created</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('detailsTab.created')}</p>
                 <p className="font-medium">{new Date(order.created_at).toLocaleString()}</p>
               </div>
               {order.placed_at && (
                 <div>
-                  <p className="text-sm text-[var(--text-muted)]">Placed</p>
+                  <p className="text-sm text-[var(--text-muted)]">{t('detailsTab.placed')}</p>
                   <p className="font-medium">{new Date(order.placed_at).toLocaleString()}</p>
                 </div>
               )}
@@ -102,7 +106,7 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
         {order.notes && (
           <Card>
             <CardHeader>
-              <CardTitle>Order Notes</CardTitle>
+              <CardTitle>{t('detailsTab.orderNotes')}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm">{order.notes}</p>
@@ -112,10 +116,10 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Amendments</CardTitle>
+            <CardTitle>{t('detailsTab.amendments')}</CardTitle>
             {!['CANCELLED', 'COMPLETED'].includes(order.status) && amendmentsEnabled && (
               <Button size="sm" variant="outline" onClick={() => setShowAmendmentForm((v) => !v)}>
-                Request change
+                {t('detailsTab.requestChange')}
               </Button>
             )}
           </CardHeader>
@@ -123,7 +127,7 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
             {showAmendmentForm && (
               <div className="space-y-2">
                 <Input
-                  placeholder="Describe the requested change"
+                  placeholder={t('detailsTab.amendmentPlaceholder')}
                   value={amendmentDescription}
                   onChange={(e) => setAmendmentDescription(e.target.value)}
                 />
@@ -131,7 +135,7 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
                   size="sm"
                   onClick={async () => {
                     if (!amendmentDescription.trim()) {
-                      toast.error('Description required')
+                      toast.error(t('detailsTab.descriptionRequired'))
                       return
                     }
                     try {
@@ -142,22 +146,22 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
                           description: amendmentDescription,
                         },
                       }).unwrap()
-                      toast.success('Amendment requested')
+                      toast.success(t('detailsTab.amendmentRequested'))
                       setAmendmentDescription('')
                       setShowAmendmentForm(false)
                       refetchAmendments()
                     } catch (e: unknown) {
                       const err = e as { data?: { error?: { message?: string } } }
-                      toast.error(err?.data?.error?.message || 'Failed to request amendment')
+                      toast.error(err?.data?.error?.message || t('detailsTab.amendmentFailed'))
                     }
                   }}
                 >
-                  Submit
+                  {t('detailsTab.submit')}
                 </Button>
               </div>
             )}
             {amendments.length === 0 ? (
-              <p className="text-sm text-[var(--text-muted)]">No amendments on this order.</p>
+              <p className="text-sm text-[var(--text-muted)]">{t('detailsTab.noAmendments')}</p>
             ) : (
               amendments.map((a) => (
                 <div
@@ -180,29 +184,29 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
                             orderId: order.id,
                             amendmentId: String(a.id),
                           }).unwrap()
-                          toast.success('Amendment accepted')
+                          toast.success(t('detailsTab.amendmentAccepted'))
                           refetchAmendments()
                           refetch()
                         }}
                       >
-                        Accept
+                        {t('detailsTab.accept')}
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={async () => {
-                          const notes = window.prompt('Rejection notes')
+                          const notes = window.prompt(t('detailsTab.rejectionNotesPrompt'))
                           if (!notes) return
                           await rejectAmendment({
                             orderId: order.id,
                             amendmentId: String(a.id),
                             responseNotes: notes,
                           }).unwrap()
-                          toast.success('Amendment rejected')
+                          toast.success(t('detailsTab.amendmentRejected'))
                           refetchAmendments()
                         }}
                       >
-                        Reject
+                        {t('detailsTab.reject')}
                       </Button>
                       <Button
                         size="sm"
@@ -215,7 +219,7 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
                           refetchAmendments()
                         }}
                       >
-                        Cancel
+                        {t('detailsTab.cancel')}
                       </Button>
                     </div>
                   )}
@@ -229,11 +233,11 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Order Summary</CardTitle>
+            <CardTitle>{t('detailsTab.orderSummary')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-[var(--text-muted)]">Subtotal</span>
+              <span className="text-[var(--text-muted)]">{t('detailsTab.subtotal')}</span>
               <span>
                 $
                 {formatPrice(
@@ -246,25 +250,26 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
             {promotionDiscount > 0 ? (
               <div className="flex items-center justify-between text-sm text-[var(--mint)]">
                 <span>
-                  Deal discount
                   {promotionInfo?.promotionName || promotionInfo?.promotion_name
-                    ? ` (${promotionInfo.promotionName || promotionInfo.promotion_name})`
-                    : ''}
+                    ? t('detailsTab.dealDiscountNamed', {
+                        name: promotionInfo.promotionName || promotionInfo.promotion_name,
+                      })
+                    : t('detailsTab.dealDiscount')}
                 </span>
                 <span>-${formatPrice(promotionDiscount)}</span>
               </div>
             ) : null}
             <div className="flex items-center justify-between text-sm">
-              <span className="text-[var(--text-muted)]">Shipping</span>
+              <span className="text-[var(--text-muted)]">{t('detailsTab.shipping')}</span>
               <span>$0.00</span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-[var(--text-muted)]">Tax</span>
+              <span className="text-[var(--text-muted)]">{t('detailsTab.tax')}</span>
               <span>$0.00</span>
             </div>
             <div className="border-t pt-4">
               <div className="flex items-center justify-between font-semibold text-lg">
-                <span>Total</span>
+                <span>{t('detailsTab.total')}</span>
                 <span>${formatPrice(order.total_amount)}</span>
               </div>
             </div>
@@ -273,14 +278,14 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
+            <CardTitle>{t('detailsTab.quickActions')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {!isSupplier && (order.status === 'COMPLETED' || order.status === 'DELIVERED') && (
               <Button className="w-full" variant="default" asChild>
                 <Link to={`/app/receiving?order=${order.id}`}>
                   <Package className="h-4 w-4 mr-2" />
-                  Receive this order
+                  {t('detailsTab.receiveThisOrder')}
                 </Link>
               </Button>
             )}
@@ -291,7 +296,7 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
               disabled={printingPdf}
             >
               <Printer className="h-4 w-4 mr-2" />
-              {printingPdf ? 'Preparing…' : 'Print Packing Slip'}
+              {printingPdf ? t('detailsTab.preparing') : t('detailsTab.printPackingSlip')}
             </Button>
             <Button
               className="w-full"
@@ -300,12 +305,12 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
               disabled={downloadingPdf}
             >
               <Download className="h-4 w-4 mr-2" />
-              {downloadingPdf ? 'Downloading...' : 'Download PDF'}
+              {downloadingPdf ? t('detailsTab.downloading') : t('detailsTab.downloadPdf')}
             </Button>
             {isSupplier && (
               <Button className="w-full" variant="outline">
                 <Edit className="h-4 w-4 mr-2" />
-                Add Internal Note
+                {t('detailsTab.addInternalNote')}
               </Button>
             )}
           </CardContent>

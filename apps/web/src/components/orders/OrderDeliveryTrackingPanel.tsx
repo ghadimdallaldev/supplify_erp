@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Navigation } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
@@ -11,6 +12,7 @@ import {
   DeliveryTrackingEtaSection,
   getDestinationLabelText,
 } from '../maps/DeliveryTrackingEtaSection'
+import { ensureNamespace } from '../../i18n'
 
 type Props = {
   orderId: string
@@ -22,12 +24,17 @@ const LIVE_TRACKING_ASSIGNMENT_STATUSES = new Set(['picked_up', 'out_for_deliver
 const ACTIVE_ASSIGNMENT_STATUSES = LIVE_TRACKING_ASSIGNMENT_STATUSES
 
 export function OrderDeliveryTrackingPanel({ orderId, pollIntervalMs = 15_000 }: Props) {
+  const { t } = useTranslation('fulfillment')
   const [pollMs, setPollMs] = useState(pollIntervalMs)
   const { data, isLoading, isError } = useGetOrderTrackingQuery(orderId, {
     pollingInterval: pollMs,
     skipPollingIfUnfocused: true,
     skip: !orderId,
   })
+
+  useEffect(() => {
+    void ensureNamespace('fulfillment')
+  }, [])
 
   useEffect(() => {
     const active =
@@ -54,11 +61,11 @@ export function OrderDeliveryTrackingPanel({ orderId, pollIntervalMs = 15_000 }:
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <Navigation className="h-4 w-4 text-[var(--brand-mid)]" />
-            Delivery tracking
+            {t('tracking.panel.title')}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-[var(--text-muted)]">Live tracking is not enabled.</p>
+          <p className="text-sm text-[var(--text-muted)]">{t('tracking.panel.notEnabled')}</p>
         </CardContent>
       </Card>
     )
@@ -78,12 +85,12 @@ export function OrderDeliveryTrackingPanel({ orderId, pollIntervalMs = 15_000 }:
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
           <Navigation className="h-4 w-4 text-[var(--brand-mid)]" />
-          Delivery tracking
+          {t('tracking.title')}
         </CardTitle>
         <CardDescription>
           {assignment.driverName
-            ? `Driver en route — ${assignment.driverName}`
-            : 'Order is on the way'}
+            ? t('tracking.panel.driverEnRoute', { name: assignment.driverName })
+            : t('tracking.panel.onTheWay')}
           {assignment.driverPhone ? ` · ${assignment.driverPhone}` : ''}
         </CardDescription>
       </CardHeader>

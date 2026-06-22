@@ -28,6 +28,7 @@ import {
 } from '../services/api'
 import { toast } from 'sonner'
 import { keycloakRealm, keycloakUrl } from '../lib/env'
+import { AdminShellPage } from '../components/admin/shell'
 import { PageShell } from '../components/ui/page-shell'
 import { AdminLoadingState } from '../components/admin/adminUi'
 import { cn } from '../lib/utils'
@@ -92,6 +93,23 @@ function LanguageSettingsCard() {
   )
 }
 
+function LanguageSettingsPanel() {
+  const { t } = useTranslation('settings')
+
+  return (
+    <section
+      data-testid="admin-settings-language"
+      className="flex flex-col gap-4 overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-5"
+    >
+      <div className="min-w-0">
+        <h2 className="text-base font-medium text-[var(--text)]">{t('language.title')}</h2>
+        <p className="mt-0.5 text-sm text-[var(--text-mid)]">{t('language.description')}</p>
+      </div>
+      <LanguageSwitcher className="shrink-0" />
+    </section>
+  )
+}
+
 function SettingsField({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="rounded-lg border border-[var(--app-border)] bg-[var(--app-bg-subtle)]/40 px-3 py-2.5">
@@ -141,6 +159,7 @@ function SettingsToggleRow({
         <p className="mt-0.5 text-xs text-[var(--text-muted)]">{description}</p>
       </div>
       <Switch
+        className="shrink-0"
         checked={checked}
         onCheckedChange={onCheckedChange}
         aria-label={label}
@@ -171,10 +190,10 @@ function AdminSettingsContent({
   const roleLabel = user?.role?.replace(/_/g, ' ').toLowerCase() ?? t('roleUnknown')
 
   return (
-    <div className="space-y-4" data-testid="admin-settings-content">
-      <LanguageSettingsCard />
+    <div className="admin-settings-layout" data-testid="admin-settings-content">
+      <LanguageSettingsPanel />
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="admin-settings-grid">
         <AppPanel
           title={t('admin.profile.title')}
           description={t('admin.profile.description')}
@@ -220,6 +239,69 @@ function AdminSettingsContent({
             <ExternalLink className="h-3.5 w-3.5" />
           </Button>
         </AppPanel>
+
+        <AppPanel
+          title={t('admin.session.title')}
+          description={t('admin.session.description')}
+          testId="admin-settings-session"
+        >
+          <div className="space-y-3">
+            <SettingsField label={t('admin.session.provider')} value="Keycloak" />
+            <SettingsField
+              label={t('admin.session.role')}
+              value={<span className="capitalize">{roleLabel}</span>}
+            />
+            <SettingsField
+              label={t('admin.session.accountStatus')}
+              value={
+                <Badge
+                  variant="outline"
+                  className="border-emerald-200 bg-emerald-50 text-emerald-700"
+                >
+                  {t('admin.session.active')}
+                </Badge>
+              }
+            />
+          </div>
+        </AppPanel>
+
+        <AppPanel
+          title={t('admin.preferences.title')}
+          description={t('admin.preferences.description')}
+          testId="admin-settings-preferences"
+        >
+          <div className="space-y-2">
+            {ADMIN_PREF_KEYS.map((prefKey) => (
+              <div
+                key={prefKey}
+                className="rounded-lg border border-dashed border-[var(--app-border)] p-3"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-medium text-[var(--text)]">{t(`${prefKey}.label`)}</p>
+                  <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                    {t('comingSoon')}
+                  </Badge>
+                </div>
+                <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                  {t(`${prefKey}.description`)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </AppPanel>
+
+        <AppPanel
+          title={t('admin.support.title')}
+          description={t('admin.support.description')}
+          testId="admin-settings-support"
+          className="md:col-span-2"
+        >
+          <p className="mb-4 text-sm text-[var(--text-mid)]">{t('admin.support.hint')}</p>
+          <Button variant="outline" size="sm" className="inline-flex items-center gap-2">
+            <Mail className="h-4 w-4" />
+            {t('admin.support.contact')}
+          </Button>
+        </AppPanel>
       </div>
 
       <AppPanel
@@ -252,7 +334,7 @@ function AdminSettingsContent({
         {isLoadingNotificationPrefs ? (
           <AdminLoadingState label={t('notifications.loading')} />
         ) : (
-          <div className="grid gap-2 lg:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             {NOTIFICATION_FIELD_KEYS.map((key) => (
               <SettingsToggleRow
                 key={key}
@@ -274,70 +356,6 @@ function AdminSettingsContent({
             ))}
           </div>
         )}
-      </AppPanel>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <AppPanel
-          title={t('admin.preferences.title')}
-          description={t('admin.preferences.description')}
-          testId="admin-settings-preferences"
-        >
-          <div className="space-y-2">
-            {ADMIN_PREF_KEYS.map((prefKey) => (
-              <div
-                key={prefKey}
-                className="rounded-lg border border-dashed border-[var(--app-border)] p-3"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-medium text-[var(--text)]">{t(`${prefKey}.label`)}</p>
-                  <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                    {t('comingSoon')}
-                  </Badge>
-                </div>
-                <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                  {t(`${prefKey}.description`)}
-                </p>
-              </div>
-            ))}
-          </div>
-        </AppPanel>
-
-        <AppPanel
-          title={t('admin.session.title')}
-          description={t('admin.session.description')}
-          testId="admin-settings-session"
-        >
-          <div className="space-y-3">
-            <SettingsField label={t('admin.session.provider')} value="Keycloak" />
-            <SettingsField
-              label={t('admin.session.role')}
-              value={<span className="capitalize">{roleLabel}</span>}
-            />
-            <SettingsField
-              label={t('admin.session.accountStatus')}
-              value={
-                <Badge
-                  variant="outline"
-                  className="border-emerald-200 bg-emerald-50 text-emerald-700"
-                >
-                  {t('admin.session.active')}
-                </Badge>
-              }
-            />
-          </div>
-        </AppPanel>
-      </div>
-
-      <AppPanel
-        title={t('admin.support.title')}
-        description={t('admin.support.description')}
-        testId="admin-settings-support"
-      >
-        <p className="mb-4 text-sm text-[var(--text-mid)]">{t('admin.support.hint')}</p>
-        <Button variant="outline" size="sm" className="inline-flex items-center gap-2">
-          <Mail className="h-4 w-4" />
-          {t('admin.support.contact')}
-        </Button>
       </AppPanel>
     </div>
   )
@@ -421,205 +439,196 @@ export function SettingsPage() {
 
   if (isAdminSettings) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <PageShell
-          maxWidth="focused"
-          className="min-h-0 flex-1 px-4 py-4 sm:px-6 sm:py-5"
-          data-testid="settings-page"
-        >
-          <AdminSettingsContent
-            user={user}
-            canEditSettings={canEditSettings}
-            notificationPrefs={notificationPrefs}
-            isLoadingNotificationPrefs={isLoadingNotificationPrefs}
-            isSavingNotificationPrefs={isSavingNotificationPrefs}
-            onToggleNotification={handleToggleNotification}
-            onSaveNotifications={handleSaveNotifications}
-          />
-        </PageShell>
-      </div>
+      <AdminShellPage maxWidth="focused" data-testid="settings-page">
+        <AdminSettingsContent
+          user={user}
+          canEditSettings={canEditSettings}
+          notificationPrefs={notificationPrefs}
+          isLoadingNotificationPrefs={isLoadingNotificationPrefs}
+          isSavingNotificationPrefs={isSavingNotificationPrefs}
+          onToggleNotification={handleToggleNotification}
+          onSaveNotifications={handleSaveNotifications}
+        />
+      </AdminShellPage>
     )
   }
 
   const header = { title: t('page.title'), subtitle: t('page.subtitle') }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <PageShell
-        maxWidth="focused"
-        className="min-h-0 flex-1 px-4 py-4 sm:px-6 sm:py-5"
-        data-testid="settings-page"
-      >
-        <>
-          <h1 className="text-2xl font-semibold text-[var(--text)]">{header.title}</h1>
-          <p className="mt-1 mb-4 text-sm text-[var(--text-mid)]">{header.subtitle}</p>
-        </>
+    <PageShell
+      maxWidth="focused"
+      padding
+      className="min-h-0 flex-1 overflow-x-hidden py-4 sm:py-5"
+      data-testid="settings-page"
+    >
+      <>
+        <h1 className="text-2xl font-semibold text-[var(--text)]">{header.title}</h1>
+        <p className="mt-1 mb-4 text-sm text-[var(--text-mid)]">{header.subtitle}</p>
+      </>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <LanguageSettingsCard />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <LanguageSettingsCard />
 
-          <Card>
-            <CardHeader className="px-4 py-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <User className="h-4 w-4" />
-                {t('profile.title')}
-              </CardTitle>
-              <CardDescription className="text-xs">{t('profile.description')}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 px-4 pb-4 pt-0 text-sm">
-              <div>
-                <p className="text-xs font-medium text-[var(--text-mid)]">
-                  {t('profile.displayName')}
-                </p>
-                <p>{user?.displayName}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-[var(--text-mid)]">{t('profile.email')}</p>
-                <p>{user?.email}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-[var(--text-mid)]">{t('profile.role')}</p>
-                <p className="capitalize">{user?.role?.toLowerCase()}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-[var(--text-mid)]">
-                  {t('profile.memberSince')}
-                </p>
-                <p>
-                  {user?.createdAt
-                    ? new Date(user.createdAt).toLocaleDateString()
-                    : t('profile.notAvailable')}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <User className="h-4 w-4" />
+              {t('profile.title')}
+            </CardTitle>
+            <CardDescription className="text-xs">{t('profile.description')}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 px-4 pb-4 pt-0 text-sm">
+            <div>
+              <p className="text-xs font-medium text-[var(--text-mid)]">
+                {t('profile.displayName')}
+              </p>
+              <p>{user?.displayName}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-[var(--text-mid)]">{t('profile.email')}</p>
+              <p>{user?.email}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-[var(--text-mid)]">{t('profile.role')}</p>
+              <p className="capitalize">{user?.role?.toLowerCase()}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-[var(--text-mid)]">
+                {t('profile.memberSince')}
+              </p>
+              <p>
+                {user?.createdAt
+                  ? new Date(user.createdAt).toLocaleDateString()
+                  : t('profile.notAvailable')}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="px-4 py-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Shield className="h-4 w-4" />
-                {t('security.title')}
-              </CardTitle>
-              <CardDescription className="text-xs">{t('security.description')}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 px-4 pb-4 pt-0">
-              <p className="text-sm text-[var(--text-muted)]">{t('security.keycloakManaged')}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  window.open(`${keycloakUrl}/realms/${keycloakRealm}/account`, '_blank')
-                }}
-              >
-                {t('security.changePassword')}
-              </Button>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Shield className="h-4 w-4" />
+              {t('security.title')}
+            </CardTitle>
+            <CardDescription className="text-xs">{t('security.description')}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 px-4 pb-4 pt-0">
+            <p className="text-sm text-[var(--text-muted)]">{t('security.keycloakManaged')}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                window.open(`${keycloakUrl}/realms/${keycloakRealm}/account`, '_blank')
+              }}
+            >
+              {t('security.changePassword')}
+            </Button>
+          </CardContent>
+        </Card>
 
-          <Card className="md:col-span-2 xl:col-span-1">
-            <CardHeader className="px-4 py-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Bell className="h-4 w-4" />
-                {t('notifications.title')}
-              </CardTitle>
-              <CardDescription className="text-xs">
-                {t('notifications.description')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 px-4 pb-4 pt-0">
-              {isLoadingNotificationPrefs ? (
-                <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t('notifications.loading')}
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-2">
-                    {NOTIFICATION_FIELD_KEYS.map((key) => (
-                      <div
-                        key={key}
-                        className="flex items-start justify-between gap-3 rounded-lg border border-[var(--app-border)] p-3"
-                      >
-                        <div>
-                          <p className="text-sm font-medium text-[var(--text)]">
-                            {t(`notifications.fields.${key}.label`)}
-                          </p>
-                          <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                            {t(`notifications.fields.${key}.description`)}
-                          </p>
-                        </div>
-                        <Switch
-                          checked={notificationPrefs[key]}
-                          onCheckedChange={() => handleToggleNotification(key)}
-                          aria-label={t(`notifications.fields.${key}.label`)}
-                          disabled={!canEditSettings}
-                        />
+        <Card className="md:col-span-2 xl:col-span-1">
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Bell className="h-4 w-4" />
+              {t('notifications.title')}
+            </CardTitle>
+            <CardDescription className="text-xs">{t('notifications.description')}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 px-4 pb-4 pt-0">
+            {isLoadingNotificationPrefs ? (
+              <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {t('notifications.loading')}
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {NOTIFICATION_FIELD_KEYS.map((key) => (
+                    <div
+                      key={key}
+                      className="flex items-start justify-between gap-3 rounded-lg border border-[var(--app-border)] p-3"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-[var(--text)]">
+                          {t(`notifications.fields.${key}.label`)}
+                        </p>
+                        <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                          {t(`notifications.fields.${key}.description`)}
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                  <Button
-                    onClick={handleSaveNotifications}
-                    disabled={isSavingNotificationPrefs || !canEditSettings}
-                    size="sm"
-                    className="inline-flex items-center gap-2"
-                  >
-                    {isSavingNotificationPrefs ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {t('notifications.saving')}
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4" />
-                        {t('notifications.save')}
-                      </>
-                    )}
-                  </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                      <Switch
+                        checked={notificationPrefs[key]}
+                        onCheckedChange={() => handleToggleNotification(key)}
+                        aria-label={t(`notifications.fields.${key}.label`)}
+                        disabled={!canEditSettings}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  onClick={handleSaveNotifications}
+                  disabled={isSavingNotificationPrefs || !canEditSettings}
+                  size="sm"
+                  className="inline-flex items-center gap-2"
+                >
+                  {isSavingNotificationPrefs ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {t('notifications.saving')}
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      {t('notifications.save')}
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="px-4 py-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <LogIn className="h-4 w-4" />
-                {t('session.title')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 px-4 pb-4 pt-0 text-sm">
-              <p className="text-[var(--text-muted)]">{t('session.authenticatedVia')}</p>
-              <p>
-                <span className="text-xs font-medium text-[var(--text-mid)]">
-                  {t('session.role')}:{' '}
-                </span>
-                <span className="capitalize">{user?.role?.toLowerCase()}</span>
-              </p>
-              <p>
-                <span className="text-xs font-medium text-[var(--text-mid)]">
-                  {t('session.account')}:{' '}
-                </span>
-                {t('session.active')}
-              </p>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <LogIn className="h-4 w-4" />
+              {t('session.title')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 px-4 pb-4 pt-0 text-sm">
+            <p className="text-[var(--text-muted)]">{t('session.authenticatedVia')}</p>
+            <p>
+              <span className="text-xs font-medium text-[var(--text-mid)]">
+                {t('session.role')}:{' '}
+              </span>
+              <span className="capitalize">{user?.role?.toLowerCase()}</span>
+            </p>
+            <p>
+              <span className="text-xs font-medium text-[var(--text-mid)]">
+                {t('session.account')}:{' '}
+              </span>
+              {t('session.active')}
+            </p>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="px-4 py-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Mail className="h-4 w-4" />
-                {t('support.title')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-4 pt-0">
-              <p className="mb-3 text-sm text-[var(--text-muted)]">{t('support.hint')}</p>
-              <Button variant="outline" size="sm">
-                {t('support.contact')}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </PageShell>
-    </div>
+        <Card>
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Mail className="h-4 w-4" />
+              {t('support.title')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4 pt-0">
+            <p className="mb-3 text-sm text-[var(--text-muted)]">{t('support.hint')}</p>
+            <Button variant="outline" size="sm">
+              {t('support.contact')}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </PageShell>
   )
 }

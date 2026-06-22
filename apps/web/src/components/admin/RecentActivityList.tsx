@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { getActivityEventConfig } from '../../lib/adminActivityConfig'
 import {
   AdminEmptyState,
@@ -29,6 +30,8 @@ export function RecentActivityList({
   errorMessage?: string
   onRetry?: () => void
 }) {
+  const { t } = useTranslation('admin')
+
   if (isLoading) {
     return <AdminLoadingSkeleton rows={4} />
   }
@@ -36,8 +39,8 @@ export function RecentActivityList({
   if (isError) {
     return (
       <AdminErrorState
-        title="Could not load activity"
-        message={errorMessage || 'The activity feed failed to load.'}
+        title={t('activity.recent.loadFailedTitle')}
+        message={errorMessage || t('activity.recent.loadFailedMessage')}
         onRetry={onRetry}
       />
     )
@@ -46,8 +49,8 @@ export function RecentActivityList({
   if (events.length === 0) {
     return (
       <AdminEmptyState
-        title="No recent platform activity yet"
-        description="Platform events will appear here as tenants use the system."
+        title={t('activity.recent.emptyTitle')}
+        description={t('activity.recent.emptyDescription')}
       />
     )
   }

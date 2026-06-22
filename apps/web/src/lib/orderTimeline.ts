@@ -1,3 +1,11 @@
+import i18n from 'i18next'
+
+const NS = 'orders'
+
+function ft(key: string, options?: Record<string, unknown>): string {
+  return i18n.t(key, { ns: NS, ...options })
+}
+
 export type TimelineEventState = 'completed' | 'current' | 'upcoming' | 'skipped'
 
 export type TimelineViewerRole = 'RESTAURANT' | 'SUPPLIER'
@@ -133,8 +141,11 @@ function buildSubstitutionDetails(
     const orderItem = orderItems?.find((i) => i.id === row.orderItemId)
     return {
       originalName:
-        productNameById(orderItems, originalId) || orderItem?.product_name || 'Original item',
-      substituteName: productNameById(orderItems, substituteId) || 'Substitute item',
+        productNameById(orderItems, originalId) ||
+        orderItem?.product_name ||
+        ft('timeline.events.defaults.originalItem'),
+      substituteName:
+        productNameById(orderItems, substituteId) || ft('timeline.events.defaults.substituteItem'),
       quantity:
         (row.requestedQuantity as number | string | undefined) ??
         (row.requested_quantity as number | string | undefined) ??
@@ -194,24 +205,41 @@ function pushDriverDeliveryMilestones(
   const driverRank = DRIVER_STATUS_RANK[assignment.status] ?? 0
   if (driverRank < 1) return
 
-  const driverLabel = assignment.driverName ? ` (${assignment.driverName})` : ''
+  const driverLabel = assignment.driverName
+    ? ft('timeline.events.driver.driverSuffix', { name: assignment.driverName })
+    : ''
 
-  const steps: Array<{ id: string; title: string; minRank: number; ts?: string | null }> = [
+  const steps: Array<{
+    id: string
+    titleKey: string
+    stepLabelKey: string
+    minRank: number
+    ts?: string | null
+  }> = [
     {
       id: 'driver-assigned',
-      title: 'Driver assigned',
+      titleKey: 'timeline.events.driver.assigned',
+      stepLabelKey: 'timeline.events.driver.stepLabel.assigned',
       minRank: 1,
       ts: assignment.assignedAt,
     },
-    { id: 'driver-picked-up', title: 'Picked up', minRank: 2, ts: assignment.pickedUpAt },
+    {
+      id: 'driver-picked-up',
+      titleKey: 'timeline.events.driver.pickedUp',
+      stepLabelKey: 'timeline.events.driver.stepLabel.pickedUp',
+      minRank: 2,
+      ts: assignment.pickedUpAt,
+    },
     {
       id: 'driver-out-for-delivery',
-      title: 'Out for delivery',
+      titleKey: 'timeline.events.driver.outForDelivery',
+      stepLabelKey: 'timeline.events.driver.stepLabel.outForDelivery',
       minRank: 3,
     },
     {
       id: 'driver-delivered',
-      title: 'Delivered by driver',
+      titleKey: 'timeline.events.driver.delivered',
+      stepLabelKey: 'timeline.events.driver.stepLabel.delivered',
       minRank: 4,
       ts: assignment.deliveredAt,
     },
@@ -219,12 +247,13 @@ function pushDriverDeliveryMilestones(
 
   for (const step of steps) {
     const done = driverRank >= step.minRank
+    const stepLabel = ft(step.stepLabelKey)
     events.push({
       id: step.id,
-      title: step.title + driverLabel,
+      title: ft(step.titleKey) + driverLabel,
       description: done
-        ? `Delivery milestone: ${step.title.toLowerCase()}.`
-        : `Pending: ${step.title.toLowerCase()}.`,
+        ? ft('timeline.events.driver.milestoneDone', { step: stepLabel })
+        : ft('timeline.events.driver.milestonePending', { step: stepLabel }),
       timestamp: done ? formatTs(step.ts ?? null) : null,
       state: done
         ? 'completed'
@@ -250,51 +279,59 @@ function pushCoreFulfillmentSteps(
 
   events.push({
     id: 'placed',
-    title: isSupplier ? 'Order received' : 'Order placed',
+    title: isSupplier
+      ? ft('timeline.events.placed.titleSupplier')
+      : ft('timeline.events.placed.titleRestaurant'),
     description: isSupplier
-      ? `New order from ${restaurantName || 'restaurant'}.`
-      : `Order sent to ${supplierName}.`,
+      ? ft('timeline.events.placed.descSupplier', {
+          name: restaurantName || ft('timeline.events.defaults.restaurant'),
+        })
+      : ft('timeline.events.placed.descRestaurant', { name: supplierName }),
     timestamp: milestoneTimestamp(order, MILESTONE.PLACED, statusRank),
     state: stepState(statusRank, MILESTONE.PLACED),
   })
 
   events.push({
     id: 'confirmed',
-    title: isSupplier ? 'Order acknowledged' : 'Supplier confirmed',
+    title: isSupplier
+      ? ft('timeline.events.confirmed.titleSupplier')
+      : ft('timeline.events.confirmed.titleRestaurant'),
     description:
       statusRank >= MILESTONE.ACKNOWLEDGED
         ? isSupplier
-          ? 'You acknowledged this order.'
-          : `${supplierName} acknowledged the order.`
+          ? ft('timeline.events.confirmed.descDoneSupplier')
+          : ft('timeline.events.confirmed.descDoneRestaurant', { name: supplierName })
         : isSupplier
-          ? 'Acknowledge the order to start fulfillment.'
-          : 'Waiting for the supplier to acknowledge this order.',
+          ? ft('timeline.events.confirmed.descPendingSupplier')
+          : ft('timeline.events.confirmed.descPendingRestaurant'),
     timestamp: milestoneTimestamp(order, MILESTONE.ACKNOWLEDGED, statusRank),
     state: stepState(statusRank, MILESTONE.ACKNOWLEDGED),
   })
 
   events.push({
     id: 'processing',
-    title: isSupplier ? 'Picking & processing' : 'Order processing',
+    title: isSupplier
+      ? ft('timeline.events.processing.titleSupplier')
+      : ft('timeline.events.processing.titleRestaurant'),
     description:
       statusRank >= MILESTONE.PROCESSING
         ? isSupplier
-          ? 'Items are being picked and prepared for dispatch.'
-          : 'The supplier is preparing and picking items for delivery.'
+          ? ft('timeline.events.processing.descDoneSupplier')
+          : ft('timeline.events.processing.descDoneRestaurant')
         : isSupplier
-          ? 'Pick and prepare items after acknowledgment.'
-          : 'Supplier will start preparing items after confirmation.',
+          ? ft('timeline.events.processing.descPendingSupplier')
+          : ft('timeline.events.processing.descPendingRestaurant'),
     timestamp: milestoneTimestamp(order, MILESTONE.PROCESSING, statusRank),
     state: stepState(statusRank, MILESTONE.PROCESSING),
   })
 
   events.push({
     id: 'shipped',
-    title: 'Order shipped',
+    title: ft('timeline.events.shipped.title'),
     description:
       statusRank >= MILESTONE.SHIPPED
-        ? 'Order has left the warehouse and is on its way.'
-        : 'Dispatch will begin once the order is marked as shipped.',
+        ? ft('timeline.events.shipped.descDone')
+        : ft('timeline.events.shipped.descPending'),
     timestamp: milestoneTimestamp(order, MILESTONE.SHIPPED, statusRank),
     state: stepState(statusRank, MILESTONE.SHIPPED),
   })
@@ -315,11 +352,11 @@ function pushCoreDeliveryCompletionSteps(
   if (isSupplier) {
     events.push({
       id: 'delivered',
-      title: 'Marked delivered',
+      title: ft('timeline.events.delivered.titleSupplier'),
       description:
         statusRank >= MILESTONE.DELIVERED
-          ? 'Delivery completed. The restaurant can confirm receipt.'
-          : 'Mark delivered when the handoff or drop-off is complete.',
+          ? ft('timeline.events.delivered.descDoneSupplier')
+          : ft('timeline.events.delivered.descPendingSupplier'),
       timestamp: milestoneTimestamp(order, MILESTONE.DELIVERED, statusRank),
       state: stepState(statusRank, MILESTONE.DELIVERED),
     })
@@ -327,8 +364,8 @@ function pushCoreDeliveryCompletionSteps(
     if (statusRank >= MILESTONE.RECEIVED) {
       events.push({
         id: 'restaurant-received',
-        title: 'Restaurant confirmed receipt',
-        description: 'The restaurant recorded receiving this delivery.',
+        title: ft('timeline.events.restaurantReceived.title'),
+        description: ft('timeline.events.restaurantReceived.desc'),
         timestamp: milestoneTimestamp(order, MILESTONE.RECEIVED, statusRank),
         state: 'completed',
       })
@@ -339,11 +376,11 @@ function pushCoreDeliveryCompletionSteps(
   // Restaurant view
   events.push({
     id: 'delivered',
-    title: 'Delivered by supplier',
+    title: ft('timeline.events.delivered.titleRestaurant'),
     description:
       statusRank >= MILESTONE.DELIVERED
-        ? `${supplierName} marked the order as delivered.`
-        : 'Supplier delivery completion will appear here.',
+        ? ft('timeline.events.delivered.descDoneRestaurant', { name: supplierName })
+        : ft('timeline.events.delivered.descPendingRestaurant'),
     timestamp: milestoneTimestamp(order, MILESTONE.DELIVERED, statusRank),
     state: stepState(statusRank, MILESTONE.DELIVERED),
   })
@@ -363,17 +400,25 @@ function pushReceivingStep(
   const state = receivingState(statusRank, Boolean(receiving))
 
   if (receiving) {
+    const receivingStatus = receiving.status ? String(receiving.status).toLowerCase() : ''
     events.push({
       id: 'received',
-      title: disputeOpen ? 'Received - dispute open' : 'Goods received',
+      title: disputeOpen
+        ? ft('timeline.events.receiving.titleDispute')
+        : ft('timeline.events.receiving.title'),
       description: disputeOpen
-        ? 'Receiving was recorded. A dispute is open with the supplier until it is resolved.'
-        : `Receiving report recorded${receiving.status ? ` (${String(receiving.status).toLowerCase()})` : ''}.`,
+        ? ft('timeline.events.receiving.descDispute')
+        : receivingStatus
+          ? ft('timeline.events.receiving.descRecordedWithStatus', { status: receivingStatus })
+          : ft('timeline.events.receiving.descRecorded'),
       timestamp: formatTs(
         String(receiving.received_at ?? receiving.receivedAt ?? receiving.created_at ?? '')
       ),
       state: disputeOpen ? 'completed' : state,
-      link: { label: 'View receiving', href: `/app/receiving?order=${order.id}` },
+      link: {
+        label: ft('timeline.events.receiving.viewReceiving'),
+        href: `/app/receiving?order=${order.id}`,
+      },
     })
     return
   }
@@ -383,22 +428,25 @@ function pushReceivingStep(
     title:
       disputeOpen || statusRank >= MILESTONE.RECEIVED
         ? disputeOpen
-          ? 'Received - dispute open'
-          : 'Goods received'
-        : 'Confirm receipt',
+          ? ft('timeline.events.receiving.titleDispute')
+          : ft('timeline.events.receiving.title')
+        : ft('timeline.events.receiving.titleConfirm'),
     description: disputeOpen
-      ? 'Receiving was recorded. Resolve the open dispute with your supplier.'
+      ? ft('timeline.events.receiving.descDisputeResolve')
       : statusRank >= MILESTONE.RECEIVED
-        ? 'Receiving has been recorded for this order.'
+        ? ft('timeline.events.receiving.descDone')
         : statusRank >= MILESTONE.DELIVERED
-          ? 'Record receiving to confirm quantities and quality.'
-          : 'Receiving will be available after delivery.',
+          ? ft('timeline.events.receiving.descAfterDelivery')
+          : ft('timeline.events.receiving.descPending'),
     timestamp:
       state === 'completed' ? milestoneTimestamp(order, MILESTONE.RECEIVED, statusRank) : null,
     state,
     link:
       statusRank >= MILESTONE.DELIVERED
-        ? { label: 'Receive order', href: `/app/receiving?order=${order.id}` }
+        ? {
+            label: ft('timeline.events.receiving.receiveOrder'),
+            href: `/app/receiving?order=${order.id}`,
+          }
         : undefined,
   })
 }
@@ -423,23 +471,26 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
 
   const events: TimelineEvent[] = []
   const status = order.status
-  const supplierName = order.items?.find((i) => i.supplier_name)?.supplier_name || 'Supplier'
+  const supplierName =
+    order.items?.find((i) => i.supplier_name)?.supplier_name ||
+    ft('timeline.events.defaults.supplier')
   const restaurantName =
-    (order as OrderLike & { restaurant_name?: string }).restaurant_name || 'Restaurant'
+    (order as OrderLike & { restaurant_name?: string }).restaurant_name ||
+    ft('timeline.events.defaults.restaurant')
 
   if (status === 'CANCELLED') {
     const supplierDeclined = order.cancelled_by === 'SUPPLIER' && viewerRole === 'RESTAURANT'
     const reason = order.cancel_reason?.trim()
     events.push({
       id: 'cancelled',
-      title: supplierDeclined ? 'Declined by supplier' : 'Order cancelled',
+      title: supplierDeclined
+        ? ft('timeline.events.cancelled.titleDeclined')
+        : ft('timeline.events.cancelled.title'),
       description: supplierDeclined
-        ? reason
-          ? reason
-          : 'The supplier declined this order and it will not be fulfilled.'
+        ? reason || ft('timeline.events.cancelled.descDeclined')
         : reason
-          ? `Cancelled: ${reason}`
-          : 'This order was cancelled and will not be fulfilled.',
+          ? ft('timeline.events.cancelled.descWithReason', { reason })
+          : ft('timeline.events.cancelled.desc'),
       timestamp: formatTs(order.updated_at),
       state: 'completed',
     })
@@ -477,8 +528,8 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
     const respondedAt = amendmentField<string>(amendment, 'responded_at', 'respondedAt')
     events.push({
       id: `substitution-${String(amendment.id)}`,
-      title: 'Items substituted',
-      description: String(amendment.description || 'Approved item substitutions.'),
+      title: ft('timeline.events.substitution.title'),
+      description: String(amendment.description || ft('timeline.events.substitution.descDefault')),
       timestamp: formatTs(respondedAt || String(amendment.updated_at ?? '')),
       state: 'completed',
       substitutions: buildSubstitutionDetails(amendment, order.items),
@@ -495,15 +546,17 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
     const disputeOpen = order.status === 'RECEIVED_WITH_DISPUTE'
     events.push({
       id: 'restaurant-received',
-      title: disputeOpen ? 'Received - dispute open' : 'Restaurant confirmed receipt',
+      title: disputeOpen
+        ? ft('timeline.events.restaurantReceived.titleDispute')
+        : ft('timeline.events.restaurantReceived.title'),
       description: disputeOpen
-        ? `${restaurantName} recorded receiving and opened a dispute that needs your response.`
-        : `${restaurantName} recorded receiving for this order.`,
+        ? ft('timeline.events.restaurantReceived.descDisputeSupplier', { name: restaurantName })
+        : ft('timeline.events.restaurantReceived.descDoneSupplier', { name: restaurantName }),
       timestamp: formatTs(order.updated_at),
       state: disputeOpen ? 'current' : 'completed',
       link: disputeOpen
         ? {
-            label: 'Manage dispute',
+            label: ft('timeline.events.dispute.manageDispute'),
             href: firstOpenDispute
               ? `/app/disputes/${String(firstOpenDispute.id)}`
               : '/app/disputes',
@@ -516,15 +569,17 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
     const type = String(dispute.type ?? 'issue').replace(/_/g, ' ')
     events.push({
       id: `dispute-${String(dispute.id)}`,
-      title: 'Dispute opened',
-      description: String(dispute.description || `Dispute raised: ${type}.`),
+      title: ft('timeline.events.dispute.title'),
+      description: String(
+        dispute.description || ft('timeline.events.dispute.descDefault', { type })
+      ),
       timestamp: formatTs(String(dispute.createdAt ?? dispute.created_at ?? '')),
       state: ['resolved', 'rejected', 'cancelled'].includes(String(dispute.status))
         ? 'completed'
         : 'current',
       badge: type,
       link: {
-        label: 'View dispute',
+        label: ft('timeline.events.dispute.viewDispute'),
         href: `/app/disputes/${String(dispute.id)}`,
       },
     })
@@ -535,15 +590,20 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
     const disputeId = String(replacement.source_dispute_id ?? replacement.sourceDisputeId ?? '')
     events.push({
       id: `replacement-${replacementId}`,
-      title: 'Replacement order created',
+      title: ft('timeline.events.replacement.title'),
       description: disputeId
-        ? `Replacement order #${replacementId.slice(0, 8).toUpperCase()} was created from dispute #${disputeId.slice(0, 8).toUpperCase()}.`
-        : `Replacement order #${replacementId.slice(0, 8).toUpperCase()} was created to fulfill disputed quantities.`,
+        ? ft('timeline.events.replacement.descFromDispute', {
+            orderRef: replacementId.slice(0, 8).toUpperCase(),
+            disputeRef: disputeId.slice(0, 8).toUpperCase(),
+          })
+        : ft('timeline.events.replacement.desc', {
+            orderRef: replacementId.slice(0, 8).toUpperCase(),
+          }),
       timestamp: formatTs(String(replacement.created_at ?? replacement.createdAt ?? '')),
       state: 'completed',
-      badge: 'Replacement',
+      badge: ft('timeline.events.replacement.badge'),
       link: {
-        label: 'View replacement order',
+        label: ft('timeline.events.replacement.viewOrder'),
         href: `/app/orders/${replacementId}`,
       },
     })
@@ -557,11 +617,13 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
   for (const cn of orderCreditNotes) {
     events.push({
       id: `credit-${String(cn.id)}`,
-      title: 'Credit note issued',
-      description: `Credit of ${cn.credit_amount ?? cn.creditAmount ?? cn.remaining_amount ?? '-'} applied from dispute resolution.`,
+      title: ft('timeline.events.creditNote.title'),
+      description: ft('timeline.events.creditNote.desc', {
+        amount: cn.credit_amount ?? cn.creditAmount ?? cn.remaining_amount ?? '-',
+      }),
       timestamp: formatTs(String(cn.issue_date ?? cn.created_at ?? '')),
       state: 'completed',
-      link: { label: 'View invoices', href: '/app/invoices' },
+      link: { label: ft('timeline.events.creditNote.viewInvoices'), href: '/app/invoices' },
     })
   }
 
@@ -569,14 +631,21 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
     for (const invoice of invoices) {
       const invoiceStatus = String(invoice.status ?? '').toUpperCase()
       const isPaid = invoiceStatus === 'PAID'
-      const invoiceNumber = String(invoice.invoice_number ?? invoice.invoiceNumber ?? 'Invoice')
+      const invoiceNumber = String(
+        invoice.invoice_number ?? invoice.invoiceNumber ?? ft('timeline.events.defaults.invoice')
+      )
 
       events.push({
         id: `invoice-${String(invoice.id)}`,
-        title: isPaid ? 'Invoice closed' : 'Invoice issued',
+        title: isPaid
+          ? ft('timeline.events.invoice.titleClosed')
+          : ft('timeline.events.invoice.titleIssued'),
         description: isPaid
-          ? `${invoiceNumber} has been paid in full.`
-          : `${invoiceNumber} is ${invoiceStatus.toLowerCase() || 'open'}.`,
+          ? ft('timeline.events.invoice.descPaid', { number: invoiceNumber })
+          : ft('timeline.events.invoice.descOpen', {
+              number: invoiceNumber,
+              status: invoiceStatus.toLowerCase() || 'open',
+            }),
         timestamp: formatTs(
           String(
             invoice.payment_date ??
@@ -588,7 +657,7 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
           )
         ),
         state: isPaid ? 'completed' : invoiceStatus === 'ISSUED' ? 'current' : 'upcoming',
-        link: { label: 'View invoice', href: '/app/invoices' },
+        link: { label: ft('timeline.events.invoice.viewInvoice'), href: '/app/invoices' },
       })
     }
   }
@@ -596,26 +665,34 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
   return events
 }
 
-export const RESTAURANT_LIFECYCLE_LABELS = [
-  'Order placed',
-  'Supplier confirmed',
-  'Substitutions',
-  'Processing',
-  'Shipped',
-  'Delivered',
-  'Goods received',
-  'Dispute',
-  'Credit note',
-  'Invoice closed',
+const RESTAURANT_LIFECYCLE_KEYS = [
+  'orderPlaced',
+  'supplierConfirmed',
+  'substitutions',
+  'processing',
+  'shipped',
+  'delivered',
+  'goodsReceived',
+  'dispute',
+  'creditNote',
+  'invoiceClosed',
 ] as const
 
-export const SUPPLIER_LIFECYCLE_LABELS = [
-  'Order received',
-  'Acknowledged',
-  'Substitutions',
-  'Picking',
-  'Shipped',
-  'Delivered',
-  'Restaurant receipt',
-  'Dispute',
+const SUPPLIER_LIFECYCLE_KEYS = [
+  'orderReceived',
+  'acknowledged',
+  'substitutions',
+  'picking',
+  'shipped',
+  'delivered',
+  'restaurantReceipt',
+  'dispute',
 ] as const
+
+export function getRestaurantLifecycleLabels(): string[] {
+  return RESTAURANT_LIFECYCLE_KEYS.map((key) => ft(`timeline.lifecycle.${key}`))
+}
+
+export function getSupplierLifecycleLabels(): string[] {
+  return SUPPLIER_LIFECYCLE_KEYS.map((key) => ft(`timeline.lifecycle.${key}`))
+}

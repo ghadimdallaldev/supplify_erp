@@ -16,6 +16,8 @@ import { z } from 'zod'
 import {
   getRestaurantPayables,
   getRestaurantStatementOpeningBalance,
+  getRestaurantStatementAdjustments,
+  computeRestaurantStatementClosingBalance,
 } from '../services/restaurant-payables.service.js'
 
 const router = express.Router()
@@ -809,15 +811,18 @@ router.get(
         [restaurantId, supplierId, startDate, endDate].filter(Boolean)
       )
 
-      const openingBalance = startDate
-        ? await getRestaurantStatementOpeningBalance(restaurantId, supplierId, startDate)
-        : 0
+      const [openingBalance, totalAdjustments] = await Promise.all([
+        startDate
+          ? getRestaurantStatementOpeningBalance(restaurantId, supplierId, startDate)
+          : Promise.resolve(0),
+        getRestaurantStatementAdjustments(restaurantId, supplierId, startDate, endDate),
+      ])
 
       const summary = {
         openingBalance,
         totalCharges: 0,
         totalPayments: 0,
-        totalAdjustments: 0,
+        totalAdjustments,
         closingBalance: 0,
         invoiceCount: invoices.length,
       }
@@ -827,11 +832,7 @@ router.get(
         summary.totalPayments += parseFloat(inv.total_paid || 0)
       })
 
-      summary.closingBalance =
-        summary.openingBalance +
-        summary.totalCharges -
-        summary.totalPayments +
-        summary.totalAdjustments
+      summary.closingBalance = computeRestaurantStatementClosingBalance(summary)
 
       res.json({
         ok: true,

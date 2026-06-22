@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
@@ -33,15 +34,15 @@ import { ReceivingHistoryTab } from '../components/receiving/ReceivingHistoryTab
 import { ReceivingSummaryStrip } from '../components/receiving/ReceivingPendingOrderRow'
 
 export function ReceivingPage() {
+  const { t } = useTranslation('orders')
   const [searchParams, setSearchParams] = useSearchParams()
   const orderIdFromUrl = searchParams.get('order')
   const { user } = useAppSelector((state) => state.auth)
   const { can } = usePermissions()
   const { persona } = useWorkspaceRole()
-  const receivingTitle = persona.pageCopy?.receiving?.title ?? 'Receiving & Quality Control'
+  const receivingTitle = persona.pageCopy?.receiving?.title ?? t('receiving.title')
   const receivingDescription =
-    persona.pageCopy?.receiving?.description ??
-    'Confirm deliveries, record quality issues, and open disputes when needed.'
+    persona.pageCopy?.receiving?.description ?? t('receiving.description')
   const canReceive = can('RECEIVING_MANAGE')
   const canOpenDispute = can('ORDERS_CREATE') || can('RECEIVING_MANAGE')
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
@@ -71,7 +72,7 @@ export function ReceivingPage() {
   ) => {
     const supplierId = supplierIdFromOrder(order as Parameters<typeof supplierIdFromOrder>[0])
     if (!supplierId) {
-      toast.error('Could not determine supplier for this order')
+      toast.error(t('receiving.supplierUnknown'))
       return
     }
     setOpenDisputeContext({
@@ -158,10 +159,10 @@ export function ReceivingPage() {
       const reportId = (result as { report?: { id?: string } })?.report?.id
 
       if (canShowDispute && discrepancyItems.length > 0 && supplierId) {
-        toast(
-          `Receiving saved. ${discrepancyItems.length} item(s) had issues — submit one dispute for the supplier.`,
-          { icon: '⚠️', duration: 7000 }
-        )
+        toast(t('receiving.savedWithIssues', { count: discrepancyItems.length }), {
+          icon: '⚠️',
+          duration: 7000,
+        })
         setOpenDisputeContext({
           orderId,
           supplierId,
@@ -169,7 +170,7 @@ export function ReceivingPage() {
           receivingReportId: reportId,
         })
       } else {
-        toast.success('Receiving completed successfully')
+        toast.success(t('receiving.completedSuccess'))
       }
 
       await new Promise((resolve) => setTimeout(resolve, 500))
@@ -212,7 +213,7 @@ export function ReceivingPage() {
         console.error('Receiving report not found in history after', maxRetries, 'retries')
       }
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to create receiving report')
+      toast.error(error?.data?.error?.message || t('receiving.createFailed'))
       setReceivingOrderIds((prev) => {
         const next = new Set(prev)
         next.delete(orderId)
@@ -276,7 +277,7 @@ export function ReceivingPage() {
       {!receivingEnabled ? (
         <FeatureLockedCard
           featureKey="receiving_quality"
-          featureName="Receiving & quality control"
+          featureName={t('receiving.featureName')}
           currentPlan={entitlementsData?.entitlements?.plan?.name ?? null}
           upgradeUrl="/app/settings?tab=subscription"
         />
@@ -288,8 +289,8 @@ export function ReceivingPage() {
             className="rounded-xl border border-[var(--amber)]/25 bg-[var(--amber-pale)] px-4 py-3 text-sm text-[var(--text)]"
             data-testid="receiving-delivered-hint"
           >
-            <strong className="font-semibold">Delivered does not mean received.</strong> Confirm
-            quantities on site even when the supplier marks an order as delivered.
+            <strong className="font-semibold">{t('receiving.deliveredHintTitle')}</strong>{' '}
+            {t('receiving.deliveredHintBody')}
           </div>
 
           {!pendingLoading && !historyLoading ? (
@@ -304,7 +305,7 @@ export function ReceivingPage() {
             <TabsList className="tabs-scroll h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
               <TabsTrigger value="pending" className="gap-1.5 text-xs sm:text-sm">
                 <PackageCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                Pending Orders
+                {t('receiving.tabs.pending')}
                 {pendingOrders.length > 0 ? (
                   <Badge variant="destructive" className="ml-0.5">
                     {pendingOrders.length}
@@ -313,7 +314,7 @@ export function ReceivingPage() {
               </TabsTrigger>
               <TabsTrigger value="history" className="gap-1.5 text-xs sm:text-sm">
                 <History className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                Receiving History
+                {t('receiving.tabs.history')}
               </TabsTrigger>
             </TabsList>
 

@@ -11,11 +11,24 @@ module.exports = {
   parser: '@typescript-eslint/parser',
   plugins: ['@typescript-eslint', 'react-refresh'],
   rules: {
-    'react-refresh/only-export-components': [
+    'react-refresh/only-export-components': 'off',
+    '@typescript-eslint/no-unused-vars': [
       'warn',
-      { allowConstantExport: true },
+      {
+        args: 'none',
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        ignoreRestSiblings: true,
+      },
     ],
-    '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     '@typescript-eslint/no-explicit-any': 'off',
   },
+  overrides: [
+    {
+      files: ['**/*.{test,spec}.{ts,tsx}'],
+      rules: {
+        '@typescript-eslint/no-unused-vars': 'off',
+      },
+    },
+  ],
 }

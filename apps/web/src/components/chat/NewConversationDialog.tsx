@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Building2, Loader2, MessageSquare, Search, Store } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Input } from '../ui/input'
@@ -20,6 +21,7 @@ export function NewConversationDialog({
   onSelectParticipant,
   isCreating = false,
 }: Props) {
+  const { t } = useTranslation('chat')
   const [search, setSearch] = useState('')
   const isSupplier = userRole === 'SUPPLIER'
 
@@ -59,11 +61,11 @@ export function NewConversationDialog({
     >
       <DialogContent size="md" className="gap-4">
         <DialogHeader>
-          <DialogTitle>New message</DialogTitle>
+          <DialogTitle>{t('newConversation.title')}</DialogTitle>
           <DialogDescription>
             {isSupplier
-              ? 'Choose a restaurant to open a thread.'
-              : 'Choose a supplier to open a thread.'}
+              ? t('newConversation.descriptionSupplier')
+              : t('newConversation.descriptionRestaurant')}
           </DialogDescription>
         </DialogHeader>
 
@@ -74,7 +76,11 @@ export function NewConversationDialog({
           />
           <Input
             autoFocus
-            placeholder={isSupplier ? 'Search restaurants…' : 'Search suppliers…'}
+            placeholder={
+              isSupplier
+                ? t('newConversation.searchRestaurants')
+                : t('newConversation.searchSuppliers')
+            }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-10 pl-8"
@@ -85,7 +91,9 @@ export function NewConversationDialog({
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 p-10 text-sm text-[var(--text-mid)]">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              {isSupplier ? 'Loading restaurants…' : 'Loading suppliers…'}
+              {isSupplier
+                ? t('newConversation.loadingRestaurants')
+                : t('newConversation.loadingSuppliers')}
             </div>
           ) : participants.length === 0 ? (
             <div className="space-y-2 p-10 text-center">
@@ -99,11 +107,11 @@ export function NewConversationDialog({
               <p className="text-sm text-[var(--text-mid)]">
                 {search.trim()
                   ? isSupplier
-                    ? 'No restaurants match your search'
-                    : 'No suppliers match your search'
+                    ? t('newConversation.noRestaurantsMatch')
+                    : t('newConversation.noSuppliersMatch')
                   : isSupplier
-                    ? 'No restaurants available yet'
-                    : 'No suppliers found'}
+                    ? t('newConversation.noRestaurantsAvailable')
+                    : t('newConversation.noSuppliersFound')}
               </p>
             </div>
           ) : (
@@ -141,7 +149,7 @@ export function NewConversationDialog({
         </div>
 
         <Button variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
-          Cancel
+          {t('newConversation.cancel')}
         </Button>
       </DialogContent>
     </Dialog>

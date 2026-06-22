@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../ui/card'
 import { Button } from '../../../ui/button'
 import { Bell, Save, Loader2, CheckCircle2 } from 'lucide-react'
@@ -13,10 +14,12 @@ import {
 import { isEntitlementFeatureEnabled } from '../../../../lib/planLimits'
 import {
   SUPPLIER_NOTIFICATION_DEFAULTS,
-  SUPPLIER_NOTIFICATION_FIELDS,
+  SUPPLIER_NOTIFICATION_FIELD_KEYS,
 } from '../supplierSettingsShared'
+import { ensureNamespace } from '../../../../i18n'
 
 export function SupplierNotificationsTab() {
+  const { t } = useTranslation('suppliers')
   const { user } = useAppSelector((state) => state.auth)
   const [notificationPrefs, setNotificationPrefs] = useState(SUPPLIER_NOTIFICATION_DEFAULTS)
   const {
@@ -32,6 +35,10 @@ export function SupplierNotificationsTab() {
     'push_notifications'
   )
   const push = usePushNotifications()
+
+  useEffect(() => {
+    void ensureNamespace('suppliers')
+  }, [])
 
   useEffect(() => {
     const prefs = notificationPrefsData?.preferences
@@ -57,9 +64,9 @@ export function SupplierNotificationsTab() {
     try {
       await updateNotificationPreferences(notificationPrefs).unwrap()
       await refetchNotificationPrefs()
-      toast.success('Notification preferences saved!')
+      toast.success(t('notifications.toast.saved'))
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to save notification preferences')
+      toast.error(error?.data?.error?.message || t('notifications.toast.saveFailed'))
     }
   }
 
@@ -69,31 +76,35 @@ export function SupplierNotificationsTab() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Bell className="h-5 w-5" />
-            Notification Preferences
+            {t('notifications.title')}
           </CardTitle>
-          <CardDescription>Choose how you want to be notified</CardDescription>
+          <CardDescription>{t('notifications.description')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {isLoadingNotificationPrefs ? (
             <div className="flex items-center gap-3 text-sm text-[var(--text-muted)]">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading notification preferences…
+              {t('notifications.loading')}
             </div>
           ) : (
             <>
               <div className="grid gap-3 md:grid-cols-2">
-                {SUPPLIER_NOTIFICATION_FIELDS.map(({ key, label, description }) => (
+                {SUPPLIER_NOTIFICATION_FIELD_KEYS.map((key) => (
                   <label
                     key={key}
                     className="flex flex-col gap-2 rounded-xl border p-4 hover:bg-[var(--brand-ultra)] cursor-pointer"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-[var(--text)]">{label}</span>
+                      <span className="text-sm font-medium text-[var(--text)]">
+                        {t(`notifications.fields.${key}.label`)}
+                      </span>
                       {notificationPrefs[key] && (
                         <CheckCircle2 className="h-5 w-5 text-[var(--mint)] shrink-0" />
                       )}
                     </div>
-                    <p className="text-xs text-[var(--text-muted)]">{description}</p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {t(`notifications.fields.${key}.description`)}
+                    </p>
                     <input
                       type="checkbox"
                       className="hidden"
@@ -106,34 +117,30 @@ export function SupplierNotificationsTab() {
 
               {pushNotificationsEnabled ? (
                 <div className="border-t pt-6">
-                  <h4 className="text-sm font-semibold text-[var(--text-mid)]">Browser push</h4>
+                  <h4 className="text-sm font-semibold text-[var(--text-mid)]">
+                    {t('notifications.browserPush')}
+                  </h4>
                   <p className="text-xs text-[var(--text-muted)] mt-1 mb-3">
-                    Get real-time alerts even when Supplify is in the background.
+                    {t('notifications.browserPushHint')}
                   </p>
                   {push.pushAvailable ? (
                     <div className="space-y-3">
                       {push.pushPermissionBlocked ? (
                         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-                          <p className="font-medium">Notifications blocked by your browser</p>
+                          <p className="font-medium">{t('notifications.blockedTitle')}</p>
                           <p className="mt-1">{push.pushPermissionBlockedReason}</p>
                           <ol className="mt-2 list-decimal space-y-1 pl-4">
-                            <li>
-                              Click the <strong>lock / tune icon</strong> left of the address bar
-                            </li>
-                            <li>
-                              Open <strong>Permissions</strong> → set <strong>Notifications</strong>{' '}
-                              to <strong>Allow</strong>
-                            </li>
-                            <li>Reload this page, then click Enable below</li>
+                            <li>{t('notifications.blockedSteps.step1')}</li>
+                            <li>{t('notifications.blockedSteps.step2')}</li>
+                            <li>{t('notifications.blockedSteps.step3')}</li>
                           </ol>
                           <p className="mt-2 text-[var(--text-muted)]">
-                            In Edge: Settings → Cookies and site permissions → All permissions →
-                            Notifications → remove this site if listed as blocked.
+                            {t('notifications.blockedEdgeHint')}
                           </p>
                         </div>
                       ) : null}
                       <div className="flex items-center justify-between rounded-xl border p-4">
-                        <span className="text-sm">Enable push notifications</span>
+                        <span className="text-sm">{t('notifications.enablePush')}</span>
                         <Button
                           type="button"
                           variant={push.subscribed ? 'outline' : 'default'}
@@ -146,24 +153,23 @@ export function SupplierNotificationsTab() {
                           onClick={() => {
                             const action = push.subscribed ? push.disablePush() : push.enablePush()
                             action.catch((err: Error) =>
-                              toast.error(err?.message || 'Could not update push notifications')
+                              toast.error(err?.message || t('notifications.toast.pushUpdateFailed'))
                             )
                           }}
                         >
-                          {push.subscribed ? 'Disable' : 'Enable'}
+                          {push.subscribed ? t('notifications.disable') : t('notifications.enable')}
                         </Button>
                       </div>
                     </div>
                   ) : (
                     <p className="text-xs text-amber-800 dark:text-amber-200">
-                      {push.pushUnavailableReason ||
-                        'Push is not configured on this server. Ask your admin to set VAPID keys on the API.'}
+                      {push.pushUnavailableReason || t('notifications.pushNotConfigured')}
                     </p>
                   )}
                 </div>
               ) : (
                 <p className="text-xs text-[var(--text-muted)] border-t pt-6">
-                  Browser push is not included on your plan. Upgrade to enable real-time alerts.
+                  {t('notifications.pushNotOnPlan')}
                 </p>
               )}
 
@@ -177,7 +183,9 @@ export function SupplierNotificationsTab() {
                 ) : (
                   <Save className="h-4 w-4 mr-2" />
                 )}
-                {isSavingNotificationPrefs ? 'Saving…' : 'Save preferences'}
+                {isSavingNotificationPrefs
+                  ? t('notifications.saving')
+                  : t('notifications.savePreferences')}
               </Button>
             </>
           )}

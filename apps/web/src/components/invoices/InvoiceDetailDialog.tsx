@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogContent,
@@ -7,20 +8,15 @@ import {
   DialogTitle,
 } from '../ui/dialog'
 import { Button } from '../ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
+import { Card, CardContent } from '../ui/card'
 import { StatusBadge } from '../ui/status-badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
-import { Input } from '../ui/input'
-import { Label } from '../ui/label'
-import { Textarea } from '../ui/textarea'
-import { Select, SelectItem, SelectTrigger } from '../ui/select'
 import { Loader2, Download, CreditCard, ArrowRightLeft, FileText } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { formatPrice } from '../../utils/format'
 import { apiUrl } from '../../lib/apiBase'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function InvoiceDetailDialog(props: any) {
   const {
     showInvoiceDetail,
@@ -36,12 +32,14 @@ export function InvoiceDetailDialog(props: any) {
     remainingBalance,
   } = props
 
+  const { t } = useTranslation('invoices')
+
   return (
     <Dialog open={showInvoiceDetail} onOpenChange={setShowInvoiceDetail}>
       <DialogContent size="wide">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
-            <span>Invoice {selectedInvoice?.invoice_number}</span>
+            <span>{t('detail.title', { number: selectedInvoice?.invoice_number })}</span>
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -62,9 +60,9 @@ export function InvoiceDetailDialog(props: any) {
                     a.download = `invoice-${(selectedInvoice.invoice_number || selectedInvoice.id).replace(/[^a-zA-Z0-9-_]/g, '-')}.pdf`
                     a.click()
                     URL.revokeObjectURL(url)
-                    toast.success('PDF downloaded')
+                    toast.success(t('toasts.pdfDownloaded'))
                   } catch (e) {
-                    toast.error('Could not download PDF')
+                    toast.error(t('toasts.pdfFailed'))
                   } finally {
                     setDownloadingPdfId(null)
                   }
@@ -75,7 +73,7 @@ export function InvoiceDetailDialog(props: any) {
                 ) : (
                   <Download className="h-4 w-4 mr-2" />
                 )}
-                PDF
+                {t('detail.pdf')}
               </Button>
               {isRestaurant &&
                 canRecordPayments &&
@@ -91,22 +89,20 @@ export function InvoiceDetailDialog(props: any) {
                     }}
                   >
                     <CreditCard className="h-4 w-4 mr-2" />
-                    Make Payment
+                    {t('detail.makePayment')}
                   </Button>
                 )}
             </div>
           </DialogTitle>
-          <DialogDescription>
-            Comprehensive invoice details, payment history, and order information
-          </DialogDescription>
+          <DialogDescription>{t('detail.description')}</DialogDescription>
         </DialogHeader>
 
         {selectedInvoice && (
           <Tabs defaultValue="details" className="w-full">
             <TabsList>
-              <TabsTrigger value="details">Details</TabsTrigger>
-              <TabsTrigger value="payments">Payment History</TabsTrigger>
-              <TabsTrigger value="order">Related Order</TabsTrigger>
+              <TabsTrigger value="details">{t('detail.tabs.details')}</TabsTrigger>
+              <TabsTrigger value="payments">{t('detail.tabs.payments')}</TabsTrigger>
+              <TabsTrigger value="order">{t('detail.tabs.order')}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="details" className="space-y-6">
@@ -119,7 +115,7 @@ export function InvoiceDetailDialog(props: any) {
                   {/* Invoice Header */}
                   <div className="grid grid-cols-1 gap-6 border-b pb-6 sm:grid-cols-2">
                     <div>
-                      <h3 className="font-semibold mb-2">Bill From:</h3>
+                      <h3 className="font-semibold mb-2">{t('detail.billFrom')}</h3>
                       <p className="font-medium">{invoiceDetail.invoice.supplier_name}</p>
                       {invoiceDetail.invoice.supplier_address && (
                         <p className="text-sm text-[var(--text-muted)] mt-1">
@@ -140,13 +136,15 @@ export function InvoiceDetailDialog(props: any) {
                     <div className="text-right">
                       <div className="space-y-3">
                         <div>
-                          <p className="text-sm text-[var(--text-muted)]">Invoice Date</p>
+                          <p className="text-sm text-[var(--text-muted)]">
+                            {t('detail.invoiceDate')}
+                          </p>
                           <p className="font-semibold">
                             {new Date(invoiceDetail.invoice.invoice_date).toLocaleDateString()}
                           </p>
                         </div>
                         <div>
-                          <p className="text-sm text-[var(--text-muted)]">Due Date</p>
+                          <p className="text-sm text-[var(--text-muted)]">{t('detail.dueDate')}</p>
                           <p
                             className={`font-semibold ${
                               new Date(invoiceDetail.invoice.due_date) < new Date() &&
@@ -160,7 +158,7 @@ export function InvoiceDetailDialog(props: any) {
                         </div>
                         {invoiceDetail.invoice.order_id && (
                           <div>
-                            <p className="text-sm text-[var(--text-muted)]">Order</p>
+                            <p className="text-sm text-[var(--text-muted)]">{t('detail.order')}</p>
                             <Link
                               to={`/app/orders/${invoiceDetail.invoice.order_id}`}
                               className="font-semibold text-[var(--brand-mid)] hover:underline"
@@ -175,17 +173,29 @@ export function InvoiceDetailDialog(props: any) {
 
                   {/* Items Table */}
                   <div>
-                    <h3 className="font-semibold mb-4">Line Items</h3>
+                    <h3 className="font-semibold mb-4">{t('detail.lineItems')}</h3>
                     <div className="border rounded-lg overflow-hidden">
                       <table className="w-full">
                         <thead className="bg-[var(--brand-ultra)]">
                           <tr>
-                            <th className="text-left py-3 px-4 text-sm font-medium">Product</th>
-                            <th className="text-left py-3 px-4 text-sm font-medium">SKU</th>
-                            <th className="text-right py-3 px-4 text-sm font-medium">Quantity</th>
-                            <th className="text-right py-3 px-4 text-sm font-medium">Unit Price</th>
-                            <th className="text-right py-3 px-4 text-sm font-medium">Tax</th>
-                            <th className="text-right py-3 px-4 text-sm font-medium">Total</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium">
+                              {t('detail.product')}
+                            </th>
+                            <th className="text-left py-3 px-4 text-sm font-medium">
+                              {t('detail.sku')}
+                            </th>
+                            <th className="text-right py-3 px-4 text-sm font-medium">
+                              {t('detail.quantity')}
+                            </th>
+                            <th className="text-right py-3 px-4 text-sm font-medium">
+                              {t('detail.unitPrice')}
+                            </th>
+                            <th className="text-right py-3 px-4 text-sm font-medium">
+                              {t('detail.tax')}
+                            </th>
+                            <th className="text-right py-3 px-4 text-sm font-medium">
+                              {t('detail.total')}
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -193,7 +203,7 @@ export function InvoiceDetailDialog(props: any) {
                             <tr key={item.id} className="border-b hover:bg-[var(--brand-ultra)]">
                               <td className="py-3 px-4">{item.description}</td>
                               <td className="py-3 px-4 text-sm text-[var(--text-muted)]">
-                                {item.sku || 'N/A'}
+                                {item.sku || t('stats.na')}
                               </td>
                               <td className="py-3 px-4 text-right">{item.quantity}</td>
                               <td className="py-3 px-4 text-right">
@@ -221,40 +231,39 @@ export function InvoiceDetailDialog(props: any) {
                   <div className="ml-auto w-80">
                     <div className="space-y-2 border rounded-lg p-4 bg-[var(--brand-ultra)]">
                       <div className="flex justify-between">
-                        <span className="text-[var(--text-muted)]">Subtotal</span>
+                        <span className="text-[var(--text-muted)]">{t('detail.subtotal')}</span>
                         <span>{formatPrice(invoiceDetail.invoice.subtotal)}</span>
                       </div>
                       {parseFloat(invoiceDetail.invoice.tax_amount || 0) > 0 && (
                         <div className="flex justify-between">
                           <span className="text-[var(--text-muted)]">
-                            Tax{' '}
                             {invoiceDetail.invoice.tax_rate
-                              ? `(${invoiceDetail.invoice.tax_rate}%)`
-                              : ''}
+                              ? t('detail.taxWithRate', { rate: invoiceDetail.invoice.tax_rate })
+                              : t('detail.tax')}
                           </span>
                           <span>{formatPrice(invoiceDetail.invoice.tax_amount)}</span>
                         </div>
                       )}
                       <div className="flex justify-between font-semibold text-lg border-t pt-2 mt-2">
-                        <span>Total</span>
+                        <span>{t('detail.total')}</span>
                         <span>{formatPrice(invoiceDetail.invoice.total_amount)}</span>
                       </div>
                       {parseFloat(invoiceDetail.invoice.total_paid || 0) > 0 && (
                         <div className="flex justify-between text-[var(--mint)] border-t pt-2 mt-2">
-                          <span>Paid</span>
+                          <span>{t('detail.paid')}</span>
                           <span>-{formatPrice(invoiceDetail.invoice.total_paid)}</span>
                         </div>
                       )}
                       {remainingBalance > 0 && (
                         <div className="flex justify-between font-semibold text-lg text-[var(--red)] border-t pt-2 mt-2">
-                          <span>Balance Due</span>
+                          <span>{t('detail.balanceDue')}</span>
                           <span>{formatPrice(remainingBalance)}</span>
                         </div>
                       )}
                       {remainingBalance === 0 && (
                         <div className="flex justify-between font-semibold text-lg text-[var(--mint)] border-t pt-2 mt-2">
-                          <span>Status</span>
-                          <span>Fully Paid</span>
+                          <span>{t('detail.status')}</span>
+                          <span>{t('detail.fullyPaid')}</span>
                         </div>
                       )}
                     </div>
@@ -262,7 +271,9 @@ export function InvoiceDetailDialog(props: any) {
 
                   {invoiceDetail.invoice.notes && (
                     <div className="border rounded-lg p-4 bg-[var(--brand-ultra)]">
-                      <p className="text-sm font-medium text-[var(--text-mid)] mb-1">Notes</p>
+                      <p className="text-sm font-medium text-[var(--text-mid)] mb-1">
+                        {t('detail.notes')}
+                      </p>
                       <p className="text-sm text-[var(--text-muted)]">
                         {invoiceDetail.invoice.notes}
                       </p>
@@ -273,7 +284,7 @@ export function InvoiceDetailDialog(props: any) {
             </TabsContent>
 
             <TabsContent value="payments" className="space-y-4">
-              <h3 className="font-semibold">Payment History</h3>
+              <h3 className="font-semibold">{t('detail.paymentHistory')}</h3>
               {invoiceDetail?.payments && invoiceDetail.payments.length > 0 ? (
                 <div className="space-y-3">
                   {invoiceDetail.payments.map((payment: any) => (
@@ -281,14 +292,18 @@ export function InvoiceDetailDialog(props: any) {
                       <CardContent className="pt-4">
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="font-medium">{payment.payment_method}</p>
+                            <p className="font-medium">
+                              {t(`payment.methods.${payment.payment_method}`, {
+                                defaultValue: payment.payment_method,
+                              })}
+                            </p>
                             <p className="text-sm text-[var(--text-muted)]">
                               {new Date(payment.payment_date).toLocaleDateString()} •
                               {payment.payment_number && ` ${payment.payment_number}`}
                             </p>
                             {payment.payment_reference && (
                               <p className="text-xs text-[var(--text-muted)] mt-1">
-                                Reference: {payment.payment_reference}
+                                {t('detail.reference')}: {payment.payment_reference}
                               </p>
                             )}
                             {payment.notes && (
@@ -298,7 +313,7 @@ export function InvoiceDetailDialog(props: any) {
                             )}
                             {payment.bank_name && (
                               <p className="text-xs text-[var(--text-muted)]">
-                                Bank: {payment.bank_name}
+                                {t('detail.bank')}: {payment.bank_name}
                               </p>
                             )}
                           </div>
@@ -316,9 +331,13 @@ export function InvoiceDetailDialog(props: any) {
                     <div className="border-2 border-[var(--amber-mid)]/40 rounded-lg p-4 bg-[var(--amber-pale)]">
                       <div className="flex justify-between items-center">
                         <div>
-                          <p className="font-medium text-[var(--amber)]">Outstanding Balance</p>
+                          <p className="font-medium text-[var(--amber)]">
+                            {t('detail.outstandingBalance')}
+                          </p>
                           <p className="text-sm text-[var(--amber)]">
-                            Due {new Date(selectedInvoice.due_date).toLocaleDateString()}
+                            {t('detail.due', {
+                              date: new Date(selectedInvoice.due_date).toLocaleDateString(),
+                            })}
                           </p>
                         </div>
                         <div className="text-right">
@@ -333,7 +352,7 @@ export function InvoiceDetailDialog(props: any) {
               ) : (
                 <div className="border rounded-lg p-8 text-center bg-[var(--brand-ultra)]">
                   <CreditCard className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
-                  <p className="text-[var(--text-muted)]">No payments recorded yet</p>
+                  <p className="text-[var(--text-muted)]">{t('detail.noPayments')}</p>
                   {canRecordPayments && remainingBalance > 0 && (
                     <Button
                       className="mt-4"
@@ -342,7 +361,7 @@ export function InvoiceDetailDialog(props: any) {
                         handleOpenPaymentDialog(selectedInvoice)
                       }}
                     >
-                      Record Payment
+                      {t('detail.recordPayment')}
                     </Button>
                   )}
                 </div>
@@ -353,10 +372,10 @@ export function InvoiceDetailDialog(props: any) {
               {invoiceDetail?.invoice?.order_id ? (
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold">Related Order</h3>
+                    <h3 className="font-semibold">{t('detail.relatedOrder')}</h3>
                     <Link to={`/app/orders/${invoiceDetail.invoice.order_id}`}>
                       <Button variant="outline" size="sm">
-                        View Order
+                        {t('detail.viewOrder')}
                         <ArrowRightLeft className="h-4 w-4 ml-2" />
                       </Button>
                     </Link>
@@ -365,16 +384,20 @@ export function InvoiceDetailDialog(props: any) {
                     <CardContent className="pt-4">
                       <div className="space-y-2">
                         <div className="flex justify-between">
-                          <span className="text-[var(--text-muted)]">Order ID</span>
+                          <span className="text-[var(--text-muted)]">{t('detail.orderId')}</span>
                           <span className="font-medium">{invoiceDetail.invoice.order_id}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-[var(--text-muted)]">Order Status</span>
-                          <StatusBadge status={invoiceDetail.invoice.order_status || 'N/A'} />
+                          <span className="text-[var(--text-muted)]">
+                            {t('detail.orderStatus')}
+                          </span>
+                          <StatusBadge
+                            status={invoiceDetail.invoice.order_status || t('stats.na')}
+                          />
                         </div>
                         {invoiceDetail.invoice.order_placed_at && (
                           <div className="flex justify-between">
-                            <span className="text-[var(--text-muted)]">Placed</span>
+                            <span className="text-[var(--text-muted)]">{t('detail.placed')}</span>
                             <span>
                               {new Date(invoiceDetail.invoice.order_placed_at).toLocaleDateString()}
                             </span>
@@ -387,7 +410,7 @@ export function InvoiceDetailDialog(props: any) {
               ) : (
                 <div className="text-center py-8 text-[var(--text-muted)]">
                   <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No related order</p>
+                  <p>{t('detail.noRelatedOrder')}</p>
                 </div>
               )}
             </TabsContent>
@@ -396,7 +419,7 @@ export function InvoiceDetailDialog(props: any) {
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setShowInvoiceDetail(false)}>
-            Close
+            {t('detail.close')}
           </Button>
         </DialogFooter>
       </DialogContent>

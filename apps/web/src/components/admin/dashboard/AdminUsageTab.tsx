@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Filter, Loader2, RefreshCw, X } from 'lucide-react'
 import { Button } from '../../ui/button'
 import { AppPanel, SummaryStrip } from '../../ui/app-panel'
@@ -22,6 +23,21 @@ import type { AdminTenantType } from '../../../lib/adminTenantSearch'
 import type { OpenChangePlanFn } from './AdminChangePlanDialog'
 import { ADMIN_TENANT_PAGE_SIZE, dedupeAdminPlans } from './adminDashboardShared'
 
+function usageStatusLabel(status: UsageStatus, t: (key: string) => string): string {
+  switch (status) {
+    case 'near_limit':
+      return t('usageStatus.nearLimit')
+    case 'over_limit':
+      return t('usageStatus.overLimit')
+    case 'healthy':
+      return t('usageStatus.healthy')
+    case 'unlimited':
+      return t('usageStatus.unlimited')
+    case 'unknown':
+      return t('usageStatus.unknown')
+  }
+}
+
 export type AdminUsageTabProps = {
   active: boolean
   initialTab?: string
@@ -35,6 +51,7 @@ export function AdminUsageTab({
   onOpenChangePlan,
   onTenantDiag,
 }: AdminUsageTabProps) {
+  const { t } = useTranslation('admin')
   const [supplierListOffset, setSupplierListOffset] = useState(0)
   const [restaurantListOffset, setRestaurantListOffset] = useState(0)
   const [accumulatedSuppliers, setAccumulatedSuppliers] = useState<any[]>([])
@@ -153,21 +170,21 @@ export function AdminUsageTab({
   )
 
   const headerTitle = showSuppliersOnly
-    ? 'Supplier usage & quotas'
+    ? t('usage.tab.title.suppliers')
     : showRestaurantsOnly
-      ? 'Restaurant usage & quotas'
-      : 'Usage & quotas'
+      ? t('usage.tab.title.restaurants')
+      : t('usage.tab.title.overview')
   const headerDescription = showSuppliersOnly
-    ? 'Product, warehouse, deal, and storage usage vs plan limits for each supplier.'
+    ? t('usage.tab.description.suppliers')
     : showRestaurantsOnly
-      ? 'Daily orders, supplier connections, inventory, and storage vs plan limits.'
-      : 'Monitor quota pressure across suppliers and restaurants — who needs an upgrade or limit review.'
+      ? t('usage.tab.description.restaurants')
+      : t('usage.tab.description.overview')
 
   const metricDimensions = showSuppliersOnly
-    ? '4 metrics per supplier (products, warehouses, deals, storage)'
+    ? t('usage.tab.metricDimensions.suppliers')
     : showRestaurantsOnly
-      ? '5 metrics per restaurant (orders today, 30d volume, suppliers, inventory, storage)'
-      : '9 metrics tracked (4 supplier + 5 restaurant dimensions)'
+      ? t('usage.tab.metricDimensions.restaurants')
+      : t('usage.tab.metricDimensions.overview')
 
   const filteredSuppliers =
     statusFilter === 'all'
@@ -209,33 +226,37 @@ export function AdminUsageTab({
             ...(showOverview
               ? [
                   {
-                    label: 'Loaded tenants',
+                    label: t('usage.tab.metrics.loadedTenants'),
                     value: stats.loadedTotal,
-                    hint: `${stats.supplierCount} suppliers · ${stats.restaurantCount} restaurants of ${stats.platformTotal} total`,
+                    hint: t('usage.tab.metrics.loadedTenantsHint', {
+                      supplierCount: stats.supplierCount,
+                      restaurantCount: stats.restaurantCount,
+                      platformTotal: stats.platformTotal,
+                    }),
                   },
                 ]
               : showSuppliersOnly
                 ? [
                     {
-                      label: 'Suppliers loaded',
+                      label: t('usage.tab.metrics.suppliersLoaded'),
                       value: `${stats.supplierCount} / ${suppliersTotal}`,
-                      hint: 'Paginate below for more',
+                      hint: t('usage.tab.metrics.paginateHint'),
                       tone: 'brand' as const,
                     },
                   ]
                 : [
                     {
-                      label: 'Restaurants loaded',
+                      label: t('usage.tab.metrics.restaurantsLoaded'),
                       value: `${stats.restaurantCount} / ${restaurantsTotal}`,
-                      hint: 'Paginate below for more',
+                      hint: t('usage.tab.metrics.paginateHint'),
                       tone: 'brand' as const,
                     },
                   ]),
             {
-              label: 'Needs attention',
+              label: t('usage.tab.metrics.needsAttention'),
               value: stats.needsAttention,
               tone: stats.needsAttention > 0 ? 'amber' : 'default',
-              hint: 'Near or over limit',
+              hint: t('usage.tab.metrics.needsAttentionHint'),
               active: statusFilter === 'near_limit' || statusFilter === 'over_limit',
               onClick: () =>
                 setStatusFilter((f) =>
@@ -243,31 +264,31 @@ export function AdminUsageTab({
                 ),
             },
             {
-              label: 'Over limit',
+              label: t('usageStatus.overLimit'),
               value: stats.overLimit,
               tone: stats.overLimit > 0 ? 'danger' : 'default',
-              hint: 'Exceeds plan quota',
+              hint: t('usage.tab.metrics.overLimitHint'),
               active: statusFilter === 'over_limit',
               onClick: () => setStatusFilter((f) => (f === 'over_limit' ? 'all' : 'over_limit')),
             },
             {
-              label: 'Near limit',
+              label: t('usageStatus.nearLimit'),
               value: stats.nearLimit,
               tone: stats.nearLimit > 0 ? 'amber' : 'default',
-              hint: '≥80% of quota',
+              hint: t('usage.tab.metrics.nearLimitHint'),
               active: statusFilter === 'near_limit',
               onClick: () => setStatusFilter((f) => (f === 'near_limit' ? 'all' : 'near_limit')),
             },
             {
-              label: 'Healthy',
+              label: t('usageStatus.healthy'),
               value: stats.healthy,
               tone: 'mint',
-              hint: 'Under 80% utilization',
+              hint: t('usage.tab.metrics.healthyHint'),
               active: statusFilter === 'healthy',
               onClick: () => setStatusFilter((f) => (f === 'healthy' ? 'all' : 'healthy')),
             },
             {
-              label: 'Metrics tracked',
+              label: t('usage.tab.metrics.metricsTracked'),
               value: showOverview ? 9 : showSuppliersOnly ? 4 : 5,
               hint: metricDimensions,
             },
@@ -279,7 +300,7 @@ export function AdminUsageTab({
         <div className="flex items-center gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 text-sm">
           <Filter className="h-3.5 w-3.5 text-[var(--text-muted)]" />
           <span>
-            Filtering loaded tenants by <strong>{statusFilter.replace(/_/g, ' ')}</strong>
+            {t('usage.tab.filteringBy')} <strong>{usageStatusLabel(statusFilter, t)}</strong>
           </span>
           <Button
             type="button"
@@ -289,15 +310,15 @@ export function AdminUsageTab({
             onClick={() => setStatusFilter('all')}
           >
             <X className="mr-1 h-3.5 w-3.5" />
-            Clear
+            {t('usage.tab.clearFilter')}
           </Button>
         </div>
       )}
 
       {showOverview && !isLoading && (
         <AppPanel
-          title="Tenants under pressure"
-          description={`Top ${pressureList.length} loaded tenant${pressureList.length === 1 ? '' : 's'} closest to or over plan limits`}
+          title={t('usage.tenantsUnderPressure')}
+          description={t('usage.tab.pressureDescription', { count: pressureList.length })}
           testId="admin-usage-pressure-panel"
         >
           <UsagePressureList
@@ -310,11 +331,18 @@ export function AdminUsageTab({
 
       {(showOverview || showSuppliersOnly) && (
         <AppPanel
-          title={showOverview ? 'Supplier usage' : 'All suppliers'}
+          title={
+            showOverview
+              ? t('usage.tab.supplierPanel.titleOverview')
+              : t('usage.tab.supplierPanel.titleAll')
+          }
           description={
             suppliersLoading
-              ? 'Loading supplier usage…'
-              : `${filteredSuppliers.length} supplier${filteredSuppliers.length === 1 ? '' : 's'} shown · ${metricDimensions.split('(')[0].trim()}`
+              ? t('usage.tab.supplierPanel.loading')
+              : t('usage.tab.supplierPanel.shown', {
+                  count: filteredSuppliers.length,
+                  metrics: t('usage.tab.supplierPanel.metricsShort'),
+                })
           }
           testId="admin-usage-suppliers-panel"
           footer={
@@ -328,7 +356,10 @@ export function AdminUsageTab({
                   disabled={suppliersFetching}
                 >
                   {suppliersFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Load more suppliers ({suppliersForUi?.length ?? 0} / {suppliersTotal})
+                  {t('usage.tab.supplierPanel.loadMore', {
+                    loaded: suppliersForUi?.length ?? 0,
+                    total: suppliersTotal,
+                  })}
                 </Button>
               </div>
             ) : undefined
@@ -347,11 +378,15 @@ export function AdminUsageTab({
 
       {(showOverview || showRestaurantsOnly) && (
         <AppPanel
-          title={showOverview ? 'Restaurant usage' : 'All restaurants'}
+          title={
+            showOverview
+              ? t('usage.tab.restaurantPanel.titleOverview')
+              : t('usage.tab.restaurantPanel.titleAll')
+          }
           description={
             restaurantsLoading
-              ? 'Loading restaurant usage…'
-              : `${filteredRestaurants.length} restaurant${filteredRestaurants.length === 1 ? '' : 's'} shown · orders, suppliers, inventory, storage`
+              ? t('usage.tab.restaurantPanel.loading')
+              : t('usage.tab.restaurantPanel.shown', { count: filteredRestaurants.length })
           }
           testId="admin-usage-restaurants-panel"
           footer={
@@ -365,7 +400,10 @@ export function AdminUsageTab({
                   disabled={restaurantsFetching}
                 >
                   {restaurantsFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Load more restaurants ({restaurantsForUi?.length ?? 0} / {restaurantsTotal})
+                  {t('usage.tab.restaurantPanel.loadMore', {
+                    loaded: restaurantsForUi?.length ?? 0,
+                    total: restaurantsTotal,
+                  })}
                 </Button>
               </div>
             ) : undefined

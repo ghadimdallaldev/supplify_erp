@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -15,6 +16,7 @@ export function AdminPlatformSettingsPanel({
 }: {
   variant?: 'default' | 'compact'
 }) {
+  const { t } = useTranslation('admin')
   const { data, isLoading } = useGetAdminPlatformSettingsQuery()
   const [updateSettings, { isLoading: saving }] = useUpdateAdminPlatformSettingsMutation()
   const [days, setDays] = useState('30')
@@ -28,12 +30,12 @@ export function AdminPlatformSettingsPanel({
   const handleSave = async () => {
     const n = Number(days)
     if (!Number.isFinite(n) || n < 7 || n > 90) {
-      toast.error('Enter a number between 7 and 90 days')
+      toast.error(t('platformToasts.daysRange'))
       return
     }
     try {
       await updateSettings({ freeSandboxDays: Math.round(n) }).unwrap()
-      toast.success('Platform settings saved')
+      toast.success(t('platformToasts.saved'))
     } catch (e: unknown) {
       const msg =
         (e as { data?: { error?: { message?: string } } })?.data?.error?.message ||

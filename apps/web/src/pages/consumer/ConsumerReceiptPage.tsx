@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { Link, useParams } from 'react-router-dom'
 import { useGetPublicConsumerReceiptQuery } from '../../services/consumerApi'
 import { OrderStatusStepper } from '../../components/consumer/OrderStatusStepper'
@@ -10,6 +12,7 @@ import { PageShell } from '../../components/ui/page-shell'
 import { formatPrice } from '../../utils/format'
 import { isConsumerOrderTerminal, type ConsumerOrderLine } from '../../lib/consumerOrderTracking'
 import { CheckCircle2, Gift } from 'lucide-react'
+import { ensureNamespace } from '../../i18n'
 
 function formatModifiers(line: ConsumerOrderLine): string | null {
   const modifiers = line.modifiers ?? []
@@ -20,7 +23,17 @@ function formatModifiers(line: ConsumerOrderLine): string | null {
     .join(', ')
 }
 
+function fulfillmentLabel(type: string, t: TFunction<'consumer'>) {
+  return t(`fulfillment.${type}`, { defaultValue: type.replace('_', ' ') })
+}
+
 export function ConsumerReceiptPage() {
+  const { t } = useTranslation('consumer')
+
+  useEffect(() => {
+    void ensureNamespace('consumer')
+  }, [])
+
   const { restaurantSlug, receiptToken } = useParams<{
     restaurantSlug: string
     receiptToken: string
@@ -52,7 +65,7 @@ export function ConsumerReceiptPage() {
   }
 
   if (isError || !data?.order) {
-    return <div className="p-6 text-center text-muted-foreground">Receipt not found.</div>
+    return <div className="p-6 text-center text-muted-foreground">{t('receipt.notFound')}</div>
   }
 
   const { order, lines, history, loyalty } = data
@@ -67,7 +80,7 @@ export function ConsumerReceiptPage() {
           className={`mx-auto mb-2 h-10 w-10 ${delivered ? 'text-green-600' : 'text-[var(--brand-mid)]'}`}
         />
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">
-          {delivered ? 'Order delivered' : 'Order confirmed'}
+          {delivered ? t('receipt.delivered') : t('receipt.confirmed')}
         </h1>
         <p className="mt-2 text-base leading-relaxed text-[var(--lead-text-color)]">
           {order.order_number}
@@ -80,14 +93,14 @@ export function ConsumerReceiptPage() {
             <Gift className="h-8 w-8 shrink-0 text-green-700 dark:text-green-400" />
             <div>
               <p className="font-medium text-green-900 dark:text-green-100">
-                +{pointsEarned} rewards points earned!
+                {t('receipt.pointsEarned', { points: pointsEarned })}
               </p>
               <Button
                 asChild
                 variant="link"
                 className="mt-1 h-auto p-0 text-green-800 dark:text-green-300"
               >
-                <Link to={`/order/${restaurantSlug}/rewards`}>View my rewards →</Link>
+                <Link to={`/order/${restaurantSlug}/rewards`}>{t('receipt.viewRewards')}</Link>
               </Button>
             </div>
           </CardContent>
@@ -96,7 +109,7 @@ export function ConsumerReceiptPage() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Live tracking</CardTitle>
+          <CardTitle className="text-base">{t('receipt.liveTracking')}</CardTitle>
         </CardHeader>
         <CardContent>
           <OrderStatusStepper status={order.status} fulfillmentType={order.fulfillment_type} />
@@ -106,7 +119,7 @@ export function ConsumerReceiptPage() {
       {history && history.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Status history</CardTitle>
+            <CardTitle className="text-base">{t('receipt.statusHistory')}</CardTitle>
           </CardHeader>
           <CardContent>
             <OrderHistoryTimeline history={history} fulfillmentType={order.fulfillment_type} />
@@ -116,12 +129,12 @@ export function ConsumerReceiptPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Summary</CardTitle>
+          <CardTitle>{t('receipt.summary')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Fulfillment</span>
-            <span>{order.fulfillment_type.replace('_', ' ')}</span>
+            <span className="text-muted-foreground">{t('receipt.fulfillment')}</span>
+            <span>{fulfillmentLabel(order.fulfillment_type, t)}</span>
           </div>
           {lines.map((line) => {
             const modifierText = formatModifiers(line)
@@ -135,25 +148,27 @@ export function ConsumerReceiptPage() {
                 </div>
                 {modifierText && <p className="text-xs text-muted-foreground">+ {modifierText}</p>}
                 {line.notes && (
-                  <p className="text-xs italic text-muted-foreground">Note: {line.notes}</p>
+                  <p className="text-xs italic text-muted-foreground">
+                    {t('common.note', { note: line.notes })}
+                  </p>
                 )}
               </div>
             )
           })}
           {Number(order.delivery_fee) > 0 && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Delivery</span>
+              <span className="text-muted-foreground">{t('common.delivery')}</span>
               <span>{formatPrice(Number(order.delivery_fee))}</span>
             </div>
           )}
           {loyalty && loyalty.discountAmount > 0 && (
             <div className="flex justify-between text-green-700 dark:text-green-400">
-              <span>Rewards discount</span>
+              <span>{t('checkout.rewardsDiscount')}</span>
               <span>-{formatPrice(loyalty.discountAmount)}</span>
             </div>
           )}
           <div className="flex justify-between border-t pt-2 font-medium">
-            <span>Total</span>
+            <span>{t('common.total')}</span>
             <span>{formatPrice(Number(order.total_amount))}</span>
           </div>
         </CardContent>
@@ -161,10 +176,10 @@ export function ConsumerReceiptPage() {
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <Button asChild variant="outline" className="flex-1">
-          <Link to={`/order/${restaurantSlug}/track`}>Track another order</Link>
+          <Link to={`/order/${restaurantSlug}/track`}>{t('receipt.trackAnother')}</Link>
         </Button>
         <Button asChild className="flex-1 bg-[var(--brand-mid)] hover:bg-[var(--brand)]">
-          <Link to={`/order/${restaurantSlug}`}>Back to store</Link>
+          <Link to={`/order/${restaurantSlug}`}>{t('common.backToStore')}</Link>
         </Button>
       </div>
     </PageShell>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,7 @@ export function AdminResetPasswordDialog({
   onOpenChange: (open: boolean) => void
   target: AdminResetPasswordTarget | null
 }) {
+  const { t } = useTranslation('admin')
   const [resetPassword, { isLoading }] = useResetAdminUserPasswordMutation()
   const [useCustomPassword, setUseCustomPassword] = useState(false)
   const [customPassword, setCustomPassword] = useState('')
@@ -47,7 +49,7 @@ export function AdminResetPasswordDialog({
   const handleReset = async () => {
     if (!target) return
     if (useCustomPassword && customPassword.length < 10) {
-      toast.error('Password must be at least 10 characters')
+      toast.error(t('resetPassword.passwordMinLength'))
       return
     }
     try {
@@ -60,15 +62,15 @@ export function AdminResetPasswordDialog({
       }).unwrap()
       if (result.temporaryPassword) {
         setIssuedPassword(result.temporaryPassword)
-        toast.success('Temporary password set — copy it now')
+        toast.success(t('resetPassword.temporarySet'))
       } else {
-        toast.success('Password updated')
+        toast.success(t('resetPassword.passwordUpdated'))
         onOpenChange(false)
       }
     } catch (e: unknown) {
       const msg =
         (e as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Failed to reset password'
+        t('resetPassword.resetFailed')
       toast.error(msg)
     }
   }
@@ -77,9 +79,9 @@ export function AdminResetPasswordDialog({
     if (!issuedPassword) return
     try {
       await navigator.clipboard.writeText(issuedPassword)
-      toast.success('Copied to clipboard')
+      toast.success(t('resetPassword.copied'))
     } catch {
-      toast.error('Could not copy — select and copy manually')
+      toast.error(t('resetPassword.copyFailed'))
     }
   }
 
@@ -87,18 +89,20 @@ export function AdminResetPasswordDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="sm">
         <DialogHeader>
-          <DialogTitle>Reset password</DialogTitle>
+          <DialogTitle>{t('resetPassword.title')}</DialogTitle>
           <DialogDescription>
             {target
-              ? `Set a new sign-in password for ${target.displayName || target.email}. Changes apply in Keycloak immediately.`
-              : 'Select a user to reset their password.'}
+              ? t('resetPassword.description', { name: target.displayName || target.email })
+              : t('resetPassword.selectUser')}
           </DialogDescription>
         </DialogHeader>
 
         {target && !issuedPassword && (
           <div className="space-y-4 py-1">
             <div className="rounded-lg border border-[var(--app-border)] bg-[var(--app-bg-subtle)] px-3 py-2 text-sm">
-              <p className="font-medium text-[var(--text)]">{target.displayName || 'User'}</p>
+              <p className="font-medium text-[var(--text)]">
+                {target.displayName || t('common.user')}
+              </p>
               <p className="text-[var(--text-muted)]">{target.email}</p>
             </div>
 
@@ -109,13 +113,13 @@ export function AdminResetPasswordDialog({
                 onChange={(e) => setUseCustomPassword(!e.target.checked)}
                 className="rounded border-[var(--app-border-mid)]"
               />
-              Generate a secure temporary password
+              {t('resetPassword.generateTemporary')}
             </label>
 
             {useCustomPassword && (
               <>
                 <div>
-                  <Label htmlFor="adminNewPassword">New password</Label>
+                  <Label htmlFor="adminNewPassword">{t('resetPassword.newPassword')}</Label>
                   <Input
                     id="adminNewPassword"
                     type="text"
@@ -123,7 +127,7 @@ export function AdminResetPasswordDialog({
                     value={customPassword}
                     onChange={(e) => setCustomPassword(e.target.value)}
                     className="mt-1.5"
-                    placeholder="Min. 10 chars, upper, lower, number"
+                    placeholder={t('resetPassword.passwordPlaceholder')}
                   />
                 </div>
                 <label className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
@@ -133,8 +137,7 @@ export function AdminResetPasswordDialog({
                     onChange={(e) => setTemporary(e.target.checked)}
                     className="rounded border-[var(--app-border-mid)]"
                   />
-                  Require new password on next login (Keycloak screen — not a name change in
-                  Supplify)
+                  {t('resetPassword.requireChangeOnLogin')}
                 </label>
               </>
             )}
@@ -143,7 +146,9 @@ export function AdminResetPasswordDialog({
 
         {issuedPassword && (
           <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-sm font-medium text-amber-950">Temporary password (shown once)</p>
+            <p className="text-sm font-medium text-amber-950">
+              {t('resetPassword.temporaryShownOnce')}
+            </p>
             <div className="flex items-center gap-2">
               <code className="flex-1 break-all rounded bg-white px-2 py-1.5 text-sm text-[var(--text)]">
                 {issuedPassword}
@@ -152,10 +157,7 @@ export function AdminResetPasswordDialog({
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
-            <p className="text-xs text-amber-900/80">
-              Share this securely with the user. On next sign-in, Keycloak will ask them to set a
-              new password (not first/last name — those are filled from their profile in Supplify).
-            </p>
+            <p className="text-xs text-amber-900/80">{t('resetPassword.shareSecurely')}</p>
           </div>
         )}
 
@@ -166,7 +168,7 @@ export function AdminResetPasswordDialog({
             onClick={() => onOpenChange(false)}
             disabled={isLoading}
           >
-            {issuedPassword ? 'Done' : 'Cancel'}
+            {issuedPassword ? t('common.done') : t('common.cancel')}
           </Button>
           {!issuedPassword && (
             <Button
@@ -177,10 +179,10 @@ export function AdminResetPasswordDialog({
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Resetting…
+                  {t('resetPassword.resetting')}
                 </>
               ) : (
-                'Reset password'
+                t('resetPassword.title')
               )}
             </Button>
           )}

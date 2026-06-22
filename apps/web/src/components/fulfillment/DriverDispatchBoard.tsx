@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
@@ -57,6 +58,7 @@ export function DriverDispatchBoard({
   onRetry,
   onClearFilters,
 }: Props) {
+  const { t } = useTranslation('fulfillment')
   const { can } = usePermissions()
   const canManage = can('FULFILLMENT_MANAGE') || can('DRIVER_DELIVERIES_MANAGE')
   const canPlanRoutes = can('FULFILLMENT_MANAGE')
@@ -81,7 +83,7 @@ export function DriverDispatchBoard({
   const [rolloverAssignment, { isLoading: rollingOver }] = useRolloverAssignmentToTomorrowMutation()
 
   const driverLabel = (d: { full_name?: string; fullName?: string }) =>
-    d.full_name ?? d.fullName ?? 'Driver'
+    d.full_name ?? d.fullName ?? t('dispatch.driverFallback')
 
   const openTracking = (orderId: string) => setTrackingOrderId(orderId)
 
@@ -89,12 +91,12 @@ export function DriverDispatchBoard({
     if (!assignOrder || !selectedDriverId) return
     try {
       await assignDriver({ orderId: assignOrder.id, driver_id: selectedDriverId }).unwrap()
-      toast.success('Driver assigned')
+      toast.success(t('dispatch.toast.driverAssigned'))
       setAssignOrder(null)
       setSelectedDriverId('')
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Failed to assign driver')
+      toast.error(msg || t('dispatch.toast.assignFailed'))
     }
   }
 
@@ -105,12 +107,12 @@ export function DriverDispatchBoard({
         orderId: reassignOrder.id,
         driver_id: selectedDriverId,
       }).unwrap()
-      toast.success('Driver reassigned')
+      toast.success(t('dispatch.toast.driverReassigned'))
       setReassignOrder(null)
       setSelectedDriverId('')
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Failed to reassign')
+      toast.error(msg || t('dispatch.toast.reassignFailed'))
     }
   }
 
@@ -119,10 +121,10 @@ export function DriverDispatchBoard({
     if (!assignmentId) return
     try {
       await rolloverAssignment({ assignmentId }).unwrap()
-      toast.success('Moved to tomorrow')
+      toast.success(t('dispatch.toast.movedToTomorrow'))
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Could not move to tomorrow')
+      toast.error(msg || t('dispatch.toast.moveToTomorrowFailed'))
     }
   }
 
@@ -135,10 +137,10 @@ export function DriverDispatchBoard({
       if (next === 'delivered') {
         setPodOrder(order)
       }
-      toast.success(`Marked as ${next.replace(/_/g, ' ')}`)
+      toast.success(t('dispatch.toast.markedAs', { status: next.replace(/_/g, ' ') }))
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Status update failed')
+      toast.error(msg || t('dispatch.toast.statusUpdateFailed'))
     }
   }
 
@@ -150,12 +152,12 @@ export function DriverDispatchBoard({
         status: 'failed',
         failure_reason: failureReason,
       }).unwrap()
-      toast.success('Marked as failed')
+      toast.success(t('dispatch.toast.markedFailed'))
       setFailOrder(null)
       setFailureReason('')
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Failed to update')
+      toast.error(msg || t('dispatch.toast.updateFailed'))
     }
   }
 
@@ -180,10 +182,10 @@ export function DriverDispatchBoard({
         role="alert"
       >
         <AlertTriangle className="mx-auto mb-2 h-8 w-8 text-[var(--red)]" />
-        <p className="text-sm text-[var(--text-muted)]">Could not load dispatch board.</p>
+        <p className="text-sm text-[var(--text-muted)]">{t('dispatch.loadFailed')}</p>
         {onRetry && (
           <Button type="button" variant="outline" size="sm" className="mt-3" onClick={onRetry}>
-            Retry
+            {t('common:actions.retry')}
           </Button>
         )}
       </div>
@@ -226,12 +228,10 @@ export function DriverDispatchBoard({
               onClick={() => setCreateRouteOpen(true)}
             >
               <Route className="mr-1.5 h-4 w-4" />
-              Create route ({selectedOrders.length})
+              {t('dispatch.createRoute', { count: selectedOrders.length })}
             </Button>
             {selectedOrders.length === 0 && (
-              <p className="text-xs text-[var(--text-mid)]">
-                Select unassigned or assigned orders (not already on a route) to build a route.
-              </p>
+              <p className="text-xs text-[var(--text-mid)]">{t('dispatch.createRouteHint')}</p>
             )}
           </div>
         )}
@@ -241,7 +241,7 @@ export function DriverDispatchBoard({
           className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-6"
         >
           <KpiCard
-            label="Total orders"
+            label={t('dispatch.stats.totalOrders')}
             value={summary.total}
             icon={Package}
             tone="brand"
@@ -249,48 +249,48 @@ export function DriverDispatchBoard({
             testId="dispatch-stat-total"
           />
           <KpiCard
-            label="Pending"
+            label={t('dispatch.stats.pending')}
             value={summary.pending}
             icon={Clock}
             tone="warning"
             size="sm"
-            description="Awaiting dispatch"
+            description={t('dispatch.stats.pendingDescription')}
             testId="dispatch-stat-pending"
           />
           <KpiCard
-            label="Out for delivery"
+            label={t('dispatch.stats.outForDelivery')}
             value={summary.outForDelivery}
             icon={Truck}
             tone="info"
             size="sm"
-            description="On the road today"
+            description={t('dispatch.stats.outForDeliveryDescription')}
             testId="dispatch-stat-out-for-delivery"
           />
           <KpiCard
-            label="Delivered"
+            label={t('dispatch.stats.delivered')}
             value={summary.delivered}
             icon={CheckCircle}
             tone="success"
             size="sm"
-            description="Completed today"
+            description={t('dispatch.stats.deliveredDescription')}
             testId="dispatch-stat-delivered"
           />
           <KpiCard
-            label="Failed"
+            label={t('dispatch.stats.failed')}
             value={summary.failed}
             icon={AlertTriangle}
             tone="danger"
             size="sm"
-            description="Needs follow-up"
+            description={t('dispatch.stats.failedDescription')}
             testId="dispatch-stat-failed"
           />
           <KpiCard
-            label="Rescheduled"
+            label={t('dispatch.stats.rescheduled')}
             value={summary.rescheduled}
             icon={CalendarClock}
             tone="neutral"
             size="sm"
-            description="Moved to a later run"
+            description={t('dispatch.stats.rescheduledDescription')}
             testId="dispatch-stat-rescheduled"
           />
         </section>
@@ -302,9 +302,7 @@ export function DriverDispatchBoard({
           >
             <PackageOpen className="mx-auto mb-3 h-9 w-9 text-[var(--text-muted)]" aria-hidden />
             <p className="text-sm text-[var(--text-mid)]">
-              {filtersActive
-                ? 'No deliveries match these filters.'
-                : 'No orders ready for dispatch right now.'}
+              {filtersActive ? t('dispatch.emptyFiltered') : t('dispatch.emptyDefault')}
             </p>
             {filtersActive && onClearFilters && (
               <Button
@@ -314,13 +312,13 @@ export function DriverDispatchBoard({
                 className="mt-3"
                 onClick={onClearFilters}
               >
-                Clear filters
+                {t('dispatch.filters.clearFilters')}
               </Button>
             )}
           </div>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
-            <DispatchColumn title="Unassigned" count={data.pending.length}>
+            <DispatchColumn title={t('dispatch.columns.unassigned')} count={data.pending.length}>
               {data.pending.map((order) => {
                 const sel = canSelectOrderForRoute(order)
                 return (
@@ -331,11 +329,11 @@ export function DriverDispatchBoard({
                     selectable={canPlanRoutes}
                     selected={selectedIds.has(order.id)}
                     onToggleSelect={() => toggleSelect(order)}
-                    selectDisabledReason={sel.ok ? undefined : sel.reason}
+                    selectDisabledReason={sel.ok ? undefined : t(sel.reasonKey!)}
                     actions={
                       canManage ? (
                         <Button size="sm" variant="default" onClick={() => setAssignOrder(order)}>
-                          Assign driver
+                          {t('dispatch.assignDriver')}
                         </Button>
                       ) : undefined
                     }
@@ -344,7 +342,7 @@ export function DriverDispatchBoard({
               })}
             </DispatchColumn>
 
-            <DispatchColumn title="Assigned" count={data.assigned.length}>
+            <DispatchColumn title={t('dispatch.columns.assigned')} count={data.assigned.length}>
               {data.assigned.map((order) => {
                 const sel = canSelectOrderForRoute(order)
                 return (
@@ -356,7 +354,7 @@ export function DriverDispatchBoard({
                     selectable={canPlanRoutes}
                     selected={selectedIds.has(order.id)}
                     onToggleSelect={() => toggleSelect(order)}
-                    selectDisabledReason={sel.ok ? undefined : sel.reason}
+                    selectDisabledReason={sel.ok ? undefined : t(sel.reasonKey!)}
                   >
                     {canManage && (
                       <div className="flex flex-wrap gap-2">
@@ -366,7 +364,7 @@ export function DriverDispatchBoard({
                           disabled={updatingStatus}
                           onClick={() => advanceStatus(order, 'picked_up')}
                         >
-                          Mark picked up
+                          {t('dispatch.markPickedUp')}
                         </Button>
                         <Button
                           size="sm"
@@ -376,7 +374,7 @@ export function DriverDispatchBoard({
                             setSelectedDriverId('')
                           }}
                         >
-                          Reassign
+                          {t('dispatch.reassign')}
                         </Button>
                         <Button
                           size="sm"
@@ -384,7 +382,7 @@ export function DriverDispatchBoard({
                           disabled={updatingStatus || rollingOver}
                           onClick={() => moveToTomorrow(order)}
                         >
-                          Move to tomorrow
+                          {t('dispatch.moveToTomorrow')}
                         </Button>
                       </div>
                     )}
@@ -393,7 +391,10 @@ export function DriverDispatchBoard({
               })}
             </DispatchColumn>
 
-            <DispatchColumn title="Out for delivery" count={data.out_for_delivery.length}>
+            <DispatchColumn
+              title={t('dispatch.columns.outForDelivery')}
+              count={data.out_for_delivery.length}
+            >
               {data.out_for_delivery.map((order) => (
                 <DispatchOrderRow
                   key={order.id}
@@ -406,7 +407,7 @@ export function DriverDispatchBoard({
                       {order.assignment?.status === 'rescheduled' && (
                         <>
                           <Badge variant="outline" className="border-amber-400 text-amber-700">
-                            Rescheduled
+                            {t('dispatch.rescheduled')}
                           </Badge>
                           <Button
                             size="sm"
@@ -414,7 +415,7 @@ export function DriverDispatchBoard({
                             disabled={updatingStatus}
                             onClick={() => advanceStatus(order, 'assigned')}
                           >
-                            Ready to dispatch
+                            {t('dispatch.readyToDispatch')}
                           </Button>
                         </>
                       )}
@@ -425,7 +426,7 @@ export function DriverDispatchBoard({
                           disabled={updatingStatus}
                           onClick={() => advanceStatus(order, 'out_for_delivery')}
                         >
-                          Out for delivery
+                          {t('dispatch.outForDelivery')}
                         </Button>
                       )}
                       {order.assignment?.status === 'out_for_delivery' && (
@@ -437,7 +438,7 @@ export function DriverDispatchBoard({
                             onClick={() => advanceStatus(order, 'delivered')}
                           >
                             <CheckCircle className="mr-1 h-3 w-3" />
-                            Mark delivered
+                            {t('dispatch.markDelivered')}
                           </Button>
                           <Button
                             size="sm"
@@ -445,7 +446,7 @@ export function DriverDispatchBoard({
                             className="text-[var(--red)]"
                             onClick={() => setFailOrder(order)}
                           >
-                            Mark failed
+                            {t('dispatch.markFailed')}
                           </Button>
                           <Button
                             size="sm"
@@ -453,7 +454,7 @@ export function DriverDispatchBoard({
                             disabled={updatingStatus || rollingOver}
                             onClick={() => moveToTomorrow(order)}
                           >
-                            Move to tomorrow
+                            {t('dispatch.moveToTomorrow')}
                           </Button>
                         </>
                       )}
@@ -463,7 +464,10 @@ export function DriverDispatchBoard({
               ))}
             </DispatchColumn>
 
-            <DispatchColumn title="Delivered today" count={data.delivered_today.length}>
+            <DispatchColumn
+              title={t('dispatch.columns.deliveredToday')}
+              count={data.delivered_today.length}
+            >
               {data.delivered_today.map((order) => (
                 <DispatchOrderRow
                   key={order.id}
@@ -479,7 +483,7 @@ export function DriverDispatchBoard({
                         : 'border-amber-400 text-amber-600'
                     }
                   >
-                    {order.has_pod ? 'POD on file' : 'No POD'}
+                    {order.has_pod ? t('dispatch.podOnFile') : t('dispatch.noPod')}
                   </Badge>
                 </DispatchOrderRow>
               ))}
@@ -501,12 +505,14 @@ export function DriverDispatchBoard({
             <Dialog open={!!assignOrder} onOpenChange={(o) => !o && setAssignOrder(null)}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Assign driver</DialogTitle>
+                  <DialogTitle>{t('dispatch.assignDialog.title')}</DialogTitle>
                 </DialogHeader>
-                <Label htmlFor="assign-driver-select">Driver</Label>
+                <Label htmlFor="assign-driver-select">
+                  {t('dispatch.assignDialog.driverLabel')}
+                </Label>
                 <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
                   <SelectTrigger id="assign-driver-select">
-                    <option value="">Select driver…</option>
+                    <option value="">{t('dispatch.assignDialog.selectDriver')}</option>
                     {drivers.map((d) => (
                       <option key={d.id} value={d.id}>
                         {driverLabel(d)}
@@ -517,11 +523,11 @@ export function DriverDispatchBoard({
                 </Select>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setAssignOrder(null)}>
-                    Cancel
+                    {t('common:actions.cancel')}
                   </Button>
                   <Button onClick={handleAssign} disabled={assigning || !selectedDriverId}>
                     {assigning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Assign
+                    {t('dispatch.assignDialog.assign')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -530,12 +536,14 @@ export function DriverDispatchBoard({
             <Dialog open={!!reassignOrder} onOpenChange={(o) => !o && setReassignOrder(null)}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Reassign driver</DialogTitle>
+                  <DialogTitle>{t('dispatch.reassignDialog.title')}</DialogTitle>
                 </DialogHeader>
-                <Label htmlFor="reassign-driver-select">New driver</Label>
+                <Label htmlFor="reassign-driver-select">
+                  {t('dispatch.reassignDialog.newDriverLabel')}
+                </Label>
                 <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
                   <SelectTrigger id="reassign-driver-select">
-                    <option value="">Select driver…</option>
+                    <option value="">{t('dispatch.assignDialog.selectDriver')}</option>
                     {drivers.map((d) => (
                       <option key={d.id} value={d.id}>
                         {driverLabel(d)}
@@ -545,10 +553,10 @@ export function DriverDispatchBoard({
                 </Select>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setReassignOrder(null)}>
-                    Cancel
+                    {t('common:actions.cancel')}
                   </Button>
                   <Button onClick={handleReassign} disabled={reassigning || !selectedDriverId}>
-                    Reassign
+                    {t('dispatch.reassign')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -565,9 +573,9 @@ export function DriverDispatchBoard({
             <Dialog open={!!failOrder} onOpenChange={(o) => !o && setFailOrder(null)}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Mark delivery failed</DialogTitle>
+                  <DialogTitle>{t('dispatch.failDialog.title')}</DialogTitle>
                 </DialogHeader>
-                <Label>Reason</Label>
+                <Label>{t('dispatch.failDialog.reasonLabel')}</Label>
                 <Textarea
                   value={failureReason}
                   onChange={(e) => setFailureReason(e.target.value)}
@@ -575,10 +583,10 @@ export function DriverDispatchBoard({
                 />
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setFailOrder(null)}>
-                    Cancel
+                    {t('common:actions.cancel')}
                   </Button>
                   <Button variant="destructive" onClick={handleFail} disabled={updatingStatus}>
-                    Confirm failed
+                    {t('dispatch.failDialog.confirmFailed')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -607,6 +615,7 @@ function DispatchColumn({
   count: number
   children: React.ReactNode
 }) {
+  const { t } = useTranslation('fulfillment')
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]">
       <header className="flex items-center justify-between gap-2 border-b border-[var(--app-border)] px-4 py-3">
@@ -617,7 +626,9 @@ function DispatchColumn({
       </header>
       <div className="max-h-[min(70vh,720px)] flex-1 divide-y divide-[var(--app-border)] overflow-y-auto overflow-x-hidden">
         {count === 0 ? (
-          <p className="py-8 text-center text-sm text-[var(--text-muted)]">Nothing here yet.</p>
+          <p className="py-8 text-center text-sm text-[var(--text-muted)]">
+            {t('dispatch.columns.empty')}
+          </p>
         ) : (
           children
         )}

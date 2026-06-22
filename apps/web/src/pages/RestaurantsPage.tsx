@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useGetOrdersQuery, useGetRestaurantsQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
@@ -38,8 +39,10 @@ import {
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { KpiCard } from '../components/ui/kpi-card'
+import { ensureNamespace } from '../i18n'
 
 export function RestaurantsPage() {
+  const { t } = useTranslation('restaurants')
   const { user } = useAppSelector((state) => state.auth)
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
@@ -50,6 +53,10 @@ export function RestaurantsPage() {
   const isSupplier = user?.role === 'SUPPLIER'
   const supplierId =
     user?.workspace?.tenantType === 'SUPPLIER' ? user.workspace.tenantId : undefined
+
+  useEffect(() => {
+    void ensureNamespace('restaurants')
+  }, [])
 
   // Get orders to find restaurants (filter by supplier if supplier)
   const { data: ordersData } = useGetOrdersQuery(
@@ -225,14 +232,14 @@ export function RestaurantsPage() {
     if (error) {
       return (
         <div className="text-center py-12">
-          <p className="text-[var(--red)]">Failed to load restaurants</p>
+          <p className="text-[var(--red)]">{t('list.loadError')}</p>
         </div>
       )
     }
 
     return (
       <PageShell data-testid="restaurants-page">
-        <PageHeader title="Restaurants" description="Manage restaurants in the marketplace" />
+        <PageHeader title={t('list.title')} description={t('list.description')} />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {restaurantsData?.restaurants.map((restaurant) => (
@@ -265,11 +272,17 @@ export function RestaurantsPage() {
                   left={
                     <Badge variant="outline" className="max-w-full truncate">
                       {restaurant.trade_license_no
-                        ? `License: ${restaurant.trade_license_no}`
-                        : 'No License'}
+                        ? t('list.license', { number: restaurant.trade_license_no })
+                        : t('list.noLicense')}
                     </Badge>
                   }
-                  right={<>Joined {new Date(restaurant.created_at).toLocaleDateString()}</>}
+                  right={
+                    <>
+                      {t('list.joined', {
+                        date: new Date(restaurant.created_at).toLocaleDateString(),
+                      })}
+                    </>
+                  }
                 />
               </CardContent>
             </Card>
@@ -279,7 +292,7 @@ export function RestaurantsPage() {
         {restaurantsData?.restaurants.length === 0 && (
           <div className="text-center py-12">
             <Building2 className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-4" />
-            <p className="text-[var(--text-muted)]">No restaurants found</p>
+            <p className="text-[var(--text-muted)]">{t('list.empty')}</p>
           </div>
         )}
       </PageShell>
@@ -293,7 +306,7 @@ export function RestaurantsPage() {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-[var(--red)]">Failed to load restaurants</p>
+        <p className="text-[var(--red)]">{t('list.loadError')}</p>
       </div>
     )
   }
@@ -301,8 +314,8 @@ export function RestaurantsPage() {
   return (
     <PageShell data-testid="restaurants-page">
       <PageHeader
-        title="My Restaurants"
-        description="Restaurants that follow you or purchase from you"
+        title={t('list.titleSupplier')}
+        description={t('list.descriptionSupplier')}
         actions={
           <div className="flex flex-wrap gap-2 shrink-0">
             <Button
@@ -312,7 +325,7 @@ export function RestaurantsPage() {
               onClick={() => setViewMode('grid')}
             >
               <Grid3x3 className="h-4 w-4 mr-1 shrink-0" />
-              Grid
+              {t('list.grid')}
             </Button>
             <Button
               variant={viewMode === 'list' ? 'default' : 'outline'}
@@ -321,7 +334,7 @@ export function RestaurantsPage() {
               onClick={() => setViewMode('list')}
             >
               <List className="h-4 w-4 mr-1 shrink-0" />
-              List
+              {t('list.list')}
             </Button>
           </div>
         }
@@ -331,32 +344,32 @@ export function RestaurantsPage() {
       {isSupplier && (
         <div className="dashboard-kpi-grid" data-testid="restaurants-stats">
           <KpiCard
-            label="Total Restaurants"
+            label={t('list.stats.total')}
             value={stats.total}
             icon={Building2}
             tone="brand"
-            description="Following you or ordering from you"
+            description={t('list.stats.totalHint')}
           />
           <KpiCard
-            label="Total Orders"
+            label={t('list.stats.totalOrders')}
             value={stats.totalOrders}
             icon={ShoppingCart}
             tone="success"
-            description="All time across your network"
+            description={t('list.stats.totalOrdersHint')}
           />
           <KpiCard
-            label="Total Revenue"
+            label={t('list.stats.totalRevenue')}
             value={formatCurrency(stats.totalRevenue, { maximumFractionDigits: 0 })}
             icon={DollarSign}
             tone="brand"
-            description="Lifetime order value"
+            description={t('list.stats.totalRevenueHint')}
           />
           <KpiCard
-            label="Avg Order Value"
+            label={t('list.stats.avgOrderValue')}
             value={formatCurrency(stats.avgOrderValue, { maximumFractionDigits: 0 })}
             icon={TrendingUp}
             tone="warning"
-            description="Per order average"
+            description={t('list.stats.avgOrderValueHint')}
           />
         </div>
       )}
@@ -367,7 +380,7 @@ export function RestaurantsPage() {
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
             <Input
-              placeholder="Search restaurants by name, email, or city..."
+              placeholder={t('list.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-10"
@@ -375,7 +388,7 @@ export function RestaurantsPage() {
           </div>
           <div className="w-64">
             <Input
-              placeholder="Filter by city..."
+              placeholder={t('list.cityPlaceholder')}
               value={cityFilter}
               onChange={(e) => setCityFilter(e.target.value)}
             />
@@ -388,7 +401,7 @@ export function RestaurantsPage() {
             size="sm"
             onClick={() => setFilterBy('all')}
           >
-            All
+            {t('list.filters.all')}
           </Button>
           <Button
             variant={filterBy === 'active' ? 'default' : 'outline'}
@@ -396,7 +409,7 @@ export function RestaurantsPage() {
             onClick={() => setFilterBy('active')}
           >
             <Clock className="h-3 w-3 mr-1" />
-            Active
+            {t('list.filters.active')}
           </Button>
           <Button
             variant={filterBy === 'new' ? 'default' : 'outline'}
@@ -404,17 +417,17 @@ export function RestaurantsPage() {
             onClick={() => setFilterBy('new')}
           >
             <Sparkles className="h-3 w-3 mr-1" />
-            New
+            {t('list.filters.new')}
           </Button>
           <div className="flex-1" />
           <div className="flex items-center gap-2">
             <ArrowUpDown className="h-4 w-4 text-[var(--text-muted)]" />
             <Select value={sortBy} onValueChange={(value) => setSortBy(value as any)}>
               <SelectTrigger className="w-auto">
-                <option value="name">Sort by Name</option>
-                <option value="orders">Sort by Orders</option>
-                <option value="revenue">Sort by Revenue</option>
-                <option value="recent">Sort by Recent</option>
+                <option value="name">{t('list.sort.name')}</option>
+                <option value="orders">{t('list.sort.orders')}</option>
+                <option value="revenue">{t('list.sort.revenue')}</option>
+                <option value="recent">{t('list.sort.recent')}</option>
               </SelectTrigger>
             </Select>
           </div>
@@ -428,12 +441,12 @@ export function RestaurantsPage() {
             <div className="text-center">
               <Building2 className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-[var(--text)] mb-2">
-                No restaurants found
+                {t('list.emptyFilteredTitle')}
               </h3>
               <p className="text-[var(--text-muted)] mb-4">
                 {search || cityFilter || filterBy !== 'all'
-                  ? 'Try adjusting your search or filters'
-                  : 'No restaurants follow you or have purchased from you yet'}
+                  ? t('list.emptyFilteredDescription')
+                  : t('list.emptyDefaultDescription')}
               </p>
               {(search || cityFilter || filterBy !== 'all') && (
                 <Button
@@ -445,7 +458,7 @@ export function RestaurantsPage() {
                     setFilterBy('all')
                   }}
                 >
-                  Clear Filters
+                  {t('list.clearFilters')}
                 </Button>
               )}
             </div>
@@ -472,19 +485,19 @@ export function RestaurantsPage() {
                     {isActive && (
                       <Badge className="bg-[var(--mint)] text-white flex items-center gap-1">
                         <Clock className="h-3 w-3 shrink-0" />
-                        Active
+                        {t('list.badges.active')}
                       </Badge>
                     )}
                     {isNew && (
                       <Badge className="bg-[var(--brand)] text-white flex items-center gap-1">
                         <Sparkles className="h-3 w-3 shrink-0" />
-                        New
+                        {t('list.badges.new')}
                       </Badge>
                     )}
                     {restaurant.isFollowerOnly && (
                       <Badge variant="outline" className="flex items-center gap-1">
                         <Users className="h-3 w-3 shrink-0" />
-                        Following
+                        {t('list.badges.following')}
                       </Badge>
                     )}
                   </CardStatusBadges>
@@ -553,7 +566,7 @@ export function RestaurantsPage() {
                         {restaurant.totalOrders || 0}
                       </p>
                       <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-0.5">
-                        Orders
+                        {t('list.orders')}
                       </p>
                     </div>
                     <div className="text-center min-w-0">
@@ -561,7 +574,7 @@ export function RestaurantsPage() {
                         {formatCurrency(restaurant.totalSpent, { maximumFractionDigits: 0 })}
                       </p>
                       <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-0.5">
-                        Revenue
+                        {t('list.revenue')}
                       </p>
                     </div>
                     <div className="text-center min-w-0">
@@ -570,10 +583,10 @@ export function RestaurantsPage() {
                           ? new Date(
                               restaurant.latestOrder.placed_at || restaurant.latestOrder.created_at
                             ).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                          : 'N/A'}
+                          : t('list.notAvailable')}
                       </p>
                       <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-0.5">
-                        Last order
+                        {t('list.lastOrder')}
                       </p>
                     </div>
                   </div>
@@ -583,7 +596,7 @@ export function RestaurantsPage() {
                     <div className="pt-3 border-t">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-medium text-[var(--text-muted)]">
-                          Latest Order
+                          {t('list.latestOrder')}
                         </span>
                         <Badge
                           variant={
@@ -596,7 +609,7 @@ export function RestaurantsPage() {
                       </div>
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-[var(--text-muted)]">
-                          Order #{restaurant.latestOrder.id.substring(0, 8)}
+                          {t('list.orderNumber', { id: restaurant.latestOrder.id.substring(0, 8) })}
                         </span>
                         <span className="font-semibold text-[var(--text)]">
                           {formatPrice(restaurant.latestOrder.total_amount)}
@@ -613,7 +626,7 @@ export function RestaurantsPage() {
                       onClick={() => navigate(`/app/orders?restaurant=${restaurant.id}`)}
                     >
                       <ShoppingCart className="h-4 w-4 mr-1 shrink-0" />
-                      <span className="truncate">Orders</span>
+                      <span className="truncate">{t('list.orders')}</span>
                     </Button>
                     <Button
                       size="sm"
@@ -621,7 +634,7 @@ export function RestaurantsPage() {
                       onClick={() => navigate(`/app/restaurants/${restaurant.id}`)}
                     >
                       <BarChart3 className="h-4 w-4 mr-1 shrink-0" />
-                      Details
+                      {t('list.details')}
                     </Button>
                   </CardActionGrid>
                 </CardContent>
@@ -675,19 +688,19 @@ export function RestaurantsPage() {
                               {isActive && (
                                 <Badge className="bg-[var(--mint)] text-white">
                                   <Clock className="h-3 w-3 mr-1" />
-                                  Active
+                                  {t('list.badges.active')}
                                 </Badge>
                               )}
                               {isNew && (
                                 <Badge className="bg-[var(--brand)] text-white">
                                   <Sparkles className="h-3 w-3 mr-1" />
-                                  New
+                                  {t('list.badges.new')}
                                 </Badge>
                               )}
                               {restaurant.isFollowerOnly && (
                                 <Badge variant="outline">
                                   <Users className="h-3 w-3 mr-1" />
-                                  Following
+                                  {t('list.badges.following')}
                                 </Badge>
                               )}
                             </>
@@ -701,13 +714,13 @@ export function RestaurantsPage() {
                         <p className="text-xl font-bold text-[var(--text)]">
                           {restaurant.totalOrders || 0}
                         </p>
-                        <p className="text-xs text-[var(--text-muted)]">Orders</p>
+                        <p className="text-xs text-[var(--text-muted)]">{t('list.orders')}</p>
                       </div>
                       <div className="text-center min-w-[4rem]">
                         <p className="text-xl font-bold text-[var(--text)]">
                           {formatCurrency(restaurant.totalSpent, { maximumFractionDigits: 0 })}
                         </p>
-                        <p className="text-xs text-[var(--text-muted)]">Revenue</p>
+                        <p className="text-xs text-[var(--text-muted)]">{t('list.revenue')}</p>
                       </div>
                       <div className="text-center min-w-[4rem]">
                         <p className="text-sm font-semibold text-[var(--text)]">
@@ -716,9 +729,11 @@ export function RestaurantsPage() {
                                 restaurant.latestOrder.placed_at ||
                                   restaurant.latestOrder.created_at
                               ).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                            : 'N/A'}
+                            : t('list.notAvailable')}
                         </p>
-                        <p className="text-xs text-[var(--text-muted)]">Last Order</p>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          {t('list.lastOrderList')}
+                        </p>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 w-full lg:w-auto">
@@ -728,14 +743,14 @@ export function RestaurantsPage() {
                         onClick={() => navigate(`/app/orders?restaurant=${restaurant.id}`)}
                       >
                         <ShoppingCart className="h-4 w-4 mr-1" />
-                        Orders
+                        {t('list.orders')}
                       </Button>
                       <Button
                         size="sm"
                         onClick={() => navigate(`/app/restaurants/${restaurant.id}`)}
                       >
                         <BarChart3 className="h-4 w-4 mr-1" />
-                        Details
+                        {t('list.details')}
                       </Button>
                     </div>
                   </div>

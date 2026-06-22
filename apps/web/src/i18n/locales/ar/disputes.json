@@ -1,0 +1,121 @@
+{
+  "openDialog": {
+    "title": "فتح نزاع",
+    "description": "أبلغ عن بنود ناقصة أو تالفة أو غير صحيحة. سيرى المورد ذلك ضمن النزاعات وفي الجدول الزمني للطلب. يمكنك الاعتراض على جزء من الطلب (مثلاً بند واحد من 3).",
+    "supplier": "المورد",
+    "selectSupplier": "اختر المورد",
+    "supplierFallback": "مورد {{id}}",
+    "type": "النوع",
+    "lineItems": "بنود الطلب (اختياري — حدّد ما يُنازَع عليه)",
+    "includeInDispute": "إدراج {{name}} في النزاع",
+    "ordered": "المطلوب",
+    "received": "المستلم",
+    "linesSelected_one": "{{count}} بند محدد للنزاع",
+    "linesSelected_other": "{{count}} بنود محددة للنزاع",
+    "descriptionLabel": "الوصف",
+    "descriptionPlaceholder": "ما المشكلة؟ اذكر الكميات وأسماء المنتجات.",
+    "cancel": "إلغاء",
+    "submitting": "جارٍ الإرسال…",
+    "submit": "إرسال النزاع",
+    "toast": {
+      "supplierRequired": "المورد مطلوب",
+      "descriptionRequired": "الوصف مطلوب",
+      "lineItemRequired": "اختر بنداً واحداً على الأقل للنزاع، أو صِف المشكلة في الوصف",
+      "created": "تم فتح النزاع — تم إخطار المورد",
+      "createFailed": "تعذّر إنشاء النزاع"
+    }
+  },
+  "list": {
+    "noOrderLinked": "لا يوجد طلب مرتبط",
+    "review": "مراجعة",
+    "resolve": "حل",
+    "reject": "رفض"
+  },
+  "banner": {
+    "title": "نزاع قيد المعالجة",
+    "supplierHint": "راجعه واتخذ قراراً من النزاعات أو أدناه.",
+    "restaurantHint": "تم إخطار المورد.",
+    "manageDispute": "إدارة النزاع",
+    "viewDispute": "عرض النزاع",
+    "ref": "المرجع: {{id}}",
+    "defaultType": "مشكلة"
+  },
+  "types": {
+    "short_delivery": "تسليم ناقص",
+    "damaged_goods": "بضائع تالفة",
+    "wrong_items": "بنود خاطئة",
+    "quality_issue": "مشكلة جودة",
+    "billing_error": "خطأ في الفوترة",
+    "other": "أخرى"
+  },
+  "status": {
+    "open": "مفتوح",
+    "under_review": "قيد المراجعة",
+    "resolved": "محلول",
+    "rejected": "مرفوض",
+    "cancelled": "ملغى"
+  },
+  "eligibility": {
+    "notEligible": "يمكن فتح النزاعات فقط بعد أن يُسلّم المورد الطلب (تم التسليم أو الاستلام أو الإكمال)."
+  },
+  "detail": {
+    "title": "نزاع",
+    "titleDetails": "تفاصيل النزاع",
+    "notOnPlan": "النزاعات غير متوفرة في خطتك.",
+    "notFound": "النزاع غير موجود أو ليس لديك صلاحية الوصول.",
+    "backToDisputes": "العودة إلى النزاعات",
+    "replacementTitle": "تم إنشاء طلب بديل",
+    "replacementDescription": "حلّ المورد هذا النزاع بشحن بضائع بديلة في طلب جديد.",
+    "viewReplacementOrder": "عرض الطلب البديل {{ref}}",
+    "summary": "ملخص",
+    "status": "الحالة",
+    "order": "الطلب",
+    "restaurant": "المطعم",
+    "supplier": "المورد",
+    "disputedAmount": "المبلغ المتنازع عليه",
+    "orderStatus": "حالة الطلب",
+    "description": "الوصف",
+    "resolutionNotes": "ملاحظات الحل",
+    "lineItems": "بنود النزاع",
+    "lineItemsAriaLabel": "بنود النزاع",
+    "product": "المنتج",
+    "ordered": "المطلوب",
+    "received": "المستلم",
+    "issue": "المشكلة",
+    "orderedQty": "المطلوب: {{qty}}",
+    "receivedQty": "المستلم: {{qty}}",
+    "creditNotes": "إشعارات دائنة",
+    "markUnderReview": "وضع قيد المراجعة",
+    "resolve": "حل",
+    "reject": "رفض",
+    "cancelDispute": "إلغاء النزاع",
+    "resolveDialog": {
+      "title": "حل النزاع",
+      "description": "اختر كيفية إغلاق هذا النزاع للمطعم.",
+      "resolution": "الحل",
+      "creditNote": "إشعار دائن",
+      "replacement": "استبدال",
+      "refund": "استرداد",
+      "noAction": "بدون إجراء",
+      "creditAmount": "مبلغ الإشعار الدائن",
+      "notes": "ملاحظات",
+      "confirm": "تأكيد"
+    },
+    "rejectDialog": {
+      "title": "رفض النزاع",
+      "description": "اشرح سبب رفض هذا النزاع.",
+      "placeholder": "سبب الرفض (مطلوب)"
+    },
+    "toast": {
+      "markedUnderReview": "تم وضعه قيد المراجعة",
+      "updateFailed": "تعذّر تحديث النزاع",
+      "resolved": "تم حل النزاع",
+      "resolveFailed": "تعذّر الحل",
+      "rejectNotesRequired": "الملاحظات مطلوبة عند الرفض",
+      "rejected": "تم رفض النزاع",
+      "rejectFailed": "تعذّر الرفض",
+      "cancelled": "تم إلغاء النزاع",
+      "cancelFailed": "تعذّر الإلغاء"
+    }
+  }
+}

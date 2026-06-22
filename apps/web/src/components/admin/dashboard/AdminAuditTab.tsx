@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronUp, Filter, Loader2, RefreshCw, Search, Shield } from 'lucide-react'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
@@ -70,6 +71,7 @@ export type AdminAuditTabProps = {
 }
 
 export function AdminAuditTab({ active }: AdminAuditTabProps) {
+  const { t } = useTranslation('admin')
   const [auditActionType, setAuditActionType] = useState('all')
   const [auditDateFrom, setAuditDateFrom] = useState('')
   const [auditDateTo, setAuditDateTo] = useState('')
@@ -120,8 +122,8 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
   return (
     <>
       <AdminSectionHeader
-        title="Audit log"
-        description="Immutable record of admin actions across subscriptions, impersonation, overrides, and feature flags."
+        title={t('audit.title')}
+        description={t('audit.description')}
         action={
           <Button
             variant="outline"
@@ -151,13 +153,13 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
             />
             <Input
               className="h-10 pl-9"
-              placeholder="Search action, admin, or description…"
+              placeholder={t('audit.searchPlaceholder')}
               value={auditSearch}
               onChange={(e) => {
                 setAuditSearch(e.target.value)
                 setAuditOffset(0)
               }}
-              aria-label="Search audit logs"
+              aria-label={t('audit.searchAriaLabel')}
             />
           </div>
 
@@ -168,8 +170,11 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
               setAuditOffset(0)
             }}
           >
-            <SelectTrigger className="h-10 w-full" aria-label="Filter by action type">
-              <option value="all">All action types</option>
+            <SelectTrigger
+              className="h-10 w-full"
+              aria-label={t('audit.filterActionTypeAriaLabel')}
+            >
+              <option value="all">{t('common.allActionTypes')}</option>
               {auditLogsData?.actionTypes?.map((type: string) => (
                 <option key={type} value={type}>
                   {type}
@@ -187,7 +192,7 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
                 setAuditDateFrom(e.target.value)
                 setAuditOffset(0)
               }}
-              aria-label="From date"
+              aria-label={t('audit.fromDateAriaLabel')}
             />
             <span className="shrink-0 text-sm text-[var(--text-muted)]">to</span>
             <Input
@@ -198,7 +203,7 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
                 setAuditDateTo(e.target.value)
                 setAuditOffset(0)
               }}
-              aria-label="To date"
+              aria-label={t('audit.toDateAriaLabel')}
             />
           </div>
 
@@ -211,7 +216,7 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
       </div>
 
       <AppPanel
-        title="Recent entries"
+        title={t('audit.recentEntries')}
         description={
           auditLoading
             ? 'Loading audit trail…'
@@ -220,7 +225,7 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
         testId="admin-audit-panel"
       >
         {auditLoading ? (
-          <AdminLoadingState label="Loading audit logs…" />
+          <AdminLoadingState label={t('audit.loading')} />
         ) : logs.length === 0 ? (
           <AdminEmptyState
             icon={<Shield className="h-8 w-8 text-[var(--text-muted)]" />}
@@ -240,7 +245,7 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
           />
         ) : (
           <>
-            <TableScroll aria-label="Admin audit log">
+            <TableScroll aria-label={t('audit.tableAriaLabel')}>
               <table className="w-full min-w-[880px] text-sm">
                 <thead>
                   <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
@@ -248,8 +253,8 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
                     <th className="hidden px-4 py-3 md:table-cell">Target</th>
                     <th className="hidden px-4 py-3 lg:table-cell">Description</th>
                     <th className="px-4 py-3">Admin</th>
-                    <th className="px-4 py-3">Time</th>
-                    <th className="px-4 py-3 w-10" aria-label="Expand row" />
+                    <th className="px-4 py-3">{t('common.table.time')}</th>
+                    <th className="px-4 py-3 w-10" aria-label={t('common.expandRowAriaLabel')} />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--app-border)]">

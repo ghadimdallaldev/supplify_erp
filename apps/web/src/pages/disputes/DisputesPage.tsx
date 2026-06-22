@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
 import { AppPanel } from '../../components/ui/app-panel'
 import { PageShell } from '../../components/ui/page-shell'
@@ -32,10 +33,7 @@ import { useImpersonation } from '../../hooks/useImpersonation'
 import { usePermissions } from '../../hooks/usePermissions'
 import { RequirePermission } from '../../components/RequirePermission'
 import { isEntitlementFeatureEnabled } from '../../lib/planLimits'
-import {
-  disputeEligibilityMessage,
-  isOrderEligibleForDispute,
-} from '../../lib/orderDisputeEligibility'
+import { isOrderEligibleForDispute } from '../../lib/orderDisputeEligibility'
 import { OpenDisputeDialog } from '../../components/disputes/OpenDisputeDialog'
 import {
   DisputeListCards,
@@ -47,6 +45,7 @@ import { EmptyState } from '../../components/ui/empty-state'
 import { formatPrice } from '../../utils/format'
 import { toast } from 'sonner'
 import { Loader2, Scale } from 'lucide-react'
+import { ensureNamespace } from '../../i18n'
 
 type DisputeRow = {
   id: string
@@ -61,6 +60,12 @@ type DisputeRow = {
 }
 
 export function DisputesPage() {
+  const { t } = useTranslation('reports')
+
+  useEffect(() => {
+    void ensureNamespace('reports')
+  }, [])
+
   const { isEffectiveSupplier: isSupplier } = useImpersonation()
   const { can } = usePermissions()
   const canManageSupplierDisputes = can('FULFILLMENT_MANAGE')
@@ -166,20 +171,20 @@ export function DisputesPage() {
     for (const item of items) {
       const sid = item.supplier_id
       if (sid) {
-        map.set(sid, item.supplier_name || `Supplier ${sid.slice(0, 8)}`)
+        map.set(sid, item.supplier_name || t('disputes.supplierFallback', { id: sid.slice(0, 8) }))
       }
     }
     return [...map.entries()].map(([id, name]) => ({ id, name }))
-  }, [createForm.orderId, orderForDispute, ordersListData])
+  }, [createForm.orderId, orderForDispute, ordersListData, t])
 
   const supplierOptions = useMemo(() => {
     if (suppliersForSelectedOrder.length > 0) return suppliersForSelectedOrder
     const suppliers = suppliersData?.suppliers ?? []
     return suppliers.map((s) => ({
       id: s.id,
-      name: s.name || `Supplier ${String(s.id).slice(0, 8)}`,
+      name: s.name || t('disputes.supplierFallback', { id: String(s.id).slice(0, 8) }),
     }))
-  }, [suppliersForSelectedOrder, suppliersData])
+  }, [suppliersForSelectedOrder, suppliersData, t])
 
   useEffect(() => {
     if (!orderIdFromUrl || isSupplier) return
@@ -203,11 +208,9 @@ export function DisputesPage() {
   if (!disputesEnabled) {
     return (
       <PageShell className="space-y-4" data-testid="disputes-page">
-        <PageHeader title="Disputes" />
-        <AppPanel title="Disputes unavailable">
-          <p className="text-sm text-[var(--text-mid)]">
-            Disputes & returns are not on your plan. Upgrade to manage delivery issues and credits.
-          </p>
+        <PageHeader title={t('disputes.title')} />
+        <AppPanel title={t('disputes.unavailableTitle')}>
+          <p className="text-sm text-[var(--text-mid)]">{t('disputes.unavailableDescription')}</p>
         </AppPanel>
       </PageShell>
     )
@@ -216,10 +219,10 @@ export function DisputesPage() {
   const handleReview = async (id: string) => {
     try {
       await reviewDispute(id).unwrap()
-      toast.success('Marked under review')
+      toast.success(t('disputes.toasts.markedUnderReview'))
       refetch()
     } catch {
-      toast.error('Failed to update dispute')
+      toast.error(t('disputes.toasts.updateFailed'))
     }
   }
 
@@ -234,31 +237,31 @@ export function DisputesPage() {
           creditNoteAmount: creditAmount ? Number(creditAmount) : undefined,
         },
       }).unwrap()
-      toast.success('Dispute resolved')
+      toast.success(t('disputes.toasts.resolved'))
       setResolveId(null)
       setResolutionNotes('')
       setCreditAmount('')
       refetch()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to resolve')
+      toast.error(err?.data?.error?.message || t('disputes.toasts.resolveFailed'))
     }
   }
 
   const handleReject = async () => {
     if (!rejectId || !resolutionNotes.trim()) {
-      toast.error('Notes are required when rejecting')
+      toast.error(t('disputes.toasts.notesRequired'))
       return
     }
     try {
       await rejectDispute({ id: rejectId, resolutionNotes }).unwrap()
-      toast.success('Dispute rejected')
+      toast.success(t('disputes.toasts.rejected'))
       setRejectId(null)
       setResolutionNotes('')
       refetch()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to reject')
+      toast.error(err?.data?.error?.message || t('disputes.toasts.rejectFailed'))
     }
   }
 
@@ -269,9 +272,9 @@ export function DisputesPage() {
     >
       <PageShell className="space-y-4" data-testid="disputes-page">
         <PageHeader
-          title="Disputes"
+          title={t('disputes.title')}
           description={
-            isSupplier ? 'Incoming disputes from restaurants' : 'Open and track order disputes'
+            isSupplier ? t('disputes.supplierDescription') : t('disputes.restaurantDescription')
           }
           actions={
             !isSupplier ? (
@@ -288,40 +291,36 @@ export function DisputesPage() {
                   setShowCreate(true)
                 }}
               >
-                Open dispute
+                {t('disputes.openDispute')}
               </Button>
             ) : undefined
           }
         />
 
-        <AppPanel title="Filter disputes">
+        <AppPanel title={t('disputes.filterTitle')}>
           <div className="flex w-full max-w-md flex-col gap-2">
-            <Label>Status filter</Label>
+            <Label>{t('disputes.statusFilter')}</Label>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="mt-1.5">
-                <option value="">All</option>
-                <option value="open">Open</option>
-                <option value="under_review">Under review</option>
-                <option value="resolved">Resolved</option>
-                <option value="rejected">Rejected</option>
+                <option value="">{t('disputes.statusAll')}</option>
+                <option value="open">{t('disputes.statusOpen')}</option>
+                <option value="under_review">{t('disputes.statusUnderReview')}</option>
+                <option value="resolved">{t('disputes.statusResolved')}</option>
+                <option value="rejected">{t('disputes.statusRejected')}</option>
               </SelectTrigger>
             </Select>
           </div>
         </AppPanel>
 
-        <AppPanel title={isSupplier ? 'Incoming disputes' : 'My disputes'}>
+        <AppPanel title={isSupplier ? t('disputes.incomingTitle') : t('disputes.myDisputesTitle')}>
           {isLoading ? (
             <div className="flex items-center justify-center py-10 text-[var(--text-muted)]">
               <Loader2 className="h-6 w-6 animate-spin text-[var(--brand-mid)]" />
             </div>
           ) : disputes.length === 0 ? (
             <EmptyState
-              title="No disputes found"
-              description={
-                statusFilter
-                  ? 'Try clearing the status filter to see more results.'
-                  : 'Disputes opened from receiving or order issues will appear here.'
-              }
+              title={t('disputes.emptyTitle')}
+              description={statusFilter ? t('disputes.emptyFiltered') : t('disputes.emptyDefault')}
               icon={<Scale className="h-6 w-6" aria-hidden />}
             />
           ) : (
@@ -338,16 +337,20 @@ export function DisputesPage() {
                   isSupplier && canManageSupplierDisputes ? (id) => setRejectId(id) : undefined
                 }
               />
-              <TableScroll aria-label="Disputes table" className="hidden md:block">
+              <TableScroll aria-label={t('disputes.title')} className="hidden md:block">
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
                     <tr className="border-b bg-[var(--brand-ultra)]/40 text-left text-[var(--text-muted)]">
-                      <th className="px-4 py-3 pl-5 font-medium">Order</th>
-                      {isSupplier && <th className="px-4 py-3 font-medium">Restaurant</th>}
-                      <th className="px-4 py-3 font-medium">Type</th>
-                      <th className="px-4 py-3 font-medium">Status</th>
-                      <th className="px-4 py-3 font-medium">Amount</th>
-                      <th className="px-4 py-3 pr-5 text-right font-medium">Actions</th>
+                      <th className="px-4 py-3 pl-5 font-medium">{t('disputes.table.order')}</th>
+                      {isSupplier && (
+                        <th className="px-4 py-3 font-medium">{t('disputes.table.restaurant')}</th>
+                      )}
+                      <th className="px-4 py-3 font-medium">{t('disputes.table.type')}</th>
+                      <th className="px-4 py-3 font-medium">{t('disputes.table.status')}</th>
+                      <th className="px-4 py-3 font-medium">{t('disputes.table.amount')}</th>
+                      <th className="px-4 py-3 pr-5 text-right font-medium">
+                        {t('disputes.table.actions')}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -405,7 +408,7 @@ export function DisputesPage() {
                                     variant="outline"
                                     onClick={() => handleReview(String(dispute.id))}
                                   >
-                                    Review
+                                    {t('disputes.actions.review')}
                                   </Button>
                                 )}
                               {isSupplier &&
@@ -417,14 +420,14 @@ export function DisputesPage() {
                                       size="sm"
                                       onClick={() => setResolveId(String(dispute.id))}
                                     >
-                                      Resolve
+                                      {t('disputes.actions.resolve')}
                                     </Button>
                                     <Button
                                       size="sm"
                                       variant="outline"
                                       onClick={() => setRejectId(String(dispute.id))}
                                     >
-                                      Reject
+                                      {t('disputes.actions.reject')}
                                     </Button>
                                   </>
                                 )}
@@ -457,22 +460,17 @@ export function DisputesPage() {
         >
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Open dispute</DialogTitle>
-              <DialogDescription>
-                Report delivery, quality, or billing issues for an order that has been delivered or
-                received.
-              </DialogDescription>
+              <DialogTitle>{t('disputes.createDialog.title')}</DialogTitle>
+              <DialogDescription>{t('disputes.createDialog.description')}</DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
               {(orderFromUrlIneligible || selectedOrderIneligible) && (
                 <p className="text-sm text-amber-700 dark:text-amber-400 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2">
-                  {disputeEligibilityMessage(
-                    orderFromUrlIneligible ? orderForDispute?.order?.status : selectedOrderStatus
-                  )}
+                  {t('disputes.eligibilityMessage')}
                 </p>
               )}
               <div>
-                <Label>Order</Label>
+                <Label>{t('disputes.createDialog.order')}</Label>
                 <Select
                   value={createForm.orderId}
                   onValueChange={(value) =>
@@ -486,10 +484,10 @@ export function DisputesPage() {
                   <SelectTrigger className="mt-1.5" disabled={loadingOrders}>
                     <option value="">
                       {loadingOrders
-                        ? 'Loading orders…'
+                        ? t('disputes.createDialog.loadingOrders')
                         : orderOptions.length === 0
-                          ? 'No eligible delivered orders'
-                          : 'Select an order'}
+                          ? t('disputes.createDialog.noEligibleOrders')
+                          : t('disputes.createDialog.selectOrder')}
                     </option>
                     {orderOptions.map((o) => (
                       <option key={o.id} value={o.id}>
@@ -500,7 +498,7 @@ export function DisputesPage() {
                 </Select>
               </div>
               <div>
-                <Label>Supplier</Label>
+                <Label>{t('disputes.createDialog.supplier')}</Label>
                 <Select
                   value={createForm.supplierId}
                   onValueChange={(value) => setCreateForm((f) => ({ ...f, supplierId: value }))}
@@ -511,10 +509,10 @@ export function DisputesPage() {
                   >
                     <option value="">
                       {!createForm.orderId
-                        ? 'Select an order first'
+                        ? t('disputes.createDialog.selectOrderFirst')
                         : supplierOptions.length === 0
-                          ? 'No suppliers on this order'
-                          : 'Select supplier'}
+                          ? t('disputes.createDialog.noSuppliersOnOrder')
+                          : t('disputes.createDialog.selectSupplier')}
                     </option>
                     {supplierOptions.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -525,8 +523,7 @@ export function DisputesPage() {
                 </Select>
               </div>
               <p className="text-sm text-[var(--text-muted)]">
-                Next you can select specific line items and quantities (e.g. received 1 of 3
-                products).
+                {t('disputes.createDialog.lineItemsHint')}
               </p>
             </div>
             <DialogFooter className="gap-2">
@@ -535,21 +532,21 @@ export function DisputesPage() {
                 className="w-full sm:w-auto"
                 onClick={() => setShowCreate(false)}
               >
-                Cancel
+                {t('disputes.createDialog.cancel')}
               </Button>
               <Button
                 className="w-full sm:w-auto"
                 onClick={() => {
                   if (!createForm.orderId) {
-                    toast.error('Order is required')
+                    toast.error(t('disputes.toasts.orderRequired'))
                     return
                   }
                   if (!createForm.supplierId) {
-                    toast.error('Supplier is required')
+                    toast.error(t('disputes.toasts.supplierRequired'))
                     return
                   }
                   if (selectedOrderIneligible) {
-                    toast.error(disputeEligibilityMessage(selectedOrderStatus))
+                    toast.error(t('disputes.eligibilityMessage'))
                     return
                   }
                   setDisputeDialogOrderId(createForm.orderId)
@@ -557,7 +554,7 @@ export function DisputesPage() {
                 }}
                 disabled={selectedOrderIneligible || !createForm.orderId || !createForm.supplierId}
               >
-                Continue
+                {t('disputes.createDialog.continue')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -566,23 +563,23 @@ export function DisputesPage() {
         <Dialog open={Boolean(resolveId)} onOpenChange={() => setResolveId(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Resolve dispute</DialogTitle>
+              <DialogTitle>{t('disputes.resolveDialog.title')}</DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
               <div>
-                <Label>Resolution</Label>
+                <Label>{t('disputes.resolveDialog.resolution')}</Label>
                 <Select value={resolutionType} onValueChange={setResolutionType}>
                   <SelectTrigger className="mt-1.5">
-                    <option value="credit_note">Credit note</option>
-                    <option value="replacement">Replacement</option>
-                    <option value="refund">Refund</option>
-                    <option value="no_action">No action</option>
+                    <option value="credit_note">{t('disputes.resolveDialog.creditNote')}</option>
+                    <option value="replacement">{t('disputes.resolveDialog.replacement')}</option>
+                    <option value="refund">{t('disputes.resolveDialog.refund')}</option>
+                    <option value="no_action">{t('disputes.resolveDialog.noAction')}</option>
                   </SelectTrigger>
                 </Select>
               </div>
               {resolutionType === 'credit_note' && (
                 <div>
-                  <Label>Credit amount</Label>
+                  <Label>{t('disputes.resolveDialog.creditAmount')}</Label>
                   <Input
                     type="number"
                     value={creditAmount}
@@ -591,7 +588,7 @@ export function DisputesPage() {
                 </div>
               )}
               <div>
-                <Label>Notes</Label>
+                <Label>{t('disputes.resolveDialog.notes')}</Label>
                 <Textarea
                   value={resolutionNotes}
                   onChange={(e) => setResolutionNotes(e.target.value)}
@@ -600,7 +597,7 @@ export function DisputesPage() {
             </div>
             <DialogFooter>
               <Button className="w-full sm:w-auto" onClick={handleResolve} disabled={resolving}>
-                Confirm
+                {t('disputes.resolveDialog.confirm')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -609,10 +606,10 @@ export function DisputesPage() {
         <Dialog open={Boolean(rejectId)} onOpenChange={() => setRejectId(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Reject dispute</DialogTitle>
+              <DialogTitle>{t('disputes.rejectDialog.title')}</DialogTitle>
             </DialogHeader>
             <Textarea
-              placeholder="Reason for rejection (required)"
+              placeholder={t('disputes.rejectDialog.placeholder')}
               value={resolutionNotes}
               onChange={(e) => setResolutionNotes(e.target.value)}
             />
@@ -623,7 +620,7 @@ export function DisputesPage() {
                 onClick={handleReject}
                 disabled={rejecting}
               >
-                Reject
+                {t('disputes.rejectDialog.reject')}
               </Button>
             </DialogFooter>
           </DialogContent>

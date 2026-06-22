@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
+import { ensureNamespace } from '../i18n'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -11,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog'
-import { Warehouse, Package, AlertTriangle, TrendingUp, Settings, Loader2 } from 'lucide-react'
+import { Warehouse, Package, AlertTriangle, Settings, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   useGetInventoryListQuery,
@@ -34,12 +36,13 @@ import {
   countSupplierLowStockItems,
 } from '../lib/supplierStockStatus'
 
-const ADJUSTMENT_TYPES = [
-  { value: 'IN', label: 'Add Stock' },
-  { value: 'OUT', label: 'Remove Stock' },
-]
-
 export function InventoryPage() {
+  const { t } = useTranslation('inventory')
+
+  useEffect(() => {
+    void ensureNamespace('inventory')
+  }, [])
+
   const { can } = usePermissions()
   const canViewInventory = can('INVENTORY_VIEW')
   const canViewWarehouses = can('WAREHOUSES_VIEW')
@@ -65,6 +68,11 @@ export function InventoryPage() {
   )
   const [createAdjustment, { isLoading: isAdjusting }] = useCreateInventoryAdjustmentMutation()
 
+  const adjustmentTypes = [
+    { value: 'IN' as const, label: t('supplierPage.adjustDialog.addStock') },
+    { value: 'OUT' as const, label: t('supplierPage.adjustDialog.removeStock') },
+  ]
+
   const inventory = data?.inventory || []
   const warehouses = warehousesData?.warehouses || []
   const lowStockCount = countSupplierLowStockItems(inventory)
@@ -82,11 +90,11 @@ export function InventoryPage() {
     if (!selectedProduct?.product_id) return
     const qty = parseFloat(adjustmentForm.quantity)
     if (!qty || qty <= 0) {
-      toast.error('Enter a valid quantity')
+      toast.error(t('supplierPage.toasts.validQuantity'))
       return
     }
     if (!adjustmentForm.reason.trim()) {
-      toast.error('Reason is required')
+      toast.error(t('supplierPage.toasts.reasonRequired'))
       return
     }
     try {
@@ -97,17 +105,17 @@ export function InventoryPage() {
         reason: adjustmentForm.reason,
         notes: adjustmentForm.notes || undefined,
       }).unwrap()
-      toast.success('Inventory adjustment recorded')
+      toast.success(t('supplierPage.toasts.adjustmentRecorded'))
       setShowAdjustment(false)
       setAdjustmentForm({ adjustmentType: 'IN', quantity: '', reason: '', notes: '' })
     } catch (err: any) {
-      toast.error(err?.data?.error?.message || 'Failed to record adjustment')
+      toast.error(err?.data?.error?.message || t('supplierPage.toasts.adjustmentFailed'))
     }
   }
 
   if (isLoading) {
     return (
-      <RequirePermission permission="INVENTORY_VIEW" title="inventory">
+      <RequirePermission permission="INVENTORY_VIEW" title={t('supplierPage.gateTitle')}>
         <PageShell maxWidth="wide">
           <div className="space-y-5">
             <div className="flex flex-col gap-2">
@@ -159,20 +167,18 @@ export function InventoryPage() {
 
   if (error) {
     return (
-      <RequirePermission permission="INVENTORY_VIEW" title="inventory">
+      <RequirePermission permission="INVENTORY_VIEW" title={t('supplierPage.gateTitle')}>
         <PageShell maxWidth="wide">
           <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
             <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500" />
-            <p className="mb-1 font-semibold text-red-900">Failed to load inventory</p>
-            <p className="mb-4 text-sm text-red-700">
-              There was a problem fetching inventory data.
-            </p>
+            <p className="mb-1 font-semibold text-red-900">{t('supplierPage.error.title')}</p>
+            <p className="mb-4 text-sm text-red-700">{t('supplierPage.error.description')}</p>
             <Button
               onClick={() => refetch()}
               variant="outline"
               className="border-red-300 text-red-800"
             >
-              Try again
+              {t('supplierPage.error.retry')}
             </Button>
           </div>
         </PageShell>
@@ -181,15 +187,15 @@ export function InventoryPage() {
   }
 
   return (
-    <RequirePermission permission="INVENTORY_VIEW" title="inventory">
+    <RequirePermission permission="INVENTORY_VIEW" title={t('supplierPage.gateTitle')}>
       <PageShell maxWidth="wide">
         <PageHeader
-          title="Inventory"
-          description="Manage stock levels and adjustments across all warehouses"
+          title={t('supplierPage.title')}
+          description={t('supplierPage.description')}
           actions={
             <Button variant="outline" onClick={() => setShowWarehouseView(!showWarehouseView)}>
               <Warehouse className="mr-2 h-4 w-4" />
-              {showWarehouseView ? 'Table view' : 'By warehouse'}
+              {showWarehouseView ? t('supplierPage.tableView') : t('supplierPage.byWarehouse')}
             </Button>
           }
         />
@@ -197,9 +203,9 @@ export function InventoryPage() {
         <SummaryStrip
           testId="inventory-summary"
           metrics={[
-            { label: 'Total products', value: inventory.length },
+            { label: t('supplierPage.summary.totalProducts'), value: inventory.length },
             {
-              label: 'Reserved',
+              label: t('supplierPage.summary.reserved'),
               value: formatNumber(
                 inventory.reduce(
                   (sum: number, item: any) => sum + parseFloat(item.reserved_qty || 0),
@@ -210,12 +216,12 @@ export function InventoryPage() {
               tone: 'amber',
             },
             {
-              label: 'Low stock',
+              label: t('supplierPage.summary.lowStock'),
               value: lowStockCount,
               tone: lowStockCount > 0 ? 'danger' : 'default',
             },
             {
-              label: 'Available',
+              label: t('supplierPage.summary.available'),
               value: formatNumber(
                 inventory.reduce(
                   (sum: number, item: any) => sum + parseFloat(item.available_qty || 0),
@@ -233,8 +239,8 @@ export function InventoryPage() {
           <>
             {inventory.length === 0 ? (
               <EmptyState
-                title="No inventory items"
-                description="Add products and configure stock levels to start tracking inventory."
+                title={t('supplierPage.empty.title')}
+                description={t('supplierPage.empty.description')}
                 icon={<Package className="h-6 w-6" />}
               />
             ) : (
@@ -242,7 +248,7 @@ export function InventoryPage() {
                 data-testid="inventory-table-shell"
                 actions={
                   <span className="text-xs text-[var(--text-muted)]">
-                    {inventory.length} {inventory.length === 1 ? 'product' : 'products'}
+                    {t('supplierPage.table.productCount', { count: inventory.length })}
                   </span>
                 }
               >
@@ -250,25 +256,25 @@ export function InventoryPage() {
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--app-border)' }}>
                       <th className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                        Product
+                        {t('supplierPage.table.product')}
                       </th>
                       <th className="hidden py-3 px-4 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] md:table-cell">
-                        Warehouse
+                        {t('supplierPage.table.warehouse')}
                       </th>
                       <th className="hidden py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] sm:table-cell">
-                        On Hand
+                        {t('supplierPage.table.onHand')}
                       </th>
                       <th className="hidden py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] md:table-cell">
-                        Reserved
+                        {t('supplierPage.table.reserved')}
                       </th>
                       <th className="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                        Available
+                        {t('supplierPage.table.available')}
                       </th>
                       <th className="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                        Status
+                        {t('supplierPage.table.status')}
                       </th>
                       <th className="py-3 px-4 text-center text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                        Actions
+                        {t('supplierPage.table.actions')}
                       </th>
                     </tr>
                   </thead>
@@ -336,7 +342,7 @@ export function InventoryPage() {
                                 setShowAdjustment(true)
                               }}
                             >
-                              Adjust
+                              {t('supplierPage.table.adjust')}
                             </Button>
                             <Button
                               variant="outline"
@@ -396,12 +402,12 @@ export function InventoryPage() {
               </div>
             ) : warehouses.length === 0 ? (
               <EmptyState
-                title="No warehouses found"
-                description="You haven't created any warehouses yet. Create warehouses in your settings."
+                title={t('supplierPage.warehouseView.emptyTitle')}
+                description={t('supplierPage.warehouseView.emptyDescription')}
                 icon={<Warehouse className="h-6 w-6" />}
                 action={
                   <Button variant="outline" onClick={() => setShowWarehouseView(false)}>
-                    Return to table view
+                    {t('supplierPage.warehouseView.returnToTable')}
                   </Button>
                 }
               />
@@ -421,16 +427,25 @@ export function InventoryPage() {
                           )}
                         </CardTitle>
                         <CardDescription>
-                          {warehouse.product_count || 0} products ·{' '}
-                          {warehouse.total_available_qty || 0} total available
+                          {t('supplierPage.warehouseView.productCount', {
+                            count: warehouse.product_count || 0,
+                          })}{' '}
+                          ·{' '}
+                          {t('supplierPage.warehouseView.totalAvailable', {
+                            count: warehouse.total_available_qty || 0,
+                          })}
                         </CardDescription>
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold" style={{ color: 'var(--mint)' }}>
-                          Available: {warehouse.total_available_qty || 0}
+                          {t('supplierPage.warehouseView.availableLabel', {
+                            count: warehouse.total_available_qty || 0,
+                          })}
                         </p>
                         <p className="text-sm" style={{ color: 'var(--amber)' }}>
-                          Reserved: {warehouse.total_reserved_qty || 0}
+                          {t('supplierPage.warehouseView.reservedLabel', {
+                            count: warehouse.total_reserved_qty || 0,
+                          })}
                         </p>
                       </div>
                     </div>
@@ -442,19 +457,19 @@ export function InventoryPage() {
                           <thead className="bg-[var(--brand-ultra)]">
                             <tr>
                               <th className="px-4 py-2 text-left text-xs font-medium text-[var(--text-muted)]">
-                                Product
+                                {t('supplierPage.table.product')}
                               </th>
                               <th className="px-4 py-2 text-right text-xs font-medium text-[var(--text-muted)]">
-                                On Hand
+                                {t('supplierPage.table.onHand')}
                               </th>
                               <th className="px-4 py-2 text-right text-xs font-medium text-[var(--text-muted)]">
-                                Reserved
+                                {t('supplierPage.table.reserved')}
                               </th>
                               <th className="px-4 py-2 text-right text-xs font-medium text-[var(--text-muted)]">
-                                Available
+                                {t('supplierPage.table.available')}
                               </th>
                               <th className="px-4 py-2 text-center text-xs font-medium text-[var(--text-muted)]">
-                                Status
+                                {t('supplierPage.table.status')}
                               </th>
                             </tr>
                           </thead>
@@ -499,7 +514,7 @@ export function InventoryPage() {
                       </div>
                     ) : (
                       <div className="py-8 text-center text-sm text-[var(--text-muted)]">
-                        No inventory in this warehouse
+                        {t('supplierPage.warehouseView.noInventory')}
                       </div>
                     )}
                   </CardContent>
@@ -513,14 +528,16 @@ export function InventoryPage() {
         <Dialog open={showAdjustment} onOpenChange={setShowAdjustment}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Adjust Inventory</DialogTitle>
+              <DialogTitle>{t('supplierPage.adjustDialog.title')}</DialogTitle>
               <DialogDescription>
-                Record an inventory adjustment for {selectedProduct?.product_name}
+                {t('supplierPage.adjustDialog.description', {
+                  product: selectedProduct?.product_name,
+                })}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Adjustment Type *</label>
+                <label className="text-sm font-medium">{t('supplierPage.adjustDialog.type')}</label>
                 <Select
                   value={adjustmentForm.adjustmentType}
                   onValueChange={(value) =>
@@ -531,35 +548,41 @@ export function InventoryPage() {
                   }
                 >
                   <SelectTrigger>
-                    {ADJUSTMENT_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
+                    {adjustmentTypes.map((adjType) => (
+                      <option key={adjType.value} value={adjType.value}>
+                        {adjType.label}
                       </option>
                     ))}
                   </SelectTrigger>
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Quantity *</label>
+                <label className="text-sm font-medium">
+                  {t('supplierPage.adjustDialog.quantity')}
+                </label>
                 <Input
                   type="number"
                   min="0.01"
                   step="0.01"
-                  placeholder="Enter quantity"
+                  placeholder={t('supplierPage.adjustDialog.quantityPlaceholder')}
                   value={adjustmentForm.quantity}
                   onChange={(e) => setAdjustmentForm((f) => ({ ...f, quantity: e.target.value }))}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Reason *</label>
+                <label className="text-sm font-medium">
+                  {t('supplierPage.adjustDialog.reason')}
+                </label>
                 <Input
-                  placeholder="Enter reason for adjustment"
+                  placeholder={t('supplierPage.adjustDialog.reasonPlaceholder')}
                   value={adjustmentForm.reason}
                   onChange={(e) => setAdjustmentForm((f) => ({ ...f, reason: e.target.value }))}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Notes</label>
+                <label className="text-sm font-medium">
+                  {t('supplierPage.adjustDialog.notes')}
+                </label>
                 <textarea
                   className="w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                   rows={3}
@@ -570,11 +593,11 @@ export function InventoryPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAdjustment(false)}>
-                Cancel
+                {t('supplierPage.adjustDialog.cancel')}
               </Button>
               <Button onClick={handleAdjustment} disabled={isAdjusting}>
                 {isAdjusting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Record Adjustment
+                {t('supplierPage.adjustDialog.record')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -584,48 +607,60 @@ export function InventoryPage() {
         <Dialog open={showSettings} onOpenChange={setShowSettings}>
           <DialogContent size="lg">
             <DialogHeader>
-              <DialogTitle>Inventory Settings</DialogTitle>
+              <DialogTitle>{t('supplierPage.settingsDialog.title')}</DialogTitle>
               <DialogDescription>
-                Configure inventory settings for {selectedProduct?.product_name}
+                {t('supplierPage.settingsDialog.description', {
+                  product: selectedProduct?.product_name,
+                })}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">MOQ (Minimum Order Quantity)</label>
+                  <label className="text-sm font-medium">
+                    {t('supplierPage.settingsDialog.moq')}
+                  </label>
                   <Input type="number" placeholder="1" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Order Multiple</label>
+                  <label className="text-sm font-medium">
+                    {t('supplierPage.settingsDialog.orderMultiple')}
+                  </label>
                   <Input type="number" placeholder="1" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Lead Time (days)</label>
+                  <label className="text-sm font-medium">
+                    {t('supplierPage.settingsDialog.leadTime')}
+                  </label>
                   <Input type="number" placeholder="2" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Low Stock Threshold</label>
+                  <label className="text-sm font-medium">
+                    {t('supplierPage.settingsDialog.lowStockThreshold')}
+                  </label>
                   <Input type="number" placeholder="20" />
                 </div>
               </div>
               <div className="space-y-2">
                 <label className="flex items-center space-x-2">
                   <input type="checkbox" className="rounded" />
-                  <span className="text-sm font-medium">Backorders Allowed</span>
+                  <span className="text-sm font-medium">
+                    {t('supplierPage.settingsDialog.backordersAllowed')}
+                  </span>
                 </label>
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowSettings(false)}>
-                Cancel
+                {t('supplierPage.settingsDialog.cancel')}
               </Button>
               <Button
                 onClick={() => {
-                  toast.success('Settings saved')
+                  toast.success(t('supplierPage.toasts.settingsSaved'))
                   setShowSettings(false)
                 }}
               >
-                Save Settings
+                {t('supplierPage.settingsDialog.save')}
               </Button>
             </DialogFooter>
           </DialogContent>

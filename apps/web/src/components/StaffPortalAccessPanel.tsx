@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
@@ -11,13 +13,7 @@ import {
   useDisableStaffPortalAccessMutation,
 } from '../services/staffApi'
 import { cn } from '../lib/utils'
-
-const statusLabels: Record<string, string> = {
-  none: 'No portal access',
-  invited: 'Invite pending',
-  active: 'Portal active',
-  disabled: 'Access disabled',
-}
+import { ensureNamespace } from '../i18n'
 
 interface StaffPortalAccessPanelProps {
   member: StaffMember
@@ -30,10 +26,19 @@ export function StaffPortalAccessPanel({
   canManage,
   compact = false,
 }: StaffPortalAccessPanelProps) {
+  const { t } = useTranslation('staff')
+
+  useEffect(() => {
+    void ensureNamespace('staff')
+  }, [])
+
   const portal = member.portalAccess
   const status = portal?.status ?? 'none'
   const magicLinkOnly = Boolean(portal?.magicLinkEnabled)
-  const label = magicLinkOnly ? 'Magic link' : (statusLabels[status] ?? status)
+  const statusKey = magicLinkOnly
+    ? 'magicLink'
+    : (status as 'none' | 'invited' | 'active' | 'disabled')
+  const label = t(`portalAccess.status.${statusKey}`, { defaultValue: status })
 
   const [createAccount, { isLoading: creating }] = useCreateStaffPortalAccountMutation()
   const [sendInvite, { isLoading: inviting }] = useSendStaffPortalInviteMutation()
@@ -41,30 +46,34 @@ export function StaffPortalAccessPanel({
   const [resetAccess, { isLoading: resetting }] = useResetStaffPortalAccessMutation()
   const [disableAccess, { isLoading: disabling }] = useDisableStaffPortalAccessMutation()
 
+  const displayName = member.displayName || member.email || t('team.addStaff')
+
   const handleCreate = async () => {
     if (!member.email) {
-      toast.error('Add a work email before creating a portal account')
+      toast.error(t('portalAccess.toast.emailRequired'))
       return
     }
     try {
       const result = await createAccount(member.id).unwrap()
       if (result.temporaryPassword) {
         await navigator.clipboard.writeText(result.temporaryPassword)
-        toast.success('Portal account created. Temporary password copied to clipboard.')
+        toast.success(t('portalAccess.toast.accountCreatedWithPassword', { name: displayName }))
       } else {
-        toast.success('Portal account is ready')
+        toast.success(t('portalAccess.toast.accountCreated', { name: displayName }))
       }
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Unable to create portal account'))
+      toast.error(getApiErrorMessage(error, t('portalAccess.errors.createFailed')))
     }
   }
 
   const handleInvite = async () => {
     try {
       await sendInvite(member.id).unwrap()
-      toast.success('Sign-in link sent to their work email')
+      toast.success(
+        t('portalAccess.toast.inviteSent', { email: member.email ?? t('team.noEmail') })
+      )
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Unable to send invite'))
+      toast.error(getApiErrorMessage(error, t('portalAccess.errors.inviteFailed')))
     }
   }
 
@@ -72,9 +81,13 @@ export function StaffPortalAccessPanel({
     try {
       const result = await fetchLoginLink(member.id).unwrap()
       await navigator.clipboard.writeText(result.loginUrl)
-      toast.success('Staff login link copied')
+      if (result.linkType === 'magic') {
+        toast.success(t('portalAccess.toast.magicLinkCopied', { name: displayName }))
+      } else {
+        toast.success(t('portalAccess.toast.loginLinkCopied', { name: displayName }))
+      }
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Unable to copy login link'))
+      toast.error(getApiErrorMessage(error, t('portalAccess.errors.copyFailed')))
     }
   }
 
@@ -83,33 +96,38 @@ export function StaffPortalAccessPanel({
       const result = await resetAccess(member.id).unwrap()
       if (result.temporaryPassword) {
         await navigator.clipboard.writeText(result.temporaryPassword)
-        toast.success('Access reset. New temporary password copied.')
+        toast.success(t('portalAccess.toast.resetWithPassword', { name: displayName }))
       } else {
-        toast.success('Portal access reset')
+        toast.success(t('portalAccess.toast.resetDone', { name: displayName }))
       }
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Unable to reset access'))
+      toast.error(getApiErrorMessage(error, t('portalAccess.errors.resetFailed')))
     }
   }
 
   const handleDisable = async () => {
     try {
       await disableAccess(member.id).unwrap()
-      toast.success('Staff portal access disabled')
+      toast.success(t('portalAccess.toast.disabled', { name: displayName }))
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Unable to disable access'))
+      toast.error(getApiErrorMessage(error, t('portalAccess.errors.disableFailed')))
     }
   }
 
   const badgeVariant =
     status === 'active' ? 'default' : status === 'disabled' ? 'destructive' : 'outline'
 
+  const canSharePortalLink =
+    magicLinkOnly || status === 'invited' || (status === 'active' && Boolean(portal?.enabled))
+
   if (!canManage) {
     return (
       <p className={cn('text-xs text-[var(--text-muted)]', compact ? 'mt-1' : 'mt-2')}>
-        Portal: {label}
+        {t('portalAccess.readOnly', { status: label })}
         {portal?.lastLoginAt
-          ? ` · Last login ${new Date(portal.lastLoginAt).toLocaleString()}`
+          ? t('portalAccess.readOnlyLastLogin', {
+              date: new Date(portal.lastLoginAt).toLocaleString(),
+            })
           : null}
       </p>
     )
@@ -124,18 +142,29 @@ export function StaffPortalAccessPanel({
           : 'mt-3 w-full border-t border-[var(--app-border)] pt-3'
       )}
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-[var(--text-mid)]">Staff portal</span>
-        <Badge
-          variant={badgeVariant}
-          className={magicLinkOnly ? 'bg-[var(--brand-pale)] text-[var(--brand-mid)]' : undefined}
-        >
-          {label}
-        </Badge>
-        {portal?.lastLoginAt ? (
-          <span className="text-xs text-[var(--text-muted)]">
-            Last login {new Date(portal.lastLoginAt).toLocaleDateString()}
+      <div className="space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-[var(--text-mid)]">
+            {t('portalAccess.sectionTitle')}
           </span>
+          <Badge
+            variant={badgeVariant}
+            className={magicLinkOnly ? 'bg-[var(--brand-pale)] text-[var(--brand-mid)]' : undefined}
+          >
+            {label}
+          </Badge>
+          {portal?.lastLoginAt ? (
+            <span className="text-xs text-[var(--text-muted)]">
+              {t('portalAccess.lastLogin', {
+                date: new Date(portal.lastLoginAt).toLocaleDateString(),
+              })}
+            </span>
+          ) : null}
+        </div>
+        {!compact ? (
+          <p className="text-xs leading-relaxed text-[var(--text-muted)]">
+            {t('portalAccess.sectionHint')}
+          </p>
         ) : null}
       </div>
       <div className="flex flex-wrap gap-2">
@@ -147,10 +176,12 @@ export function StaffPortalAccessPanel({
             disabled={creating}
             onClick={handleCreate}
           >
-            {creating ? 'Creating…' : 'Add password login'}
+            {creating
+              ? t('portalAccess.buttons.creating')
+              : t('portalAccess.buttons.createAccount')}
           </Button>
         ) : null}
-        {magicLinkOnly || status === 'invited' || (status === 'active' && portal?.hasAccount) ? (
+        {canSharePortalLink ? (
           <>
             <Button
               size="sm"
@@ -159,19 +190,25 @@ export function StaffPortalAccessPanel({
               disabled={inviting}
               onClick={handleInvite}
             >
-              {inviting ? 'Sending…' : magicLinkOnly ? 'Send magic link' : 'Send login invite'}
+              {inviting
+                ? t('portalAccess.buttons.sending')
+                : magicLinkOnly
+                  ? t('portalAccess.buttons.sendMagicLink')
+                  : t('portalAccess.buttons.sendLoginInvite')}
             </Button>
-            {portal?.hasAccount ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="consumer-pressable min-h-9"
-                disabled={copying}
-                onClick={handleCopyLink}
-              >
-                {copying ? 'Copying…' : 'Copy login link'}
-              </Button>
-            ) : null}
+            <Button
+              size="sm"
+              variant="outline"
+              className="consumer-pressable min-h-9"
+              disabled={copying}
+              onClick={handleCopyLink}
+            >
+              {copying
+                ? t('portalAccess.buttons.copying')
+                : magicLinkOnly
+                  ? t('portalAccess.buttons.copyMagicLink')
+                  : t('portalAccess.buttons.copyLoginLink')}
+            </Button>
           </>
         ) : null}
         {portal?.hasAccount && status === 'active' ? (
@@ -183,7 +220,9 @@ export function StaffPortalAccessPanel({
               disabled={resetting}
               onClick={handleReset}
             >
-              {resetting ? 'Resetting…' : 'Reset access'}
+              {resetting
+                ? t('portalAccess.buttons.resetting')
+                : t('portalAccess.buttons.resetAccess')}
             </Button>
             <Button
               size="sm"
@@ -192,7 +231,7 @@ export function StaffPortalAccessPanel({
               disabled={disabling}
               onClick={handleDisable}
             >
-              {disabling ? 'Disabling…' : 'Disable'}
+              {disabling ? t('portalAccess.buttons.disabling') : t('portalAccess.buttons.disable')}
             </Button>
           </>
         ) : null}

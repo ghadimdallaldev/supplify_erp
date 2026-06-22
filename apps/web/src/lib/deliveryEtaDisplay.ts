@@ -1,20 +1,33 @@
+import i18n from 'i18next'
 import type { RestaurantOrderTrackingResponse, SupplierOrderTrackingResponse } from '../types'
 import { isRestaurantOrderTracking } from '../types'
 
+const NS = 'fulfillment'
+
+function ft(key: string, options?: Record<string, unknown>): string {
+  return i18n.t(key, { ns: NS, ...options })
+}
+
 export function formatEtaRange(min?: number | null, max?: number | null): string | null {
   if (min == null || max == null) return null
-  if (min === max) return `${min} min`
-  return `${min}–${max} min`
+  if (min === max) return ft('tracking.eta.minSingle', { min })
+  return ft('tracking.eta.minRange', { min, max })
+}
+
+export function formatEtaMinutesRange(min?: number | null, max?: number | null): string | null {
+  if (min == null || max == null) return null
+  if (min === max) return ft('tracking.eta.minutesSingle', { min })
+  return ft('tracking.eta.minutesRange', { min, max })
 }
 
 export function formatDistanceKm(km?: number | null): string | null {
   if (km == null) return null
-  return `${km.toFixed(1)} km away`
+  return ft('tracking.eta.distanceKm', { km: km.toFixed(1) })
 }
 
 export function formatSupplierDistanceKm(km?: number | null): string | null {
   if (km == null) return null
-  return `Distance ${km.toFixed(1)} km`
+  return ft('tracking.eta.supplierDistance', { km: km.toFixed(1) })
 }
 
 export function getRestaurantEtaPrimaryText(
@@ -23,12 +36,12 @@ export function getRestaurantEtaPrimaryText(
   if (!data?.etaAvailable) return null
   const range = formatEtaRange(data.etaMinutesMin, data.etaMinutesMax)
   if (!range) return null
-  const minutes = range.replace(' min', ' minutes')
+  const minutes = formatEtaMinutesRange(data.etaMinutesMin, data.etaMinutesMax)
+  if (!minutes) return null
   if (data.nextStop === false && (data.stopsBefore ?? 0) > 0) {
-    const stopWord = data.stopsBefore === 1 ? 'stop' : 'stops'
-    return `Your delivery is planned after ${data.stopsBefore} ${stopWord}`
+    return ft('tracking.eta.restaurant.plannedAfterStops', { count: data.stopsBefore })
   }
-  return `Arriving in about ${minutes}`
+  return ft('tracking.eta.restaurant.arrivingIn', { range: minutes })
 }
 
 export function getRestaurantEtaSecondaryText(
@@ -36,8 +49,8 @@ export function getRestaurantEtaSecondaryText(
 ): string | null {
   if (!data?.etaAvailable) return null
   if (data.nextStop === false && (data.stopsBefore ?? 0) > 0) {
-    const range = formatEtaRange(data.etaMinutesMin, data.etaMinutesMax)
-    if (range) return `Estimated arrival: ${range.replace(' min', ' minutes')}`
+    const minutes = formatEtaMinutesRange(data.etaMinutesMin, data.etaMinutesMax)
+    if (minutes) return ft('tracking.eta.restaurant.estimatedArrival', { range: minutes })
   }
   return formatDistanceKm(data.distanceKm)
 }
@@ -48,7 +61,7 @@ export function getSupplierEtaPrimaryText(
   if (!data?.etaAvailable) return null
   const range = formatEtaRange(data.etaMinutesMin, data.etaMinutesMax)
   if (!range) return null
-  return `ETA ${range}`
+  return ft('tracking.eta.supplier.eta', { range })
 }
 
 export function getSupplierEtaSecondaryText(
@@ -57,11 +70,15 @@ export function getSupplierEtaSecondaryText(
   if (!data?.etaAvailable) return null
   const parts: string[] = []
   if ((data.stopsBefore ?? 0) > 0) {
-    const stopWord = data.stopsBefore === 1 ? 'stop' : 'stops'
-    parts.push(`${data.stopsBefore} ${stopWord} before this order`)
+    parts.push(ft('tracking.eta.supplier.stopsBefore', { count: data.stopsBefore }))
   }
   if (data.routePosition != null && data.routePositionTotal != null) {
-    parts.push(`Route position ${data.routePosition} of ${data.routePositionTotal}`)
+    parts.push(
+      ft('tracking.eta.supplier.routePosition', {
+        position: data.routePosition,
+        total: data.routePositionTotal,
+      })
+    )
   }
   const distance = formatSupplierDistanceKm(data.distanceKm)
   if (distance) parts.push(distance)
@@ -71,6 +88,17 @@ export function getSupplierEtaSecondaryText(
 function isPreActiveDeliveryStatus(status: string | null | undefined): boolean {
   const s = String(status || 'pending').toLowerCase()
   return s === 'pending' || s === 'assigned'
+}
+
+export function isDestinationMissingEtaUnavailable(
+  data: RestaurantOrderTrackingResponse | SupplierOrderTrackingResponse | undefined
+): boolean {
+  if (!data?.trackingEnabled) return false
+  const deliveryStatus = isRestaurantOrderTracking(data)
+    ? data.delivery?.status
+    : data.assignment?.status
+  if (deliveryStatus === 'delivered' || deliveryStatus === 'failed') return false
+  return data.destinationCoordinatesAvailable === false
 }
 
 export function getEtaUnavailableMessage(
@@ -85,21 +113,21 @@ export function getEtaUnavailableMessage(
   if (deliveryStatus === 'delivered' || deliveryStatus === 'failed') return null
 
   if (data.destinationCoordinatesAvailable === false) {
-    return 'ETA unavailable — restaurant delivery location is not set.'
+    return ft('tracking.eta.unavailable.destinationMissing')
   }
 
   if (isPreActiveDeliveryStatus(deliveryStatus)) {
-    return 'ETA will appear once the driver starts delivery.'
+    return ft('tracking.eta.unavailable.startDelivery')
   }
 
   if (!data.etaAvailable) {
     if (!isRestaurantOrderTracking(data) && data.unavailableReason === 'driver_location_missing') {
-      return 'ETA will appear once the driver starts delivery.'
+      return ft('tracking.eta.unavailable.startDelivery')
     }
     if (!isRestaurantOrderTracking(data) && data.unavailableReason) {
       return mapSupplierUnavailableReason(data.unavailableReason)
     }
-    return 'ETA will appear once the driver starts delivery.'
+    return ft('tracking.eta.unavailable.startDelivery')
   }
 
   return null
@@ -108,15 +136,15 @@ export function getEtaUnavailableMessage(
 function mapSupplierUnavailableReason(reason: string): string {
   switch (reason) {
     case 'destination_missing':
-      return 'ETA unavailable — restaurant delivery location is not set.'
+      return ft('tracking.eta.unavailable.destinationMissing')
     case 'assignment_not_active':
-      return 'ETA will appear once the driver starts delivery.'
+      return ft('tracking.eta.unavailable.startDelivery')
     case 'driver_location_missing':
-      return 'ETA will appear once the driver starts delivery.'
+      return ft('tracking.eta.unavailable.startDelivery')
     case 'order_terminal':
-      return 'ETA not available for this order.'
+      return ft('tracking.eta.unavailable.orderTerminal')
     default:
-      return 'ETA not available yet'
+      return ft('tracking.eta.unavailable.notAvailableYet')
   }
 }
 

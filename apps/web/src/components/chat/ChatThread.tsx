@@ -1,5 +1,6 @@
 import { format, isToday, isYesterday } from 'date-fns'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   ChevronDown,
   Download,
@@ -31,13 +32,6 @@ type Props = {
   onScrollToBottom: () => void
 }
 
-function formatDateLabel(dateStr: string) {
-  const date = new Date(dateStr)
-  if (isToday(date)) return 'Today'
-  if (isYesterday(date)) return 'Yesterday'
-  return format(date, 'MMMM d, yyyy')
-}
-
 export function ChatThread({
   messagesLoading,
   groupedMessages,
@@ -51,7 +45,15 @@ export function ChatThread({
   showScrollButton,
   onScrollToBottom,
 }: Props) {
+  const { t } = useTranslation('chat')
   const isEmpty = groupedMessages.every((g) => g.messages.length === 0)
+
+  const formatDateLabel = (dateStr: string) => {
+    const date = new Date(dateStr)
+    if (isToday(date)) return t('thread.today')
+    if (isYesterday(date)) return t('thread.yesterday')
+    return format(date, 'MMMM d, yyyy')
+  }
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col bg-[var(--brand-ultra)]/40">
@@ -74,12 +76,10 @@ export function ChatThread({
             </div>
             <div>
               <p className="text-sm font-medium text-[var(--text)]">
-                {searchQuery ? 'No messages match your search' : 'Start the conversation'}
+                {searchQuery ? t('thread.noSearchResults') : t('thread.emptyTitle')}
               </p>
               <p className="mt-1 text-sm text-[var(--text-mid)]">
-                {searchQuery
-                  ? 'Try a different keyword.'
-                  : 'Send a message, attach a file, or share an order reference.'}
+                {searchQuery ? t('thread.noSearchHint') : t('thread.emptyHint')}
               </p>
             </div>
           </div>
@@ -165,7 +165,9 @@ export function ChatThread({
                                 <ShoppingCart
                                   className={`h-4 w-4 ${isMyMessage ? 'text-white' : 'text-[var(--brand-mid)]'}`}
                                 />
-                                <span className="text-sm font-medium">Order reference</span>
+                                <span className="text-sm font-medium">
+                                  {t('thread.orderReference')}
+                                </span>
                               </div>
                               <Link
                                 to={`/app/orders/${String(msg.order_id)}`}
@@ -174,7 +176,7 @@ export function ChatThread({
                                 }`}
                               >
                                 <Eye className="h-3 w-3" />
-                                View order
+                                {t('thread.viewOrder')}
                               </Link>
                             </div>
                           ) : null}
@@ -194,7 +196,7 @@ export function ChatThread({
                                     >
                                       <img
                                         src={String(att.fileUrl)}
-                                        alt={String(att.fileName || 'Attachment')}
+                                        alt={String(att.fileName || t('thread.attachmentAlt'))}
                                         className="max-h-56 max-w-full cursor-pointer rounded-lg object-cover"
                                       />
                                     </a>
@@ -232,7 +234,11 @@ export function ChatThread({
                             >
                               <span>{formatMessageDate(String(msg.created_at))}</span>
                               {isMyMessage ? (
-                                <span aria-label={msg.is_read ? 'Read' : 'Sent'}>
+                                <span
+                                  aria-label={
+                                    msg.is_read ? t('thread.readAria') : t('thread.sentAria')
+                                  }
+                                >
                                   {msg.is_read ? '✓✓' : '✓'}
                                 </span>
                               ) : null}
@@ -246,7 +252,7 @@ export function ChatThread({
                             onClick={() => onReply(msg)}
                             className="mt-1 px-1 text-xs font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--brand-mid)]"
                           >
-                            Reply
+                            {t('thread.reply')}
                           </button>
                         ) : null}
                       </div>
@@ -263,7 +269,9 @@ export function ChatThread({
                     <span className="chat-typing-dot h-1.5 w-1.5 rounded-full bg-[var(--brand-mid)]" />
                     <span className="chat-typing-dot h-1.5 w-1.5 rounded-full bg-[var(--brand-mid)]" />
                     <span className="chat-typing-dot h-1.5 w-1.5 rounded-full bg-[var(--brand-mid)]" />
-                    <span className="ml-1.5 text-xs text-[var(--text-mid)]">typing…</span>
+                    <span className="ml-1.5 text-xs text-[var(--text-mid)]">
+                      {t('thread.typing')}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -280,7 +288,7 @@ export function ChatThread({
           size="sm"
           variant="secondary"
           className="erp-pressable absolute bottom-4 right-4 h-9 w-9 rounded-full p-0"
-          aria-label="Scroll to latest"
+          aria-label={t('thread.scrollToLatestAria')}
         >
           <ChevronDown className="h-4 w-4" />
         </Button>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import {
@@ -38,6 +39,7 @@ export function AdminOverviewExtras({
   lastUpdated?: Date | null
   canNavigateTab?: (tab: string) => boolean
 }) {
+  const { t } = useTranslation('admin')
   const { data: dealInsights } = useGetAdminDealInsightsQuery()
   const { data: pendingDealsData } = useGetAdminPendingDealsQuery()
   const { data: healthData } = useGetAdminHealthQuery()
@@ -64,15 +66,15 @@ export function AdminOverviewExtras({
   })
 
   const allQuickActions: QuickAction[] = [
-    { label: 'Manage tenants', tab: 'tenants', icon: Users },
-    { label: 'Review subscriptions', tab: 'subscriptions', icon: CreditCard },
-    { label: 'Plan limits', tab: 'plans', icon: Layers },
-    { label: 'Feature overrides', tab: 'features', icon: Flag },
-    { label: 'Limit overrides', tab: 'limits', icon: Sliders },
-    { label: 'Health check', tab: 'health', icon: HeartPulse },
-    { label: 'Audit logs', tab: 'audit', icon: ScrollText },
-    { label: 'Review deals', tab: 'deals', icon: Tag },
-    { label: 'Operations', tab: 'operations', icon: Wrench },
+    { label: t('overview.extras.manageTenants'), tab: 'tenants', icon: Users },
+    { label: t('overview.extras.reviewSubscriptions'), tab: 'subscriptions', icon: CreditCard },
+    { label: t('overview.extras.planLimits'), tab: 'plans', icon: Layers },
+    { label: t('overview.extras.featureOverrides'), tab: 'features', icon: Flag },
+    { label: t('overview.extras.limitOverrides'), tab: 'limits', icon: Sliders },
+    { label: t('overview.extras.healthCheck'), tab: 'health', icon: HeartPulse },
+    { label: t('overview.extras.auditLogs'), tab: 'audit', icon: ScrollText },
+    { label: t('overview.extras.reviewDeals'), tab: 'deals', icon: Tag },
+    { label: t('overview.extras.operations'), tab: 'operations', icon: Wrench },
   ]
 
   const quickActions = allQuickActions.map((action) => ({
@@ -90,7 +92,9 @@ export function AdminOverviewExtras({
       >
         <Card className="lg:col-span-1">
           <CardHeader className="px-4 pb-2 pt-4">
-            <CardTitle className="text-sm font-semibold">Needs your attention</CardTitle>
+            <CardTitle className="text-sm font-semibold">
+              {t('overview.extras.needsAttention')}
+            </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4 pt-0">
             <AttentionPanel
@@ -103,14 +107,16 @@ export function AdminOverviewExtras({
 
         <Card className="lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between px-4 pb-2 pt-4">
-            <CardTitle className="text-sm font-semibold">Recent activity</CardTitle>
+            <CardTitle className="text-sm font-semibold">
+              {t('overview.extras.recentActivity')}
+            </CardTitle>
             <Button
               variant="ghost"
               size="sm"
               className="h-7 text-xs"
               onClick={() => onNavigateTab('activity')}
             >
-              View all <ArrowRight className="ml-1 h-3 w-3" />
+              {t('overview.extras.viewAll')} <ArrowRight className="ml-1 h-3 w-3" />
             </Button>
           </CardHeader>
           <CardContent className="px-4 pb-4 pt-0">
@@ -126,7 +132,9 @@ export function AdminOverviewExtras({
 
         <Card className="lg:col-span-1 overflow-visible">
           <CardHeader className="px-4 pb-2 pt-4">
-            <CardTitle className="text-sm font-semibold">Quick actions</CardTitle>
+            <CardTitle className="text-sm font-semibold">
+              {t('overview.extras.quickActions')}
+            </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4 pt-0">
             <QuickActionGrid actions={quickActions} onNavigateTab={onNavigateTab} />

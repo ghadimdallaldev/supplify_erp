@@ -1,8 +1,8 @@
 {
   "title": "تقويم الطلبات",
   "subtitle": {
-    "restaurant": "تصوّر الطلبات والتسليمات والمدفوعات لفروعك",
-    "supplier": "تصوّر الطلبات والتسليمات والمدفوعات عبر شركاء المطاعم"
+    "restaurant": "اعرض الطلبات والتسليمات والمدفوعات لفروعك",
+    "supplier": "اعرض الطلبات والتسليمات والمدفوعات عبر شركاء المطاعم"
   },
   "views": {
     "month": "شهر",
@@ -13,6 +13,46 @@
   "cta": {
     "createOrder": "إنشاء طلب",
     "createManualOrder": "إنشاء طلب يدوي"
+  },
+  "roles": {
+    "restaurantView": "عرض المطعم",
+    "supplierView": "عرض المورد"
+  },
+  "counterpart": {
+    "restaurant": "مطعم",
+    "supplier": "مورد"
+  },
+  "filters": {
+    "allStatuses": "كل الحالات",
+    "allSuppliers": "كل الموردين",
+    "allRestaurants": "كل المطاعم",
+    "allBranches": "كل الفروع",
+    "allCategories": "كل الفئات",
+    "liveHint": "يتم تحديث الفلاتر فوراً",
+    "reset": "إعادة ضبط",
+    "updating": "جار التحديث..."
+  },
+  "plan": {
+    "fallbackName": "خطتك",
+    "lockedTitle": "{{feature}} غير متاح في {{planName}}",
+    "lockedDescription": "اعرض الطلبات والتسليمات ومواعيد الدفع في مكان واحد. قم بالترقية إلى Silver أو Gold لفتح التقويم - الخطة المجانية مخصصة للإعداد والاختبار الخفيف فقط.",
+    "comparePlans": "قارن الخطط وقم بالترقية"
+  },
+  "state": {
+    "loading": "جار تحميل التقويم...",
+    "loadError": "تعذر تحميل تقويم الطلبات الآن.",
+    "tryAgain": "حاول مرة أخرى",
+    "showingEvents": "عرض {{shown}} من {{total}} حدث",
+    "previous": "السابق",
+    "next": "التالي",
+    "pageOf": "صفحة {{page}} من {{totalPages}}"
+  },
+  "eventCard": {
+    "order": "طلب",
+    "status": "الحالة",
+    "counterpart": "الطرف المقابل",
+    "branch": "الفرع",
+    "categories": "الفئات"
   },
   "eventSheet": {
     "orderTitle": "طلب #{{id}}",

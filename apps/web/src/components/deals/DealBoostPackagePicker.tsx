@@ -26,7 +26,7 @@ export function DealBoostPackagePicker({
   disabled?: boolean
 }) {
   const { data, isLoading } = useGetPromotionPricingQuery()
-  const options = (data?.pricing || []) as BoostPricingOption[]
+  const options = useMemo(() => (data?.pricing || []) as BoostPricingOption[], [data?.pricing])
 
   const defaultKey = useMemo(() => {
     const recommended = options.find((o) => o.is_recommended)

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { TableScroll } from '../ui/table-scroll'
@@ -37,26 +38,28 @@ export function UsagePressureList({
   }) => void
   onChangePlan?: (id: string, name: string, tenantType: 'SUPPLIER' | 'RESTAURANT') => void
 }) {
+  const { t } = useTranslation('admin')
+
   if (entries.length === 0) {
     return (
       <AdminEmptyState
-        title="No tenants under pressure"
-        description="No loaded tenants are near or over plan limits. Load more tenants or check back later."
+        title={t('usage.noTenantsUnderPressureTitle')}
+        description={t('usage.noTenantsUnderPressureDescription')}
       />
     )
   }
 
   return (
-    <TableScroll aria-label="Tenants under usage pressure">
+    <TableScroll aria-label={t('usage.pressureTableAriaLabel')}>
       <table className="w-full min-w-[720px] text-sm" data-testid="admin-usage-pressure-list">
         <thead>
           <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            <th className="px-4 py-3">Tenant</th>
+            <th className="px-4 py-3">{t('common.table.tenant')}</th>
             <th className="px-4 py-3">Type</th>
-            <th className="hidden px-4 py-3 sm:table-cell">Plan</th>
+            <th className="hidden px-4 py-3 sm:table-cell">{t('common.table.plan')}</th>
             <th className="px-4 py-3">Top pressure</th>
-            <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3 text-right">Actions</th>
+            <th className="px-4 py-3">{t('common.table.status')}</th>
+            <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-[var(--app-border)]">

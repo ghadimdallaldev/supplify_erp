@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Star } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -39,6 +40,7 @@ export function ReceivingDialog({
   canOpenDispute: boolean
   onOpenDispute: (formData: Record<string, unknown>) => void
 }) {
+  const { t } = useTranslation('orders')
   const [formData, setFormData] = useState<Record<string, unknown>>({
     deliveryNotes: '',
     qualityScore: 5,
@@ -58,18 +60,17 @@ export function ReceivingDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="xl" className="pb-[max(1rem,env(safe-area-inset-bottom))]">
         <DialogHeader>
-          <DialogTitle>Receive Order #{order.id.slice(0, 8)}</DialogTitle>
-          <DialogDescription>
-            Enter quantities and quality for each line. When you complete receiving, if any items
-            had issues, one dispute form opens for the whole order (not per item).
-          </DialogDescription>
+          <DialogTitle>{t('receiving.dialog.title', { id: order.id.slice(0, 8) })}</DialogTitle>
+          <DialogDescription>{t('receiving.dialog.description')}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
           <div>
-            <p className="text-sm font-semibold text-[var(--text)]">Line items</p>
+            <p className="text-sm font-semibold text-[var(--text)]">
+              {t('receiving.dialog.lineItems')}
+            </p>
             <p className="mt-0.5 text-xs text-[var(--text-mid)]">
-              Enter received quantities and quality for each product.
+              {t('receiving.dialog.lineItemsDescription')}
             </p>
             <div className="mt-3 divide-y divide-[var(--app-border)] overflow-hidden rounded-xl border border-[var(--app-border)]">
               {order.items.map((item: any) => {
@@ -86,10 +87,14 @@ export function ReceivingDialog({
                   <div key={item.id} className="space-y-3 bg-[var(--surface)] p-4">
                     <div>
                       <p className="font-medium text-[var(--text)]">{item.product_name}</p>
-                      <p className="text-xs text-[var(--text-mid)]">SKU: {item.sku}</p>
                       <p className="text-xs text-[var(--text-mid)]">
-                        Ordered: {ordered} {unit}
-                        {qtyRules.allowDecimals ? ` (step ${qtyRules.step})` : ' (whole units)'}
+                        {t('receiving.dialog.sku', { sku: item.sku })}
+                      </p>
+                      <p className="text-xs text-[var(--text-mid)]">
+                        {t('receiving.dialog.ordered', { quantity: ordered, unit })}
+                        {qtyRules.allowDecimals
+                          ? t('receiving.dialog.step', { step: qtyRules.step })
+                          : t('receiving.dialog.wholeUnits')}
                       </p>
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -98,7 +103,7 @@ export function ReceivingDialog({
                           htmlFor={`received_${item.id}`}
                           className="text-xs font-medium text-[var(--text-mid)]"
                         >
-                          Received qty
+                          {t('receiving.dialog.receivedQty')}
                         </Label>
                         <Input
                           id={`received_${item.id}`}
@@ -123,7 +128,7 @@ export function ReceivingDialog({
                           htmlFor={`quality_${item.id}`}
                           className="text-xs font-medium text-[var(--text-mid)]"
                         >
-                          Quality status
+                          {t('receiving.dialog.qualityStatus')}
                         </Label>
                         <Select
                           value={String(formData[`quality_${item.id}`] ?? 'ACCEPTED')}
@@ -135,11 +140,15 @@ export function ReceivingDialog({
                           }
                         >
                           <SelectTrigger id={`quality_${item.id}`}>
-                            <option value="ACCEPTED">Accepted</option>
-                            <option value="DAMAGED">Damaged</option>
-                            <option value="EXPIRED">Expired</option>
-                            <option value="WRONG_ITEM">Wrong Item</option>
-                            <option value="SHORT">Short</option>
+                            <option value="ACCEPTED">
+                              {t('receiving.dialog.quality.ACCEPTED')}
+                            </option>
+                            <option value="DAMAGED">{t('receiving.dialog.quality.DAMAGED')}</option>
+                            <option value="EXPIRED">{t('receiving.dialog.quality.EXPIRED')}</option>
+                            <option value="WRONG_ITEM">
+                              {t('receiving.dialog.quality.WRONG_ITEM')}
+                            </option>
+                            <option value="SHORT">{t('receiving.dialog.quality.SHORT')}</option>
                           </SelectTrigger>
                         </Select>
                       </div>
@@ -148,7 +157,7 @@ export function ReceivingDialog({
                           htmlFor={`notes_${item.id}`}
                           className="text-xs font-medium text-[var(--text-mid)]"
                         >
-                          Notes (optional)
+                          {t('receiving.dialog.notesOptional')}
                         </Label>
                         <Input
                           id={`notes_${item.id}`}
@@ -162,7 +171,7 @@ export function ReceivingDialog({
                           htmlFor={`expiry_${item.id}`}
                           className="text-xs font-medium text-[var(--text-mid)]"
                         >
-                          Expiry date (optional)
+                          {t('receiving.dialog.expiryOptional')}
                         </Label>
                         <Input
                           id={`expiry_${item.id}`}
@@ -177,7 +186,7 @@ export function ReceivingDialog({
                           htmlFor={`batch_${item.id}`}
                           className="text-xs font-medium text-[var(--text-mid)]"
                         >
-                          Batch / lot #
+                          {t('receiving.dialog.batchLot')}
                         </Label>
                         <Input
                           id={`batch_${item.id}`}
@@ -191,7 +200,7 @@ export function ReceivingDialog({
                           htmlFor={`storage_${item.id}`}
                           className="text-xs font-medium text-[var(--text-mid)]"
                         >
-                          Storage location
+                          {t('receiving.dialog.storageLocation')}
                         </Label>
                         <Input
                           id={`storage_${item.id}`}
@@ -210,7 +219,7 @@ export function ReceivingDialog({
           <div className="rounded-xl border border-[var(--app-border)] bg-[var(--brand-ultra)]/40 p-4 space-y-4">
             <div>
               <Label htmlFor="qualityScore" className="text-sm font-semibold text-[var(--text)]">
-                Overall quality score
+                {t('receiving.dialog.overallQualityScore')}
               </Label>
               <div className="flex items-center gap-2 mt-2">
                 {[1, 2, 3, 4, 5].map((score) => (
@@ -231,22 +240,22 @@ export function ReceivingDialog({
 
             <div>
               <Label htmlFor="qualityNotes" className="text-xs font-medium text-[var(--text-mid)]">
-                Quality notes
+                {t('receiving.dialog.qualityNotes')}
               </Label>
               <Textarea
                 id="qualityNotes"
-                placeholder="Enter any quality observations..."
+                placeholder={t('receiving.dialog.qualityNotesPlaceholder')}
                 onChange={(e) => setFormData({ ...formData, qualityNotes: e.target.value })}
               />
             </div>
 
             <div>
               <Label htmlFor="deliveryNotes" className="text-xs font-medium text-[var(--text-mid)]">
-                Delivery notes
+                {t('receiving.dialog.deliveryNotes')}
               </Label>
               <Textarea
                 id="deliveryNotes"
-                placeholder="Enter delivery notes (truck number, driver, etc.)..."
+                placeholder={t('receiving.dialog.deliveryNotesPlaceholder')}
                 onChange={(e) => setFormData({ ...formData, deliveryNotes: e.target.value })}
               />
             </div>
@@ -267,20 +276,20 @@ export function ReceivingDialog({
                 data-testid="receiving-open-dispute"
                 onClick={() => onOpenDispute(formData)}
               >
-                Open dispute
+                {t('receiving.dialog.openDispute')}
               </Button>
             )}
           </div>
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t('receiving.dialog.cancel')}
             </Button>
             <Button
               className="min-h-[44px] w-full sm:w-auto"
               onClick={() => onSubmit(formData)}
               disabled={isLoading || !canReceive}
             >
-              {isLoading ? 'Processing...' : 'Complete Receiving'}
+              {isLoading ? t('receiving.dialog.processing') : t('receiving.dialog.complete')}
             </Button>
           </div>
         </DialogFooter>

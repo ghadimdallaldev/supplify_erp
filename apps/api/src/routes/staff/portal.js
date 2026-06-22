@@ -49,6 +49,7 @@ import {
   resetStaffPortalAccess,
   getStaffPortalAccessRow,
   mapPortalAccessInfo,
+  resolveStaffPortalCopyLink,
 } from '../../services/staff-portal-account.service.js'
 
 import {
@@ -334,22 +335,14 @@ portalAdminRouter.post('/send-invite', async (req, res) => {
 portalAdminRouter.get('/login-link', async (req, res) => {
   try {
     const restaurantId = await resolveRestaurantId(req)
-    const row = await getStaffPortalAccessRow(req.params.id, restaurantId)
-    if (!row) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: { name: 'STAFF_NOT_FOUND', message: 'Staff member not found' },
-        requestId: req.requestId,
-      })
-    }
-    const info = mapPortalAccessInfo(row)
-    res.json({ ok: true, data: info, error: null, requestId: req.requestId })
+    const data = await resolveStaffPortalCopyLink(req.params.id, restaurantId)
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
   } catch (error) {
-    res.status(400).json({
+    const status = error.status || 400
+    res.status(status).json({
       ok: false,
       data: null,
-      error: { name: 'PORTAL_LINK_ERROR', message: error.message },
+      error: { name: error.name || 'PORTAL_LINK_ERROR', message: error.message },
       requestId: req.requestId,
     })
   }

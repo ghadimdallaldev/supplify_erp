@@ -1,7 +1,10 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
+import { ensureNamespace } from '../../i18n'
 
 export type DisputeListRow = {
   id: string
@@ -29,6 +32,18 @@ function formatOrderRef(orderId: unknown): string {
   return `#${id.slice(0, 8).toUpperCase()}`
 }
 
+function formatDisputeType(type: string, t: (key: string) => string): string {
+  const key = `types.${type}`
+  const translated = t(key)
+  return translated === key ? type.replace(/_/g, ' ') : translated
+}
+
+function formatDisputeStatus(status: string, t: (key: string) => string): string {
+  const key = `status.${status}`
+  const translated = t(key)
+  return translated === key ? status.replace(/_/g, ' ') : translated
+}
+
 type Props = {
   disputes: DisputeListRow[]
   isSupplier: boolean
@@ -46,6 +61,12 @@ export function DisputeListCards({
   onResolve,
   onReject,
 }: Props) {
+  const { t } = useTranslation('disputes')
+
+  useEffect(() => {
+    void ensureNamespace('disputes')
+  }, [])
+
   return (
     <div className="space-y-3 md:hidden">
       {disputes.map((dispute) => {
@@ -67,7 +88,9 @@ export function DisputeListCards({
                       {formatOrderRef(orderId)}
                     </Link>
                   ) : (
-                    <span className="text-sm text-[var(--text-muted)]">No order linked</span>
+                    <span className="text-sm text-[var(--text-muted)]">
+                      {t('list.noOrderLinked')}
+                    </span>
                   )}
                   {isSupplier && (
                     <p className="text-sm text-[var(--text-muted)] truncate">
@@ -78,11 +101,11 @@ export function DisputeListCards({
                     to={`/app/disputes/${dispute.id}`}
                     className="text-sm capitalize text-[var(--text-mid)] hover:underline"
                   >
-                    {String(dispute.type || '').replace(/_/g, ' ')}
+                    {formatDisputeType(String(dispute.type || ''), t)}
                   </Link>
                 </div>
                 <Badge variant={statusBadge(status)} className="shrink-0 capitalize">
-                  {status}
+                  {formatDisputeStatus(status, t)}
                 </Badge>
               </div>
 
@@ -99,7 +122,7 @@ export function DisputeListCards({
                         className="min-h-[40px] flex-1 sm:flex-none"
                         onClick={() => onReview(dispute.id)}
                       >
-                        Review
+                        {t('list.review')}
                       </Button>
                     )}
                     {onResolve && (
@@ -108,7 +131,7 @@ export function DisputeListCards({
                         className="min-h-[40px] flex-1 sm:flex-none"
                         onClick={() => onResolve(dispute.id)}
                       >
-                        Resolve
+                        {t('list.resolve')}
                       </Button>
                     )}
                     {onReject && (
@@ -118,7 +141,7 @@ export function DisputeListCards({
                         className="min-h-[40px] flex-1 sm:flex-none"
                         onClick={() => onReject(dispute.id)}
                       >
-                        Reject
+                        {t('list.reject')}
                       </Button>
                     )}
                   </div>

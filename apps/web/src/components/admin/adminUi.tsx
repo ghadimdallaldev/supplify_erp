@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { Loader2 } from 'lucide-react'
 import { EmptyState } from '../ui/empty-state'
@@ -57,11 +58,13 @@ export function AdminEmptyState({
   return <EmptyState title={title} description={description} action={action} icon={icon} />
 }
 
-export function AdminLoadingState({ label = 'Loading…' }: { label?: string }) {
+export function AdminLoadingState({ label }: { label?: string }) {
+  const { t } = useTranslation('admin')
+  const resolvedLabel = label ?? t('common.loading')
   return (
     <div className="flex items-center justify-center gap-2 py-10 text-sm text-[var(--text-muted)]">
       <Loader2 className="h-5 w-5 animate-spin" />
-      {label}
+      {resolvedLabel}
     </div>
   )
 }
@@ -88,7 +91,7 @@ export function AdminTooltip({ label, children }: { label: string; children: Rea
 export { TooltipProvider }
 
 export function AdminErrorState({
-  title = 'Something went wrong',
+  title,
   message,
   onRetry,
 }: {
@@ -96,16 +99,18 @@ export function AdminErrorState({
   message?: string
   onRetry?: () => void
 }) {
+  const { t } = useTranslation('admin')
+  const resolvedTitle = title ?? t('common.errorDefault')
   return (
     <div
       className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm"
       data-testid="admin-error-state"
     >
-      <p className="font-semibold text-red-900">{title}</p>
+      <p className="font-semibold text-red-900">{resolvedTitle}</p>
       {message && <p className="mt-1 text-red-800">{message}</p>}
       {onRetry && (
         <Button variant="outline" size="sm" className="mt-3" onClick={onRetry}>
-          Retry
+          {t('common.retry')}
         </Button>
       )}
     </div>
@@ -121,11 +126,14 @@ export function AdminRefreshBar({
   onRefresh?: () => void
   refreshing?: boolean
 }) {
+  const { t } = useTranslation('admin')
   return (
     <div className="flex items-center justify-end gap-2 text-xs text-[var(--text-muted)]">
       {lastUpdated && (
         <span>
-          Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {t('common.updatedAt', {
+            time: lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          })}
         </span>
       )}
       {onRefresh && (
@@ -137,7 +145,7 @@ export function AdminRefreshBar({
           onClick={onRefresh}
           disabled={refreshing}
         >
-          {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Refresh'}
+          {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t('common.refresh')}
         </Button>
       )}
     </div>

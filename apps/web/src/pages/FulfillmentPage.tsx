@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { AlertCircle, ClipboardList, MapPin, Navigation, Truck, Warehouse } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
@@ -23,12 +24,18 @@ import {
   LazyFulfillmentRoutesTab,
   LazyFulfillmentTrackingTab,
 } from '../components/fulfillment/lazyFulfillmentTabs'
+import { ensureNamespace } from '../i18n'
 
 export function FulfillmentPage() {
+  const { t } = useTranslation('fulfillment')
   const { can } = usePermissions()
   const canViewWarehouses = can('WAREHOUSES_VIEW')
   const [activeTab, setActiveTab] = useState('dispatch')
   const [selectedWarehouseId, setSelectedWarehouseId] = useState('')
+
+  useEffect(() => {
+    void ensureNamespace('fulfillment')
+  }, [])
 
   const { entitlements } = useEntitlements()
   const { data: warehousesData } = useGetWarehousesQuery(undefined, {
@@ -47,26 +54,23 @@ export function FulfillmentPage() {
   })
 
   return (
-    <RequirePermission permission="FULFILLMENT_VIEW" title="fulfillment">
+    <RequirePermission permission="FULFILLMENT_VIEW" title={t('page.permissionTitle')}>
       <PageShell maxWidth="wide" className="overflow-x-hidden">
-        <PageHeader
-          title="Fulfillment & logistics"
-          description="Pick lists, driver dispatch, routes, and delivery tracking."
-        />
+        <PageHeader title={t('page.title')} description={t('page.description')} />
 
         {multiWarehouseActive && warehouses.length > 0 && (
           <div className="flex max-w-sm items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2">
             <Warehouse className="h-4 w-4 shrink-0 text-[var(--brand-mid)]" aria-hidden />
             <div className="min-w-0 flex-1">
               <Label htmlFor="fulfillment-warehouse" className="sr-only">
-                Warehouse filter
+                {t('page.warehouseFilter')}
               </Label>
               <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>
                 <SelectTrigger
                   id="fulfillment-warehouse"
                   className="h-8 border-0 bg-transparent px-0 shadow-none focus:ring-0"
                 >
-                  <option value="">All warehouses</option>
+                  <option value="">{t('page.allWarehouses')}</option>
                   {warehouses.map((wh: { id: string; name: string }) => (
                     <option key={wh.id} value={wh.id}>
                       {wh.name}
@@ -82,23 +86,23 @@ export function FulfillmentPage() {
           <TabsList className="h-auto w-full gap-1 sm:flex sm:flex-wrap">
             <TabsTrigger value="dispatch" className="gap-1.5 text-xs sm:text-sm">
               <Truck className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Driver Dispatch
+              {t('page.tabs.dispatch')}
             </TabsTrigger>
             <TabsTrigger value="picklists" className="gap-1.5 text-xs sm:text-sm">
               <ClipboardList className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Pick Lists
+              {t('page.tabs.picklists')}
             </TabsTrigger>
             <TabsTrigger value="routes" className="gap-1.5 text-xs sm:text-sm">
               <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Routes
+              {t('page.tabs.routes')}
             </TabsTrigger>
             <TabsTrigger value="tracking" className="gap-1.5 text-xs sm:text-sm">
               <Navigation className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Delivery Tracking
+              {t('page.tabs.tracking')}
             </TabsTrigger>
             <TabsTrigger value="exceptions" className="relative gap-1.5 text-xs sm:text-sm">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Exceptions
+              {t('page.tabs.exceptions')}
               {(exceptionsResponse?.openCount ?? 0) > 0 && (
                 <StatusBadge
                   status="OVERDUE"

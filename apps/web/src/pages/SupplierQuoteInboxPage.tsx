@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useGetSupplierQuoteInboxQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
@@ -8,21 +10,28 @@ import { Skeleton } from '../components/ui/skeleton'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { Inbox } from 'lucide-react'
+import { ensureNamespace } from '../i18n'
 
-function statusLabel(status: string) {
+function statusLabel(status: string, t: (key: string) => string) {
   switch (status) {
     case 'pending':
-      return 'Pending'
+      return t('status.pending')
     case 'responded':
-      return 'Responded'
+      return t('status.responded')
     case 'declined':
-      return 'Declined'
+      return t('status.declined')
     default:
       return status
   }
 }
 
 export function SupplierQuoteInboxPage() {
+  const { t } = useTranslation('quotes')
+
+  useEffect(() => {
+    void ensureNamespace('quotes')
+  }, [])
+
   const { data, isLoading, isError, refetch } = useGetSupplierQuoteInboxQuery({
     page: 1,
     limit: 50,
@@ -31,10 +40,7 @@ export function SupplierQuoteInboxPage() {
 
   return (
     <PageShell className="space-y-6" data-testid="supplier-quote-inbox-page">
-      <PageHeader
-        title="Quote request inbox"
-        description="Restaurants requesting your best price and availability."
-      />
+      <PageHeader title={t('inbox.title')} description={t('inbox.description')} />
 
       {isLoading && (
         <div className="space-y-3">
@@ -46,10 +52,10 @@ export function SupplierQuoteInboxPage() {
 
       {isError && (
         <EmptyState
-          title="Could not load inbox"
+          title={t('inbox.loadFailedTitle')}
           action={
             <Button variant="outline" onClick={() => refetch()}>
-              Retry
+              {t('common.retry')}
             </Button>
           }
         />
@@ -57,8 +63,8 @@ export function SupplierQuoteInboxPage() {
 
       {!isLoading && !isError && inbox.length === 0 && (
         <EmptyState
-          title="Inbox is empty"
-          description="When restaurants send quote requests, they will appear here."
+          title={t('inbox.emptyTitle')}
+          description={t('inbox.emptyDescription')}
           icon={<Inbox className="h-6 w-6" />}
         />
       )}
@@ -71,19 +77,23 @@ export function SupplierQuoteInboxPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <CardTitle className="text-base">{entry.restaurantName}</CardTitle>
                   <Badge variant={entry.status === 'pending' ? 'secondary' : 'default'}>
-                    {statusLabel(entry.status)}
+                    {statusLabel(entry.status, t)}
                   </Badge>
                 </div>
                 <CardDescription>
-                  {entry.itemCount} item{entry.itemCount === 1 ? '' : 's'} ·{' '}
-                  {new Date(entry.createdAt).toLocaleDateString()}
-                  {entry.neededBy ? ` · Needed by ${entry.neededBy}` : ''}
+                  {[
+                    t('inbox.items', { count: entry.itemCount }),
+                    new Date(entry.createdAt).toLocaleDateString(),
+                    entry.neededBy ? t('inbox.neededBy', { date: entry.neededBy }) : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex justify-end">
                 <Button asChild size="sm">
                   <Link to={`/app/quote-requests/supplier/${entry.id}`}>
-                    {entry.status === 'responded' ? 'View response' : 'Respond'}
+                    {entry.status === 'responded' ? t('inbox.viewResponse') : t('inbox.respond')}
                   </Link>
                 </Button>
               </CardContent>

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -64,6 +65,7 @@ function RouteStopCard({
   settingNext: boolean
   updatingStop: boolean
 }) {
+  const { t } = useTranslation('fulfillment')
   const badge = formatFulfillmentStopStatus(stop, route.status)
   const etaLabel = getStopEtaLabel(stop)
   const gpsLabel = stop.tracking ? getGpsStatusLabel(stop.tracking) : null
@@ -83,7 +85,7 @@ function RouteStopCard({
           variant="outline"
           disabled={settingNext}
           onClick={() => onSetNext(stop.orderId)}
-          title="Set as next"
+          title={t('routeDetail.setAsNext')}
         >
           <Star className="h-3 w-3" />
         </Button>
@@ -95,7 +97,7 @@ function RouteStopCard({
             variant="outline"
             disabled={index === 0 || reordering}
             onClick={() => onMoveStop(index, -1)}
-            aria-label="Move up"
+            aria-label={t('routeDetail.moveUp')}
           >
             <ArrowUp className="h-3 w-3" />
           </Button>
@@ -104,7 +106,7 @@ function RouteStopCard({
             variant="outline"
             disabled={index === route.stops.length - 1 || reordering}
             onClick={() => onMoveStop(index, 1)}
-            aria-label="Move down"
+            aria-label={t('routeDetail.moveDown')}
           >
             <ArrowDown className="h-3 w-3" />
           </Button>
@@ -117,7 +119,7 @@ function RouteStopCard({
           disabled={updatingStop}
           onClick={() => onSetStatus(stop.id, 'OUT_FOR_DELIVERY')}
         >
-          Out
+          {t('routeDetail.out')}
         </Button>
       )}
       {['PLANNED', 'OUT_FOR_DELIVERY'].includes(stop.status) && (
@@ -127,7 +129,7 @@ function RouteStopCard({
           disabled={updatingStop}
           onClick={() => onSetStatus(stop.id, 'DELIVERED')}
         >
-          Delivered
+          {t('routeDetail.delivered')}
         </Button>
       )}
       {stop.status !== 'DELIVERED' && stop.status !== 'FAILED' && (
@@ -138,7 +140,7 @@ function RouteStopCard({
           disabled={updatingStop}
           onClick={() => onSetStatus(stop.id, 'FAILED')}
         >
-          Problem
+          {t('routeDetail.problem')}
         </Button>
       )}
     </div>
@@ -169,7 +171,7 @@ function RouteStopCard({
           <div className="min-w-0 flex-1 space-y-1">
             {isNext ? (
               <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--brand-mid)]">
-                Next stop
+                {t('routeDetail.nextStop')}
               </p>
             ) : null}
             <p className="font-semibold leading-snug">{stop.restaurantName}</p>
@@ -206,7 +208,7 @@ function RouteStopCard({
               aria-expanded={expanded}
               data-testid={`stop-details-toggle-${stop.id}`}
             >
-              {expanded ? 'Hide details' : 'Show details'}
+              {expanded ? t('routeDetail.hideDetails') : t('routeDetail.showDetails')}
               <ChevronDown
                 className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
                 aria-hidden
@@ -221,7 +223,9 @@ function RouteStopCard({
                 {stop.addressLine ? <p>{stop.addressLine}</p> : null}
                 {stop.itemCount > 0 || stop.totalAmount > 0 ? (
                   <p>
-                    {stop.itemCount > 0 ? `${stop.itemCount} items` : null}
+                    {stop.itemCount > 0
+                      ? t('routeDetail.itemsCount', { count: stop.itemCount })
+                      : null}
                     {stop.itemCount > 0 && stop.totalAmount > 0 ? ' · ' : null}
                     {stop.totalAmount > 0 ? `$${stop.totalAmount.toFixed(2)}` : null}
                   </p>
@@ -239,7 +243,7 @@ function RouteStopCard({
             className="mt-2 h-auto min-h-[44px] p-0 text-sm sm:min-h-0 sm:text-xs"
             onClick={() => onViewTracking(stop.orderId)}
           >
-            View tracking
+            {t('routeDetail.viewTracking')}
           </Button>
         ) : null}
       </div>
@@ -266,7 +270,7 @@ function RouteStopCard({
                 disabled={updatingStop}
                 onClick={() => onSetStatus(stop.id, 'FAILED')}
               >
-                Problem
+                {t('routeDetail.problem')}
               </Button>
             ) : null}
             {expanded && showSecondaryActions ? (
@@ -280,7 +284,7 @@ function RouteStopCard({
                     onClick={() => onSetNext(stop.orderId)}
                   >
                     <Star className="mr-1 h-4 w-4" aria-hidden />
-                    Next
+                    {t('routeDetail.next')}
                   </Button>
                 ) : (
                   <span />
@@ -291,10 +295,10 @@ function RouteStopCard({
                   className="min-h-[44px] text-xs"
                   disabled={index === 0 || reordering}
                   onClick={() => onMoveStop(index, -1)}
-                  aria-label="Move up"
+                  aria-label={t('routeDetail.moveUp')}
                 >
                   <ArrowUp className="mr-1 h-4 w-4" aria-hidden />
-                  Up
+                  {t('routeDetail.up')}
                 </Button>
                 <Button
                   type="button"
@@ -302,10 +306,10 @@ function RouteStopCard({
                   className="min-h-[44px] text-xs"
                   disabled={index === route.stops.length - 1 || reordering}
                   onClick={() => onMoveStop(index, 1)}
-                  aria-label="Move down"
+                  aria-label={t('routeDetail.moveDown')}
                 >
                   <ArrowDown className="mr-1 h-4 w-4" aria-hidden />
-                  Down
+                  {t('routeDetail.down')}
                 </Button>
               </div>
             ) : null}
@@ -318,6 +322,7 @@ function RouteStopCard({
 }
 
 export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: Props) {
+  const { t } = useTranslation('fulfillment')
   const { can } = usePermissions()
   const canManage = can('FULFILLMENT_MANAGE')
   const [expandedStops, setExpandedStops] = useState<Record<string, boolean>>({})
@@ -339,9 +344,9 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
     ids[next] = tmp
     try {
       await reorderStops({ routeId: route.id, stop_ids: ids }).unwrap()
-      toast.success('Stop order updated')
+      toast.success(t('routeDetail.toast.stopOrderUpdated'))
     } catch {
-      toast.error('Could not reorder stops')
+      toast.error(t('routeDetail.toast.reorderStopsFailed'))
     }
   }
 
@@ -351,10 +356,10 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
   ) => {
     try {
       await updateStop({ routeId: route.id, stopId, status }).unwrap()
-      toast.success('Stop updated')
+      toast.success(t('routeDetail.toast.stopUpdated'))
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Update failed')
+      toast.error(msg || t('routeDetail.toast.updateFailed'))
     }
   }
 
@@ -364,41 +369,41 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
       const km = result.preview?.estimatedDistanceKm
       if (apply) {
         toast.success(
-          km != null ? `Route optimized (~${km} km estimated)` : 'Route stop order updated'
+          km != null
+            ? t('routeDetail.toast.routeOptimizedWithKm', { km })
+            : t('routeDetail.toast.routeStopOrderUpdated')
         )
       } else {
-        const ok = window.confirm(
-          `Optimize stop order? Estimated distance ~${km ?? '?'} km. Apply new order?`
-        )
+        const ok = window.confirm(t('routeDetail.optimizeConfirm', { km: km ?? '?' }))
         if (ok) {
           await optimizeRoute({ routeId: route.id, apply: true }).unwrap()
-          toast.success('Route optimized')
+          toast.success(t('routeDetail.toast.routeOptimized'))
         }
       }
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Could not optimize route')
+      toast.error(msg || t('routeDetail.toast.optimizeFailed'))
     }
   }
 
   const startRoute = async () => {
     try {
       await updateRoute({ id: route.id, status: 'IN_PROGRESS' }).unwrap()
-      toast.success('Route started')
+      toast.success(t('routeDetail.toast.routeStarted'))
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || 'Could not start route')
+      toast.error(msg || t('routeDetail.toast.startFailed'))
     }
   }
 
   const handleCancel = async () => {
-    if (!confirm('Cancel this route? Stops will be released from the route.')) return
+    if (!confirm(t('routeDetail.cancelConfirm'))) return
     try {
       await cancelRoute(route.id).unwrap()
-      toast.success('Route cancelled')
+      toast.success(t('routeDetail.toast.routeCancelled'))
       onClose()
     } catch {
-      toast.error('Could not cancel route')
+      toast.error(t('routeDetail.toast.cancelFailed'))
     }
   }
 
@@ -408,9 +413,9 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
   const handleSetNext = async (orderId: string) => {
     try {
       await setNextStop({ routeId: route.id, orderId }).unwrap()
-      toast.success('Next stop updated')
+      toast.success(t('routeDetail.toast.nextStopUpdated'))
     } catch {
-      toast.error('Could not set next stop')
+      toast.error(t('routeDetail.toast.setNextStopFailed'))
     }
   }
 
@@ -432,8 +437,12 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
                 </SheetDescription>
               </SheetHeader>
               <p className="text-xs text-[var(--text-muted)] mt-2">
-                {new Date(route.scheduledDate).toLocaleDateString()} · {route.stops.length} stops ·{' '}
-                {route.completedStops} delivered · {route.failedStops} failed
+                {t('routeDetail.metaSummary', {
+                  date: new Date(route.scheduledDate).toLocaleDateString(),
+                  stops: route.stops.length,
+                  delivered: route.completedStops,
+                  failed: route.failedStops,
+                })}
               </p>
             </>
           ) : (
@@ -444,8 +453,12 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
                 {route.area ? ` · ${route.area}` : ''}
               </p>
               <p className="text-xs text-[var(--text-muted)] mt-1">
-                {new Date(route.scheduledDate).toLocaleDateString()} · {route.stops.length} stops ·{' '}
-                {route.completedStops} delivered · {route.failedStops} failed
+                {t('routeDetail.metaSummary', {
+                  date: new Date(route.scheduledDate).toLocaleDateString(),
+                  stops: route.stops.length,
+                  delivered: route.completedStops,
+                  failed: route.failedStops,
+                })}
               </p>
             </>
           )}
@@ -456,7 +469,7 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
           </Badge>
           {!isDesktop ? (
             <Button variant="ghost" size="sm" className="min-h-[44px] sm:min-h-0" onClick={onClose}>
-              Close
+              {t('common:actions.close')}
             </Button>
           ) : null}
         </div>
@@ -471,7 +484,7 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
           disabled={optimizing}
         >
           {optimizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Optimize stop order
+          {t('routeDetail.optimizeStopOrder')}
         </Button>
       )}
 
@@ -483,12 +496,9 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
             onClick={startRoute}
             disabled={updatingRoute}
           >
-            Activate ready orders
+            {t('routeDetail.activateReadyOrders')}
           </Button>
-          <p className="text-xs text-[var(--text-muted)]">
-            Starts dispatch for orders that are ready. Orders still waiting for preparation stay on
-            the planned route until they are ready for dispatch.
-          </p>
+          <p className="text-xs text-[var(--text-muted)]">{t('routeDetail.activateHint')}</p>
         </div>
       )}
 
@@ -527,7 +537,7 @@ export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: 
           ) : (
             <XCircle className="mr-2 h-4 w-4" />
           )}
-          Cancel route
+          {t('routeDetail.cancelRoute')}
         </Button>
       )}
     </>

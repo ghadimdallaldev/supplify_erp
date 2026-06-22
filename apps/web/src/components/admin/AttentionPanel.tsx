@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { CheckCircle2 } from 'lucide-react'
 import { AdminEmptyState } from './adminUi'
 
@@ -172,12 +173,14 @@ export function AttentionPanel({
   onNavigateTab: (tab: string) => void
   pendingDeals?: Array<{ id: string | number; name?: string; supplier_name?: string }>
 }) {
+  const { t } = useTranslation('admin')
+
   return (
     <div className="space-y-2">
       {items.length === 0 ? (
         <AdminEmptyState
-          title="All clear"
-          description="All clear. No critical platform issues right now."
+          title={t('attention.allClearTitle')}
+          description={t('attention.allClearDescription')}
           icon={<CheckCircle2 className="h-8 w-8 text-emerald-500" />}
         />
       ) : (

@@ -5,8 +5,8 @@
     "defaultProgramName": "مكافآت الشركاء"
   },
   "summary": {
-    "earnRate": "{{points}} نقطة لكل $1",
-    "redeemValue": "${{value}}/نقطة",
+    "earnRate": "{{points}} نقطة لكل دولار واحد",
+    "redeemValue": "{{value}} دولار/نقطة",
     "minRedeem": "{{points}} نقطة"
   },
   "programSettings": {
@@ -14,10 +14,10 @@
     "description": "اضبط معدل الكسب وقيمة الاستبدال والحد الأدنى للاستبدال والحدود لكل طلب لشركاء المطاعم.",
     "save": "حفظ البرنامج",
     "enabledLabel": "تفعيل البرنامج",
-    "enabledDescription": "فعّل نقاط الولاء B2B للمطاعم التي تطلب من كتالوجك.",
+    "enabledDescription": "فعّل نقاط الولاء بين الشركات للمطاعم التي تطلب من كتالوجك.",
     "nameLabel": "اسم البرنامج",
-    "earnLabel": "النقاط المكتسبة لكل $1",
-    "redeemLabel": "قيمة الاستبدال لكل نقطة ($)",
+    "earnLabel": "النقاط المكتسبة لكل دولار واحد",
+    "redeemLabel": "قيمة الاستبدال لكل نقطة (دولار)",
     "minRedeemLabel": "الحد الأدنى لنقاط الاستبدال",
     "maxRedeemLabel": "الحد الأقصى لنسبة الاستبداد لكل طلب"
   },

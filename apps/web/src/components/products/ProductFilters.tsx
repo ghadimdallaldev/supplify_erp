@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
@@ -53,16 +54,17 @@ export function ProductFilterFields({
   | 'setMinPrice'
   | 'setMaxPrice'
 >) {
+  const { t } = useTranslation('products')
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-12 xl:items-end w-full">
       {!isSupplier && (
         <div className="min-w-0 xl:col-span-2">
           <Label htmlFor="product-supplier-filter" className="sr-only">
-            Supplier
+            {t('filters.supplier')}
           </Label>
           <Select value={supplierFilter} onValueChange={setSupplierFilter}>
             <SelectTrigger id="product-supplier-filter">
-              <option value="">All Suppliers</option>
+              <option value="">{t('filters.allSuppliers')}</option>
               {uniqueSuppliers.map((supplier) => (
                 <option key={supplier.id} value={supplier.id}>
                   {supplier.name}
@@ -74,7 +76,7 @@ export function ProductFilterFields({
       )}
       <div className={`min-w-0 ${!isSupplier ? 'xl:col-span-2' : 'sm:col-span-1 xl:col-span-3'}`}>
         <Label htmlFor="product-category-filter" className="sr-only">
-          Category
+          {t('filters.category')}
         </Label>
         <Select
           value={categoryId}
@@ -84,7 +86,7 @@ export function ProductFilterFields({
           }}
         >
           <SelectTrigger id="product-category-filter">
-            <option value="">All Categories</option>
+            <option value="">{t('filters.allCategories')}</option>
             {categoriesData?.categories?.map((cat) => (
               <option key={cat.id} value={cat.id}>
                 {cat.name}
@@ -96,13 +98,13 @@ export function ProductFilterFields({
       {!isSupplier && (
         <div className="min-w-0 sm:col-span-2 xl:col-span-4">
           <Label className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">
-            Price range
+            {t('filters.priceRange')}
           </Label>
           <div className="flex items-center gap-2">
             <Input
               type="number"
-              placeholder="Min"
-              aria-label="Minimum price"
+              placeholder={t('filters.minPrice')}
+              aria-label={t('filters.minPriceAria')}
               value={minPrice}
               onChange={(e) => setMinPrice(e.target.value)}
               min="0"
@@ -112,8 +114,8 @@ export function ProductFilterFields({
             <span className="shrink-0 text-sm text-[var(--text-muted)]">–</span>
             <Input
               type="number"
-              placeholder="Max"
-              aria-label="Maximum price"
+              placeholder={t('filters.maxPrice')}
+              aria-label={t('filters.maxPriceAria')}
               value={maxPrice}
               onChange={(e) => setMaxPrice(e.target.value)}
               min="0"
@@ -130,7 +132,7 @@ export function ProductFilterFields({
                   setMaxPrice('')
                 }}
               >
-                Clear
+                {t('filters.clear')}
               </Button>
             )}
           </div>
@@ -146,10 +148,11 @@ export function ProductTagFilters({
   selectedTags,
   setSelectedTags,
 }: Pick<ProductFiltersProps, 'isSupplier' | 'tagsData' | 'selectedTags' | 'setSelectedTags'>) {
+  const { t } = useTranslation('products')
   if (isSupplier || !tagsData?.tags?.length) return null
   return (
     <div className="px-4 py-3">
-      <Label className="text-sm font-medium">Filter by tags</Label>
+      <Label className="text-sm font-medium">{t('filters.filterByTags')}</Label>
       <div className="mt-2 flex flex-wrap gap-2">
         {tagsData.tags.map((tag) => (
           <Badge
@@ -186,6 +189,7 @@ export function ProductActiveFilters({
   setMinPrice,
   setMaxPrice,
 }: Omit<ProductFiltersProps, 'uniqueSuppliers' | 'tagsData'>) {
+  const { t } = useTranslation('products')
   if (
     isSupplier ||
     !(supplierFilter || categoryId || category || selectedTags.length || minPrice || maxPrice)
@@ -194,14 +198,14 @@ export function ProductActiveFilters({
   }
   return (
     <div className="flex flex-wrap items-center gap-2 px-4 py-3">
-      <span className="text-sm text-[var(--text-muted)]">Filtered by:</span>
+      <span className="text-sm text-[var(--text-muted)]">{t('filters.filteredBy')}</span>
       {supplierFilter && (
         <Badge
           variant="secondary"
           className="cursor-pointer hover:bg-[var(--app-border-mid)]"
           onClick={() => setSupplierFilter('')}
         >
-          Supplier: {supplierFilter} ×
+          {t('filters.filterSupplier', { value: supplierFilter })}
         </Badge>
       )}
       {(categoryId || category) && (
@@ -213,8 +217,9 @@ export function ProductActiveFilters({
             setCategory('')
           }}
         >
-          Category: {categoriesData?.categories?.find((c) => c.id === categoryId)?.name || category}{' '}
-          ×
+          {t('filters.filterCategory', {
+            value: categoriesData?.categories?.find((c) => c.id === categoryId)?.name || category,
+          })}{' '}
         </Badge>
       )}
       {selectedTags.map((tag) => (
@@ -222,9 +227,9 @@ export function ProductActiveFilters({
           key={tag}
           variant="secondary"
           className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-          onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
+          onClick={() => setSelectedTags((prev) => prev.filter((item) => item !== tag))}
         >
-          Tag: {tag} ×
+          {t('filters.filterTag', { value: tag })}
         </Badge>
       ))}
       {(minPrice || maxPrice) && (
@@ -236,7 +241,7 @@ export function ProductActiveFilters({
             setMaxPrice('')
           }}
         >
-          Price: ${minPrice || '0'} - ${maxPrice || '∞'} ×
+          {t('filters.filterPrice', { min: minPrice || '0', max: maxPrice || '∞' })}
         </Badge>
       )}
     </div>

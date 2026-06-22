@@ -40,7 +40,7 @@ const CommandInput = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
 >(({ className, ...props }, ref) => (
   <div className="flex items-center border-b border-[var(--app-border)] px-3" cmdk-input-wrapper="">
-    <Search className="mr-2 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+    <Search className="me-2 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
@@ -123,7 +123,7 @@ CommandItem.displayName = CommandPrimitive.Item.displayName
 
 const CommandShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => (
   <span
-    className={cn('ml-auto text-xs tracking-widest text-[var(--text-muted)]', className)}
+    className={cn('ms-auto text-xs tracking-widest text-[var(--text-muted)]', className)}
     {...props}
   />
 )

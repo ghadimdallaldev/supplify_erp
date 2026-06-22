@@ -1,4 +1,6 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
@@ -14,6 +16,7 @@ import {
   type WarehouseZoneInput,
 } from '../../../services/api/endpoints/warehouses'
 import { formatPrice } from '../../../utils/format'
+import { ensureNamespace } from '../../../i18n'
 
 type Props = {
   warehouseId: string
@@ -89,9 +92,9 @@ function zoneToForm(zone: WarehouseDeliveryZone): ZoneFormState {
   }
 }
 
-function zoneSummary(zone: WarehouseDeliveryZone): string {
+function zoneSummary(zone: WarehouseDeliveryZone, t: TFunction<'suppliers'>): string {
   if (zone.zone_type === 'radius' && zone.radius_km != null) {
-    return `Radius ${zone.radius_km} km`
+    return t('zones.radiusSummary', { km: zone.radius_km })
   }
   if (zone.postal_codes?.length) {
     return zone.postal_codes.join(', ')
@@ -100,6 +103,7 @@ function zoneSummary(zone: WarehouseDeliveryZone): string {
 }
 
 export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
+  const { t } = useTranslation('suppliers')
   const { data, isLoading, isError } = useListZonesQuery(warehouseId)
   const [createZone, { isLoading: isCreating }] = useCreateZoneMutation()
   const [updateZone, { isLoading: isUpdating }] = useUpdateZoneMutation()
@@ -111,6 +115,10 @@ export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
   const zones = data?.zones ?? []
   const isSaving = isCreating || isUpdating
 
+  useEffect(() => {
+    void ensureNamespace('suppliers')
+  }, [])
+
   const resetForm = () => {
     setForm(EMPTY_FORM)
     setEditingId(null)
@@ -119,11 +127,11 @@ export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     if (!canWrite) {
-      toast.error('You do not have permission to manage delivery zones')
+      toast.error(t('zones.noPermission'))
       return
     }
     if (!form.name.trim()) {
-      toast.error('Zone name is required')
+      toast.error(t('zones.nameRequired'))
       return
     }
 
@@ -132,14 +140,14 @@ export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
     try {
       if (editingId) {
         await updateZone({ warehouseId, zoneId: editingId, body }).unwrap()
-        toast.success('Zone updated')
+        toast.success(t('zones.updated'))
       } else {
         await createZone({ warehouseId, body }).unwrap()
-        toast.success('Zone created')
+        toast.success(t('zones.created'))
       }
       resetForm()
     } catch (err: any) {
-      toast.error(err?.data?.error?.message || 'Failed to save zone')
+      toast.error(err?.data?.error?.message || t('zones.saveFailed'))
     }
   }
 
@@ -150,17 +158,17 @@ export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
 
   const handleDelete = async (zone: WarehouseDeliveryZone) => {
     if (!canWrite) {
-      toast.error('You do not have permission to manage delivery zones')
+      toast.error(t('zones.noPermission'))
       return
     }
-    if (!window.confirm(`Delete zone "${zone.name}"?`)) return
+    if (!window.confirm(t('zones.deleteConfirm', { name: zone.name }))) return
 
     try {
       await deleteZone({ warehouseId, zoneId: zone.id }).unwrap()
       if (editingId === zone.id) resetForm()
-      toast.success('Zone deleted')
+      toast.success(t('zones.deleted'))
     } catch (err: any) {
-      toast.error(err?.data?.error?.message || 'Failed to delete zone')
+      toast.error(err?.data?.error?.message || t('zones.deleteFailed'))
     }
   }
 
@@ -170,36 +178,36 @@ export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
         <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border p-4">
           <div className="flex items-center justify-between gap-2">
             <h4 className="text-sm font-medium">
-              {editingId ? 'Edit delivery zone' : 'Add delivery zone'}
+              {editingId ? t('zones.editTitle') : t('zones.addTitle')}
             </h4>
             {editingId && (
               <Button type="button" variant="ghost" size="sm" onClick={resetForm}>
-                Cancel edit
+                {t('zones.cancelEdit')}
               </Button>
             )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="zone-name">Name *</Label>
+              <Label htmlFor="zone-name">{t('zones.name')}</Label>
               <Input
                 id="zone-name"
-                placeholder="Downtown delivery"
+                placeholder={t('zones.namePlaceholder')}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="zone-postal-codes">Postal codes</Label>
+              <Label htmlFor="zone-postal-codes">{t('zones.postalCodes')}</Label>
               <Input
                 id="zone-postal-codes"
-                placeholder="SW1, SW2, E1"
+                placeholder={t('zones.postalCodesPlaceholder')}
                 value={form.postal_codes}
                 onChange={(e) => setForm({ ...form, postal_codes: e.target.value })}
               />
-              <p className="text-xs text-[var(--text-muted)]">Comma-separated prefixes or codes</p>
+              <p className="text-xs text-[var(--text-muted)]">{t('zones.postalCodesHint')}</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="zone-min-order">Min order amount</Label>
+              <Label htmlFor="zone-min-order">{t('zones.minOrder')}</Label>
               <Input
                 id="zone-min-order"
                 type="number"
@@ -210,7 +218,7 @@ export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="zone-delivery-fee">Delivery fee</Label>
+              <Label htmlFor="zone-delivery-fee">{t('zones.deliveryFee')}</Label>
               <Input
                 id="zone-delivery-fee"
                 type="number"
@@ -221,7 +229,7 @@ export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="zone-radius">Radius (km)</Label>
+              <Label htmlFor="zone-radius">{t('zones.radius')}</Label>
               <Input
                 id="zone-radius"
                 type="number"
@@ -233,7 +241,7 @@ export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="zone-center-lat">Center latitude</Label>
+              <Label htmlFor="zone-center-lat">{t('zones.centerLat')}</Label>
               <Input
                 id="zone-center-lat"
                 type="number"
@@ -244,7 +252,7 @@ export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="zone-center-lng">Center longitude</Label>
+              <Label htmlFor="zone-center-lng">{t('zones.centerLng')}</Label>
               <Input
                 id="zone-center-lng"
                 type="number"
@@ -257,28 +265,28 @@ export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
           </div>
           <Button type="submit" disabled={isSaving}>
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {editingId ? 'Save changes' : 'Add zone'}
+            {editingId ? t('zones.saveChanges') : t('zones.addZone')}
           </Button>
         </form>
       )}
 
       <div className="space-y-3">
-        <h4 className="text-sm font-medium">Delivery zones</h4>
+        <h4 className="text-sm font-medium">{t('zones.listTitle')}</h4>
         {isLoading && (
           <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading zones…
+            {t('zones.loading')}
           </div>
         )}
         {isError && (
           <p className="text-sm text-red-600" role="alert">
-            Could not load delivery zones.
+            {t('zones.loadFailed')}
           </p>
         )}
         {!isLoading && !isError && zones.length === 0 && (
           <div className="rounded-lg border border-dashed p-6 text-center text-sm text-[var(--text-muted)]">
             <MapPinned className="mx-auto mb-2 h-8 w-8 opacity-50" />
-            No delivery zones yet. Add a zone to define coverage and fees for this warehouse.
+            {t('zones.empty')}
           </div>
         )}
         {zones.map((zone) => (
@@ -290,12 +298,16 @@ export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{zone.name}</span>
                 <Badge variant="outline">{zone.zone_type.replace('_', ' ')}</Badge>
-                {zone.is_active === false && <Badge variant="secondary">Inactive</Badge>}
+                {zone.is_active === false && (
+                  <Badge variant="secondary">{t('zones.inactive')}</Badge>
+                )}
               </div>
-              <p className="text-sm text-[var(--text-muted)]">{zoneSummary(zone)}</p>
+              <p className="text-sm text-[var(--text-muted)]">{zoneSummary(zone, t)}</p>
               <p className="text-xs text-[var(--text-muted)]">
-                Min order {formatPrice(zone.min_order_amount)} · Fee{' '}
-                {formatPrice(zone.delivery_fee)}
+                {t('zones.minOrderFee', {
+                  min: formatPrice(zone.min_order_amount),
+                  fee: formatPrice(zone.delivery_fee),
+                })}
               </p>
             </div>
             {canWrite && (
@@ -304,7 +316,7 @@ export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  aria-label={`Edit ${zone.name}`}
+                  aria-label={t('zones.editAriaLabel', { name: zone.name })}
                   onClick={() => handleEdit(zone)}
                   disabled={isDeleting}
                 >
@@ -314,7 +326,7 @@ export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  aria-label={`Delete ${zone.name}`}
+                  aria-label={t('zones.deleteAriaLabel', { name: zone.name })}
                   onClick={() => handleDelete(zone)}
                   disabled={isDeleting}
                 >

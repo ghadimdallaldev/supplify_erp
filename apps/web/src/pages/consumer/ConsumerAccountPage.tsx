@@ -1,4 +1,5 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { useConsumerAuth } from '../../contexts/ConsumerAuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
@@ -9,8 +10,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/ta
 import { PageShell } from '../../components/ui/page-shell'
 import { toast } from 'sonner'
 import { ArrowLeft } from 'lucide-react'
+import { ensureNamespace } from '../../i18n'
 
 export function ConsumerAccountPage() {
+  const { t } = useTranslation('consumer')
+
+  useEffect(() => {
+    void ensureNamespace('consumer')
+  }, [])
+
   const { restaurantSlug } = useParams<{ restaurantSlug: string }>()
   const slug = restaurantSlug ?? ''
   const { isAuthenticated, login, signup } = useConsumerAuth()
@@ -26,20 +34,22 @@ export function ConsumerAccountPage() {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     if (!username.trim() || !password) {
-      toast.error('Username and password are required')
+      toast.error(t('account.credentialsRequired'))
       return
     }
     setSubmitting(true)
     try {
       if (tab === 'login') {
         await login(username.trim(), password)
-        toast.success('Welcome back!')
+        toast.success(t('account.welcomeBack'))
       } else {
         await signup(username.trim(), password)
-        toast.success('Account created — welcome bonus applied if enabled')
+        toast.success(t('account.accountCreated'))
       }
     } catch (error: any) {
-      toast.error(error?.data?.message || error?.data?.error?.message || 'Unable to continue')
+      toast.error(
+        error?.data?.message || error?.data?.error?.message || t('common.unableToContinue')
+      )
     } finally {
       setSubmitting(false)
     }
@@ -50,27 +60,25 @@ export function ConsumerAccountPage() {
       <Button variant="ghost" size="sm" asChild>
         <Link to={`/order/${slug}`}>
           <ArrowLeft className="mr-1 h-4 w-4" />
-          Back
+          {t('common.back')}
         </Link>
       </Button>
 
       <Card>
         <CardHeader>
-          <CardTitle>Rewards account</CardTitle>
-          <CardDescription>
-            Sign in or create an account to earn points on every order.
-          </CardDescription>
+          <CardTitle>{t('account.title')}</CardTitle>
+          <CardDescription>{t('account.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs value={tab} onValueChange={(v) => setTab(v as 'login' | 'signup')}>
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Log in</TabsTrigger>
-              <TabsTrigger value="signup">Sign up</TabsTrigger>
+              <TabsTrigger value="login">{t('account.login')}</TabsTrigger>
+              <TabsTrigger value="signup">{t('account.signup')}</TabsTrigger>
             </TabsList>
             <TabsContent value="login">
               <form onSubmit={handleSubmit} className="mt-4 space-y-3">
                 <div className="space-y-1">
-                  <Label htmlFor="login-username">Username</Label>
+                  <Label htmlFor="login-username">{t('common.username')}</Label>
                   <Input
                     id="login-username"
                     autoComplete="username"
@@ -80,7 +88,7 @@ export function ConsumerAccountPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="login-password">Password</Label>
+                  <Label htmlFor="login-password">{t('common.password')}</Label>
                   <Input
                     id="login-password"
                     type="password"
@@ -91,14 +99,14 @@ export function ConsumerAccountPage() {
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={submitting}>
-                  {submitting ? 'Signing in…' : 'Log in'}
+                  {submitting ? t('account.signingIn') : t('account.login')}
                 </Button>
               </form>
             </TabsContent>
             <TabsContent value="signup">
               <form onSubmit={handleSubmit} className="mt-4 space-y-3">
                 <div className="space-y-1">
-                  <Label htmlFor="signup-username">Username</Label>
+                  <Label htmlFor="signup-username">{t('common.username')}</Label>
                   <Input
                     id="signup-username"
                     autoComplete="username"
@@ -109,7 +117,7 @@ export function ConsumerAccountPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="signup-password">Password</Label>
+                  <Label htmlFor="signup-password">{t('common.password')}</Label>
                   <Input
                     id="signup-password"
                     type="password"
@@ -119,10 +127,10 @@ export function ConsumerAccountPage() {
                     minLength={8}
                     required
                   />
-                  <p className="text-xs text-muted-foreground">At least 8 characters</p>
+                  <p className="text-xs text-muted-foreground">{t('account.passwordMinLength')}</p>
                 </div>
                 <Button type="submit" className="w-full" disabled={submitting}>
-                  {submitting ? 'Creating account…' : 'Sign up for rewards'}
+                  {submitting ? t('account.creatingAccount') : t('account.signupForRewards')}
                 </Button>
               </form>
             </TabsContent>

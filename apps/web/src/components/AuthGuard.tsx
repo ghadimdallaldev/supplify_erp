@@ -66,7 +66,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     if (data && data.role !== 'ADMIN') {
       clearAdminPreferences()
     }
-  }, [data?.role, data?.adminPreferences])
+  }, [data])
 
   useEffect(() => {
     if (isLoading) {

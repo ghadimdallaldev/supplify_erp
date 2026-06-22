@@ -1,5 +1,12 @@
+import i18n from 'i18next'
 import type { RestaurantOrderTrackingResponse } from '../types'
 import { getGpsDisplayStatus } from './deliveryTrackingLabels'
+
+const NS = 'orders'
+
+function ot(key: string, options?: Record<string, unknown>): string {
+  return i18n.t(key, { ns: NS, ...options })
+}
 
 const ACTIVE_DELIVERY_STATUSES = new Set(['assigned', 'picked_up', 'out_for_delivery'])
 
@@ -19,42 +26,42 @@ export function shouldPollRestaurantTracking(
 export function getRestaurantTrackingMessage(
   data: RestaurantOrderTrackingResponse | undefined
 ): string {
-  if (!data) return 'Loading delivery tracking…'
+  if (!data) return ot('tracking.messages.loading')
 
   if (data.reason === 'restaurant_tracking_disabled' || !data.trackingEnabled) {
-    return 'Live tracking is not enabled for this order.'
+    return ot('tracking.messages.notEnabled')
   }
 
   const deliveryStatus = data.delivery?.status
   if (!deliveryStatus || deliveryStatus === 'pending') {
-    return 'Delivery tracking will appear once the supplier assigns a driver.'
+    return ot('tracking.messages.pendingDriver')
   }
 
   if (deliveryStatus === 'delivered') {
-    return 'Delivered. You can now receive the order.'
+    return ot('tracking.messages.delivered')
   }
 
   if (deliveryStatus === 'failed') {
-    return 'Delivery could not be completed. Contact your supplier for updates.'
+    return ot('tracking.messages.failed')
   }
 
   const gps = getGpsDisplayStatus(data.tracking)
   const lastLabel = data.tracking?.lastUpdatedLabel
 
   if (gps === 'none') {
-    return 'Driver assigned. Waiting for the first GPS update.'
+    return ot('tracking.messages.waitingGps')
   }
   if (gps === 'stale') {
     return lastLabel
-      ? `Location has not updated recently. Last update: ${lastLabel}.`
-      : 'Location has not updated recently.'
+      ? ot('tracking.messages.staleWithTime', { time: lastLabel })
+      : ot('tracking.messages.stale')
   }
   if (gps === 'live') {
     return lastLabel
-      ? `Driver is on the way. Location updated ${lastLabel}.`
-      : 'Driver is on the way.'
+      ? ot('tracking.messages.liveWithTime', { time: lastLabel })
+      : ot('tracking.messages.live')
   }
-  return 'Delivery tracking is unavailable for this order.'
+  return ot('tracking.messages.unavailable')
 }
 
 export function canShowRestaurantReceiveCta(

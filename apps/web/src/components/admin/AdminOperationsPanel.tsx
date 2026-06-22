@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Label } from '../ui/label'
@@ -42,6 +43,7 @@ export function AdminOperationsPanel({
   initialSubTab?: OpsSubTab
   onNavigateDeals?: () => void
 }) {
+  const { t } = useTranslation('admin')
   const [subTab, setSubTab] = useState<OpsSubTab>(initialSubTab)
   useEffect(() => {
     setSubTab(initialSubTab)
@@ -102,18 +104,17 @@ export function AdminOperationsPanel({
   const warnings = Array.isArray(summary?.warnings) ? summary.warnings : []
 
   const gpsStateLabel = (state: string) => {
-    if (state === 'live') return 'Live'
-    if (state === 'stale') return 'Stale'
-    if (state === 'noGps') return 'No GPS'
-    if (state === 'off') return 'Off'
+    const key = `operations.gpsState.${state}` as const
+    const translated = t(key, { defaultValue: '' })
+    if (translated) return translated
     return state
   }
 
   return (
     <div className="space-y-4">
       <AdminSectionHeader
-        title="Operations"
-        description="Email, inventory expiry, reorder cadence, fulfillment issues, and GPS delivery health (read-only)"
+        title={t('operations.title')}
+        description={t('operations.description')}
         action={
           <AdminRefreshBar
             onRefresh={() => {
@@ -188,40 +189,43 @@ export function AdminOperationsPanel({
                   </CardContent>
                 </Card>
               ) : (
-                <AdminEmptyState title="No warnings" description="Operational checks look clear." />
+                <AdminEmptyState
+                  title={t('operations.noWarningsTitle')}
+                  description={t('operations.noWarningsDescription')}
+                />
               )}
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <MetricCard
                   icon={<Mail className="h-4 w-4" />}
-                  label="Email failed (24h)"
+                  label={t('operations.emailFailed24h')}
                   value={summary?.email?.failed24h ?? 0}
                 />
                 <MetricCard
                   icon={<Package className="h-4 w-4" />}
-                  label="Open fulfillment issues"
+                  label={t('operations.openFulfillmentIssues')}
                   value={summary?.fulfillment?.openIssues ?? 0}
                 />
                 <MetricCard
                   icon={<MapPin className="h-4 w-4" />}
-                  label="Stale GPS deliveries"
+                  label={t('operations.staleGpsDeliveries')}
                   value={summary?.gpsDeliveries?.stale ?? 0}
                 />
                 <MetricCard
                   icon={<ListOrdered className="h-4 w-4" />}
-                  label="Expired inventory lots"
+                  label={t('operations.expiredInventoryLots')}
                   value={summary?.expiry?.expiredLots ?? 0}
                 />
               </div>
 
               <div className="grid md:grid-cols-2 gap-4 text-sm">
-                <ConfigCard title="Email">
+                <ConfigCard title={t('operations.emailConfig')}>
                   <p>Enabled: {summary?.email?.enabled ? 'Yes' : 'No'}</p>
                   <p>Log-only: {summary?.email?.logOnly ? 'Yes' : 'No'}</p>
                   <p>Provider: {summary?.email?.providerLabel ?? '—'}</p>
                   <p>Configured: {summary?.email?.providerConfigured ? 'Yes' : 'No'}</p>
                 </ConfigCard>
-                <ConfigCard title="GPS & privacy">
+                <ConfigCard title={t('operations.gpsPrivacy')}>
                   <p>Platform GPS: {summary?.gps?.platformGpsEnabled ? 'On' : 'Off'}</p>
                   <p>
                     Restaurant tracking:{' '}
@@ -238,7 +242,7 @@ export function AdminOperationsPanel({
         <TabsContent value="email" className="mt-4 space-y-3">
           <div className="flex flex-wrap gap-2 items-end">
             <div>
-              <Label className="text-xs">Status</Label>
+              <Label className="text-xs">{t('common.table.status')}</Label>
               <Select
                 value={emailStatus}
                 onValueChange={(value) => {
@@ -260,18 +264,18 @@ export function AdminOperationsPanel({
             <AdminLoadingSkeleton rows={6} />
           ) : !emailLogsData?.logs?.length ? (
             <AdminEmptyState
-              title="No email logs"
-              description="No delivery log entries match filters."
+              title={t('operations.noEmailLogsTitle')}
+              description={t('operations.noEmailLogsDescription')}
             />
           ) : (
             <div className="rounded-lg border border-[var(--app-border)] overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-[var(--surface-mid)]">
-                    <th className="text-left px-3 py-2">Time</th>
-                    <th className="text-left px-3 py-2">Tenant</th>
+                    <th className="text-left px-3 py-2">{t('common.table.time')}</th>
+                    <th className="text-left px-3 py-2">{t('common.table.tenant')}</th>
                     <th className="text-left px-3 py-2">Event</th>
-                    <th className="text-left px-3 py-2">Status</th>
+                    <th className="text-left px-3 py-2">{t('common.table.status')}</th>
                     <th className="text-left px-3 py-2">Recipient</th>
                   </tr>
                 </thead>
@@ -357,8 +361,8 @@ export function AdminOperationsPanel({
             <AdminLoadingSkeleton rows={5} />
           ) : !issuesData?.issues?.length ? (
             <AdminEmptyState
-              title="No open fulfillment issues"
-              description="Shortage and substitution issues awaiting resolution will appear here."
+              title={t('operations.noFulfillmentIssuesTitle')}
+              description={t('operations.noFulfillmentIssuesDescription')}
             />
           ) : (
             <div className="rounded-lg border border-[var(--app-border)] overflow-x-auto">
@@ -366,10 +370,10 @@ export function AdminOperationsPanel({
                 <thead>
                   <tr className="bg-[var(--surface-mid)]">
                     <th className="text-left px-3 py-2">Order</th>
-                    <th className="text-left px-3 py-2">Supplier</th>
-                    <th className="text-left px-3 py-2">Restaurant</th>
+                    <th className="text-left px-3 py-2">{t('common.supplier')}</th>
+                    <th className="text-left px-3 py-2">{t('common.restaurant')}</th>
                     <th className="text-left px-3 py-2">Type</th>
-                    <th className="text-left px-3 py-2">Status</th>
+                    <th className="text-left px-3 py-2">{t('common.table.status')}</th>
                     <th className="text-left px-3 py-2">Chat</th>
                   </tr>
                 </thead>
@@ -395,11 +399,26 @@ export function AdminOperationsPanel({
             <AdminLoadingSkeleton rows={2} />
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-              <MetricCard label="Active" value={summary?.gpsDeliveries?.active ?? 0} />
-              <MetricCard label="Live" value={summary?.gpsDeliveries?.live ?? 0} />
-              <MetricCard label="Stale" value={summary?.gpsDeliveries?.stale ?? 0} />
-              <MetricCard label="No GPS" value={summary?.gpsDeliveries?.noGps ?? 0} />
-              <MetricCard label="Failed today" value={summary?.gpsDeliveries?.failedToday ?? 0} />
+              <MetricCard
+                label={t('operations.gpsActive')}
+                value={summary?.gpsDeliveries?.active ?? 0}
+              />
+              <MetricCard
+                label={t('operations.gpsLive')}
+                value={summary?.gpsDeliveries?.live ?? 0}
+              />
+              <MetricCard
+                label={t('operations.gpsStale')}
+                value={summary?.gpsDeliveries?.stale ?? 0}
+              />
+              <MetricCard
+                label={t('operations.gpsNoGps')}
+                value={summary?.gpsDeliveries?.noGps ?? 0}
+              />
+              <MetricCard
+                label={t('operations.gpsFailedToday')}
+                value={summary?.gpsDeliveries?.failedToday ?? 0}
+              />
             </div>
           )}
           {deliveriesLoading ? (
@@ -412,8 +431,8 @@ export function AdminOperationsPanel({
                 <thead>
                   <tr className="bg-[var(--surface-mid)]">
                     <th className="text-left px-3 py-2">Order</th>
-                    <th className="text-left px-3 py-2">Supplier</th>
-                    <th className="text-left px-3 py-2">Status</th>
+                    <th className="text-left px-3 py-2">{t('common.supplier')}</th>
+                    <th className="text-left px-3 py-2">{t('common.table.status')}</th>
                     <th className="text-left px-3 py-2">GPS</th>
                   </tr>
                 </thead>
