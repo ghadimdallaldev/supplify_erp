@@ -68,6 +68,7 @@ function DeliveryLocationFields({
           <Label htmlFor={`${idPrefix}-lat`}>Latitude</Label>
           <Input
             id={`${idPrefix}-lat`}
+            dir="ltr"
             inputMode="decimal"
             placeholder="e.g. 33.8938"
             value={form.deliveryLatitude}
@@ -78,6 +79,7 @@ function DeliveryLocationFields({
           <Label htmlFor={`${idPrefix}-lng`}>Longitude</Label>
           <Input
             id={`${idPrefix}-lng`}
+            dir="ltr"
             inputMode="decimal"
             placeholder="e.g. 35.5018"
             value={form.deliveryLongitude}

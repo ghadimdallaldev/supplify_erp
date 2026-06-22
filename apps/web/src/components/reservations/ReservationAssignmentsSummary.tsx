@@ -81,7 +81,7 @@ export function ReservationAssignmentsSummary({
           >
             <div>
               <span className="font-semibold text-[var(--text)]">{row.name}</span>
-              <span className="ml-2 text-xs text-[var(--text-muted)]">{row.when}</span>
+              <span className="ms-2 text-xs text-[var(--text-muted)]">{row.when}</span>
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="secondary">{row.tableNames}</Badge>
