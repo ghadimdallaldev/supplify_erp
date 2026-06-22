@@ -45,7 +45,7 @@ export function MenuItemCard({
         type="button"
         onClick={() => onSelect(item)}
         disabled={addDisabled}
-        className="flex min-w-0 flex-1 gap-3 text-left disabled:cursor-not-allowed"
+        className="flex min-w-0 flex-1 gap-3 text-start disabled:cursor-not-allowed"
       >
         {imageUrl ? (
           <img

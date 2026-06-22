@@ -72,7 +72,7 @@ export function DealBoostPackagePicker({
               type="button"
               disabled={disabled}
               onClick={() => onSelect(opt.pricing_key)}
-              className={`text-left rounded-xl border-2 p-4 transition-colors disabled:opacity-60 ${
+              className={`text-start rounded-xl border-2 p-4 transition-colors disabled:opacity-60 ${
                 isSelected
                   ? 'border-[var(--brand)] bg-[var(--brand)]/5'
                   : 'border-[var(--app-border)] hover:border-[var(--brand)]/40'
@@ -109,7 +109,7 @@ export function DealBoostPackagePicker({
                     ) : null}
                   </div>
                 </div>
-                <div className="text-right shrink-0">
+                <div className="text-end shrink-0">
                   <p className="text-lg font-bold tabular-nums">${Number(opt.amount).toFixed(0)}</p>
                   <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                     {t('boostPackagePicker.oneTime')}

@@ -33,7 +33,7 @@ export function FloatingCartBar({
       <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
         <button
           type="button"
-          className="consumer-pressable min-w-0 flex-1 rounded-lg px-1 py-0.5 text-left"
+          className="consumer-pressable min-w-0 flex-1 rounded-lg px-1 py-0.5 text-start"
           onClick={onOpenCart}
         >
           <p className="text-base font-semibold tabular-nums text-[var(--brand-mid)]">

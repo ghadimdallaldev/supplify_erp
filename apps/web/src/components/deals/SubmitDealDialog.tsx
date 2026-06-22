@@ -62,7 +62,7 @@ export function SubmitDealDialog({
             {t('submitDialog.cancel')}
           </Button>
           <Button onClick={handleSubmit} disabled={isLoading || !pricingKey}>
-            <Send className="h-4 w-4 mr-2" />
+            <Send className="h-4 w-4 me-2" />
             {t('submitDialog.submit')}
           </Button>
         </DialogFooter>

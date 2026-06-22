@@ -1,4 +1,5 @@
-import { lazy, Suspense, type ReactNode } from 'react'
+import { Suspense, type ReactNode } from 'react'
+import { lazyNamedPage } from './i18n/lazyPage'
 import {
   createBrowserRouter,
   RouterProvider,
@@ -22,210 +23,185 @@ import { OAuthRedirect } from './components/OAuthRedirect'
 import { PageLoading } from './components/ui/page-loading'
 import { RequirePermission } from './components/RequirePermission'
 
-const DashboardPage = lazy(() =>
-  import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage }))
+const DashboardPage = lazyNamedPage(() => import('./pages/DashboardPage'), 'DashboardPage')
+const SupplierHome = lazyNamedPage(() => import('./pages/SupplierHome'), 'SupplierHome')
+const ProductsPage = lazyNamedPage(() => import('./pages/ProductsPage'), 'ProductsPage')
+const ProductDetailPage = lazyNamedPage(
+  () => import('./pages/ProductDetailPage'),
+  'ProductDetailPage'
 )
-const SupplierHome = lazy(() =>
-  import('./pages/SupplierHome').then((m) => ({ default: m.SupplierHome }))
+const OrdersPage = lazyNamedPage(() => import('./pages/OrdersPage'), 'OrdersPage')
+const OrderDetailPage = lazyNamedPage(() => import('./pages/OrderDetailPage'), 'OrderDetailPage')
+const SuppliersPage = lazyNamedPage(() => import('./pages/SuppliersPage'), 'SuppliersPage')
+const SupplierDetailPage = lazyNamedPage(
+  () => import('./pages/SupplierDetailPage'),
+  'SupplierDetailPage'
 )
-const ProductsPage = lazy(() =>
-  import('./pages/ProductsPage').then((m) => ({ default: m.ProductsPage }))
+const RestaurantsPage = lazyNamedPage(() => import('./pages/RestaurantsPage'), 'RestaurantsPage')
+const RestaurantDetailPage = lazyNamedPage(
+  () => import('./pages/RestaurantDetailPage'),
+  'RestaurantDetailPage'
 )
-const ProductDetailPage = lazy(() =>
-  import('./pages/ProductDetailPage').then((m) => ({ default: m.ProductDetailPage }))
+const SettingsPage = lazyNamedPage(() => import('./pages/SettingsPage'), 'SettingsPage')
+const CartPage = lazyNamedPage(() => import('./pages/CartPage'), 'CartPage')
+const ChatPage = lazyNamedPage(() => import('./pages/ChatPage'), 'ChatPage')
+const FulfillmentPage = lazyNamedPage(() => import('./pages/FulfillmentPage'), 'FulfillmentPage')
+const SupplierCommandCenterPage = lazyNamedPage(
+  () => import('./pages/SupplierCommandCenterPage'),
+  'SupplierCommandCenterPage'
 )
-const OrdersPage = lazy(() => import('./pages/OrdersPage').then((m) => ({ default: m.OrdersPage })))
-const OrderDetailPage = lazy(() =>
-  import('./pages/OrderDetailPage').then((m) => ({ default: m.OrderDetailPage }))
+const SupplierRunSheetPage = lazyNamedPage(
+  () => import('./pages/SupplierRunSheetPage'),
+  'SupplierRunSheetPage'
 )
-const SuppliersPage = lazy(() =>
-  import('./pages/SuppliersPage').then((m) => ({ default: m.SuppliersPage }))
+const DriverDeliveriesPage = lazyNamedPage(
+  () => import('./pages/DriverDeliveriesPage'),
+  'DriverDeliveriesPage'
 )
-const SupplierDetailPage = lazy(() =>
-  import('./pages/SupplierDetailPage').then((m) => ({ default: m.SupplierDetailPage }))
+const InventoryPage = lazyNamedPage(() => import('./pages/InventoryPage'), 'InventoryPage')
+const InvoicesPage = lazyNamedPage(() => import('./pages/InvoicesPage'), 'InvoicesPage')
+const SupplierSettingsPage = lazyNamedPage(
+  () => import('./pages/SupplierSettingsPage'),
+  'SupplierSettingsPage'
 )
-const RestaurantsPage = lazy(() =>
-  import('./pages/RestaurantsPage').then((m) => ({ default: m.RestaurantsPage }))
+const QuickListsPage = lazyNamedPage(() => import('./pages/QuickListsPage'), 'QuickListsPage')
+const RestaurantInventoryPage = lazyNamedPage(
+  () => import('./pages/RestaurantInventoryPage'),
+  'RestaurantInventoryPage'
 )
-const RestaurantDetailPage = lazy(() =>
-  import('./pages/RestaurantDetailPage').then((m) => ({ default: m.RestaurantDetailPage }))
+const RestaurantOnboardingPage = lazyNamedPage(
+  () => import('./pages/RestaurantOnboardingPage'),
+  'RestaurantOnboardingPage'
 )
-const SettingsPage = lazy(() =>
-  import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage }))
+const ReceivingPage = lazyNamedPage(() => import('./pages/ReceivingPage'), 'ReceivingPage')
+const SupplierCustomerGrowthPage = lazyNamedPage(
+  () => import('./pages/SupplierCustomerGrowthPage'),
+  'SupplierCustomerGrowthPage'
 )
-const CartPage = lazy(() => import('./pages/CartPage').then((m) => ({ default: m.CartPage })))
-const ChatPage = lazy(() => import('./pages/ChatPage').then((m) => ({ default: m.ChatPage })))
-const FulfillmentPage = lazy(() =>
-  import('./pages/FulfillmentPage').then((m) => ({ default: m.FulfillmentPage }))
+const AdminDashboardPage = lazyNamedPage(
+  () => import('./pages/AdminDashboardPage'),
+  'AdminDashboardPage'
 )
-const SupplierCommandCenterPage = lazy(() =>
-  import('./pages/SupplierCommandCenterPage').then((m) => ({
-    default: m.SupplierCommandCenterPage,
-  }))
+const ReservationsPage = lazyNamedPage(() => import('./pages/ReservationsPage'), 'ReservationsPage')
+const StaffPage = lazyNamedPage(() => import('./pages/StaffPage'), 'StaffPage')
+const PublicReservationPortal = lazyNamedPage(
+  () => import('./pages/PublicReservationPortal'),
+  'PublicReservationPortal'
 )
-const SupplierRunSheetPage = lazy(() =>
-  import('./pages/SupplierRunSheetPage').then((m) => ({
-    default: m.SupplierRunSheetPage,
-  }))
+const PublicReservationConfirmation = lazyNamedPage(
+  () => import('./pages/PublicReservationConfirmation'),
+  'PublicReservationConfirmation'
 )
-const DriverDeliveriesPage = lazy(() =>
-  import('./pages/DriverDeliveriesPage').then((m) => ({
-    default: m.DriverDeliveriesPage,
-  }))
+const PublicReservationManage = lazyNamedPage(
+  () => import('./pages/PublicReservationManage'),
+  'PublicReservationManage'
 )
-const InventoryPage = lazy(() =>
-  import('./pages/InventoryPage').then((m) => ({ default: m.InventoryPage }))
+const PublicReservationWaitlistOffer = lazyNamedPage(
+  () => import('./pages/PublicReservationWaitlistOffer'),
+  'PublicReservationWaitlistOffer'
 )
-const InvoicesPage = lazy(() =>
-  import('./pages/InvoicesPage').then((m) => ({ default: m.InvoicesPage }))
+const StaffSelfServiceLogin = lazyNamedPage(
+  () => import('./pages/StaffSelfServiceLogin'),
+  'StaffSelfServiceLogin'
 )
-const SupplierSettingsPage = lazy(() =>
-  import('./pages/SupplierSettingsPage').then((m) => ({ default: m.SupplierSettingsPage }))
+const StaffSelfServiceDashboard = lazyNamedPage(
+  () => import('./pages/StaffSelfServiceDashboard'),
+  'StaffSelfServiceDashboard'
 )
-const QuickListsPage = lazy(() =>
-  import('./pages/QuickListsPage').then((m) => ({ default: m.QuickListsPage }))
+const AccountActivationPage = lazyNamedPage(
+  () => import('./pages/AccountActivationPage'),
+  'AccountActivationPage'
 )
-const RestaurantInventoryPage = lazy(() =>
-  import('./pages/RestaurantInventoryPage').then((m) => ({ default: m.RestaurantInventoryPage }))
+const ReportsPage = lazyNamedPage(() => import('./pages/reports/ReportsPage'), 'ReportsPage')
+const DisputesPage = lazyNamedPage(() => import('./pages/disputes/DisputesPage'), 'DisputesPage')
+const DisputeDetailPage = lazyNamedPage(
+  () => import('./pages/disputes/DisputeDetailPage'),
+  'DisputeDetailPage'
 )
-const RestaurantOnboardingPage = lazy(() =>
-  import('./pages/RestaurantOnboardingPage').then((m) => ({ default: m.RestaurantOnboardingPage }))
+const PromotionsPage = lazyNamedPage(
+  () => import('./pages/promotions/PromotionsPage'),
+  'PromotionsPage'
 )
-const ReceivingPage = lazy(() =>
-  import('./pages/ReceivingPage').then((m) => ({ default: m.ReceivingPage }))
+const ContractPricingPage = lazyNamedPage(
+  () => import('./pages/ContractPricingPage'),
+  'ContractPricingPage'
 )
-const SupplierCustomerGrowthPage = lazy(() =>
-  import('./pages/SupplierCustomerGrowthPage').then((m) => ({
-    default: m.SupplierCustomerGrowthPage,
-  }))
+const MyContractPricesPage = lazyNamedPage(
+  () => import('./pages/MyContractPricesPage'),
+  'MyContractPricesPage'
 )
-const AdminDashboardPage = lazy(() =>
-  import('./pages/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage }))
+const DealsPage = lazyNamedPage(() => import('./pages/deals/DealsPage'), 'DealsPage')
+const LoyaltyProgramPage = lazyNamedPage(
+  () => import('./pages/loyalty/LoyaltyProgramPage'),
+  'LoyaltyProgramPage'
 )
-const ReservationsPage = lazy(() =>
-  import('./pages/ReservationsPage').then((m) => ({ default: m.ReservationsPage }))
+const ConsumerLoyaltyPage = lazyNamedPage(
+  () => import('./pages/loyalty/ConsumerLoyaltyPage'),
+  'ConsumerLoyaltyPage'
 )
-const StaffPage = lazy(() => import('./pages/StaffPage').then((m) => ({ default: m.StaffPage })))
-const PublicReservationPortal = lazy(() =>
-  import('./pages/PublicReservationPortal').then((m) => ({ default: m.PublicReservationPortal }))
+const OrgOverviewPage = lazyNamedPage(() => import('./pages/OrgOverviewPage'), 'OrgOverviewPage')
+const BranchDetailPage = lazyNamedPage(() => import('./pages/BranchDetailPage'), 'BranchDetailPage')
+const LegalHubPage = lazyNamedPage(() => import('./pages/LegalDocumentPage'), 'LegalHubPage')
+const LegalDocumentPage = lazyNamedPage(
+  () => import('./pages/LegalDocumentPage'),
+  'LegalDocumentPage'
 )
-const PublicReservationConfirmation = lazy(() =>
-  import('./pages/PublicReservationConfirmation').then((m) => ({
-    default: m.PublicReservationConfirmation,
-  }))
+const PublicSupplierCatalogPage = lazyNamedPage(
+  () => import('./pages/PublicSupplierCatalogPage'),
+  'PublicSupplierCatalogPage'
 )
-const PublicReservationManage = lazy(() =>
-  import('./pages/PublicReservationManage').then((m) => ({ default: m.PublicReservationManage }))
+const QuoteRequestsPage = lazyNamedPage(
+  () => import('./pages/QuoteRequestsPage'),
+  'QuoteRequestsPage'
 )
-const PublicReservationWaitlistOffer = lazy(() =>
-  import('./pages/PublicReservationWaitlistOffer').then((m) => ({
-    default: m.PublicReservationWaitlistOffer,
-  }))
+const QuoteRequestDetailPage = lazyNamedPage(
+  () => import('./pages/QuoteRequestDetailPage'),
+  'QuoteRequestDetailPage'
 )
-const StaffSelfServiceLogin = lazy(() =>
-  import('./pages/StaffSelfServiceLogin').then((m) => ({ default: m.StaffSelfServiceLogin }))
+const CreateQuoteRequestPage = lazyNamedPage(
+  () => import('./pages/CreateQuoteRequestPage'),
+  'CreateQuoteRequestPage'
 )
-const StaffSelfServiceDashboard = lazy(() =>
-  import('./pages/StaffSelfServiceDashboard').then((m) => ({
-    default: m.StaffSelfServiceDashboard,
-  }))
+const SupplierQuoteInboxPage = lazyNamedPage(
+  () => import('./pages/SupplierQuoteInboxPage'),
+  'SupplierQuoteInboxPage'
 )
-const AccountActivationPage = lazy(() =>
-  import('./pages/AccountActivationPage').then((m) => ({ default: m.AccountActivationPage }))
+const SupplierQuoteResponsePage = lazyNamedPage(
+  () => import('./pages/SupplierQuoteResponsePage'),
+  'SupplierQuoteResponsePage'
 )
-const ReportsPage = lazy(() =>
-  import('./pages/reports/ReportsPage').then((m) => ({ default: m.ReportsPage }))
+const ConsumerStorefrontPage = lazyNamedPage(
+  () => import('./pages/consumer/ConsumerStorefrontPage'),
+  'ConsumerStorefrontPage'
 )
-const DisputesPage = lazy(() =>
-  import('./pages/disputes/DisputesPage').then((m) => ({ default: m.DisputesPage }))
+const ConsumerMenuPage = lazyNamedPage(
+  () => import('./pages/consumer/ConsumerMenuPage'),
+  'ConsumerMenuPage'
 )
-const DisputeDetailPage = lazy(() =>
-  import('./pages/disputes/DisputeDetailPage').then((m) => ({ default: m.DisputeDetailPage }))
+const ConsumerCheckoutPage = lazyNamedPage(
+  () => import('./pages/consumer/ConsumerCheckoutPage'),
+  'ConsumerCheckoutPage'
 )
-const PromotionsPage = lazy(() =>
-  import('./pages/promotions/PromotionsPage').then((m) => ({ default: m.PromotionsPage }))
+const ConsumerReceiptPage = lazyNamedPage(
+  () => import('./pages/consumer/ConsumerReceiptPage'),
+  'ConsumerReceiptPage'
 )
-const ContractPricingPage = lazy(() =>
-  import('./pages/ContractPricingPage').then((m) => ({ default: m.ContractPricingPage }))
+const ConsumerTrackOrderPage = lazyNamedPage(
+  () => import('./pages/consumer/ConsumerTrackOrderPage'),
+  'ConsumerTrackOrderPage'
 )
-const MyContractPricesPage = lazy(() =>
-  import('./pages/MyContractPricesPage').then((m) => ({ default: m.MyContractPricesPage }))
+const MenuAdminPage = lazyNamedPage(() => import('./pages/consumer/MenuAdminPage'), 'MenuAdminPage')
+const ConsumerOrdersPage = lazyNamedPage(
+  () => import('./pages/consumer/ConsumerOrdersPage'),
+  'ConsumerOrdersPage'
 )
-const DealsPage = lazy(() =>
-  import('./pages/deals/DealsPage').then((m) => ({ default: m.DealsPage }))
+const ConsumerAccountPage = lazyNamedPage(
+  () => import('./pages/consumer/ConsumerAccountPage'),
+  'ConsumerAccountPage'
 )
-const LoyaltyProgramPage = lazy(() =>
-  import('./pages/loyalty/LoyaltyProgramPage').then((m) => ({ default: m.LoyaltyProgramPage }))
-)
-const ConsumerLoyaltyPage = lazy(() =>
-  import('./pages/loyalty/ConsumerLoyaltyPage').then((m) => ({ default: m.ConsumerLoyaltyPage }))
-)
-const OrgOverviewPage = lazy(() =>
-  import('./pages/OrgOverviewPage').then((m) => ({ default: m.OrgOverviewPage }))
-)
-const BranchDetailPage = lazy(() =>
-  import('./pages/BranchDetailPage').then((m) => ({ default: m.BranchDetailPage }))
-)
-const LegalHubPage = lazy(() =>
-  import('./pages/LegalDocumentPage').then((m) => ({ default: m.LegalHubPage }))
-)
-const LegalDocumentPage = lazy(() =>
-  import('./pages/LegalDocumentPage').then((m) => ({ default: m.LegalDocumentPage }))
-)
-const PublicSupplierCatalogPage = lazy(() =>
-  import('./pages/PublicSupplierCatalogPage').then((m) => ({
-    default: m.PublicSupplierCatalogPage,
-  }))
-)
-const QuoteRequestsPage = lazy(() =>
-  import('./pages/QuoteRequestsPage').then((m) => ({ default: m.QuoteRequestsPage }))
-)
-const QuoteRequestDetailPage = lazy(() =>
-  import('./pages/QuoteRequestDetailPage').then((m) => ({ default: m.QuoteRequestDetailPage }))
-)
-const CreateQuoteRequestPage = lazy(() =>
-  import('./pages/CreateQuoteRequestPage').then((m) => ({ default: m.CreateQuoteRequestPage }))
-)
-const SupplierQuoteInboxPage = lazy(() =>
-  import('./pages/SupplierQuoteInboxPage').then((m) => ({ default: m.SupplierQuoteInboxPage }))
-)
-const SupplierQuoteResponsePage = lazy(() =>
-  import('./pages/SupplierQuoteResponsePage').then((m) => ({
-    default: m.SupplierQuoteResponsePage,
-  }))
-)
-const ConsumerStorefrontPage = lazy(() =>
-  import('./pages/consumer/ConsumerStorefrontPage').then((m) => ({
-    default: m.ConsumerStorefrontPage,
-  }))
-)
-const ConsumerMenuPage = lazy(() =>
-  import('./pages/consumer/ConsumerMenuPage').then((m) => ({ default: m.ConsumerMenuPage }))
-)
-const ConsumerCheckoutPage = lazy(() =>
-  import('./pages/consumer/ConsumerCheckoutPage').then((m) => ({
-    default: m.ConsumerCheckoutPage,
-  }))
-)
-const ConsumerReceiptPage = lazy(() =>
-  import('./pages/consumer/ConsumerReceiptPage').then((m) => ({ default: m.ConsumerReceiptPage }))
-)
-const ConsumerTrackOrderPage = lazy(() =>
-  import('./pages/consumer/ConsumerTrackOrderPage').then((m) => ({
-    default: m.ConsumerTrackOrderPage,
-  }))
-)
-const MenuAdminPage = lazy(() =>
-  import('./pages/consumer/MenuAdminPage').then((m) => ({ default: m.MenuAdminPage }))
-)
-const ConsumerOrdersPage = lazy(() =>
-  import('./pages/consumer/ConsumerOrdersPage').then((m) => ({ default: m.ConsumerOrdersPage }))
-)
-const ConsumerAccountPage = lazy(() =>
-  import('./pages/consumer/ConsumerAccountPage').then((m) => ({ default: m.ConsumerAccountPage }))
-)
-const ConsumerRewardsPage = lazy(() =>
-  import('./pages/consumer/ConsumerRewardsPage').then((m) => ({ default: m.ConsumerRewardsPage }))
+const ConsumerRewardsPage = lazyNamedPage(
+  () => import('./pages/consumer/ConsumerRewardsPage'),
+  'ConsumerRewardsPage'
 )
 
 function ConsumerRouteLayout() {

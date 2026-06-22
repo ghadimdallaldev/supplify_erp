@@ -107,7 +107,7 @@ export function PromoteDealDialog({
                   key={opt.pricing_key}
                   type="button"
                   onClick={() => setSelectedPricingKey(opt.pricing_key)}
-                  className={`text-left rounded-xl border-2 p-4 transition-colors ${
+                  className={`text-start rounded-xl border-2 p-4 transition-colors ${
                     isSelected
                       ? 'border-[var(--brand)] bg-[var(--brand)]/5'
                       : 'border-[var(--app-border)] hover:border-[var(--brand)]/40'
@@ -147,7 +147,7 @@ export function PromoteDealDialog({
                         ) : null}
                       </div>
                     </div>
-                    <div className="text-right shrink-0">
+                    <div className="text-end shrink-0">
                       <p className="text-lg font-bold tabular-nums">
                         ${Number(opt.amount).toFixed(0)}
                       </p>
@@ -189,7 +189,7 @@ export function PromoteDealDialog({
             onClick={handlePromote}
             disabled={isLoading || !selectedPricingKey || pricingOptions.length === 0}
           >
-            <Megaphone className="h-4 w-4 mr-2" />
+            <Megaphone className="h-4 w-4 me-2" />
             {t('promoteDialog.boostDeal')}
           </Button>
         </DialogFooter>

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { useGetPromotionAnalyticsQuery } from '../../services/api'
 import { formatBoostStatusLabel } from '../../lib/dealDisplayLabels'
+import { formatPrice } from '../../utils/format'
 import { ensureNamespace } from '../../i18n'
 import { Loader2 } from 'lucide-react'
 
@@ -47,7 +48,7 @@ export function DealAnalyticsDialog({
             />
             <Stat
               label={t('analytics.discountAmount')}
-              value={a?.total_discount != null ? `$${Number(a.total_discount).toFixed(2)}` : '—'}
+              value={a?.total_discount != null ? formatPrice(Number(a.total_discount)) : '—'}
             />
             {promo ? (
               <div className="col-span-2 text-xs text-[var(--text-muted)] border-t pt-2">
