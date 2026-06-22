@@ -1,0 +1,13 @@
+{
+  "errors": {
+    "restaurantNotFound": "Restaurant not found",
+    "supplierNotFound": "Supplier not found",
+    "failedPendingOrders": "Failed to get pending orders",
+    "failedSupplierPendingOrders": "Failed to get supplier receiving list",
+    "orderNotReady": "This order is not ready to receive yet. Wait until the supplier marks it as delivered.",
+    "reportAlreadyExists": "A receiving report already exists for this order",
+    "receivedExceedsOrdered": "Received quantity cannot exceed ordered quantity ({{ordered}} {{unit}})",
+    "failedCreateReport": "Failed to create receiving report",
+    "failedReceivingHistory": "Failed to get receiving history"
+  }
+}

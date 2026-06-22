@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Phone, MapPin, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
@@ -27,6 +28,7 @@ import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { useAppDispatch, useAppSelector } from '../hooks/redux'
 
 export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?: string }) {
+  const { t } = useTranslation('branches')
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
   const isSupplier = user?.role === 'SUPPLIER'
@@ -72,7 +74,7 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
 
   const handleCreate = async () => {
     if (!form.name.trim()) {
-      toast.error('Branch name is required')
+      toast.error(t('toast.nameRequired'))
       return
     }
     if (!canAdd) {
@@ -99,11 +101,11 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
       setForm({ name: '', phone: '', address: '' })
       setShowDialog(false)
       refetch()
-      toast.success('Branch created')
+      toast.success(t('toast.created'))
     } catch (error: unknown) {
       const msg =
         (error as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Failed to create branch'
+        t('toast.createFailed')
       toast.error(msg)
     }
   }
@@ -116,11 +118,11 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
         await deleteBranch(branchId).unwrap()
       }
       refetch()
-      toast.success('Branch removed')
+      toast.success(t('toast.removed'))
     } catch (error: unknown) {
       const msg =
         (error as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Failed to remove branch'
+        t('toast.removeFailed')
       toast.error(msg)
     }
   }

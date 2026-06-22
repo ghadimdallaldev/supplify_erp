@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAppDispatch, useAppSelector } from '../../hooks/redux'
 import { closePaymentModal } from '../../features/billing/billingSlice'
 import {
@@ -25,6 +26,7 @@ function formatMoney(amount: number) {
 }
 
 export function PaymentModal() {
+  const { t } = useTranslation('common')
   const dispatch = useAppDispatch()
   const { paymentModalOpen, paymentModalMode, paymentModalPlan } = useAppSelector((s) => s.billing)
 
@@ -127,7 +129,7 @@ export function PaymentModal() {
         const paymentMethodId = await ensurePaymentMethod()
         await setAutoRenew({ autoRenew }).unwrap()
         await payNow({ paymentMethodId, idempotencyKey }).unwrap()
-        toast.success('Payment received. Your account has been restored.')
+        toast.success(t('toast.paymentReceivedAccountRestored'))
       } else {
         if (!plan?.planId) {
           setError('Plan not selected')
@@ -150,7 +152,9 @@ export function PaymentModal() {
           }).unwrap()
         }
         toast.success(
-          isFreeCheckout ? 'Your free plan is active.' : `You're now on ${plan.planName}`
+          isFreeCheckout
+            ? t('toast.freePlanActive')
+            : t('toast.nowOnPlan', { planName: plan.planName })
         )
       }
 

@@ -1,0 +1,228 @@
+{
+  "common": {
+    "guest": "Guest",
+    "aRestaurant": "A restaurant",
+    "aSupplier": "A supplier",
+    "teamMember": "Team member",
+    "theRestaurant": "the restaurant",
+    "supplier": "supplier",
+    "yourSupplier": "your supplier",
+    "aTeam": "a team",
+    "newDeal": "New deal",
+    "promotion": "promotion",
+    "upcomingShift": "upcoming shift"
+  },
+  "reservation": {
+    "unscheduled": "your scheduled time"
+  },
+  "lowStock": {
+    "supplierTitle": "Low stock alert",
+    "supplierMessage": "Low stock: {{name}}. Current: {{currentValue}}, threshold: {{threshold}}. Restock soon."
+  },
+  "order": {
+    "placed": {
+      "title": "New Order Received",
+      "messageWithRestaurant": "New order from {{restaurantName}} - Order #{{orderId}} for ${{amount}}",
+      "message": "New order #{{orderId}} for ${{amount}}"
+    },
+    "acknowledged": {
+      "title": "Order Acknowledged",
+      "message": "Your order #{{orderId}} has been acknowledged by {{supplierName}}"
+    },
+    "processing": {
+      "title": "Order Processing",
+      "message": "Your order #{{orderId}} is being prepared for shipping"
+    },
+    "shipped": {
+      "title": "Order Shipped",
+      "message": "Your order #{{orderId}} has been shipped"
+    },
+    "delivered": {
+      "title": "Order Delivered",
+      "message": "Your order #{{orderId}} has been delivered"
+    },
+    "completed": {
+      "title": "Order Completed",
+      "message": "Your order #{{orderId}} has been completed and delivered by {{supplierName}}"
+    },
+    "cancelled": {
+      "title": "Order Cancelled",
+      "messageWithRestaurant": "Order #{{orderId}} from {{restaurantName}} has been cancelled",
+      "message": "Order #{{orderId}} has been cancelled"
+    },
+    "supplierDeclined": {
+      "title": "Order declined by supplier",
+      "messageWithReason": "Order #{{orderId}} was declined: {{reason}}",
+      "message": "Order #{{orderId}} was declined by {{supplierName}}"
+    }
+  },
+  "driver": {
+    "driver_assigned": {
+      "title": "Driver assigned",
+      "restaurant": "A driver has been assigned to your order #{{orderId}}",
+      "supplier": "Driver assigned to order #{{orderId}}"
+    },
+    "out_for_delivery": {
+      "title": "Out for delivery",
+      "restaurant": "Your order #{{orderId}} is out for delivery",
+      "supplier": "Order #{{orderId}} is out for delivery"
+    },
+    "delivered": {
+      "title": "Delivery completed",
+      "restaurant": "Your order #{{orderId}} has been delivered",
+      "supplier": "Order #{{orderId}} marked delivered"
+    },
+    "failed_delivery": {
+      "title": "Delivery failed",
+      "restaurant": "Delivery failed for order #{{orderId}}",
+      "supplier": "Delivery failed for order #{{orderId}}"
+    },
+    "delivery_rescheduled": {
+      "title": "Delivery rescheduled",
+      "restaurant": "Delivery for order #{{orderId}} was rescheduled for tomorrow",
+      "supplier": "Delivery for order #{{orderId}} was rescheduled for tomorrow"
+    },
+    "rollover": {
+      "title": "Deliveries moved to tomorrow",
+      "messageOne": "1 delivery was moved to tomorrow.",
+      "messageMany": "{{count}} deliveries were moved to tomorrow."
+    }
+  },
+  "reservationEvents": {
+    "created": {
+      "title": "New reservation booked",
+      "message": "{{customerName}} party of {{partySize}} for {{timeslot}}"
+    },
+    "waitlist": {
+      "title": "Reservation moved to waitlist",
+      "message": "{{customerName}} is waiting for a table ({{partySize}} guests)."
+    },
+    "rescheduled": {
+      "title": "Reservation rescheduled",
+      "message": "{{customerName}} (party of {{partySize}}) moved to {{timeslot}}"
+    },
+    "cancelled": {
+      "title": "Reservation cancelled",
+      "message": "{{customerName}} cancelled their booking for {{timeslot}}"
+    },
+    "statusChanged": {
+      "title": "Reservation updated",
+      "message": "{{customerName}} — now {{status}} for {{timeslot}}"
+    }
+  },
+  "staff": {
+    "ptoRequest": {
+      "title": "New PTO request submitted",
+      "message": "{{name}} requested {{type}} ({{dateRange}})"
+    },
+    "swapRequest": {
+      "title": "Shift swap requested",
+      "message": "{{name}} requested a swap for {{shiftDate}}"
+    },
+    "ptoApproved": {
+      "title": "PTO request approved",
+      "message": "Your time-off request was approved by your manager."
+    },
+    "ptoDeclined": {
+      "title": "PTO request declined",
+      "message": "Your time-off request was declined by your manager."
+    },
+    "swapApproved": {
+      "title": "Shift swap approved",
+      "message": "Your shift swap request was approved."
+    },
+    "swapDeclined": {
+      "title": "Shift swap declined",
+      "message": "Your shift swap request was declined."
+    },
+    "announcementDefault": "Team announcement",
+    "documentDefault": "New document"
+  },
+  "scheduledOrder": {
+    "executedTitle": "Scheduled order executed",
+    "reminderTitle": "Scheduled order reminder",
+    "executedMessage": "Scheduled order \"{{name}}\" has been created automatically.",
+    "reminderMessage": "Scheduled order \"{{name}}\" will run soon. Review inventory if you need to pause it."
+  },
+  "invoice": {
+    "issuedTitle": "Invoice Issued",
+    "issuedMessage": "Invoice {{invoiceNumber}} for ${{amount}} due {{dueDate}}",
+    "overdueRestaurantTitle": "Invoice Overdue",
+    "overdueRestaurantMessage": "Invoice {{invoiceNumber}} for ${{amount}} was due on {{dueDate}} and is now overdue.",
+    "overdueSupplierTitle": "Payment Overdue",
+    "overdueSupplierMessage": "Invoice {{invoiceNumber}} for ${{amount}} is overdue since {{dueDate}}."
+  },
+  "payment": {
+    "receivedTitle": "Payment Received",
+    "receivedMessage": "Payment of ${{amount}} received for invoice {{invoiceRef}}"
+  },
+  "inventory": {
+    "lowStockTitle": "Low Stock Alert",
+    "lowStockMessage": "{{productName}} is below threshold. Current: {{currentStock}}, Threshold: {{threshold}}",
+    "outOfStockTitle": "Out of Stock",
+    "outOfStockMessage": "{{productName}} is now out of stock."
+  },
+  "message": {
+    "title": "New message",
+    "body": "{{senderLabel}} sent you a message{{preview}}"
+  },
+  "dispute": {
+    "openedTitle": "New dispute opened",
+    "openedMessage": "A restaurant opened a dispute on order #{{orderId}}",
+    "rejectedTitle": "Dispute rejected",
+    "resolvedTitle": "Dispute resolved",
+    "rejectedMessage": "Your dispute was rejected. {{notes}}",
+    "resolvedMessage": "Your dispute was resolved ({{resolutionType}}).",
+    "replacementMessage": "Your dispute was resolved with a replacement. Replacement order #{{orderId}} has been created."
+  },
+  "deal": {
+    "approvedTitle": "New deal from {{supplierLabel}}",
+    "approvedMessage": "{{dealName}} is now available. Open Deals to view and redeem.",
+    "rejectedTitle": "Deal rejected",
+    "rejectedMessage": "Your deal \"{{dealName}}\" was not approved.{{reasonSuffix}}",
+    "rejectedReason": " Reason: {{reason}}",
+    "submittedSupplierTitle": "Deal submitted for review",
+    "submittedSupplierMessage": "Your deal \"{{dealName}}\" was submitted and is pending admin approval.",
+    "submittedAdminTitle": "Deal requires approval",
+    "submittedAdminMessage": "{{supplierLabel}} submitted \"{{dealName}}\" for approval.",
+    "expiredTitle": "Deal expired",
+    "expiredMessage": "Your deal \"{{dealName}}\" has expired."
+  },
+  "billing": {
+    "trialStartedTitle": "Trial started",
+    "trialStartedMessage": "Your Supplify trial{{planSuffix}} has started.{{endsSuffix}}",
+    "trialStartedPlan": " ({{planName}})",
+    "trialStartedEnds": " It ends on {{trialEndsAt}}.",
+    "trialEndingTitle": "Trial ending soon",
+    "trialEndingMessage": "Your Supplify trial ends in {{daysLeft}} day(s){{endsSuffix}}. Add a payment method to keep full access.",
+    "trialEndingEnds": " ({{trialEndsAt}})",
+    "trialExpiredTitle": "Trial expired",
+    "trialExpiredMessage": "Your Supplify trial has expired. Subscribe to restore write access.",
+    "activatedTitle": "Subscription activated",
+    "activatedMessage": "Your Supplify subscription{{planSuffix}} is now active.",
+    "renewedTitle": "Subscription renewed",
+    "renewedMessage": "Your subscription was renewed{{periodSuffix}}",
+    "renewedPeriod": " through {{periodEnd}}.",
+    "renewedPeriodFallback": ".",
+    "paymentFailedTitle": "Payment failed",
+    "paymentFailedMessage": "We could not process your subscription payment.{{reasonSuffix}} Update your payment method to avoid interruption.",
+    "cancelledTitle": "Subscription cancelled",
+    "cancelledMessage": "Your Supplify subscription has been cancelled.",
+    "accountLockedTitle": "Account restricted",
+    "accountLockedMessage": "Write access is restricted{{reasonSuffix}}. Visit billing to restore access.",
+    "reasonPrefix": ": {{reason}}"
+  },
+  "quote": {
+    "requestTitle": "New quote request",
+    "requestMessage": "{{restaurantName}} requested your best price on selected items.",
+    "responseTitle": "Supplier response received",
+    "responseMessage": "{{supplierName}} responded to your quote request."
+  },
+  "admin": {
+    "newTenantTitle": "New {{tenantType}} registered",
+    "newTenantMessage": "New {{tenantType}} \"{{tenantName}}\" registered{{emailSuffix}}",
+    "newTenantEmail": " ({{contactEmail}})",
+    "tenantTypeSupplier": "supplier",
+    "tenantTypeRestaurant": "restaurant"
+  }
+}

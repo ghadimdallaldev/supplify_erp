@@ -3,6 +3,8 @@
  * preorders only outside that window (scheduled for next live opening).
  */
 
+import { t, resolveLocale } from '../i18n/index.js'
+
 /** @param {string | undefined | null} timeStr */
 export function parseTimeToMinutes(timeStr) {
   if (!timeStr || typeof timeStr !== 'string') return null
@@ -93,13 +95,17 @@ export function getNextLiveOrderStart(now, startTime) {
 /**
  * @param {Record<string, unknown> | null | undefined} config
  * @param {Date} [now]
+ * @param {string} [locale]
  */
-export function resolveConsumerOrderingStatus(config, now = new Date()) {
+export function resolveConsumerOrderingStatus(config, now = new Date(), locale = 'en') {
+  const lng = resolveLocale(locale)
   const { liveOrderStart, liveOrderEnd, allowPreordersOutsideLiveHours } =
     normalizeOrderingHoursConfig(config)
 
   const isLive = isWithinLiveOrderWindow(now, liveOrderStart, liveOrderEnd)
-  const endLabel = endTimeIsEndOfDay(liveOrderEnd) ? 'midnight' : liveOrderEnd
+  const endLabel = endTimeIsEndOfDay(liveOrderEnd)
+    ? t('consumer.ordering.midnight', lng)
+    : liveOrderEnd
   const startLabel = formatMinutesToTime(parseTimeToMinutes(liveOrderStart) ?? 12 * 60)
 
   if (isLive) {
@@ -111,7 +117,7 @@ export function resolveConsumerOrderingStatus(config, now = new Date()) {
       liveOrderEnd,
       allowPreordersOutsideLiveHours,
       nextLiveOrderAt: null,
-      message: `Open for orders until ${endLabel}.`,
+      message: t('consumer.ordering.live', lng, { end: endLabel }),
     }
   }
 
@@ -126,7 +132,7 @@ export function resolveConsumerOrderingStatus(config, now = new Date()) {
       liveOrderEnd,
       allowPreordersOutsideLiveHours,
       nextLiveOrderAt: nextLiveOrderAt.toISOString(),
-      message: `Preorders only until ${startLabel}. Schedule for ${startLabel} or later.`,
+      message: t('consumer.ordering.preorderOnly', lng, { start: startLabel }),
     }
   }
 
@@ -138,7 +144,7 @@ export function resolveConsumerOrderingStatus(config, now = new Date()) {
     liveOrderEnd,
     allowPreordersOutsideLiveHours,
     nextLiveOrderAt: nextLiveOrderAt.toISOString(),
-    message: `Ordering is closed. Live orders resume at ${startLabel}.`,
+    message: t('consumer.ordering.closed', lng, { start: startLabel }),
   }
 }
 
@@ -146,9 +152,17 @@ export function resolveConsumerOrderingStatus(config, now = new Date()) {
  * @param {Record<string, unknown> | null | undefined} config
  * @param {string | null | undefined} scheduledFor ISO timestamp
  * @param {Date} [now]
+ * @param {string} [locale]
  */
-export function validateConsumerOrderSchedule(config, scheduledFor, now = new Date()) {
-  const status = resolveConsumerOrderingStatus(config, now)
+export function validateConsumerOrderSchedule(
+  config,
+  scheduledFor,
+  now = new Date(),
+  locale = 'en'
+) {
+  const lng = resolveLocale(locale)
+  const status = resolveConsumerOrderingStatus(config, now, lng)
+  const startLabel = formatMinutesToTime(parseTimeToMinutes(status.liveOrderStart) ?? 12 * 60)
 
   if (status.mode === 'LIVE') {
     if (!scheduledFor) {
@@ -156,8 +170,9 @@ export function validateConsumerOrderSchedule(config, scheduledFor, now = new Da
     }
     const scheduled = new Date(scheduledFor)
     if (Number.isNaN(scheduled.getTime()) || scheduled <= now) {
-      throw Object.assign(new Error('Scheduled time must be in the future'), {
+      throw Object.assign(new Error(t('consumer.ordering.scheduleInvalid', lng)), {
         name: 'SCHEDULE_INVALID',
+        code: 'scheduleInvalid',
       })
     }
     return status
@@ -166,26 +181,26 @@ export function validateConsumerOrderSchedule(config, scheduledFor, now = new Da
   if (status.mode === 'PREORDER_ONLY') {
     if (!scheduledFor) {
       throw Object.assign(
-        new Error(
-          `Live ordering opens at ${formatMinutesToTime(parseTimeToMinutes(status.liveOrderStart) ?? 12 * 60)}. Please schedule your order.`
-        ),
-        { name: 'ORDERING_PREORDER_REQUIRED' }
+        new Error(t('consumer.ordering.preorderRequired', lng, { start: startLabel })),
+        {
+          name: 'ORDERING_PREORDER_REQUIRED',
+          code: 'preorderRequired',
+        }
       )
     }
     const scheduled = new Date(scheduledFor)
     const minStart = new Date(status.nextLiveOrderAt)
     if (Number.isNaN(scheduled.getTime()) || scheduled < minStart) {
       throw Object.assign(
-        new Error(
-          `Preorder must be scheduled for ${formatMinutesToTime(parseTimeToMinutes(status.liveOrderStart) ?? 12 * 60)} or later`
-        ),
-        { name: 'ORDERING_SCHEDULE_TOO_EARLY' }
+        new Error(t('consumer.ordering.scheduleTooEarly', lng, { start: startLabel })),
+        { name: 'ORDERING_SCHEDULE_TOO_EARLY', code: 'scheduleTooEarly' }
       )
     }
     return status
   }
 
-  throw Object.assign(new Error(status.message || 'Ordering is currently closed'), {
+  throw Object.assign(new Error(status.message || t('consumer.ordering.windowClosed', lng)), {
     name: 'ORDERING_WINDOW_CLOSED',
+    code: 'windowClosed',
   })
 }

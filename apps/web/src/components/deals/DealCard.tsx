@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
@@ -29,31 +30,38 @@ import { openBrowseUpgrade } from '../../lib/openBrowseUpgrade'
 import { cn } from '../../lib/utils'
 import { cardActionBtnClass, cardShellClass } from '../ui/card-layout'
 import {
-  COUPON_COPIED_TOAST,
-  COUPON_LINKED_HELPER,
   formatDealTypeLabel,
+  getCouponCopiedToast,
+  getCouponLinkedHelper,
   getCtaLabel,
 } from '../../lib/dealDisplayLabels'
+import { ensureNamespace } from '../../i18n'
+import type { TFunction } from 'i18next'
 
 export type DealRecord = Record<string, unknown>
 
-function formatDiscount(deal: DealRecord) {
+function formatDiscount(deal: DealRecord, t: TFunction<'deals'>) {
   const type = String(deal.type || '')
   const val = deal.discount_value
   if (val == null) return formatDealTypeLabel(type)
-  if (type === 'percentage_discount' || type === 'percentage_off') return `${val}% off`
-  if (type === 'fixed_discount' || type === 'fixed_off') return `${formatPrice(Number(val))} off`
-  if (type === 'free_shipping') return 'Free shipping'
+  if (type === 'percentage_discount' || type === 'percentage_off') {
+    return t('labels.discount.percentageOff', { value: val })
+  }
+  if (type === 'fixed_discount' || type === 'fixed_off') {
+    return t('labels.discount.fixedOff', { value: formatPrice(Number(val)) })
+  }
+  if (type === 'free_shipping') return t('labels.discount.freeShipping')
   return formatDealTypeLabel(type)
 }
 
-function formatValidUntil(deal: DealRecord) {
-  if (!deal.ends_at) return 'No expiry'
-  return new Date(String(deal.ends_at)).toLocaleDateString(undefined, {
+function formatValidUntil(deal: DealRecord, t: TFunction<'deals'>) {
+  if (!deal.ends_at) return t('labels.validUntil.noExpiry')
+  const date = new Date(String(deal.ends_at)).toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   })
+  return t('labels.validUntil.label', { date })
 }
 
 function ctaLabel(deal: DealRecord) {
@@ -74,16 +82,24 @@ function CtaIcon({ cta }: { cta: string }) {
   }
 }
 
-function DealBadges({ deal, isSponsored }: { deal: DealRecord; isSponsored: boolean }) {
+function DealBadges({
+  deal,
+  isSponsored,
+  t,
+}: {
+  deal: DealRecord
+  isSponsored: boolean
+  t: TFunction<'deals'>
+}) {
   return (
     <div className="flex flex-row flex-wrap items-center justify-end gap-1 shrink-0 max-w-full">
       {isSponsored ? (
         <Badge variant="secondary" className="gap-1 text-[10px]">
           <Megaphone className="h-3 w-3" />
-          Sponsored
+          {t('labels.sponsored')}
         </Badge>
       ) : null}
-      {deal.is_featured ? <Badge className="text-[10px]">Featured</Badge> : null}
+      {deal.is_featured ? <Badge className="text-[10px]">{t('labels.featured')}</Badge> : null}
     </div>
   )
 }
@@ -100,6 +116,7 @@ export function DealCard({
   deal: DealRecord
   canRedeem?: boolean
 }) {
+  const { t } = useTranslation('deals')
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const { isEffectiveRestaurant, shouldLoadTenantEntitlements } = useImpersonation()
@@ -118,6 +135,10 @@ export function DealCard({
   const dealId = String(deal.id)
   const supplierId = String(deal.supplier_id || '')
   const isSponsored = Boolean(deal.is_sponsored)
+
+  useEffect(() => {
+    void ensureNamespace('deals')
+  }, [])
 
   const trackInteraction = async (interactionType: 'view' | 'click') => {
     try {
@@ -169,13 +190,13 @@ export function DealCard({
       try {
         const result = await redeemCoupon(dealId).unwrap()
         await navigator.clipboard.writeText(result.couponCode)
-        toast.success(COUPON_COPIED_TOAST)
+        toast.success(getCouponCopiedToast())
         navigate(
           `/app/cart?coupon=${encodeURIComponent(result.couponCode)}&supplierId=${supplierId}`
         )
       } catch (e: unknown) {
         const err = e as { data?: { error?: { message?: string } } }
-        toast.error(err?.data?.error?.message || 'Could not retrieve coupon')
+        toast.error(err?.data?.error?.message || t('card.toastCouponError'))
       }
       return
     }
@@ -186,7 +207,7 @@ export function DealCard({
         navigate(`/app/chat?conversation=${result.conversation.id}`)
       } catch (e: unknown) {
         const err = e as { data?: { error?: { message?: string } } }
-        toast.error(err?.data?.error?.message || 'Could not start conversation')
+        toast.error(err?.data?.error?.message || t('card.toastMessageError'))
       }
       return
     }
@@ -222,37 +243,39 @@ export function DealCard({
                   <span className="truncate">{String(deal.name)}</span>
                 </span>
               </CardTitle>
-              <DealBadges deal={deal} isSponsored={isSponsored} />
+              <DealBadges deal={deal} isSponsored={isSponsored} t={t} />
             </div>
             <p className="text-xs text-[var(--text-muted)] flex items-center gap-1 min-w-0">
               <Building2 className="h-3 w-3 shrink-0" />
-              <span className="truncate">{String(deal.supplier_name || 'Supplier')}</span>
+              <span className="truncate">
+                {String(deal.supplier_name || t('labels.supplierFallback'))}
+              </span>
             </p>
           </div>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          <p className="font-semibold text-[var(--brand)]">{formatDiscount(deal)}</p>
+          <p className="font-semibold text-[var(--brand)]">{formatDiscount(deal, t)}</p>
           {deal.min_order_amount != null && Number(deal.min_order_amount) > 0 ? (
             <p className="text-xs text-[var(--text-muted)]">
-              Min order: {formatPrice(Number(deal.min_order_amount))}
+              {t('labels.minOrder', { amount: formatPrice(Number(deal.min_order_amount)) })}
             </p>
           ) : null}
           {deal.coupon_code ? (
             <div className="space-y-1">
               <p className="text-xs font-mono bg-[var(--app-muted)] px-2 py-1 rounded inline-block">
                 {canRedeem ? (
-                  <>Code: {String(deal.coupon_code)}</>
+                  <>{t('labels.code', { code: String(deal.coupon_code) })}</>
                 ) : (
-                  <>Apply limit reached — upgrade for more redemptions</>
+                  <>{t('labels.applyLimitReached')}</>
                 )}
               </p>
-              <p className="text-xs text-[var(--text-muted)]">{COUPON_LINKED_HELPER}</p>
+              <p className="text-xs text-[var(--text-muted)]">{getCouponLinkedHelper()}</p>
             </div>
           ) : null}
           {deal.description ? (
             <p className="text-[var(--text-muted)] line-clamp-2">{String(deal.description)}</p>
           ) : null}
-          <p className="text-xs text-[var(--text-muted)]">Valid until {formatValidUntil(deal)}</p>
+          <p className="text-xs text-[var(--text-muted)]">{formatValidUntil(deal, t)}</p>
           <Button
             size="sm"
             className={cn('w-full', cardActionBtnClass())}
@@ -264,7 +287,7 @@ export function DealCard({
             ) : (
               <CtaIcon cta={String(deal.cta_type || 'order_now')} />
             )}
-            {!canRedeem && ctaNeedsRedeem(deal) ? 'Daily limit reached' : ctaLabel(deal)}
+            {!canRedeem && ctaNeedsRedeem(deal) ? t('labels.dailyLimitReached') : ctaLabel(deal)}
           </Button>
         </CardContent>
       </Card>

@@ -1,0 +1,15 @@
+{
+  "errors": {
+    "productNotFound": "Product not found",
+    "accessDeniedOwnProducts": "Access denied. You can only view prices for your own products",
+    "accessDeniedSetOwnProducts": "Access denied. You can only set prices for your own products",
+    "accessDeniedUpdateOwnProducts": "Access denied. You can only update prices for your own products",
+    "accessDenied": "Access denied",
+    "failedGetPrices": "Failed to get prices",
+    "invalidPriceData": "Invalid price data",
+    "failedCreatePrice": "Failed to create price",
+    "noFieldsToUpdate": "No fields to update",
+    "invalidUpdateData": "Invalid update data",
+    "failedUpdatePrice": "Failed to update price"
+  }
+}

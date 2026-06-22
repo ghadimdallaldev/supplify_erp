@@ -6,6 +6,8 @@ import {
   getVapidPublicKey,
   savePushSubscription,
   removePushSubscription,
+  saveExpoPushDevice,
+  removeExpoPushDevice,
 } from '../services/push.service.js'
 import { setPushEnabledPreference } from '../services/notification.service.js'
 
@@ -21,6 +23,11 @@ const subscribeSchema = z.object({
 
 const unsubscribeSchema = z.object({
   endpoint: z.string().url(),
+})
+
+const deviceSchema = z.object({
+  token: z.string().min(1),
+  platform: z.enum(['ios', 'android']),
 })
 
 router.get('/vapid-public-key', (req, res) => {
@@ -82,6 +89,42 @@ router.delete(
       if (removed) {
         await setPushEnabledPreference(req.userData.id, req.userData.role, false)
       }
+      res.json({ ok: true, data: { removed }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/devices',
+  requireAuth,
+  resolveTenantContext,
+  pushFeatureGate,
+  async (req, res, next) => {
+    try {
+      const body = deviceSchema.parse(req.body)
+      const device = await saveExpoPushDevice(req.userData.id, {
+        token: body.token,
+        platform: body.platform,
+      })
+      await setPushEnabledPreference(req.userData.id, req.userData.role, true)
+      res.status(201).json({ ok: true, data: { device }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.delete(
+  '/devices',
+  requireAuth,
+  resolveTenantContext,
+  pushFeatureGate,
+  async (req, res, next) => {
+    try {
+      const body = deviceSchema.parse(req.body)
+      const removed = await removeExpoPushDevice(req.userData.id, body.token)
       res.json({ ok: true, data: { removed }, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)

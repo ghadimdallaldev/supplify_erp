@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import {
   useGetRestaurantConnectionRequestsQuery,
@@ -9,13 +11,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Button } from '../ui/button'
 import { Skeleton } from '../ui/skeleton'
 import { UserPlus, X } from 'lucide-react'
+import { ensureNamespace } from '../../i18n'
 
 export function ConnectionRequestsPanel() {
+  const { t } = useTranslation('suppliers')
   const { data, isLoading, isError, refetch } = useGetRestaurantConnectionRequestsQuery()
   const [acceptRequest, { isLoading: accepting }] = useAcceptConnectionRequestMutation()
   const [declineRequest, { isLoading: declining }] = useDeclineConnectionRequestMutation()
 
   const requests = data?.requests ?? []
+
+  useEffect(() => {
+    void ensureNamespace('suppliers')
+  }, [])
 
   if (isLoading) {
     return (
@@ -44,18 +52,18 @@ export function ConnectionRequestsPanel() {
   const handleAccept = async (id: string) => {
     try {
       await acceptRequest(id).unwrap()
-      toast.success('Connection accepted — supplier added to your network')
+      toast.success(t('connectionRequests.toast.accepted'))
     } catch (err: any) {
-      toast.error(err?.data?.error?.message || 'Failed to accept request')
+      toast.error(err?.data?.error?.message || t('connectionRequests.toast.acceptFailed'))
     }
   }
 
   const handleDecline = async (id: string) => {
     try {
       await declineRequest(id).unwrap()
-      toast.success('Connection request declined')
+      toast.success(t('connectionRequests.toast.declined'))
     } catch (err: any) {
-      toast.error(err?.data?.error?.message || 'Failed to decline request')
+      toast.error(err?.data?.error?.message || t('connectionRequests.toast.declineFailed'))
     }
   }
 

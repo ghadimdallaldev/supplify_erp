@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -52,6 +53,7 @@ export function RestaurantWastePanel({
   preselectedProductId,
   onPreselectConsumed,
 }: Props) {
+  const { t } = useTranslation('inventory')
   const [period, setPeriod] = useState(30)
   const [showLogDialog, setShowLogDialog] = useState(false)
   const [selectedProductId, setSelectedProductId] = useState('')
@@ -103,22 +105,25 @@ export function RestaurantWastePanel({
 
   const handleLogWaste = async () => {
     if (!selectedProductId || !quantity) {
-      toast.error('Select a product and quantity')
+      toast.error(t('toast.wasteSelectProductQuantity'))
       return
     }
     const qty = parseFloat(quantity)
     if (!Number.isFinite(qty) || qty <= 0) {
-      toast.error('Quantity must be a positive number')
+      toast.error(t('toast.wasteQuantityPositive'))
       return
     }
     const cost = unitCost.trim() ? parseFloat(unitCost) : undefined
     if (cost != null && (!Number.isFinite(cost) || cost < 0)) {
-      toast.error('Unit cost must be zero or positive')
+      toast.error(t('toast.wasteUnitCostNonNegative'))
       return
     }
     if (selectedItem && qty > Number(selectedItem.quantity)) {
       toast.error(
-        `Cannot log more than on hand (${selectedItem.quantity} ${selectedItem.product_unit || ''})`
+        t('toast.wasteExceedsOnHand', {
+          quantity: selectedItem.quantity,
+          unit: selectedItem.product_unit || '',
+        })
       )
       return
     }
@@ -132,13 +137,13 @@ export function RestaurantWastePanel({
         unitCost: cost,
         wasteCategory,
       }).unwrap()
-      toast.success('Waste logged and stock updated')
+      toast.success(t('toast.wasteLogged'))
       setShowLogDialog(false)
       refetch()
     } catch (err: unknown) {
       const message =
         (err as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Failed to log waste'
+        t('toast.wasteLogFailed')
       toast.error(message)
     }
   }

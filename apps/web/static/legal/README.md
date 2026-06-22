@@ -6,6 +6,10 @@
 
 Placeholders to replace before launch: `[Company Legal Name]`, `[Company Address]`, `[Support Email]`, `[Privacy Email]`, `[Effective Date]`, `[Last Updated]`, `[Website]`.
 
+## Arabic translations (`ar/`)
+
+Professional Arabic (`ar/`) mirrors the English documents in this directory. Each `ar/*.md` file corresponds to the same-named English file at the pack root (for example, `ar/TERMS_AND_CONDITIONS.md` ↔ `TERMS_AND_CONDITIONS.md`). Keep both languages in sync when bumping `LEGAL_PACK_VERSION`. The app serves the locale-appropriate copy based on the user’s language preference.
+
 ## Included files
 
 1. `TERMS_AND_CONDITIONS.md` — Master platform terms for restaurants, suppliers, staff, drivers, admins, public guests, reservations, orders, branches, warehouses, subscriptions, **deals & boosts**, mobile app usage, and platform liability.

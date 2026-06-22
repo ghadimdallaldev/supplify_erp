@@ -174,5 +174,253 @@
     "acceptFailed": "تعذّر قبول هذا العرض",
     "offerDeclinedToast": "تم رفض العرض",
     "declineFailed": "تعذّر رفض العرض"
+  },
+  "common": {
+    "guests_one": "{{count}} ضيف",
+    "guests_other": "{{count}} ضيوف",
+    "seats": "{{count}} مقاعد",
+    "cancel": "إلغاء",
+    "saving": "جاري الحفظ…",
+    "unknownTable": "طاولة غير معروفة",
+    "inactive": "غير نشطة",
+    "all": "الكل",
+    "copySuffix": "نسخة"
+  },
+  "board": {
+    "title": "لوحة الحجوزات",
+    "description": "عيّن طاولة على كل بطاقة، ثم استخدم الجلوس / الإكمال — أو اسحب من مقبض الإمساك.",
+    "dragAriaLabel": "سحب الحجز",
+    "unassigned": "غير معيّنة",
+    "chooseTablePlaceholder": "اختر طاولة…",
+    "tableSeats": "{{name}} · {{capacity}} مقاعد",
+    "assignTable": "تعيين طاولة",
+    "requested": "طُلب:",
+    "pax": "{{count}} ضيف",
+    "totalSeats": "إجمالي المقاعد: {{count}}",
+    "coversBooked": "الضيوف المحجوزون: {{count}}",
+    "dropHere": "أسقط الحجوزات هنا",
+    "liveWaitlist": "قائمة انتظار مباشرة",
+    "columns": {
+      "PENDING": "قيد الانتظار",
+      "CONFIRMED": "مؤكدة",
+      "SEATED": "جالسون",
+      "WAITLIST": "قائمة الانتظار"
+    },
+    "actions": {
+      "confirm": "تأكيد",
+      "cancel": "إلغاء",
+      "seat": "جلوس",
+      "complete": "إكمال"
+    },
+    "statusLower": {
+      "PENDING": "قيد الانتظار",
+      "CONFIRMED": "مؤكدة",
+      "SEATED": "جالسون",
+      "WAITLIST": "قائمة الانتظار",
+      "CANCELLED": "ملغاة",
+      "COMPLETED": "مكتملة"
+    },
+    "toasts": {
+      "movedTo": "نُقل إلى {{status}}",
+      "updateFailed": "تعذّر تحديث الحجز",
+      "completed": "اكتمل الحجز",
+      "seated": "تم جلوس الضيف",
+      "cancelled": "أُلغي الحجز",
+      "updated": "تم تحديث الحجز",
+      "tableAssigned": "تم تعيين الطاولة",
+      "assignFailed": "تعذّر تعيين الطاولة"
+    }
+  },
+  "assignments": {
+    "empty": "لا حجوزات في <strong>{{date}}</strong>. غيّر التاريخ أعلاه أو شارك رابط الحجز مع الضيوف.",
+    "title": "خريطة طاولات اليوم",
+    "description": "{{assigned}} معيّنة · {{unassigned}} غير معيّنة في {{date}}. تطابق ما يجب أن يظهر على الأرضية أدناه.",
+    "unassignedList": "غير معيّنة: {{names}}"
+  },
+  "publicBooking": {
+    "title": "الحجز العام عبر الإنترنت",
+    "description": "يستخدم الضيوف رابط الحجز العام. السعة من الطاولات النشطة في مخطط الأرضية؛ الساعات تحدد الأوقات المتاحة.",
+    "loading": "جاري تحميل إعدادات الحجز…",
+    "tableCapacity": "سعة الطاولات",
+    "capacitySummary": "{{count}} طاولة نشطة، {{seats}} مقعد إجمالي — تُعرض كـ «مقاعد متبقية» لكل وقت بعد حجز الضيوف.",
+    "noActiveTables": "لا طاولات نشطة بعد. أضف طاولات في مخطط الأرضية أدناه وإلا لن يرى الضيوف أوقاتاً متاحة.",
+    "durationLabel": "مدة الحجز (دقائق)",
+    "intervalLabel": "فترة الفتحة (دقائق)",
+    "openLabel": "أول فتحة",
+    "closeLabel": "آخر جلوس (إغلاق)",
+    "save": "حفظ ساعات الحجز العام",
+    "toasts": {
+      "saved": "تم تحديث ساعات الحجز العام",
+      "saveFailed": "تعذّر حفظ ساعات الحجز"
+    }
+  },
+  "analytics": {
+    "title": "ذكاء تدفق الضيوف",
+    "description": "اكتشف ساعات الذروة والإلغاءات وضغط قائمة الانتظار بلمحة.",
+    "busiestHour": "أكثر ساعة ازدحاماً: {{label}} ({{covers}} ضيف)",
+    "busiestDay": "أكثر يوم ازدحاماً: {{label}} ({{covers}} ضيف)",
+    "rangeDay": "الضيوف حسب الساعة (اليوم)",
+    "rangeWeek": "الضيوف حسب اليوم (آخر 7 أيام)",
+    "rangeMonth": "الضيوف حسب اليوم (آخر 30 يوماً)",
+    "tabs": {
+      "day": "يوم",
+      "week": "أسبوع",
+      "month": "شهر"
+    },
+    "stats": {
+      "totalCovers": "إجمالي الضيوف",
+      "confirmed": "مؤكدة",
+      "cancelled": "ملغاة",
+      "waitlisted": "في قائمة الانتظار"
+    },
+    "chart": {
+      "covers": "الضيوف",
+      "cancelled": "ملغاة",
+      "guests": "ضيوف",
+      "emptyReservations": "لا حجوزات في هذه الفترة بعد.",
+      "waitlistByStatus": "قائمة الانتظار حسب الحالة",
+      "emptyWaitlist": "لا إدخالات في قائمة الانتظار."
+    }
+  },
+  "createDrawer": {
+    "trigger": "+ حجز جديد",
+    "title": "تسجيل حجز",
+    "description": "سجّل الأساسيات ودع Supplify يتولى حساب السعة.",
+    "guestName": "اسم الضيف",
+    "contact": "التواصل",
+    "contactPlaceholder": "+971...",
+    "partySize": "عدد الضيوف",
+    "duration": "المدة (دقيقة)",
+    "startTime": "وقت البدء",
+    "preferredTable": "الطاولة المفضلة",
+    "autoAssign": "تعيين تلقائي",
+    "tableOption": "{{name}} • {{capacity}} مقاعد",
+    "notes": "ملاحظات",
+    "notesPlaceholder": "كعكة عيد ميلاد؟ ضيف مميز؟ حساسية؟",
+    "booking": "جاري الحجز…",
+    "confirm": "تأكيد الحجز",
+    "toasts": {
+      "created": "تم إنشاء الحجز",
+      "createFailed": "فشل إنشاء الحجز"
+    }
+  },
+  "tableBuilder": {
+    "title": "منشئ الأرضية",
+    "descriptionLive": "عرض مباشر: الطاولات المعيّنة تعرض اسم الضيف والحالة لحجوزات اليوم.",
+    "descriptionEdit": "وضع التحرير — فعّل العرض المباشر لرؤية تعيينات الطاولات من اللوحة أعلاه.",
+    "shortcuts": "Del: حذف · Ctrl+D: نسخ · Ctrl+Z: تراجع · Ctrl+Y: إعادة · Esc: إلغاء التحديد",
+    "liveView": "عرض مباشر",
+    "serviceMode": "وضع الخدمة",
+    "virtualFloor": "الأرضية الافتراضية",
+    "virtualFloorHint": "اسحب الطاولات وغيّر أحجامها لعكس خدمتك الفعلية.",
+    "liveStatus": "الحالة المباشرة:",
+    "noTablesTitle": "لا طاولات بعد",
+    "noTablesHint": "ابدأ بإضافة شكل أعلاه.",
+    "legend": {
+      "dragDrop": "سحب وإفلات",
+      "resize": "اسحب المقابض لتغيير الحجم",
+      "keyboard": "Del/Backspace: حذف · Ctrl+D: نسخ · Ctrl+Z/Y: تراجع/إعادة"
+    },
+    "toolbar": {
+      "undo": "تراجع (Ctrl+Z)",
+      "redo": "إعادة (Ctrl+Y)",
+      "gridSnap": "محاذاة الشبكة",
+      "snap": "محاذاة",
+      "zoomOut": "تصغير",
+      "resetZoom": "إعادة ضبط التكبير",
+      "zoomIn": "تكبير"
+    },
+    "stats": {
+      "activeTables": "طاولات نشطة: {{active}}/{{total}}",
+      "totalCapacity": "السعة الإجمالية: {{count}}",
+      "assignedOnFloor": "معيّنة على الأرضية: {{assigned}} / {{active}}",
+      "selected": "المحددة: {{name}}"
+    },
+    "clearFloor": "مسح الأرضية",
+    "saveLayout": "حفظ المخطط",
+    "tableDetails": "تفاصيل الطاولة",
+    "duplicateTable": "نسخ الطاولة",
+    "deleteTable": "حذف الطاولة",
+    "hideTableDetails": "إخفاء تفاصيل الطاولة",
+    "showTableDetails": "عرض تفاصيل الطاولة",
+    "selectTableHint": "اختر طاولة من اللوحة لإظهار عناصر التحكم التفصيلية.",
+    "guest": "الضيف:",
+    "partySize": "عدد الضيوف:",
+    "status": "الحالة:",
+    "availableNoReservation": "متاحة — لا حجز نشط",
+    "capacityZone": "السعة: {{capacity}} · المنطقة: {{zone}}",
+    "tableName": "اسم الطاولة",
+    "capacity": "السعة",
+    "active": "نشطة",
+    "activeHint": "تضمين في تدفق الحجز",
+    "shape": "الشكل",
+    "zone": "المنطقة",
+    "signatureColor": "اللون المميز",
+    "features": "الميزات",
+    "rotation": "الدوران",
+    "reset": "إعادة ضبط",
+    "specialNotes": "ملاحظات خاصة",
+    "notesPlaceholder": "اذكر خطوط الرؤية، مسؤولية النادل، أو نصائح الأجواء.",
+    "expertTipTitle": "نصيحة خبير",
+    "expertTipBody": "عيّن الألوان والمناطق لتطابق طريقة تحدث فريقك على الأرضية. يمكن للنوادل الآن مطابقة الحجوزات بلمحة واحدة، مما يقلل التسليم والأخطاء.",
+    "tableGuests": "{{count}} ضيوف · {{name}}",
+    "toasts": {
+      "saved": "تم حفظ الطاولات",
+      "saveFailed": "فشل حفظ الطاولات"
+    },
+    "shapes": {
+      "round": {
+        "label": "دائرية",
+        "description": "مثالية للمجموعات الصغيرة."
+      },
+      "square": {
+        "label": "مربعة",
+        "description": "مثالية للأزواج."
+      },
+      "rectangle": {
+        "label": "مأدبة",
+        "description": "تستوعب مجموعات أكبر."
+      },
+      "booth": {
+        "label": "كابينة",
+        "description": "جلوس مريح مع خصوصية."
+      },
+      "chef_table": {
+        "label": "طاولة الشيف",
+        "description": "مواجهة للحدث."
+      }
+    },
+    "colors": {
+      "classicBlue": "أزرق كلاسيكي",
+      "aqua": "أزرق مائي",
+      "gardenGreen": "أخضر حديقة",
+      "sunsetOrange": "برتقالي غروب",
+      "goldenHour": "الساعة الذهبية",
+      "lavender": "لافندر",
+      "rose": "وردي",
+      "slate": "رمادي"
+    },
+    "zones": {
+      "main": "الطابق الرئيسي",
+      "patio": "الفناء",
+      "bar": "البار",
+      "vip": "مميز",
+      "private": "خاص"
+    },
+    "features": {
+      "accessible": "يمكن الوصول",
+      "window": "إطلالة نافذة",
+      "high_top": "طاولة مرتفعة",
+      "power": "مقبس كهرباء",
+      "romantic": "رومانسي",
+      "near_music": "قرب الموسيقى الحية"
+    },
+    "serviceStatus": {
+      "SEATED": "جالسون",
+      "CONFIRMED": "مؤكدة",
+      "PENDING": "قيد الانتظار",
+      "WAITLIST": "قائمة الانتظار",
+      "available": "متاحة"
+    }
   }
 }

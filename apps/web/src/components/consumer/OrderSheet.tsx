@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Minus, Plus } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
@@ -15,6 +16,7 @@ import { formatPrice } from '../../utils/format'
 import type { ConsumerMenuItem, ConsumerOrderingMode } from '../../services/consumerApi'
 import type { AddCartLineInput } from '../../hooks/useConsumerCart'
 import { cn } from '../../lib/utils'
+import { ensureNamespace } from '../../i18n'
 
 type OrderSheetProps = {
   open: boolean
@@ -35,10 +37,15 @@ export function OrderSheet({
   onAdd,
   orderingMode = 'LIVE',
 }: OrderSheetProps) {
+  const { t } = useTranslation('consumer')
   const [selectedByGroup, setSelectedByGroup] = useState<Record<string, string[]>>({})
   const [notes, setNotes] = useState('')
   const [quantity, setQuantity] = useState(1)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    void ensureNamespace('consumer')
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -79,7 +86,7 @@ export function OrderSheet({
         return { ...prev, [group.id]: current.filter((id) => id !== optionId) }
       }
       if (current.length >= group.max_selections) {
-        setError(`Choose at most ${group.max_selections} for ${group.name}`)
+        setError(t('orderSheet.chooseAtMost', { max: group.max_selections, group: group.name }))
         return prev
       }
       return { ...prev, [group.id]: [...current, optionId] }
@@ -93,11 +100,11 @@ export function OrderSheet({
       const min = effectiveMin(group)
       if (count < min) {
         return min === 1
-          ? `Please choose an option for ${group.name}`
-          : `Choose at least ${min} for ${group.name}`
+          ? t('orderSheet.chooseOptionFor', { group: group.name })
+          : t('orderSheet.chooseAtLeast', { min, group: group.name })
       }
       if (count > group.max_selections) {
-        return `Choose at most ${group.max_selections} for ${group.name}`
+        return t('orderSheet.chooseAtMost', { max: group.max_selections, group: group.name })
       }
     }
     return null
@@ -141,7 +148,8 @@ export function OrderSheet({
   const orderingClosed = orderingMode === 'CLOSED'
   const isItemUnavailable = 'is_available' in item && item.is_available === false
   const canAdd = !orderingClosed && !isItemUnavailable
-  const addButtonLabel = orderingMode === 'PREORDER_ONLY' ? 'Preorder' : 'Add to cart'
+  const addButtonLabel =
+    orderingMode === 'PREORDER_ONLY' ? t('orderSheet.preorder') : t('orderSheet.addToCart')
   const hasModifiers = (item.modifierGroups?.length ?? 0) > 0
   const imageUrl = item.image_url
 
@@ -162,7 +170,7 @@ export function OrderSheet({
           <DialogHeader className="text-left">
             <DialogTitle>{item.name}</DialogTitle>
             <DialogDescription id="order-sheet-description">
-              {item.description || 'Customize your order'}
+              {item.description || t('orderSheet.customizeFallback')}
             </DialogDescription>
           </DialogHeader>
 
@@ -174,11 +182,14 @@ export function OrderSheet({
                 const hint =
                   group.max_selections === 1
                     ? min > 0
-                      ? 'Required · choose 1'
-                      : 'Choose 1'
+                      ? t('orderSheet.requiredChooseOne')
+                      : t('orderSheet.chooseOne')
                     : min > 0
-                      ? `Required · choose ${min}–${group.max_selections}`
-                      : `Choose up to ${group.max_selections}`
+                      ? t('orderSheet.requiredChooseRange', {
+                          min,
+                          max: group.max_selections,
+                        })
+                      : t('orderSheet.chooseUpTo', { max: group.max_selections })
 
                 return (
                   <div key={group.id} className="space-y-2">
@@ -204,7 +215,9 @@ export function OrderSheet({
                           >
                             <span>{option.name}</span>
                             <span className="text-muted-foreground">
-                              {priceDelta > 0 ? `+${formatPrice(priceDelta)}` : 'Included'}
+                              {priceDelta > 0
+                                ? `+${formatPrice(priceDelta)}`
+                                : t('orderSheet.included')}
                             </span>
                           </button>
                         )
@@ -215,13 +228,13 @@ export function OrderSheet({
               })}
 
             <div className="space-y-1">
-              <Label htmlFor="lineNotes">Special instructions</Label>
+              <Label htmlFor="lineNotes">{t('orderSheet.specialInstructions')}</Label>
               <Textarea
                 id="lineNotes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
-                placeholder="Allergies, preferences…"
+                placeholder={t('orderSheet.notesPlaceholder')}
               />
             </div>
 
@@ -230,7 +243,7 @@ export function OrderSheet({
 
           <DialogFooter className="flex-col gap-3 sm:flex-col">
             <div className="flex w-full items-center justify-between">
-              <span className="text-sm font-medium">Quantity</span>
+              <span className="text-sm font-medium">{t('orderSheet.quantity')}</span>
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
@@ -238,7 +251,7 @@ export function OrderSheet({
                   size="icon"
                   className="consumer-pressable h-9 w-9"
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  aria-label="Decrease quantity"
+                  aria-label={t('orderSheet.decreaseQuantity')}
                 >
                   <Minus className="h-4 w-4" />
                 </Button>
@@ -251,14 +264,14 @@ export function OrderSheet({
                   size="icon"
                   className="consumer-pressable h-9 w-9"
                   onClick={() => setQuantity((q) => q + 1)}
-                  aria-label="Increase quantity"
+                  aria-label={t('orderSheet.increaseQuantity')}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
             </div>
             <div className="flex w-full items-center justify-between text-sm">
-              <span>Item total</span>
+              <span>{t('orderSheet.itemTotal')}</span>
               <span className="text-lg font-semibold">{formatPrice(lineTotal)}</span>
             </div>
             <Button
@@ -268,9 +281,9 @@ export function OrderSheet({
               disabled={!canAdd}
             >
               {isItemUnavailable
-                ? 'Sold out'
+                ? t('orderSheet.soldOut')
                 : orderingClosed
-                  ? 'Ordering closed'
+                  ? t('orderSheet.orderingClosed')
                   : `${addButtonLabel} · ${formatPrice(lineTotal)}`}
             </Button>
           </DialogFooter>

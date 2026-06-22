@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   ResponsiveContainer,
   AreaChart,
@@ -57,6 +58,8 @@ export function ReservationAnalyticsPanel({
   onRangeChange,
   activeRange,
 }: ReservationAnalyticsPanelProps) {
+  const { t } = useTranslation('reservations')
+
   const chartData = useMemo<ChartPoint[]>(() => {
     if (!analytics?.slots?.length) return []
     return [...analytics.slots]
@@ -101,25 +104,30 @@ export function ReservationAnalyticsPanel({
 
   const rangeHint =
     activeRange === 'day'
-      ? 'Covers by hour (today)'
+      ? t('analytics.rangeDay')
       : activeRange === 'week'
-        ? 'Covers by day (last 7 days)'
-        : 'Covers by day (last 30 days)'
+        ? t('analytics.rangeWeek')
+        : t('analytics.rangeMonth')
 
   return (
     <Card>
       <CardHeader>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <CardTitle>Guest flow intelligence</CardTitle>
-            <CardDescription>
-              Spot peak hours, cancellations, and waitlist pressure at a glance.
-            </CardDescription>
+            <CardTitle>{t('analytics.title')}</CardTitle>
+            <CardDescription>{t('analytics.description')}</CardDescription>
           </div>
           {busiest && (
             <Badge variant="outline" className="text-xs shrink-0 w-fit">
-              Busiest {activeRange === 'day' ? 'hour' : 'day'}:{' '}
-              {formatBusiestLabel(busiest.hour_slot, activeRange)} ({busiest.total_covers} covers)
+              {activeRange === 'day'
+                ? t('analytics.busiestHour', {
+                    label: formatBusiestLabel(busiest.hour_slot, activeRange),
+                    covers: busiest.total_covers,
+                  })
+                : t('analytics.busiestDay', {
+                    label: formatBusiestLabel(busiest.hour_slot, activeRange),
+                    covers: busiest.total_covers,
+                  })}
             </Badge>
           )}
         </div>
@@ -130,34 +138,34 @@ export function ReservationAnalyticsPanel({
           onValueChange={(value) => onRangeChange?.(value as 'day' | 'week' | 'month')}
         >
           <TabsList>
-            <TabsTrigger value="day">Day</TabsTrigger>
-            <TabsTrigger value="week">Week</TabsTrigger>
-            <TabsTrigger value="month">Month</TabsTrigger>
+            <TabsTrigger value="day">{t('analytics.tabs.day')}</TabsTrigger>
+            <TabsTrigger value="week">{t('analytics.tabs.week')}</TabsTrigger>
+            <TabsTrigger value="month">{t('analytics.tabs.month')}</TabsTrigger>
           </TabsList>
         </Tabs>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="rounded-lg border bg-[var(--brand-ultra)] px-3 py-2">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              Total covers
+              {t('analytics.stats.totalCovers')}
             </p>
             <p className="text-lg font-bold text-[var(--text)]">{totals.covers}</p>
           </div>
           <div className="rounded-lg border px-3 py-2">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              Confirmed
+              {t('analytics.stats.confirmed')}
             </p>
             <p className="text-lg font-bold text-emerald-700">{totals.confirmed}</p>
           </div>
           <div className="rounded-lg border px-3 py-2">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              Cancelled
+              {t('analytics.stats.cancelled')}
             </p>
             <p className="text-lg font-bold text-rose-700">{totals.cancelled}</p>
           </div>
           <div className="rounded-lg border px-3 py-2">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              Waitlisted
+              {t('analytics.stats.waitlisted')}
             </p>
             <p className="text-lg font-bold text-amber-700">{totals.waitlisted}</p>
           </div>
@@ -168,7 +176,7 @@ export function ReservationAnalyticsPanel({
           <div className="h-52">
             {chartData.length === 0 ? (
               <div className="h-full flex items-center justify-center rounded-lg border border-dashed text-sm text-[var(--text-muted)]">
-                No reservations in this period yet.
+                {t('analytics.chart.emptyReservations')}
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -201,7 +209,7 @@ export function ReservationAnalyticsPanel({
                   <Area
                     type="monotone"
                     dataKey="total_covers"
-                    name="Covers"
+                    name={t('analytics.chart.covers')}
                     stroke="#7c3aed"
                     fill="url(#coversGradient)"
                     strokeWidth={2}
@@ -209,7 +217,7 @@ export function ReservationAnalyticsPanel({
                   <Area
                     type="monotone"
                     dataKey="cancelled"
-                    name="Cancelled"
+                    name={t('analytics.chart.cancelled')}
                     stroke="#e11d48"
                     fill="none"
                     strokeWidth={1.5}
@@ -222,11 +230,13 @@ export function ReservationAnalyticsPanel({
         </div>
 
         <div>
-          <p className="text-xs text-[var(--text-muted)] mb-2">Waitlist by status</p>
+          <p className="text-xs text-[var(--text-muted)] mb-2">
+            {t('analytics.chart.waitlistByStatus')}
+          </p>
           <div className="h-44">
             {waitlistData.length === 0 ? (
               <div className="h-full flex items-center justify-center rounded-lg border border-dashed text-sm text-[var(--text-muted)]">
-                No waitlist entries.
+                {t('analytics.chart.emptyWaitlist')}
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -235,7 +245,12 @@ export function ReservationAnalyticsPanel({
                   <XAxis dataKey="status" tick={{ fontSize: 11 }} />
                   <YAxis allowDecimals={false} width={32} tick={{ fontSize: 11 }} />
                   <Tooltip />
-                  <Bar dataKey="total" name="Guests" fill="#f59e0b" radius={[6, 6, 0, 0]} />
+                  <Bar
+                    dataKey="total"
+                    name={t('analytics.chart.guests')}
+                    fill="#f59e0b"
+                    radius={[6, 6, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             )}

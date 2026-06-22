@@ -73,5 +73,12 @@
       "description": "Your subscription payment is overdue. Pay within {{days}} day(s) to avoid account lock.",
       "cta": "Pay now"
     }
+  },
+  "toast": {
+    "paymentReceivedAccountRestored": "Payment received. Your account has been restored.",
+    "freePlanActive": "Your free plan is active.",
+    "freePlanActiveTesting": "You are now on the Free testing plan. Upgrade anytime for production use.",
+    "nowOnPlan": "You're now on {{planName}}",
+    "checkoutStartFailed": "We could not start checkout for that plan. Try again or contact support."
   }
 }

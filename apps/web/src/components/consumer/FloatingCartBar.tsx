@@ -1,6 +1,9 @@
 import { ShoppingCart } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { formatPrice } from '../../utils/format'
+import { ensureNamespace } from '../../i18n'
+import { useEffect } from 'react'
 
 type FloatingCartBarProps = {
   cartCount: number
@@ -17,6 +20,12 @@ export function FloatingCartBar({
   onCheckout,
   checkoutDisabled = false,
 }: FloatingCartBarProps) {
+  const { t } = useTranslation('consumer')
+
+  useEffect(() => {
+    void ensureNamespace('consumer')
+  }, [])
+
   if (!cartCount) return null
 
   return (
@@ -31,7 +40,7 @@ export function FloatingCartBar({
             {formatPrice(cartTotal)}
           </p>
           <p className="text-sm text-[var(--text-muted)]">
-            {cartCount} item{cartCount === 1 ? '' : 's'} · View cart
+            {t('cartBar.itemCount', { count: cartCount })}
           </p>
         </button>
         <Button
@@ -40,7 +49,7 @@ export function FloatingCartBar({
           className="consumer-pressable shrink-0 bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
         >
           <ShoppingCart className="mr-2 h-4 w-4" />
-          Checkout
+          {t('cartBar.checkout')}
         </Button>
       </div>
     </div>

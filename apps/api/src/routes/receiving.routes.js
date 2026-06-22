@@ -16,8 +16,13 @@ import { notifyLeaveReviewIfEligible } from '../services/reviews.service.js'
 import { notifyInvoiceIssued } from '../services/notification.service.js'
 import { createLotFromReceivingLine } from '../services/inventory-expiry.service.js'
 import { earnLoyaltyOnOrderReceive } from '../services/loyalty.service.js'
+import { resolveRequestLocale, localizedError } from '../i18n/index.js'
 
 const router = express.Router()
+
+function receivingErr(req, name, key, vars = {}) {
+  return localizedError(resolveRequestLocale(req), name, `errors.${key}`, vars, 'receiving')
+}
 
 const receivingQualityGate = requireFeature(
   'receiving_quality',
@@ -59,10 +64,7 @@ router.get(
         return res.status(403).json({
           ok: false,
           data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Restaurant not found',
-          },
+          error: receivingErr(req, 'FORBIDDEN', 'restaurantNotFound'),
           requestId: req.requestId,
         })
       }
@@ -144,8 +146,7 @@ router.get(
         ok: false,
         data: null,
         error: {
-          name: 'INTERNAL_ERROR',
-          message: 'Failed to get pending orders',
+          ...receivingErr(req, 'INTERNAL_ERROR', 'failedPendingOrders'),
           details: error.message,
         },
         requestId: req.requestId,
@@ -170,7 +171,7 @@ router.get(
         return res.status(403).json({
           ok: false,
           data: null,
-          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+          error: receivingErr(req, 'FORBIDDEN', 'supplierNotFound'),
           requestId: req.requestId,
         })
       }
@@ -214,8 +215,7 @@ router.get(
         ok: false,
         data: null,
         error: {
-          name: 'INTERNAL_ERROR',
-          message: 'Failed to get supplier receiving list',
+          ...receivingErr(req, 'INTERNAL_ERROR', 'failedSupplierPendingOrders'),
           details: error.message,
         },
         requestId: req.requestId,
@@ -239,10 +239,7 @@ router.post(
         return res.status(403).json({
           ok: false,
           data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Restaurant not found',
-          },
+          error: receivingErr(req, 'FORBIDDEN', 'restaurantNotFound'),
           requestId: req.requestId,
         })
       }
@@ -265,11 +262,7 @@ router.post(
         return res.status(400).json({
           ok: false,
           data: null,
-          error: {
-            name: 'VALIDATION_ERROR',
-            message:
-              'This order is not ready to receive yet. Wait until the supplier marks it as delivered.',
-          },
+          error: receivingErr(req, 'VALIDATION_ERROR', 'orderNotReady'),
           requestId: req.requestId,
         })
       }
@@ -284,10 +277,7 @@ router.post(
         return res.status(409).json({
           ok: false,
           data: null,
-          error: {
-            name: 'CONFLICT',
-            message: 'A receiving report already exists for this order',
-          },
+          error: receivingErr(req, 'CONFLICT', 'reportAlreadyExists'),
           requestId: req.requestId,
         })
       }
@@ -336,10 +326,10 @@ router.post(
           return res.status(400).json({
             ok: false,
             data: null,
-            error: {
-              name: 'VALIDATION_ERROR',
-              message: `Received quantity cannot exceed ordered quantity (${ordered} ${unit})`,
-            },
+            error: receivingErr(req, 'VALIDATION_ERROR', 'receivedExceedsOrdered', {
+              ordered,
+              unit,
+            }),
             requestId: req.requestId,
           })
         }
@@ -698,8 +688,7 @@ router.post(
         ok: false,
         data: null,
         error: {
-          name: 'INTERNAL_ERROR',
-          message: 'Failed to create receiving report',
+          ...receivingErr(req, 'INTERNAL_ERROR', 'failedCreateReport'),
           details: error.message,
         },
         requestId: req.requestId,
@@ -721,10 +710,7 @@ router.get(
         return res.status(403).json({
           ok: false,
           data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Restaurant not found',
-          },
+          error: receivingErr(req, 'FORBIDDEN', 'restaurantNotFound'),
           requestId: req.requestId,
         })
       }
@@ -765,8 +751,7 @@ router.get(
         ok: false,
         data: null,
         error: {
-          name: 'INTERNAL_ERROR',
-          message: 'Failed to get receiving history',
+          ...receivingErr(req, 'INTERNAL_ERROR', 'failedReceivingHistory'),
           details: error.message,
         },
         requestId: req.requestId,

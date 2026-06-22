@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Label } from '../ui/label'
 import { Input } from '../ui/input'
@@ -11,6 +12,7 @@ import {
 } from '../../services/reservationsApi'
 
 export function PublicBookingSettingsCard() {
+  const { t } = useTranslation('reservations')
   const { data, isLoading } = useGetPublicBookingSettingsQuery()
   const [updateSettings, { isLoading: saving }] = useUpdatePublicBookingSettingsMutation()
 
@@ -29,10 +31,10 @@ export function PublicBookingSettingsCard() {
   const handleSave = async () => {
     try {
       await updateSettings({ openTime, closeTime, durationMinutes, slotIntervalMinutes }).unwrap()
-      toast.success('Public booking hours updated')
+      toast.success(t('publicBooking.toasts.saved'))
     } catch (error: unknown) {
       const err = error as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Could not save booking hours')
+      toast.error(err?.data?.error?.message || t('publicBooking.toasts.saveFailed'))
     }
   }
 
@@ -41,30 +43,30 @@ export function PublicBookingSettingsCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Clock className="h-4 w-4 text-[var(--brand-mid)]" />
-          Public online booking
+          {t('publicBooking.title')}
         </CardTitle>
-        <CardDescription>
-          Guests use your public reservation link. Capacity comes from active tables in the floor
-          plan; hours control which time slots appear.
-        </CardDescription>
+        <CardDescription>{t('publicBooking.description')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
         {isLoading ? (
           <div className="flex items-center gap-2 text-[var(--text-muted)]">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading booking settings…
+            {t('publicBooking.loading')}
           </div>
         ) : (
           <>
             <div className="rounded-xl border border-[var(--app-border)] bg-[var(--brand-ultra)] p-3 space-y-2">
               <p className="flex items-center gap-2 font-medium text-[var(--text)]">
                 <LayoutGrid className="h-4 w-4" />
-                Table capacity
+                {t('publicBooking.tableCapacity')}
               </p>
               <p className="text-[var(--text-muted)]">
                 {data?.tableCount
-                  ? `${data.tableCount} active table(s), ${data.totalCapacity} total seats — shown as “seats left” per time after guests book.`
-                  : 'No active tables yet. Add tables in the floor plan below or guests will see no available times.'}
+                  ? t('publicBooking.capacitySummary', {
+                      count: data.tableCount,
+                      seats: data.totalCapacity,
+                    })
+                  : t('publicBooking.noActiveTables')}
               </p>
             </div>
 
@@ -72,7 +74,7 @@ export function PublicBookingSettingsCard() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <Label htmlFor="booking-duration">Reservation length (minutes)</Label>
+                <Label htmlFor="booking-duration">{t('publicBooking.durationLabel')}</Label>
                 <Input
                   id="booking-duration"
                   type="number"
@@ -84,7 +86,7 @@ export function PublicBookingSettingsCard() {
                 />
               </div>
               <div>
-                <Label htmlFor="booking-interval">Slot interval (minutes)</Label>
+                <Label htmlFor="booking-interval">{t('publicBooking.intervalLabel')}</Label>
                 <Input
                   id="booking-interval"
                   type="number"
@@ -96,7 +98,7 @@ export function PublicBookingSettingsCard() {
                 />
               </div>
               <div>
-                <Label htmlFor="booking-open">First slot</Label>
+                <Label htmlFor="booking-open">{t('publicBooking.openLabel')}</Label>
                 <Input
                   id="booking-open"
                   type="time"
@@ -105,7 +107,7 @@ export function PublicBookingSettingsCard() {
                 />
               </div>
               <div>
-                <Label htmlFor="booking-close">Last seating (close)</Label>
+                <Label htmlFor="booking-close">{t('publicBooking.closeLabel')}</Label>
                 <Input
                   id="booking-close"
                   type="time"
@@ -116,7 +118,7 @@ export function PublicBookingSettingsCard() {
             </div>
 
             <Button type="button" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save public booking hours'}
+              {saving ? t('common.saving') : t('publicBooking.save')}
             </Button>
           </>
         )}

@@ -7,6 +7,8 @@ import { refetchAppSession, hasStaleRegistrationState } from '../lib/refetchAppS
 import { needsLegalReacceptance } from '../lib/legalReacceptanceGate'
 import { getRegisterCompletePath } from '../lib/referralToken'
 import { applyAdminPreferences, clearAdminPreferences } from '../lib/adminPreferences'
+import { changeAppLanguage, readStoredLocale } from '../i18n'
+import { isSupportedLocale } from '../i18n/config'
 import type { ReactNode } from 'react'
 
 interface AuthGuardProps {
@@ -67,6 +69,14 @@ export function AuthGuard({ children }: AuthGuardProps) {
       clearAdminPreferences()
     }
   }, [data])
+
+  useEffect(() => {
+    const preferred = data?.preferredLocale
+    if (!preferred || !isSupportedLocale(preferred)) return
+    if (readStoredLocale() !== preferred) {
+      void changeAppLanguage(preferred, { skipServerSync: true })
+    }
+  }, [data?.preferredLocale])
 
   useEffect(() => {
     if (isLoading) {

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight, Edit, Loader2, Lock, Plus, Trash2, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
@@ -49,6 +50,7 @@ export function TeamRolesPanel({
   onRemoveMember,
   renderInviteForm,
 }) {
+  const { t } = useTranslation('settings')
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const advancedRolesEnabled = isEntitlementFeatureEnabled(
     entitlementsData?.entitlements,
@@ -111,11 +113,11 @@ export function TeamRolesPanel({
 
   const saveRole = async () => {
     if (!roleForm.name.trim()) {
-      toast.error('Role name is required')
+      toast.error(t('toast.roleNameRequired'))
       return
     }
     if (roleDialog?.mode !== 'edit' && roleForm.permissions.length === 0) {
-      toast.error('Select at least one permission')
+      toast.error(t('toast.selectAtLeastOnePermission'))
       return
     }
     try {
@@ -125,7 +127,7 @@ export function TeamRolesPanel({
           description: roleForm.description,
           permissions: roleForm.permissions,
         }).unwrap()
-        toast.success('Role created')
+        toast.success(t('toast.roleCreated'))
       } else if (roleDialog?.role) {
         await updateRole({
           id: roleDialog.role.id,
@@ -133,12 +135,12 @@ export function TeamRolesPanel({
           description: roleForm.description,
           permissions: roleDialog.role.is_system ? undefined : roleForm.permissions,
         }).unwrap()
-        toast.success('Role updated')
+        toast.success(t('toast.roleUpdated'))
       }
       setRoleDialog(null)
       refetchRoles()
     } catch (error) {
-      toast.error(error?.data?.message || 'Failed to save role')
+      toast.error(error?.data?.message || t('toast.roleSaveFailed'))
     }
   }
 
@@ -146,7 +148,7 @@ export function TeamRolesPanel({
     if (!deleteConfirm) return
     try {
       await deleteRole(deleteConfirm.id).unwrap()
-      toast.success('Role deleted')
+      toast.success(t('toast.roleDeleted'))
       setDeleteConfirm(null)
       refetchRoles()
     } catch (error) {
@@ -154,7 +156,7 @@ export function TeamRolesPanel({
       if (users?.length) {
         setDeleteConfirm({ ...deleteConfirm, blockedUsers: users })
       } else {
-        toast.error(error?.data?.message || 'Failed to delete role')
+        toast.error(error?.data?.message || t('toast.roleDeleteFailed'))
       }
     }
   }
@@ -179,12 +181,12 @@ export function TeamRolesPanel({
         driver_id: driver_id || undefined,
         create_driver_profile,
       }).unwrap()
-      toast.success('Role updated')
+      toast.success(t('toast.roleUpdated'))
       refetchUsers()
       setOwnerConfirm(null)
       setDriverAssign(null)
     } catch (error) {
-      toast.error(error?.data?.message || 'Failed to assign role')
+      toast.error(error?.data?.message || t('toast.roleAssignFailed'))
     }
   }
 

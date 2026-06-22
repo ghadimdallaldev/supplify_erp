@@ -1,16 +1,24 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { useGetNewDealsBannerQuery, useDismissDealBannerMutation } from '../../services/api'
 import { InfoBanner } from '../ui/info-banner'
+import { ensureNamespace } from '../../i18n'
 import { Tag, X } from 'lucide-react'
 
-function formatDiscount(deal: { discountType?: string; discountValue?: number }) {
+function formatDiscount(
+  deal: { discountType?: string; discountValue?: number },
+  t: (key: string, options?: Record<string, unknown>) => string
+) {
   if (!deal.discountValue) return null
-  if (deal.discountType?.includes('percentage')) return `${deal.discountValue}% off`
-  return `$${deal.discountValue} off`
+  if (deal.discountType?.includes('percentage')) {
+    return t('banner.percentageOff', { value: deal.discountValue })
+  }
+  return t('banner.fixedOff', { value: deal.discountValue })
 }
 
 export function NewDealsBanner() {
+  const { t } = useTranslation('deals')
   const { data } = useGetNewDealsBannerQuery(undefined, {
     pollingInterval: 0,
     refetchOnMountOrArgChange: false,
@@ -20,9 +28,13 @@ export function NewDealsBanner() {
   const banner = useMemo(() => data?.summary, [data])
   const primaryDeal = data?.deals?.[0]
 
+  useEffect(() => {
+    void ensureNamespace('deals')
+  }, [])
+
   if (!banner || !primaryDeal) return null
 
-  const discountLabel = formatDiscount(primaryDeal)
+  const discountLabel = formatDiscount(primaryDeal, t)
 
   const handleDismiss = () => {
     void dismissBanner(primaryDeal.id)
@@ -32,7 +44,8 @@ export function NewDealsBanner() {
     banner.count > 1 ? (
       <>
         {banner.supplierNames?.join(', ')}
-        {banner.count > 3 ? ` and ${banner.count - 3} more` : ''} — tap to browse deals.
+        {banner.count > 3 ? t('banner.andMore', { count: banner.count - 3 }) : ''}
+        {t('banner.tapToBrowse')}
       </>
     ) : (
       <>
@@ -54,13 +67,13 @@ export function NewDealsBanner() {
             to={`/app/deals?highlight=${primaryDeal.id}`}
             className="font-medium text-[var(--brand)] underline hover:no-underline text-sm"
           >
-            View deal{banner.count > 1 ? 's' : ''}
+            {t('banner.viewDeal', { count: banner.count })}
           </Link>
           <button
             type="button"
             onClick={handleDismiss}
             className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--app-border)]"
-            aria-label="Dismiss deal banner"
+            aria-label={t('banner.dismiss')}
           >
             <X className="h-4 w-4" />
           </button>

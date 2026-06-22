@@ -3,6 +3,7 @@ import { logger } from '../../lib/logger.js'
 import { sendMail, isEmailConfigured as isTransportConfigured } from '../mailer.service.js'
 import { query } from '../../lib/db.js'
 import { claimEmailDelivery, finalizeEmailDelivery } from './email-delivery-log.js'
+import { resolveLocale } from '../../i18n/index.js'
 import { renderTemplate } from './templates/registry.js'
 
 let bootLogged = false
@@ -201,6 +202,7 @@ export async function sendTemplateEmail({
   template,
   subject,
   data = {},
+  locale,
   cc,
   bcc,
   attachments,
@@ -212,7 +214,12 @@ export async function sendTemplateEmail({
   skipDedup = false,
   throwOnError = false,
 }) {
-  const rendered = renderTemplate(template, { ...data, subject })
+  const resolvedLocale = resolveLocale(locale || data.locale || data.preferred_locale || data.user)
+  const rendered = renderTemplate(
+    template,
+    { ...data, subject, locale: resolvedLocale },
+    resolvedLocale
+  )
   return sendEmail({
     to,
     subject: subject || rendered.subject,
@@ -231,6 +238,7 @@ export async function sendTemplateEmail({
     retryPayload: {
       template,
       data,
+      locale: resolvedLocale,
       to,
       subject: subject || rendered.subject,
       tenantId,

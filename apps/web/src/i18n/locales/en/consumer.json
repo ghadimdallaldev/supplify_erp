@@ -37,6 +37,32 @@
     "addAria": "Add {{name}}",
     "preorder": "Preorder"
   },
+  "cartBar": {
+    "itemCount_one": "{{count}} item · View cart",
+    "itemCount_other": "{{count}} items · View cart",
+    "checkout": "Checkout"
+  },
+  "orderSheet": {
+    "customizeFallback": "Customize your order",
+    "requiredChooseOne": "Required · choose 1",
+    "chooseOne": "Choose 1",
+    "requiredChooseRange": "Required · choose {{min}}–{{max}}",
+    "chooseUpTo": "Choose up to {{max}}",
+    "included": "Included",
+    "specialInstructions": "Special instructions",
+    "notesPlaceholder": "Allergies, preferences…",
+    "quantity": "Quantity",
+    "decreaseQuantity": "Decrease quantity",
+    "increaseQuantity": "Increase quantity",
+    "itemTotal": "Item total",
+    "soldOut": "Sold out",
+    "orderingClosed": "Ordering closed",
+    "preorder": "Preorder",
+    "addToCart": "Add to cart",
+    "chooseAtMost": "Choose at most {{max}} for {{group}}",
+    "chooseOptionFor": "Please choose an option for {{group}}",
+    "chooseAtLeast": "Choose at least {{min}} for {{group}}"
+  },
   "common": {
     "back": "Back",
     "backToStore": "Back to store",
@@ -335,6 +361,20 @@
     "noItemsYet": "No items yet",
     "emptyTitle": "No menu yet",
     "emptyDescription": "Create a category above, import from CSV, or add items one at a time."
+  },
+  "menuBulkImport": {
+    "toast": {
+      "pasteOrUploadFirst": "Paste CSV text or upload a file first",
+      "rowsNeedFixes": "{{count}} row(s) need fixes before import",
+      "rowsReady": "{{count}} row(s) ready to import",
+      "previewFailed": "Unable to preview CSV",
+      "importSuccess": "Imported {{created}} item(s){{updated}}{{categories}}",
+      "importSuccessUpdated": ", updated {{count}}",
+      "importSuccessCategories_one": ", {{count}} new category",
+      "importSuccessCategories_other": ", {{count}} new categories",
+      "rowsFailed": "{{count}} row(s) failed",
+      "importFailed": "Import failed"
+    }
   },
   "loyalty": {
     "title": "Diner rewards",

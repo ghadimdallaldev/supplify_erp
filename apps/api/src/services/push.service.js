@@ -81,6 +81,41 @@ export async function removePushSubscription(userId, endpoint) {
   return rowCount > 0
 }
 
+const EXPO_ENDPOINT_PREFIX = 'expo:'
+
+export function expoPushEndpoint(token) {
+  return `${EXPO_ENDPOINT_PREFIX}${token}`
+}
+
+export function isExpoPushSubscription(subscriptionRow) {
+  return subscriptionRow?.endpoint?.startsWith(EXPO_ENDPOINT_PREFIX)
+}
+
+export async function saveExpoPushDevice(userId, { token, platform }) {
+  if (!token || !['ios', 'android'].includes(platform)) {
+    throw new Error('Invalid expo push device payload')
+  }
+  const { rows } = await query(
+    `
+    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent)
+    VALUES ($1, $2, $3, $4, $5)
+    ON CONFLICT (user_id, endpoint)
+    DO UPDATE SET p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, user_agent = EXCLUDED.user_agent
+    RETURNING *
+    `,
+    [userId, expoPushEndpoint(token), 'expo', platform, null]
+  )
+  return rows[0]
+}
+
+export async function removeExpoPushDevice(userId, token) {
+  const { rowCount } = await query(
+    `DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = $2`,
+    [userId, expoPushEndpoint(token)]
+  )
+  return rowCount > 0
+}
+
 export async function deleteStaleSubscription(subscriptionId) {
   await query(`DELETE FROM push_subscriptions WHERE id = $1`, [subscriptionId])
 }
@@ -139,6 +174,7 @@ export function sendWebPushToUser({ userId, title, message, referenceId, referen
 
     let sent = 0
     for (const sub of subscriptions) {
+      if (isExpoPushSubscription(sub)) continue
       const result = await sendPushToSubscription(sub, payloadString)
       if (result.sent) sent += 1
     }

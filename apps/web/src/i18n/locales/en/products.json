@@ -232,6 +232,21 @@
   "shared": {
     "exampleDownloaded": "Example file downloaded!"
   },
+  "substitutes": {
+    "title": "Substitute products",
+    "description": "Pre-approved alternates when this item is unavailable on an order.",
+    "loading": "Loading substitutes…",
+    "loadError": "Could not load substitutes.",
+    "retry": "Retry",
+    "empty": "No substitutes configured yet.",
+    "remove": "Remove",
+    "selectPlaceholder": "Choose substitute product",
+    "addButton": "Add substitute",
+    "toast": {
+      "added": "Substitute added",
+      "addFailed": "Failed to add substitute"
+    }
+  },
   "toast": {
     "addedToCart": "Added to cart",
     "removedFromFavorites": "Removed from favorites",
@@ -260,6 +275,20 @@
     "imageImportFailed": "Image import failed",
     "stockAdded": "Stock added successfully",
     "stockRemoved": "Stock removed successfully",
-    "inventoryUpdateFailed": "Failed to update inventory"
+    "inventoryUpdateFailed": "Failed to update inventory",
+    "selectImageFile": "Please select an image file",
+    "logoUploadFailed": "Failed to upload logo",
+    "imageUploadedSuccess": "Image uploaded successfully!",
+    "imageRemovedSuccess": "Image removed successfully!",
+    "catalogImportFinishedWithFailures": "Import finished with {{failed}} failed row(s). Valid rows were saved.",
+    "catalogImportComplete": "Import complete: {{created}} created, {{updated}} updated",
+    "catalogBulkUploadFailed": "Bulk upload failed",
+    "catalogNoValidRows": "No valid rows to import — fix errors below",
+    "catalogPreviewReady": "Preview: {{valid}} valid, {{errorCount}} with issues ({{totalRows}} rows)",
+    "catalogPreviewFailed": "Failed to preview file",
+    "catalogNoErrorsToExport": "No errors to export",
+    "catalogErrorReportDownloadFailed": "Could not download error report",
+    "catalogFixValidationErrors": "Fix validation errors before importing",
+    "catalogLargeImportQueued": "Large import queued — processing in the background"
   }
 }

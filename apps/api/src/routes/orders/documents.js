@@ -55,6 +55,7 @@ import { ordersRouterMutationGuard } from '../../lib/route-permissions.js'
 import { releaseOrderFromPlannedRoutes } from '../../services/delivery-routes.service.js'
 
 import { buildPackingSlipPdf } from './orders.helpers.js'
+import { resolveRequestLocale } from '../../i18n/index.js'
 
 const router = express.Router()
 
@@ -292,7 +293,7 @@ router.get(
         totalAmount: order.total_amount,
         currency: order.currency,
       }
-      const buf = await buildPackingSlipPdf(packingSlip)
+      const buf = await buildPackingSlipPdf(packingSlip, resolveRequestLocale(req))
       res.setHeader('Content-Type', 'application/pdf')
       res.setHeader(
         'Content-Disposition',

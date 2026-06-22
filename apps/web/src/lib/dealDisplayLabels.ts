@@ -3,64 +3,81 @@
  * Internal API/DB keys remain unchanged (promotions, deal_promotions, coupon_code, etc.).
  */
 
-export const DEAL_TYPE_LABELS: Record<string, string> = {
-  percentage_discount: 'Percentage off',
-  percentage_off: 'Percentage off',
-  fixed_discount: 'Fixed amount off',
-  fixed_off: 'Fixed amount off',
-  buy_x_get_y: 'Buy X Get Y',
-  bogo: 'Buy X Get Y',
-  bundle: 'Bundle',
-  free_shipping: 'Free shipping',
-  featured_listing: 'Visibility only',
+import i18n from 'i18next'
+
+const NS = 'deals'
+
+function ft(key: string, options?: Record<string, unknown>): string {
+  return i18n.t(key, { ns: NS, ...options })
 }
 
-export const DEAL_TYPE_HELPER_TEXT: Record<string, string> = {
-  percentage_discount: 'Give restaurants a percentage off eligible products.',
-  percentage_off: 'Give restaurants a percentage off eligible products.',
-  fixed_discount: 'Give restaurants a fixed amount off eligible orders.',
-  fixed_off: 'Give restaurants a fixed amount off eligible orders.',
-  buy_x_get_y: 'Reward restaurants for buying a quantity of selected products.',
-  bogo: 'Reward restaurants for buying a quantity of selected products.',
-  bundle: 'Bundle selected products at a special price.',
-  free_shipping: 'Remove shipping cost for eligible orders.',
-  featured_listing: 'Visibility-only deal. This does not discount the order.',
+const DEAL_TYPE_KEYS: Record<string, string> = {
+  percentage_discount: 'labels.dealTypes.percentage_discount',
+  percentage_off: 'labels.dealTypes.percentage_off',
+  fixed_discount: 'labels.dealTypes.fixed_discount',
+  fixed_off: 'labels.dealTypes.fixed_off',
+  buy_x_get_y: 'labels.dealTypes.buy_x_get_y',
+  bogo: 'labels.dealTypes.bogo',
+  bundle: 'labels.dealTypes.bundle',
+  free_shipping: 'labels.dealTypes.free_shipping',
+  featured_listing: 'labels.dealTypes.featured_listing',
 }
 
-export const SUPPLIER_CTA_LABELS: Record<string, string> = {
-  order_now: 'Order now',
-  use_coupon: 'Use coupon',
-  message_supplier: 'Message supplier',
-  view_products: 'View products',
+const DEAL_TYPE_HELPER_KEYS: Record<string, string> = {
+  percentage_discount: 'labels.dealTypeHelpers.percentage_discount',
+  percentage_off: 'labels.dealTypeHelpers.percentage_off',
+  fixed_discount: 'labels.dealTypeHelpers.fixed_discount',
+  fixed_off: 'labels.dealTypeHelpers.fixed_off',
+  buy_x_get_y: 'labels.dealTypeHelpers.buy_x_get_y',
+  bogo: 'labels.dealTypeHelpers.bogo',
+  bundle: 'labels.dealTypeHelpers.bundle',
+  free_shipping: 'labels.dealTypeHelpers.free_shipping',
+  featured_listing: 'labels.dealTypeHelpers.featured_listing',
 }
 
-export const RESTAURANT_CTA_LABELS: Record<string, string> = {
-  order_now: 'Order with deal',
-  use_coupon: 'Use coupon',
-  message_supplier: 'Message supplier',
-  view_products: 'View products',
+const SUPPLIER_CTA_KEYS: Record<string, string> = {
+  order_now: 'labels.cta.supplier.order_now',
+  use_coupon: 'labels.cta.supplier.use_coupon',
+  message_supplier: 'labels.cta.supplier.message_supplier',
+  view_products: 'labels.cta.supplier.view_products',
 }
 
-export const CTA_TYPE_HELPER_TEXT: Record<string, string> = {
-  order_now: 'Send restaurants directly to the order flow with this deal context.',
-  use_coupon: 'Reveal a coupon code and apply it during checkout.',
-  message_supplier: 'Start a chat with a prefilled message about this deal.',
-  view_products: 'Show restaurants the eligible products for this deal.',
+const RESTAURANT_CTA_KEYS: Record<string, string> = {
+  order_now: 'labels.cta.restaurant.order_now',
+  use_coupon: 'labels.cta.restaurant.use_coupon',
+  message_supplier: 'labels.cta.restaurant.message_supplier',
+  view_products: 'labels.cta.restaurant.view_products',
 }
 
-export const COUPON_FIELD_HELPER =
-  'Coupon codes are attached to this deal. They are not standalone vouchers.'
+const CTA_HELPER_KEYS: Record<string, string> = {
+  order_now: 'labels.cta.helpers.order_now',
+  use_coupon: 'labels.cta.helpers.use_coupon',
+  message_supplier: 'labels.cta.helpers.message_supplier',
+  view_products: 'labels.cta.helpers.view_products',
+}
 
-/** When the discount/coupon itself is valid — separate from boost feed visibility. */
-export const DEAL_SCHEDULE_SECTION_HELPER =
-  'Controls when restaurants can redeem this discount or coupon. This is separate from your boost package, which only controls how long the deal is promoted in restaurant feeds.'
+const DEAL_STATUS_KEYS: Record<string, string> = {
+  active: 'labels.dealStatus.active',
+  scheduled: 'labels.dealStatus.scheduled',
+  expired: 'labels.dealStatus.expired',
+  paused: 'labels.dealStatus.paused',
+  draft: 'labels.dealStatus.draft',
+  pending_approval: 'labels.dealStatus.pending_approval',
+  pending_admin_approval: 'labels.dealStatus.pending_admin_approval',
+  pending_review: 'labels.dealStatus.pending_review',
+  rejected: 'labels.dealStatus.rejected',
+  approved_pending_payment: 'labels.dealStatus.approved_pending_payment',
+  cancelled: 'labels.dealStatus.cancelled',
+}
 
-export const DEAL_SCHEDULE_ENDS_HELPER =
-  'Leave blank to keep the offer open for the full boost period (or until you pause it). Set an end date only if you want the discount to stop before or after boosted visibility ends.'
-
-export const COUPON_LINKED_HELPER = 'This code is linked to this supplier deal.'
-
-export const COUPON_COPIED_TOAST = "Coupon copied. We'll apply it at checkout when eligible."
+const BOOST_STATUS_KEYS: Record<string, string> = {
+  active: 'labels.boostStatus.active',
+  expired: 'labels.boostStatus.expired',
+  scheduled: 'labels.boostStatus.scheduled',
+  none: 'labels.boostStatus.none',
+  sponsored: 'labels.boostStatus.sponsored',
+  boosted: 'labels.boostStatus.boosted',
+}
 
 export const SUPPLIER_DEAL_TYPES = [
   'percentage_discount',
@@ -70,62 +87,98 @@ export const SUPPLIER_DEAL_TYPES = [
 ] as const
 
 export const SUPPLIER_CTA_TYPES = [
-  { value: 'order_now', label: SUPPLIER_CTA_LABELS.order_now },
-  { value: 'use_coupon', label: SUPPLIER_CTA_LABELS.use_coupon },
-  { value: 'message_supplier', label: SUPPLIER_CTA_LABELS.message_supplier },
-  { value: 'view_products', label: SUPPLIER_CTA_LABELS.view_products },
+  {
+    value: 'order_now',
+    get label() {
+      return ft(SUPPLIER_CTA_KEYS.order_now)
+    },
+  },
+  {
+    value: 'use_coupon',
+    get label() {
+      return ft(SUPPLIER_CTA_KEYS.use_coupon)
+    },
+  },
+  {
+    value: 'message_supplier',
+    get label() {
+      return ft(SUPPLIER_CTA_KEYS.message_supplier)
+    },
+  },
+  {
+    value: 'view_products',
+    get label() {
+      return ft(SUPPLIER_CTA_KEYS.view_products)
+    },
+  },
 ] as const
 
-const DEAL_STATUS_LABELS: Record<string, string> = {
-  active: 'Active',
-  scheduled: 'Scheduled',
-  expired: 'Expired',
-  paused: 'Paused',
-  draft: 'Draft',
-  pending_approval: 'Pending approval',
-  pending_admin_approval: 'Pending approval',
-  pending_review: 'Pending review',
-  rejected: 'Rejected',
-  approved_pending_payment: 'Awaiting boost payment',
-  cancelled: 'Cancelled',
+export function getCouponFieldHelper(): string {
+  return ft('labels.coupon.fieldHelper')
 }
 
-const BOOST_STATUS_LABELS: Record<string, string> = {
-  active: 'Active boost',
-  expired: 'Expired boost',
-  scheduled: 'Scheduled boost',
-  none: 'No boost',
-  sponsored: 'Sponsored',
-  boosted: 'Boosted',
+export function getDealScheduleSectionHelper(): string {
+  return ft('labels.schedule.sectionHelper')
+}
+
+export function getDealScheduleEndsHelper(): string {
+  return ft('labels.schedule.endsHelper')
+}
+
+export function getCouponLinkedHelper(): string {
+  return ft('labels.coupon.linkedHelper')
+}
+
+export function getCouponCopiedToast(): string {
+  return ft('labels.coupon.copiedToast')
 }
 
 export const SUPPLIER_EMPTY_STATE = {
-  title: 'No deals yet',
-  description:
-    'Create your first supplier deal to offer discounts, coupons, or visibility-based offers to restaurants.',
-  cta: 'Create deal',
+  get title() {
+    return ft('empty.supplier.title')
+  },
+  get description() {
+    return ft('empty.supplier.description')
+  },
+  get cta() {
+    return ft('empty.supplier.cta')
+  },
 } as const
 
 export const RESTAURANT_EMPTY_STATE = {
-  title: 'No active deals right now',
-  description: "When your suppliers publish offers, they'll appear here.",
+  get title() {
+    return ft('empty.restaurant.title')
+  },
+  get description() {
+    return ft('empty.restaurant.description')
+  },
 } as const
 
 export const ADMIN_EMPTY_STATE = {
-  title: 'No deals found',
-  description: 'Supplier-created deals and sponsored boosts will appear here.',
+  get title() {
+    return ft('empty.admin.title')
+  },
+  get description() {
+    return ft('empty.admin.description')
+  },
 } as const
 
 export const BOOST_EMPTY_STATE = {
-  title: 'No boosted deals yet',
-  description:
-    'Boosts are optional paid campaigns that increase deal visibility in the restaurant deals feed.',
+  get title() {
+    return ft('empty.boost.title')
+  },
+  get description() {
+    return ft('empty.boost.description')
+  },
 } as const
 
 export const ADMIN_BOOST_PACKAGES_EMPTY = {
-  title: 'No boost packages configured',
-  description:
-    'Boost packages define paid sponsored placement pricing suppliers see when boosting deals.',
+  get title() {
+    return ft('empty.adminBoostPackages.title')
+  },
+  get description() {
+    return ft('empty.adminBoostPackages.description')
+  },
 } as const
 
 function titleCaseFromKey(key: string): string {
@@ -134,20 +187,26 @@ function titleCaseFromKey(key: string): string {
 
 export function formatDealTypeLabel(type: unknown): string {
   const key = String(type || '')
-  if (!key) return '—'
-  return DEAL_TYPE_LABELS[key] || titleCaseFromKey(key)
+  if (!key) return ft('labels.emDash')
+  const i18nKey = DEAL_TYPE_KEYS[key]
+  if (i18nKey) return ft(i18nKey)
+  return titleCaseFromKey(key)
 }
 
 export function formatDealStatusLabel(status: unknown): string {
   const key = String(status || '')
-  if (!key) return '—'
-  return DEAL_STATUS_LABELS[key] || titleCaseFromKey(key)
+  if (!key) return ft('labels.emDash')
+  const i18nKey = DEAL_STATUS_KEYS[key]
+  if (i18nKey) return ft(i18nKey)
+  return titleCaseFromKey(key)
 }
 
 export function formatBoostStatusLabel(status: unknown): string {
   const key = String(status || '')
-  if (!key) return '—'
-  return BOOST_STATUS_LABELS[key] || titleCaseFromKey(key)
+  if (!key) return ft('labels.emDash')
+  const i18nKey = BOOST_STATUS_KEYS[key]
+  if (i18nKey) return ft(i18nKey)
+  return titleCaseFromKey(key)
 }
 
 export function getCtaLabel(
@@ -155,16 +214,19 @@ export function getCtaLabel(
   audience: 'supplier' | 'restaurant' = 'restaurant'
 ): string {
   const key = String(cta || 'order_now')
-  const map = audience === 'supplier' ? SUPPLIER_CTA_LABELS : RESTAURANT_CTA_LABELS
-  return map[key] || SUPPLIER_CTA_LABELS.order_now
+  const map = audience === 'supplier' ? SUPPLIER_CTA_KEYS : RESTAURANT_CTA_KEYS
+  const i18nKey = map[key]
+  return i18nKey ? ft(i18nKey) : ft(SUPPLIER_CTA_KEYS.order_now)
 }
 
 export function getDealTypeHelperText(type: unknown): string | undefined {
   const key = String(type || '')
-  return DEAL_TYPE_HELPER_TEXT[key]
+  const i18nKey = DEAL_TYPE_HELPER_KEYS[key]
+  return i18nKey ? ft(i18nKey) : undefined
 }
 
 export function getCtaHelperText(cta: unknown): string | undefined {
   const key = String(cta || '')
-  return CTA_TYPE_HELPER_TEXT[key]
+  const i18nKey = CTA_HELPER_KEYS[key]
+  return i18nKey ? ft(i18nKey) : undefined
 }

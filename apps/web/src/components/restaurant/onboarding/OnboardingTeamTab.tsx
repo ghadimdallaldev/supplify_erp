@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../../ui/button'
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
@@ -11,8 +12,10 @@ import { TeamRolesPanel } from '../../TeamRolesPanel'
 import { RestaurantMemberInviteModal } from '../../org/RestaurantMemberInviteModal'
 import { RestaurantPendingInvitations } from '../../org/RestaurantPendingInvitations'
 import { OnboardingTabLoading } from './onboardingShared'
+import { ensureNamespace } from '../../../i18n'
 
 export function OnboardingTeamTab() {
+  const { t } = useTranslation('onboarding')
   const { user } = useAppSelector((state) => state.auth)
   const [showAddMemberDialog, setShowAddMemberDialog] = useState(false)
   const {
@@ -23,13 +26,17 @@ export function OnboardingTeamTab() {
   const [deleteTeamMember] = useDeleteRestaurantTeamMemberMutation()
   const teamMembers = teamData?.team ?? []
 
+  useEffect(() => {
+    void ensureNamespace('onboarding')
+  }, [])
+
   const handleRemoveMember = async (memberId: string) => {
     try {
       await deleteTeamMember(memberId).unwrap()
       refetchTeam()
-      toast.success('Member removed')
+      toast.success(t('restaurantTeam.toast.memberRemoved'))
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to remove member')
+      toast.error(error?.data?.error?.message || t('restaurantTeam.toast.removeFailed'))
     }
   }
 

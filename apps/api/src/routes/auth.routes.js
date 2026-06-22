@@ -448,6 +448,7 @@ router.get('/me', requireAuth, async (req, res) => {
         adminPermissions,
         legalStatus,
         adminPreferences,
+        preferredLocale: user.preferred_locale || 'en',
         ...additionalData,
       },
       error: null,
@@ -751,6 +752,57 @@ router.get('/admin-preferences', requireAuth, async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get admin preferences' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+const localePatchSchema = z.object({
+  locale: z.enum(['en', 'ar']),
+})
+
+router.patch('/me/locale', requireAuth, async (req, res) => {
+  try {
+    const { locale } = localePatchSchema.parse(req.body)
+    const { rows } = await query(
+      `UPDATE app_user
+       SET preferred_locale = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING preferred_locale`,
+      [locale, req.userData.id]
+    )
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'User not found' },
+        requestId: req.requestId,
+      })
+    }
+
+    req.userData.preferred_locale = rows[0].preferred_locale
+
+    res.json({
+      ok: true,
+      data: { preferredLocale: rows[0].preferred_locale },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.errors[0]?.message || 'Invalid input' },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Update locale preference error', { error: error.message })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to update locale preference' },
       requestId: req.requestId,
     })
   }
