@@ -1,10 +1,18 @@
+import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useGetMyReviewsQuery } from '../../../services/api'
 import { AppPanel } from '../../ui/app-panel'
 import { Star } from 'lucide-react'
 import { OnboardingTabLoading } from './onboardingShared'
+import { ensureNamespace } from '../../../i18n'
 
 export function OnboardingReviewsTab() {
+  const { t } = useTranslation('onboarding')
   const { data: myReviewsData, isLoading } = useGetMyReviewsQuery({ limit: 20 })
+
+  useEffect(() => {
+    void ensureNamespace('onboarding')
+  }, [])
 
   if (isLoading) {
     return <OnboardingTabLoading />
@@ -13,14 +21,12 @@ export function OnboardingReviewsTab() {
   return (
     <div className="space-y-4">
       <AppPanel
-        title="My supplier reviews"
-        description="Reviews you have submitted after completed orders"
+        title={t('restaurantReviews.title')}
+        description={t('restaurantReviews.description')}
       >
         <div className="space-y-3">
           {(myReviewsData?.reviews || []).length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)]">
-              You have not written any reviews yet.
-            </p>
+            <p className="text-sm text-[var(--text-muted)]">{t('restaurantReviews.empty')}</p>
           ) : (
             (myReviewsData?.reviews || []).map((r: Record<string, unknown>) => (
               <div key={String(r.id)} className="rounded-lg border p-3 text-sm">
@@ -32,7 +38,9 @@ export function OnboardingReviewsTab() {
                     />
                   ))}
                 </div>
-                <p className="font-medium mt-1">{String(r.supplier_name || 'Supplier')}</p>
+                <p className="font-medium mt-1">
+                  {String(r.supplier_name || t('restaurantReviews.supplierFallback'))}
+                </p>
                 {r.comment ? (
                   <p className="text-[var(--text-muted)] mt-1">{String(r.comment)}</p>
                 ) : null}

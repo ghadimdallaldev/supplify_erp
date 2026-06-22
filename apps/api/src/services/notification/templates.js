@@ -1,11 +1,20 @@
 import { query } from '../../lib/db.js'
 import { logger } from '../../lib/logger.js'
+import { t, resolveLocale, DEFAULT_LOCALE } from '../../i18n/index.js'
 import { sendTemplateEmail } from '../email/email.service.js'
 import { notifyTenantUsers, sendNotification } from './in-app.js'
 
 /**
  * Domain notification templates and typed notify* helpers.
  */
+
+function nt(key, locale = DEFAULT_LOCALE, params = {}) {
+  return t(`notifications.${key}`, resolveLocale(locale), params)
+}
+
+function orderShortId(order) {
+  return order.id.slice(0, 8)
+}
 
 export const DEFAULT_NOTIFICATION_PREFS = {
   email_enabled: true,
@@ -142,9 +151,10 @@ export function resolveAllowedChannels(notificationsFeatureValue) {
   }
 }
 
-export function formatReservationTime(scheduledAt) {
-  if (!scheduledAt) return 'your scheduled time'
-  return new Date(scheduledAt).toLocaleString()
+export function formatReservationTime(scheduledAt, locale = DEFAULT_LOCALE) {
+  if (!scheduledAt) return nt('reservation.unscheduled', locale)
+  const lng = resolveLocale(locale)
+  return new Date(scheduledAt).toLocaleString(lng === 'ar' ? 'ar' : 'en')
 }
 
 async function getStaffMemberContext(staffId) {
@@ -184,15 +194,21 @@ export async function notifySupplierLowStock({
   }
   const userId = userRows[0].id
 
-  const message = `Low stock: ${name}. Current: ${currentValue}, threshold: ${threshold}. Restock soon.`
+  const message = nt('lowStock.supplierMessage', DEFAULT_LOCALE, {
+    name,
+    currentValue,
+    threshold,
+  })
   try {
     const sent = await notifyTenantUsers({
       tenantId: supplierId,
       tenantType: 'SUPPLIER',
       notificationType: 'LOW_STOCK',
       notificationCategory: 'inventory_alerts',
-      title: 'Low stock alert',
-      message,
+      contentForLocale: (locale) => ({
+        title: nt('lowStock.supplierTitle', locale),
+        message: nt('lowStock.supplierMessage', locale, { name, currentValue, threshold }),
+      }),
       referenceId: productId,
       referenceType: 'PRODUCT',
       metadata: { productId, warehouseId, threshold, currentValue },
@@ -208,60 +224,89 @@ export async function notifySupplierLowStock({
  * Helper functions for common notification types
  */
 
-export async function notifyOrderStatusChange(order, status) {
-  const messages = {
-    PLACED: {
-      title: 'New Order Received',
-      message: order.restaurant_name
-        ? `New order from ${order.restaurant_name} - Order #${order.id.slice(0, 8)} for $${order.total_amount}`
-        : `New order #${order.id.slice(0, 8)} for $${order.total_amount}`,
-    },
-    ACKNOWLEDGED: {
-      title: 'Order Acknowledged',
-      message: `Your order #${order.id.slice(0, 8)} has been acknowledged by ${order.supplier_name || 'supplier'}`,
-    },
-    PROCESSING: {
-      title: 'Order Processing',
-      message: `Your order #${order.id.slice(0, 8)} is being prepared for shipping`,
-    },
-    SHIPPED: {
-      title: 'Order Shipped',
-      message: `Your order #${order.id.slice(0, 8)} has been shipped`,
-    },
-    DELIVERED: {
-      title: 'Order Delivered',
-      message: `Your order #${order.id.slice(0, 8)} has been delivered`,
-    },
-    COMPLETED: {
-      title: 'Order Completed',
-      message: `Your order #${order.id.slice(0, 8)} has been completed and delivered by ${order.supplier_name || 'supplier'}`,
-    },
-    CANCELLED: {
-      title: 'Order Cancelled',
-      message: order.restaurant_name
-        ? `Order #${order.id.slice(0, 8)} from ${order.restaurant_name} has been cancelled`
-        : `Order #${order.id.slice(0, 8)} has been cancelled`,
-    },
-    SUPPLIER_DECLINED: {
-      title: 'Order declined by supplier',
-      message: order.cancel_reason
-        ? `Order #${order.id.slice(0, 8)} was declined: ${order.cancel_reason}`
-        : `Order #${order.id.slice(0, 8)} was declined by ${order.supplier_name || 'your supplier'}`,
-    },
-  }
-
+export function buildOrderStatusNotification(order, status, locale = DEFAULT_LOCALE) {
+  const lng = resolveLocale(locale)
+  const orderId = orderShortId(order)
+  const supplierName = order.supplier_name || nt('common.supplier', lng)
   const isSupplierDecline =
     status === 'CANCELLED' &&
     (order.cancelled_by === 'SUPPLIER' || order.cancelledBy === 'SUPPLIER')
 
-  const msg = isSupplierDecline ? messages.SUPPLIER_DECLINED : messages[status]
+  if (isSupplierDecline) {
+    const reason = order.cancel_reason || order.cancelReason
+    return {
+      title: nt('order.supplierDeclined.title', lng),
+      message: reason
+        ? nt('order.supplierDeclined.messageWithReason', lng, { orderId, reason })
+        : nt('order.supplierDeclined.message', lng, { orderId, supplierName }),
+    }
+  }
+
+  const keyMap = {
+    PLACED: 'placed',
+    ACKNOWLEDGED: 'acknowledged',
+    PROCESSING: 'processing',
+    SHIPPED: 'shipped',
+    DELIVERED: 'delivered',
+    COMPLETED: 'completed',
+    CANCELLED: 'cancelled',
+  }
+  const key = keyMap[status]
+  if (!key) return null
+
+  if (status === 'PLACED') {
+    return {
+      title: nt('order.placed.title', lng),
+      message: order.restaurant_name
+        ? nt('order.placed.messageWithRestaurant', lng, {
+            restaurantName: order.restaurant_name,
+            orderId,
+            amount: order.total_amount,
+          })
+        : nt('order.placed.message', lng, { orderId, amount: order.total_amount }),
+    }
+  }
+
+  if (status === 'CANCELLED') {
+    return {
+      title: nt('order.cancelled.title', lng),
+      message: order.restaurant_name
+        ? nt('order.cancelled.messageWithRestaurant', lng, {
+            orderId,
+            restaurantName: order.restaurant_name,
+          })
+        : nt('order.cancelled.message', lng, { orderId }),
+    }
+  }
+
+  if (status === 'ACKNOWLEDGED') {
+    return {
+      title: nt('order.acknowledged.title', lng),
+      message: nt('order.acknowledged.message', lng, { orderId, supplierName }),
+    }
+  }
+
+  if (status === 'COMPLETED') {
+    return {
+      title: nt('order.completed.title', lng),
+      message: nt('order.completed.message', lng, { orderId, supplierName }),
+    }
+  }
+
+  return {
+    title: nt(`order.${key}.title`, lng),
+    message: nt(`order.${key}.message`, lng, { orderId, supplierName }),
+  }
+}
+
+export async function notifyOrderStatusChange(order, status) {
+  const msg = buildOrderStatusNotification(order, status)
   if (!msg) return null
 
   const payload = {
     notificationType: 'ORDER',
     notificationCategory: status,
-    title: msg.title,
-    message: msg.message,
+    contentForLocale: (locale) => buildOrderStatusNotification(order, status, locale),
     referenceId: order.id,
     referenceType: 'ORDER',
     metadata: {
@@ -271,6 +316,10 @@ export async function notifyOrderStatusChange(order, status) {
       cancel_reason: order.cancel_reason || order.cancelReason,
     },
   }
+
+  const isSupplierDecline =
+    status === 'CANCELLED' &&
+    (order.cancelled_by === 'SUPPLIER' || order.cancelledBy === 'SUPPLIER')
 
   if (status === 'PLACED') {
     return notifyTenantUsers({
@@ -303,31 +352,21 @@ export async function notifyOrderStatusChange(order, status) {
 }
 
 const DRIVER_MILESTONE_MESSAGES = {
-  driver_assigned: {
-    title: 'Driver assigned',
-    restaurant: (o) => `A driver has been assigned to your order #${o.id.slice(0, 8)}`,
-    supplier: (o) => `Driver assigned to order #${o.id.slice(0, 8)}`,
-  },
-  out_for_delivery: {
-    title: 'Out for delivery',
-    restaurant: (o) => `Your order #${o.id.slice(0, 8)} is out for delivery`,
-    supplier: (o) => `Order #${o.id.slice(0, 8)} is out for delivery`,
-  },
-  delivered: {
-    title: 'Delivery completed',
-    restaurant: (o) => `Your order #${o.id.slice(0, 8)} has been delivered`,
-    supplier: (o) => `Order #${o.id.slice(0, 8)} marked delivered`,
-  },
-  failed_delivery: {
-    title: 'Delivery failed',
-    restaurant: (o) => `Delivery failed for order #${o.id.slice(0, 8)}`,
-    supplier: (o) => `Delivery failed for order #${o.id.slice(0, 8)}`,
-  },
-  delivery_rescheduled: {
-    title: 'Delivery rescheduled',
-    restaurant: (o) => `Delivery for order #${o.id.slice(0, 8)} was rescheduled for tomorrow`,
-    supplier: (o) => `Delivery for order #${o.id.slice(0, 8)} was rescheduled for tomorrow`,
-  },
+  driver_assigned: 'driver_assigned',
+  out_for_delivery: 'out_for_delivery',
+  delivered: 'delivered',
+  failed_delivery: 'failed_delivery',
+  delivery_rescheduled: 'delivery_rescheduled',
+}
+
+function buildDriverMilestoneNotification(order, milestone, audience, locale = DEFAULT_LOCALE) {
+  const lng = resolveLocale(locale)
+  const key = DRIVER_MILESTONE_MESSAGES[milestone]
+  if (!key) return null
+  return {
+    title: nt(`driver.${key}.title`, lng),
+    message: nt(`driver.${key}.${audience}`, lng, { orderId: orderShortId(order) }),
+  }
 }
 
 /** Batch supplier notification after delivery rollover job (one message per supplier). */
@@ -338,18 +377,19 @@ export async function notifyDeliveryRolloverBatch({
 }) {
   if (!supplierId || !items.length) return null
   const count = items.length
-  const defs = DRIVER_MILESTONE_MESSAGES.delivery_rescheduled
 
   await notifyTenantUsers({
     tenantId: supplierId,
     tenantType: 'SUPPLIER',
     notificationType: 'ORDER',
     notificationCategory: 'delivery_rollover',
-    title: 'Deliveries moved to tomorrow',
-    message:
-      count === 1
-        ? '1 delivery was moved to tomorrow.'
-        : `${count} deliveries were moved to tomorrow.`,
+    contentForLocale: (locale) => ({
+      title: nt('driver.rollover.title', locale),
+      message:
+        count === 1
+          ? nt('driver.rollover.messageOne', locale)
+          : nt('driver.rollover.messageMany', locale, { count }),
+    }),
     referenceType: 'SUPPLIER',
     metadata: { count, order_ids: items.map((i) => i.orderId) },
   })
@@ -368,8 +408,8 @@ export async function notifyDeliveryRolloverBatch({
       tenantType: 'RESTAURANT',
       notificationType: 'ORDER',
       notificationCategory: 'delivery_rescheduled',
-      title: defs.title,
-      message: defs.restaurant(order),
+      contentForLocale: (locale) =>
+        buildDriverMilestoneNotification(order, 'delivery_rescheduled', 'restaurant', locale),
       referenceId: order.id,
       referenceType: 'ORDER',
       metadata: { order_id: order.id, scheduled_date: item.scheduledDate },
@@ -380,8 +420,7 @@ export async function notifyDeliveryRolloverBatch({
 
 /** In-app notifications for driver delivery milestones (no email per ping). */
 export async function notifyDriverDeliveryMilestone({ order, supplierId, milestone, driverName }) {
-  const defs = DRIVER_MILESTONE_MESSAGES[milestone]
-  if (!defs || !order?.id) return null
+  if (!DRIVER_MILESTONE_MESSAGES[milestone] || !order?.id) return null
 
   const base = {
     notificationType: 'ORDER',
@@ -398,8 +437,8 @@ export async function notifyDriverDeliveryMilestone({ order, supplierId, milesto
   await notifyTenantUsers({
     tenantId: order.restaurant_id,
     tenantType: 'RESTAURANT',
-    title: defs.title,
-    message: defs.restaurant(order),
+    contentForLocale: (locale) =>
+      buildDriverMilestoneNotification(order, milestone, 'restaurant', locale),
     ...base,
   })
 
@@ -407,8 +446,8 @@ export async function notifyDriverDeliveryMilestone({ order, supplierId, milesto
     await notifyTenantUsers({
       tenantId: supplierId,
       tenantType: 'SUPPLIER',
-      title: defs.title,
-      message: defs.supplier(order),
+      contentForLocale: (locale) =>
+        buildDriverMilestoneNotification(order, milestone, 'supplier', locale),
       ...base,
     })
   }
@@ -416,22 +455,33 @@ export async function notifyDriverDeliveryMilestone({ order, supplierId, milesto
   return true
 }
 
-export async function notifyReservationCreated(reservation) {
+export async function notifyReservationCreated(reservation, locale = DEFAULT_LOCALE) {
   const restaurantId = reservation.restaurant_id || reservation.restaurantId
   const branchId = reservation.branch_id || reservation.branchId || null
-  const customerName = reservation.customer_name || reservation.customerName || 'Guest'
+  const customerName =
+    reservation.customer_name || reservation.customerName || nt('common.guest', locale)
   const partySize = reservation.party_size || reservation.partySize || 0
   const scheduledAt = reservation.scheduled_at || reservation.scheduledAt
   const status = reservation.status || reservation.reservationStatus
 
-  const timeslot = scheduledAt ? new Date(scheduledAt).toLocaleString() : 'unscheduled time'
+  const timeslot = scheduledAt
+    ? formatReservationTime(scheduledAt, locale)
+    : nt('reservation.unscheduled', locale)
   const sent = await notifyTenantUsers({
     tenantId: restaurantId,
     tenantType: 'RESTAURANT',
     notificationType: 'RESERVATION_CREATED',
     notificationCategory: 'RESERVATION_CREATED',
-    title: 'New reservation booked',
-    message: `${customerName} party of ${partySize} for ${timeslot}`,
+    contentForLocale: (userLocale) => ({
+      title: nt('reservationEvents.created.title', userLocale),
+      message: nt('reservationEvents.created.message', userLocale, {
+        customerName,
+        partySize,
+        timeslot: scheduledAt
+          ? formatReservationTime(scheduledAt, userLocale)
+          : nt('reservation.unscheduled', userLocale),
+      }),
+    }),
     referenceId: reservation.id || reservation.reservationId,
     referenceType: 'RESERVATION',
     metadata: {
@@ -445,10 +495,11 @@ export async function notifyReservationCreated(reservation) {
   return sent[0] || null
 }
 
-export async function notifyReservationWaitlist(reservation) {
+export async function notifyReservationWaitlist(reservation, locale = DEFAULT_LOCALE) {
   const restaurantId = reservation.restaurant_id || reservation.restaurantId
   const branchId = reservation.branch_id || reservation.branchId || null
-  const customerName = reservation.customer_name || reservation.customerName || 'Guest'
+  const customerName =
+    reservation.customer_name || reservation.customerName || nt('common.guest', locale)
   const partySize = reservation.party_size || reservation.partySize || 0
   const scheduledAt = reservation.scheduled_at || reservation.scheduledAt
   const status = reservation.status || reservation.reservationStatus
@@ -458,8 +509,10 @@ export async function notifyReservationWaitlist(reservation) {
     tenantType: 'RESTAURANT',
     notificationType: 'RESERVATION_WAITLIST',
     notificationCategory: 'RESERVATION_WAITLIST',
-    title: 'Reservation moved to waitlist',
-    message: `${customerName} is waiting for a table (${partySize} guests).`,
+    contentForLocale: (userLocale) => ({
+      title: nt('reservationEvents.waitlist.title', userLocale),
+      message: nt('reservationEvents.waitlist.message', userLocale, { customerName, partySize }),
+    }),
     referenceId: reservation.id || reservation.reservationId,
     referenceType: 'RESERVATION',
     metadata: {
@@ -476,32 +529,24 @@ export async function notifyReservationWaitlist(reservation) {
 /**
  * Restaurant team alert for reservation changes (reschedule, cancel, status).
  */
-export async function notifyReservationStaffEvent(reservation, event = 'updated') {
+export async function notifyReservationStaffEvent(
+  reservation,
+  event = 'updated',
+  locale = DEFAULT_LOCALE
+) {
   const restaurantId = reservation.restaurant_id || reservation.restaurantId
   if (!restaurantId) return null
 
-  const customerName = reservation.customer_name || reservation.customerName || 'Guest'
+  const customerName =
+    reservation.customer_name || reservation.customerName || nt('common.guest', locale)
   const partySize = reservation.party_size || reservation.partySize || 0
   const scheduledAt = reservation.scheduled_at || reservation.scheduledAt
-  const timeslot = formatReservationTime(scheduledAt)
   const status = reservation.status || 'CONFIRMED'
 
   const copy = {
-    rescheduled: {
-      category: 'reservation_rescheduled',
-      title: 'Reservation rescheduled',
-      message: `${customerName} (party of ${partySize}) moved to ${timeslot}`,
-    },
-    cancelled: {
-      category: 'reservation_cancelled',
-      title: 'Reservation cancelled',
-      message: `${customerName} cancelled their booking for ${timeslot}`,
-    },
-    status_changed: {
-      category: 'reservation_created',
-      title: 'Reservation updated',
-      message: `${customerName} — now ${status} for ${timeslot}`,
-    },
+    rescheduled: 'rescheduled',
+    cancelled: 'cancelled',
+    status_changed: 'statusChanged',
   }
   const chosen = copy[event] || copy.status_changed
 
@@ -509,9 +554,21 @@ export async function notifyReservationStaffEvent(reservation, event = 'updated'
     tenantId: restaurantId,
     tenantType: 'RESTAURANT',
     notificationType: 'RESERVATION',
-    notificationCategory: chosen.category,
-    title: chosen.title,
-    message: chosen.message,
+    notificationCategory:
+      event === 'rescheduled'
+        ? 'reservation_rescheduled'
+        : event === 'cancelled'
+          ? 'reservation_cancelled'
+          : 'reservation_created',
+    contentForLocale: (userLocale) => ({
+      title: nt(`reservationEvents.${chosen}.title`, userLocale),
+      message: nt(`reservationEvents.${chosen}.message`, userLocale, {
+        customerName,
+        partySize,
+        timeslot: formatReservationTime(scheduledAt, userLocale),
+        status,
+      }),
+    }),
     referenceId: reservation.id,
     referenceType: 'RESERVATION',
     metadata: { restaurantId, partySize, scheduledAt, status, event },
@@ -519,7 +576,7 @@ export async function notifyReservationStaffEvent(reservation, event = 'updated'
   return sent[0] || null
 }
 
-export async function notifyStaffPtoRequest(ptoRequest) {
+export async function notifyStaffPtoRequest(ptoRequest, locale = DEFAULT_LOCALE) {
   const staffId = ptoRequest.staff_id || ptoRequest.staffId
   const staffContext = await getStaffMemberContext(staffId)
   if (!staffContext) return null
@@ -529,13 +586,20 @@ export async function notifyStaffPtoRequest(ptoRequest) {
   const type = ptoRequest.type || ptoRequest.requestType || 'PTO'
   const status = ptoRequest.status || ptoRequest.requestStatus
   const dateRange = `${startDate} → ${endDate}`
+  const displayName = staffContext.display_name || nt('common.teamMember', locale)
   const sent = await notifyTenantUsers({
     tenantId: staffContext.restaurant_id,
     tenantType: 'RESTAURANT',
     notificationType: 'STAFF_PTO_REQUEST',
     notificationCategory: 'STAFF_PTO',
-    title: 'New PTO request submitted',
-    message: `${staffContext.display_name || 'Team member'} requested ${type} (${dateRange})`,
+    contentForLocale: (userLocale) => ({
+      title: nt('staff.ptoRequest.title', userLocale),
+      message: nt('staff.ptoRequest.message', userLocale, {
+        name: staffContext.display_name || nt('common.teamMember', userLocale),
+        type,
+        dateRange,
+      }),
+    }),
     referenceId: ptoRequest.id || ptoRequest.requestId,
     referenceType: 'STAFF_PTO',
     metadata: {
@@ -549,7 +613,7 @@ export async function notifyStaffPtoRequest(ptoRequest) {
   return sent[0] || null
 }
 
-export async function notifyStaffSwapRequest(swap) {
+export async function notifyStaffSwapRequest(swap, locale = DEFAULT_LOCALE) {
   const requestedBy = swap.requested_by || swap.requestedBy
   const restaurantId = swap.restaurant_id || swap.restaurantId
   const shift = swap.shift || {}
@@ -557,7 +621,8 @@ export async function notifyStaffSwapRequest(swap) {
   const staffContext = await getStaffMemberContext(requestedBy)
   if (!staffContext) return null
 
-  const shiftDate = shift.date || swap.shift_date || swap.shiftDate || 'upcoming shift'
+  const shiftDate =
+    shift.date || swap.shift_date || swap.shiftDate || nt('common.upcomingShift', locale)
   const targetRestaurantId = restaurantId || staffContext.restaurant_id
 
   const sent = await notifyTenantUsers({
@@ -565,8 +630,13 @@ export async function notifyStaffSwapRequest(swap) {
     tenantType: 'RESTAURANT',
     notificationType: 'STAFF_SWAP_REQUEST',
     notificationCategory: 'STAFF_SWAP',
-    title: 'Shift swap requested',
-    message: `${staffContext.display_name || 'Team member'} requested a swap for ${shiftDate}`,
+    contentForLocale: (userLocale) => ({
+      title: nt('staff.swapRequest.title', userLocale),
+      message: nt('staff.swapRequest.message', userLocale, {
+        name: staffContext.display_name || nt('common.teamMember', userLocale),
+        shiftDate,
+      }),
+    }),
     referenceId: swap.id || swap.swapId,
     referenceType: 'STAFF_SWAP',
     metadata: {
@@ -581,7 +651,8 @@ export async function notifyStaffSwapRequest(swap) {
 
 async function notifyStaffLinkedUser(
   staffId,
-  { notificationType, notificationCategory, title, message, referenceId, referenceType, metadata }
+  { notificationType, notificationCategory, title, message, referenceId, referenceType, metadata },
+  locale = DEFAULT_LOCALE
 ) {
   const { rows } = await query(
     `
@@ -601,65 +672,82 @@ async function notifyStaffLinkedUser(
     notificationCategory,
     title,
     message,
+    locale,
     referenceId,
     referenceType,
     metadata,
   })
 }
 
-export async function notifyStaffPtoDecision(ptoRequest) {
+export async function notifyStaffPtoDecision(ptoRequest, locale = DEFAULT_LOCALE) {
   const staffId = ptoRequest.staff_id || ptoRequest.staffId
   const status = ptoRequest.status
   if (!staffId || !['APPROVED', 'DECLINED'].includes(status)) return null
 
   const approved = status === 'APPROVED'
-  return notifyStaffLinkedUser(staffId, {
-    notificationType: 'STAFF_PTO',
-    notificationCategory: 'staff_pto',
-    title: approved ? 'PTO request approved' : 'PTO request declined',
-    message: approved
-      ? 'Your time-off request was approved by your manager.'
-      : 'Your time-off request was declined by your manager.',
-    referenceId: ptoRequest.id,
-    referenceType: 'STAFF_PTO',
-    metadata: { staffId, status },
-  })
+  return notifyStaffLinkedUser(
+    staffId,
+    {
+      notificationType: 'STAFF_PTO',
+      notificationCategory: 'staff_pto',
+      title: approved
+        ? nt('staff.ptoApproved.title', locale)
+        : nt('staff.ptoDeclined.title', locale),
+      message: approved
+        ? nt('staff.ptoApproved.message', locale)
+        : nt('staff.ptoDeclined.message', locale),
+      referenceId: ptoRequest.id,
+      referenceType: 'STAFF_PTO',
+      metadata: { staffId, status },
+    },
+    locale
+  )
 }
 
-export async function notifyStaffSwapDecision(swap, decisionStatus) {
+export async function notifyStaffSwapDecision(swap, decisionStatus, locale = DEFAULT_LOCALE) {
   const staffId = swap.requested_by || swap.requestedBy
   if (!staffId || !['APPROVED', 'DECLINED'].includes(decisionStatus)) return null
 
   const approved = decisionStatus === 'APPROVED'
-  return notifyStaffLinkedUser(staffId, {
-    notificationType: 'STAFF_SWAP',
-    notificationCategory: 'staff_swap',
-    title: approved ? 'Shift swap approved' : 'Shift swap declined',
-    message: approved
-      ? 'Your shift swap request was approved.'
-      : 'Your shift swap request was declined.',
-    referenceId: swap.id,
-    referenceType: 'STAFF_SWAP',
-    metadata: { staffId, status: decisionStatus },
-  })
+  return notifyStaffLinkedUser(
+    staffId,
+    {
+      notificationType: 'STAFF_SWAP',
+      notificationCategory: 'staff_swap',
+      title: approved
+        ? nt('staff.swapApproved.title', locale)
+        : nt('staff.swapDeclined.title', locale),
+      message: approved
+        ? nt('staff.swapApproved.message', locale)
+        : nt('staff.swapDeclined.message', locale),
+      referenceId: swap.id,
+      referenceType: 'STAFF_SWAP',
+      metadata: { staffId, status: decisionStatus },
+    },
+    locale
+  )
 }
 
-export async function notifyScheduledOrderEvent(quickList, action) {
+export async function notifyScheduledOrderEvent(quickList, action, locale = DEFAULT_LOCALE) {
   const restaurantId = quickList.restaurant_id || quickList.restaurantId
   if (!restaurantId) return null
 
-  const autoMessage =
-    action === 'EXECUTED'
-      ? `Scheduled order "${quickList.name}" has been created automatically.`
-      : `Scheduled order "${quickList.name}" will run soon. Review inventory if you need to pause it.`
-
+  const listName = quickList.name
   const sent = await notifyTenantUsers({
     tenantId: restaurantId,
     tenantType: 'RESTAURANT',
     notificationType: 'SCHEDULED_ORDER',
     notificationCategory: 'SCHEDULED_ORDER',
-    title: action === 'EXECUTED' ? 'Scheduled order executed' : 'Scheduled order reminder',
-    message: autoMessage,
+    contentForLocale: (userLocale) => ({
+      title:
+        action === 'EXECUTED'
+          ? nt('scheduledOrder.executedTitle', userLocale)
+          : nt('scheduledOrder.reminderTitle', userLocale),
+      message:
+        action === 'EXECUTED'
+          ? nt('scheduledOrder.executedMessage', userLocale, { name: listName })
+          : nt('scheduledOrder.reminderMessage', userLocale, { name: listName }),
+    }),
     referenceId: quickList.id,
     referenceType: 'QUICK_LIST',
     metadata: {
@@ -671,14 +759,20 @@ export async function notifyScheduledOrderEvent(quickList, action) {
   return sent[0] || null
 }
 
-export async function notifyInvoiceIssued(invoice) {
+export async function notifyInvoiceIssued(invoice, locale = DEFAULT_LOCALE) {
   const sent = await notifyTenantUsers({
     tenantId: invoice.restaurant_id,
     tenantType: 'RESTAURANT',
     notificationType: 'INVOICE',
     notificationCategory: 'invoice_issued',
-    title: 'Invoice Issued',
-    message: `Invoice ${invoice.invoice_number} for $${invoice.total_amount} due ${invoice.due_date}`,
+    contentForLocale: (userLocale) => ({
+      title: nt('invoice.issuedTitle', userLocale),
+      message: nt('invoice.issuedMessage', userLocale, {
+        invoiceNumber: invoice.invoice_number,
+        amount: invoice.total_amount,
+        dueDate: invoice.due_date,
+      }),
+    }),
     referenceId: invoice.id,
     referenceType: 'INVOICE',
     metadata: { invoice_number: invoice.invoice_number, total_amount: invoice.total_amount },
@@ -686,17 +780,23 @@ export async function notifyInvoiceIssued(invoice) {
   return sent[0] || null
 }
 
-export async function notifyPaymentReceived(payment) {
+export async function notifyPaymentReceived(payment, locale = DEFAULT_LOCALE) {
   const supplierId = payment.invoice?.supplier_id
   if (!supplierId) return null
 
+  const invoiceRef = payment.invoice_number || payment.invoice_id?.slice(0, 8)
   const sent = await notifyTenantUsers({
     tenantId: supplierId,
     tenantType: 'SUPPLIER',
     notificationType: 'PAYMENT',
     notificationCategory: 'payment_received',
-    title: 'Payment Received',
-    message: `Payment of $${payment.payment_amount} received for invoice ${payment.invoice_number || payment.invoice_id?.slice(0, 8)}`,
+    contentForLocale: (userLocale) => ({
+      title: nt('payment.receivedTitle', userLocale),
+      message: nt('payment.receivedMessage', userLocale, {
+        amount: payment.payment_amount,
+        invoiceRef,
+      }),
+    }),
     referenceId: payment.invoice_id,
     referenceType: 'INVOICE',
     metadata: { payment_id: payment.id, amount: payment.payment_amount },
@@ -704,7 +804,7 @@ export async function notifyPaymentReceived(payment) {
   return sent[0] || null
 }
 
-export async function notifyLowStock(product, currentStock, threshold) {
+export async function notifyLowStock(product, currentStock, threshold, locale = DEFAULT_LOCALE) {
   const restaurantId = product.restaurant_id
   if (!restaurantId) return null
 
@@ -713,8 +813,14 @@ export async function notifyLowStock(product, currentStock, threshold) {
     tenantType: 'RESTAURANT',
     notificationType: 'INVENTORY',
     notificationCategory: 'low_stock',
-    title: 'Low Stock Alert',
-    message: `${product.name} is below threshold. Current: ${currentStock}, Threshold: ${threshold}`,
+    contentForLocale: (userLocale) => ({
+      title: nt('inventory.lowStockTitle', userLocale),
+      message: nt('inventory.lowStockMessage', userLocale, {
+        productName: product.name,
+        currentStock,
+        threshold,
+      }),
+    }),
     referenceId: product.product_id,
     referenceType: 'PRODUCT',
     metadata: { product_name: product.name, current_stock: currentStock, threshold },
@@ -722,7 +828,7 @@ export async function notifyLowStock(product, currentStock, threshold) {
   return sent[0] || null
 }
 
-export async function notifyInvoiceOverdue(invoice) {
+export async function notifyInvoiceOverdue(invoice, locale = DEFAULT_LOCALE) {
   const payload = {
     notificationType: 'INVOICE',
     notificationCategory: 'invoice_overdue',
@@ -736,15 +842,27 @@ export async function notifyInvoiceOverdue(invoice) {
       tenantId: invoice.restaurant_id,
       tenantType: 'RESTAURANT',
       ...payload,
-      title: 'Invoice Overdue',
-      message: `Invoice ${invoice.invoice_number} for $${invoice.total_amount} was due on ${invoice.due_date} and is now overdue.`,
+      contentForLocale: (userLocale) => ({
+        title: nt('invoice.overdueRestaurantTitle', userLocale),
+        message: nt('invoice.overdueRestaurantMessage', userLocale, {
+          invoiceNumber: invoice.invoice_number,
+          amount: invoice.total_amount,
+          dueDate: invoice.due_date,
+        }),
+      }),
     }),
     notifyTenantUsers({
       tenantId: invoice.supplier_id,
       tenantType: 'SUPPLIER',
       ...payload,
-      title: 'Payment Overdue',
-      message: `Invoice ${invoice.invoice_number} for $${invoice.total_amount} is overdue since ${invoice.due_date}.`,
+      contentForLocale: (userLocale) => ({
+        title: nt('invoice.overdueSupplierTitle', userLocale),
+        message: nt('invoice.overdueSupplierMessage', userLocale, {
+          invoiceNumber: invoice.invoice_number,
+          amount: invoice.total_amount,
+          dueDate: invoice.due_date,
+        }),
+      }),
     }),
   ])
   for (const result of results) {
@@ -755,7 +873,10 @@ export async function notifyInvoiceOverdue(invoice) {
   return results
 }
 
-export async function notifyOutOfStock({ productId, warehouseId, productName }) {
+export async function notifyOutOfStock(
+  { productId, warehouseId, productName },
+  locale = DEFAULT_LOCALE
+) {
   const { rows: pRows } = await query(
     `SELECT p.name, p.supplier_id FROM product p WHERE p.id = $1`,
     [productId]
@@ -768,8 +889,12 @@ export async function notifyOutOfStock({ productId, warehouseId, productName }) 
       tenantType: 'SUPPLIER',
       notificationType: 'OUT_OF_STOCK',
       notificationCategory: 'out_of_stock',
-      title: 'Out of Stock',
-      message: `${productName || pRows[0].name} is now out of stock.`,
+      contentForLocale: (userLocale) => ({
+        title: nt('inventory.outOfStockTitle', userLocale),
+        message: nt('inventory.outOfStockMessage', userLocale, {
+          productName: productName || pRows[0].name,
+        }),
+      }),
       referenceId: productId,
       referenceType: 'PRODUCT',
       metadata: { productId, warehouseId },
@@ -781,7 +906,10 @@ export async function notifyOutOfStock({ productId, warehouseId, productName }) 
   }
 }
 
-export async function notifyMessageReceived({ conversationId, senderType, messagePreview }) {
+export async function notifyMessageReceived(
+  { conversationId, senderType, messagePreview },
+  locale = DEFAULT_LOCALE
+) {
   const { rows: cRows } = await query(
     `SELECT supplier_id, restaurant_id FROM conversation WHERE id = $1`,
     [conversationId]
@@ -795,11 +923,11 @@ export async function notifyMessageReceived({ conversationId, senderType, messag
   if (senderType === 'RESTAURANT') {
     tenantId = conv.supplier_id
     tenantType = 'SUPPLIER'
-    senderLabel = 'A restaurant'
+    senderLabel = nt('common.aRestaurant', locale)
   } else {
     tenantId = conv.restaurant_id
     tenantType = 'RESTAURANT'
-    senderLabel = 'A supplier'
+    senderLabel = nt('common.aSupplier', locale)
   }
   if (!tenantId) return null
 
@@ -810,8 +938,16 @@ export async function notifyMessageReceived({ conversationId, senderType, messag
       tenantType,
       notificationType: 'MESSAGE',
       notificationCategory: 'message_received',
-      title: 'New message',
-      message: `${senderLabel} sent you a message${preview}`,
+      contentForLocale: (userLocale) => ({
+        title: nt('message.title', userLocale),
+        message: nt('message.body', userLocale, {
+          senderLabel:
+            senderType === 'RESTAURANT'
+              ? nt('common.aRestaurant', userLocale)
+              : nt('common.aSupplier', userLocale),
+          preview,
+        }),
+      }),
       referenceId: conversationId,
       referenceType: 'CONVERSATION',
       metadata: { conversationId },
@@ -823,7 +959,7 @@ export async function notifyMessageReceived({ conversationId, senderType, messag
   }
 }
 
-export async function notifyDisputeOpened(dispute) {
+export async function notifyDisputeOpened(dispute, locale = DEFAULT_LOCALE) {
   const supplierId = dispute.supplierId || dispute.supplier_id
   if (!supplierId) return null
 
@@ -833,8 +969,12 @@ export async function notifyDisputeOpened(dispute) {
       tenantType: 'SUPPLIER',
       notificationType: 'DISPUTE',
       notificationCategory: 'dispute_opened',
-      title: 'New dispute opened',
-      message: `A restaurant opened a dispute on order #${String(dispute.orderId || dispute.order_id || '').slice(0, 8)}`,
+      contentForLocale: (userLocale) => ({
+        title: nt('dispute.openedTitle', userLocale),
+        message: nt('dispute.openedMessage', userLocale, {
+          orderId: String(dispute.orderId || dispute.order_id || '').slice(0, 8),
+        }),
+      }),
       referenceId: dispute.id,
       referenceType: 'DISPUTE',
       metadata: {
@@ -853,11 +993,11 @@ export async function notifyDisputeOpened(dispute) {
 /**
  * Notify restaurants when a supplier deal is approved and live (or pending payment).
  */
-export async function notifyDealApproved(deal, { supplierName } = {}) {
+export async function notifyDealApproved(deal, { supplierName } = {}, locale = DEFAULT_LOCALE) {
   const supplierId = deal.supplier_id || deal.supplierId
   const dealId = deal.id
-  const dealName = String(deal.name || 'New deal')
-  const supplierLabel = supplierName || deal.supplier_name || 'A supplier'
+  const dealName = String(deal.name || nt('common.newDeal', locale))
+  const supplierLabel = supplierName || deal.supplier_name || nt('common.aSupplier', locale)
   const link = `/app/deals?highlight=${encodeURIComponent(String(dealId))}`
 
   if (!supplierId || !dealId) return { followers: 0, nonFollowers: 0 }
@@ -886,8 +1026,14 @@ export async function notifyDealApproved(deal, { supplierName } = {}) {
         tenantType: 'RESTAURANT',
         notificationType: 'PROMOTION',
         notificationCategory: 'promotions',
-        title: `New deal from ${supplierLabel}`,
-        message: `${dealName} is now available. Open Deals to view and redeem.`,
+        contentForLocale: (userLocale) => ({
+          title: nt('deal.approvedTitle', userLocale, {
+            supplierLabel: supplierName || deal.supplier_name || nt('common.aSupplier', userLocale),
+          }),
+          message: nt('deal.approvedMessage', userLocale, {
+            dealName: String(deal.name || nt('common.newDeal', userLocale)),
+          }),
+        }),
         referenceId: dealId,
         referenceType: 'DEAL',
         metadata: { link, dealId, supplierId, audience: 'eligible' },
@@ -907,22 +1053,38 @@ export async function notifyDealApproved(deal, { supplierName } = {}) {
   }
 }
 
-export async function notifyDisputeResolved(dispute, outcome, { replacementOrderId = null } = {}) {
+export async function notifyDisputeResolved(
+  dispute,
+  outcome,
+  { replacementOrderId = null } = {},
+  locale = DEFAULT_LOCALE
+) {
   const restaurantId = dispute.restaurantId || dispute.restaurant_id
   if (!restaurantId) return null
 
   const resolutionType = dispute.resolutionType || dispute.resolution_type
   const replacementId =
     replacementOrderId || dispute.replacementOrderId || dispute.replacement_order_id
+  const notes = dispute.resolutionNotes || dispute.resolution_notes || ''
 
-  const title = outcome === 'rejected' ? 'Dispute rejected' : 'Dispute resolved'
-  let message =
-    outcome === 'rejected'
-      ? `Your dispute was rejected. ${dispute.resolutionNotes || dispute.resolution_notes || ''}`.trim()
-      : `Your dispute was resolved (${resolutionType || 'closed'}).`
-
-  if (outcome !== 'rejected' && resolutionType === 'replacement' && replacementId) {
-    message = `Your dispute was resolved with a replacement. Replacement order #${String(replacementId).slice(0, 8)} has been created.`
+  const buildContent = (userLocale) => {
+    const title =
+      outcome === 'rejected'
+        ? nt('dispute.rejectedTitle', userLocale)
+        : nt('dispute.resolvedTitle', userLocale)
+    let message
+    if (outcome === 'rejected') {
+      message = nt('dispute.rejectedMessage', userLocale, { notes }).trim()
+    } else if (resolutionType === 'replacement' && replacementId) {
+      message = nt('dispute.replacementMessage', userLocale, {
+        orderId: String(replacementId).slice(0, 8),
+      })
+    } else {
+      message = nt('dispute.resolvedMessage', userLocale, {
+        resolutionType: resolutionType || 'closed',
+      })
+    }
+    return { title, message }
   }
 
   const metadata = {
@@ -940,8 +1102,7 @@ export async function notifyDisputeResolved(dispute, outcome, { replacementOrder
       tenantType: 'RESTAURANT',
       notificationType: 'DISPUTE',
       notificationCategory: outcome === 'rejected' ? 'dispute_rejected' : 'dispute_resolved',
-      title,
-      message,
+      contentForLocale: buildContent,
       referenceId: dispute.id,
       referenceType: 'DISPUTE',
       metadata,
@@ -967,15 +1128,21 @@ async function listPlatformAdminUserIds(limit = 50) {
   return rows.map((r) => r.id)
 }
 
-async function notifyBillingEvent(tenantId, tenantType, category, title, message, metadata = {}) {
+async function notifyBillingEvent(
+  tenantId,
+  tenantType,
+  category,
+  contentForLocale,
+  metadata = {},
+  locale = DEFAULT_LOCALE
+) {
   try {
     const sent = await notifyTenantUsers({
       tenantId,
       tenantType,
       notificationType: 'BILLING',
       notificationCategory: category,
-      title,
-      message,
+      contentForLocale,
       referenceType: 'SUBSCRIPTION',
       referenceId: metadata.subscriptionId || null,
       metadata: { ctaUrl: '/app/billing', ...metadata },
@@ -987,105 +1154,175 @@ async function notifyBillingEvent(tenantId, tenantType, category, title, message
   }
 }
 
-export async function notifyBillingTrialStarted({ tenantId, tenantType, planName, trialEndsAt }) {
+function billingReasonSuffix(reason, locale) {
+  return reason ? nt('billing.reasonPrefix', locale, { reason }) : ''
+}
+
+export async function notifyBillingTrialStarted(
+  { tenantId, tenantType, planName, trialEndsAt },
+  locale = DEFAULT_LOCALE
+) {
   return notifyBillingEvent(
     tenantId,
     tenantType,
     'billing_trial_started',
-    'Trial started',
-    `Your Supplify trial${planName ? ` (${planName})` : ''} has started.${trialEndsAt ? ` It ends on ${trialEndsAt}.` : ''}`,
-    { trialEndsAt }
+    (userLocale) => ({
+      title: nt('billing.trialStartedTitle', userLocale),
+      message: nt('billing.trialStartedMessage', userLocale, {
+        planSuffix: planName ? nt('billing.trialStartedPlan', userLocale, { planName }) : '',
+        endsSuffix: trialEndsAt ? nt('billing.trialStartedEnds', userLocale, { trialEndsAt }) : '',
+      }),
+    }),
+    { trialEndsAt },
+    locale
   )
 }
 
-export async function notifyBillingTrialEnding({ tenantId, tenantType, daysLeft, trialEndsAt }) {
+export async function notifyBillingTrialEnding(
+  { tenantId, tenantType, daysLeft, trialEndsAt },
+  locale = DEFAULT_LOCALE
+) {
   return notifyBillingEvent(
     tenantId,
     tenantType,
     'billing_trial_ending',
-    'Trial ending soon',
-    `Your Supplify trial ends in ${daysLeft} day(s)${trialEndsAt ? ` (${trialEndsAt})` : ''}. Add a payment method to keep full access.`,
-    { daysLeft, trialEndsAt }
+    (userLocale) => ({
+      title: nt('billing.trialEndingTitle', userLocale),
+      message: nt('billing.trialEndingMessage', userLocale, {
+        daysLeft,
+        endsSuffix: trialEndsAt ? nt('billing.trialEndingEnds', userLocale, { trialEndsAt }) : '',
+      }),
+    }),
+    { daysLeft, trialEndsAt },
+    locale
   )
 }
 
-export async function notifyBillingTrialExpired({ tenantId, tenantType }) {
+export async function notifyBillingTrialExpired({ tenantId, tenantType }, locale = DEFAULT_LOCALE) {
   return notifyBillingEvent(
     tenantId,
     tenantType,
     'billing_trial_expired',
-    'Trial expired',
-    'Your Supplify trial has expired. Subscribe to restore write access.',
-    {}
+    (userLocale) => ({
+      title: nt('billing.trialExpiredTitle', userLocale),
+      message: nt('billing.trialExpiredMessage', userLocale),
+    }),
+    {},
+    locale
   )
 }
 
-export async function notifyBillingActivated({ tenantId, tenantType, planName }) {
+export async function notifyBillingActivated(
+  { tenantId, tenantType, planName },
+  locale = DEFAULT_LOCALE
+) {
   return notifyBillingEvent(
     tenantId,
     tenantType,
     'billing_activated',
-    'Subscription activated',
-    `Your Supplify subscription${planName ? ` (${planName})` : ''} is now active.`,
-    { planName }
+    (userLocale) => ({
+      title: nt('billing.activatedTitle', userLocale),
+      message: nt('billing.activatedMessage', userLocale, {
+        planSuffix: planName ? nt('billing.trialStartedPlan', userLocale, { planName }) : '',
+      }),
+    }),
+    { planName },
+    locale
   )
 }
 
-export async function notifyBillingRenewed({ tenantId, tenantType, periodEnd }) {
+export async function notifyBillingRenewed(
+  { tenantId, tenantType, periodEnd },
+  locale = DEFAULT_LOCALE
+) {
   return notifyBillingEvent(
     tenantId,
     tenantType,
     'billing_renewed',
-    'Subscription renewed',
-    `Your subscription was renewed${periodEnd ? ` through ${periodEnd}.` : '.'}`,
-    { periodEnd }
+    (userLocale) => ({
+      title: nt('billing.renewedTitle', userLocale),
+      message: nt('billing.renewedMessage', userLocale, {
+        periodSuffix: periodEnd
+          ? nt('billing.renewedPeriod', userLocale, { periodEnd })
+          : nt('billing.renewedPeriodFallback', userLocale),
+      }),
+    }),
+    { periodEnd },
+    locale
   )
 }
 
-export async function notifyBillingPaymentFailed({ tenantId, tenantType, reason }) {
+export async function notifyBillingPaymentFailed(
+  { tenantId, tenantType, reason },
+  locale = DEFAULT_LOCALE
+) {
   return notifyBillingEvent(
     tenantId,
     tenantType,
     'billing_payment_failed',
-    'Payment failed',
-    `We could not process your subscription payment.${reason ? ` ${reason}` : ''} Update your payment method to avoid interruption.`,
-    { reason }
+    (userLocale) => ({
+      title: nt('billing.paymentFailedTitle', userLocale),
+      message: nt('billing.paymentFailedMessage', userLocale, {
+        reasonSuffix: billingReasonSuffix(reason, userLocale),
+      }),
+    }),
+    { reason },
+    locale
   )
 }
 
-export async function notifyBillingCancelled({ tenantId, tenantType }) {
+export async function notifyBillingCancelled({ tenantId, tenantType }, locale = DEFAULT_LOCALE) {
   return notifyBillingEvent(
     tenantId,
     tenantType,
     'billing_cancelled',
-    'Subscription cancelled',
-    'Your Supplify subscription has been cancelled.',
-    {}
+    (userLocale) => ({
+      title: nt('billing.cancelledTitle', userLocale),
+      message: nt('billing.cancelledMessage', userLocale),
+    }),
+    {},
+    locale
   )
 }
 
-export async function notifyBillingAccountLocked({ tenantId, tenantType, reason }) {
+export async function notifyBillingAccountLocked(
+  { tenantId, tenantType, reason },
+  locale = DEFAULT_LOCALE
+) {
   return notifyBillingEvent(
     tenantId,
     tenantType,
     'billing_account_locked',
-    'Account restricted',
-    `Write access is restricted${reason ? `: ${reason}` : ''}. Visit billing to restore access.`,
-    { reason }
+    (userLocale) => ({
+      title: nt('billing.accountLockedTitle', userLocale),
+      message: nt('billing.accountLockedMessage', userLocale, {
+        reasonSuffix: billingReasonSuffix(reason, userLocale),
+      }),
+    }),
+    { reason },
+    locale
   )
 }
 
-export async function notifyDealRejected(deal, { rejectionReason } = {}) {
+export async function notifyDealRejected(deal, { rejectionReason } = {}, locale = DEFAULT_LOCALE) {
   const supplierId = deal.supplier_id || deal.supplierId
   if (!supplierId) return null
+  const dealName = deal.name || deal.title || nt('common.promotion', locale)
   try {
     return notifyTenantUsers({
       tenantId: supplierId,
       tenantType: 'SUPPLIER',
       notificationType: 'PROMOTION',
       notificationCategory: 'deal_rejected',
-      title: 'Deal rejected',
-      message: `Your deal "${deal.name || deal.title || 'promotion'}" was not approved.${rejectionReason ? ` Reason: ${rejectionReason}` : ''}`,
+      contentForLocale: (userLocale) => ({
+        title: nt('deal.rejectedTitle', userLocale),
+        message: nt('deal.rejectedMessage', userLocale, {
+          dealName,
+          reasonSuffix: rejectionReason
+            ? nt('deal.rejectedReason', userLocale, { reason: rejectionReason })
+            : '',
+        }),
+      }),
       referenceId: deal.id,
       referenceType: 'DEAL',
       metadata: { rejectionReason },
@@ -1096,17 +1333,20 @@ export async function notifyDealRejected(deal, { rejectionReason } = {}) {
   }
 }
 
-export async function notifyDealSubmitted(deal, { supplierName } = {}) {
+export async function notifyDealSubmitted(deal, { supplierName } = {}, locale = DEFAULT_LOCALE) {
   const supplierId = deal.supplier_id || deal.supplierId
-  const label = supplierName || 'A supplier'
+  const label = supplierName || nt('common.aSupplier', locale)
+  const dealName = deal.name || deal.title
   try {
     await notifyTenantUsers({
       tenantId: supplierId,
       tenantType: 'SUPPLIER',
       notificationType: 'PROMOTION',
       notificationCategory: 'deal_submitted',
-      title: 'Deal submitted for review',
-      message: `Your deal "${deal.name || deal.title}" was submitted and is pending admin approval.`,
+      contentForLocale: (userLocale) => ({
+        title: nt('deal.submittedSupplierTitle', userLocale),
+        message: nt('deal.submittedSupplierMessage', userLocale, { dealName }),
+      }),
       referenceId: deal.id,
       referenceType: 'DEAL',
     })
@@ -1117,8 +1357,9 @@ export async function notifyDealSubmitted(deal, { supplierName } = {}) {
         userType: 'ADMIN',
         notificationType: 'PROMOTION',
         notificationCategory: 'deal_submitted',
-        title: 'Deal requires approval',
-        message: `${label} submitted "${deal.name || deal.title}" for approval.`,
+        title: nt('deal.submittedAdminTitle', locale),
+        message: nt('deal.submittedAdminMessage', locale, { supplierLabel: label, dealName }),
+        locale,
         referenceId: deal.id,
         referenceType: 'DEAL',
         metadata: { ctaUrl: '/admin/promotions' },
@@ -1129,17 +1370,22 @@ export async function notifyDealSubmitted(deal, { supplierName } = {}) {
   }
 }
 
-export async function notifyDealExpired(deal) {
+export async function notifyDealExpired(deal, locale = DEFAULT_LOCALE) {
   const supplierId = deal.supplier_id || deal.supplierId
   if (!supplierId) return null
+  const dealName = deal.name || deal.title || nt('common.promotion', locale)
   try {
     return notifyTenantUsers({
       tenantId: supplierId,
       tenantType: 'SUPPLIER',
       notificationType: 'PROMOTION',
       notificationCategory: 'deal_expired',
-      title: 'Deal expired',
-      message: `Your deal "${deal.name || deal.title || 'promotion'}" has expired.`,
+      contentForLocale: (userLocale) => ({
+        title: nt('deal.expiredTitle', userLocale),
+        message: nt('deal.expiredMessage', userLocale, {
+          dealName: deal.name || deal.title || nt('common.promotion', userLocale),
+        }),
+      }),
       referenceId: deal.id,
       referenceType: 'DEAL',
     })
@@ -1152,7 +1398,8 @@ export async function notifyDealExpired(deal) {
 export async function notifyStaffShiftEvent(
   staffMemberId,
   restaurantId,
-  { title, message, shiftId }
+  { title, message, shiftId },
+  locale = DEFAULT_LOCALE
 ) {
   try {
     const { rows } = await query(
@@ -1165,7 +1412,8 @@ export async function notifyStaffShiftEvent(
         to: staff.email,
         template: 'staff.shift',
         subject: title,
-        data: { message, title, recipientName: staff.display_name, tenantName: null },
+        locale,
+        data: { message, title, recipientName: staff.display_name, tenantName: null, locale },
         tenantId: restaurantId,
         eventType: 'staff.shift',
         eventKey: shiftId ? `staff:shift:${shiftId}:${staffMemberId}` : undefined,
@@ -1180,6 +1428,7 @@ export async function notifyStaffShiftEvent(
         notificationCategory: 'staff_clock',
         title,
         message,
+        locale,
         referenceId: shiftId || null,
         referenceType: 'STAFF_SHIFT',
       })
@@ -1191,15 +1440,21 @@ export async function notifyStaffShiftEvent(
   }
 }
 
-export async function notifyStaffAnnouncement(restaurantId, { title, message, announcementId }) {
+export async function notifyStaffAnnouncement(
+  restaurantId,
+  { title, message, announcementId },
+  locale = DEFAULT_LOCALE
+) {
   try {
     return notifyTenantUsers({
       tenantId: restaurantId,
       tenantType: 'RESTAURANT',
       notificationType: 'STAFF',
       notificationCategory: 'staff_announcement',
-      title: title || 'Team announcement',
-      message,
+      contentForLocale: (userLocale) => ({
+        title: title || nt('staff.announcementDefault', userLocale),
+        message,
+      }),
       referenceId: announcementId || null,
       referenceType: 'STAFF_ANNOUNCEMENT',
     })
@@ -1209,15 +1464,21 @@ export async function notifyStaffAnnouncement(restaurantId, { title, message, an
   }
 }
 
-export async function notifyStaffDocumentUploaded(restaurantId, { title, message, documentId }) {
+export async function notifyStaffDocumentUploaded(
+  restaurantId,
+  { title, message, documentId },
+  locale = DEFAULT_LOCALE
+) {
   try {
     return notifyTenantUsers({
       tenantId: restaurantId,
       tenantType: 'RESTAURANT',
       notificationType: 'STAFF',
       notificationCategory: 'staff_document',
-      title: title || 'New document',
-      message,
+      contentForLocale: (userLocale) => ({
+        title: title || nt('staff.documentDefault', userLocale),
+        message,
+      }),
       referenceId: documentId || null,
       referenceType: 'STAFF_DOCUMENT',
     })
@@ -1255,12 +1516,10 @@ async function hasRecentQuoteNotification({
   return rows.length > 0
 }
 
-export async function notifyQuoteRequestReceived({
-  supplierId,
-  quoteRequestId,
-  quoteRequestSupplierId,
-  restaurantId,
-}) {
+export async function notifyQuoteRequestReceived(
+  { supplierId, quoteRequestId, quoteRequestSupplierId, restaurantId },
+  locale = DEFAULT_LOCALE
+) {
   try {
     const alreadySent = await hasRecentQuoteNotification({
       tenantId: supplierId,
@@ -1271,15 +1530,19 @@ export async function notifyQuoteRequestReceived({
     if (alreadySent) return null
 
     const { rows } = await query(`SELECT name FROM restaurant WHERE id = $1`, [restaurantId])
-    const restaurantName = rows[0]?.name || 'A restaurant'
+    const restaurantName = rows[0]?.name || nt('common.aRestaurant', locale)
 
     return notifyTenantUsers({
       tenantId: supplierId,
       tenantType: 'SUPPLIER',
       notificationType: 'QUOTE_REQUEST',
       notificationCategory: 'quote_request_received',
-      title: 'New quote request',
-      message: `${restaurantName} requested your best price on selected items.`,
+      contentForLocale: (userLocale) => ({
+        title: nt('quote.requestTitle', userLocale),
+        message: nt('quote.requestMessage', userLocale, {
+          restaurantName: rows[0]?.name || nt('common.aRestaurant', userLocale),
+        }),
+      }),
       referenceId: quoteRequestId,
       referenceType: 'QUOTE_REQUEST',
       metadata: {
@@ -1293,12 +1556,10 @@ export async function notifyQuoteRequestReceived({
   }
 }
 
-export async function notifyQuoteResponseReceived({
-  restaurantId,
-  quoteRequestId,
-  quoteRequestSupplierId,
-  supplierId,
-}) {
+export async function notifyQuoteResponseReceived(
+  { restaurantId, quoteRequestId, quoteRequestSupplierId, supplierId },
+  locale = DEFAULT_LOCALE
+) {
   try {
     const alreadySent = await hasRecentQuoteNotification({
       tenantId: restaurantId,
@@ -1309,15 +1570,19 @@ export async function notifyQuoteResponseReceived({
     if (alreadySent) return null
 
     const { rows } = await query(`SELECT name FROM supplier WHERE id = $1`, [supplierId])
-    const supplierName = rows[0]?.name || 'A supplier'
+    const supplierName = rows[0]?.name || nt('common.aSupplier', locale)
 
     return notifyTenantUsers({
       tenantId: restaurantId,
       tenantType: 'RESTAURANT',
       notificationType: 'QUOTE_RESPONSE',
       notificationCategory: 'quote_response_received',
-      title: 'Supplier response received',
-      message: `${supplierName} responded to your quote request.`,
+      contentForLocale: (userLocale) => ({
+        title: nt('quote.responseTitle', userLocale),
+        message: nt('quote.responseMessage', userLocale, {
+          supplierName: rows[0]?.name || nt('common.aSupplier', userLocale),
+        }),
+      }),
       referenceId: quoteRequestId,
       referenceType: 'QUOTE_REQUEST',
       metadata: {
@@ -1332,18 +1597,29 @@ export async function notifyQuoteResponseReceived({
   }
 }
 
-export async function notifyAdminNewTenant({ tenantId, tenantType, tenantName, contactEmail }) {
+export async function notifyAdminNewTenant(
+  { tenantId, tenantType, tenantName, contactEmail },
+  locale = DEFAULT_LOCALE
+) {
   try {
     const adminIds = await listPlatformAdminUserIds(50)
-    const message = `New ${tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'} "${tenantName}" registered${contactEmail ? ` (${contactEmail})` : ''}.`
+    const tenantTypeLabel =
+      tenantType === 'SUPPLIER'
+        ? nt('admin.tenantTypeSupplier', locale)
+        : nt('admin.tenantTypeRestaurant', locale)
     for (const userId of adminIds) {
       await sendNotification({
         userId,
         userType: 'ADMIN',
         notificationType: 'SYSTEM',
         notificationCategory: 'system_updates',
-        title: `New ${tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'} registered`,
-        message,
+        title: nt('admin.newTenantTitle', locale, { tenantType: tenantTypeLabel }),
+        message: nt('admin.newTenantMessage', locale, {
+          tenantType: tenantTypeLabel,
+          tenantName,
+          emailSuffix: contactEmail ? nt('admin.newTenantEmail', locale, { contactEmail }) : '',
+        }),
+        locale,
         referenceId: tenantId,
         referenceType: 'TENANT',
         metadata: { tenantType, tenantName, ctaUrl: '/admin' },

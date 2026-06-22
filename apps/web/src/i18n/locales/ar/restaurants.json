@@ -88,5 +88,19 @@
       "empty": "لا توجد طلبات بعد"
     },
     "unknownProduct": "منتج غير معروف"
+  },
+  "deliveryLocation": {
+    "validation": {
+      "bothOrEmpty": "أدخل خط العرض وخط الطول معاً، أو اتركهما فارغين.",
+      "invalidNumbers": "يجب أن يكون خط العرض وخط الطول أرقاماً صالحة.",
+      "outOfRange": "خط العرض أو خط الطول خارج النطاق.",
+      "invalidCoordinates": "إحداثيات غير صالحة."
+    },
+    "toast": {
+      "saved": "تم حفظ موقع التسليم",
+      "saveFailed": "فشل حفظ موقع التسليم",
+      "branchSaved": "تم حفظ موقع تسليم الفرع",
+      "branchSaveFailed": "فشل حفظ موقع تسليم الفرع"
+    }
   }
 }

@@ -96,6 +96,49 @@ describe('Push Service', () => {
     expect(removed).toBe(true)
   })
 
+  it('saveExpoPushDevice stores expo token in push_subscriptions', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 'device-1' }] })
+    const { saveExpoPushDevice } = await import('./push.service.js')
+    const row = await saveExpoPushDevice('user-1', {
+      token: 'ExponentPushToken[abc]',
+      platform: 'ios',
+    })
+    expect(row.id).toBe('device-1')
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO push_subscriptions'),
+      ['user-1', 'expo:ExponentPushToken[abc]', 'expo', 'ios', null]
+    )
+  })
+
+  it('removeExpoPushDevice deletes by expo endpoint', async () => {
+    queryMock.mockResolvedValueOnce({ rowCount: 1 })
+    const { removeExpoPushDevice } = await import('./push.service.js')
+    const removed = await removeExpoPushDevice('user-1', 'ExponentPushToken[abc]')
+    expect(removed).toBe(true)
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM push_subscriptions'),
+      ['user-1', 'expo:ExponentPushToken[abc]']
+    )
+  })
+
+  it('sendWebPushToUser skips expo device subscriptions', async () => {
+    sendNotificationMock.mockResolvedValue(undefined)
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        { id: 'expo-1', endpoint: 'expo:ExponentPushToken[abc]', p256dh: 'expo', auth: 'ios' },
+        { id: 'web-1', endpoint: 'https://push.example/1', p256dh: 'k', auth: 'a' },
+      ],
+    })
+    const { sendWebPushToUser } = await import('./push.service.js')
+    const result = await sendWebPushToUser({
+      userId: 'user-1',
+      title: 'Hi',
+      message: 'There',
+    })
+    expect(result.sent).toBe(1)
+    expect(sendNotificationMock).toHaveBeenCalledTimes(1)
+  })
+
   it('treats CHANGE_ME placeholders as not configured', async () => {
     vi.doMock('../config/env.js', () => ({
       config: {

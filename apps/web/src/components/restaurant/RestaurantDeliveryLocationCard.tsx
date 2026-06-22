@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { MapPin, Save, Loader2, ExternalLink, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
@@ -20,6 +21,14 @@ import {
   validateDeliveryLocationForm,
   type DeliveryLocationForm,
 } from '../../lib/deliveryLocationForm'
+import { ensureNamespace } from '../../i18n'
+
+const VALIDATION_MESSAGE_KEYS: Record<string, string> = {
+  'Enter both latitude and longitude, or leave both empty.': 'validation.bothOrEmpty',
+  'Latitude and longitude must be valid numbers.': 'validation.invalidNumbers',
+  'Latitude or longitude is out of range.': 'validation.outOfRange',
+  'Invalid coordinates.': 'validation.invalidCoordinates',
+}
 
 function DeliveryLocationFields({
   form,
@@ -109,6 +118,7 @@ function DeliveryLocationFields({
 }
 
 export function RestaurantDeliveryLocationCard() {
+  const { t } = useTranslation('restaurants')
   const { data, isLoading, isError, refetch } = useGetRestaurantDeliveryLocationsQuery()
   const [updateRestaurant, { isLoading: savingRestaurant }] =
     useUpdateRestaurantDeliveryLocationMutation()
@@ -120,6 +130,10 @@ export function RestaurantDeliveryLocationCard() {
   const [branchForms, setBranchForms] = useState<Record<string, DeliveryLocationForm>>({})
 
   useEffect(() => {
+    void ensureNamespace('restaurants')
+  }, [])
+
+  useEffect(() => {
     if (!data) return
     setRestaurantForm(formFromDeliveryLocation(data.restaurant))
     const next: Record<string, DeliveryLocationForm> = {}
@@ -129,10 +143,16 @@ export function RestaurantDeliveryLocationCard() {
     setBranchForms(next)
   }, [data])
 
+  const translateValidationError = (validationError: string | null) => {
+    if (!validationError) return null
+    const key = VALIDATION_MESSAGE_KEYS[validationError]
+    return key ? t(`deliveryLocation.${key}`) : validationError
+  }
+
   const handleSaveRestaurant = async () => {
     const validationError = validateDeliveryLocationForm(restaurantForm)
     if (validationError) {
-      toast.error(validationError)
+      toast.error(translateValidationError(validationError))
       return
     }
     try {
@@ -144,12 +164,12 @@ export function RestaurantDeliveryLocationCard() {
           )
         )
       }
-      toast.success('Delivery location saved')
+      toast.success(t('deliveryLocation.toast.saved'))
       refetch()
     } catch (error: unknown) {
       const msg =
         (error as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Failed to save delivery location'
+        t('deliveryLocation.toast.saveFailed')
       toast.error(msg)
     }
   }
@@ -159,7 +179,7 @@ export function RestaurantDeliveryLocationCard() {
     if (!form) return
     const validationError = validateDeliveryLocationForm(form)
     if (validationError) {
-      toast.error(validationError)
+      toast.error(translateValidationError(validationError))
       return
     }
     try {
@@ -175,12 +195,12 @@ export function RestaurantDeliveryLocationCard() {
           ),
         }))
       }
-      toast.success('Branch delivery location saved')
+      toast.success(t('deliveryLocation.toast.branchSaved'))
       refetch()
     } catch (error: unknown) {
       const msg =
         (error as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Failed to save branch delivery location'
+        t('deliveryLocation.toast.branchSaveFailed')
       toast.error(msg)
     }
   }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { apiUrl } from '../lib/apiBase'
 import {
@@ -33,6 +34,7 @@ export function useProductCatalogImport({
   refetch,
   onImportSuccess,
 }: UseProductCatalogImportOptions) {
+  const { t } = useTranslation('products')
   const [importSummary, setImportSummary] = useState<ProductImportSummary | null>(null)
   const [importPreviewMeta, setImportPreviewMeta] = useState<ImportPreviewMeta | null>(null)
   const [importErrors, setImportErrors] = useState<ProductImportRowError[]>([])
@@ -68,15 +70,17 @@ export function useProductCatalogImport({
       setImportSummary(summary)
       if (result.errors?.length) setImportErrors(result.errors)
       if (summary.failed > 0) {
-        toast.error(`Import finished with ${summary.failed} failed row(s). Valid rows were saved.`)
+        toast.error(t('toast.catalogImportFinishedWithFailures', { failed: summary.failed }))
         return
       }
-      toast.success(`Import complete: ${summary.created} created, ${summary.updated} updated`)
+      toast.success(
+        t('toast.catalogImportComplete', { created: summary.created, updated: summary.updated })
+      )
       onImportSuccess()
       resetImportTracking()
       refetch()
     },
-    [onImportSuccess, refetch, resetImportTracking]
+    [onImportSuccess, refetch, resetImportTracking, t]
   )
 
   useEffect(() => {
@@ -93,7 +97,7 @@ export function useProductCatalogImport({
 
     if (importJob.status === 'failed') {
       importTerminalToastRef.current = toastKey
-      toast.error(importJob.errorMessage || 'Bulk upload failed')
+      toast.error(importJob.errorMessage || t('toast.catalogBulkUploadFailed'))
     }
   }, [importJob, applyImportResult])
 
@@ -112,10 +116,14 @@ export function useProductCatalogImport({
         })
         setImportErrors(result.errors || [])
         if ((result.validCount ?? 0) === 0) {
-          toast.error('No valid rows to import — fix errors below')
+          toast.error(t('toast.catalogNoValidRows'))
         } else {
           toast.success(
-            `Preview: ${result.validCount} valid, ${result.errorCount} with issues (${result.totalRows} rows)`
+            t('toast.catalogPreviewReady', {
+              valid: result.validCount,
+              errorCount: result.errorCount,
+              totalRows: result.totalRows,
+            })
           )
         }
       } catch (error: unknown) {
@@ -123,10 +131,10 @@ export function useProductCatalogImport({
           error && typeof error === 'object' && 'data' in error
             ? (error as { data?: { error?: { message?: string } } }).data?.error?.message
             : undefined
-        toast.error(message || 'Failed to preview file')
+        toast.error(message || t('toast.catalogPreviewFailed'))
       }
     },
-    [previewImport, resetImportTracking]
+    [previewImport, resetImportTracking, t]
   )
 
   const downloadErrorReport = useCallback(async () => {
@@ -135,7 +143,7 @@ export function useProductCatalogImport({
         ? importErrors
         : (importSummary as { errors?: ProductImportRowError[] })?.errors || []
     if (!errors.length) {
-      toast.error('No errors to export')
+      toast.error(t('toast.catalogNoErrorsToExport'))
       return
     }
     try {
@@ -153,15 +161,15 @@ export function useProductCatalogImport({
       a.click()
       URL.revokeObjectURL(url)
     } catch {
-      toast.error('Could not download error report')
+      toast.error(t('toast.catalogErrorReportDownloadFailed'))
     }
-  }, [importErrors, importSummary])
+  }, [importErrors, importSummary, t])
 
   const submitImport = useCallback(
     async (uploadedFile: File | null) => {
       if (!uploadedFile) return
       if (importPreviewMeta && importPreviewMeta.validCount === 0) {
-        toast.error('Fix validation errors before importing')
+        toast.error(t('toast.catalogFixValidationErrors'))
         return
       }
       try {
@@ -171,7 +179,7 @@ export function useProductCatalogImport({
         if (isAsyncProductImportStart(result)) {
           setImportJobId(result.jobId)
           importTerminalToastRef.current = null
-          toast.success('Large import queued — processing in the background')
+          toast.success(t('toast.catalogLargeImportQueued'))
           return
         }
         applyImportResult(result)
@@ -180,10 +188,10 @@ export function useProductCatalogImport({
           error && typeof error === 'object' && 'data' in error
             ? (error as { data?: { error?: { message?: string } } }).data?.error?.message
             : undefined
-        toast.error(message || 'Bulk upload failed')
+        toast.error(message || t('toast.catalogBulkUploadFailed'))
       }
     },
-    [applyImportResult, executeImport, importPreviewMeta]
+    [applyImportResult, executeImport, importPreviewMeta, t]
   )
 
   return {

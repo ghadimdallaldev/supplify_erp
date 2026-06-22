@@ -10,8 +10,13 @@ import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../lib/safe-update.js'
+import { resolveRequestLocale, localizedError } from '../i18n/index.js'
 
 const router = express.Router()
+
+function priceErr(req, name, key, vars = {}) {
+  return localizedError(resolveRequestLocale(req), name, `errors.${key}`, vars, 'prices')
+}
 
 // Validation schemas
 const priceCreateSchema = z.object({
@@ -50,10 +55,7 @@ router.get('/product/:productId', requireAuth, async (req, res) => {
       return res.status(404).json({
         ok: false,
         data: null,
-        error: {
-          name: 'NOT_FOUND',
-          message: 'Product not found',
-        },
+        error: priceErr(req, 'NOT_FOUND', 'productNotFound'),
         requestId: req.requestId,
       })
     }
@@ -66,10 +68,7 @@ router.get('/product/:productId', requireAuth, async (req, res) => {
         return res.status(403).json({
           ok: false,
           data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied. You can only view prices for your own products',
-          },
+          error: priceErr(req, 'FORBIDDEN', 'accessDeniedOwnProducts'),
           requestId: req.requestId,
         })
       }
@@ -79,10 +78,7 @@ router.get('/product/:productId', requireAuth, async (req, res) => {
         return res.status(403).json({
           ok: false,
           data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied',
-          },
+          error: priceErr(req, 'FORBIDDEN', 'accessDenied'),
           requestId: req.requestId,
         })
       }
@@ -104,10 +100,7 @@ router.get('/product/:productId', requireAuth, async (req, res) => {
         return res.status(404).json({
           ok: false,
           data: null,
-          error: {
-            name: 'NOT_FOUND',
-            message: 'Product not found',
-          },
+          error: priceErr(req, 'NOT_FOUND', 'productNotFound'),
           requestId: req.requestId,
         })
       }
@@ -115,10 +108,7 @@ router.get('/product/:productId', requireAuth, async (req, res) => {
       return res.status(403).json({
         ok: false,
         data: null,
-        error: {
-          name: 'FORBIDDEN',
-          message: 'Access denied',
-        },
+        error: priceErr(req, 'FORBIDDEN', 'accessDenied'),
         requestId: req.requestId,
       })
     }
@@ -145,10 +135,7 @@ router.get('/product/:productId', requireAuth, async (req, res) => {
     res.status(500).json({
       ok: false,
       data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get prices',
-      },
+      error: priceErr(req, 'INTERNAL_ERROR', 'failedGetPrices'),
       requestId: req.requestId,
     })
   }
@@ -179,10 +166,7 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
         return res.status(403).json({
           ok: false,
           data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied. You can only set prices for your own products',
-          },
+          error: priceErr(req, 'FORBIDDEN', 'accessDeniedSetOwnProducts'),
           requestId: req.requestId,
         })
       }
@@ -221,11 +205,7 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
       return res.status(400).json({
         ok: false,
         data: null,
-        error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Invalid price data',
-          details: error.errors,
-        },
+        error: { ...priceErr(req, 'VALIDATION_ERROR', 'invalidPriceData'), details: error.errors },
         requestId: req.requestId,
       })
     }
@@ -234,10 +214,7 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
     res.status(500).json({
       ok: false,
       data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to create price',
-      },
+      error: priceErr(req, 'INTERNAL_ERROR', 'failedCreatePrice'),
       requestId: req.requestId,
     })
   }
@@ -270,10 +247,7 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
         return res.status(403).json({
           ok: false,
           data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied. You can only update prices for your own products',
-          },
+          error: priceErr(req, 'FORBIDDEN', 'accessDeniedUpdateOwnProducts'),
           requestId: req.requestId,
         })
       }
@@ -295,10 +269,7 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
       return res.status(400).json({
         ok: false,
         data: null,
-        error: {
-          name: 'VALIDATION_ERROR',
-          message: 'No fields to update',
-        },
+        error: priceErr(req, 'VALIDATION_ERROR', 'noFieldsToUpdate'),
         requestId: req.requestId,
       })
     }
@@ -331,11 +302,7 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
       return res.status(400).json({
         ok: false,
         data: null,
-        error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Invalid update data',
-          details: error.errors,
-        },
+        error: { ...priceErr(req, 'VALIDATION_ERROR', 'invalidUpdateData'), details: error.errors },
         requestId: req.requestId,
       })
     }
@@ -344,10 +311,7 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
     res.status(500).json({
       ok: false,
       data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to update price',
-      },
+      error: priceErr(req, 'INTERNAL_ERROR', 'failedUpdatePrice'),
       requestId: req.requestId,
     })
   }

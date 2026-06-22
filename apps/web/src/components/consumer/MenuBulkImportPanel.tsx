@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Download, FileUp, Upload } from 'lucide-react'
 import {
@@ -11,6 +12,7 @@ import { Button } from '../ui/button'
 import { Label } from '../ui/label'
 import { Switch } from '../ui/switch'
 import { cn } from '../../lib/utils'
+import { ensureNamespace } from '../../i18n'
 
 type PreviewRow = {
   rowNumber: number
@@ -24,6 +26,7 @@ type MenuBulkImportPanelProps = {
 }
 
 export function MenuBulkImportPanel({ onImported }: MenuBulkImportPanelProps) {
+  const { t } = useTranslation('consumer')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [csvText, setCsvText] = useState('')
   const [updateExisting, setUpdateExisting] = useState(true)
@@ -36,6 +39,10 @@ export function MenuBulkImportPanel({ onImported }: MenuBulkImportPanelProps) {
 
   const [previewImport, { isLoading: previewing }] = usePreviewConsumerMenuImportMutation()
   const [runImport, { isLoading: importing }] = useImportConsumerMenuMutation()
+
+  useEffect(() => {
+    void ensureNamespace('consumer')
+  }, [])
 
   const handleDownloadTemplate = () => {
     const blob = new Blob([MENU_IMPORT_CSV_TEMPLATE], { type: 'text/csv;charset=utf-8' })
@@ -58,47 +65,53 @@ export function MenuBulkImportPanel({ onImported }: MenuBulkImportPanelProps) {
 
   const handlePreview = async () => {
     if (!csvText.trim()) {
-      toast.error('Paste CSV text or upload a file first')
+      toast.error(t('menuBulkImport.toast.pasteOrUploadFirst'))
       return
     }
     try {
       const result = await previewImport({ csv: csvText }).unwrap()
       setPreview(result)
       if (result.errorCount > 0) {
-        toast.error(`${result.errorCount} row(s) need fixes before import`)
+        toast.error(t('menuBulkImport.toast.rowsNeedFixes', { count: result.errorCount }))
       } else {
-        toast.success(`${result.validCount} row(s) ready to import`)
+        toast.success(t('menuBulkImport.toast.rowsReady', { count: result.validCount }))
       }
     } catch (error: unknown) {
       const err = error as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Unable to preview CSV')
+      toast.error(err?.data?.error?.message || t('menuBulkImport.toast.previewFailed'))
     }
   }
 
   const handleImport = async () => {
     if (!csvText.trim()) {
-      toast.error('Paste CSV text or upload a file first')
+      toast.error(t('menuBulkImport.toast.pasteOrUploadFirst'))
       return
     }
     try {
       const result = await runImport({ csv: csvText, updateExisting }).unwrap()
       const { summary } = result
+      const updated = summary.itemsUpdated
+        ? t('menuBulkImport.toast.importSuccessUpdated', { count: summary.itemsUpdated })
+        : ''
+      const categories = summary.categoriesCreated
+        ? t('menuBulkImport.toast.importSuccessCategories', { count: summary.categoriesCreated })
+        : ''
       toast.success(
-        `Imported ${summary.itemsCreated} item(s)` +
-          (summary.itemsUpdated ? `, updated ${summary.itemsUpdated}` : '') +
-          (summary.categoriesCreated
-            ? `, ${summary.categoriesCreated} new categor${summary.categoriesCreated === 1 ? 'y' : 'ies'}`
-            : '')
+        t('menuBulkImport.toast.importSuccess', {
+          created: summary.itemsCreated,
+          updated,
+          categories,
+        })
       )
       if (summary.failed) {
-        toast.error(`${summary.failed} row(s) failed`)
+        toast.error(t('menuBulkImport.toast.rowsFailed', { count: summary.failed }))
       }
       setCsvText('')
       setPreview(null)
       onImported()
     } catch (error: unknown) {
       const err = error as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Import failed')
+      toast.error(err?.data?.error?.message || t('menuBulkImport.toast.importFailed'))
     }
   }
 

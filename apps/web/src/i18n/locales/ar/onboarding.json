@@ -103,6 +103,18 @@
       "updateFailed": "فشل تحديث الملف"
     }
   },
+  "restaurantTeam": {
+    "toast": {
+      "memberRemoved": "تمت إزالة العضو",
+      "removeFailed": "فشل إزالة العضو"
+    }
+  },
+  "restaurantReviews": {
+    "title": "تقييمات المورّدين الخاصة بي",
+    "description": "التقييمات التي أرسلتها بعد إتمام الطلبات",
+    "empty": "لم تكتب أي تقييمات بعد.",
+    "supplierFallback": "مورّد"
+  },
   "restaurantBranches": {
     "title": "حسابات الفروع",
     "description": "كل فرع هو حساب مستقل له طلباته ومخزونه وإعداداته. يمكنك التبديل بينها من الرأس بعد إنشاء فرع.",

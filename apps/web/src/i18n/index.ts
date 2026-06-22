@@ -17,13 +17,25 @@ import arNavigation from './locales/ar/navigation.json'
 
 const ALL_NAMESPACES = [...EAGER_NAMESPACES, ...LAZY_NAMESPACES] as const
 
-function readStoredLocale(): string {
+export function readStoredLocale(): string {
   if (typeof window === 'undefined') return DEFAULT_LOCALE
   try {
     const stored = localStorage.getItem(LOCALE_STORAGE_KEY)
     return isSupportedLocale(stored) ? stored : DEFAULT_LOCALE
   } catch {
     return DEFAULT_LOCALE
+  }
+}
+
+async function syncLocalePreferenceToServer(locale: string) {
+  try {
+    const { store } = await import('../store')
+    const { api } = await import('../services/api')
+    await store
+      .dispatch(api.endpoints.updateLocalePreference.initiate({ locale: locale as 'en' | 'ar' }))
+      .unwrap()
+  } catch {
+    // User may be logged out or offline; local preference still applies.
   }
 }
 
@@ -37,7 +49,12 @@ export function getActiveLocale(): string {
   return i18n.language?.split('-')[0] || DEFAULT_LOCALE
 }
 
-export async function changeAppLanguage(locale: string) {
+type ChangeAppLanguageOptions = {
+  /** Skip PATCH /auth/me/locale when applying server-side preference on login/init */
+  skipServerSync?: boolean
+}
+
+export async function changeAppLanguage(locale: string, options?: ChangeAppLanguageOptions) {
   const next = isSupportedLocale(locale) ? locale : DEFAULT_LOCALE
   await i18n.changeLanguage(next)
   applyHtmlAttributes(next)
@@ -45,6 +62,9 @@ export async function changeAppLanguage(locale: string) {
     localStorage.setItem(LOCALE_STORAGE_KEY, next)
   } catch {
     // ignore storage failures
+  }
+  if (!options?.skipServerSync) {
+    void syncLocalePreferenceToServer(next)
   }
 }
 

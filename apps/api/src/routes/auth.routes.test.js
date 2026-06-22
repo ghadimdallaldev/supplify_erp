@@ -61,6 +61,7 @@ vi.mock('../lib/rbac.js', async (importOriginal) => {
         email: 'test@example.com',
         role: 'RESTAURANT',
         display_name: 'Test User',
+        preferred_locale: 'en',
         created_at: new Date(),
       }
       next()
@@ -384,6 +385,34 @@ describe('Auth Routes', () => {
         needsReacceptance: true,
         currentPackVersion: expect.any(String),
       })
+      expect(response.body.data.preferredLocale).toBe('en')
+    })
+  })
+
+  describe('PATCH /auth/me/locale', () => {
+    it('updates preferred locale for authenticated user', async () => {
+      db.query.mockResolvedValueOnce({ rows: [{ preferred_locale: 'ar' }] })
+
+      const response = await request(app)
+        .patch('/auth/me/locale')
+        .send({ locale: 'ar' })
+        .expect(200)
+
+      expect(response.body.ok).toBe(true)
+      expect(response.body.data.preferredLocale).toBe('ar')
+      expect(db.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE app_user'), [
+        'ar',
+        'user-1',
+      ])
+    })
+
+    it('rejects invalid locale', async () => {
+      const response = await request(app)
+        .patch('/auth/me/locale')
+        .send({ locale: 'fr' })
+        .expect(400)
+
+      expect(response.body.error.name).toBe('VALIDATION_ERROR')
     })
   })
 

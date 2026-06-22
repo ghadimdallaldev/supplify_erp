@@ -232,6 +232,21 @@
   "shared": {
     "exampleDownloaded": "تم تنزيل ملف المثال!"
   },
+  "substitutes": {
+    "title": "منتجات بديلة",
+    "description": "بدائل معتمدة مسبقاً عندما يكون هذا الصنف غير متوفر في الطلب.",
+    "loading": "جارٍ تحميل البدائل…",
+    "loadError": "تعذّر تحميل البدائل.",
+    "retry": "إعادة المحاولة",
+    "empty": "لم تُضبط بدائل بعد.",
+    "remove": "إزالة",
+    "selectPlaceholder": "اختر منتجاً بديلاً",
+    "addButton": "إضافة بديل",
+    "toast": {
+      "added": "تمت إضافة البديل",
+      "addFailed": "فشل إضافة البديل"
+    }
+  },
   "toast": {
     "addedToCart": "تمت الإضافة إلى السلة",
     "removedFromFavorites": "تمت الإزالة من المفضلة",
@@ -260,6 +275,20 @@
     "imageImportFailed": "فشل استيراد الصور",
     "stockAdded": "تمت إضافة المخزون بنجاح",
     "stockRemoved": "تمت إزالة المخزون بنجاح",
-    "inventoryUpdateFailed": "فشل تحديث المخزون"
+    "inventoryUpdateFailed": "فشل تحديث المخزون",
+    "selectImageFile": "يُرجى اختيار ملف صورة",
+    "logoUploadFailed": "فشل رفع الشعار",
+    "imageUploadedSuccess": "تم رفع الصورة بنجاح!",
+    "imageRemovedSuccess": "تمت إزالة الصورة بنجاح!",
+    "catalogImportFinishedWithFailures": "اكتمل الاستيراد مع {{failed}} صف فاشل. تم حفظ الصفوف الصالحة.",
+    "catalogImportComplete": "اكتمل الاستيراد: {{created}} أُنشئ، {{updated}} حُدّث",
+    "catalogBulkUploadFailed": "فشل الرفع الجماعي",
+    "catalogNoValidRows": "لا توجد صفوف صالحة للاستيراد — أصلح الأخطاء أدناه",
+    "catalogPreviewReady": "معاينة: {{valid}} صالح، {{errorCount}} بها مشاكل ({{totalRows}} صف)",
+    "catalogPreviewFailed": "فشلت معاينة الملف",
+    "catalogNoErrorsToExport": "لا توجد أخطاء للتصدير",
+    "catalogErrorReportDownloadFailed": "تعذّر تنزيل تقرير الأخطاء",
+    "catalogFixValidationErrors": "أصلح أخطاء التحقق قبل الاستيراد",
+    "catalogLargeImportQueued": "تمت جدولة استيراد كبير — المعالجة في الخلفية"
   }
 }

@@ -27,5 +27,237 @@
       "defaultDescription": "When your suppliers publish offers, they'll appear here.",
       "browseSuppliers": "Browse suppliers"
     }
+  },
+  "labels": {
+    "emDash": "—",
+    "dealTypes": {
+      "percentage_discount": "Percentage off",
+      "percentage_off": "Percentage off",
+      "fixed_discount": "Fixed amount off",
+      "fixed_off": "Fixed amount off",
+      "buy_x_get_y": "Buy X Get Y",
+      "bogo": "Buy X Get Y",
+      "bundle": "Bundle",
+      "free_shipping": "Free shipping",
+      "featured_listing": "Visibility only"
+    },
+    "dealTypeHelpers": {
+      "percentage_discount": "Give restaurants a percentage off eligible products.",
+      "percentage_off": "Give restaurants a percentage off eligible products.",
+      "fixed_discount": "Give restaurants a fixed amount off eligible orders.",
+      "fixed_off": "Give restaurants a fixed amount off eligible orders.",
+      "buy_x_get_y": "Reward restaurants for buying a quantity of selected products.",
+      "bogo": "Reward restaurants for buying a quantity of selected products.",
+      "bundle": "Bundle selected products at a special price.",
+      "free_shipping": "Remove shipping cost for eligible orders.",
+      "featured_listing": "Visibility-only deal. This does not discount the order."
+    },
+    "dealStatus": {
+      "active": "Active",
+      "scheduled": "Scheduled",
+      "expired": "Expired",
+      "paused": "Paused",
+      "draft": "Draft",
+      "pending_approval": "Pending approval",
+      "pending_admin_approval": "Pending approval",
+      "pending_review": "Pending review",
+      "rejected": "Rejected",
+      "approved_pending_payment": "Awaiting boost payment",
+      "cancelled": "Cancelled"
+    },
+    "boostStatus": {
+      "active": "Active boost",
+      "expired": "Expired boost",
+      "scheduled": "Scheduled boost",
+      "none": "No boost",
+      "sponsored": "Sponsored",
+      "boosted": "Boosted"
+    },
+    "cta": {
+      "supplier": {
+        "order_now": "Order now",
+        "use_coupon": "Use coupon",
+        "message_supplier": "Message supplier",
+        "view_products": "View products"
+      },
+      "restaurant": {
+        "order_now": "Order with deal",
+        "use_coupon": "Use coupon",
+        "message_supplier": "Message supplier",
+        "view_products": "View products"
+      },
+      "helpers": {
+        "order_now": "Send restaurants directly to the order flow with this deal context.",
+        "use_coupon": "Reveal a coupon code and apply it during checkout.",
+        "message_supplier": "Start a chat with a prefilled message about this deal.",
+        "view_products": "Show restaurants the eligible products for this deal."
+      }
+    },
+    "coupon": {
+      "fieldHelper": "Coupon codes are attached to this deal. They are not standalone vouchers.",
+      "linkedHelper": "This code is linked to this supplier deal.",
+      "copiedToast": "Coupon copied. We'll apply it at checkout when eligible."
+    },
+    "schedule": {
+      "sectionHelper": "Controls when restaurants can redeem this discount or coupon. This is separate from your boost package, which only controls how long the deal is promoted in restaurant feeds.",
+      "endsHelper": "Leave blank to keep the offer open for the full boost period (or until you pause it). Set an end date only if you want the discount to stop before or after boosted visibility ends."
+    },
+    "discount": {
+      "percentageOff": "{{value}}% off",
+      "fixedOff": "{{value}} off",
+      "freeShipping": "Free shipping",
+      "freeShip": "Free ship"
+    },
+    "validUntil": {
+      "noExpiry": "No expiry",
+      "label": "Valid until {{date}}"
+    },
+    "minOrder": "Min order: {{amount}}",
+    "code": "Code: {{code}}",
+    "applyLimitReached": "Apply limit reached — upgrade for more redemptions",
+    "dailyLimitReached": "Daily limit reached",
+    "supplierFallback": "Supplier",
+    "sponsored": "Sponsored",
+    "featured": "Featured"
+  },
+  "empty": {
+    "supplier": {
+      "title": "No deals yet",
+      "description": "Create your first supplier deal to offer discounts, coupons, or visibility-based offers to restaurants.",
+      "cta": "Create deal"
+    },
+    "restaurant": {
+      "title": "No active deals right now",
+      "description": "When your suppliers publish offers, they'll appear here."
+    },
+    "admin": {
+      "title": "No deals found",
+      "description": "Supplier-created deals and sponsored boosts will appear here."
+    },
+    "boost": {
+      "title": "No boosted deals yet",
+      "description": "Boosts are optional paid campaigns that increase deal visibility in the restaurant deals feed."
+    },
+    "adminBoostPackages": {
+      "title": "No boost packages configured",
+      "description": "Boost packages define paid sponsored placement pricing suppliers see when boosting deals."
+    }
+  },
+  "boostPackagePicker": {
+    "loading": "Loading boost packages…",
+    "noneAvailable": "No boost packages available. Contact support.",
+    "helperText": "Your deal will get sponsored placement in restaurant deal feeds during the boost period. Reach labels describe placement priority, not exact impression counts.",
+    "boostPeriod": "Boost period",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "oneTime": "one-time"
+  },
+  "promoteDialog": {
+    "title": "Boost this deal",
+    "description": "Choose a boost package for sponsored placement in restaurant deal feeds — including restaurants that do not follow you yet.",
+    "helperText": "Your deal will appear higher in restaurant deal feeds during the boost period. Reach estimates describe placement priority, not exact impression counts.",
+    "loading": "Loading boost packages…",
+    "noneAvailable": "No boost packages are available right now. Contact support or try again later.",
+    "recommended": "Recommended",
+    "daysBoost_one": "{{count}} day boost",
+    "daysBoost_other": "{{count}} days boost",
+    "boostPeriod": "Boost period",
+    "oneTime": "one-time",
+    "boostingWith": "You are boosting with {{name}}",
+    "priceForDays_one": "${{amount}} for {{count}} day",
+    "priceForDays_other": "${{amount}} for {{count}} days",
+    "priceForPeriod": "${{amount}} for the boost period",
+    "cancel": "Cancel",
+    "boostDeal": "Boost deal",
+    "toastSuccess": "Deal boost activated",
+    "toastError": "Failed to boost deal"
+  },
+  "submitDialog": {
+    "title": "Submit for approval",
+    "descriptionWithName": "Choose how to boost \"{{name}}\" before admin review. Approval publishes your deal to restaurants.",
+    "description": "Choose a boost package before admin review. Approval publishes your deal to restaurants.",
+    "cancel": "Cancel",
+    "submit": "Submit for approval",
+    "toastSelectPackage": "Select a boost package",
+    "toastSuccess": "Deal and boost submitted for approval",
+    "toastError": "Failed to submit deal"
+  },
+  "targeting": {
+    "helperText": "Limit which catalog items this deal applies to. Leave as all products for store-wide offers.",
+    "appliesTo": "Applies to",
+    "allProducts": "All products",
+    "specificProducts": "Specific products",
+    "specificCategories": "Specific categories",
+    "products": "Products",
+    "removeProduct": "Remove {{name}}",
+    "searchProducts": "Search products...",
+    "loadingCatalog": "Loading your catalog…",
+    "noProductsFound": "No products found",
+    "categories": "Categories",
+    "noCategoriesAvailable": "No categories available",
+    "clearSelection": "Clear selection"
+  },
+  "banner": {
+    "andMore": " and {{count}} more",
+    "tapToBrowse": " — tap to browse deals.",
+    "viewDeal_one": "View deal",
+    "viewDeal_other": "View deals",
+    "dismiss": "Dismiss deal banner",
+    "percentageOff": "{{value}}% off",
+    "fixedOff": "${{value}} off"
+  },
+  "supplierRow": {
+    "sponsored": "Sponsored",
+    "percentageOff": "{{value}}% off",
+    "fixedOff": "${{value}} off",
+    "rejected": "Rejected: {{reason}}",
+    "boostPrice_one": "Boost ${{price}} · {{count}} day",
+    "boostPrice_other": "Boost ${{price}} · {{count}} days",
+    "awaitingPayment": "Awaiting boost payment to go live",
+    "submitWithBoost": "Submit with boost",
+    "delete": "Delete",
+    "pause": "Pause",
+    "viewAnalytics": "View analytics",
+    "resume": "Resume",
+    "boostAgain": "Boost again",
+    "filterAriaLabel": "Filter deals by status",
+    "statusFilters": {
+      "all": "All",
+      "draft": "Draft",
+      "pending_approval": "Pending",
+      "rejected": "Rejected",
+      "approved_pending_payment": "Awaiting payment",
+      "active": "Live",
+      "paused": "Paused",
+      "expired": "Expired"
+    }
+  },
+  "analytics": {
+    "boostTitle": "Boost analytics",
+    "performanceTitle": "Deal performance",
+    "views": "Views",
+    "clicks": "Clicks",
+    "redemptions": "Deal redemptions",
+    "messages": "Messages",
+    "couponUses": "Coupon uses",
+    "conversion": "Conversion",
+    "discountAmount": "Discount amount",
+    "boostSummary": "Boost: {{status}} · budget ${{budget}} · {{impressions}} impressions · sponsored placement"
+  },
+  "boostStatusCard": {
+    "active": "Boost active · {{packageName}}",
+    "boostFallback": "Boost",
+    "daysLeft_one": "{{count}} day left",
+    "daysLeft_other": "{{count}} days left",
+    "running": "Running",
+    "activeUntil": "Active until {{date}}",
+    "scheduled": "{{packageName}} scheduled",
+    "starts": " · starts {{date}}",
+    "ended": "Boost ended",
+    "expired": " · expired {{date}}"
+  },
+  "card": {
+    "toastCouponError": "Could not retrieve coupon",
+    "toastMessageError": "Could not start conversation"
   }
 }

@@ -35,5 +35,12 @@
     "passwordMinLength": "Password must be at least 8 characters",
     "acceptFailed": "Could not accept invitation. Try signing in with a different account.",
     "createFailed": "Could not create your account. The link may have expired."
+  },
+  "toast": {
+    "nameRequired": "Branch name is required",
+    "created": "Branch created",
+    "createFailed": "Failed to create branch",
+    "removed": "Branch removed",
+    "removeFailed": "Failed to remove branch"
   }
 }

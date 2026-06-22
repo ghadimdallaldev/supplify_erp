@@ -532,6 +532,28 @@
     "openChat": "فتح الدردشة",
     "viewConversation": "عرض المحادثة ←"
   },
+  "featuredPlacement": {
+    "toast": {
+      "activated": "تم تفعيل الموضع المميز",
+      "activateFailed": "تعذّر تفعيل الموضع المميز"
+    }
+  },
+  "connectionRequests": {
+    "toast": {
+      "accepted": "تم قبول الاتصال — أُضيف المورد إلى شبكتك",
+      "acceptFailed": "فشل قبول الطلب",
+      "declined": "تم رفض طلب الاتصال",
+      "declineFailed": "فشل رفض الطلب"
+    }
+  },
+  "reviewModal": {
+    "toast": {
+      "updated": "تم تحديث التقييم",
+      "submitted": "تم إرسال التقييم",
+      "selectOrder": "اختر طلباً لتقييمه",
+      "saveFailed": "فشل حفظ التقييم"
+    }
+  },
   "substitution": {
     "proposeDescription": "اقتراح بديل: {{name}}",
     "proposeSuccess": "تم اقتراح البديل — في انتظار قبول المطعم",

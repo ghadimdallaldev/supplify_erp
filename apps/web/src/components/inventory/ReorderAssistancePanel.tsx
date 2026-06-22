@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   useGetReorderAssistanceQuery,
   useGetEntitlementsQuery,
@@ -101,6 +102,7 @@ export function ReorderAssistancePanel({
   maxItems,
   className,
 }: ReorderAssistancePanelProps) {
+  const { t } = useTranslation('inventory')
   const { data, isLoading, isError, refetch } = useGetReorderAssistanceQuery()
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const { data: quickListsData } = useGetQuickListsQuery()
@@ -142,9 +144,9 @@ export function ReorderAssistancePanel({
         action: 'snooze',
         snoozeDays: 7,
       }).unwrap()
-      toast.success('Reminder snoozed for 7 days')
+      toast.success(t('toast.reorderReminderSnoozed'))
     } catch (e: any) {
-      toast.error(e?.data?.error?.message || 'Could not snooze reminder')
+      toast.error(e?.data?.error?.message || t('toast.reorderSnoozeFailed'))
     }
   }
 
@@ -155,20 +157,20 @@ export function ReorderAssistancePanel({
         scopeId: item.scopeId,
         action: 'not_needed',
       }).unwrap()
-      toast.success('Marked as not needed')
+      toast.success(t('toast.reorderMarkedNotNeeded'))
     } catch (e: any) {
-      toast.error(e?.data?.error?.message || 'Could not update preference')
+      toast.error(e?.data?.error?.message || t('toast.reorderUpdatePreferenceFailed'))
     }
   }
 
   const handleAddToQuickList = async (item: (typeof suggestions)[0]) => {
     const lists = quickListsData?.quickLists || []
     if (lists.length === 0) {
-      toast.error('Create an ordering list first')
+      toast.error(t('toast.createOrderingListFirst'))
       return
     }
     if (!item.productId) {
-      toast.error('No product linked to this suggestion')
+      toast.error(t('toast.noProductLinkedToSuggestion'))
       return
     }
     setBusyId(item.id)
@@ -182,9 +184,9 @@ export function ReorderAssistancePanel({
           quantity: qty,
         },
       }).unwrap()
-      toast.success(`Added to ${lists[0].name}`)
+      toast.success(t('toast.addedToList', { listName: lists[0].name }))
     } catch (e: any) {
-      toast.error(e?.data?.error?.message || 'Failed to add to list')
+      toast.error(e?.data?.error?.message || t('toast.addToListFailed'))
     } finally {
       setBusyId(null)
     }
@@ -196,10 +198,10 @@ export function ReorderAssistancePanel({
       setExplainResult(result)
       setExplainOpen(true)
       if (result.usageLimited) {
-        toast.message('Daily AI limit reached — showing rule-based summary')
+        toast.message(t('toast.aiDailyLimitReached'))
       }
     } catch (e: any) {
-      toast.error(e?.data?.error?.message || 'Could not explain suggestions')
+      toast.error(e?.data?.error?.message || t('toast.explainSuggestionsFailed'))
     }
   }
 
@@ -209,21 +211,21 @@ export function ReorderAssistancePanel({
     try {
       const result = await askAssistance({ query: q }).unwrap()
       if (result.matchedProducts.length === 0) {
-        toast.message(result.clarifyingQuestion || 'No matching products found')
+        toast.message(result.clarifyingQuestion || t('toast.noMatchingProducts'))
         return
       }
       setAskResult(result)
       setAskOpen(true)
       setAskQuery('')
     } catch (e: any) {
-      toast.error(e?.data?.error?.message || 'Could not parse your request')
+      toast.error(e?.data?.error?.message || t('toast.parseRequestFailed'))
     }
   }
 
   const handleAskAddToList = async (match: ReorderAiAskResult['matchedProducts'][0]) => {
     const lists = quickListsData?.quickLists || []
     if (lists.length === 0) {
-      toast.error('Create an ordering list first')
+      toast.error(t('toast.createOrderingListFirst'))
       return
     }
     const suggestion = suggestions.find((s) => s.productId === match.productId)
@@ -237,9 +239,9 @@ export function ReorderAssistancePanel({
           quantity: match.qty ?? 1,
         },
       }).unwrap()
-      toast.success(`Added to ${lists[0].name}`)
+      toast.success(t('toast.addedToList', { listName: lists[0].name }))
     } catch (e: any) {
-      toast.error(e?.data?.error?.message || 'Failed to add to list')
+      toast.error(e?.data?.error?.message || t('toast.addToListFailed'))
     } finally {
       setAskBusyProductId(null)
     }

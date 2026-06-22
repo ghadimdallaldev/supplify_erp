@@ -1,0 +1,8 @@
+{
+  "errors": {
+    "checkUnavailable": "Unable to verify billing status. Try again shortly.",
+    "freeTrialExpired": "Your Free Trial has expired. Upgrade your plan to continue using Supplify.",
+    "pendingActivation": "Your account is not activated yet. Complete payment for a plan or ask an administrator to activate your account.",
+    "paymentOverdue": "Your account is locked due to an overdue subscription payment. Pay your balance to restore access."
+  }
+}

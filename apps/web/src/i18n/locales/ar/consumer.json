@@ -37,6 +37,32 @@
     "addAria": "إضافة {{name}}",
     "preorder": "طلب مسبق"
   },
+  "cartBar": {
+    "itemCount_one": "{{count}} عنصر · عرض السلة",
+    "itemCount_other": "{{count}} عناصر · عرض السلة",
+    "checkout": "إتمام الطلب"
+  },
+  "orderSheet": {
+    "customizeFallback": "خصّص طلبك",
+    "requiredChooseOne": "مطلوب · اختر 1",
+    "chooseOne": "اختر 1",
+    "requiredChooseRange": "مطلوب · اختر {{min}}–{{max}}",
+    "chooseUpTo": "اختر حتى {{max}}",
+    "included": "مشمول",
+    "specialInstructions": "تعليمات خاصة",
+    "notesPlaceholder": "حساسية، تفضيلات…",
+    "quantity": "الكمية",
+    "decreaseQuantity": "تقليل الكمية",
+    "increaseQuantity": "زيادة الكمية",
+    "itemTotal": "إجمالي العنصر",
+    "soldOut": "نفدت الكمية",
+    "orderingClosed": "الطلبات مغلقة",
+    "preorder": "طلب مسبق",
+    "addToCart": "أضف إلى السلة",
+    "chooseAtMost": "اختر على الأكثر {{max}} لـ {{group}}",
+    "chooseOptionFor": "يرجى اختيار خيار لـ {{group}}",
+    "chooseAtLeast": "اختر على الأقل {{min}} لـ {{group}}"
+  },
   "common": {
     "back": "رجوع",
     "backToStore": "العودة إلى المتجر",
@@ -335,6 +361,20 @@
     "noItemsYet": "لا توجد عناصر بعد",
     "emptyTitle": "لا توجد قائمة بعد",
     "emptyDescription": "أنشئ فئة أعلاه، أو استورد من CSV، أو أضف العناصر واحداً تلو الآخر."
+  },
+  "menuBulkImport": {
+    "toast": {
+      "pasteOrUploadFirst": "الصق نص CSV أو ارفع ملفاً أولاً",
+      "rowsNeedFixes": "{{count}} صف(وف) يحتاج إلى تصحيح قبل الاستيراد",
+      "rowsReady": "{{count}} صف(وف) جاهز للاستيراد",
+      "previewFailed": "تعذّرت معاينة CSV",
+      "importSuccess": "تم استيراد {{created}} عنصر(عناصر){{updated}}{{categories}}",
+      "importSuccessUpdated": "، تم تحديث {{count}}",
+      "importSuccessCategories_one": "، {{count}} فئة جديدة",
+      "importSuccessCategories_other": "، {{count}} فئات جديدة",
+      "rowsFailed": "فشل {{count}} صف(وف)",
+      "importFailed": "فشل الاستيراد"
+    }
   },
   "loyalty": {
     "title": "مكافآت الضيوف",

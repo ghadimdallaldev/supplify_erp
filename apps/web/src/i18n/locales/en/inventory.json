@@ -260,5 +260,35 @@
       "adjustmentFailed": "Failed to record adjustment",
       "settingsSaved": "Settings saved"
     }
+  },
+  "toast": {
+    "reorderReminderSnoozed": "Reminder snoozed for 7 days",
+    "reorderSnoozeFailed": "Could not snooze reminder",
+    "reorderMarkedNotNeeded": "Marked as not needed",
+    "reorderUpdatePreferenceFailed": "Could not update preference",
+    "createOrderingListFirst": "Create an ordering list first",
+    "noProductLinkedToSuggestion": "No product linked to this suggestion",
+    "addedToList": "Added to {{listName}}",
+    "addToListFailed": "Failed to add to list",
+    "aiDailyLimitReached": "Daily AI limit reached — showing rule-based summary",
+    "explainSuggestionsFailed": "Could not explain suggestions",
+    "noMatchingProducts": "No matching products found",
+    "parseRequestFailed": "Could not parse your request",
+    "expiryItemAndDateRequired": "Item name and expiry date are required",
+    "expiryLotAdded": "Expiry lot added",
+    "expiryAddLotFailed": "Failed to add lot",
+    "expiryLotRemoved": "Lot removed",
+    "expiryRemoveLotFailed": "Could not remove lot",
+    "wasteSelectProductQuantity": "Select a product and quantity",
+    "wasteQuantityPositive": "Quantity must be a positive number",
+    "wasteUnitCostNonNegative": "Unit cost must be zero or positive",
+    "wasteExceedsOnHand": "Cannot log more than on hand ({{quantity}} {{unit}})",
+    "wasteLogged": "Waste logged and stock updated",
+    "wasteLogFailed": "Failed to log waste",
+    "addedToOrderingList": "Added {{name}} to ordering list",
+    "orderingListItemFallback": "item",
+    "addToOrderingListFailed": "Could not add to list",
+    "createdListAndAddedItem": "Created list and added item",
+    "createOrderingListFailed": "Could not create list"
   }
 }

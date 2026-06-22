@@ -31,5 +31,57 @@
     "saveError": "Could not save your acceptance. Try again.",
     "saving": "Saving…",
     "acceptContinue": "Accept and continue"
+  },
+  "documents": {
+    "terms_and_conditions": {
+      "title": "Terms and Conditions",
+      "shortTitle": "Terms",
+      "description": "Master platform agreement for all Supplify users and services."
+    },
+    "privacy_policy": {
+      "title": "Privacy Policy",
+      "shortTitle": "Privacy",
+      "description": "How we collect, use, and protect personal and business data."
+    },
+    "acceptable_use_policy": {
+      "title": "Acceptable Use Policy",
+      "shortTitle": "AUP",
+      "description": "Rules for lawful and responsible use of the platform."
+    },
+    "data_processing_addendum": {
+      "title": "Data Processing Addendum",
+      "shortTitle": "DPA",
+      "description": "B2B data processing terms for tenant business data."
+    },
+    "cookie_policy": {
+      "title": "Cookie Policy",
+      "shortTitle": "Cookies",
+      "description": "Cookies, sessions, and similar technologies we use."
+    },
+    "restaurant_agreement": {
+      "title": "Restaurant Agreement",
+      "shortTitle": "Restaurant Agreement",
+      "description": "Additional terms for restaurant and food-service operators."
+    },
+    "supplier_agreement": {
+      "title": "Supplier Agreement",
+      "shortTitle": "Supplier Agreement",
+      "description": "Additional terms for suppliers, distributors, and vendors."
+    },
+    "mobile_app_terms": {
+      "title": "Mobile App Terms",
+      "shortTitle": "Mobile",
+      "description": "Terms for mobile and installable app use, including PWA."
+    },
+    "subscription_addon_terms": {
+      "title": "Subscription & Add-on Terms",
+      "shortTitle": "Subscriptions",
+      "description": "Plans, billing, trials, and add-on purchases."
+    },
+    "deals_boost_terms": {
+      "title": "Deals & Boost Terms",
+      "shortTitle": "Deals & Boosts",
+      "description": "Terms for supplier deals, optional coupon codes, and paid visibility boosts."
+    }
   }
 }

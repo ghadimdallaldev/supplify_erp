@@ -9,10 +9,12 @@ import {
   LEGAL_PACK_VERSION,
   type LegalDocumentSlug,
   legalDocumentAssetUrl,
+  legalDocumentTitleKey,
+  legalDocumentDescriptionKey,
 } from '../lib/legalDocuments'
 import { SupplifyLogo } from '../components/SupplifyLogo'
 import { PageHeader } from '../components/ui/page-header'
-import { ensureNamespace } from '../i18n'
+import { ensureNamespace, getActiveLocale } from '../i18n'
 
 const SLUGS = new Set(Object.keys(LEGAL_DOCUMENTS))
 
@@ -21,7 +23,7 @@ function isLegalSlug(value: string | undefined): value is LegalDocumentSlug {
 }
 
 export function LegalDocumentPage() {
-  const { t } = useTranslation('legal')
+  const { t, i18n } = useTranslation('legal')
   const { slug } = useParams<{ slug: string }>()
   const [markdown, setMarkdown] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -41,8 +43,16 @@ export function LegalDocumentPage() {
     let cancelled = false
     setLoading(true)
     setError(null)
-    fetch(legalDocumentAssetUrl(meta.fileName))
+    const locale = getActiveLocale()
+    const assetUrl = legalDocumentAssetUrl(meta.fileName, locale)
+    fetch(assetUrl)
       .then((res) => {
+        if (!res.ok && locale === 'ar') {
+          return fetch(legalDocumentAssetUrl(meta.fileName, 'en')).then((fallback) => {
+            if (!fallback.ok) throw new Error('Document not found')
+            return fallback.text()
+          })
+        }
         if (!res.ok) throw new Error('Document not found')
         return res.text()
       })
@@ -58,7 +68,7 @@ export function LegalDocumentPage() {
     return () => {
       cancelled = true
     }
-  }, [meta, t])
+  }, [meta, t, i18n.language])
 
   if (!meta) {
     return (
@@ -94,8 +104,8 @@ export function LegalDocumentPage() {
             {t('document.legalCenter')}
           </Link>
         }
-        title={meta.title}
-        description={meta.description}
+        title={t(legalDocumentTitleKey(meta.slug))}
+        description={t(legalDocumentDescriptionKey(meta.slug))}
         actions={
           <button
             type="button"
@@ -184,10 +194,10 @@ export function LegalHubPage() {
                       <FileText className="mt-0.5 h-5 w-5 shrink-0 text-[var(--brand-mid)]" />
                       <span>
                         <span className="block text-sm font-semibold text-[var(--text)] group-hover:text-[var(--brand-mid)]">
-                          {doc.title}
+                          {t(legalDocumentTitleKey(doc.slug))}
                         </span>
                         <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
-                          {doc.description}
+                          {t(legalDocumentDescriptionKey(doc.slug))}
                         </span>
                       </span>
                     </Link>
