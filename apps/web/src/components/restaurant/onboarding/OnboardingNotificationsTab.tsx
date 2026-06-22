@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../../ui/button'
 import { Save, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -18,8 +19,10 @@ import {
   PreferenceToggleRow,
   SettingsSection,
 } from './onboardingShared'
+import { ensureNamespace } from '../../../i18n'
 
 export function OnboardingNotificationsTab() {
+  const { t } = useTranslation(['settings', 'suppliers'])
   const { user } = useAppSelector((state) => state.auth)
   const push = usePushNotifications()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
@@ -35,6 +38,11 @@ export function OnboardingNotificationsTab() {
   } = useGetNotificationPreferencesQuery(undefined, { skip: !user?.id })
   const [updateNotificationPreferences, { isLoading: isSavingNotificationPrefs }] =
     useUpdateNotificationPreferencesMutation()
+
+  useEffect(() => {
+    void ensureNamespace('settings')
+    void ensureNamespace('suppliers')
+  }, [])
 
   useEffect(() => {
     const prefs = notificationPrefsData?.preferences
@@ -68,9 +76,9 @@ export function OnboardingNotificationsTab() {
     try {
       await updateNotificationPreferences(notificationPrefs).unwrap()
       await refetchNotificationPrefs()
-      toast.success('Notification preferences saved!')
+      toast.success(t('settings:notifications.saved'))
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to save notification preferences')
+      toast.error(error?.data?.error?.message || t('settings:notifications.saveFailed'))
     }
   }
 
@@ -171,7 +179,9 @@ export function OnboardingNotificationsTab() {
                           onClick={() => {
                             const action = push.subscribed ? push.disablePush() : push.enablePush()
                             action.catch((err: Error) =>
-                              toast.error(err?.message || 'Could not update push notifications')
+                              toast.error(
+                                err?.message || t('suppliers:notifications.toast.pushUpdateFailed')
+                              )
                             )
                           }}
                         >
@@ -205,7 +215,9 @@ export function OnboardingNotificationsTab() {
           <div className="mt-3 flex gap-2">
             <Button
               size="sm"
-              onClick={() => push.enablePush().catch(() => toast.error('Could not enable push'))}
+              onClick={() =>
+                push.enablePush().catch(() => toast.error(t('suppliers:pushBanner.enableFailed')))
+              }
             >
               Enable
             </Button>

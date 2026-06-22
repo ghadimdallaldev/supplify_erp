@@ -1,14 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { useStartSupportChatMutation } from '../../services/api'
 import { Button } from '../ui/button'
 import { AppPanel } from '../ui/app-panel'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { ensureNamespace } from '../../i18n'
 
 export function SupportContactCard() {
+  const { t } = useTranslation('settings')
   const [startSupport, { isLoading }] = useStartSupportChatMutation()
   const [conversationId, setConversationId] = useState<string | null>(null)
+
+  useEffect(() => {
+    void ensureNamespace('settings')
+  }, [])
 
   const handleStart = async () => {
     try {
@@ -19,10 +26,10 @@ export function SupportContactCard() {
       const id = result?.conversation?.id
       if (id) {
         setConversationId(id)
-        toast.success('Support chat ready')
+        toast.success(t('support.toast.chatReady'))
       }
     } catch (e: any) {
-      toast.error(e?.data?.error?.message || 'Could not start support chat')
+      toast.error(e?.data?.error?.message || t('support.toast.startFailed'))
     }
   }
 

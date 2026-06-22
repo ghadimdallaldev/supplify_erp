@@ -9,6 +9,7 @@ import { startStage, mark } from './request-timing.js'
 import { LOCK_REASON_FREE_SANDBOX_EXPIRED } from '../lib/billing/constants.js'
 import { isImpersonating } from '../lib/impersonation.js'
 import { logger } from '../lib/logger.js'
+import { resolveRequestLocale, localizedError } from '../i18n/index.js'
 
 const ALLOW_PREFIXES = ['/api/billing', '/api/register', '/auth', '/health', '/api/public']
 
@@ -77,7 +78,7 @@ export async function billingAccessMiddleware(req, res, next) {
         return res.status(402).json({
           ok: false,
           data: { billing: { access: billing.access, amountDue: billing.amountDue } },
-          error: buildAccountLockedError(billing),
+          error: buildAccountLockedError(billing, resolveRequestLocale(req)),
           requestId: req.requestId,
         })
       }
@@ -91,7 +92,7 @@ export async function billingAccessMiddleware(req, res, next) {
       return res.status(402).json({
         ok: false,
         data: { billing: { access: billing.access, amountDue: billing.amountDue } },
-        error: buildAccountLockedError(billing),
+        error: buildAccountLockedError(billing, resolveRequestLocale(req)),
         requestId: req.requestId,
       })
     }
@@ -102,7 +103,7 @@ export async function billingAccessMiddleware(req, res, next) {
     return res.status(402).json({
       ok: false,
       data: { billing: { access: billing.access, amountDue: billing.amountDue } },
-      error: buildAccountLockedError(billing),
+      error: buildAccountLockedError(billing, resolveRequestLocale(req)),
       requestId: req.requestId,
     })
   } catch (error) {
@@ -112,10 +113,13 @@ export async function billingAccessMiddleware(req, res, next) {
     return res.status(503).json({
       ok: false,
       data: null,
-      error: {
-        name: 'BILLING_CHECK_UNAVAILABLE',
-        message: 'Unable to verify billing status. Try again shortly.',
-      },
+      error: localizedError(
+        resolveRequestLocale(req),
+        'BILLING_CHECK_UNAVAILABLE',
+        'errors.checkUnavailable',
+        {},
+        'billing'
+      ),
       requestId: req.requestId,
     })
   }

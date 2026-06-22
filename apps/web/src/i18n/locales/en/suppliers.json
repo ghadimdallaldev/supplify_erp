@@ -532,6 +532,28 @@
     "openChat": "Open chat",
     "viewConversation": "View conversation →"
   },
+  "featuredPlacement": {
+    "toast": {
+      "activated": "Featured placement activated",
+      "activateFailed": "Could not activate featured placement"
+    }
+  },
+  "connectionRequests": {
+    "toast": {
+      "accepted": "Connection accepted — supplier added to your network",
+      "acceptFailed": "Failed to accept request",
+      "declined": "Connection request declined",
+      "declineFailed": "Failed to decline request"
+    }
+  },
+  "reviewModal": {
+    "toast": {
+      "updated": "Review updated",
+      "submitted": "Review submitted",
+      "selectOrder": "Select an order to review",
+      "saveFailed": "Failed to save review"
+    }
+  },
   "substitution": {
     "proposeDescription": "Propose substitute: {{name}}",
     "proposeSuccess": "Substitute proposed — awaiting restaurant acceptance",

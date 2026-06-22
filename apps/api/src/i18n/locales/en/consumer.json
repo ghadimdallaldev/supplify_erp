@@ -1,0 +1,24 @@
+{
+  "ordering": {
+    "live": "Open for orders until {{end}}.",
+    "preorderOnly": "Preorders only until {{start}}. Schedule for {{start}} or later.",
+    "closed": "Ordering closed. Live orders resume at {{start}}.",
+    "midnight": "midnight",
+    "scheduleInvalid": "Scheduled time must be in the future",
+    "preorderRequired": "Live ordering opens at {{start}}. Please schedule your order.",
+    "scheduleTooEarly": "Preorder must be scheduled for {{start}} or later",
+    "windowClosed": "Ordering is currently closed"
+  },
+  "menu": {
+    "loadError": "Unable to load menu. Try again later.",
+    "slugRequired": "Restaurant slug is required."
+  },
+  "order": {
+    "placed": "Order placed successfully",
+    "failed": "Could not place order. Please try again."
+  },
+  "auth": {
+    "sessionExpired": "Your session has expired. Please sign in again.",
+    "loginRequired": "Please sign in to continue."
+  }
+}

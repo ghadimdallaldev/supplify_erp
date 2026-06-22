@@ -130,7 +130,11 @@
   "support": {
     "title": "Support",
     "hint": "Need help? Contact our support team.",
-    "contact": "Contact Support"
+    "contact": "Contact Support",
+    "toast": {
+      "chatReady": "Support chat ready",
+      "startFailed": "Could not start support chat"
+    }
   },
   "activityLog": {
     "locked": "Activity log is not on your plan. Upgrade to Gold or Platinum to view tenant audit history and exports.",
@@ -178,5 +182,25 @@
     },
     "emptyValue": "-"
   },
-  "roleUnknown": "unknown"
+  "roleUnknown": "unknown",
+  "toast": {
+    "brandingUpdated": "Branding updated",
+    "brandingSaveFailed": "Failed to save branding",
+    "brandColorsReset": "Brand colors reset to defaults",
+    "brandColorsResetFailed": "Failed to reset brand colors",
+    "multiWarehouseEnabled": "Multi-warehouse enabled",
+    "multiWarehouseDisabled": "Multi-warehouse disabled",
+    "fulfillmentUpdateFailed": "Failed to update fulfillment settings",
+    "routeWouldRouteTo": "Would route to: {{warehouseName}}",
+    "simulationComplete": "Simulation complete",
+    "simulationFailed": "Simulation failed",
+    "roleNameRequired": "Role name is required",
+    "selectAtLeastOnePermission": "Select at least one permission",
+    "roleCreated": "Role created",
+    "roleUpdated": "Role updated",
+    "roleSaveFailed": "Failed to save role",
+    "roleDeleted": "Role deleted",
+    "roleDeleteFailed": "Failed to delete role",
+    "roleAssignFailed": "Failed to assign role"
+  }
 }

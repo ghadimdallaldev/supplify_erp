@@ -174,5 +174,253 @@
     "acceptFailed": "Could not accept this offer",
     "offerDeclinedToast": "Offer declined",
     "declineFailed": "Could not decline offer"
+  },
+  "common": {
+    "guests_one": "{{count}} guest",
+    "guests_other": "{{count}} guests",
+    "seats": "{{count}} seats",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "unknownTable": "Unknown table",
+    "inactive": "Inactive",
+    "all": "All",
+    "copySuffix": "copy"
+  },
+  "board": {
+    "title": "Reservations Board",
+    "description": "Assign a table on each card, then use Seat / Complete — or drag by the grip handle.",
+    "dragAriaLabel": "Drag reservation",
+    "unassigned": "Unassigned",
+    "chooseTablePlaceholder": "Choose table…",
+    "tableSeats": "{{name}} · {{capacity}} seats",
+    "assignTable": "Assign table",
+    "requested": "Requested:",
+    "pax": "{{count}} pax",
+    "totalSeats": "Total seats: {{count}}",
+    "coversBooked": "Covers booked: {{count}}",
+    "dropHere": "Drop reservations here",
+    "liveWaitlist": "Live waitlist",
+    "columns": {
+      "PENDING": "Pending",
+      "CONFIRMED": "Confirmed",
+      "SEATED": "Seated",
+      "WAITLIST": "Waitlist"
+    },
+    "actions": {
+      "confirm": "Confirm",
+      "cancel": "Cancel",
+      "seat": "Seat",
+      "complete": "Complete"
+    },
+    "statusLower": {
+      "PENDING": "pending",
+      "CONFIRMED": "confirmed",
+      "SEATED": "seated",
+      "WAITLIST": "waitlist",
+      "CANCELLED": "cancelled",
+      "COMPLETED": "completed"
+    },
+    "toasts": {
+      "movedTo": "Moved to {{status}}",
+      "updateFailed": "Could not update reservation",
+      "completed": "Reservation completed",
+      "seated": "Guest seated",
+      "cancelled": "Reservation cancelled",
+      "updated": "Reservation updated",
+      "tableAssigned": "Table assigned",
+      "assignFailed": "Could not assign table"
+    }
+  },
+  "assignments": {
+    "empty": "No reservations on <strong>{{date}}</strong>. Change the date above or share your booking link with guests.",
+    "title": "Today's table map",
+    "description": "{{assigned}} assigned · {{unassigned}} unassigned on {{date}}. Matches what should appear on the floor below.",
+    "unassignedList": "Unassigned: {{names}}"
+  },
+  "publicBooking": {
+    "title": "Public online booking",
+    "description": "Guests use your public reservation link. Capacity comes from active tables in the floor plan; hours control which time slots appear.",
+    "loading": "Loading booking settings…",
+    "tableCapacity": "Table capacity",
+    "capacitySummary": "{{count}} active table(s), {{seats}} total seats — shown as “seats left” per time after guests book.",
+    "noActiveTables": "No active tables yet. Add tables in the floor plan below or guests will see no available times.",
+    "durationLabel": "Reservation length (minutes)",
+    "intervalLabel": "Slot interval (minutes)",
+    "openLabel": "First slot",
+    "closeLabel": "Last seating (close)",
+    "save": "Save public booking hours",
+    "toasts": {
+      "saved": "Public booking hours updated",
+      "saveFailed": "Could not save booking hours"
+    }
+  },
+  "analytics": {
+    "title": "Guest flow intelligence",
+    "description": "Spot peak hours, cancellations, and waitlist pressure at a glance.",
+    "busiestHour": "Busiest hour: {{label}} ({{covers}} covers)",
+    "busiestDay": "Busiest day: {{label}} ({{covers}} covers)",
+    "rangeDay": "Covers by hour (today)",
+    "rangeWeek": "Covers by day (last 7 days)",
+    "rangeMonth": "Covers by day (last 30 days)",
+    "tabs": {
+      "day": "Day",
+      "week": "Week",
+      "month": "Month"
+    },
+    "stats": {
+      "totalCovers": "Total covers",
+      "confirmed": "Confirmed",
+      "cancelled": "Cancelled",
+      "waitlisted": "Waitlisted"
+    },
+    "chart": {
+      "covers": "Covers",
+      "cancelled": "Cancelled",
+      "guests": "Guests",
+      "emptyReservations": "No reservations in this period yet.",
+      "waitlistByStatus": "Waitlist by status",
+      "emptyWaitlist": "No waitlist entries."
+    }
+  },
+  "createDrawer": {
+    "trigger": "+ New reservation",
+    "title": "Capture reservation",
+    "description": "Log the essentials and let Supplify handle the capacity math for you.",
+    "guestName": "Guest name",
+    "contact": "Contact",
+    "contactPlaceholder": "+971...",
+    "partySize": "Party size",
+    "duration": "Duration (min)",
+    "startTime": "Start time",
+    "preferredTable": "Preferred table",
+    "autoAssign": "Auto assign",
+    "tableOption": "{{name}} • {{capacity}} seats",
+    "notes": "Notes",
+    "notesPlaceholder": "Birthday cake? VIP? Allergies?",
+    "booking": "Booking…",
+    "confirm": "Confirm reservation",
+    "toasts": {
+      "created": "Reservation created",
+      "createFailed": "Failed to create reservation"
+    }
+  },
+  "tableBuilder": {
+    "title": "Floor builder",
+    "descriptionLive": "Live view: assigned tables show the guest name and status for today's board.",
+    "descriptionEdit": "Edit layout mode — turn on Live view to see table assignments from the board above.",
+    "shortcuts": "Del: delete · Ctrl+D: duplicate · Ctrl+Z: undo · Ctrl+Y: redo · Esc: deselect",
+    "liveView": "Live view",
+    "serviceMode": "Service mode",
+    "virtualFloor": "Virtual floor",
+    "virtualFloorHint": "Drag tables, resize footprints, and mirror your actual service.",
+    "liveStatus": "Live status:",
+    "noTablesTitle": "No tables yet",
+    "noTablesHint": "Start by adding a shape above.",
+    "legend": {
+      "dragDrop": "Drag & drop",
+      "resize": "Drag handles to resize",
+      "keyboard": "Del/Backspace: delete · Ctrl+D: duplicate · Ctrl+Z/Y: undo/redo"
+    },
+    "toolbar": {
+      "undo": "Undo (Ctrl+Z)",
+      "redo": "Redo (Ctrl+Y)",
+      "gridSnap": "Grid snap",
+      "snap": "Snap",
+      "zoomOut": "Zoom out",
+      "resetZoom": "Reset zoom",
+      "zoomIn": "Zoom in"
+    },
+    "stats": {
+      "activeTables": "Active tables: {{active}}/{{total}}",
+      "totalCapacity": "Total capacity: {{count}}",
+      "assignedOnFloor": "Assigned on floor: {{assigned}} / {{active}}",
+      "selected": "Selected: {{name}}"
+    },
+    "clearFloor": "Clear floor",
+    "saveLayout": "Save layout",
+    "tableDetails": "Table details",
+    "duplicateTable": "Duplicate table",
+    "deleteTable": "Delete table",
+    "hideTableDetails": "Hide table details",
+    "showTableDetails": "Show table details",
+    "selectTableHint": "Select a table from the canvas to reveal granular controls.",
+    "guest": "Guest:",
+    "partySize": "Party size:",
+    "status": "Status:",
+    "availableNoReservation": "Available — no active reservation",
+    "capacityZone": "Capacity: {{capacity}} · Zone: {{zone}}",
+    "tableName": "Table name",
+    "capacity": "Capacity",
+    "active": "Active",
+    "activeHint": "Include in booking flow",
+    "shape": "Shape",
+    "zone": "Zone",
+    "signatureColor": "Signature color",
+    "features": "Features",
+    "rotation": "Rotation",
+    "reset": "Reset",
+    "specialNotes": "Special notes",
+    "notesPlaceholder": "Mention sight lines, server ownership, or ambience tips.",
+    "expertTipTitle": "Expert tip",
+    "expertTipBody": "Assign colors and zones to match how your team speaks on the floor. Servers can now cross-reference reservations with a single glance, reducing handovers and double-sat mishaps.",
+    "tableGuests": "{{count}} guests · {{name}}",
+    "toasts": {
+      "saved": "Tables saved",
+      "saveFailed": "Failed to save tables"
+    },
+    "shapes": {
+      "round": {
+        "label": "Round",
+        "description": "Perfect for intimate groups."
+      },
+      "square": {
+        "label": "Square",
+        "description": "Ideal for couples."
+      },
+      "rectangle": {
+        "label": "Banquet",
+        "description": "Seats larger parties."
+      },
+      "booth": {
+        "label": "Booth",
+        "description": "Cozy seating with privacy."
+      },
+      "chef_table": {
+        "label": "Chef's table",
+        "description": "Facing the action."
+      }
+    },
+    "colors": {
+      "classicBlue": "Classic blue",
+      "aqua": "Aqua",
+      "gardenGreen": "Garden green",
+      "sunsetOrange": "Sunset orange",
+      "goldenHour": "Golden hour",
+      "lavender": "Lavender",
+      "rose": "Rose",
+      "slate": "Slate"
+    },
+    "zones": {
+      "main": "Main floor",
+      "patio": "Patio",
+      "bar": "Bar",
+      "vip": "VIP",
+      "private": "Private"
+    },
+    "features": {
+      "accessible": "Accessible",
+      "window": "Window view",
+      "high_top": "High top",
+      "power": "Power outlet",
+      "romantic": "Romantic",
+      "near_music": "Near live music"
+    },
+    "serviceStatus": {
+      "SEATED": "Seated",
+      "CONFIRMED": "Confirmed",
+      "PENDING": "Pending",
+      "WAITLIST": "Waitlist",
+      "available": "Available"
+    }
   }
 }

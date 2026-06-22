@@ -44,6 +44,8 @@ export interface User {
   legalStatus?: LegalAcceptanceStatus
   /** Platform admin UI preferences */
   adminPreferences?: AdminUserPreferences
+  /** Persisted UI locale preference */
+  preferredLocale?: 'en' | 'ar'
 }
 
 export type AdminLandingTab =

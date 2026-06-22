@@ -103,6 +103,18 @@
       "updateFailed": "Failed to update profile"
     }
   },
+  "restaurantTeam": {
+    "toast": {
+      "memberRemoved": "Member removed",
+      "removeFailed": "Failed to remove member"
+    }
+  },
+  "restaurantReviews": {
+    "title": "My supplier reviews",
+    "description": "Reviews you have submitted after completed orders",
+    "empty": "You have not written any reviews yet.",
+    "supplierFallback": "Supplier"
+  },
   "restaurantBranches": {
     "title": "Branch accounts",
     "description": "Each branch is a separate account with its own orders, inventory, and settings. Switch between them from the header after creating one.",

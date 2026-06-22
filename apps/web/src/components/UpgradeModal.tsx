@@ -26,6 +26,7 @@ import { openCheckoutPayment } from '../lib/openPaymentModal'
 import { Check, Minus, TrendingUp } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { usePermissions } from '../hooks/usePermissions'
 import {
@@ -131,6 +132,7 @@ function isOnUpgradeDestination(path: string, search: string, target: string): b
 }
 
 export function UpgradeModal() {
+  const { t } = useTranslation('common')
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const location = useLocation()
@@ -271,9 +273,7 @@ export function UpgradeModal() {
       void activateFreePlanFromPlans(dispatch, plans).then((result) => {
         if (result.ok) {
           toast.success(
-            pendingActivation
-              ? 'Your free plan is active.'
-              : 'You are now on the Free testing plan. Upgrade anytime for production use.'
+            pendingActivation ? t('toast.freePlanActive') : t('toast.freePlanActiveTesting')
           )
           if (pendingActivation) navigate('/app', { replace: true })
         } else {
@@ -289,7 +289,7 @@ export function UpgradeModal() {
     }
 
     if (showPlans) {
-      toast.error('We could not start checkout for that plan. Try again or contact support.')
+      toast.error(t('toast.checkoutStartFailed'))
       return
     }
 

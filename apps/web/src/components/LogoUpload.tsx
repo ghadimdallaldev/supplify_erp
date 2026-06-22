@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from './ui/button'
 import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -36,6 +37,7 @@ export function LogoUpload({
   previewAlt,
   previewClassName = 'w-32 h-32',
 }: LogoUploadProps) {
+  const { t } = useTranslation('products')
   const [isUploading, setIsUploading] = useState(false)
   const [preview, setPreview] = useState<string | null>(currentLogo || null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -50,13 +52,13 @@ export function LogoUpload({
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file')
+      toast.error(t('toast.selectImageFile'))
       return
     }
 
     // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB')
+      toast.error(t('toast.imageTooLarge'))
       return
     }
 
@@ -94,7 +96,7 @@ export function LogoUpload({
       fileUrl = publicUrl
     } catch (error: unknown) {
       console.error('Logo upload error:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to upload logo')
+      toast.error(error instanceof Error ? error.message : t('toast.logoUploadFailed'))
       setPreview(currentLogo || null)
       setIsUploading(false)
       if (fileInputRef.current) {
@@ -105,7 +107,7 @@ export function LogoUpload({
 
     try {
       await onUpload(fileUrl)
-      toast.success('Image uploaded successfully!')
+      toast.success(t('toast.imageUploadedSuccess'))
     } catch (error: unknown) {
       console.error('Logo save error:', error)
       setPreview(currentLogo || null)
@@ -121,7 +123,7 @@ export function LogoUpload({
     try {
       await onUpload('') // Empty string removes the logo
       setPreview(null)
-      toast.success('Image removed successfully!')
+      toast.success(t('toast.imageRemovedSuccess'))
     } catch (error: unknown) {
       console.error('Logo remove error:', error)
       setPreview(currentLogo || null)

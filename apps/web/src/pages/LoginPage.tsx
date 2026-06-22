@@ -61,10 +61,26 @@ export function LoginPage() {
   }
 
   const features = [
-    { icon: ShoppingCart, title: 'Order Management', desc: 'Streamlined ordering process' },
-    { icon: Truck, title: 'Fulfillment', desc: 'Track deliveries in real-time' },
-    { icon: BarChart3, title: 'Analytics', desc: 'Data-driven insights' },
-    { icon: Shield, title: 'Secure', desc: 'Enterprise-grade security' },
+    {
+      icon: ShoppingCart,
+      title: t('marketingFeatures.orderManagement.title'),
+      desc: t('marketingFeatures.orderManagement.description'),
+    },
+    {
+      icon: Truck,
+      title: t('marketingFeatures.fulfillment.title'),
+      desc: t('marketingFeatures.fulfillment.description'),
+    },
+    {
+      icon: BarChart3,
+      title: t('marketingFeatures.analytics.title'),
+      desc: t('marketingFeatures.analytics.description'),
+    },
+    {
+      icon: Shield,
+      title: t('marketingFeatures.secure.title'),
+      desc: t('marketingFeatures.secure.description'),
+    },
   ]
 
   return (
@@ -113,8 +129,7 @@ export function LoginPage() {
               lineHeight: 1.6,
             }}
           >
-            The platform connecting restaurants with trusted F&amp;B suppliers. Streamline
-            operations, reduce costs, scale your business.
+            {t('marketingDescription')}
           </p>
         </div>
 
@@ -149,7 +164,7 @@ export function LoginPage() {
           }}
         >
           <CheckCircle2 style={{ width: 14, height: 14, color: '#10b981' }} />
-          <span>Trusted by 100+ restaurants and suppliers</span>
+          <span>{t('trustedBy')}</span>
         </div>
       </div>
 

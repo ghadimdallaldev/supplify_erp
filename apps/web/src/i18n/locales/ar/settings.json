@@ -130,7 +130,11 @@
   "support": {
     "title": "الدعم",
     "hint": "هل تحتاج مساعدة؟ تواصل مع فريق الدعم.",
-    "contact": "تواصل مع الدعم"
+    "contact": "تواصل مع الدعم",
+    "toast": {
+      "chatReady": "دردشة الدعم جاهزة",
+      "startFailed": "تعذّر بدء دردشة الدعم"
+    }
   },
   "activityLog": {
     "locked": "سجل النشاط غير متاح في خطتك. قم بالترقية إلى Gold أو Platinum لعرض سجل تدقيق المستأجرين والتصديرات.",
@@ -178,5 +182,25 @@
     },
     "emptyValue": "-"
   },
-  "roleUnknown": "غير معروف"
+  "roleUnknown": "غير معروف",
+  "toast": {
+    "brandingUpdated": "تم تحديث العلامة التجارية",
+    "brandingSaveFailed": "فشل حفظ العلامة التجارية",
+    "brandColorsReset": "تمت إعادة ألوان العلامة إلى الافتراضية",
+    "brandColorsResetFailed": "فشلت إعادة ألوان العلامة إلى الافتراضية",
+    "multiWarehouseEnabled": "تم تفعيل تعدد المستودعات",
+    "multiWarehouseDisabled": "تم تعطيل تعدد المستودعات",
+    "fulfillmentUpdateFailed": "فشل تحديث إعدادات التنفيذ",
+    "routeWouldRouteTo": "سيتم التوجيه إلى: {{warehouseName}}",
+    "simulationComplete": "اكتملت المحاكاة",
+    "simulationFailed": "فشلت المحاكاة",
+    "roleNameRequired": "اسم الدور مطلوب",
+    "selectAtLeastOnePermission": "اختر صلاحية واحدة على الأقل",
+    "roleCreated": "تم إنشاء الدور",
+    "roleUpdated": "تم تحديث الدور",
+    "roleSaveFailed": "فشل حفظ الدور",
+    "roleDeleted": "تم حذف الدور",
+    "roleDeleteFailed": "فشل حذف الدور",
+    "roleAssignFailed": "فشل تعيين الدور"
+  }
 }

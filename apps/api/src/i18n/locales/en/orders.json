@@ -1,0 +1,13 @@
+{
+  "packingSlip": {
+    "title": "PACKING SLIP",
+    "orderNumber": "Order #{{number}}",
+    "date": "Date:",
+    "shipTo": "Ship To:",
+    "items": "Items",
+    "qty": "Qty:",
+    "itemFallback": "Item",
+    "total": "Total:",
+    "na": "N/A"
+  }
+}

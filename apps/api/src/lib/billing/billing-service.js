@@ -11,6 +11,7 @@ import {
 } from './constants.js'
 import { clampFreeTrialDays, getFreeSandboxDays } from '../platform-settings.js'
 import { formatPlanDisplayName } from '../plan-codes.js'
+import { t, resolveLocale } from '../../i18n/index.js'
 
 function addDays(date, days) {
   const d = new Date(date)
@@ -880,7 +881,8 @@ export async function setAutoRenew(tenantId, tenantType, autoRenew) {
   return { autoRenew: Boolean(autoRenew) }
 }
 
-export function buildAccountLockedError(billingStatus) {
+export function buildAccountLockedError(billingStatus, locale = 'en') {
+  const lng = resolveLocale(locale)
   const access = billingStatus?.access ?? {}
   const pendingActivation = access.pendingActivation
   const freeSandboxExpired =
@@ -889,7 +891,8 @@ export function buildAccountLockedError(billingStatus) {
   if (freeSandboxExpired) {
     return {
       name: 'ACCOUNT_LOCKED',
-      message: 'Your Free Trial has expired. Upgrade your plan to continue using Supplify.',
+      code: 'freeTrialExpired',
+      message: t('billing.errors.freeTrialExpired', lng),
       details: {
         amountDue: billingStatus?.amountDue ?? 0,
         gracePeriodEndsAt: access.gracePeriodEndsAt ?? null,
@@ -903,9 +906,10 @@ export function buildAccountLockedError(billingStatus) {
 
   return {
     name: 'ACCOUNT_LOCKED',
+    code: pendingActivation ? 'pendingActivation' : 'paymentOverdue',
     message: pendingActivation
-      ? 'Your account is not activated yet. Complete payment for a plan or ask an administrator to activate your account.'
-      : 'Your account is locked due to an overdue subscription payment. Pay your balance to restore access.',
+      ? t('billing.errors.pendingActivation', lng)
+      : t('billing.errors.paymentOverdue', lng),
     details: {
       amountDue: billingStatus?.amountDue ?? 0,
       gracePeriodEndsAt: access.gracePeriodEndsAt ?? null,

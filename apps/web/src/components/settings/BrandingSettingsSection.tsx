@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useGetTenantBrandingQuery, useUpdateTenantBrandingMutation } from '../../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -28,6 +29,7 @@ type Props = {
 }
 
 export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
+  const { t } = useTranslation('settings')
   const { data, isLoading, isError, refetch } = useGetTenantBrandingQuery({ tenantType })
   const [updateBranding, { isLoading: saving }] = useUpdateTenantBrandingMutation()
   const [brandPrimary, setBrandPrimary] = useState('')
@@ -63,9 +65,9 @@ export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
         brandAccent: brandAccent || null,
         brandDisplayName: brandDisplayName || null,
       }).unwrap()
-      toast.success('Branding updated')
+      toast.success(t('toast.brandingUpdated'))
     } catch (e: any) {
-      toast.error(e?.data?.error?.message || 'Failed to save branding')
+      toast.error(e?.data?.error?.message || t('toast.brandingSaveFailed'))
     }
   }
 
@@ -81,9 +83,9 @@ export function BrandingSettingsSection({ tenantType, canEdit = true }: Props) {
       setBrandAccent('')
       setPrimaryError(null)
       setAccentError(null)
-      toast.success('Brand colors reset to defaults')
+      toast.success(t('toast.brandColorsReset'))
     } catch (e: any) {
-      toast.error(e?.data?.error?.message || 'Failed to reset brand colors')
+      toast.error(e?.data?.error?.message || t('toast.brandColorsResetFailed'))
     } finally {
       setIsResetting(false)
     }

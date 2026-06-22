@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Shield, FileText, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
 import {
@@ -6,6 +7,8 @@ import {
   LEGAL_PACK_VERSION,
   type LegalDocumentSlug,
   legalDocumentPath,
+  legalDocumentTitleKey,
+  legalDocumentShortTitleKey,
   requiredInviteSlugs,
   requiredRegistrationSlugs,
 } from '../../lib/legalDocuments'
@@ -38,6 +41,7 @@ export function LegalAcceptancePanel({
   onElectronicSignedChange,
   disabled,
 }: Props) {
+  const { t } = useTranslation('legal')
   const [expanded, setExpanded] = useState(true)
 
   const requiredSlugs = useMemo(() => {
@@ -133,7 +137,7 @@ export function LegalAcceptancePanel({
                   rel="noopener noreferrer"
                   className="font-medium text-[var(--brand-mid)] hover:underline inline-flex items-center gap-1"
                 >
-                  {LEGAL_DOCUMENTS[slug].title}
+                  {t(legalDocumentTitleKey(slug))}
                   <ExternalLink className="h-3 w-3" aria-hidden />
                 </Link>
               </li>
@@ -247,6 +251,7 @@ export function isLegalAcceptanceComplete(
 }
 
 function DocLink({ slug }: { slug: LegalDocumentSlug }) {
+  const { t } = useTranslation('legal')
   return (
     <Link
       to={legalDocumentPath(slug)}
@@ -255,7 +260,7 @@ function DocLink({ slug }: { slug: LegalDocumentSlug }) {
       className="font-medium text-[var(--brand-mid)] hover:underline inline-flex items-center gap-0.5"
       onClick={(e) => e.stopPropagation()}
     >
-      {LEGAL_DOCUMENTS[slug].shortTitle}
+      {t(legalDocumentShortTitleKey(slug))}
       <ExternalLink className="h-3 w-3" aria-hidden />
     </Link>
   )

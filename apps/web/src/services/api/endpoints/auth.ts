@@ -24,6 +24,17 @@ export const authApi = api.injectEndpoints({
       }),
       invalidatesTags: ['User'],
     }),
+    updateLocalePreference: builder.mutation<
+      { preferredLocale: 'en' | 'ar' },
+      { locale: 'en' | 'ar' }
+    >({
+      query: (body) => ({
+        url: '/auth/me/locale',
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['User'],
+    }),
     getInviteSession: builder.query<
       { id: string; email: string; displayName: string } | null,
       void

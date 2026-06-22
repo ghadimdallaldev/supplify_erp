@@ -1,0 +1,15 @@
+{
+  "errors": {
+    "productNotFound": "المنتج غير موجود",
+    "accessDeniedOwnProducts": "تم رفض الوصول. يمكنك عرض أسعار منتجاتك فقط",
+    "accessDeniedSetOwnProducts": "تم رفض الوصول. يمكنك تعيين أسعار منتجاتك فقط",
+    "accessDeniedUpdateOwnProducts": "تم رفض الوصول. يمكنك تحديث أسعار منتجاتك فقط",
+    "accessDenied": "تم رفض الوصول",
+    "failedGetPrices": "تعذر جلب الأسعار",
+    "invalidPriceData": "بيانات السعر غير صالحة",
+    "failedCreatePrice": "تعذر إنشاء السعر",
+    "noFieldsToUpdate": "لا توجد حقول للتحديث",
+    "invalidUpdateData": "بيانات التحديث غير صالحة",
+    "failedUpdatePrice": "تعذر تحديث السعر"
+  }
+}

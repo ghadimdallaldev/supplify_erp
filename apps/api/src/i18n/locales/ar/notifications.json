@@ -1,0 +1,228 @@
+{
+  "common": {
+    "guest": "ضيف",
+    "aRestaurant": "مطعم",
+    "aSupplier": "مورد",
+    "teamMember": "عضو الفريق",
+    "theRestaurant": "المطعم",
+    "supplier": "المورد",
+    "yourSupplier": "مورّدك",
+    "aTeam": "فريق",
+    "newDeal": "عرض جديد",
+    "promotion": "عرض ترويجي",
+    "upcomingShift": "وردية قادمة"
+  },
+  "reservation": {
+    "unscheduled": "الوقت المحدد"
+  },
+  "lowStock": {
+    "supplierTitle": "تنبيه مخزون منخفض",
+    "supplierMessage": "مخزون منخفض: {{name}}. الحالي: {{currentValue}}، الحد: {{threshold}}. أعد التخزين قريبًا."
+  },
+  "order": {
+    "placed": {
+      "title": "طلب جديد مستلم",
+      "messageWithRestaurant": "طلب جديد من {{restaurantName}} - الطلب #{{orderId}} بقيمة ${{amount}}",
+      "message": "طلب جديد #{{orderId}} بقيمة ${{amount}}"
+    },
+    "acknowledged": {
+      "title": "تم تأكيد الطلب",
+      "message": "تم تأكيد طلبك #{{orderId}} من {{supplierName}}"
+    },
+    "processing": {
+      "title": "جاري معالجة الطلب",
+      "message": "يتم تجهيز طلبك #{{orderId}} للشحن"
+    },
+    "shipped": {
+      "title": "تم شحن الطلب",
+      "message": "تم شحن طلبك #{{orderId}}"
+    },
+    "delivered": {
+      "title": "تم تسليم الطلب",
+      "message": "تم تسليم طلبك #{{orderId}}"
+    },
+    "completed": {
+      "title": "اكتمل الطلب",
+      "message": "اكتمل طلبك #{{orderId}} وتم تسليمه من {{supplierName}}"
+    },
+    "cancelled": {
+      "title": "تم إلغاء الطلب",
+      "messageWithRestaurant": "تم إلغاء الطلب #{{orderId}} من {{restaurantName}}",
+      "message": "تم إلغاء الطلب #{{orderId}}"
+    },
+    "supplierDeclined": {
+      "title": "رفض المورد الطلب",
+      "messageWithReason": "تم رفض الطلب #{{orderId}}: {{reason}}",
+      "message": "رفض {{supplierName}} الطلب #{{orderId}}"
+    }
+  },
+  "driver": {
+    "driver_assigned": {
+      "title": "تم تعيين سائق",
+      "restaurant": "تم تعيين سائق لطلبك #{{orderId}}",
+      "supplier": "تم تعيين سائق للطلب #{{orderId}}"
+    },
+    "out_for_delivery": {
+      "title": "في الطريق للتسليم",
+      "restaurant": "طلبك #{{orderId}} في الطريق للتسليم",
+      "supplier": "الطلب #{{orderId}} في الطريق للتسليم"
+    },
+    "delivered": {
+      "title": "اكتمل التسليم",
+      "restaurant": "تم تسليم طلبك #{{orderId}}",
+      "supplier": "تم وضع علامة تسليم على الطلب #{{orderId}}"
+    },
+    "failed_delivery": {
+      "title": "فشل التسليم",
+      "restaurant": "فشل تسليم الطلب #{{orderId}}",
+      "supplier": "فشل تسليم الطلب #{{orderId}}"
+    },
+    "delivery_rescheduled": {
+      "title": "تم إعادة جدولة التسليم",
+      "restaurant": "تم نقل تسليم الطلب #{{orderId}} إلى الغد",
+      "supplier": "تم نقل تسليم الطلب #{{orderId}} إلى الغد"
+    },
+    "rollover": {
+      "title": "تم نقل التسليمات إلى الغد",
+      "messageOne": "تم نقل تسليم واحد إلى الغد.",
+      "messageMany": "تم نقل {{count}} تسليمات إلى الغد."
+    }
+  },
+  "reservationEvents": {
+    "created": {
+      "title": "حجز جديد",
+      "message": "{{customerName}} مجموعة {{partySize}} في {{timeslot}}"
+    },
+    "waitlist": {
+      "title": "تم نقل الحجز إلى قائمة الانتظار",
+      "message": "{{customerName}} ينتظر طاولة ({{partySize}} ضيوف)."
+    },
+    "rescheduled": {
+      "title": "تم إعادة جدولة الحجز",
+      "message": "{{customerName}} (مجموعة {{partySize}}) انتقل إلى {{timeslot}}"
+    },
+    "cancelled": {
+      "title": "تم إلغاء الحجز",
+      "message": "ألغى {{customerName}} حجزه لـ {{timeslot}}"
+    },
+    "statusChanged": {
+      "title": "تم تحديث الحجز",
+      "message": "{{customerName}} — الآن {{status}} لـ {{timeslot}}"
+    }
+  },
+  "staff": {
+    "ptoRequest": {
+      "title": "طلب إجازة جديد",
+      "message": "طلب {{name}} {{type}} ({{dateRange}})"
+    },
+    "swapRequest": {
+      "title": "طلب تبديل وردية",
+      "message": "طلب {{name}} تبديلًا لـ {{shiftDate}}"
+    },
+    "ptoApproved": {
+      "title": "تمت الموافقة على الإجازة",
+      "message": "وافق مديرك على طلب إجازتك."
+    },
+    "ptoDeclined": {
+      "title": "تم رفض طلب الإجازة",
+      "message": "رفض مديرك طلب إجازتك."
+    },
+    "swapApproved": {
+      "title": "تمت الموافقة على تبديل الوردية",
+      "message": "وافقوا على طلب تبديل ورديتك."
+    },
+    "swapDeclined": {
+      "title": "تم رفض تبديل الوردية",
+      "message": "رفضوا طلب تبديل ورديتك."
+    },
+    "announcementDefault": "إعلان للفريق",
+    "documentDefault": "مستند جديد"
+  },
+  "scheduledOrder": {
+    "executedTitle": "تم تنفيذ الطلب المجدول",
+    "reminderTitle": "تذكير بالطلب المجدول",
+    "executedMessage": "تم إنشاء الطلب المجدول \"{{name}}\" تلقائيًا.",
+    "reminderMessage": "سيتم تنفيذ الطلب المجدول \"{{name}}\" قريبًا. راجع المخزون إذا أردت إيقافه."
+  },
+  "invoice": {
+    "issuedTitle": "تم إصدار الفاتورة",
+    "issuedMessage": "الفاتورة {{invoiceNumber}} بقيمة ${{amount}} مستحقة {{dueDate}}",
+    "overdueRestaurantTitle": "فاتورة متأخرة",
+    "overdueRestaurantMessage": "الفاتورة {{invoiceNumber}} بقيمة ${{amount}} كانت مستحقة في {{dueDate}} وهي متأخرة الآن.",
+    "overdueSupplierTitle": "دفعة متأخرة",
+    "overdueSupplierMessage": "الفاتورة {{invoiceNumber}} بقيمة ${{amount}} متأخرة منذ {{dueDate}}."
+  },
+  "payment": {
+    "receivedTitle": "تم استلام الدفع",
+    "receivedMessage": "تم استلام دفعة ${{amount}} للفاتورة {{invoiceRef}}"
+  },
+  "inventory": {
+    "lowStockTitle": "تنبيه مخزون منخفض",
+    "lowStockMessage": "{{productName}} أقل من الحد. الحالي: {{currentStock}}، الحد: {{threshold}}",
+    "outOfStockTitle": "نفاد المخزون",
+    "outOfStockMessage": "{{productName}} نفد من المخزون."
+  },
+  "message": {
+    "title": "رسالة جديدة",
+    "body": "أرسل {{senderLabel}} رسالة{{preview}}"
+  },
+  "dispute": {
+    "openedTitle": "تم فتح نزاع جديد",
+    "openedMessage": "فتح مطعم نزاعًا على الطلب #{{orderId}}",
+    "rejectedTitle": "تم رفض النزاع",
+    "resolvedTitle": "تم حل النزاع",
+    "rejectedMessage": "تم رفض نزاعك. {{notes}}",
+    "resolvedMessage": "تم حل نزاعك ({{resolutionType}}).",
+    "replacementMessage": "تم حل نزاعك باستبدال. تم إنشاء طلب الاستبدال #{{orderId}}."
+  },
+  "deal": {
+    "approvedTitle": "عرض جديد من {{supplierLabel}}",
+    "approvedMessage": "{{dealName}} متاح الآن. افتح العروض للعرض والاستفادة.",
+    "rejectedTitle": "تم رفض العرض",
+    "rejectedMessage": "لم تتم الموافقة على عرضك \"{{dealName}}\".{{reasonSuffix}}",
+    "rejectedReason": " السبب: {{reason}}",
+    "submittedSupplierTitle": "تم تقديم العرض للمراجعة",
+    "submittedSupplierMessage": "تم تقديم عرضك \"{{dealName}}\" وهو بانتظار موافقة الإدارة.",
+    "submittedAdminTitle": "عرض يحتاج موافقة",
+    "submittedAdminMessage": "قدّم {{supplierLabel}} \"{{dealName}}\" للموافقة.",
+    "expiredTitle": "انتهى العرض",
+    "expiredMessage": "انتهى عرضك \"{{dealName}}\"."
+  },
+  "billing": {
+    "trialStartedTitle": "بدأت الفترة التجريبية",
+    "trialStartedMessage": "بدأت فترتك التجريبية في سبلايفاي{{planSuffix}}.{{endsSuffix}}",
+    "trialStartedPlan": " ({{planName}})",
+    "trialStartedEnds": " تنتهي في {{trialEndsAt}}.",
+    "trialEndingTitle": "الفترة التجريبية تنتهي قريبًا",
+    "trialEndingMessage": "تنتهي فترتك التجريبية في سبلايفاي خلال {{daysLeft}} يوم/أيام{{endsSuffix}}. أضف طريقة دفع للحفاظ على الوصول الكامل.",
+    "trialEndingEnds": " ({{trialEndsAt}})",
+    "trialExpiredTitle": "انتهت الفترة التجريبية",
+    "trialExpiredMessage": "انتهت فترتك التجريبية في سبلايفاي. اشترك لاستعادة صلاحية الكتابة.",
+    "activatedTitle": "تم تفعيل الاشتراك",
+    "activatedMessage": "اشتراكك في سبلايفاي{{planSuffix}} نشط الآن.",
+    "renewedTitle": "تم تجديد الاشتراك",
+    "renewedMessage": "تم تجديد اشتراكك{{periodSuffix}}",
+    "renewedPeriod": " حتى {{periodEnd}}.",
+    "renewedPeriodFallback": ".",
+    "paymentFailedTitle": "فشل الدفع",
+    "paymentFailedMessage": "تعذّر معالجة دفعة اشتراكك.{{reasonSuffix}} حدّث طريقة الدفع لتجنب الانقطاع.",
+    "cancelledTitle": "تم إلغاء الاشتراك",
+    "cancelledMessage": "تم إلغاء اشتراكك في سبلايفاي.",
+    "accountLockedTitle": "الحساب مقيد",
+    "accountLockedMessage": "صلاحية الكتابة مقيدة{{reasonSuffix}}. زُر الفوترة لاستعادة الوصول.",
+    "reasonPrefix": ": {{reason}}"
+  },
+  "quote": {
+    "requestTitle": "طلب عرض سعر جديد",
+    "requestMessage": "طلب {{restaurantName}} أفضل سعر للمنتجات المحددة.",
+    "responseTitle": "رد من المورد",
+    "responseMessage": "رد {{supplierName}} على طلب عرض السعر."
+  },
+  "admin": {
+    "newTenantTitle": "تسجيل {{tenantType}} جديد",
+    "newTenantMessage": "تم تسجيل {{tenantType}} جديد \"{{tenantName}}\"{{emailSuffix}}",
+    "newTenantEmail": " ({{contactEmail}})",
+    "tenantTypeSupplier": "مورد",
+    "tenantTypeRestaurant": "مطعم"
+  }
+}

@@ -260,5 +260,35 @@
       "adjustmentFailed": "فشل تسجيل التعديل",
       "settingsSaved": "تم حفظ الإعدادات"
     }
+  },
+  "toast": {
+    "reorderReminderSnoozed": "تم تأجيل التذكير لمدة 7 أيام",
+    "reorderSnoozeFailed": "تعذّر تأجيل التذكير",
+    "reorderMarkedNotNeeded": "تم وضع علامة غير مطلوب",
+    "reorderUpdatePreferenceFailed": "تعذّر تحديث التفضيل",
+    "createOrderingListFirst": "أنشئ قائمة طلب أولاً",
+    "noProductLinkedToSuggestion": "لا يوجد منتج مرتبط بهذا الاقتراح",
+    "addedToList": "تمت الإضافة إلى {{listName}}",
+    "addToListFailed": "فشلت الإضافة إلى القائمة",
+    "aiDailyLimitReached": "تم الوصول إلى الحد اليومي للذكاء الاصطناعي — يُعرض ملخص قائم على القواعد",
+    "explainSuggestionsFailed": "تعذّر شرح الاقتراحات",
+    "noMatchingProducts": "لم يتم العثور على منتجات مطابقة",
+    "parseRequestFailed": "تعذّر تحليل طلبك",
+    "expiryItemAndDateRequired": "اسم الصنف وتاريخ الانتهاء مطلوبان",
+    "expiryLotAdded": "تمت إضافة دفعة انتهاء الصلاحية",
+    "expiryAddLotFailed": "فشلت إضافة الدفعة",
+    "expiryLotRemoved": "تمت إزالة الدفعة",
+    "expiryRemoveLotFailed": "تعذّر إزالة الدفعة",
+    "wasteSelectProductQuantity": "اختر منتجاً وكمية",
+    "wasteQuantityPositive": "يجب أن تكون الكمية رقماً موجباً",
+    "wasteUnitCostNonNegative": "يجب أن تكون تكلفة الوحدة صفراً أو أكثر",
+    "wasteExceedsOnHand": "لا يمكن تسجيل أكثر من المتوفر ({{quantity}} {{unit}})",
+    "wasteLogged": "تم تسجيل الهدر وتحديث المخزون",
+    "wasteLogFailed": "فشل تسجيل الهدر",
+    "addedToOrderingList": "تمت إضافة {{name}} إلى قائمة الطلب",
+    "orderingListItemFallback": "صنف",
+    "addToOrderingListFailed": "تعذّرت الإضافة إلى القائمة",
+    "createdListAndAddedItem": "تم إنشاء القائمة وإضافة الصنف",
+    "createOrderingListFailed": "تعذّر إنشاء القائمة"
   }
 }

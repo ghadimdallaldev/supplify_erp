@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   useGetSupplierFulfillmentQuery,
   useUpdateSupplierFulfillmentMutation,
@@ -18,6 +19,7 @@ type Props = {
 }
 
 export function WarehouseFulfillmentSettings({ enabled }: Props) {
+  const { t } = useTranslation('settings')
   const { data, isLoading } = useGetSupplierFulfillmentQuery(undefined, { skip: !enabled })
   const [updateFulfillment, { isLoading: saving }] = useUpdateSupplierFulfillmentMutation()
   const { data: rulesData } = useGetWarehouseRoutingRulesQuery(undefined, { skip: !enabled })
@@ -29,9 +31,9 @@ export function WarehouseFulfillmentSettings({ enabled }: Props) {
   const handleToggleMulti = async (checked: boolean) => {
     try {
       await updateFulfillment({ multi_warehouse_enabled: checked }).unwrap()
-      toast.success(checked ? 'Multi-warehouse enabled' : 'Multi-warehouse disabled')
+      toast.success(checked ? t('toast.multiWarehouseEnabled') : t('toast.multiWarehouseDisabled'))
     } catch (e: any) {
-      toast.error(e?.data?.error?.message || 'Failed to update fulfillment settings')
+      toast.error(e?.data?.error?.message || t('toast.fulfillmentUpdateFailed'))
     }
   }
 
@@ -39,10 +41,12 @@ export function WarehouseFulfillmentSettings({ enabled }: Props) {
     try {
       const result = await simulateRouting({ deliveryArea: simulateArea || undefined }).unwrap()
       toast.success(
-        result?.warehouseName ? `Would route to: ${result.warehouseName}` : 'Simulation complete'
+        result?.warehouseName
+          ? t('toast.routeWouldRouteTo', { warehouseName: result.warehouseName })
+          : t('toast.simulationComplete')
       )
     } catch (e: any) {
-      toast.error(e?.data?.error?.message || 'Simulation failed')
+      toast.error(e?.data?.error?.message || t('toast.simulationFailed'))
     }
   }
 
