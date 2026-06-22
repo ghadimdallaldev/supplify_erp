@@ -55,11 +55,11 @@ export function KpiCard({
             aria-hidden
           />
         </div>
-        <span className="text-xs font-medium leading-snug text-[var(--text-muted)]">{label}</span>
+        <span className="text-xs font-medium leading-snug text-[var(--text-mid)]">{label}</span>
       </div>
       <p
         className={cn(
-          'font-bold tabular-nums leading-none text-[var(--text)]',
+          'font-bold tabular-nums leading-none tracking-tight text-[var(--text)]',
           size === 'sm' ? 'text-lg sm:text-xl' : 'text-2xl sm:text-[1.75rem]'
         )}
       >

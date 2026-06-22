@@ -7,7 +7,7 @@ import { Skeleton } from '../ui/skeleton'
 import { useGetOrderTrackingQuery } from '../../services/api'
 import { formatDeliveryStatus } from '../../lib/deliveryStatusLabels'
 import { getGpsStatusLabel, getLiveDeliveryStatusLine } from '../../lib/deliveryTrackingLabels'
-import { DeliveryTrackingMap } from '../maps/DeliveryTrackingMap'
+import { LazyDeliveryTrackingMap } from '../maps/LazyDeliveryTrackingMap'
 import {
   DeliveryTrackingEtaSection,
   getDestinationLabelText,
@@ -112,7 +112,7 @@ export function OrderDeliveryTrackingPanel({ orderId, pollIntervalMs = 15_000 }:
             {destinationLabel}
           </p>
         ) : null}
-        <DeliveryTrackingMap
+        <LazyDeliveryTrackingMap
           latitude={loc?.latitude}
           longitude={loc?.longitude}
           destinationLatitude={data.destination?.latitude}
