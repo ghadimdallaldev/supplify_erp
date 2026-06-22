@@ -33,6 +33,7 @@ import { formatPlanDisplayName } from '../lib/planComparison'
 import { formatCurrency } from '../utils/format'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
+import { Badge } from '../components/ui/badge'
 import {
   DASHBOARD_CALENDAR_EXTRA_GAP,
   DashboardSummaryStrip,
@@ -175,11 +176,6 @@ export function DashboardPage() {
 
   // ── Derived data ─────────────────────────────────────────────────────────
   const orders = (ordersData?.orders || []).slice(0, 7)
-  const orderAmounts = orders.map((o: any) => Number(o.total_amount) || 0)
-  const revenueSparkData = orderAmounts.length >= 3 ? [...orderAmounts.slice(-7)] : []
-  const ordersSparkData: number[] = []
-  const pendingSparkData: number[] = []
-  const counterpartSparkData: number[] = []
 
   const invoiceSpendTrend = Array.isArray(invoiceAnalytics?.points)
     ? invoiceAnalytics.points.map((p: any) => ({
@@ -212,8 +208,6 @@ export function DashboardPage() {
       iconColor: 'var(--brand)',
       Icon: DollarSign,
       meta: t('kpi.supplier.revenue.meta'),
-      sparkData: revenueSparkData,
-      sparkColor: 'var(--brand)',
     },
     {
       kpiKey: 'orders',
@@ -223,8 +217,6 @@ export function DashboardPage() {
       iconColor: 'var(--mint)',
       Icon: ShoppingCart,
       meta: t('kpi.supplier.orders.meta'),
-      sparkData: ordersSparkData,
-      sparkColor: 'var(--mint-mid)',
     },
     {
       kpiKey: 'pending',
@@ -234,8 +226,6 @@ export function DashboardPage() {
       iconColor: 'var(--amber)',
       Icon: TrendingUp,
       meta: t('kpi.supplier.pending.meta'),
-      sparkData: pendingSparkData,
-      sparkColor: 'var(--amber-mid)',
     },
     {
       kpiKey: 'counterpart',
@@ -245,8 +235,6 @@ export function DashboardPage() {
       iconColor: 'var(--brand)',
       Icon: Users,
       meta: t('kpi.supplier.counterpart.meta'),
-      sparkData: counterpartSparkData,
-      sparkColor: 'var(--brand-light)',
     },
   ]
 
@@ -262,8 +250,6 @@ export function DashboardPage() {
       iconColor: 'var(--brand)',
       Icon: DollarSign,
       meta: t('kpi.restaurant.revenue.meta'),
-      sparkData: revenueSparkData,
-      sparkColor: 'var(--brand)',
     },
     {
       kpiKey: 'orders',
@@ -273,8 +259,6 @@ export function DashboardPage() {
       iconColor: 'var(--mint)',
       Icon: ShoppingCart,
       meta: t('kpi.restaurant.orders.meta'),
-      sparkData: ordersSparkData,
-      sparkColor: 'var(--mint-mid)',
     },
     {
       kpiKey: 'pending',
@@ -284,8 +268,6 @@ export function DashboardPage() {
       iconColor: 'var(--amber)',
       Icon: TrendingUp,
       meta: t('kpi.restaurant.pending.meta'),
-      sparkData: pendingSparkData,
-      sparkColor: 'var(--amber-mid)',
     },
     {
       kpiKey: 'counterpart',
@@ -295,8 +277,6 @@ export function DashboardPage() {
       iconColor: 'var(--brand)',
       Icon: Building2,
       meta: t('kpi.restaurant.counterpart.meta'),
-      sparkData: counterpartSparkData,
-      sparkColor: 'var(--brand-light)',
     },
   ]
 
@@ -332,7 +312,13 @@ export function DashboardPage() {
 
       <PageHeader
         title={dashboardConfig?.title ?? `${greeting}, ${firstName}`}
-        description={`${dashboardConfig?.description ?? formattedDate} · ${persona.roleLabel} · ${planName}`}
+        description={dashboardConfig?.description ?? formattedDate}
+        actions={
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge variant="outline">{persona.roleLabel}</Badge>
+            <Badge variant="default">{planName}</Badge>
+          </div>
+        }
       />
 
       {isRestaurant ? (

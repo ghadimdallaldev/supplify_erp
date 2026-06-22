@@ -63,10 +63,11 @@ describe('FulfillmentTrackingTab', () => {
     expect(screen.getByTestId('delivery-tracking-drawer')).toBeInTheDocument()
   })
 
-  it('switches to map view and opens drawer from map selection', () => {
+  it('switches to map view and opens drawer from map selection', async () => {
     renderWithFulfillmentI18n(<FulfillmentTrackingTab />)
     fireEvent.click(screen.getByTestId('fulfillment-tracking-map-view'))
-    fireEvent.click(screen.getByTestId('active-deliveries-map-mock'))
+    // The map is lazy-loaded (React.lazy + Suspense), so wait for the chunk to resolve.
+    fireEvent.click(await screen.findByTestId('active-deliveries-map-mock'))
     expect(screen.getByTestId('delivery-tracking-drawer')).toBeInTheDocument()
   })
 })

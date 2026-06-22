@@ -686,7 +686,7 @@ export async function seedB2cDemo() {
 
   const demoDiner = await ensureDemoDiner(restaurant.id)
   const primaryBranch = branches[0]
-  const baseUrl = process.env.WEB_ORIGIN || 'http://localhost:5173'
+  const baseUrl = process.env.MARKETING_WEB_ORIGIN || process.env.WEB_ORIGIN || 'http://localhost:5173'
 
   const summary = {
     restaurant: restaurant.name,

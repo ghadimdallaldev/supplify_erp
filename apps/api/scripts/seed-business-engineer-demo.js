@@ -113,6 +113,16 @@ async function clearDemoPair(client, pair) {
     if (!rows[0]) continue
     const tenantId = rows[0].id
 
+    if (tenantType === 'SUPPLIER') {
+      await client.query(
+        `DELETE FROM route_stop WHERE route_id IN (SELECT id FROM delivery_route WHERE supplier_id = $1)`,
+        [tenantId]
+      )
+      await client.query(`DELETE FROM delivery_route WHERE supplier_id = $1`, [tenantId])
+      await client.query(`DELETE FROM driver_assignments WHERE supplier_id = $1`, [tenantId])
+      await client.query(`DELETE FROM drivers WHERE supplier_id = $1`, [tenantId])
+    }
+
     const tables = [
       'deal_interactions',
       'deal_promotions',
