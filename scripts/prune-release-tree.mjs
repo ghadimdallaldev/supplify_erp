@@ -122,43 +122,24 @@ function slimPackageJson() {
   if (rootPkg.devDependencies) rootSlim.devDependencies = rootPkg.devDependencies
   writeJson('package.json', rootSlim)
 
+  const apiPkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'apps/api/package.json'), 'utf8'))
   writeJson('apps/api/package.json', {
-    name: '@supplify/api',
-    version: '2.0.0',
-    description: 'Supplify API Server',
-    type: 'module',
-    main: 'dist/server.js',
+    ...apiPkg,
     scripts: {
-      build: "echo 'Build not needed for JS'",
+      build: apiPkg.scripts?.build || "echo 'Build not needed for JS'",
       start: 'node src/server.js',
       'db:migrate': 'node scripts/migrate.js',
     },
-    dependencies: JSON.parse(fs.readFileSync(path.join(ROOT, 'apps/api/package.json'), 'utf8'))
-      .dependencies,
   })
 
   const webPkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'apps/web/package.json'), 'utf8'))
   const dockerBuild = webPkg.scripts['build:docker'] || webPkg.scripts.build
   writeJson('apps/web/package.json', {
-    name: '@supplify/web',
-    version: '2.0.0',
-    description: 'Supplify Web Application',
-    type: 'module',
+    ...webPkg,
     scripts: {
       build: dockerBuild,
       'build:docker': dockerBuild,
       preview: 'vite preview',
-    },
-    dependencies: webPkg.dependencies,
-    devDependencies: {
-      '@types/react': webPkg.devDependencies['@types/react'],
-      '@types/react-dom': webPkg.devDependencies['@types/react-dom'],
-      '@vitejs/plugin-react': webPkg.devDependencies['@vitejs/plugin-react'],
-      autoprefixer: webPkg.devDependencies.autoprefixer,
-      postcss: webPkg.devDependencies.postcss,
-      tailwindcss: webPkg.devDependencies.tailwindcss,
-      typescript: webPkg.devDependencies.typescript,
-      vite: webPkg.devDependencies.vite,
     },
   })
 }
