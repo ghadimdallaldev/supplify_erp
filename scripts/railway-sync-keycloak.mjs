@@ -65,7 +65,8 @@ function parseEnvFile(content) {
 }
 
 function railway(args) {
-  return execFileSync('railway', args, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+  const bin = process.platform === 'win32' ? 'railway.cmd' : 'railway';
+  return execFileSync(bin, args, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], shell: true });
 }
 
 function main() {
@@ -76,8 +77,9 @@ function main() {
     process.exit(1);
   }
 
+  const bin = process.platform === 'win32' ? 'railway.cmd' : 'railway';
   try {
-    execFileSync('railway', ['--version'], { stdio: 'ignore' });
+    execFileSync(bin, ['--version'], { stdio: 'ignore', shell: true });
   } catch {
     console.error('Railway CLI not found. Install: npm i -g @railway/cli');
     process.exit(1);
@@ -91,19 +93,20 @@ function main() {
     console.warn('Tip: set KEYCLOAK_ADMIN_PASSWORD in the shell when syncing secrets.');
   }
 
-  const args = ['variables', '--set'];
-  if (service) args.push('--service', service);
-  for (const [key, value] of Object.entries(vars)) {
-    args.push(`${key}=${value}`);
-  }
+  const pairs = Object.entries(vars).filter(([, value]) => value !== '');
 
-  console.log(`Syncing ${Object.keys(vars).length} variables from ${envFile}`);
+  console.log(`Syncing ${pairs.length} variables from ${envFile}`);
   if (service) console.log(`Service: ${service}`);
 
-  const result = spawnSync('railway', args, { stdio: 'inherit' });
-  if (result.status !== 0) {
-    console.error('\nFailed. Run `railway link` in this repo if the project is not linked.');
-    process.exit(result.status ?? 1);
+  for (const [key, value] of pairs) {
+    const quoted = `${key}=${value}`.replace(/"/g, '\\"');
+    const serviceArg = service ? ` --service ${service}` : '';
+    const cmd = `"${bin}" variable set "${quoted}"${serviceArg}`;
+    const result = spawnSync(cmd, { stdio: 'pipe', shell: true, encoding: 'utf8' });
+    if (result.status !== 0) {
+      console.error(`Failed ${key}:`, result.stderr?.trim() || result.stdout?.trim());
+      process.exit(result.status ?? 1);
+    }
   }
 
   console.log('\nDone. Redeploy the Keycloak service (or push to git if auto-deploy is on).');

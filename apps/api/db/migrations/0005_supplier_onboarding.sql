@@ -34,7 +34,7 @@ ALTER TABLE supplier ADD COLUMN IF NOT EXISTS subscription_limits JSONB DEFAULT 
 ALTER TABLE supplier ADD COLUMN IF NOT EXISTS account_status TEXT DEFAULT 'ACTIVE';
 ALTER TABLE supplier ADD COLUMN IF NOT EXISTS suspension_reason TEXT;
 
--- Create warehouse table for supplier locations
+-- Create warehouse table for supplier locations (0002 may have created a slimmer schema)
 CREATE TABLE IF NOT EXISTS warehouse (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   supplier_id UUID NOT NULL REFERENCES supplier(id) ON DELETE CASCADE,
@@ -49,9 +49,13 @@ CREATE TABLE IF NOT EXISTS warehouse (
   UNIQUE(supplier_id, code)
 );
 
+-- Extend warehouse when created by 0002_inventory_enhancements.sql
+ALTER TABLE warehouse ADD COLUMN IF NOT EXISTS delivery_coverage_zones JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE warehouse ADD COLUMN IF NOT EXISTS is_main BOOLEAN DEFAULT false;
+
 -- Create indexes for warehouse
-CREATE INDEX idx_warehouse_supplier ON warehouse(supplier_id);
-CREATE INDEX idx_warehouse_active ON warehouse(supplier_id) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_warehouse_supplier ON warehouse(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_warehouse_active ON warehouse(supplier_id) WHERE is_active = true;
 
 -- Create delivery coverage zone table
 CREATE TABLE IF NOT EXISTS delivery_zone (
@@ -69,9 +73,9 @@ CREATE TABLE IF NOT EXISTS delivery_zone (
 );
 
 -- Create indexes for delivery zones
-CREATE INDEX idx_delivery_zone_supplier ON delivery_zone(supplier_id);
-CREATE INDEX idx_delivery_zone_warehouse ON delivery_zone(warehouse_id);
-CREATE INDEX idx_delivery_zone_active ON delivery_zone(supplier_id) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_delivery_zone_supplier ON delivery_zone(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_delivery_zone_warehouse ON delivery_zone(warehouse_id);
+CREATE INDEX IF NOT EXISTS idx_delivery_zone_active ON delivery_zone(supplier_id) WHERE is_active = true;
 
 -- Add comments for documentation
 COMMENT ON COLUMN supplier.subscription_tier IS 'Subscription tier: BASIC, PRO, ENTERPRISE';

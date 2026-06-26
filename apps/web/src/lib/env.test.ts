@@ -6,12 +6,12 @@ describe('hosted web config', () => {
     vi.resetModules()
   })
 
-  it('requires VITE_API_URL when VITE_APP_ENV is prod', async () => {
+  it('allows empty API base in prod when nginx proxies /api', async () => {
     vi.stubEnv('VITE_APP_ENV', 'prod')
     vi.stubEnv('DEV', '')
     vi.stubEnv('VITE_API_URL', '')
     const { resolveApiBase } = await import('./env')
-    expect(() => resolveApiBase()).toThrow(/VITE_API_URL/)
+    expect(resolveApiBase()).toBe('')
   })
 
   it('allows empty API base in dev with Vite proxy', async () => {

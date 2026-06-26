@@ -100,7 +100,14 @@ async function partialImport(url, token, realmName, realmExport) {
   const payload = {
     ifResourceExists: 'OVERWRITE',
   }
-  if (realmExport.clients?.length) payload.clients = realmExport.clients
+  if (realmExport.clients?.length) {
+    payload.clients = realmExport.clients.map((client) => {
+      const copy = { ...client }
+      // Never overwrite live client secrets from git placeholders.
+      if (!copy.secret || copy.secret === 'changeme') delete copy.secret
+      return copy
+    })
+  }
   if (realmExport.roles) payload.roles = realmExport.roles
   if (realmExport.users?.length) payload.users = realmExport.users
 
