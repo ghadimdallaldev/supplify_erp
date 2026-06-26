@@ -53,12 +53,8 @@ export function resolveApiBase(): string {
   const configured = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? ''
   if (configured) return configured
   if (import.meta.env.DEV) return ''
-  if (HOSTED_ENVS.has(appEnv)) {
-    throw new Error(
-      `Configuration error: VITE_API_URL is required when VITE_APP_ENV=${appEnv}. ` +
-        'Set it in Railway (or your build env) before deploying the web service.'
-    )
-  }
+  // Hosted builds may omit VITE_API_URL when nginx proxies /api and /auth (see NGINX_API_UPSTREAM).
+  if (HOSTED_ENVS.has(appEnv)) return ''
   return ''
 }
 

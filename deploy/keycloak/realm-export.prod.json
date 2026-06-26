@@ -1,13 +1,20 @@
 {
   "realm": "supplify-prod",
   "enabled": true,
-  "sslRequired": "external",
+  "sslRequired": "all",
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
   "editUsernameAllowed": false,
   "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
   "clients": [
     {
       "clientId": "supplify-api",
@@ -15,12 +22,25 @@
       "directAccessGrantsEnabled": false,
       "standardFlowEnabled": true,
       "clientAuthenticatorType": "client-secret",
-      "secret": "REPLACE_BEFORE_IMPORT",
-      "redirectUris": ["https://api.yourdomain.com/auth/callback", "https://api.yourdomain.com/*"],
-      "webOrigins": ["https://app.yourdomain.com"],
+      "secret": "changeme",
+      "redirectUris": [
+        "https://app.supplifyerp.com/auth/callback",
+        "https://app.supplifyerp.com/*",
+        "https://api.supplifyerp.com/auth/callback",
+        "https://api.supplifyerp.com/*",
+        "https://supplify-web-prod-production.up.railway.app/auth/callback",
+        "https://supplify-web-prod-production.up.railway.app/*",
+        "https://supplify-api-prod-production.up.railway.app/auth/callback",
+        "https://supplify-api-prod-production.up.railway.app/*"
+      ],
+      "webOrigins": [
+        "https://app.supplifyerp.com",
+        "https://api.supplifyerp.com",
+        "https://supplify-web-prod-production.up.railway.app"
+      ],
       "protocol": "openid-connect",
       "attributes": {
-        "post.logout.redirect.uris": "https://api.yourdomain.com/auth/register?continue=1##https://api.yourdomain.com/auth/register##https://api.yourdomain.com/*##https://app.yourdomain.com/login##https://app.yourdomain.com/*"
+        "post.logout.redirect.uris": "https://app.supplifyerp.com/login##https://app.supplifyerp.com/*##https://api.supplifyerp.com/auth/register?continue=1##https://api.supplifyerp.com/auth/register##https://api.supplifyerp.com/*##https://supplify-web-prod-production.up.railway.app/login##https://supplify-web-prod-production.up.railway.app/*"
       },
       "defaultClientScopes": ["web-origins", "profile", "roles", "email"],
       "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
@@ -29,12 +49,22 @@
       "clientId": "supplify-web",
       "enabled": true,
       "publicClient": true,
-      "redirectUris": ["https://api.yourdomain.com/auth/callback", "https://api.yourdomain.com/*"],
-      "webOrigins": ["https://app.yourdomain.com"],
+      "redirectUris": [
+        "https://app.supplifyerp.com/auth/callback",
+        "https://app.supplifyerp.com/*",
+        "https://api.supplifyerp.com/auth/callback",
+        "https://api.supplifyerp.com/*",
+        "https://supplify-web-prod-production.up.railway.app/auth/callback",
+        "https://supplify-web-prod-production.up.railway.app/*"
+      ],
+      "webOrigins": [
+        "https://app.supplifyerp.com",
+        "https://supplify-web-prod-production.up.railway.app"
+      ],
       "protocol": "openid-connect",
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "https://app.yourdomain.com/login##https://app.yourdomain.com/*##https://api.yourdomain.com/*"
+        "post.logout.redirect.uris": "https://app.supplifyerp.com/login##https://app.supplifyerp.com/*##https://api.supplifyerp.com/*##https://supplify-web-prod-production.up.railway.app/login##https://supplify-web-prod-production.up.railway.app/*"
       },
       "defaultClientScopes": ["web-origins", "profile", "roles", "email"],
       "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]

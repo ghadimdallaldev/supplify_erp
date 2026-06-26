@@ -10,9 +10,10 @@ WORKDIR /app
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@8.15.9 --activate
 
-# Copy package files
+# Copy package files (include vendored xlsx tarball — file: dependency in apps/api/package.json)
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json ./apps/api/
+COPY vendor/sheetjs/xlsx-0.20.3.tgz ./vendor/sheetjs/xlsx-0.20.3.tgz
 
 # Install API workspace and its dependency tree only
 RUN pnpm install --frozen-lockfile --filter @supplify/api...
