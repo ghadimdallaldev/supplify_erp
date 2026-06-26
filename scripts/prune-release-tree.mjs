@@ -118,6 +118,8 @@ function slimPackageJson() {
   }
   // pnpm-lock.yaml embeds overrides — omitting them breaks frozen install in Docker.
   if (rootPkg.pnpm) rootSlim.pnpm = rootPkg.pnpm
+  // Lockfile still lists root devDependencies; keep them for frozen install.
+  if (rootPkg.devDependencies) rootSlim.devDependencies = rootPkg.devDependencies
   writeJson('package.json', rootSlim)
 
   writeJson('apps/api/package.json', {
