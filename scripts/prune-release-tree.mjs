@@ -100,7 +100,8 @@ function writeJson(rel, data) {
 }
 
 function slimPackageJson() {
-  writeJson('package.json', {
+  const rootPkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
+  const rootSlim = {
     name: 'supplify',
     version: '1.0.0',
     description: 'Supplify - Restaurant & F&B Supplier Marketplace',
@@ -114,7 +115,10 @@ function slimPackageJson() {
     },
     engines: { node: '>=18.0.0', pnpm: '>=8.0.0' },
     packageManager: 'pnpm@8.15.9',
-  })
+  }
+  // pnpm-lock.yaml embeds overrides — omitting them breaks frozen install in Docker.
+  if (rootPkg.pnpm) rootSlim.pnpm = rootPkg.pnpm
+  writeJson('package.json', rootSlim)
 
   writeJson('apps/api/package.json', {
     name: '@supplify/api',
@@ -132,13 +136,15 @@ function slimPackageJson() {
   })
 
   const webPkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'apps/web/package.json'), 'utf8'))
+  const dockerBuild = webPkg.scripts['build:docker'] || webPkg.scripts.build
   writeJson('apps/web/package.json', {
     name: '@supplify/web',
     version: '2.0.0',
     description: 'Supplify Web Application',
     type: 'module',
     scripts: {
-      build: 'tsc && vite build',
+      build: dockerBuild,
+      'build:docker': dockerBuild,
       preview: 'vite preview',
     },
     dependencies: webPkg.dependencies,
