@@ -8,7 +8,8 @@
       "deploy/railway/**",
       "package.json",
       "pnpm-lock.yaml",
-      "pnpm-workspace.yaml"
+      "pnpm-workspace.yaml",
+      "vendor/sheetjs/**"
     ]
   },
   "deploy": {
