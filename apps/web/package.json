@@ -4,7 +4,8 @@
   "description": "Supplify Web Application",
   "type": "module",
   "scripts": {
-    "build": "tsc && vite build",
+    "build": "node scripts/generate-pwa-icons.mjs && vite build",
+    "build:docker": "node scripts/generate-pwa-icons.mjs && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
