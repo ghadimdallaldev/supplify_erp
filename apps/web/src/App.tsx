@@ -21,6 +21,7 @@ import { InviteAcceptPage } from './pages/InviteAcceptPage'
 import { BranchInviteAcceptPage } from './pages/BranchInviteAcceptPage'
 import { OAuthRedirect } from './components/OAuthRedirect'
 import { PageLoading } from './components/ui/page-loading'
+import { CustomDomainCatalogHost } from './components/public/CustomDomainCatalogHost'
 import { RequirePermission } from './components/RequirePermission'
 
 const DashboardPage = lazyNamedPage(() => import('./pages/DashboardPage'), 'DashboardPage')
@@ -858,7 +859,11 @@ const router = createBrowserRouter([
 ])
 
 export function App() {
-  return <RouterProvider router={router} future={ROUTER_FUTURE} />
+  return (
+    <CustomDomainCatalogHost>
+      <RouterProvider router={router} future={ROUTER_FUTURE} />
+    </CustomDomainCatalogHost>
+  )
 }
 
 export default App

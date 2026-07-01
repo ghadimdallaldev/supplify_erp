@@ -169,20 +169,20 @@ Storage: `tenant_subscription_addon` (admin PUT `/api/admin-dashboard/tenants/:t
 
 Binary on/off per key (non-empty string = on). **Tier strings are not compared** on most routes.
 
-| Area                     | Enforcement                                                                      |
-| ------------------------ | -------------------------------------------------------------------------------- |
-| Branches                 | `plan-enforcement` + org-wide count + add-ons + Enterprise cap (6)               |
-| Warehouses               | `limits.warehouses` + add-ons (supplier org-wide count) + `warehouses` feature   |
-| Smart reorder            | `smart_reorder` on/off; tier via `resolveSmartReorderCapabilities()` (see below) |
-| AI platform (LLM assist) | `ai_platform` + env `AI_ENABLED`; `ai_requests_per_day` on LLM calls only        |
-| Reports / waste reports  | `reports` / `waste_tracking` on/off                                              |
-| Advanced roles           | `advanced_roles`                                                                 |
-| Activity log             | `tenant_audit_log`                                                               |
-| Waitlist auto-promo      | `waitlist_auto_promo`                                                            |
-| Supplier promotions CRUD | `promotions` feature + `promotions` limit                                        |
-| Restaurant deal redeem   | `supplier_deals` + `deal_redemptions_per_day`                                    |
-| Notifications            | `resolveAllowedChannels(notifications)` → in-app, email, WhatsApp (not webhooks) |
-| Custom branding PATCH    | `custom_branding` on/off                                                         |
+| Area                     | Enforcement                                                                                                                        |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Branches                 | `plan-enforcement` + org-wide count + add-ons + Enterprise cap (6)                                                                 |
+| Warehouses               | `limits.warehouses` + add-ons (supplier org-wide count) + `warehouses` feature                                                     |
+| Smart reorder            | `smart_reorder` on/off; tier via `resolveSmartReorderCapabilities()` (see below)                                                   |
+| AI platform (LLM assist) | `ai_platform` + env `AI_ENABLED`; `ai_requests_per_day` on LLM calls only                                                          |
+| Reports / waste reports  | `reports` / `waste_tracking` on/off                                                                                                |
+| Advanced roles           | `advanced_roles`                                                                                                                   |
+| Activity log             | `tenant_audit_log`                                                                                                                 |
+| Waitlist auto-promo      | `waitlist_auto_promo`                                                                                                              |
+| Supplier promotions CRUD | `promotions` feature + `promotions` limit                                                                                          |
+| Restaurant deal redeem   | `supplier_deals` + `deal_redemptions_per_day`                                                                                      |
+| Notifications            | `resolveAllowedChannels(notifications)` → in-app, email, WhatsApp; Platinum `email_whatsapp_webhook` adds outbound webhook channel |
+| Custom branding PATCH    | `custom_branding` on/off; Platinum `white_label_domain` adds custom hostname via `resolveBrandingCapabilities()`                   |
 
 **`smart_reorder` capabilities** (`resolveSmartReorderCapabilities()`):
 
@@ -191,6 +191,17 @@ Binary on/off per key (non-empty string = on). **Tier strings are not compared**
 | off / Silver                     |     —      |         —         |        —         |      —       |          —          |
 | `full_90day_trends` (Gold)       |     ✓      |         ✓         |        ✓         |      —       |          —          |
 | `ai_forecast_seasonality` (Plat) |     ✓      |         ✓         |        ✓         |      ✓       |          ✓          |
+
+**`quick_lists` capabilities** (`resolveQuickListCapabilities()`):
+
+| Plan value / tier            | Scheduling | Full schedule | Smart quantities | Suggest items |
+| ---------------------------- | :--------: | :-----------: | :--------------: | :-----------: |
+| off / manual                 |     —      |       —       |        —         |       —       |
+| `automated_weekly` (Silver)  |     ✓      |       —       |        —         |       —       |
+| `full_schedule` (Gold)       |     ✓      |       ✓       |        —         |       —       |
+| `ai_smart_automation` (Plat) |     ✓      |       ✓       |        ✓         |       ✓       |
+
+See [ai-quick-lists.md](../features/ai-quick-lists.md).
 
 ### Free Trial behavior (unchanged)
 
@@ -202,21 +213,28 @@ Binary on/off per key (non-empty string = on). **Tier strings are not compared**
 
 ## 7. Catalog-only / not fully enforced yet
 
-### Platinum-only strings (see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md))
+See [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md) for the live backlog.
 
-AI quick lists, advanced/custom reports, full API/webhooks, webhook notifications, white-label domain, read receipts, central purchasing, advanced finance/receiving/inventory strings — **marketing/catalog** until separate implementation. **Smart reorder forecasts + LLM assist** are implemented — see [ai-smart-reorder.md](../features/ai-smart-reorder.md).
+### Enforced Platinum strings (2026-07)
 
-### Cross-tier (string labels ≠ behavior)
+- **Smart quick lists** — [ai-quick-lists.md](../features/ai-quick-lists.md)
+- **Notification webhooks** — migration `0182`, `GET/PUT /api/notifications/webhook`
+- **Custom catalog domain** — [custom-domains.md](../operations/custom-domains.md)
+- **Smart reorder** — [ai-smart-reorder.md](../features/ai-smart-reorder.md)
 
-| Keys                          | Issue                                                                                                                                                                                     |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `reports`                     | `basic_kpis` vs `usage_cost_dashboards` vs `advanced_forecasting_custom_reports` — same route gate                                                                                        |
-| `smart_reorder`               | **Enforced** — `resolveSmartReorderCapabilities()` gates forecast model, explain (Gold+), ask (Platinum). See capability table in [ai-smart-reorder.md](../features/ai-smart-reorder.md). |
-| `finance_invoices`            | `record_payments` / `expense_analytics` / `advanced_finance_dashboard` — same gate                                                                                                        |
-| `receiving_quality`           | photos / scoring / supplier_performance — same gate                                                                                                                                       |
-| `waste_tracking` (restaurant) | `manual_entry` / `analytics_dashboard` / `cost_percentage_vs_sales` — same waste route gate                                                                                               |
-| `api_integrations`            | `api_key_access` vs `full_api_webhooks` — no differentiated API product gate                                                                                                              |
-| `notifications`               | `email_whatsapp_webhook` — **no webhook channel** in notification service                                                                                                                 |
+### Cross-tier (string labels ≠ behavior) — still open
+
+| Keys                          | Issue                                                                                              |
+| ----------------------------- | -------------------------------------------------------------------------------------------------- |
+| `reports`                     | `basic_kpis` vs `usage_cost_dashboards` vs `advanced_forecasting_custom_reports` — same route gate |
+| `smart_reorder`               | **Enforced** — see §6 capability table                                                             |
+| `quick_lists`                 | **Enforced** — see §6 capability table                                                             |
+| `notifications`               | **Enforced** for outbound webhooks (`email_whatsapp_webhook`)                                      |
+| `custom_branding`             | **Enforced** for custom domain (`white_label_domain`); logo/colors shared with Gold                |
+| `finance_invoices`            | `record_payments` / `expense_analytics` / `advanced_finance_dashboard` — same gate                 |
+| `receiving_quality`           | photos / scoring / `supplier_performance` — same gate                                              |
+| `waste_tracking` (restaurant) | `manual_entry` / `analytics_dashboard` / `cost_percentage_vs_sales` — same waste route gate        |
+| `api_integrations`            | `api_key_access` vs `full_api_webhooks` — no differentiated API product gate                       |
 
 ### Reservations
 
@@ -263,17 +281,17 @@ Feature overrides: tenant `feature_flag_override` and global `feature_flag.globa
 
 ## 10. Known risks
 
-| Risk                                             | Severity             | Notes                                                                                                                        |
-| ------------------------------------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| **Free Trial feature parity with Gold (`0112`)** | High (GTM)           | Trial unlocks same feature flags as Gold; only limits differ — can confuse upgrade story                                     |
-| **Tier feature strings not enforced**            | High (Platinum/Gold) | Buyers may expect AI/webhooks/white-label product not yet built                                                              |
-| **Webhook notification label**                   | Medium               | Platinum `email_whatsapp_webhook` does not enable webhooks                                                                   |
-| **Storage soft enforcement**                     | Low                  | Documented grace; tenants may exceed before block                                                                            |
-| **Legacy `bronze` in API**                       | Low                  | Normalized to silver; stale clients safe                                                                                     |
-| **Enterprise catalog incomplete**                | Low                  | Inactive; sparse flags; not self-serve                                                                                       |
-| **Free `scheduled_order_grace_per_day: 1`**      | Low                  | Hidden meter; sandbox order overflow                                                                                         |
-| **Supplier Free high feature set**               | Medium               | Same `0112` copy pattern as restaurant Free                                                                                  |
-| **Platinum `multi_branch` tier string**          | Low (mitigated)      | Frontend uses `featureEnabled` / `isEntitlementFeatureEnabled` + `planFeatures` on entitlements; API still resolves booleans |
+| Risk                                             | Severity               | Notes                                                                                                                        |
+| ------------------------------------------------ | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Free Trial feature parity with Gold (`0112`)** | High (GTM)             | Trial unlocks same feature flags as Gold; only limits differ — can confuse upgrade story                                     |
+| **Tier feature strings not enforced**            | Medium (Platinum/Gold) | Remaining catalog items: full API platform, advanced reports strings — see §7                                                |
+| **Webhook notification label**                   | Low (mitigated)        | Outbound notification webhooks shipped (`0182`)                                                                              |
+| **Storage soft enforcement**                     | Low                    | Documented grace; tenants may exceed before block                                                                            |
+| **Legacy `bronze` in API**                       | Low                    | Normalized to silver; stale clients safe                                                                                     |
+| **Enterprise catalog incomplete**                | Low                    | Inactive; sparse flags; not self-serve                                                                                       |
+| **Free `scheduled_order_grace_per_day: 1`**      | Low                    | Hidden meter; sandbox order overflow                                                                                         |
+| **Supplier Free high feature set**               | Medium                 | Same `0112` copy pattern as restaurant Free                                                                                  |
+| **Platinum `multi_branch` tier string**          | Low (mitigated)        | Frontend uses `featureEnabled` / `isEntitlementFeatureEnabled` + `planFeatures` on entitlements; API still resolves booleans |
 
 **No catalog bugs found** requiring migration changes on this verification (prices, ladder, promotions key split, approvals removed, Enterprise inactive).
 

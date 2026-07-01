@@ -8,6 +8,8 @@ import { renderWithProviders } from '../../test/utils'
 const mockReceivables = vi.fn()
 const mockDrivers = vi.fn()
 const mockCommandCenter = vi.fn()
+const mockAtRisk = vi.fn()
+const mockEntitlements = vi.fn()
 const mockCreateDraft = vi.fn()
 
 vi.mock('../../hooks/usePermissions', () => ({
@@ -28,6 +30,8 @@ vi.mock('../../services/api', async (importOriginal) => {
     useGetSupplierReceivablesQuery: (...args: unknown[]) => mockReceivables(...args),
     useGetDriversQuery: (...args: unknown[]) => mockDrivers(...args),
     useGetSupplierCommandCenterQuery: (...args: unknown[]) => mockCommandCenter(...args),
+    useGetSupplierAtRiskOrdersQuery: (...args: unknown[]) => mockAtRisk(...args),
+    useGetEntitlementsQuery: (...args: unknown[]) => mockEntitlements(...args),
     useGetSupplierRunSheetQuery: (...args: unknown[]) => mockRunSheet(...args),
     useCreateReorderReminderDraftMutation: () => [mockCreateDraft, { isLoading: false }],
     useSendInvoiceReminderMutation: () => [vi.fn(), { isLoading: false }],
@@ -48,6 +52,15 @@ describe('supplier pain-killer UI', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockDrivers.mockReturnValue({ data: { drivers: [] } })
+    mockEntitlements.mockReturnValue({ data: { entitlements: { features: {} } } })
+    mockAtRisk.mockReturnValue({ data: { orders: [] } })
+    mockCommandCenter.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    })
   })
 
   it('SupplierReceivablesPanel shows empty state when no unpaid invoices', () => {

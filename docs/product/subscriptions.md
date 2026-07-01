@@ -135,7 +135,7 @@ Top self-serve tier: most operational meters **unlimited** (`-1`), but **branche
 
 **Smart reorder (Platinum):** `smart_reorder` = `ai_forecast_seasonality` — Gold forecasts plus weekday seasonality and 7d/30d trend adjustment; adds `POST /reorder-assistance/ask` for natural-language product matching. LLM gated by `ai_platform` + env; metered via `ai_requests_per_day`.
 
-**Feature strings (see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md)):** `ai_smart_automation`, `advanced_forecasting_custom_reports`, `full_api_webhooks`, `white_label_domain`, `central_purchasing`, `cost_percentage_vs_sales`, etc. — many are **not tier-differentiated in route code yet**. Smart reorder tier strings **are** enforced — see [ai-smart-reorder.md](../features/ai-smart-reorder.md).
+**Feature strings (see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md)):** Platinum **smart quick lists**, **notification webhooks**, and **custom catalog domains** are enforced (see feature docs). Still catalog-only: `advanced_forecasting_custom_reports`, `full_api_webhooks`, `central_purchasing`, etc. Smart reorder tier strings **are** enforced — see [ai-smart-reorder.md](../features/ai-smart-reorder.md).
 
 ### Supplier Platinum
 

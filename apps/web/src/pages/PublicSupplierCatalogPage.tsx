@@ -227,9 +227,16 @@ function GuestAccessPanel({ loginHref }: { loginHref: string }) {
   )
 }
 
-export function PublicSupplierCatalogPage() {
+export function PublicSupplierCatalogPage({
+  forcedSlug,
+  whiteLabel = false,
+}: {
+  forcedSlug?: string
+  whiteLabel?: boolean
+} = {}) {
   const { t } = useTranslation('public')
-  const { idOrSlug } = useParams<{ idOrSlug: string }>()
+  const { idOrSlug: paramSlug } = useParams<{ idOrSlug: string }>()
+  const idOrSlug = forcedSlug || paramSlug
   const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
   const isRestaurant = user?.role === 'RESTAURANT'
@@ -428,7 +435,7 @@ export function PublicSupplierCatalogPage() {
         minimumOrderAmount={supplier.minimumOrderAmount}
       />
 
-      {!user && <GuestAccessPanel loginHref={loginHref} />}
+      {!user && !whiteLabel && <GuestAccessPanel loginHref={loginHref} />}
 
       <div className="mb-4">
         <div className="relative">

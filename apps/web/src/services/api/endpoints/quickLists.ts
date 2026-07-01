@@ -62,5 +62,22 @@ export const quickListsApi = api.injectEndpoints({
       }),
       invalidatesTags: ['QuickList'],
     }),
+    suggestQuickListItems: builder.mutation<{ quickListId: string; proposals: any[] }, string>({
+      query: (quickListId) => ({
+        url: `/api/quick-lists/${quickListId}/ai-suggest`,
+        method: 'POST',
+      }),
+    }),
+    applyQuickListSuggestions: builder.mutation<
+      { applied: number },
+      { quickListId: string; proposals: any[] }
+    >({
+      query: ({ quickListId, proposals }) => ({
+        url: `/api/quick-lists/${quickListId}/ai-suggest/apply`,
+        method: 'POST',
+        body: { proposals },
+      }),
+      invalidatesTags: ['QuickList'],
+    }),
   }),
 })

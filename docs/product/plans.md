@@ -162,7 +162,7 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 **Features (catalog; some require future implementation — see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md)):**
 
 - **Everything in Gold PLUS (marketing):**
-- AI smart automation for quick lists
+- Smart quantities + suggest for quick lists (forecast-based, Platinum)
 - AI forecast with seasonality
 - Lot expiry tracking
 - Cost vs sales waste analytics
@@ -275,7 +275,7 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 | **Waste Tracking**                  | ❌                 | Manual entry           | Analytics dashboard            | Cost vs. sales analytics              |
 | **Receiving Quality**               | Manual only        | Photos enabled         | Quality scoring                | Supplier performance reports          |
 | **Finance & Invoices**              | View only          | Record payments        | Expense analytics              | Advanced finance dashboard            |
-| **Quick Lists**                     | Manual only        | Automated weekly       | Full schedule                  | AI smart automation                   |
+| **Quick Lists**                     | Manual only        | Automated weekly       | Full schedule                  | Smart quantities + suggest            |
 | **Fulfillment Tools** _(supplier)_  | Basic orders       | Manual + invoices      | Warehouse pick & pack          | Full routing suite                    |
 | **Disputes & Returns**              | ❌                 | ✅                     | ✅                             | ✅                                    |
 | **Order Amendments**                | ✅                 | ✅                     | ✅                             | ✅                                    |

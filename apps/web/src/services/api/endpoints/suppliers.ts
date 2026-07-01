@@ -123,5 +123,60 @@ export const suppliersApi = api.injectEndpoints({
         { type: 'Supplier', id: 'LIST' },
       ],
     }),
+    getSupplierCustomDomain: builder.query<
+      {
+        allowed: boolean
+        customDomain: {
+          hostname: string
+          verifiedAt: string | null
+          sslStatus: string
+          enabled: boolean
+        } | null
+      },
+      void
+    >({
+      query: () => '/api/suppliers/me/custom-domain',
+      providesTags: ['Supplier'],
+    }),
+    updateSupplierCustomDomain: builder.mutation<
+      {
+        customDomain: {
+          hostname: string
+          verifiedAt: string | null
+          sslStatus: string
+          enabled: boolean
+          verificationInstructions?: {
+            txtRecord: { name: string; value: string }
+            cnameRecord: { name: string; value: string }
+            note: string
+          }
+        }
+      },
+      { hostname: string }
+    >({
+      query: (body) => ({
+        url: '/api/suppliers/me/custom-domain',
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['Supplier'],
+    }),
+    verifySupplierCustomDomain: builder.mutation<
+      {
+        customDomain: {
+          hostname: string
+          verifiedAt: string | null
+          sslStatus: string
+          enabled: boolean
+        }
+      },
+      void
+    >({
+      query: () => ({
+        url: '/api/suppliers/me/custom-domain/verify',
+        method: 'POST',
+      }),
+      invalidatesTags: ['Supplier'],
+    }),
   }),
 })

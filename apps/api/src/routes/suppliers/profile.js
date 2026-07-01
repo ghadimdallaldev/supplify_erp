@@ -9,7 +9,7 @@ import {
   getRestaurantIdForRequest,
   getRequestTenant,
 } from '../../lib/rbac.js'
-import { requireFeature, isFeatureEnabled } from '../../lib/subscription.js'
+import { requireFeature, isFeatureEnabled, getEntitlements } from '../../lib/subscription.js'
 import { query } from '../../lib/db.js'
 import { createModuleLogger, logEvent, logQueryDebug, logger } from '../../lib/logger.js'
 import { patchRequestLogTenant } from '../../lib/request-log-context.js'
@@ -27,6 +27,12 @@ import {
   getRecentReviewsForSuppliersBatch,
 } from '../../services/reviews.service.js'
 import { getTenantBranding, updateTenantBranding } from '../../services/branding.service.js'
+import {
+  getTenantCustomDomain,
+  upsertTenantCustomDomain,
+  verifyTenantCustomDomain,
+} from '../../services/custom-domain.service.js'
+import { hasBrandingCapability } from '../../lib/branding-tier.js'
 import {
   mapSupplierBusinessSettingsRow,
   serializeOperatingHoursForDb,
@@ -263,6 +269,107 @@ router.patch(
       const branding = await updateTenantBranding(supplierId, 'SUPPLIER', body)
       invalidateTenantProfileCache(supplierId, 'SUPPLIER')
       res.json({ ok: true, data: { branding }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+const customDomainSchema = z.object({
+  hostname: z.string().min(3).max(253),
+})
+
+router.get(
+  '/me/custom-domain',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER']),
+  requirePermission('SETTINGS_VIEW'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) throw new NotFoundError('Supplier not found')
+      const row = await getTenantCustomDomain(supplierId, 'SUPPLIER')
+      const entitlements = await getEntitlements(supplierId, 'SUPPLIER')
+      const allowed = hasBrandingCapability(entitlements?.features?.custom_branding, 'customDomain')
+      res.json({
+        ok: true,
+        data: {
+          allowed,
+          customDomain: row
+            ? {
+                hostname: row.hostname,
+                verifiedAt: row.verified_at,
+                sslStatus: row.ssl_status,
+                enabled: row.enabled,
+              }
+            : null,
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.put(
+  '/me/custom-domain',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER']),
+  requirePermission('SETTINGS_EDIT'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) throw new NotFoundError('Supplier not found')
+      const body = customDomainSchema.parse(req.body ?? {})
+      const saved = await upsertTenantCustomDomain(supplierId, 'SUPPLIER', body.hostname)
+      res.json({
+        ok: true,
+        data: {
+          customDomain: {
+            hostname: saved.hostname,
+            verifiedAt: saved.verified_at,
+            sslStatus: saved.ssl_status,
+            enabled: saved.enabled,
+            verificationInstructions: saved.verificationInstructions,
+          },
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/me/custom-domain/verify',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER']),
+  requirePermission('SETTINGS_EDIT'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) throw new NotFoundError('Supplier not found')
+      const verified = await verifyTenantCustomDomain(supplierId, 'SUPPLIER')
+      res.json({
+        ok: true,
+        data: {
+          customDomain: {
+            hostname: verified.hostname,
+            verifiedAt: verified.verified_at,
+            sslStatus: verified.ssl_status,
+            enabled: verified.enabled,
+          },
+        },
+        error: null,
+        requestId: req.requestId,
+      })
     } catch (err) {
       next(err)
     }

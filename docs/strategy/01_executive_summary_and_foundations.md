@@ -66,11 +66,7 @@ liabilities on a balance sheet — because it is decision-relevant:
 
 - No live production tenants; every number about usage, retention, or revenue in this
   document is a **target**, never an actual, until stated otherwise.
-- Several Platinum-tier marketing claims (full API/webhooks, white-label domains, AI-driven
-  "quick lists," advanced custom reporting) exist as **catalog entries** — priced and
-  displayed — without full backend enforcement yet (Source: `docs/product/tier-matrix.md`,
-  §7). This is a near-term engineering backlog item, not a hidden defect discovered by
-  outside diligence; it is disclosed here first.
+- Several Platinum-tier marketing claims (full API/order webhooks, advanced custom reporting, central purchasing) remain **catalog entries** — priced and displayed — without full backend enforcement yet (Source: `docs/product/tier-matrix.md`, §7). **Smart quick lists, notification webhooks, custom catalog domains, and smart reorder** are enforced — see `docs/product/PLATINUM_CATALOG_ONLY_FEATURES.md`.
 - Single-region infrastructure (Railway, one deployment per environment) — no multi-region
   failover or data residency options yet, relevant once GCC/EU expansion requires local
   data hosting.

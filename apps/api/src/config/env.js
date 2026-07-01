@@ -58,6 +58,20 @@ export const config = {
       : `http://localhost:${process.env.PORT || 4000}`),
   PUBLIC_FRONTEND_URL:
     process.env.PUBLIC_FRONTEND_URL || primaryWebOrigin || 'http://localhost:5173',
+  /** CNAME target for Platinum custom-domain verification (e.g. cname.supplify.app). */
+  CUSTOM_DOMAIN_CNAME_TARGET: process.env.CUSTOM_DOMAIN_CNAME_TARGET || 'cname.supplify.app',
+  /** Platform hostname tenants cannot use as a custom domain. */
+  CUSTOM_DOMAIN_PLATFORM_HOST:
+    process.env.CUSTOM_DOMAIN_PLATFORM_HOST ||
+    (() => {
+      try {
+        return new URL(
+          process.env.PUBLIC_FRONTEND_URL || primaryWebOrigin || 'http://localhost:5173'
+        ).hostname
+      } catch {
+        return 'localhost'
+      }
+    })(),
   DATABASE_URL: resolvedDatabaseUrl,
   /** Direct Postgres URL for DDL/migrations (bypasses poolers that block ALTER TABLE). */
   DATABASE_MIGRATION_URL:
