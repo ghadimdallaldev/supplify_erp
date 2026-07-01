@@ -34,6 +34,10 @@ import { AdminLoadingState } from '../components/admin/adminUi'
 import { cn } from '../lib/utils'
 import type { User as AuthUser } from '../types/auth'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
+import {
+  NotificationChannelPlanNotice,
+  NotificationWebhookCard,
+} from '../components/notifications/NotificationWebhookCard'
 import { ensureNamespace } from '../i18n'
 
 const DEFAULT_NOTIFICATION_PREFS = {
@@ -544,6 +548,7 @@ export function SettingsPage() {
               </div>
             ) : (
               <>
+                <NotificationChannelPlanNotice />
                 <div className="space-y-2">
                   {NOTIFICATION_FIELD_KEYS.map((key) => (
                     <div
@@ -589,6 +594,8 @@ export function SettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        <NotificationWebhookCard />
 
         <Card>
           <CardHeader className="px-4 py-3">

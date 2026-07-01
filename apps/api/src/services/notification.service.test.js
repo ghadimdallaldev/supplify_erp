@@ -134,10 +134,12 @@ describe('Notification Service', () => {
         message: 'Restock soon',
       })
 
-      expect(sendWhatsAppMessage).toHaveBeenCalledWith({
-        to: '+96176911906',
-        message: 'Restock soon',
-      })
+      expect(sendWhatsAppMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: '+96176911906',
+          message: 'Restock soon',
+        })
+      )
     })
 
     it('does NOT send email when tenant is on Free plan', async () => {

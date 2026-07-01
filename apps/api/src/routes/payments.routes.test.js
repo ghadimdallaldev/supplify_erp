@@ -86,41 +86,49 @@ describe('Payments Routes', () => {
 
   describe('POST /api/payments', () => {
     it('should create a payment', async () => {
-      // Mock: invoice lookup (with supplier join), then payment insert
-      // The route doesn't use withTransaction, it queries directly
-      db.query
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: '00000000-0000-0000-0000-000000000001',
-              restaurant_id: 'restaurant-1',
-              supplier_id: 'supplier-1',
-              contact_email: 'supplier@example.com', // From supplier join
-              total_amount: 100.5,
-              balance_due: 100.5,
-            },
-          ],
-        })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 'payment-1',
-              invoice_id: '00000000-0000-0000-0000-000000000001',
-              payment_amount: 100.5,
-              payment_method: 'CASH',
-              payment_number: 'PAY-1234567890',
-              status: 'COMPLETED',
-            },
-          ],
-        })
+      const invoiceId = '00000000-0000-0000-0000-000000000001'
+      const invoice = {
+        id: invoiceId,
+        restaurant_id: 'restaurant-1',
+        supplier_id: 'supplier-1',
+        total_amount: 100.5,
+        balance_due: 100.5,
+        currency: 'USD',
+      }
+
+      db.query.mockResolvedValueOnce({ rows: [invoice] })
+
+      db.withTransaction.mockImplementation(async (handler) => {
+        const client = {
+          query: vi
+            .fn()
+            .mockResolvedValueOnce({ rows: [invoice] })
+            .mockResolvedValueOnce({ rows: [{ total_paid: 0 }] })
+            .mockResolvedValueOnce({ rows: [{ payment_number: 'PAY-TEST-001' }] })
+            .mockResolvedValueOnce({
+              rows: [
+                {
+                  id: 'payment-1',
+                  invoice_id: invoiceId,
+                  payment_amount: 100.5,
+                  payment_method: 'CASH',
+                  payment_number: 'PAY-TEST-001',
+                  status: 'COMPLETED',
+                },
+              ],
+            })
+            .mockResolvedValueOnce({ rows: [{ ...invoice, balance_due: 0, status: 'PAID' }] }),
+        }
+        return handler(client)
+      })
 
       const response = await request(app)
         .post('/api/payments')
         .send({
-          invoice_id: '00000000-0000-0000-0000-000000000001', // Valid UUID format
+          invoice_id: invoiceId,
           payment_amount: 100.5,
           payment_method: 'CASH',
-          payment_date: new Date().toISOString().split('T')[0], // Date string (YYYY-MM-DD)
+          payment_date: new Date().toISOString().split('T')[0],
         })
         .expect(201)
 

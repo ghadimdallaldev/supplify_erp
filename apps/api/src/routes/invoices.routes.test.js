@@ -109,25 +109,21 @@ describe('Invoices Routes', () => {
 
   describe('GET /api/invoices/:id', () => {
     it('should return invoice details', async () => {
-      // Mock: invoice query, tenant check (supplier lookup), then line items query
+      const invoiceRow = {
+        id: 'invoice-1',
+        order_id: 'order-1',
+        total_amount: 100.5,
+        balance_due: 100.5,
+        status: 'ISSUED',
+        supplier_id: 'supplier-1',
+        restaurant_id: 'restaurant-1',
+        restaurant_name: 'Test Restaurant',
+        supplier_name: 'Test Supplier',
+        total_paid: 0,
+      }
+
       db.query
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 'invoice-1',
-              order_id: 'order-1',
-              total_amount: 100.5,
-              status: 'PENDING',
-              supplier_id: 'supplier-1',
-              restaurant_id: 'restaurant-1',
-              restaurant_name: 'Test Restaurant',
-              supplier_name: 'Test Supplier',
-            },
-          ],
-        })
-        .mockResolvedValueOnce({
-          rows: [{ id: 'supplier-1' }], // Tenant scoping: supplier lookup by email must match invoice.supplier_id
-        })
+        .mockResolvedValueOnce({ rows: [invoiceRow] })
         .mockResolvedValueOnce({
           rows: [
             {
@@ -139,11 +135,14 @@ describe('Invoices Routes', () => {
             },
           ],
         })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
 
       const response = await request(app).get('/api/invoices/invoice-1').expect(200)
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.invoice.id).toBe('invoice-1')
+      expect(response.body.data.lineItems).toHaveLength(1)
     })
   })
 })

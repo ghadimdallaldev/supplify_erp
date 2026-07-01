@@ -1,5 +1,11 @@
 import { api } from '../base'
-import type { Supplier, SupplierFilters, SuppliersResponse } from '../../../types'
+import type {
+  Supplier,
+  SupplierBusinessSettings,
+  SupplierFilters,
+  SuppliersResponse,
+  UpdateSupplierBusinessSettingsRequest,
+} from '../../../types'
 export const suppliersApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getSuppliers: builder.query<SuppliersResponse, SupplierFilters>({
@@ -48,6 +54,21 @@ export const suppliersApi = api.injectEndpoints({
       query: () => '/api/suppliers/me',
       providesTags: ['Supplier'],
       keepUnusedDataFor: 300,
+    }),
+    getSupplierBusinessSettings: builder.query<{ business: SupplierBusinessSettings }, void>({
+      query: () => '/api/suppliers/me/business',
+      providesTags: ['Supplier'],
+    }),
+    updateSupplierBusinessSettings: builder.mutation<
+      { business: SupplierBusinessSettings },
+      UpdateSupplierBusinessSettingsRequest
+    >({
+      query: (body) => ({
+        url: '/api/suppliers/me/business',
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Supplier'],
     }),
     updateSupplier: builder.mutation<Supplier, { id: string; data: Partial<Supplier> }>({
       query: ({ id, data }) => ({

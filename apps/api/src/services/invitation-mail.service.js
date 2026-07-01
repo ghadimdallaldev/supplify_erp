@@ -1,8 +1,9 @@
 import { sendTemplateEmail } from './email/email.service.js'
 import { logger } from '../lib/logger.js'
+import { buildAppUrl } from '../lib/app-url.js'
 
 /**
- * Send team invitation email (branch/supplier/restaurant).
+ * Send team invitation email (branch/supplier/restaurant/referral).
  */
 export async function sendTeamInvitationEmail({
   to,
@@ -12,32 +13,34 @@ export async function sendTeamInvitationEmail({
   tenantType,
   invitationId,
   tenantId,
+  locale,
 }) {
   if (!to || !inviteUrl) {
     logger.warn('Team invite email skipped — missing to or inviteUrl')
     return { delivered: false, skipped: true }
   }
 
-  const greeting = invitedName ? `Hi ${invitedName},` : 'Hi,'
-  const orgLabel =
-    tenantType === 'SUPPLIER'
-      ? 'supplier team'
-      : tenantType === 'RESTAURANT'
-        ? 'restaurant team'
-        : 'team'
+  const resolvedInviteUrl = inviteUrl.startsWith('http') ? inviteUrl : buildAppUrl(inviteUrl)
 
-  return sendTemplateEmail({
+  const result = await sendTemplateEmail({
     to,
     template: 'auth.team_invite',
+    locale,
     data: {
-      message: `${greeting}\n\nYou have been invited to join ${tenantName || `a ${orgLabel}`} on Supplify.`,
-      inviteUrl,
+      inviteUrl: resolvedInviteUrl,
+      invitedName,
       tenantName,
       tenantType,
+      ctaUrl: resolvedInviteUrl,
     },
     tenantId,
     eventType: 'auth.team_invite',
     eventKey: invitationId ? `invite:${invitationId}:created` : `invite:${to}:${Date.now()}`,
     entityId: invitationId,
   })
+
+  return {
+    delivered: Boolean(result.sent || result.logOnly || result.preview),
+    ...result,
+  }
 }

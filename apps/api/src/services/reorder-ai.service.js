@@ -1,9 +1,9 @@
 import { z } from 'zod'
 import { query } from '../lib/db.js'
+import { config } from '../config/env.js'
 import { getAiProvider } from '../lib/ai/index.js'
 import { isAiEnvEnabled, isAiPlatformEnabledForTenant } from '../lib/ai-platform.js'
-import { checkAndIncrementUsage } from '../lib/subscription.js'
-import { ValidationError } from '../middlewares/errorHandler.js'
+import { checkAndIncrementUsage, incrementUsage } from '../lib/subscription.js'
 import { getReorderAssistance } from './restaurant-reorder-assistance.service.js'
 
 const explainSchema = z.object({
@@ -27,6 +27,56 @@ const askSchema = z.object({
   ),
   clarifyingQuestion: z.string().optional(),
 })
+
+const STOP_WORDS = new Set([
+  'the',
+  'and',
+  'for',
+  'with',
+  'some',
+  'more',
+  'order',
+  'need',
+  'please',
+  'get',
+  'buy',
+  'want',
+  'from',
+  'this',
+  'that',
+  'our',
+  'have',
+])
+
+/**
+ * Rank allowed products by how many query terms appear in their name.
+ * Used for the no-AI and quota-limited fallbacks. Scores across ALL query
+ * tokens (not just the first word) so multi-word requests match sensibly.
+ */
+function buildKeywordMatches(text, allowedProducts) {
+  const tokens = String(text || '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 2)
+  const terms = tokens.filter((t) => !STOP_WORDS.has(t))
+  const effectiveTerms = terms.length > 0 ? terms : tokens
+
+  const scored = allowedProducts
+    .map((p) => {
+      const name = String(p.productName || '').toLowerCase()
+      const hits = effectiveTerms.filter((term) => name.includes(term)).length
+      return { p, hits }
+    })
+    .filter((x) => x.hits > 0)
+    .sort((a, b) => b.hits - a.hits)
+
+  return scored.slice(0, 5).map(({ p, hits }) => ({
+    productId: p.productId,
+    qty: Math.max(1, p.suggestedQty || 1),
+    confidence: Math.min(0.6, 0.3 + hits * 0.15),
+    productName: p.productName,
+  }))
+}
 
 function buildHeuristicExplain(suggestions, forecasts) {
   const forecastByProduct = new Map(forecasts.map((f) => [f.productId, f]))
@@ -87,6 +137,44 @@ async function logAiRequest({
   }
 }
 
+/** Absolute per-tenant/day ceiling from env (safety cap on top of plan limits). */
+function tenantDailyCeiling() {
+  const n = Number(config.AI_MAX_REQUESTS_PER_TENANT_PER_DAY)
+  return Number.isFinite(n) && n > 0 ? n : Infinity
+}
+
+/** Count today's AI request-log rows for a tenant (for the env ceiling). */
+async function countTenantAiRequestsToday(restaurantId) {
+  try {
+    const { rows } = await query(
+      `SELECT COUNT(*)::int AS count
+       FROM reorder_ai_request_log
+       WHERE restaurant_id = $1 AND created_at >= CURRENT_DATE`,
+      [restaurantId]
+    )
+    return rows[0]?.count ?? 0
+  } catch {
+    return 0
+  }
+}
+
+/** True when the tenant has hit the env-configured daily AI ceiling. */
+async function isOverTenantDailyCeiling(restaurantId) {
+  const ceiling = tenantDailyCeiling()
+  if (ceiling === Infinity) return false
+  const used = await countTenantAiRequestsToday(restaurantId)
+  return used >= ceiling
+}
+
+/** Refund a reserved plan-usage unit when the LLM call did not produce a usable result. */
+async function refundAiUsage(restaurantId) {
+  try {
+    await incrementUsage(restaurantId, 'RESTAURANT', 'ai_requests_per_day', -1)
+  } catch {
+    // Best-effort — never fail the request because a refund could not be applied.
+  }
+}
+
 /**
  * @param {string} restaurantId
  * @param {{ smartReorderFeatureValue: unknown, branchId?: string | null, userId?: string }} opts
@@ -98,17 +186,29 @@ export async function explainReorderSuggestions(restaurantId, opts) {
     limit: 15,
   })
   const forecasts = assistance.forecasts || []
+  const allowedIds = new Set(
+    assistance.suggestions.filter((s) => s.productId).map((s) => String(s.productId))
+  )
   const aiPlatformOn = await isAiPlatformEnabledForTenant(restaurantId, 'RESTAURANT')
 
+  const heuristicResult = () => ({
+    ...buildHeuristicExplain(assistance.suggestions, forecasts),
+    source: 'heuristic',
+    usedLlm: false,
+  })
+
   if (!isAiEnvEnabled() || !aiPlatformOn) {
-    const heuristic = buildHeuristicExplain(assistance.suggestions, forecasts)
-    return { ...heuristic, source: 'heuristic', usedLlm: false }
+    return heuristicResult()
   }
 
   const provider = getAiProvider()
   if (!provider) {
-    const heuristic = buildHeuristicExplain(assistance.suggestions, forecasts)
-    return { ...heuristic, source: 'heuristic', usedLlm: false }
+    return heuristicResult()
+  }
+
+  // Env-level safety ceiling (independent of plan limits).
+  if (await isOverTenantDailyCeiling(restaurantId)) {
+    return { ...heuristicResult(), usageLimited: true }
   }
 
   const payload = {
@@ -122,18 +222,13 @@ export async function explainReorderSuggestions(restaurantId, opts) {
     })),
   }
 
-  try {
-    const usage = await checkAndIncrementUsage(restaurantId, 'RESTAURANT', 'ai_requests_per_day', 1)
-    if (!usage.allowed) {
-      const heuristic = buildHeuristicExplain(assistance.suggestions, forecasts)
-      return {
-        ...heuristic,
-        source: 'heuristic',
-        usedLlm: false,
-        usageLimited: true,
-      }
-    }
+  // Reserve a plan-usage unit up front to avoid races; refund if the call fails.
+  const usage = await checkAndIncrementUsage(restaurantId, 'RESTAURANT', 'ai_requests_per_day', 1)
+  if (!usage.allowed) {
+    return { ...heuristicResult(), usageLimited: true }
+  }
 
+  try {
     const result = await provider.completeJson({
       system:
         'You explain restaurant inventory reorder suggestions clearly and concisely. Use only provided data. Output JSON.',
@@ -143,7 +238,7 @@ export async function explainReorderSuggestions(restaurantId, opts) {
 
     const parsed = explainSchema.safeParse(result.data)
     if (!parsed.success) {
-      const heuristic = buildHeuristicExplain(assistance.suggestions, forecasts)
+      await refundAiUsage(restaurantId)
       await logAiRequest({
         restaurantId,
         userId: opts.userId,
@@ -154,8 +249,12 @@ export async function explainReorderSuggestions(restaurantId, opts) {
         success: false,
         errorCode: 'invalid_schema',
       })
-      return { ...heuristic, source: 'heuristic', usedLlm: false }
+      return heuristicResult()
     }
+
+    // Guard against hallucinated product IDs: keep only items that map to a
+    // real current suggestion (parity with the ask() allowlist).
+    const safeItems = parsed.data.items.filter((item) => allowedIds.has(String(item.productId)))
 
     await logAiRequest({
       restaurantId,
@@ -167,9 +266,9 @@ export async function explainReorderSuggestions(restaurantId, opts) {
       success: true,
     })
 
-    return { ...parsed.data, source: 'llm', usedLlm: true }
+    return { summary: parsed.data.summary, items: safeItems, source: 'llm', usedLlm: true }
   } catch (error) {
-    const heuristic = buildHeuristicExplain(assistance.suggestions, forecasts)
+    await refundAiUsage(restaurantId)
     await logAiRequest({
       restaurantId,
       userId: opts.userId,
@@ -180,7 +279,7 @@ export async function explainReorderSuggestions(restaurantId, opts) {
       success: false,
       errorCode: error.message?.slice(0, 120),
     })
-    return { ...heuristic, source: 'heuristic', usedLlm: false }
+    return heuristicResult()
   }
 }
 
@@ -209,17 +308,8 @@ export async function parseReorderIntent(restaurantId, opts) {
       supplierName: s.supplierName,
     }))
 
-  const aiPlatformOn = await isAiPlatformEnabledForTenant(restaurantId, 'RESTAURANT')
-  if (!isAiEnvEnabled() || !getAiProvider() || !aiPlatformOn) {
-    const keyword = text.toLowerCase()
-    const matched = allowedProducts
-      .filter((p) => p.productName?.toLowerCase().includes(keyword.split(' ')[0]))
-      .slice(0, 5)
-      .map((p) => ({
-        productId: p.productId,
-        qty: Math.max(1, p.suggestedQty || 1),
-        confidence: 0.4,
-      }))
+  const keywordFallback = (usageLimited = false) => {
+    const matched = buildKeywordMatches(text, allowedProducts)
     return {
       intent: text,
       matchedProducts: matched,
@@ -228,16 +318,30 @@ export async function parseReorderIntent(restaurantId, opts) {
         : 'Try naming a product from your suggestions list.',
       source: 'heuristic',
       usedLlm: false,
+      ...(usageLimited ? { usageLimited: true } : {}),
     }
   }
 
-  const provider = getAiProvider()
-  try {
-    const usage = await checkAndIncrementUsage(restaurantId, 'RESTAURANT', 'ai_requests_per_day', 1)
-    if (!usage.allowed) {
-      throw new ValidationError('Daily AI assist limit reached for your plan')
-    }
+  const aiPlatformOn = await isAiPlatformEnabledForTenant(restaurantId, 'RESTAURANT')
+  if (!isAiEnvEnabled() || !getAiProvider() || !aiPlatformOn) {
+    return keywordFallback()
+  }
 
+  // Env-level safety ceiling (independent of plan limits) — fall back gracefully.
+  if (await isOverTenantDailyCeiling(restaurantId)) {
+    return keywordFallback(true)
+  }
+
+  const provider = getAiProvider()
+
+  // Reserve a plan-usage unit up front; on limit fall back to heuristics
+  // (symmetric with explain — no hard error).
+  const usage = await checkAndIncrementUsage(restaurantId, 'RESTAURANT', 'ai_requests_per_day', 1)
+  if (!usage.allowed) {
+    return keywordFallback(true)
+  }
+
+  try {
     const result = await provider.completeJson({
       system:
         'Map the user request to products from the allowed list only. Never invent product IDs. Output JSON.',
@@ -256,6 +360,10 @@ export async function parseReorderIntent(restaurantId, opts) {
         confidence: m.confidence,
         productName: allowedProducts.find((p) => p.productId === m.productId)?.productName,
       }))
+
+    if (!parsed.success) {
+      await refundAiUsage(restaurantId)
+    }
 
     await logAiRequest({
       restaurantId,
@@ -288,6 +396,7 @@ export async function parseReorderIntent(restaurantId, opts) {
       usedLlm: true,
     }
   } catch (error) {
+    await refundAiUsage(restaurantId)
     await logAiRequest({
       restaurantId,
       userId: opts.userId,
@@ -297,6 +406,7 @@ export async function parseReorderIntent(restaurantId, opts) {
       success: false,
       errorCode: error.message?.slice(0, 120),
     })
-    throw error
+    // Symmetric with explain: degrade to heuristic instead of throwing.
+    return keywordFallback()
   }
 }

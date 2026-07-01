@@ -6,12 +6,13 @@ import {
   requirePermission,
   getSupplierIdForRequest,
 } from '../lib/rbac.js'
-import { query } from '../lib/db.js'
+import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 import { notifyPaymentReceived } from '../services/notification.service.js'
 import { invoicesMutationGuard } from '../lib/route-permissions.js'
+import { recordCashPayment, computeRemainingBalance } from '../services/invoice.service.js'
 
 const router = express.Router()
 
@@ -77,42 +78,32 @@ router.post('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
       }
     }
 
-    const balanceDue = Number(invoice.balance_due ?? invoice.total_amount ?? 0)
+    const balanceDue = computeRemainingBalance(invoice)
     if (paymentData.payment_amount > balanceDue) {
       throw new ValidationError(
         `Payment amount (${paymentData.payment_amount}) exceeds balance due (${balanceDue})`
       )
     }
 
-    const paymentNumber = `PAY-${Date.now()}`
-
-    const { rows } = await query(
-      `
-      INSERT INTO payment (
-        invoice_id, payment_number, payment_date, payment_amount,
-        payment_method, payment_reference, provider, provider_transaction_id,
-        bank_name, notes, recorded_by, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-      RETURNING *
-    `,
-      [
-        paymentData.invoice_id,
-        paymentNumber,
-        paymentData.payment_date,
-        paymentData.payment_amount,
-        paymentData.payment_method,
-        paymentData.payment_reference ?? null,
-        paymentData.provider ?? null,
-        paymentData.provider_transaction_id ?? null,
-        paymentData.bank_name ?? null,
-        paymentData.notes ?? null,
-        req.userData.id,
-        'COMPLETED',
-      ]
+    const result = await withTransaction((client) =>
+      recordCashPayment(client, {
+        invoiceId: paymentData.invoice_id,
+        paymentAmount: paymentData.payment_amount,
+        paymentDate: paymentData.payment_date,
+        paymentMethod: paymentData.payment_method,
+        paymentReference: paymentData.payment_reference,
+        notes: paymentData.notes,
+        bankName: paymentData.bank_name,
+        provider: paymentData.provider,
+        providerTransactionId: paymentData.provider_transaction_id,
+        recordedBy: req.userData.id,
+      })
     )
 
+    const payment = result.payment
+
     logger.info('Payment recorded', {
-      paymentId: rows[0].id,
+      paymentId: payment.id,
       invoiceId: paymentData.invoice_id,
       amount: paymentData.payment_amount,
       actor: req.userData.id,
@@ -120,10 +111,10 @@ router.post('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
 
     try {
       await notifyPaymentReceived({
-        id: rows[0].id,
+        id: payment.id,
         payment_amount: paymentData.payment_amount,
         invoice_id: paymentData.invoice_id,
-        invoice,
+        invoice: result.invoice,
       })
     } catch (notifError) {
       logger.error('Failed to send payment notification', { error: notifError.message })
@@ -131,7 +122,7 @@ router.post('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
 
     res.status(201).json({
       ok: true,
-      data: { payment: rows[0] },
+      data: { payment },
       error: null,
       requestId: req.requestId,
     })

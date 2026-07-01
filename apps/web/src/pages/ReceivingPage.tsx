@@ -157,6 +157,8 @@ export function ReceivingPage() {
       const discrepancyItems = disputeLineItemsFromReceiving(selectedOrder.items ?? [], formData)
       const supplierId = supplierIdFromOrder(selectedOrder)
       const reportId = (result as { report?: { id?: string } })?.report?.id
+      const createdInvoice = (result as { invoice?: { id?: string; invoice_number?: string } })
+        ?.invoice
 
       if (canShowDispute && discrepancyItems.length > 0 && supplierId) {
         toast(t('receiving.savedWithIssues', { count: discrepancyItems.length }), {
@@ -170,7 +172,18 @@ export function ReceivingPage() {
           receivingReportId: reportId,
         })
       } else {
-        toast.success(t('receiving.completedSuccess'))
+        if (createdInvoice?.id) {
+          toast.success(t('receiving.completedWithInvoice'), {
+            action: {
+              label: t('receiving.viewInvoice'),
+              onClick: () => {
+                window.location.href = `/app/invoices?invoice=${createdInvoice.id}`
+              },
+            },
+          })
+        } else {
+          toast.success(t('receiving.completedSuccess'))
+        }
       }
 
       await new Promise((resolve) => setTimeout(resolve, 500))

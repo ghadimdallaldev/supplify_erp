@@ -19,6 +19,14 @@ import {
   getRestaurantStatementAdjustments,
   computeRestaurantStatementClosingBalance,
 } from '../services/restaurant-payables.service.js'
+import {
+  applyCreditToInvoice,
+  computeRemainingBalance,
+  getInvoiceDetail,
+  recordCashPayment,
+  INVOICE_CSV_HEADER,
+  invoiceToCsvRow,
+} from '../services/invoice.service.js'
 
 const router = express.Router()
 
@@ -123,10 +131,14 @@ router.get(
       queryParams.push(limit, offset)
 
       const { rows } = await query(invoicesQuery, queryParams)
+      const invoices = rows.map((row) => ({
+        ...row,
+        remaining_balance: computeRemainingBalance(row, row.total_paid),
+      }))
 
       res.json({
         ok: true,
-        data: { invoices: rows },
+        data: { invoices },
         error: null,
         requestId: req.requestId,
       })
@@ -156,19 +168,36 @@ router.get(
   requirePermission('INVOICES_VIEW'),
   async (req, res, next) => {
     try {
-      const { status, supplier } = req.query
+      const { status, supplier, invoiceId } = req.query
       const restaurantId = await requireRestaurantId(req)
+
+      if (invoiceId) {
+        const detail = await getInvoiceDetail(String(invoiceId), {
+          tenantId: restaurantId,
+          tenantType: 'RESTAURANT',
+        })
+        const csv = INVOICE_CSV_HEADER + invoiceToCsvRow(detail.invoice)
+        const date = new Date().toISOString().slice(0, 10)
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="invoice-${detail.invoice.invoice_number}-${date}.csv"`
+        )
+        return res.send(csv)
+      }
 
       let sql = `
         SELECT
-          i.invoice_number,
-          i.invoice_date,
-          i.due_date,
-          i.status,
-          i.total_amount,
-          s.name AS supplier_name
+          i.*,
+          s.name AS supplier_name,
+          r.name AS restaurant_name,
+          b.name AS branch_name,
+          COALESCE(SUM(p.payment_amount) FILTER (WHERE p.status = 'COMPLETED'), 0) AS total_paid
         FROM invoice i
         JOIN supplier s ON s.id = i.supplier_id
+        JOIN restaurant r ON r.id = i.restaurant_id
+        LEFT JOIN branch b ON b.id = i.branch_id
+        LEFT JOIN payment p ON p.invoice_id = i.id
         WHERE i.restaurant_id = $1
       `
       const params = [restaurantId]
@@ -180,15 +209,16 @@ router.get(
         params.push(supplier)
         sql += ` AND i.supplier_id = $${params.length}`
       }
-      sql += ` ORDER BY i.invoice_date ASC`
+      sql += ` GROUP BY i.id, s.name, r.name, b.name ORDER BY i.invoice_date ASC`
 
       const { rows } = await query(sql, params)
-      const header = 'Invoice Number,Invoice Date,Due Date,Status,Total,Supplier\n'
-      const lines = rows.map(
-        (r) =>
-          `"${r.invoice_number}","${r.invoice_date}","${r.due_date}","${r.status}",${r.total_amount},"${String(r.supplier_name || '').replace(/"/g, '""')}"`
+      const lines = rows.map((r) =>
+        invoiceToCsvRow({
+          ...r,
+          remaining_balance: computeRemainingBalance(r, r.total_paid),
+        })
       )
-      const csv = header + lines.join('\n')
+      const csv = INVOICE_CSV_HEADER + lines.join('\n')
       const date = new Date().toISOString().slice(0, 10)
       res.setHeader('Content-Type', 'text/csv; charset=utf-8')
       res.setHeader('Content-Disposition', `attachment; filename="invoices-${date}.csv"`)
@@ -359,66 +389,15 @@ router.get(
       const { id } = req.params
 
       const restaurantId = await requireRestaurantId(req)
-
-      // Get invoice
-      const { rows: invoices } = await query(
-        `
-      SELECT 
-        i.*,
-        s.name as supplier_name,
-        s.slug as supplier_slug,
-        s.address_json as supplier_address,
-        s.phone as supplier_phone,
-        s.contact_email as supplier_email,
-        o.id as order_id,
-        o.status as order_status,
-        o.placed_at as order_placed_at,
-        COALESCE(SUM(p.payment_amount) FILTER (WHERE p.status = 'COMPLETED'), 0) as total_paid
-      FROM invoice i
-      JOIN supplier s ON s.id = i.supplier_id
-      LEFT JOIN customer_order o ON o.id = i.order_id
-      LEFT JOIN payment p ON p.invoice_id = i.id
-      WHERE i.id = $1 AND i.restaurant_id = $2
-      GROUP BY i.id, s.name, s.slug, s.address_json, s.phone, s.contact_email, o.id, o.status, o.placed_at
-    `,
-        [id, restaurantId]
-      )
-
-      if (invoices.length === 0) {
-        throw new NotFoundError('Invoice not found')
-      }
-
-      // Get line items
-      const { rows: lineItems } = await query(
-        `
-      SELECT * FROM invoice_line_item 
-      WHERE invoice_id = $1 
-      ORDER BY created_at
-    `,
-        [id]
-      )
-
-      // Get payment history
-      const { rows: payments } = await query(
-        `
-      SELECT 
-        p.*,
-        pm.name as recorded_by_name
-      FROM payment p
-      LEFT JOIN app_user pm ON pm.id::text = p.recorded_by
-      WHERE p.invoice_id = $1
-      ORDER BY p.payment_date DESC, p.created_at DESC
-    `,
-        [id]
-      )
+      const detail = await getInvoiceDetail(id, {
+        tenantId: restaurantId,
+        tenantType: 'RESTAURANT',
+        includePayments: true,
+      })
 
       res.json({
         ok: true,
-        data: {
-          invoice: invoices[0],
-          lineItems,
-          payments,
-        },
+        data: detail,
         error: null,
         requestId: req.requestId,
       })
@@ -437,12 +416,12 @@ router.get(
         error: error.message,
         stack: error.stack,
       })
-      res.status(500).json({
+      res.status(error.statusCode || 500).json({
         ok: false,
         data: null,
         error: {
-          name: 'INTERNAL_ERROR',
-          message: 'Failed to get invoice',
+          name: error.name || 'INTERNAL_ERROR',
+          message: error.message || 'Failed to get invoice',
           details: error.message,
         },
         requestId: req.requestId,
@@ -504,7 +483,6 @@ router.post(
 
       const invoice = invoices[0]
 
-      // Calculate remaining balance and available credits
       const { rows: payments } = await query(
         `
       SELECT COALESCE(SUM(payment_amount), 0) as total_paid
@@ -515,45 +493,16 @@ router.post(
       )
 
       const totalPaid = parseFloat(payments[0].total_paid || 0)
-      const remainingBalance = parseFloat(invoice.total_amount) - totalPaid
+      const remainingBalance = computeRemainingBalance(invoice, totalPaid)
 
-      // Get available credit notes for this restaurant-supplier relationship
       let creditAmount = parseFloat(paymentData.creditAmount || 0)
-      let creditNoteId = paymentData.creditNoteId || null
+      const creditNoteId = paymentData.creditNoteId || null
 
-      if (creditAmount > 0 && creditNoteId) {
-        // Validate credit note exists and belongs to restaurant
-        const { rows: creditNotes } = await query(
-          `
-        SELECT * FROM credit_note 
-        WHERE id = $1 AND restaurant_id = $2 AND supplier_id = $3
-          AND status = 'ISSUED' AND remaining_amount > 0
-      `,
-          [creditNoteId, restaurantId, invoice.supplier_id]
-        )
-
-        if (creditNotes.length === 0) {
-          throw new ValidationError('Invalid or unavailable credit note')
-        }
-
-        const creditNote = creditNotes[0]
-        const availableCredit = parseFloat(creditNote.remaining_amount || 0)
-
-        if (creditAmount > availableCredit) {
-          throw new ValidationError(
-            `Credit amount (${creditAmount}) exceeds available credit (${availableCredit})`
-          )
-        }
-      }
-
-      // Determine payment amount
       let paymentAmount = paymentData.paymentAmount
       if (!paymentAmount || paymentAmount === 0) {
-        // Default to full remaining balance
-        paymentAmount = remainingBalance
+        paymentAmount = Math.max(0, remainingBalance - creditAmount)
       }
 
-      // Total payment (cash + credit)
       const totalPaymentWithCredit = paymentAmount + creditAmount
 
       if (totalPaymentWithCredit > remainingBalance) {
@@ -566,92 +515,42 @@ router.post(
         throw new ValidationError('Payment amount must be greater than 0')
       }
 
-      // Generate payment number
-      const paymentNumber = `PAY-${new Date().toISOString().split('T')[0]}-${Date.now().toString().slice(-6)}`
+      const hqNote = paymentData.paidByHQ
+        ? `Payment made by HQ${paymentData.hqNotes ? `: ${paymentData.hqNotes}` : ''}`
+        : paymentData.notes || null
 
-      // Use transaction for atomicity
       const result = await withTransaction(async (client) => {
-        // Create payment record (only if cash payment > 0)
         let payment = null
         if (paymentAmount > 0) {
-          const { rows: paymentRows } = await client.query(
-            `
-          INSERT INTO payment (
-            invoice_id, payment_number, payment_date, payment_amount,
-            payment_method, payment_reference, currency, status,
-            recorded_by, notes, bank_name, provider, provider_transaction_id
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-          RETURNING *
-        `,
-            [
-              id,
-              paymentNumber,
-              paymentData.paymentDate,
-              paymentAmount,
-              paymentData.paymentMethod,
-              paymentData.paymentReference || null,
-              invoice.currency,
-              'COMPLETED',
-              req.userData.id,
-              paymentData.notes ||
-                (paymentData.paidByHQ
-                  ? `Payment made by HQ${paymentData.hqNotes ? `: ${paymentData.hqNotes}` : ''}`
-                  : null),
-              paymentData.bankName || null,
-              paymentData.provider || null,
-              paymentData.providerTransactionId || null,
-            ]
-          )
-
-          payment = paymentRows[0]
+          const cashResult = await recordCashPayment(client, {
+            invoiceId: id,
+            paymentAmount,
+            paymentDate: paymentData.paymentDate,
+            paymentMethod: paymentData.paymentMethod,
+            paymentReference: paymentData.paymentReference,
+            notes: hqNote,
+            bankName: paymentData.bankName,
+            provider: paymentData.provider,
+            providerTransactionId: paymentData.providerTransactionId,
+            recordedBy: req.userData.id,
+            currency: invoice.currency,
+          })
+          payment = cashResult.payment
         }
 
-        // Apply credit note if provided
         if (creditAmount > 0 && creditNoteId) {
-          // Update credit note to mark as applied
-          await client.query(
-            `
-          UPDATE credit_note
-          SET applied_amount = applied_amount + $1,
-              remaining_amount = remaining_amount - $1,
-              status = CASE WHEN remaining_amount - $1 <= 0 THEN 'APPLIED' ELSE 'ISSUED' END,
-              updated_at = now()
-          WHERE id = $2
-        `,
-            [creditAmount, creditNoteId]
-          )
-
-          // Create a payment record for the credit (with special method)
-          const creditPaymentNumber = `CREDIT-${new Date().toISOString().split('T')[0]}-${Date.now().toString().slice(-6)}`
-          await client.query(
-            `
-          INSERT INTO payment (
-            invoice_id, payment_number, payment_date, payment_amount,
-            payment_method, currency, status,
-            recorded_by, notes, payment_reference
-          ) VALUES ($1, $2, $3, $4, 'OTHER', $5, 'COMPLETED', $6, $7, $8)
-        `,
-            [
-              id,
-              creditPaymentNumber,
-              paymentData.paymentDate,
-              creditAmount,
-              invoice.currency,
-              req.userData.id,
-              `Credit note applied: ${creditNoteId}`,
-              creditNoteId,
-            ]
-          )
+          await applyCreditToInvoice(client, {
+            creditNoteId,
+            invoiceId: id,
+            creditAmount,
+            paymentDate: paymentData.paymentDate,
+            recordedBy: req.userData.id,
+          })
         }
 
-        // Get updated invoice
-        const { rows: updatedInvoice } = await client.query(
-          `
-        SELECT * FROM invoice WHERE id = $1
-      `,
-          [id]
-        )
-
+        const { rows: updatedInvoice } = await client.query(`SELECT * FROM invoice WHERE id = $1`, [
+          id,
+        ])
         return { payment, updatedInvoice: updatedInvoice[0] }
       })
 

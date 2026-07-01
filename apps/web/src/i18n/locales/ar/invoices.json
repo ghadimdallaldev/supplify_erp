@@ -101,7 +101,8 @@
     "amount": "المبلغ",
     "status": "الحالة",
     "action": "إجراء",
-    "apply": "تطبيق"
+    "apply": "تطبيق",
+    "applyViaPayment": "يُطبّق عند دفع الفاتورة"
   },
   "detail": {
     "title": "فاتورة {{number}}",

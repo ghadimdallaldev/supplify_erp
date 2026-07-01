@@ -103,4 +103,72 @@ describe('Supplier profile routes', () => {
       })
     })
   })
+
+  describe('GET /api/suppliers/me/business', () => {
+    it('returns normalized business settings', async () => {
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            business_hours_json: {
+              monday: { open: '08:00', close: '18:00' },
+              sunday: { closed: true },
+            },
+            minimum_order_amount: '200',
+            payment_terms: 'Net 30',
+            return_policy: 'Returns within 7 days',
+            terms_and_conditions: 'Standard terms',
+          },
+        ],
+      })
+
+      const response = await request(app).get('/api/suppliers/me/business').expect(200)
+
+      expect(response.body.ok).toBe(true)
+      expect(response.body.data.business).toMatchObject({
+        minimumOrderAmount: 200,
+        paymentTerms: 'Net 30',
+        returnPolicy: 'Returns within 7 days',
+        termsAndConditions: 'Standard terms',
+      })
+      expect(response.body.data.business.operatingHours.monday).toEqual({
+        open: '08:00',
+        close: '18:00',
+        closed: false,
+      })
+      expect(response.body.data.business.operatingHours.sunday.closed).toBe(true)
+    })
+  })
+
+  describe('PATCH /api/suppliers/me/business', () => {
+    it('updates business settings', async () => {
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            business_hours_json: { monday: { open: '09:00', close: '17:00', closed: false } },
+            minimum_order_amount: '150',
+            payment_terms: 'COD',
+            return_policy: 'No returns',
+            terms_and_conditions: 'Updated terms',
+          },
+        ],
+      })
+
+      const response = await request(app)
+        .patch('/api/suppliers/me/business')
+        .send({
+          minimumOrderAmount: 150,
+          paymentTerms: 'COD',
+          returnPolicy: 'No returns',
+          termsAndConditions: 'Updated terms',
+          operatingHours: {
+            monday: { open: '09:00', close: '17:00', closed: false },
+          },
+        })
+        .expect(200)
+
+      expect(response.body.data.business.minimumOrderAmount).toBe(150)
+      expect(response.body.data.business.paymentTerms).toBe('COD')
+      expect(db.query).toHaveBeenCalledTimes(1)
+    })
+  })
 })

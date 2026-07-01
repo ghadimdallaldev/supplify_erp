@@ -6,6 +6,7 @@ import { Button } from '../ui/button'
 import { StatusBadge } from '../ui/status-badge'
 import { Select, SelectItem, SelectTrigger } from '../ui/select'
 import { formatPrice } from '../../utils/format'
+import { invoiceRemainingBalance } from '../../lib/invoiceBalance'
 import { splitRowClass } from '../ui/card-layout'
 
 type InvoiceListPanelProps = {
@@ -81,9 +82,7 @@ export function InvoiceListPanel({
       <CardContent>
         <div className="space-y-4">
           {filteredInvoices.map((invoice: any) => {
-            const remaining =
-              parseFloat(invoice.balance_due || invoice.total_amount || 0) -
-              parseFloat(invoice.total_paid || 0)
+            const remaining = invoiceRemainingBalance(invoice)
             const isOverdue =
               invoice.days_overdue > 0 ||
               (invoice.due_date && new Date(invoice.due_date) < new Date() && remaining > 0)

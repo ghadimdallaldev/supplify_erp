@@ -168,6 +168,7 @@ export const api = createApi({
     'Receiving',
     'RestaurantFinance',
     'Notification',
+    'NotificationWebhook',
     'Branch',
     'BranchInvitations',
     'RestaurantInvitations',

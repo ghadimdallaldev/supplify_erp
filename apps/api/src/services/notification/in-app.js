@@ -8,6 +8,7 @@ import { sendWhatsAppMessage as sendWhatsAppMessageService } from '../whatsapp.s
 import { emitNotificationNew } from '../../lib/socket.js'
 import { emailService } from './email.js'
 import { dispatchPushNotification, isPushConfigured } from './push.js'
+import { dispatchNotificationWebhook } from './webhook.js'
 import { fetchUserLocales, resolveLocale, DEFAULT_LOCALE } from '../../i18n/index.js'
 import {
   DEFAULT_NOTIFICATION_PREFS,
@@ -313,9 +314,14 @@ export async function sendNotification({
       logger.warn('Failed to resolve notification tier, defaulting to in_app', { err: err.message })
     }
 
+    const metadataPayload = metadata && typeof metadata === 'object' ? { ...metadata } : {}
+
     const channels = {
       email:
-        allowedChannels.has('email') && isPrefEnabled(prefs, 'email_enabled') && !!contact?.email,
+        !metadataPayload.skipEmail &&
+        allowedChannels.has('email') &&
+        isPrefEnabled(prefs, 'email_enabled') &&
+        !!contact?.email,
       whatsapp:
         allowedChannels.has('whatsapp') &&
         isPrefEnabled(prefs, 'whatsapp_enabled') &&
@@ -323,6 +329,7 @@ export async function sendNotification({
       sms: false,
       push: isPushConfigured() && isPrefEnabled(prefs, 'push_enabled', false) && pushFeatureEnabled,
       inApp: isPrefEnabled(prefs, 'in_app_enabled'),
+      webhook: allowedChannels.has('webhook'),
     }
 
     const preferenceKey = resolvePreferenceKey(notificationCategory)
@@ -340,8 +347,8 @@ export async function sendNotification({
       INSERT INTO notification_log (
         user_id, user_type, notification_type, notification_category,
         title, message, reference_id, reference_type, metadata,
-        email_sent, sms_sent, push_sent, in_app_sent
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        email_sent, sms_sent, push_sent, in_app_sent, whatsapp_sent
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING *
     `,
       [
@@ -358,17 +365,21 @@ export async function sendNotification({
         !!channels.sms, // Convert to boolean
         !!channels.push, // Convert to boolean
         !!channels.inApp, // Convert to boolean
+        !!channels.whatsapp, // Convert to boolean
       ]
     )
 
     const results = {
       email: false,
       sms: false,
+      whatsapp: false,
       push: false,
       inApp: true,
     }
 
-    const metadataPayload = metadata && typeof metadata === 'object' ? { ...metadata } : {}
+    if (metadataPayload.skipEmail) {
+      delete metadataPayload.skipEmail
+    }
 
     if (channels.email && contact?.email) {
       try {
@@ -391,8 +402,13 @@ export async function sendNotification({
     }
 
     if (channels.whatsapp && contact?.phone) {
-      const waResult = await sendWhatsAppMessageService({ to: contact.phone, message })
-      results.sms = waResult.sent
+      const waResult = await sendWhatsAppMessageService({
+        to: contact.phone,
+        message,
+        tenantId,
+        eventType: notificationCategory || 'notification',
+      })
+      results.whatsapp = waResult.sent
     }
 
     if (Object.keys(metadataPayload).length) {
@@ -413,14 +429,23 @@ export async function sendNotification({
       })
     }
 
+    // Outbound webhook (Platinum tier) — best-effort, does not block the request.
+    if (channels.webhook && tenantId) {
+      dispatchNotificationWebhook({
+        tenantId,
+        tenantType: userType,
+        notification: { ...notification, notification_category: notificationCategory },
+      }).catch((err) => logger.warn('Notification webhook dispatch failed', { error: err.message }))
+    }
+
     // Update notification log with actual send results
     await query(
       `
       UPDATE notification_log
-      SET email_sent = $1, sms_sent = $2, push_sent = $3
-      WHERE id = $4
+      SET email_sent = $1, sms_sent = $2, push_sent = $3, whatsapp_sent = $4
+      WHERE id = $5
     `,
-      [results.email, results.sms, results.push, notification.id]
+      [results.email, results.sms, results.push, results.whatsapp, notification.id]
     )
 
     logger.info('Notification sent', {

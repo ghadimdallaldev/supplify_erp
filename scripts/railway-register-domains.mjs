@@ -10,6 +10,27 @@ const PROJECT_ID = '745872f2-9149-452f-99e9-9af97704705b';
 
 const DOMAINS = [
   {
+    env: 'development',
+    environmentId: '31f40302-dfd1-4d8e-b25a-bdcc794174d7',
+    serviceId: 'e8158ff7-35dc-4f38-9163-6b94d14dd499',
+    service: 'supplify-web-dev',
+    domain: 'app-dev.supplifyerp.com',
+  },
+  {
+    env: 'development',
+    environmentId: '31f40302-dfd1-4d8e-b25a-bdcc794174d7',
+    serviceId: '84b7bcdb-f5c9-4bfc-ac86-1ae9113672ce',
+    service: 'supplify-api-dev',
+    domain: 'api-dev.supplifyerp.com',
+  },
+  {
+    env: 'development',
+    environmentId: '31f40302-dfd1-4d8e-b25a-bdcc794174d7',
+    serviceId: 'e42456ad-a51c-4a8e-a9d6-718d15527ca0',
+    service: 'keycloak',
+    domain: 'keycloak-dev.supplifyerp.com',
+  },
+  {
     env: 'preprod',
     environmentId: '4914bd75-3288-459a-ae9a-4dcdf5593d49',
     serviceId: '9da0ec97-0e28-4c33-92f0-57182f7cd884',

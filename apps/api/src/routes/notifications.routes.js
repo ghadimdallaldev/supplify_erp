@@ -1,10 +1,11 @@
 import express from 'express'
 import { requireAuth, resolveTenantContext } from '../lib/rbac.js'
 import { notificationsMutationGuard } from '../lib/route-permissions.js'
+import { getEntitlements } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { config } from '../config/env.js'
-import { NotFoundError } from '../middlewares/errorHandler.js'
+import { ForbiddenError, NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 import {
   ensureNotificationPreferences,
@@ -15,6 +16,7 @@ import {
   getUnreadNotificationCount,
   sendNotification,
 } from '../services/notification.service.js'
+import { getTenantWebhook, upsertTenantWebhook } from '../services/notification/webhook.js'
 
 const router = express.Router()
 
@@ -246,6 +248,83 @@ router.patch('/preferences', ...tenantMutationGuard, async (req, res) => {
       },
       requestId: req.requestId,
     })
+  }
+})
+
+const webhookSchema = z.object({
+  url: z
+    .string()
+    .url()
+    .refine((u) => u.startsWith('https://'), 'Webhook URL must use https'),
+  enabled: z.boolean().optional(),
+  secret: z.string().max(200).optional(),
+})
+
+async function resolveWebhookAccess(req) {
+  const tenantId = req.tenantContext?.tenantId
+  const tenantType = req.tenantContext?.tenantType
+  if (!tenantId || !tenantType) return { allowed: false, tenantId: null, tenantType: null }
+  let allowed = false
+  try {
+    const entitlements = await getEntitlements(tenantId, tenantType)
+    allowed = entitlements?.features?.notifications === 'email_whatsapp_webhook'
+  } catch (error) {
+    logger.warn('Failed to resolve webhook entitlements', { error: error.message })
+  }
+  return { allowed, tenantId, tenantType }
+}
+
+// Get outbound notification webhook config (Platinum tier)
+router.get('/webhook', resolveTenantContext, async (req, res, next) => {
+  try {
+    const { allowed, tenantId, tenantType } = await resolveWebhookAccess(req)
+    const webhook = allowed ? await getTenantWebhook(tenantId, tenantType) : null
+    res.json({
+      ok: true,
+      data: {
+        allowed,
+        webhook: webhook
+          ? { url: webhook.url, enabled: webhook.enabled, hasSecret: Boolean(webhook.secret) }
+          : null,
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
+// Create/update outbound notification webhook config (Platinum tier)
+router.put('/webhook', ...tenantMutationGuard, async (req, res, next) => {
+  try {
+    const { allowed, tenantId, tenantType } = await resolveWebhookAccess(req)
+    if (!tenantId || !tenantType) {
+      throw new ValidationError('Tenant context required')
+    }
+    if (!allowed) {
+      throw new ForbiddenError('Notification webhooks require the Platinum plan')
+    }
+    const body = webhookSchema.parse(req.body ?? {})
+    const saved = await upsertTenantWebhook(tenantId, tenantType, {
+      url: body.url,
+      enabled: body.enabled ?? true,
+      secret: body.secret,
+    })
+    res.json({
+      ok: true,
+      data: {
+        webhook: {
+          url: saved.url,
+          enabled: saved.enabled,
+          hasSecret: Boolean(saved.has_secret),
+        },
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    next(error)
   }
 })
 
