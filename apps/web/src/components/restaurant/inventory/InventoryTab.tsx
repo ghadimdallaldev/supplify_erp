@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 import { Button } from '../../ui/button'
@@ -31,6 +31,8 @@ import {
   Recycle,
   Search,
   X,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -54,12 +56,18 @@ import {
   getStatusSortRank,
   getStockStatus,
   summaryCardClass,
+  formatStockShare,
   type SortOption,
 } from './inventoryShared'
+import { InventoryStockBar } from './InventoryStockBar'
+import { InventoryLowStockBanner } from './InventoryLowStockBanner'
 import { ensureNamespace } from '../../../i18n'
+import { cn } from '../../../lib/utils'
+import { useMediaQuery } from '../../../hooks/useMediaQuery'
 
 export interface InventoryTabProps {
   wasteTrackingEnabled: boolean
+  reorderAssistAvailable?: boolean
   onNavigateToWaste: (productId: string) => void
   showAddDialog?: boolean
   onShowAddDialogChange?: (open: boolean) => void
@@ -69,6 +77,7 @@ export interface InventoryTabProps {
 
 export function InventoryTab({
   wasteTrackingEnabled,
+  reorderAssistAvailable = false,
   onNavigateToWaste,
   showAddDialog = false,
   onShowAddDialogChange,
@@ -98,16 +107,22 @@ export function InventoryTab({
   const [selectedProductId, setSelectedProductId] = useState('')
   const [addQuantity, setAddQuantity] = useState('')
   const [addReason, setAddReason] = useState('')
+  const [showTrend, setShowTrend] = useState(false)
+  const itemsSectionRef = useRef<HTMLDivElement>(null)
 
   const { data, isLoading, error, refetch } = useGetRestaurantInventoryQuery()
-  const { data: historyData } = useGetRestaurantInventoryHistoryQuery({ limit: 50 })
-  const { data: productsData } = useGetProductsQuery({ limit: 1000 })
+  const { data: historyData } = useGetRestaurantInventoryHistoryQuery(
+    { limit: 50 },
+    { skip: !showTrend }
+  )
+  const { data: productsData } = useGetProductsQuery({ limit: 1000 }, { skip: !showAddDialog })
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const [addInventory, { isLoading: isAddingInventory }] = useAddRestaurantInventoryMutation()
   const [adjustInventory] = useAdjustRestaurantInventoryMutation()
 
   const inventory = useMemo(() => data?.inventory ?? [], [data?.inventory])
-  const history = historyData?.history || []
+  const history = useMemo(() => historyData?.history ?? [], [historyData?.history])
+  const isDesktop = useMediaQuery('(min-width: 768px)', true)
   const trackedProductIds = useMemo(
     () => new Set(inventory.map((item: { product_id: string }) => item.product_id)),
     [inventory]
@@ -303,19 +318,27 @@ export function InventoryTab({
     toast.success(t('toasts.exportedCsv'))
   }
 
-  const uniqueSuppliers = Array.from(
-    new Set<string>(
-      inventory
-        .map((item: { supplier_name?: string }) => item.supplier_name)
-        .filter((s): s is string => Boolean(s))
-    )
-  ).sort()
+  const uniqueSuppliers = useMemo(
+    () =>
+      Array.from(
+        new Set<string>(
+          inventory
+            .map((item: { supplier_name?: string }) => item.supplier_name)
+            .filter((s): s is string => Boolean(s))
+        )
+      ).sort(),
+    [inventory]
+  )
 
-  const uniqueCategories = Array.from(
-    new Set<string>(
-      inventory.map((item: any) => getItemCategory(item)).filter((c): c is string => Boolean(c))
-    )
-  ).sort()
+  const uniqueCategories = useMemo(
+    () =>
+      Array.from(
+        new Set<string>(
+          inventory.map((item: any) => getItemCategory(item)).filter((c): c is string => Boolean(c))
+        )
+      ).sort(),
+    [inventory]
+  )
 
   const hasActiveFilters =
     search !== '' || statusFilter !== 'ALL' || supplierFilter !== 'ALL' || categoryFilter !== 'ALL'
@@ -327,62 +350,98 @@ export function InventoryTab({
     setCategoryFilter('ALL')
   }
 
+  const summary = useMemo(() => {
+    let inStock = 0
+    let lowStock = 0
+    let outOfStock = 0
+    for (const item of inventory) {
+      const status = getStockStatus(item.quantity, item.low_stock_threshold)
+      if (status === 'IN_STOCK') inStock++
+      else if (status === 'LOW_STOCK') lowStock++
+      else outOfStock++
+    }
+    return { total: inventory.length, inStock, lowStock, outOfStock }
+  }, [inventory])
+
+  const trendStats = useMemo(() => {
+    if (!showTrend || history.length === 0) {
+      return { total: 0, recentAdditions: 0, recentSubtractions: 0 }
+    }
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    let recentAdditions = 0
+    let recentSubtractions = 0
+    for (const entry of history) {
+      const createdAt = new Date(entry.created_at).getTime()
+      if (createdAt <= weekAgo) continue
+      if (entry.type === 'ADD') recentAdditions++
+      else if (entry.type === 'SUBTRACT') recentSubtractions++
+    }
+    return { total: history.length, recentAdditions, recentSubtractions }
+  }, [history, showTrend])
+
+  const filteredInventory = useMemo(
+    () =>
+      inventory
+        .filter((item: any) => {
+          const itemCategory = getItemCategory(item)
+          const matchesSearch =
+            !search ||
+            item.product_name.toLowerCase().includes(search.toLowerCase()) ||
+            item.product_sku.toLowerCase().includes(search.toLowerCase()) ||
+            itemCategory.toLowerCase().includes(search.toLowerCase())
+          const matchesStatus =
+            statusFilter === 'ALL' ||
+            getStockStatus(item.quantity, item.low_stock_threshold) === statusFilter
+          const matchesSupplier = supplierFilter === 'ALL' || item.supplier_name === supplierFilter
+          const matchesCategory = categoryFilter === 'ALL' || itemCategory === categoryFilter
+          return matchesSearch && matchesStatus && matchesSupplier && matchesCategory
+        })
+        .sort((a: any, b: any) => {
+          const aPinned = pinnedItems.has(a.product_id)
+          const bPinned = pinnedItems.has(b.product_id)
+          if (aPinned && !bPinned) return -1
+          if (!aPinned && bPinned) return 1
+
+          switch (sortBy) {
+            case 'name_asc':
+              return a.product_name.localeCompare(b.product_name)
+            case 'name_desc':
+              return b.product_name.localeCompare(a.product_name)
+            case 'quantity_asc':
+              return a.quantity - b.quantity
+            case 'quantity_desc':
+              return b.quantity - a.quantity
+            case 'status': {
+              const aRank = getStatusSortRank(getStockStatus(a.quantity, a.low_stock_threshold))
+              const bRank = getStatusSortRank(getStockStatus(b.quantity, b.low_stock_threshold))
+              return aRank - bRank || a.product_name.localeCompare(b.product_name)
+            }
+            case 'updated_desc':
+            default:
+              return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+          }
+        }),
+    [inventory, search, statusFilter, supplierFilter, categoryFilter, sortBy, pinnedItems]
+  )
+
   const handleSummaryCardClick = (status: 'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK') => {
     setStatusFilter((current) => (current === status ? 'ALL' : status))
+    itemsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  const filteredInventory = inventory
-    .filter((item: any) => {
-      const itemCategory = getItemCategory(item)
-      const matchesSearch =
-        !search ||
-        item.product_name.toLowerCase().includes(search.toLowerCase()) ||
-        item.product_sku.toLowerCase().includes(search.toLowerCase()) ||
-        itemCategory.toLowerCase().includes(search.toLowerCase())
-      const matchesStatus =
-        statusFilter === 'ALL' ||
-        getStockStatus(item.quantity, item.low_stock_threshold) === statusFilter
-      const matchesSupplier = supplierFilter === 'ALL' || item.supplier_name === supplierFilter
-      const matchesCategory = categoryFilter === 'ALL' || itemCategory === categoryFilter
-      return matchesSearch && matchesStatus && matchesSupplier && matchesCategory
-    })
-    .sort((a: any, b: any) => {
-      const aPinned = pinnedItems.has(a.product_id)
-      const bPinned = pinnedItems.has(b.product_id)
-      if (aPinned && !bPinned) return -1
-      if (!aPinned && bPinned) return 1
+  const scrollToItems = () => {
+    itemsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
-      switch (sortBy) {
-        case 'name_asc':
-          return a.product_name.localeCompare(b.product_name)
-        case 'name_desc':
-          return b.product_name.localeCompare(a.product_name)
-        case 'quantity_asc':
-          return a.quantity - b.quantity
-        case 'quantity_desc':
-          return b.quantity - a.quantity
-        case 'status': {
-          const aRank = getStatusSortRank(getStockStatus(a.quantity, a.low_stock_threshold))
-          const bRank = getStatusSortRank(getStockStatus(b.quantity, b.low_stock_threshold))
-          return aRank - bRank || a.product_name.localeCompare(b.product_name)
-        }
-        case 'updated_desc':
-        default:
-          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-      }
-    })
+  const scrollToReorderAssist = () => {
+    document
+      .getElementById('reorder-assistance')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
-  const summary = {
-    total: inventory.length,
-    inStock: inventory.filter(
-      (item: any) => getStockStatus(item.quantity, item.low_stock_threshold) === 'IN_STOCK'
-    ).length,
-    lowStock: inventory.filter(
-      (item: any) => getStockStatus(item.quantity, item.low_stock_threshold) === 'LOW_STOCK'
-    ).length,
-    outOfStock: inventory.filter(
-      (item: any) => getStockStatus(item.quantity, item.low_stock_threshold) === 'OUT_OF_STOCK'
-    ).length,
+  const handleViewLowStock = () => {
+    setStatusFilter(summary.outOfStock > 0 ? 'OUT_OF_STOCK' : 'LOW_STOCK')
+    scrollToItems()
   }
 
   if (isLoading) {
@@ -408,59 +467,75 @@ export function InventoryTab({
 
   return (
     <div className="space-y-6">
-      {/* Inventory Trend Visualization */}
+      {/* Stock movements — collapsed by default to keep items above the fold */}
       <Card>
-        <CardHeader>
-          <CardTitle>{t('trend.title')}</CardTitle>
-          <CardDescription>{t('trend.description')}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--brand-pale)] bg-[var(--brand-pale)]/40 p-4">
-              <div className="min-w-0">
-                <p className="text-sm text-[var(--text-muted)]">{t('trend.totalMovements')}</p>
-                <p className="text-2xl font-bold text-[var(--text)]">{history.length}</p>
-              </div>
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)] shadow-sm">
-                <FileText className="h-6 w-6 text-[var(--brand-mid)]" />
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--mint-pale)] bg-[var(--mint-pale)]/40 p-4">
-              <div className="min-w-0">
-                <p className="text-sm text-[var(--text-muted)]">{t('trend.recentAdditions')}</p>
-                <p className="text-2xl font-bold text-[var(--mint)]">
-                  {
-                    history.filter(
-                      (h: any) =>
-                        h.type === 'ADD' &&
-                        new Date(h.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-                    ).length
-                  }
-                </p>
-              </div>
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)] shadow-sm">
-                <TrendingUp className="h-6 w-6 text-[var(--mint)]" />
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--red-pale)] bg-[var(--red-pale)]/40 p-4">
-              <div className="min-w-0">
-                <p className="text-sm text-[var(--text-muted)]">{t('trend.recentSubtractions')}</p>
-                <p className="text-2xl font-bold text-[var(--red)]">
-                  {
-                    history.filter(
-                      (h: any) =>
-                        h.type === 'SUBTRACT' &&
-                        new Date(h.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-                    ).length
-                  }
-                </p>
-              </div>
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)] shadow-sm">
-                <TrendingDown className="h-6 w-6 text-[var(--red)]" />
-              </span>
-            </div>
+        <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-2">
+          <div>
+            <CardTitle className="text-base">{t('trend.title')}</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
+              {t('trend.description')}
+            </CardDescription>
           </div>
-        </CardContent>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="shrink-0"
+            onClick={() => setShowTrend((open) => !open)}
+            aria-expanded={showTrend}
+          >
+            {showTrend ? (
+              <>
+                <ChevronUp className="mr-1 h-4 w-4" />
+                {t('trend.hide')}
+              </>
+            ) : (
+              <>
+                <ChevronDown className="mr-1 h-4 w-4" />
+                {t('trend.show')}
+              </>
+            )}
+          </Button>
+        </CardHeader>
+        {showTrend ? (
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--brand-pale)] bg-[var(--brand-pale)]/40 p-4">
+                <div className="min-w-0">
+                  <p className="text-sm text-[var(--text-muted)]">{t('trend.totalMovements')}</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">{trendStats.total}</p>
+                </div>
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)] shadow-sm">
+                  <FileText className="h-6 w-6 text-[var(--brand-mid)]" />
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--mint-pale)] bg-[var(--mint-pale)]/40 p-4">
+                <div className="min-w-0">
+                  <p className="text-sm text-[var(--text-muted)]">{t('trend.recentAdditions')}</p>
+                  <p className="text-2xl font-bold text-[var(--mint)]">
+                    {trendStats.recentAdditions}
+                  </p>
+                </div>
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)] shadow-sm">
+                  <TrendingUp className="h-6 w-6 text-[var(--mint)]" />
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--red-pale)] bg-[var(--red-pale)]/40 p-4">
+                <div className="min-w-0">
+                  <p className="text-sm text-[var(--text-muted)]">
+                    {t('trend.recentSubtractions')}
+                  </p>
+                  <p className="text-2xl font-bold text-[var(--red)]">
+                    {trendStats.recentSubtractions}
+                  </p>
+                </div>
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)] shadow-sm">
+                  <TrendingDown className="h-6 w-6 text-[var(--red)]" />
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        ) : null}
       </Card>
 
       {/* Summary Cards — click to filter by status */}
@@ -479,6 +554,9 @@ export function InventoryTab({
                   {t('summary.totalProducts')}
                 </p>
                 <p className="text-xl font-bold sm:text-2xl">{summary.total}</p>
+                <p className="mt-0.5 text-[10px] text-[var(--text-muted)] sm:text-xs">
+                  {t('summary.tracked')}
+                </p>
               </div>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-pale)] sm:h-11 sm:w-11">
                 <Package className="h-5 w-5 text-[var(--brand-mid)] sm:h-6 sm:w-6" />
@@ -501,6 +579,9 @@ export function InventoryTab({
                 </p>
                 <p className="text-xl font-bold text-[var(--mint)] sm:text-2xl">
                   {summary.inStock}
+                </p>
+                <p className="mt-0.5 text-[10px] text-[var(--text-muted)] sm:text-xs">
+                  {formatStockShare(summary.inStock, summary.total)} {t('summary.ofTotal')}
                 </p>
               </div>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--mint-pale)] sm:h-11 sm:w-11">
@@ -525,6 +606,9 @@ export function InventoryTab({
                 <p className="text-xl font-bold text-[var(--amber)] sm:text-2xl">
                   {summary.lowStock}
                 </p>
+                <p className="mt-0.5 text-[10px] text-[var(--text-muted)] sm:text-xs">
+                  {formatStockShare(summary.lowStock, summary.total)} {t('summary.ofTotal')}
+                </p>
               </div>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--amber-pale)] sm:h-11 sm:w-11">
                 <AlertCircle className="h-5 w-5 text-[var(--amber-mid)] sm:h-6 sm:w-6" />
@@ -548,6 +632,9 @@ export function InventoryTab({
                 <p className="text-xl font-bold text-[var(--red)] sm:text-2xl">
                   {summary.outOfStock}
                 </p>
+                <p className="mt-0.5 text-[10px] text-[var(--text-muted)] sm:text-xs">
+                  {formatStockShare(summary.outOfStock, summary.total)} {t('summary.ofTotal')}
+                </p>
               </div>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--red-pale)] sm:h-11 sm:w-11">
                 <TrendingDown className="h-5 w-5 text-[var(--red)] sm:h-6 sm:w-6" />
@@ -557,8 +644,16 @@ export function InventoryTab({
         </Card>
       </div>
 
+      <InventoryLowStockBanner
+        lowStockCount={summary.lowStock}
+        outOfStockCount={summary.outOfStock}
+        onViewLowStock={handleViewLowStock}
+        onScrollToItems={scrollToItems}
+        onReorder={reorderAssistAvailable ? scrollToReorderAssist : undefined}
+      />
+
       {/* Filters */}
-      <Card className="shadow-sm">
+      <Card className="sticky top-2 z-10 bg-[var(--surface)] shadow-sm">
         <CardContent className="space-y-3 p-4 pt-6">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_auto] lg:items-end">
             <div className="min-w-0 sm:col-span-2 lg:col-span-1">
@@ -733,7 +828,7 @@ export function InventoryTab({
       </Card>
 
       {/* Inventory Table */}
-      <Card>
+      <Card ref={itemsSectionRef} id="inventory-items-section">
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -777,253 +872,248 @@ export function InventoryTab({
                 )
               }
             />
-          ) : (
-            <>
-              {/* Mobile: card list */}
-              <div className="space-y-3 md:hidden">
-                {filteredInventory.map((item: any) => {
-                  const status = getStockStatus(item.quantity, item.low_stock_threshold)
-                  const reorderQty = calculateReorderQuantity(item)
-                  const isPinned = pinnedItems.has(item.product_id)
-                  return (
-                    <div
-                      key={item.id}
-                      className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-[var(--text)]">
-                            {item.product_name}
-                          </p>
-                          <p className="truncate text-xs text-[var(--text-muted)]">
-                            {item.product_sku}
-                            {getItemCategory(item) ? ` · ${getItemCategory(item)}` : ''}
-                            {item.supplier_name ? ` · ${item.supplier_name}` : ''}
-                          </p>
-                        </div>
-                        <StatusBadge status={status} className="shrink-0" />
-                      </div>
-
-                      <div className="mt-3 flex items-end justify-between gap-3">
-                        <div>
-                          <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                            {t('table.onHand')}
-                          </p>
-                          <p className="text-lg font-bold text-[var(--text)]">
-                            {item.quantity}{' '}
-                            <span className="text-sm font-medium text-[var(--text-muted)]">
-                              {item.product_unit}
-                            </span>
-                          </p>
-                        </div>
-                        {reorderQty > 0 ? (
-                          <div className="text-right">
-                            <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                              {t('table.suggestedReorder')}
-                            </p>
-                            <p className="text-lg font-bold text-[var(--amber)]">
-                              {reorderQty}{' '}
-                              <span className="text-sm font-medium text-[var(--text-muted)]">
-                                {item.product_unit}
-                              </span>
-                            </p>
+          ) : isDesktop ? (
+            <div className="overflow-x-auto rounded-lg border border-[var(--app-border)]">
+              <table className="w-full">
+                <thead className="bg-[var(--brand-ultra)]">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                      {t('table.product')}
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                      {t('table.category')}
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                      {t('table.supplier')}
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                      {t('table.stockLevel')}
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                      {t('table.suggestedReorder')}
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                      {t('table.status')}
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                      {t('table.lastUpdated')}
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                      {t('table.actions')}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--app-border)]">
+                  {filteredInventory.map((item: any) => {
+                    const status = getStockStatus(item.quantity, item.low_stock_threshold)
+                    const reorderQty = calculateReorderQuantity(item)
+                    return (
+                      <tr
+                        key={item.id}
+                        className={cn(
+                          'hover:bg-[var(--brand-ultra)]',
+                          status === 'OUT_OF_STOCK' && 'bg-[var(--red-pale)]/30',
+                          status === 'LOW_STOCK' && 'bg-[var(--amber-pale)]/20'
+                        )}
+                      >
+                        <td className="px-4 py-4">
+                          <div>
+                            <p className="font-medium text-[var(--text)]">{item.product_name}</p>
+                            <p className="text-sm text-[var(--text-muted)]">{item.product_sku}</p>
                           </div>
-                        ) : null}
-                      </div>
-
-                      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[var(--app-border)] pt-3">
-                        <Button
-                          variant="outline"
-                          size="touch"
-                          onClick={() => handleOpenAdjustDialog(item, 'ADD')}
-                        >
-                          <Plus className="mr-1.5 h-4 w-4" />
-                          {t('table.add')}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="touch"
-                          onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
-                        >
-                          <Minus className="mr-1.5 h-4 w-4" />
-                          {t('table.reduce')}
-                        </Button>
-                        <Button
-                          variant={isPinned ? 'default' : 'outline'}
-                          size="touch"
-                          onClick={() => handlePinToggle(item.product_id)}
-                        >
-                          <Pin className={`mr-1.5 h-4 w-4 ${isPinned ? 'fill-current' : ''}`} />
-                          {isPinned ? t('table.pinned') : t('table.pin')}
-                        </Button>
-                        {wasteTrackingEnabled ? (
-                          <Button
-                            variant="outline"
-                            size="touch"
-                            className="border-[var(--amber-mid)]/40 text-[var(--amber-mid)]"
-                            onClick={() => {
-                              onNavigateToWaste(item.product_id)
-                            }}
-                          >
-                            <Recycle className="mr-1.5 h-4 w-4" />
-                            {t('table.waste')}
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Desktop: table */}
-              <div className="hidden overflow-x-auto rounded-lg border border-[var(--app-border)] md:block">
-                <table className="w-full">
-                  <thead className="bg-[var(--brand-ultra)]">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                        {t('table.product')}
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                        {t('table.category')}
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                        {t('table.supplier')}
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                        {t('table.quantity')}
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                        {t('table.suggestedReorder')}
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                        {t('table.status')}
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                        {t('table.lastUpdated')}
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                        {t('table.actions')}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--app-border)]">
-                    {filteredInventory.map((item: any) => {
-                      const status = getStockStatus(item.quantity, item.low_stock_threshold)
-                      const reorderQty = calculateReorderQuantity(item)
-                      return (
-                        <tr key={item.id} className="hover:bg-[var(--brand-ultra)]">
-                          <td className="px-4 py-4">
-                            <div>
-                              <p className="font-medium text-[var(--text)]">{item.product_name}</p>
-                              <p className="text-sm text-[var(--text-muted)]">{item.product_sku}</p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                            {getItemCategory(item) || '-'}
-                          </td>
-                          <td className="px-4 py-4 text-sm text-[var(--text)]">
-                            {item.supplier_name}
-                          </td>
-                          <td className="px-4 py-4">
+                        </td>
+                        <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
+                          {getItemCategory(item) || '-'}
+                        </td>
+                        <td className="px-4 py-4 text-sm text-[var(--text)]">
+                          {item.supplier_name}
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="min-w-[10rem] max-w-xs space-y-1">
+                            <InventoryStockBar
+                              quantity={item.quantity}
+                              lowStockThreshold={item.low_stock_threshold}
+                              unit={item.product_unit}
+                            />
+                            {item.days_of_stock != null ? (
+                              <p className="text-xs text-[var(--text-muted)]">
+                                {t('table.daysLeft', {
+                                  count: Math.round(Number(item.days_of_stock)),
+                                })}
+                              </p>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          {reorderQty > 0 ? (
                             <div className="flex items-center gap-2">
-                              <span className="font-semibold">{item.quantity}</span>
-                              <span className="text-sm text-[var(--text-muted)]">
-                                {item.product_unit}
+                              <span className="font-semibold text-[var(--amber)]">
+                                {reorderQty}
                               </span>
-                              {item.days_of_stock != null ? (
-                                <span className="text-xs text-[var(--text-muted)]">
-                                  {t('table.daysLeft', {
-                                    count: Math.round(Number(item.days_of_stock)),
-                                  })}
-                                </span>
-                              ) : null}
-                            </div>
-                          </td>
-                          <td className="px-4 py-4">
-                            {reorderQty > 0 ? (
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-[var(--amber)]">
-                                  {reorderQty}
-                                </span>
-                                <Badge variant="outline" className="text-xs">
-                                  {t('reorder.suggested')}
-                                </Badge>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-xs"
-                                  onClick={() => {
-                                    const query = item.product_sku || item.product_name
-                                    navigate(`/app/products?q=${encodeURIComponent(query)}`)
-                                  }}
-                                >
-                                  {t('reorder.order')}
-                                </Button>
-                              </div>
-                            ) : (
-                              <span className="text-[var(--text-muted)]">-</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4">
-                            <StatusBadge status={status} />
-                          </td>
-                          <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                            {new Date(item.updated_at).toLocaleDateString(i18n.language)}
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="flex gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {t('reorder.suggested')}
+                              </Badge>
                               <Button
-                                variant={pinnedItems.has(item.product_id) ? 'default' : 'outline'}
+                                variant="ghost"
                                 size="sm"
-                                onClick={() => handlePinToggle(item.product_id)}
-                                title={
-                                  pinnedItems.has(item.product_id)
-                                    ? t('table.unpinItem')
-                                    : t('table.pinToTop')
-                                }
+                                className="text-xs"
+                                onClick={() => {
+                                  const query = item.product_sku || item.product_name
+                                  navigate(`/app/products?q=${encodeURIComponent(query)}`)
+                                }}
                               >
-                                <Pin
-                                  className={`h-4 w-4 ${pinnedItems.has(item.product_id) ? 'fill-current' : ''}`}
-                                />
+                                {t('reorder.order')}
                               </Button>
+                            </div>
+                          ) : (
+                            <span className="text-[var(--text-muted)]">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-4">
+                          <StatusBadge status={status} />
+                        </td>
+                        <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
+                          {new Date(item.updated_at).toLocaleDateString(i18n.language)}
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex gap-2">
+                            <Button
+                              variant={pinnedItems.has(item.product_id) ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => handlePinToggle(item.product_id)}
+                              title={
+                                pinnedItems.has(item.product_id)
+                                  ? t('table.unpinItem')
+                                  : t('table.pinToTop')
+                              }
+                            >
+                              <Pin
+                                className={`h-4 w-4 ${pinnedItems.has(item.product_id) ? 'fill-current' : ''}`}
+                              />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenAdjustDialog(item, 'ADD')}
+                              title={t('table.addInventory')}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
+                              title={t('table.countCorrection')}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            {wasteTrackingEnabled ? (
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleOpenAdjustDialog(item, 'ADD')}
-                                title={t('table.addInventory')}
+                                className="text-[var(--amber-mid)] border-[var(--amber-mid)]/40"
+                                onClick={() => {
+                                  onNavigateToWaste(item.product_id)
+                                }}
+                                title={t('table.logWaste')}
                               >
-                                <Plus className="h-4 w-4" />
+                                <Recycle className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
-                                title={t('table.countCorrection')}
-                              >
-                                <Minus className="h-4 w-4" />
-                              </Button>
-                              {wasteTrackingEnabled ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-[var(--amber-mid)] border-[var(--amber-mid)]/40"
-                                  onClick={() => {
-                                    onNavigateToWaste(item.product_id)
-                                  }}
-                                  title={t('table.logWaste')}
-                                >
-                                  <Recycle className="h-4 w-4" />
-                                </Button>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredInventory.map((item: any) => {
+                const status = getStockStatus(item.quantity, item.low_stock_threshold)
+                const reorderQty = calculateReorderQuantity(item)
+                const isPinned = pinnedItems.has(item.product_id)
+                return (
+                  <div
+                    key={item.id}
+                    className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-[var(--text)]">
+                          {item.product_name}
+                        </p>
+                        <p className="truncate text-xs text-[var(--text-muted)]">
+                          {item.product_sku}
+                          {getItemCategory(item) ? ` · ${getItemCategory(item)}` : ''}
+                          {item.supplier_name ? ` · ${item.supplier_name}` : ''}
+                        </p>
+                      </div>
+                      <StatusBadge status={status} className="shrink-0" />
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      <InventoryStockBar
+                        quantity={item.quantity}
+                        lowStockThreshold={item.low_stock_threshold}
+                        unit={item.product_unit}
+                      />
+                      {reorderQty > 0 ? (
+                        <div className="flex items-center justify-between rounded-lg bg-[var(--amber-pale)]/50 px-3 py-2 text-sm">
+                          <span className="text-[var(--text-muted)]">
+                            {t('table.suggestedReorder')}
+                          </span>
+                          <span className="font-semibold text-[var(--amber)]">
+                            {reorderQty} {item.product_unit}
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[var(--app-border)] pt-3">
+                      <Button
+                        variant="outline"
+                        size="touch"
+                        onClick={() => handleOpenAdjustDialog(item, 'ADD')}
+                      >
+                        <Plus className="mr-1.5 h-4 w-4" />
+                        {t('table.add')}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="touch"
+                        onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
+                      >
+                        <Minus className="mr-1.5 h-4 w-4" />
+                        {t('table.reduce')}
+                      </Button>
+                      <Button
+                        variant={isPinned ? 'default' : 'outline'}
+                        size="touch"
+                        onClick={() => handlePinToggle(item.product_id)}
+                      >
+                        <Pin className={`mr-1.5 h-4 w-4 ${isPinned ? 'fill-current' : ''}`} />
+                        {isPinned ? t('table.pinned') : t('table.pin')}
+                      </Button>
+                      {wasteTrackingEnabled ? (
+                        <Button
+                          variant="outline"
+                          size="touch"
+                          className="border-[var(--amber-mid)]/40 text-[var(--amber-mid)]"
+                          onClick={() => {
+                            onNavigateToWaste(item.product_id)
+                          }}
+                        >
+                          <Recycle className="mr-1.5 h-4 w-4" />
+                          {t('table.waste')}
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </CardContent>
       </Card>

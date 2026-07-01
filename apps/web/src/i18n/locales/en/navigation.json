@@ -107,7 +107,11 @@
       "products": "catalog search",
       "orders": "purchase",
       "fulfillment": "delivery shipping",
+      "reservations": "bookings host waitlist",
       "staff": "team employees",
+      "guestMenu": "consumer menu storefront",
+      "guestOrders": "diner orders kitchen",
+      "guestRewards": "loyalty points rewards",
       "settings": "preferences account"
     }
   },

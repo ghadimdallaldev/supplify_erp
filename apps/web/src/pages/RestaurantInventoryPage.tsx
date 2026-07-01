@@ -108,6 +108,7 @@ export function RestaurantInventoryPage() {
             >
               <LazyInventoryTab
                 wasteTrackingEnabled={wasteTrackingEnabled}
+                reorderAssistAvailable={smartReorderEnabled}
                 onNavigateToWaste={navigateToWaste}
                 showAddDialog={showAddProductDialog}
                 onShowAddDialogChange={setShowAddProductDialog}

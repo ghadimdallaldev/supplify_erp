@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { ShieldOff } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { isTenantOwner } from '../lib/tenantRoles'
@@ -16,6 +17,7 @@ type Props = {
 
 /** Blocks direct URL access when the user lacks view permission for a page. */
 export function RequirePermission({ permission, anyOf, title, allowOwner, children }: Props) {
+  const { t } = useTranslation('common')
   const { user } = useAppSelector((state) => state.auth)
   const { can, canAny } = usePermissions()
   const allowed =
@@ -30,11 +32,12 @@ export function RequirePermission({ permission, anyOf, title, allowOwner, childr
         <CardHeader>
           <div className="flex items-center gap-2 text-[var(--text-mid)]">
             <ShieldOff className="h-5 w-5 shrink-0 text-[var(--brand-mid)]" aria-hidden />
-            <CardTitle className="text-[var(--text)]">Access restricted</CardTitle>
+            <CardTitle className="text-[var(--text)]">{t('accessRestricted.title')}</CardTitle>
           </div>
           <CardDescription className="text-[var(--text-muted)]">
-            You don&apos;t have permission to view {title ?? 'this page'}. Your role is read-only or
-            limited for this area — contact a workspace admin if you need access.
+            {t('accessRestricted.description', {
+              area: title ?? t('accessRestricted.defaultArea'),
+            })}
           </CardDescription>
         </CardHeader>
         <CardContent />

@@ -11,7 +11,7 @@ import {
   useUpdatePublicBookingSettingsMutation,
 } from '../../services/reservationsApi'
 
-export function PublicBookingSettingsCard() {
+export function PublicBookingSettingsCard({ readOnly = false }: { readOnly?: boolean }) {
   const { t } = useTranslation('reservations')
   const { data, isLoading } = useGetPublicBookingSettingsQuery()
   const [updateSettings, { isLoading: saving }] = useUpdatePublicBookingSettingsMutation()
@@ -82,6 +82,7 @@ export function PublicBookingSettingsCard() {
                   max={240}
                   step={15}
                   value={durationMinutes}
+                  disabled={readOnly}
                   onChange={(e) => setDurationMinutes(Number(e.target.value) || 90)}
                 />
               </div>
@@ -94,6 +95,7 @@ export function PublicBookingSettingsCard() {
                   max={60}
                   step={15}
                   value={slotIntervalMinutes}
+                  disabled={readOnly}
                   onChange={(e) => setSlotIntervalMinutes(Number(e.target.value) || 30)}
                 />
               </div>
@@ -103,6 +105,7 @@ export function PublicBookingSettingsCard() {
                   id="booking-open"
                   type="time"
                   value={openTime}
+                  disabled={readOnly}
                   onChange={(e) => setOpenTime(e.target.value)}
                 />
               </div>
@@ -112,14 +115,17 @@ export function PublicBookingSettingsCard() {
                   id="booking-close"
                   type="time"
                   value={closeTime}
+                  disabled={readOnly}
                   onChange={(e) => setCloseTime(e.target.value)}
                 />
               </div>
             </div>
 
-            <Button type="button" onClick={handleSave} disabled={saving}>
-              {saving ? t('common.saving') : t('publicBooking.save')}
-            </Button>
+            {!readOnly ? (
+              <Button type="button" onClick={handleSave} disabled={saving}>
+                {saving ? t('common.saving') : t('publicBooking.save')}
+              </Button>
+            ) : null}
           </>
         )}
       </CardContent>

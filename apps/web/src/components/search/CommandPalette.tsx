@@ -1,7 +1,19 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Package, ShoppingCart, Truck, Users, Settings } from 'lucide-react'
+import {
+  CalendarDays,
+  Gift,
+  LayoutDashboard,
+  Package,
+  Settings,
+  ShoppingBasket,
+  ShoppingCart,
+  Truck,
+  Users,
+  UtensilsCrossed,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { usePermissions } from '../../hooks/usePermissions'
 import {
   CommandDialog,
   CommandEmpty,
@@ -17,12 +29,71 @@ const NAV_ITEMS = [
     href: '/app/dashboard',
     icon: LayoutDashboard,
     keywordsKey: 'dashboard',
+    anyOf: ['ORDERS_VIEW', 'INVOICES_VIEW'] as const,
   },
-  { labelKey: 'products', href: '/app/products', icon: Package, keywordsKey: 'products' },
-  { labelKey: 'orders', href: '/app/orders', icon: ShoppingCart, keywordsKey: 'orders' },
-  { labelKey: 'fulfillment', href: '/app/fulfillment', icon: Truck, keywordsKey: 'fulfillment' },
-  { labelKey: 'staff', href: '/app/staff', icon: Users, keywordsKey: 'staff' },
-  { labelKey: 'settings', href: '/app/settings', icon: Settings, keywordsKey: 'settings' },
+  {
+    labelKey: 'products',
+    href: '/app/products',
+    icon: Package,
+    keywordsKey: 'products',
+    permission: 'CATALOG_VIEW' as const,
+  },
+  {
+    labelKey: 'orders',
+    href: '/app/orders',
+    icon: ShoppingCart,
+    keywordsKey: 'orders',
+    permission: 'ORDERS_VIEW' as const,
+  },
+  {
+    labelKey: 'fulfillment',
+    href: '/app/fulfillment',
+    icon: Truck,
+    keywordsKey: 'fulfillment',
+    permission: 'FULFILLMENT_VIEW' as const,
+  },
+  {
+    labelKey: 'reservations',
+    href: '/app/reservations',
+    icon: CalendarDays,
+    keywordsKey: 'reservations',
+    permission: 'RESERVATIONS_VIEW' as const,
+  },
+  {
+    labelKey: 'staff',
+    href: '/app/staff',
+    icon: Users,
+    keywordsKey: 'staff',
+    permission: 'STAFF_VIEW' as const,
+  },
+  {
+    labelKey: 'guestMenu',
+    href: '/app/consumer-menu',
+    icon: UtensilsCrossed,
+    keywordsKey: 'guestMenu',
+    permission: 'CATALOG_VIEW' as const,
+  },
+  {
+    labelKey: 'guestOrders',
+    href: '/app/consumer-orders',
+    icon: ShoppingBasket,
+    keywordsKey: 'guestOrders',
+    permission: 'ORDERS_VIEW' as const,
+  },
+  {
+    labelKey: 'guestRewards',
+    href: '/app/consumer-loyalty',
+    icon: Gift,
+    keywordsKey: 'guestRewards',
+    permission: 'CATALOG_VIEW' as const,
+  },
+  {
+    labelKey: 'settings',
+    href: '/app/settings',
+    icon: Settings,
+    keywordsKey: 'settings',
+    permission: 'SETTINGS_VIEW' as const,
+  },
 ] as const
 
 type CommandPaletteProps = {
@@ -33,6 +104,17 @@ type CommandPaletteProps = {
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const navigate = useNavigate()
   const { t } = useTranslation('navigation')
+  const { can, canAny } = usePermissions()
+
+  const visibleItems = useMemo(
+    () =>
+      NAV_ITEMS.filter((item) => {
+        if ('anyOf' in item && item.anyOf?.length) return canAny(...item.anyOf)
+        if ('permission' in item && item.permission) return can(item.permission)
+        return true
+      }),
+    [can, canAny]
+  )
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -60,7 +142,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       <CommandList>
         <CommandEmpty>{t('command.noResults')}</CommandEmpty>
         <CommandGroup heading={t('command.navigate')}>
-          {NAV_ITEMS.map(({ labelKey, href, icon: Icon, keywordsKey }) => {
+          {visibleItems.map(({ labelKey, href, icon: Icon, keywordsKey }) => {
             const label = t(labelKey)
             const keywords = t(`command.keywords.${keywordsKey}`)
 

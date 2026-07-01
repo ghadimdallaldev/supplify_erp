@@ -104,5 +104,11 @@ export interface ReorderAssistanceResponse {
     tier: string
     capabilities: Record<string, boolean>
   }
+  ai?: {
+    envEnabled: boolean
+    platformEnabled: boolean
+    canExplainLlm: boolean
+    canAskLlm: boolean
+  }
   forecasts?: ReorderForecast[]
 }
