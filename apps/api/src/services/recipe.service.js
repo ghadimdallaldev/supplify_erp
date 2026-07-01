@@ -142,6 +142,7 @@ export async function listRecipes(restaurantId, filters = {}, opts = {}, dbQuery
   if (filters.active === 'false') sql += ` AND r.is_active = false`
   if (filters.missingCost === 'true') sql += ` AND r.calc_status = 'MISSING_DATA'`
   if (filters.aboveTarget === 'true') sql += ` AND r.calc_status = 'WARNING'`
+  if (filters.onTarget === 'true') sql += ` AND r.calc_status = 'HEALTHY'`
   if (filters.recentlyImpacted === 'true') {
     sql += ` AND r.last_price_impact_at IS NOT NULL AND r.last_price_impact_at > now() - INTERVAL '30 days'`
   }

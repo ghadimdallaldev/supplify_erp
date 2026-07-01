@@ -14,6 +14,7 @@ export type RecipeListParams = {
   active?: string
   missingCost?: string
   aboveTarget?: string
+  onTarget?: string
   recentlyImpacted?: string
   productId?: string
   limit?: number

@@ -164,6 +164,7 @@
     "recipes": "recipes",
     "missingCost": "Missing cost",
     "aboveTarget": "Above target",
+    "onTarget": "On target",
     "recentlyImpacted": "Recently impacted"
   },
   "table": {

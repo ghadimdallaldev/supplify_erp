@@ -35,6 +35,7 @@ import type { Recipe } from '../../types/recipes'
 function activeFilterFromParams(params: URLSearchParams): RecipeSummaryFilter {
   if (params.get('missingCost') === 'true') return 'missingCost'
   if (params.get('aboveTarget') === 'true') return 'aboveTarget'
+  if (params.get('onTarget') === 'true') return 'HEALTHY'
   if (params.get('recentlyImpacted') === 'true') return 'recentlyImpacted'
   return 'ALL'
 }
@@ -61,6 +62,7 @@ export function RecipesListPage() {
       active: searchParams.get('active') || 'true',
       missingCost: searchParams.get('missingCost') || undefined,
       aboveTarget: searchParams.get('aboveTarget') || undefined,
+      onTarget: searchParams.get('onTarget') || undefined,
       recentlyImpacted: searchParams.get('recentlyImpacted') || undefined,
     }),
     [searchParams]
@@ -71,6 +73,7 @@ export function RecipesListPage() {
       Boolean(filters.search) ||
       filters.missingCost === 'true' ||
       filters.aboveTarget === 'true' ||
+      filters.onTarget === 'true' ||
       filters.recentlyImpacted === 'true' ||
       Boolean(filters.category),
     [filters]
@@ -128,20 +131,25 @@ export function RecipesListPage() {
   const setFilter = (key: RecipeSummaryFilter) => {
     const next = new URLSearchParams(searchParams)
 
+    const clearStatusFilters = () => {
+      next.delete('missingCost')
+      next.delete('aboveTarget')
+      next.delete('onTarget')
+      next.delete('recentlyImpacted')
+    }
+
     const toggleParam = (param: string) => {
       if (next.get(param) === 'true') next.delete(param)
       else {
-        next.delete('missingCost')
-        next.delete('aboveTarget')
-        next.delete('recentlyImpacted')
+        clearStatusFilters()
         next.set(param, 'true')
       }
     }
 
-    if (key === 'ALL' || key === 'HEALTHY') {
-      next.delete('missingCost')
-      next.delete('aboveTarget')
-      next.delete('recentlyImpacted')
+    if (key === 'ALL') {
+      clearStatusFilters()
+    } else if (key === 'HEALTHY') {
+      toggleParam('onTarget')
     } else if (key === 'missingCost' || key === 'MISSING_DATA') {
       toggleParam('missingCost')
     } else if (key === 'aboveTarget' || key === 'WARNING') {
@@ -312,6 +320,18 @@ export function RecipesListPage() {
               {searchParams.get('aboveTarget') === 'true' ? (
                 <Badge variant="secondary" className="gap-1">
                   {t('filters.aboveTarget')}
+                  <button
+                    type="button"
+                    onClick={() => setFilter('ALL')}
+                    aria-label={t('filters.removeFilter')}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ) : null}
+              {searchParams.get('onTarget') === 'true' ? (
+                <Badge variant="secondary" className="gap-1">
+                  {t('filters.onTarget')}
                   <button
                     type="button"
                     onClick={() => setFilter('ALL')}

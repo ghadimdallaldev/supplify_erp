@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 import { Button } from '../../ui/button'
@@ -425,8 +425,18 @@ export function InventoryTab({
   )
 
   const handleSummaryCardClick = (status: 'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK') => {
-    setStatusFilter((current) => (current === status ? 'ALL' : status))
+    setStatusFilter(status)
     itemsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const handleSummaryCardKeyDown = (
+    event: KeyboardEvent,
+    status: 'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
+  ) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      handleSummaryCardClick(status)
+    }
   }
 
   const scrollToItems = () => {
@@ -545,7 +555,8 @@ export function InventoryTab({
           onClick={() => handleSummaryCardClick('ALL')}
           role="button"
           tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && handleSummaryCardClick('ALL')}
+          aria-pressed={statusFilter === 'ALL'}
+          onKeyDown={(e) => handleSummaryCardKeyDown(e, 'ALL')}
         >
           <CardContent className="p-4 sm:pt-6">
             <div className="flex items-center justify-between gap-2">
@@ -569,7 +580,8 @@ export function InventoryTab({
           onClick={() => handleSummaryCardClick('IN_STOCK')}
           role="button"
           tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && handleSummaryCardClick('IN_STOCK')}
+          aria-pressed={statusFilter === 'IN_STOCK'}
+          onKeyDown={(e) => handleSummaryCardKeyDown(e, 'IN_STOCK')}
         >
           <CardContent className="p-4 sm:pt-6">
             <div className="flex items-center justify-between gap-2">
@@ -595,7 +607,8 @@ export function InventoryTab({
           onClick={() => handleSummaryCardClick('LOW_STOCK')}
           role="button"
           tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && handleSummaryCardClick('LOW_STOCK')}
+          aria-pressed={statusFilter === 'LOW_STOCK'}
+          onKeyDown={(e) => handleSummaryCardKeyDown(e, 'LOW_STOCK')}
         >
           <CardContent className="p-4 sm:pt-6">
             <div className="flex items-center justify-between gap-2">
@@ -621,7 +634,8 @@ export function InventoryTab({
           onClick={() => handleSummaryCardClick('OUT_OF_STOCK')}
           role="button"
           tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && handleSummaryCardClick('OUT_OF_STOCK')}
+          aria-pressed={statusFilter === 'OUT_OF_STOCK'}
+          onKeyDown={(e) => handleSummaryCardKeyDown(e, 'OUT_OF_STOCK')}
         >
           <CardContent className="p-4 sm:pt-6">
             <div className="flex items-center justify-between gap-2">
