@@ -1,5 +1,6 @@
 import { logger } from '../../lib/logger.js'
 import { sendTemplateEmail } from '../email/email.service.js'
+import { buildAppUrl } from '../../lib/app-url.js'
 import {
   buildNotificationEventKey,
   resolveNotificationTemplate,
@@ -34,6 +35,13 @@ const emailService = {
         userId,
         tenantId,
       })
+      const emailMetadata =
+        metadata && typeof metadata === 'object'
+          ? {
+              ...metadata,
+              ctaUrl: metadata.ctaUrl ? buildAppUrl(metadata.ctaUrl) : metadata.ctaUrl,
+            }
+          : {}
       const result = await sendTemplateEmail({
         to: email,
         template,
@@ -43,7 +51,7 @@ const emailService = {
           title: subject,
           message,
           locale,
-          ...(metadata && typeof metadata === 'object' ? metadata : {}),
+          ...emailMetadata,
         },
         tenantId,
         eventType: notificationCategory || notificationType || 'notification',

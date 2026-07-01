@@ -32,7 +32,7 @@ router.get('/', requirePermission('INVOICES_VIEW'), async (req, res, next) => {
 })
 
 const applySchema = z.object({
-  invoiceId: z.string().uuid().optional(),
+  invoiceId: z.string().uuid(),
 })
 
 router.post('/:id/apply', requirePermission('INVOICES_MANAGE'), async (req, res, next) => {

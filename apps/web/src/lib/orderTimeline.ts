@@ -657,7 +657,10 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
           )
         ),
         state: isPaid ? 'completed' : invoiceStatus === 'ISSUED' ? 'current' : 'upcoming',
-        link: { label: ft('timeline.events.invoice.viewInvoice'), href: '/app/invoices' },
+        link: {
+          label: ft('timeline.events.invoice.viewInvoice'),
+          href: `/app/invoices?invoice=${String(invoice.id)}`,
+        },
       })
     }
   }

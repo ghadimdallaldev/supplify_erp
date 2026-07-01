@@ -1,4 +1,5 @@
 import { t, resolveLocale } from '../../../i18n/index.js'
+import { buildAppUrl } from '../../../lib/app-url.js'
 import { renderEmailLayout, textToBodyHtml } from './layout.js'
 
 function emailKey(templateId, field) {
@@ -19,12 +20,13 @@ function standardTemplate({
 }) {
   const lng = resolveLocale(locale)
   const body = data.bodyHtml || textToBodyHtml(message)
+  const resolvedCtaUrl = buildAppUrl(data.ctaUrl || data.inviteUrl || data.loginUrl || ctaUrl)
   const { html, text } = renderEmailLayout({
     locale: lng,
     title: title || subject,
     bodyHtml: body,
     bodyText: message,
-    ctaUrl: data.ctaUrl || ctaUrl,
+    ctaUrl: resolvedCtaUrl,
     ctaLabel: data.ctaLabel || ctaLabel,
     tenantName: data.tenantName || tenantName,
   })
@@ -48,7 +50,7 @@ register(TEMPLATE_REGISTRY, 'auth.welcome', (d, locale = 'en') => {
     subject: t('emails.auth.welcome.subject', lng),
     title: t('emails.auth.welcome.title', lng),
     message: d.message || t(messageKey, lng),
-    ctaUrl: d.ctaUrl,
+    ctaUrl: d.ctaUrl || '/app',
     ctaLabel: t('emails.cta.openSupplify', lng),
     tenantName: d.tenantName,
     data: d,
@@ -58,14 +60,19 @@ register(TEMPLATE_REGISTRY, 'auth.welcome', (d, locale = 'en') => {
 
 register(TEMPLATE_REGISTRY, 'auth.team_invite', (d, locale = 'en') => {
   const lng = resolveLocale(locale)
+  const tenantName = d.tenantName || t('notifications.common.aTeam', lng)
+  const greeting = d.invitedName
+    ? t('emails.auth.team_invite.greetingNamed', lng, { name: d.invitedName })
+    : t('emails.auth.team_invite.greeting', lng)
+  const defaultMessage = `${greeting}\n\n${t('emails.auth.team_invite.message', lng, { tenantName })}`
   return standardTemplate({
-    subject: d.subject || t('emails.auth.team_invite.subject', lng),
-    title: t('emails.auth.team_invite.title', lng),
-    message:
-      d.message ||
-      t('emails.auth.team_invite.message', lng, {
-        tenantName: d.tenantName || t('notifications.common.aTeam', lng),
+    subject:
+      d.subject ||
+      t('emails.auth.team_invite.subject', lng, {
+        tenantName,
       }),
+    title: t('emails.auth.team_invite.title', lng),
+    message: d.message || defaultMessage,
     ctaUrl: d.inviteUrl || d.ctaUrl,
     ctaLabel: t('emails.cta.acceptInvitation', lng),
     tenantName: d.tenantName,
@@ -353,11 +360,27 @@ const staffTemplates = {
 for (const [id, ctaKey] of Object.entries(staffTemplates)) {
   register(TEMPLATE_REGISTRY, id, (d, locale = 'en') => {
     const lng = resolveLocale(locale)
+    const loginUrl = d.loginUrl || d.ctaUrl
+    const defaultMessage =
+      id === 'staff.invite' && d.temporaryPassword
+        ? [
+            d.invitedName || d.recipientName
+              ? t('emails.staff.invite.greetingNamed', lng, {
+                  name: d.invitedName || d.recipientName,
+                })
+              : t('emails.staff.invite.greeting', lng),
+            '',
+            t('emails.staff.invite.messageWithPassword', lng, {
+              loginUrl: loginUrl || buildAppUrl('/staff/login'),
+              temporaryPassword: d.temporaryPassword,
+            }),
+          ].join('\n')
+        : d.message
     return standardTemplate({
       subject: d.subject || t(emailKey(id, 'subject'), lng),
       title: t(emailKey(id, 'title'), lng),
-      message: d.message,
-      ctaUrl: d.ctaUrl || d.loginUrl,
+      message: defaultMessage,
+      ctaUrl: loginUrl,
       ctaLabel: d.ctaLabel || t(`emails.cta.${ctaKey}`, lng),
       tenantName: d.tenantName,
       data: d,
@@ -405,16 +428,39 @@ register(TEMPLATE_REGISTRY, 'admin.deal_review', (d, locale = 'en') => {
 register(TEMPLATE_REGISTRY, 'supplier.access_request', (d, locale = 'en') => {
   const lng = resolveLocale(locale)
   return standardTemplate({
-    subject: t('emails.supplier.access_request.subject', lng),
+    subject: d.subject || t('emails.supplier.access_request.subject', lng),
     title: t('emails.supplier.access_request.title', lng),
     message: d.message,
-    ctaUrl: d.ctaUrl,
+    ctaUrl: d.ctaUrl || '/app/suppliers',
     ctaLabel: t('emails.cta.reviewRequest', lng),
     tenantName: d.tenantName,
     data: d,
     locale: lng,
   })
 })
+
+const growthTemplates = {
+  'growth.connection_accepted': { cta: '/app/restaurants', ctaLabel: 'viewRestaurants' },
+  'growth.referral_registered': { cta: '/app', ctaLabel: 'openSupplify' },
+  'growth.referral_reward': { cta: '/app/promotions', ctaLabel: 'viewDeals' },
+  'growth.sponsorship_gift': { cta: '/app/billing', ctaLabel: 'manageBilling' },
+  'growth.sponsorship_expired': { cta: '/app/billing', ctaLabel: 'manageBilling' },
+}
+for (const [id, { cta, ctaLabel }] of Object.entries(growthTemplates)) {
+  register(TEMPLATE_REGISTRY, id, (d, locale = 'en') => {
+    const lng = resolveLocale(locale)
+    return standardTemplate({
+      subject: d.subject || t(emailKey(id, 'subject'), lng),
+      title: d.title || t(emailKey(id, 'title'), lng),
+      message: d.message,
+      ctaUrl: d.ctaUrl || cta,
+      ctaLabel: d.ctaLabel || t(`emails.cta.${ctaLabel}`, lng),
+      tenantName: d.tenantName,
+      data: d,
+      locale: lng,
+    })
+  })
+}
 
 register(TEMPLATE_REGISTRY, 'notification.generic', (d, locale = 'en') => {
   const lng = resolveLocale(locale)

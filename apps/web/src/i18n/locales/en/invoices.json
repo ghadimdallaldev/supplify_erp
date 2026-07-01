@@ -101,7 +101,8 @@
     "amount": "Amount",
     "status": "Status",
     "action": "Action",
-    "apply": "Apply"
+    "apply": "Apply",
+    "applyViaPayment": "Apply when paying an invoice"
   },
   "detail": {
     "title": "Invoice {{number}}",

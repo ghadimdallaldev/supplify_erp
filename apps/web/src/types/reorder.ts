@@ -94,6 +94,7 @@ export interface ReorderAiAskResult {
   clarifyingQuestion?: string
   source: 'heuristic' | 'llm'
   usedLlm: boolean
+  usageLimited?: boolean
 }
 
 export interface ReorderAssistanceResponse {

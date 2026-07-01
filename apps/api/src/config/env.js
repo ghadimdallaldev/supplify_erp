@@ -184,6 +184,13 @@ export const config = {
   SMTP_USER: process.env.SMTP_USER || '',
   SMTP_PASS: process.env.SMTP_PASS || '',
   SMTP_SECURE: process.env.SMTP_SECURE === 'true',
+  // WhatsApp (Meta Cloud API). Wiring is complete; real delivery activates only
+  // when WHATSAPP_ENABLED=true and an access token + phone number id are set.
+  WHATSAPP_ENABLED: envBool(process.env.WHATSAPP_ENABLED, false),
+  WHATSAPP_LOG_ONLY: envBool(process.env.WHATSAPP_LOG_ONLY, false),
+  WHATSAPP_ACCESS_TOKEN: process.env.WHATSAPP_ACCESS_TOKEN || '',
+  WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+  WHATSAPP_API_VERSION: process.env.WHATSAPP_API_VERSION || 'v21.0',
   PAYMENTS_MODE,
   PAYMENTS_PROVIDER: process.env.PAYMENTS_PROVIDER || '',
   PAYMENTS_API_BASE_URL: process.env.PAYMENTS_API_BASE_URL || '',
