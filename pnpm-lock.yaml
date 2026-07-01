@@ -109,6 +109,9 @@ importers:
       dotenv:
         specifier: ^16.3.1
         version: 16.6.1
+      decimal.js:
+        specifier: ^10.6.0
+        version: 10.6.0
       express:
         specifier: ^4.18.2
         version: 4.21.2

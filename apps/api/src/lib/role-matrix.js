@@ -18,6 +18,8 @@ const RESTAURANT_ACCOUNTANT = [
   P.PAYMENTS_MANAGE,
   P.ORDERS_VIEW,
   P.SUBSCRIPTIONS_VIEW,
+  P.RECIPES_VIEW,
+  P.RECIPES_VIEW_COSTS,
 ]
 
 const SUPPLIER_ACCOUNTANT = [...RESTAURANT_ACCOUNTANT]
@@ -51,6 +53,10 @@ export const RESTAURANT_SYSTEM_ROLES = [
       P.RESERVATIONS_VIEW,
       P.RESERVATIONS_CREATE,
       P.RESERVATIONS_EDIT,
+      P.RECIPES_VIEW,
+      P.RECIPES_VIEW_COSTS,
+      P.RECIPES_EDIT,
+      P.RECIPES_MANAGE,
     ],
   },
   {
@@ -65,6 +71,8 @@ export const RESTAURANT_SYSTEM_ROLES = [
       P.INVENTORY_VIEW,
       P.CHAT_VIEW,
       P.CHAT_SEND,
+      P.RECIPES_VIEW,
+      P.RECIPES_EDIT,
     ],
   },
   {
@@ -89,7 +97,7 @@ export const RESTAURANT_SYSTEM_ROLES = [
     name: 'FOH Staff',
     legacyNames: ['FOH Staff', 'Reservations/Host Staff'],
     description: 'Front-of-house reservations; no billing, users, or catalog admin',
-    permissions: [P.RESERVATIONS_VIEW, P.RESERVATIONS_CREATE, P.RESERVATIONS_EDIT],
+    permissions: [P.RESERVATIONS_VIEW, P.RESERVATIONS_CREATE, P.RESERVATIONS_EDIT, P.RECIPES_VIEW],
   },
 ]
 
