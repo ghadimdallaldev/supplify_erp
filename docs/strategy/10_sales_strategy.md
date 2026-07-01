@@ -95,8 +95,9 @@ Lebanon relationships, which this document does not have visibility into (see Pa
    point-solution competitors.
 3. **Hotels, larger chains, and catering companies (4+ branches, Platinum/Enterprise-track).**
    Deliberately sequenced last, not because the segment lacks value, but because it is the
-   segment most likely to test the catalog-only Platinum gap (full API/webhooks, white-label,
-   central purchasing — `tier-matrix.md` §7) and ask for integrations (EDI, SSO) that do not
+   segment most likely to test **remaining** catalog-only Platinum gaps (developer API +
+   order/invoice webhooks, advanced reports, central purchasing — `PLATINUM_CATALOG_ONLY_FEATURES.md`)
+   and ask for integrations (EDI, SSO) that do not
    exist yet (`docs/sales/enterprise_checklist.md`, "Integration & SLA" section). Part 7's
    own recommendation applies here directly: do not actively pursue this segment until a
    Gold/Platinum reference customer exists (§7.4).
@@ -265,7 +266,7 @@ review or contract negotiation will find the gap regardless.
 | **"We already coordinate fine over WhatsApp and phone calls — why switch?"**                                                                           | The exact problem Supplify's own materials name (`docs/sales/01_problem.md`; Part 1 §1.7). Acknowledge WhatsApp "works" at small scale; frame value around what breaks as suppliers/locations multiply (no shared record, manual reconciliation, evidence-free disputes) rather than a fabricated hours-saved figure — Part 1 declines to cite one for this exact reason (§1.7).                                                                                                                                                                                       |
 | **"Can you integrate with our EDI system, accounting software, or POS?"**                                                                              | Not today. The one real asset is a one-way, manual **QuickBooks-compatible CSV export** (Part 11 §11.3) — no live QuickBooks/Xero sync, no EDI, no POS integration. This is why larger, already-integrated distributors are sequenced lower in §10.2 — do not commit to a timeline Part 11's roadmap doesn't support.                                                                                                                                                                                                                                                  |
 | **"We're a hotel/chain with several branches — can we run central purchasing across all of them?"**                                                    | Not as a differentiated product today — "central purchasing" is a Platinum catalog-only string behaving like Gold's `multi_branch` (`tier-matrix.md` §7; Part 11 §11.1, §11.8). What's real: strong multi-branch RBAC, a Regional Manager role, and linked branch accounts under one org (`docs/architecture/tenancy.md`) — a credible foundation, described honestly as a foundation, not a finished engine.                                                                                                                                                          |
-| **"You have zero live customers. Why would we be first?"**                                                                                             | Product risk, not market risk, is what's retired here (Part 1 §1.13) — 180 migrations, 225+ backend and 100+ frontend tests, and the hard parts (RBAC, billing enforcement, GPS logistics, real-time chat) are already built. Frame being early as direct access to the builders, not a downside.                                                                                                                                                                                                                                                                      |
+| **"You have zero live customers. Why would we be first?"**                                                                                             | Product risk, not market risk, is what's retired here (Part 1 §1.13) — 186 migrations, 225+ backend and 100+ frontend tests, and the hard parts (RBAC, billing enforcement, GPS logistics, real-time chat) are already built. Frame being early as direct access to the builders, not a downside.                                                                                                                                                                                                                                                                      |
 | **"Given the economic situation in Lebanon, can we even reliably pay you in USD?"**                                                                    | A legitimate, structural concern. Part 13 documents the Lebanese currency/banking crisis in full (§13.3–13.4): a customer's inability to reliably access USD is a real payment-collection risk the pricing model doesn't solve. Offer payment-method flexibility (the manual gateway, negotiated terms) rather than a rigid card-only signup, and track payment-failure/churn-reason data once it exists (Part 13 §13.4).                                                                                                                                              |
 
 ## 10.7 Sales Cycle & Deal Size Expectations _(targets/assumptions — no actuals exist)_
@@ -399,6 +400,7 @@ none of the following should be reported as an actual until a real cohort produc
    mid-market F&B distributors with an importable customer book) against the founder's actual
    existing relationships in Lebanon — this document has no visibility into those
    relationships (Part 1 §1.2).
-6. Decide whether to sell Platinum at all before the catalog-only gap (Part 11 §11.1, §11.6)
-   closes, or to restrict early Platinum sales to an explicitly disclosed "early access"
-   framing with a committed closure date.
+6. Decide whether to sell Platinum to IT/enterprise buyers before **developer API** and
+   **central purchasing** gaps close (Part 11 §11.1, §11.6), or restrict early Platinum sales
+   to an explicitly disclosed "early access" framing with a committed closure date. Smart
+   quick lists, notification webhooks, and custom domains are no longer blockers (July 2026).

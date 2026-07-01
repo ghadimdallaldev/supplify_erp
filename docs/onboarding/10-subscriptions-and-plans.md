@@ -42,9 +42,9 @@ return getGoldPlanFeatures(tenantType)
 
 Canonical keys live in `apps/api/src/lib/feature-keys.js`.
 
-### Restaurant (26 keys)
+### Restaurant (27 keys)
 
-`chat`, `order_calendar`, `reports`, `smart_reorder`, `multi_branch`, `receiving_quality`, `disputes_returns`, `finance_invoices`, `quick_lists`, `inventory_management`, `waste_tracking`, `advanced_roles`, `notifications`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`, `supplier_reviews`, `push_notifications`, `order_amendments`, `tenant_audit_log`, `waitlist_auto_promo`, `supplier_deals`, `supplier_deals_redeem`, `fulfillment_tools`, `ai_platform`
+`chat`, `order_calendar`, `reports`, `smart_reorder`, `recipe_costing`, `multi_branch`, `receiving_quality`, `disputes_returns`, `finance_invoices`, `quick_lists`, `inventory_management`, `waste_tracking`, `advanced_roles`, `notifications`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`, `supplier_reviews`, `push_notifications`, `order_amendments`, `tenant_audit_log`, `waitlist_auto_promo`, `supplier_deals`, `supplier_deals_redeem`, `fulfillment_tools`, `ai_platform`
 
 ### Supplier (24 keys)
 
@@ -146,6 +146,7 @@ Values from migrations **0117**, **0119**, **0120**, **0145** (Free), and **0167
 | `order_calendar`        |     ✓      |           ✓           |            ✓            |                   ✓                   |
 | `reports`               |     ✓      |     ✓ basic_kpis      | ✓ usage_cost_dashboards | ✓ advanced_forecasting_custom_reports |
 | `smart_reorder`         |     ✓      |           —           |   ✓ full_90day_trends   |       ✓ ai_forecast_seasonality       |
+| `recipe_costing`        |     ✓      |           —           |            ✓            |                   ✓                   |
 | `multi_branch`          |     ✓      |           —           |            ✓            |         ✓ central_purchasing          |
 | `receiving_quality`     |     ✓      |   ✓ photos_enabled    |    ✓ quality_scoring    |    ✓ supplier_performance_reports     |
 | `disputes_returns`      |     ✓      |           ✓           |            ✓            |                   ✓                   |

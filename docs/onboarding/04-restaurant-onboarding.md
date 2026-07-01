@@ -230,6 +230,22 @@ End-to-end onboarding for a **restaurant** tenant: registration, profile, procur
 
 ---
 
+## Step 14b — Recipe costing (Gold+)
+
+| Field                    | Detail                                                                                                                            |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Goal**                 | Build recipes linked to supplier products; track food cost % and margin from live purchase prices.                                |
+| **Who**                  | `RECIPES_EDIT` (Owner, Manager, Purchaser); costs visible with `RECIPES_VIEW_COSTS`.                                              |
+| **Navigation path**      | **Recipes** → `/app/recipes`; **Recipe costing** → `/app/recipe-costing`                                                          |
+| **Required data**        | Active recipes with ingredients mapped to catalog SKUs; receiving/invoice history for cost resolution.                            |
+| **Expected result**      | Costs recalculate after goods-in; missing price shows `MISSING_DATA` (not zero).                                                  |
+| **Possible errors**      | Plan gate `recipe_costing` (Silver → 403); unit conversion missing.                                                               |
+| **Validation checklist** | [ ] Create recipe with ingredients. [ ] Receive stock → cost updates within ~3 min. [ ] Price-impact page lists affected recipes. |
+
+**API:** `/api/recipes`, `/api/recipe-costing`. See [recipe-costing.md](../features/recipe-costing.md).
+
+---
+
 ## Step 15 — Subscription, plan, and notifications
 
 | Field                    | Detail                                                                                                                           |

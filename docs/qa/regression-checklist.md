@@ -226,6 +226,9 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | GATE-R18  | `feature_flags_access` | Tenant flag override API → 403                                          | 403 (Gold+)                        | 200 (if UI exposed)           |       |
 | GATE-R19  | `supplier_deals`       | `/app/deals` loads (sandbox); **1 redemption/day** cap                  | Loads; 10/day cap                  | Loads; 50/day cap             |       |
 | GATE-R20  | `waitlist_auto_promo`  | Cancel reservation → no auto-offer to waitlist                          | No auto-offer                      | Auto-offer on cancel (Gold+)  |       |
+| GATE-R21  | `recipe_costing`       | `/app/recipes` hidden; `GET /api/recipes` → 403                         | 403                                | 200; sidebar Recipes visible  |       |
+| GATE-R21a | `recipe_costing`       | `GET /api/recipe-costing/dashboard` → 403                               | 403                                | 200                           |       |
+| GATE-R21b | `RECIPES_VIEW_COSTS`   | Purchaser: recipes list OK; cost fields hidden/403 on breakdown         | Gold purchaser account             | Accountant sees costs         |       |
 
 ## 3.2 Supplier feature gates
 

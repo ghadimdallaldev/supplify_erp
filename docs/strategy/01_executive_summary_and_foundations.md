@@ -18,7 +18,7 @@ distributor reconciles orders across the same fragmented channels, Supplify repl
 fragmentation with one connected workspace covering ordering, fulfillment, receiving,
 invoicing, inventory, reservations, and platform administration.
 
-The product is not a pitch-deck concept. It is a working system with 180 database
+The product is not a pitch-deck concept. It is a working system with 186 database
 migrations, 225+ backend tests and 100+ frontend tests, full role-based access control,
 enforced subscription tiering, GPS-tracked delivery, and a reservations and staff module —
 built over roughly 12–18 months of iterative engineering (Source: internal codebase audit,
@@ -52,8 +52,8 @@ aspirational marketing copy:
 | Inventory               | Supplier warehouse stock; restaurant par-level and multi-branch inventory tracking; expiry and waste tracking (Gold+ plans)                                                                                                                        |
 | Fulfillment & logistics | Driver dispatch, live GPS tracking, route planning, proof-of-delivery capture, multi-warehouse routing (Gold+)                                                                                                                                     |
 | Receiving               | Restaurant goods-in workflow with quality photo capture and scoring                                                                                                                                                                                |
-| Finance                 | Invoices linked to orders, payment recording across seven payment methods, disputes and credit notes                                                                                                                                               |
-| Communication           | Real-time chat (Socket.IO + Redis) scoped to orders/products/conversations                                                                                                                                                                         |
+| Finance                 | Invoices linked to orders (central `invoice.service`, duplicate guards, tenant-scoped exports), payment recording across seven payment methods, disputes and credit notes                                                                          |
+| Communication           | Real-time chat (Socket.IO + Redis); tier-gated notifications via in-app, email, **WhatsApp** (Meta Cloud API when enabled), and **outbound webhooks** (Platinum)                                                                                   |
 | Front-of-house          | Reservation board, public guest booking portal, floor plan, staff self-service portal (PTO, shift swaps)                                                                                                                                           |
 | Consumer/B2C            | Public supplier "mini-store" storefronts, guest checkout without login, basic loyalty structure                                                                                                                                                    |
 | Growth tooling          | Supplier-side customer import, referral/connection requests, paid promotions with admin approval                                                                                                                                                   |
@@ -66,7 +66,13 @@ liabilities on a balance sheet — because it is decision-relevant:
 
 - No live production tenants; every number about usage, retention, or revenue in this
   document is a **target**, never an actual, until stated otherwise.
-- Several Platinum-tier marketing claims (full API/order webhooks, advanced custom reporting, central purchasing) remain **catalog entries** — priced and displayed — without full backend enforcement yet (Source: `docs/product/tier-matrix.md`, §7). **Smart quick lists, notification webhooks, custom catalog domains, and smart reorder** are enforced — see `docs/product/PLATINUM_CATALOG_ONLY_FEATURES.md`.
+- Several Platinum-tier marketing claims remain **catalog entries** without full backend
+  enforcement — notably **full developer API + order/invoice webhooks** (`api_integrations`),
+  advanced custom reporting strings, central purchasing, and several cross-tier report/finance
+  strings (Source: `docs/product/PLATINUM_CATALOG_ONLY_FEATURES.md`). **Enforced as of July
+  2026:** smart quick lists (`ai_smart_automation`), smart reorder, **outbound notification
+  webhooks**, **custom catalog domains** (white-label hostname), and **WhatsApp delivery**
+  (Meta Cloud API — ops-enabled per environment).
 - Single-region infrastructure (Railway, one deployment per environment) — no multi-region
   failover or data residency options yet, relevant once GCC/EU expansion requires local
   data hosting.
@@ -128,13 +134,13 @@ while retaining Platinum/Enterprise depth for chains.
 Objectives are grouped by horizon and stated as targets, not commitments with fixed dates,
 since the company has not yet launched commercially.
 
-| Horizon      | Objective                                                                                                                                              | Why this, why now                                                                                                                                        |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0–6 months   | Commercial launch in Lebanon; first paying restaurant and supplier tenants on Silver/Gold plans                                                        | Converts a built product into evidence; nothing else in this document (unit economics, retention, expansion) can be verified before this happens         |
-| 6–12 months  | Close the gap between catalog-only Platinum claims and shipped functionality (webhooks, white-label, AI quick lists) documented in `tier-matrix.md` §7 | Selling a feature that is not enforced is a churn and trust risk once a paying Platinum customer tests it                                                |
-| 12–18 months | Reach a cohort of paying tenants large enough to calculate real CAC, LTV, and net revenue retention (see Part 12 for the model once real inputs exist) | Real unit economics, not projected ones, are the basis on which a seed round should be raised                                                            |
-| 18–24 months | First GCC market entry (see Part 14)                                                                                                                   | GCC food-service digitization is further along than Lebanon's on average, and the bilingual/multi-currency groundwork is already partially in the schema |
-| 24–36 months | Category expansion beyond food/beverage suppliers into packaging, cleaning, and equipment suppliers                                                    | The tenant/catalog model is supplier-type agnostic today; expansion is a go-to-market and category-specific catalog exercise, not a re-architecture      |
+| Horizon      | Objective                                                                                                                                                                                                                               | Why this, why now                                                                                                                                                                     |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0–6 months   | Commercial launch in Lebanon; first paying restaurant and supplier tenants on Silver/Gold plans                                                                                                                                         | Converts a built product into evidence; nothing else in this document (unit economics, retention, expansion) can be verified before this happens                                      |
+| 6–12 months  | Close **remaining** catalog-only Platinum claims (developer API, advanced report strings, central purchasing) per `PLATINUM_CATALOG_ONLY_FEATURES.md`; enable WhatsApp in production environments when Meta credentials are provisioned | Four high-visibility Platinum items shipped July 2026 (smart quick lists, notification webhooks, custom domains, WhatsApp integration code); do not market what is still catalog-only |
+| 12–18 months | Reach a cohort of paying tenants large enough to calculate real CAC, LTV, and net revenue retention (see Part 12 for the model once real inputs exist)                                                                                  | Real unit economics, not projected ones, are the basis on which a seed round should be raised                                                                                         |
+| 18–24 months | First GCC market entry (see Part 14)                                                                                                                                                                                                    | GCC food-service digitization is further along than Lebanon's on average, and the bilingual/multi-currency groundwork is already partially in the schema                              |
+| 24–36 months | Category expansion beyond food/beverage suppliers into packaging, cleaning, and equipment suppliers                                                                                                                                     | The tenant/catalog model is supplier-type agnostic today; expansion is a go-to-market and category-specific catalog exercise, not a re-architecture                                   |
 
 ## 1.7 Problem Statement
 
@@ -228,7 +234,7 @@ Matrix / future revenue streams) and Part 7.
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Key Partners**           | Payment processors (Stripe referenced in payment methods); Keycloak (identity, self-hosted OSS); Railway (infra/hosting); MinIO/S3-compatible storage; eventually POS/accounting integration partners (not yet built) |
 | **Key Activities**         | Product engineering (multi-tenant platform), two-sided sales (restaurants + suppliers must both be sold), tenant onboarding, trust & safety (deal approvals, dispute mediation)                                       |
-| **Key Resources**          | The codebase itself (180 migrations, full RBAC/billing engine); founding team's Lebanon market access; bilingual data model as an expansion asset                                                                     |
+| **Key Resources**          | The codebase itself (186 migrations, full RBAC/billing engine); founding team's Lebanon market access; bilingual data model as an expansion asset                                                                     |
 | **Value Propositions**     | See §1.9 — unified ordering/fulfillment/finance for restaurants; centralized order intake/logistics/receivables for suppliers                                                                                         |
 | **Customer Relationships** | Self-serve signup/trial → in-app upgrade prompts (already instrumented — see conversion-funnel tracking in `docs/sales/08_pricing_strategy.md`) for Silver/Gold; high-touch sales for Platinum/Enterprise             |
 | **Channels**               | Direct sales (initially founder-led in Lebanon), self-serve web signup, supplier-driven referral of restaurant customers (growth program already built), future: trade associations, industry events (Part 8/9)       |
@@ -258,7 +264,7 @@ data**, not a claim that it is fundable today on traction:
 
 - **Product risk is already substantially retired.** This is not a prototype seeking
   product-market validation from zero — it is a tested, multi-tenant platform (225+
-  backend tests, 100+ frontend tests, 180 migrations) with the operationally hard parts
+  backend tests, 100+ frontend tests, 186 migrations) with the operationally hard parts
   (RBAC, billing enforcement, GPS-tracked logistics, real-time chat) already built
   (Source: internal codebase audit, 2026-07-01). Capital raised after launch can go
   disproportionately toward go-to-market, not toward finishing the product.

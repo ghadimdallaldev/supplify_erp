@@ -311,29 +311,29 @@ logistics. **MENA:** none.
 
 ## 4.8 Master Comparison Table
 
-| Competitor      | Disclosed funding     | Pricing vs. Supplify tiers                 | MENA / Lebanon                         | AI depth                                        | Target segment                     | Sales motion                      |
-| --------------- | --------------------- | ------------------------------------------ | -------------------------------------- | ----------------------------------------------- | ---------------------------------- | --------------------------------- |
-| **Supplify**    | $0 — bootstrapped     | Silver $49 / Gold $149 / Platinum $349     | **Yes — Lebanon-first**                | Catalog-only (quick lists not backend-enforced) | Two-sided restaurants + suppliers  | Self-serve + sales-led Enterprise |
-| **Supy**        | $9.5M                 | Gold/Platinum ($250+/mo)                   | **Yes — confirmed Lebanon**            | High (LLM invoice AI, vendor-claimed)           | Multi-branch groups, Gulf-first    | Fully sales-led                   |
-| Foodics         | ~$200M                | Silver–Platinum ($105–330/mo, POS)         | GCC core; Lebanon reseller only        | Moderate (analytics + acquired AI)              | Restaurants/chains, POS-first      | Hybrid                            |
-| Rewaa           | $72M                  | Silver–Gold (~$77–132/mo + add-ons)        | KSA only                               | Basic (Musaed assistant)                        | Saudi SME retail/F&B               | Hybrid trial + sales              |
-| Oracle Simphony | Public (ORCL)         | Gold+ ($55–75/mo entry; enterprise custom) | ME regional site; no Lebanon confirmed | Emerging (NetSuite AI, 2026)                    | Enterprise POS + ERP               | Hybrid                            |
-| MarketMan       | $2M + PSG $100M+      | Silver/Gold ($199–249/mo)                  | No                                     | Moderate (OCR disputed)                         | Independent–enterprise, US-centric | Demo-led                          |
-| MarginEdge      | ~$83M                 | Silver/Gold (~$300–330/mo est.)            | No                                     | Moderate–high (hybrid OCR)                      | Independent–multi-unit, US/Canada  | Sales-assisted                    |
-| Restaurant365   | $310M+ rounds         | Enterprise (~$469/loc/mo hist.)            | No                                     | Emerging (R365 AI 2026)                         | Multi-unit chains, US              | Fully sales-led                   |
-| Crunchtime      | PE-backed; $100M+ rev | Above Enterprise (custom)                  | Via global chains only                 | Basic (forecasting)                             | Enterprise chains                  | Enterprise sales                  |
-| Craftable       | Undisclosed PE (2023) | Enterprise custom                          | No                                     | Moderate–high (Craftable AI)                    | US restaurants/bars/hotels         | Sales-led                         |
-| Yellow Dog      | Not disclosed         | Quote-only (likely >Platinum)              | No                                     | None documented                                 | US large venues                    | Sales-led                         |
-| Apicbase        | ~$11.5M               | Silver–Gold (~€60–160/mo est.)             | No                                     | Basic–moderate                                  | EU multi-unit chains               | Sales-led                         |
-| Choco           | ~$301M                | Free (restaurants) / custom (suppliers)    | Unverified GCC claim                   | High (OpenAI voice agent)                       | US/EU marketplace                  | Hybrid                            |
-| BlueCart        | ~$31–32M              | Opaque (est. Silver–Gold)                  | No                                     | Moderate                                        | US distributors + buyers           | Sales-led                         |
-| Orderlion       | €4M                   | Undisclosed                                | No (DACH/UK/FR)                        | Moderate (AI Inbox)                             | F&B wholesalers (supply-side)      | Sales-led                         |
-| ChefHero/Notch  | ~$39M                 | N/A (AR/AP fintech)                        | No                                     | Basic                                           | NA distributors                    | Sales-led                         |
-| Toast/xtraCHEF  | Public (TOST)         | Platinum+ (~$199–299/mo + POS)             | No                                     | High platform (Toast IQ)                        | Toast POS customers                | Hybrid                            |
-| Lightspeed      | Public (LSPD)         | Silver–Gold ($69–399/mo)                   | Reseller only (UAE)                    | Basic (Lightspeed AI)                           | SMB restaurants, POS-first         | Hybrid                            |
-| Sourcery/Lavu   | $7.5M (pre-acq.)      | Custom per-invoice                         | No                                     | None documented                                 | Lavu POS upsell                    | Sales-led                         |
-| Cin7            | PE ~$133M acq.        | Above Platinum ($349+/mo)                  | No                                     | Moderate–deep                                   | Retail/wholesale SMB               | Hybrid self-serve                 |
-| Marketboomer    | A$4.9M                | Gold/Platinum (A$650+/mo)                  | No                                     | Basic (invoice AI)                              | APAC hotel chains                  | Sales-led                         |
+| Competitor      | Disclosed funding     | Pricing vs. Supplify tiers                 | MENA / Lebanon                         | AI depth                                                                                                                                        | Target segment                     | Sales motion                      |
+| --------------- | --------------------- | ------------------------------------------ | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | --------------------------------- |
+| **Supplify**    | $0 — bootstrapped     | Silver $49 / Gold $149 / Platinum $349     | **Yes — Lebanon-first**                | **Enforced:** smart reorder, smart quick lists, notification webhooks, custom domains; **catalog-only:** developer API, advanced report strings | Two-sided restaurants + suppliers  | Self-serve + sales-led Enterprise |
+| **Supy**        | $9.5M                 | Gold/Platinum ($250+/mo)                   | **Yes — confirmed Lebanon**            | High (LLM invoice AI, vendor-claimed)                                                                                                           | Multi-branch groups, Gulf-first    | Fully sales-led                   |
+| Foodics         | ~$200M                | Silver–Platinum ($105–330/mo, POS)         | GCC core; Lebanon reseller only        | Moderate (analytics + acquired AI)                                                                                                              | Restaurants/chains, POS-first      | Hybrid                            |
+| Rewaa           | $72M                  | Silver–Gold (~$77–132/mo + add-ons)        | KSA only                               | Basic (Musaed assistant)                                                                                                                        | Saudi SME retail/F&B               | Hybrid trial + sales              |
+| Oracle Simphony | Public (ORCL)         | Gold+ ($55–75/mo entry; enterprise custom) | ME regional site; no Lebanon confirmed | Emerging (NetSuite AI, 2026)                                                                                                                    | Enterprise POS + ERP               | Hybrid                            |
+| MarketMan       | $2M + PSG $100M+      | Silver/Gold ($199–249/mo)                  | No                                     | Moderate (OCR disputed)                                                                                                                         | Independent–enterprise, US-centric | Demo-led                          |
+| MarginEdge      | ~$83M                 | Silver/Gold (~$300–330/mo est.)            | No                                     | Moderate–high (hybrid OCR)                                                                                                                      | Independent–multi-unit, US/Canada  | Sales-assisted                    |
+| Restaurant365   | $310M+ rounds         | Enterprise (~$469/loc/mo hist.)            | No                                     | Emerging (R365 AI 2026)                                                                                                                         | Multi-unit chains, US              | Fully sales-led                   |
+| Crunchtime      | PE-backed; $100M+ rev | Above Enterprise (custom)                  | Via global chains only                 | Basic (forecasting)                                                                                                                             | Enterprise chains                  | Enterprise sales                  |
+| Craftable       | Undisclosed PE (2023) | Enterprise custom                          | No                                     | Moderate–high (Craftable AI)                                                                                                                    | US restaurants/bars/hotels         | Sales-led                         |
+| Yellow Dog      | Not disclosed         | Quote-only (likely >Platinum)              | No                                     | None documented                                                                                                                                 | US large venues                    | Sales-led                         |
+| Apicbase        | ~$11.5M               | Silver–Gold (~€60–160/mo est.)             | No                                     | Basic–moderate                                                                                                                                  | EU multi-unit chains               | Sales-led                         |
+| Choco           | ~$301M                | Free (restaurants) / custom (suppliers)    | Unverified GCC claim                   | High (OpenAI voice agent)                                                                                                                       | US/EU marketplace                  | Hybrid                            |
+| BlueCart        | ~$31–32M              | Opaque (est. Silver–Gold)                  | No                                     | Moderate                                                                                                                                        | US distributors + buyers           | Sales-led                         |
+| Orderlion       | €4M                   | Undisclosed                                | No (DACH/UK/FR)                        | Moderate (AI Inbox)                                                                                                                             | F&B wholesalers (supply-side)      | Sales-led                         |
+| ChefHero/Notch  | ~$39M                 | N/A (AR/AP fintech)                        | No                                     | Basic                                                                                                                                           | NA distributors                    | Sales-led                         |
+| Toast/xtraCHEF  | Public (TOST)         | Platinum+ (~$199–299/mo + POS)             | No                                     | High platform (Toast IQ)                                                                                                                        | Toast POS customers                | Hybrid                            |
+| Lightspeed      | Public (LSPD)         | Silver–Gold ($69–399/mo)                   | Reseller only (UAE)                    | Basic (Lightspeed AI)                                                                                                                           | SMB restaurants, POS-first         | Hybrid                            |
+| Sourcery/Lavu   | $7.5M (pre-acq.)      | Custom per-invoice                         | No                                     | None documented                                                                                                                                 | Lavu POS upsell                    | Sales-led                         |
+| Cin7            | PE ~$133M acq.        | Above Platinum ($349+/mo)                  | No                                     | Moderate–deep                                                                                                                                   | Retail/wholesale SMB               | Hybrid self-serve                 |
+| Marketboomer    | A$4.9M                | Gold/Platinum (A$650+/mo)                  | No                                     | Basic (invoice AI)                                                                                                                              | APAC hotel chains                  | Sales-led                         |
 
 ---
 
@@ -376,9 +376,11 @@ for Supplify.
 
 Invoice OCR, demand forecasting, and conversational assistants are claimed by most
 incumbents. **Named LLM partnerships** (Supy: Gemini/Claude; Choco: OpenAI Realtime API;
-Craftable: Invoice AI suite) set buyer expectations. Supplify's Platinum "AI quick lists"
-are **catalog-listed but not backend-enforced** (Part 1 §1.2) — a gap to close before
-investor or enterprise conversations that test the claim.
+Craftable: Invoice AI suite) set buyer expectations. Supplify's Platinum "AI quick lists" are **backend-enforced** as of July 2026
+(`docs/features/ai-quick-lists.md`). Remaining gaps vs. competitor AI narratives: **no
+shipped invoice OCR**, and several other Platinum strings (developer API, advanced reports,
+central purchasing) are still catalog-only (`docs/product/PLATINUM_CATALOG_ONLY_FEATURES.md`)
+— close or disclose before enterprise conversations that test those claims.
 
 ### 4.9.5 Competitors to deprioritize
 
@@ -419,7 +421,9 @@ before external investor distribution.
    in the "20+" set or move to an "adjacent/historical" appendix in Part 16.
 2. **Supy Lebanon presence** — validate with field intelligence (named logos, pricing in
    market) beyond press citations; this is the #1 competitive fact in the document.
-3. Close or contractually disclose **Platinum AI quick lists** before using §4.9.4 in
-   sales or investor materials.
+3. ~~Close or contractually disclose **Platinum AI quick lists** before using §4.9.4 in
+   sales or investor materials.~~ **Done (July 2026)** — smart quick lists enforced; keep
+   §4.9.4 accurate for **remaining** catalog-only Platinum items (developer API, advanced
+   reports, central purchasing).
 4. Revisit **Part 13 §13.2** (now updated against this part) after any Supy pricing or
    Lebanon GTM change.

@@ -22,6 +22,7 @@ export const CRON_JOBS = {
   STALE_GPS_ALERTS: 'stale_gps_alerts',
   LOG_RETENTION: 'log_retention',
   REORDER_FORECAST: 'reorder_forecast',
+  RECIPE_RECALC: 'recipe_recalc',
   GROWTH_PROGRAM_MAINTENANCE: 'growth_program_maintenance',
 }
 

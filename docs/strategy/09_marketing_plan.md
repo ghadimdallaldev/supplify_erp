@@ -293,14 +293,14 @@ becomes an open decision (Part 10 open item #2).
 
 ## 9.10 Risk Mitigation and Decision Gates
 
-| Risk                                         | Mitigation in this plan                        | Decision gate                                                                                 |
-| -------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Two-sided cold start (Part 6 §6.6)           | Supplier-first Months 1–6; anchor supplier KPI | If zero suppliers importing by M6, pause restaurant outreach and reassess ICP (Part 10 §10.2) |
-| Founder bandwidth                            | 8–15 hrs/week cap; defer paid channels         | If hours/tenant >40, cut event and blog cadence before adding spend                           |
-| Arabic "ready" overclaim (Part 8 open #3)    | Geo page delayed until UI audit                | Gate D4 on audit pass                                                                         |
-| Billing expectation mismatch (Part 10 §10.1) | FAQ discloses manual payment                   | Gate any "Subscribe now" auto-billing copy on live processor                                  |
-| Cash overrun                                 | $780 contingency; no paid ads                  | Monthly spend review; freeze at $400/mo avg                                                   |
-| Message drift vs. product                    | Quarterly claim audit with Part 11             | Remove any copy for catalog-only Platinum features                                            |
+| Risk                                         | Mitigation in this plan                        | Decision gate                                                                                                     |
+| -------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Two-sided cold start (Part 6 §6.6)           | Supplier-first Months 1–6; anchor supplier KPI | If zero suppliers importing by M6, pause restaurant outreach and reassess ICP (Part 10 §10.2)                     |
+| Founder bandwidth                            | 8–15 hrs/week cap; defer paid channels         | If hours/tenant >40, cut event and blog cadence before adding spend                                               |
+| Arabic "ready" overclaim (Part 8 open #3)    | Geo page delayed until UI audit                | Gate D4 on audit pass                                                                                             |
+| Billing expectation mismatch (Part 10 §10.1) | FAQ discloses manual payment                   | Gate any "Subscribe now" auto-billing copy on live processor                                                      |
+| Cash overrun                                 | $780 contingency; no paid ads                  | Monthly spend review; freeze at $400/mo avg                                                                       |
+| Message drift vs. product                    | Quarterly claim audit with Part 11             | Remove copy for **remaining** catalog-only Platinum strings; smart quick lists/webhooks/domains are now shippable |
 
 **Paid search reactivation criteria (Year 2 candidate — all must be true):**
 

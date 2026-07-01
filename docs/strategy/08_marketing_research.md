@@ -97,7 +97,8 @@ Part 1 (§1.5) states "Trust is the product." Pre-launch, marketing can credibly
 Platinum tiers vs. sales-gated competitors like Supy from $250/mo — Part 4 §4.3.1), and
 **regional identity** (Lebanon-first, bilingual schema — with Arabic UI completeness unverified,
 Part 4 §4.9.6). It cannot lead with customer logos, G2/Capterra reviews, or AI claims
-(Platinum quick lists are catalog-only — Part 4 §4.9.4). Pre-launch brand marketing should
+(Platinum smart quick lists are **backend-enforced** as of July 2026 — `docs/features/ai-quick-lists.md`).
+Pre-launch brand marketing should
 emphasize specificity and transparency over social proof — consistent with Part 1's "precision
 over decoration" value.
 
@@ -296,7 +297,8 @@ pillar specifies **what not to claim**:
 
 - Customer case studies and logo walls
 - ROI calculators with "hours saved" inputs (no sourced benchmark — Part 3 §3.4)
-- AI-feature marketing (Platinum quick lists not backend-enforced — Part 4 §4.9.4)
+- Smart quick lists and smart reorder (Platinum/Gold) — enforced July 2026
+- **Remaining catalog-only Platinum strings** (developer API, advanced custom reports, central purchasing — Part 4 §4.9.4)
 - "Trusted by X restaurants" claims
 
 ### 8.5.5 Technical SEO baseline (launch checklist)
@@ -474,8 +476,11 @@ action. All are **recommendations**, not executed activities.
 7. **Instrument UTM and channel attribution from first signup** — without this, Part 9 cannot
    allocate even founder time rationally.
 8. **Defer G2/Capterra, paid search, and GCC marketing** until Lebanon cohort proof exists.
-9. **Do not market AI features** until Platinum quick lists are backend-enforced (Part 4 §4.9.4).
-10. **Commission 15–20 structured prospect conversations** (Part 3 §3.9 open item #5) before
+9. **Do not market remaining catalog-only Platinum strings** (developer API, advanced custom
+   reports, central purchasing) until backend-enforced or contractually disclosed (Part 4 §4.9.4).
+10. **Smart quick lists and smart reorder** may be marketed to Platinum prospects — both are
+    enforced; LLM reorder assist still requires `AI_ENABLED` verification (Part 11 §11.2).
+11. **Commission 15–20 structured prospect conversations** (Part 3 §3.9 open item #5) before
     Part 9 finalizes messaging — this part has reached the limit of secondary research.
 
 ---
@@ -536,5 +541,6 @@ action. All are **recommendations**, not executed activities.
 8. **Set up UTM attribution and basic web analytics** on marketing pages before first external
    traffic — without this, channel ranking in §8.6.1 cannot be validated.
 9. **Resolve GCC pricing (Part 7 §7.8)** before any GCC marketing content is drafted in Part 14.
-10. **Close Platinum AI marketing gap** — do not use AI in primary messaging until backend
-    enforcement ships (Part 4 §4.9.4 open item #3).
+10. **Platinum AI marketing** — smart quick lists and smart reorder may be marketed; do not
+    claim developer API, advanced custom reports, or central purchasing until enforced
+    (Part 4 §4.9.4; `PLATINUM_CATALOG_ONLY_FEATURES.md`).

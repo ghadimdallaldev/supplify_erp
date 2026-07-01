@@ -32,6 +32,7 @@ Scheduled quick lists additionally use a **`quick_list_execution` ledger** (one 
 | Stale GPS alerts                      | 15 min                                          | [`stale-gps-alerts.job.js`](../../apps/api/src/jobs/stale-gps-alerts.job.js) — supplier alerts for stale active delivery GPS                                                                                                     |
 | Log retention                         | 24 h                                            | [`log-retention.job.js`](../../apps/api/src/jobs/log-retention.job.js) — purges old logs/sessions per retention env vars                                                                                                         |
 | Reorder forecast (`reorder_forecast`) | 24 h (`86400000` ms)                            | [`reorder-forecast.job.js`](../../apps/api/src/jobs/reorder-forecast.job.js) — `refreshAllDirtyForecasts()` for restaurants with `smart_reorder`; processes `reorder_forecast_dirty` queue and rows past 24h TTL (`stale_after`) |
+| Recipe recalc (`recipe_recalc`)       | 3 min (`180000` ms)                             | [`recipe-recalc.job.js`](../../apps/api/src/jobs/recipe-recalc.job.js) — drains `recipe_recalc_dirty` for tenants with `recipe_costing`; recalculates impacted recipes after receiving, invoices, catalog price changes          |
 | Growth program maintenance            | 1 h                                             | [`sponsorship-expiry.job.js`](../../apps/api/src/jobs/sponsorship-expiry.job.js) — expire sponsorships, growth invitations, connection requests                                                                                  |
 
 ## Environment variables
@@ -90,6 +91,7 @@ Due dates and `preferred_time` for quick lists are still evaluated in **UTC**. R
 | Fulfillment exceptions             | Skip if open exception exists for `order_id` + `type`                                                            |
 | Operational reminders              | Claim rows in `inventory_expiry_notification_log` / `reorder_cadence_reminder_log` before notify                 |
 | Reorder forecast                   | Skips tenants without `smart_reorder`; upserts `reorder_forecast`, clears matching `reorder_forecast_dirty` rows |
+| Recipe recalc                      | Skips tenants without `recipe_costing`; processes `recipe_recalc_dirty` queue; advisory lock per cron tick       |
 | Promotions / invitations / sandbox | Idempotent SQL `UPDATE` predicates                                                                               |
 | Waitlist                           | `FOR UPDATE SKIP LOCKED` in promotion flow                                                                       |
 
@@ -98,6 +100,7 @@ Due dates and `preferred_time` for quick lists are still evaluated in **UTC**. R
 - Migration `0130_quick_list_execution_ledger.sql` must be applied before scheduled-order idempotency is active.
 - Migrations **0133–0135** must be applied before operational reminders (expiry lots, fulfillment issues, reorder cadence) are active.
 - Migration **0166** (`reorder_forecast`, `reorder_forecast_dirty`) must be applied before the reorder forecast cron is active.
+- Migration **0186** (`recipe_recalc_dirty`, recipe costing tables) must be applied before the recipe recalc cron is active; run `npm run db:sync-roles` for `RECIPES_*` permissions.
 - Migration **0168** (`catalog_image_import_job`, `product.image_thumb_url`) must be applied before **Import Product Images** (bulk ZIP) is available — not a cron job; see [bulk-product-image-import.md](../features/bulk-product-image-import.md) and in-process worker `image-import-worker.js`.
 - Migration **0152** (`billing_trial_reminder_log`) must be applied before trial-ending-soon reminders are active.
 - Migration **0153** must be applied before email retry/digest, stale GPS dedup, restaurant timezone, and log retention jobs are active.

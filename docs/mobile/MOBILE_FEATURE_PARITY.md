@@ -4,7 +4,12 @@ See that file for the full feature matrix (restaurant, supplier, driver, admin).
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
-## 2026-06-12 — ERP web UI motion polish (web-only)
+## 2026-07-01 — Recipe Costing (web-only)
+
+- **Scope**: Restaurant purchasing-linked recipe costing at `/app/recipes`, `/app/recipe-costing`, `/app/recipe-costing/price-impact`. APIs at `/api/recipes` and `/api/recipe-costing`. Plan feature `recipe_costing` (Gold+ restaurant tiers).
+- **Reason**: Menu profitability and supplier price impact are finance/operations workflows suited to the web cockpit. Kitchen staff can view instructions via `RECIPES_VIEW` without costs unless granted `RECIPES_VIEW_COSTS`. Supplier users have no access.
+- **Migration**: Run `0186_recipe_costing.sql` and `npm run db:sync-roles` before use.
+- **Types**: `apps/web/src/types/recipes.ts` for future mobile.
 
 - **Scope**: Emil design-eng motion pass on ERP shell (supplier, admin, fulfillment, staff, login): shared Sheet/Tooltip/Popover/Command primitives, Sonner toasts, motion tokens, skeleton unification.
 - **Reason**: Visual polish and perceived performance on web; no API or behavioral changes. Consumer B2C polish deferred to a follow-up pass. Mobile unchanged.

@@ -35,12 +35,12 @@ Fresh Keycloak users complete organization setup at `/register/complete`, then u
 
 The sidebar (`apps/web/src/components/Sidebar.tsx`) adapts by **effective tenant role** (`useImpersonation()` when an admin is impersonating):
 
-| Role                  | Primary nav                                                                                                                                                             |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Restaurant**        | Dashboard, Orders, Products, Cart, Quick Lists, Reservations, Receiving, Suppliers, Deals, Reports, Disputes, Staff, Inventory (+ waste), Invoices, Chat, Settings, Org |
-| **Supplier**          | Dashboard, Orders, Products, Fulfillment, Restaurants, Promotions, Reports, Disputes, Invoices, Chat, Settings, Org                                                     |
-| **Platform admin**    | Admin Dashboard, Supplier Admin, Restaurant Admin, Settings                                                                                                             |
-| **Public (no login)** | Reservation portal, staff self-service                                                                                                                                  |
+| Role                  | Primary nav                                                                                                                                                                                               |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Restaurant**        | Dashboard, Orders, Products, Cart, Quick Lists, Reservations, Receiving, Suppliers, Deals, Reports, Disputes, Staff, Inventory (+ waste), Recipes & recipe costing (Gold+), Invoices, Chat, Settings, Org |
+| **Supplier**          | Dashboard, Orders, Products, Fulfillment, Restaurants, Promotions, Reports, Disputes, Invoices, Chat, Settings, Org                                                                                       |
+| **Platform admin**    | Admin Dashboard, Supplier Admin, Restaurant Admin, Settings                                                                                                                                               |
+| **Public (no login)** | Reservation portal, staff self-service                                                                                                                                                                    |
 
 RBAC permissions (e.g. `RESERVATIONS_VIEW`, `STAFF_VIEW`, `INVOICES_VIEW`) further filter restaurant nav items.
 
@@ -120,8 +120,10 @@ Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admi
 | Onboarding           | `/app/onboarding`                    | `/api/restaurant-onboarding` | Restaurant setup wizard                  |
 | Restaurant pricing   | —                                    | `/api/restaurant-pricing`    | Internal menu / cost pricing             |
 | Restaurant finance   | —                                    | `/api/restaurant-finance`    | COGS / finance hooks                     |
+| Recipes              | `/app/recipes`, `/app/recipes/:id`   | `/api/recipes`               | Recipe builder; plan `recipe_costing`    |
+| Recipe costing       | `/app/recipe-costing`                | `/api/recipe-costing`        | Dashboard, alerts, price-impact; Gold+   |
 
-**Verify:** Restaurant → Receiving → record receipt against PO. Feature flags: `receiving_quality`, `inventory_management`.
+**Verify:** Restaurant → Receiving → record receipt against PO. Feature flags: `receiving_quality`, `inventory_management`. Gold+ → **Recipes** nav loads; Silver → `GET /api/recipes` returns **403 FEATURE_NOT_AVAILABLE**. See [recipe-costing.md](../features/recipe-costing.md).
 
 ## Finance & billing
 
@@ -226,7 +228,7 @@ Tests: `auth.routes.test.js`, `rbac.test.js`. Web: `apps/web/src/lib/authRedirec
 
 Canonical keys in `apps/api/src/lib/feature-keys.js`:
 
-**Restaurant:** `chat`, `order_calendar`, `reports`, `smart_reorder`, `ai_platform`, `multi_branch`, `receiving_quality`, `disputes_returns`, `finance_invoices`, `quick_lists`, `inventory_management`, `waste_tracking`, `advanced_roles`, `notifications`, `supplier_deals`, `order_amendments`, `supplier_reviews`, `push_notifications`, `tenant_audit_log`, `waitlist_auto_promo`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`
+**Restaurant:** `chat`, `order_calendar`, `reports`, `smart_reorder`, `ai_platform`, `recipe_costing`, `multi_branch`, `receiving_quality`, `disputes_returns`, `finance_invoices`, `quick_lists`, `inventory_management`, `waste_tracking`, `advanced_roles`, `notifications`, `supplier_deals`, `order_amendments`, `supplier_reviews`, `push_notifications`, `tenant_audit_log`, `waitlist_auto_promo`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`
 
 **Supplier:** `chat`, `order_calendar`, `reports`, `multi_branch`, `warehouses`, `multi_warehouse`, `fulfillment`, `fulfillment_tools`, `driver_management`, `disputes_returns`, `quick_lists`, `inventory_management`, `promotions`, `order_amendments`, `push_notifications`, `tenant_audit_log`, `advanced_roles`, `notifications`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`
 
@@ -271,6 +273,7 @@ node apps/api/scripts/migrate.js
 | Reservations   | Restaurant board + `/reserve`          | Booking created; table assign; guest cancel notifies staff                                      |
 | Staff          | `/app/staff` + `/staff/login`          | Roster + portal controls; staff login works                                                     |
 | Admin flags    | `/app/admin` → Features                | List loads; toggle inherits/on/off                                                              |
+| Recipe costing | `/app/recipes` (Gold restaurant)       | List loads; cost breakdown respects `RECIPES_VIEW_COSTS`                                        |
 
 ## E2E (optional)
 

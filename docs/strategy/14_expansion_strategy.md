@@ -64,12 +64,12 @@ Before region-specific plans, four criteria define whether a geography is **read
 Supplify entry. These are deliberately conservative; a bootstrapped company cannot afford
 simultaneous multi-market burn.
 
-| Criterion                     | What "ready" means                                                                                                                                                                                   | Current status (2026-07-01)                                                                                                         |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| **Product-market evidence**   | At least one geography has produced paying tenants with measurable retention signals (churn reason, upgrade rate, referral conversion) sufficient to rebuild Part 7's LTV/CAC model from real inputs | **Not met** — zero paying tenants                                                                                                   |
-| **Commercial infrastructure** | Live payment collection (not stub/manual gateway only), invoicing credible for local tax context, support capacity for concurrent tenants                                                            | **Partially met** — product built; billing gateway and several Platinum features are pre-launch gaps (Part 10 §10.1, Part 11 §11.1) |
-| **Regulatory clarity**        | Local counsel has confirmed SaaS, e-invoicing, and data-protection obligations for the target market                                                                                                 | **Not met** for Jordan, GCC, or EU — flagged in Part 13 §13.6 and Part 6 §6.7                                                       |
-| **Unit-economics viability**  | Modeled gross margin after payment processing, support load, and any required localization cost supports the market at planned price points                                                          | **Unverified** — Part 7 §7.10–§7.11 models are explicit assumptions only                                                            |
+| Criterion                     | What "ready" means                                                                                                                                                                                   | Current status (2026-07-01)                                                                                                                                                                                            |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Product-market evidence**   | At least one geography has produced paying tenants with measurable retention signals (churn reason, upgrade rate, referral conversion) sufficient to rebuild Part 7's LTV/CAC model from real inputs | **Not met** — zero paying tenants                                                                                                                                                                                      |
+| **Commercial infrastructure** | Live payment collection (not stub/manual gateway only), invoicing credible for local tax context, support capacity for concurrent tenants                                                            | **Partially met** — product built; billing gateway remains pre-launch; **July 2026:** Platinum smart lists, notification webhooks, custom domains, WhatsApp integration code shipped; developer API strings still open |
+| **Regulatory clarity**        | Local counsel has confirmed SaaS, e-invoicing, and data-protection obligations for the target market                                                                                                 | **Not met** for Jordan, GCC, or EU — flagged in Part 13 §13.6 and Part 6 §6.7                                                                                                                                          |
+| **Unit-economics viability**  | Modeled gross margin after payment processing, support load, and any required localization cost supports the market at planned price points                                                          | **Unverified** — Part 7 §7.10–§7.11 models are explicit assumptions only                                                                                                                                               |
 
 **Gate rule (recommended):** no new geography opens for active sales until the _prior_
 geography in the sequence has cleared the product-market evidence gate for at least one
@@ -252,8 +252,10 @@ Proceed to GCC active sales when Jordan _or_ Lebanon has met Phase 1 exit criter
 - Regulatory memo exists for **at least one GCC target country** (UAE recommended first —
   Part 2 §2.13, §2.14).
 - Multi-currency conversion or stable USD/AED invoicing path is shipped (Part 11 §11.1).
-- Catalog-only Platinum gaps closed or contractually disclosed (Part 13 §13.1) — enterprise
-  and Platinum conversations in GCC will surface these immediately.
+- **Remaining** catalog-only Platinum gaps (developer API, advanced reports, central purchasing)
+  closed or contractually disclosed (Part 13 §13.1) — enterprise and Platinum IT conversations
+  in GCC will surface these immediately. Smart quick lists, webhooks, and custom domains are
+  no longer blockers (July 2026).
 
 ---
 
@@ -318,7 +320,8 @@ Part 6 (§6.7) and Part 13 (§13.6) establish non-negotiable workstreams:
   relative to wider MENA fragmentation; still requires localized invoice fields and counsel.
 
 Part 11 (§11.1 "Next 6–18 months") lists engineering items that are **GCC gates**: real
-multi-currency conversion, GCC-capable payment gateway, WhatsApp Business API (regional
+multi-currency conversion, GCC-capable payment gateway, **WhatsApp enabled in production**
+(Meta credentials per region — integration code shipped July 2026)
 ordering norm), enterprise security hardening.
 
 ### 14.5.5 GCC go-to-market architecture
@@ -430,16 +433,16 @@ Gold-tier positioning. **Decision deferred** until EU pilot conversations occur.
 Expansion phases fail when treated as sales-only exercises. The following enablers span
 all geographies and are sequenced by Part 11 §11.1:
 
-| Enabler                           | Lebanon                                                  | Jordan               | GCC                         | Europe                 |
-| --------------------------------- | -------------------------------------------------------- | -------------------- | --------------------------- | ---------------------- |
-| Live payment gateway              | **Required**                                             | Required             | GCC-capable processor       | EUR + SCA compliance   |
-| Manual → automated add-on billing | High priority                                            | Same                 | Same                        | Same                   |
-| WhatsApp Business API             | High (ordering norm)                                     | High                 | **Critical**                | Lower                  |
-| Multi-currency conversion         | USD/LBP context                                          | JOD/USD              | AED/SAR/QAR/KWD             | EUR                    |
-| E-invoicing compliance            | Counsel review (Lebanon mandate unverified, Part 6 §6.7) | Counsel review       | **UAE/KSA mandatory paths** | EU counsel             |
-| Data residency / multi-region     | Accept single region                                     | Accept single region | UAE region deploy           | **EU region required** |
-| Mobile app parity                 | Nice-to-have                                             | Nice-to-have         | Driver/dispatch use case    | Nice-to-have           |
-| Invoice OCR / AI ingestion        | Competitive gap vs. Supy                                 | Same                 | **Table stakes assumption** | Expected by EU buyers  |
+| Enabler                           | Lebanon                                                  | Jordan               | GCC                          | Europe                 |
+| --------------------------------- | -------------------------------------------------------- | -------------------- | ---------------------------- | ---------------------- |
+| Live payment gateway              | **Required**                                             | Required             | GCC-capable processor        | EUR + SCA compliance   |
+| Manual → automated add-on billing | High priority                                            | Same                 | Same                         | Same                   |
+| WhatsApp Business API             | High (ordering norm)                                     | High                 | **Shipped** (enable per env) | Lower                  |
+| Multi-currency conversion         | USD/LBP context                                          | JOD/USD              | AED/SAR/QAR/KWD              | EUR                    |
+| E-invoicing compliance            | Counsel review (Lebanon mandate unverified, Part 6 §6.7) | Counsel review       | **UAE/KSA mandatory paths**  | EU counsel             |
+| Data residency / multi-region     | Accept single region                                     | Accept single region | UAE region deploy            | **EU region required** |
+| Mobile app parity                 | Nice-to-have                                             | Nice-to-have         | Driver/dispatch use case     | Nice-to-have           |
+| Invoice OCR / AI ingestion        | Competitive gap vs. Supy                                 | Same                 | **Table stakes assumption**  | Expected by EU buyers  |
 
 **Organizational sequencing** (Part 6 §6.8, Part 13 §7–§8): first commercial hire when
 founder calendar saturates; first support hire by ~20–30 concurrent tenants; infra/compliance
@@ -549,8 +552,8 @@ backbone: payment, compliance, multi-region, and invoice automation are not para
   — referenced, not duplicated.
 - GCC e-invoicing (ZATCA, UAE phases), GDPR extraterritorial scope: Part 6 §6.7.
 - Pricing ladder, LTV/CAC models, GCC pricing open question: Part 7 §7.2, §7.8, §7.10–§7.11.
-- Product expansion dependencies (payment stub, multi-currency, data residency, WhatsApp):
-  Part 11 §11.1, §11.4.
+- Product expansion dependencies (payment stub, multi-currency, data residency, WhatsApp ops
+  enablement): Part 11 §11.1, §11.4.
 - Sales motion, billing stub/manual reality: Part 10 §10.1.
 - Buyer barriers, supplier-referral loop, Jordan data gap: Part 3 §3.6–§3.9.
 - Bootstrapped stage, zero paying tenants: Part 1 §1.2, §1.6; Part 4 header.

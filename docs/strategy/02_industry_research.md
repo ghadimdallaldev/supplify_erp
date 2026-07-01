@@ -717,12 +717,14 @@ as an absence of evidence, not evidence of absence.
   are structurally closer to Supplify (B2B restaurant-supplier procurement/inventory SaaS)
   than Foodics (primarily POS), and both are already operating in Supplify's stated GCC
   target markets with real funding and traction.
-- **The catalog-only "AI-driven quick lists" gap flagged in Part 1 (§1.2) is now a
-  quantified market-credibility risk, not just an engineering backlog item.** Named
-  enterprise AI-deployment failures (Starbucks, McDonald's, a $100M franchisee lawsuit,
-  §2.9) mean sophisticated buyers and investors are increasingly likely to test AI claims
-  specifically — this gap should be closed, or the claim removed from marketing, before a
-  paying Platinum customer or a diligence process finds it independently.
+- **The catalog-only "AI-driven quick lists" gap flagged in Part 1 (§1.2) was closed in July
+  2026** (`resolveQuickListCapabilities()`, forecast-based quantities + suggest — see
+  `docs/features/ai-quick-lists.md`). Sophisticated buyers may still test other Platinum
+  strings (developer API, central purchasing, advanced reports) — those remain catalog-only
+  per `docs/product/PLATINUM_CATALOG_ONLY_FEATURES.md`. Named enterprise AI-deployment
+  failures (Starbucks, McDonald's, a $100M franchisee lawsuit, §2.9) still mean **honest,
+  testable claims** matter in sales and diligence — but quick-list AI is no longer a
+  credibility liability.
 - **Packaging/cleaning/equipment category expansion (Part 1, §1.6) has no dedicated market
   sizing in this research pass** — none of the sources consulted size B2B software or
   marketplace demand for these adjacent supplier categories specifically. This is a genuine

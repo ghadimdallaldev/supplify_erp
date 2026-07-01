@@ -71,13 +71,14 @@ figures.
 **Where the real technical feasibility risk actually sits — the two gaps Part 1 already
 disclosed, not generic ones:**
 
-1. **Catalog-only Platinum features.** Full API/webhooks, white-label domains, AI-driven
-   "quick lists," and advanced reporting are priced and displayed but not fully
-   backend-enforced yet (Source: `docs/product/tier-matrix.md`, §7). A **scoped, finite
-   backlog item**, not an open-ended architectural risk — the enforcement pattern already
-   exists and is proven elsewhere; this is implementation, not discovery, work. The risk is
-   sequencing: Part 1 §1.6 targets closing it in the 6–12 month window, at or before the
-   first Platinum sale, since a customer testing an unenforced feature is a trust event.
+1. **Remaining catalog-only Platinum features.** Developer API/order webhooks
+   (`api_integrations`), advanced reporting strings, central purchasing, and several
+   cross-tier finance/report strings are still priced/displayed without full backend
+   differentiation (Source: `docs/product/PLATINUM_CATALOG_ONLY_FEATURES.md`). **Closed
+   July 2026:** smart quick lists, outbound notification webhooks, custom catalog domains,
+   and WhatsApp Meta Cloud API integration. A paying Platinum customer testing **developer
+   API** or **central purchasing** claims is still a trust event — sequence closure or
+   contractual disclosure before those sales.
 2. **Single-region infrastructure.** One Railway deployment per environment, no
    multi-region failover or data-residency option (Part 1 §1.2) — not a defect in a
    Lebanon-only launch, but a scoping constraint once GCC/EU expansion requires local data
@@ -380,16 +381,16 @@ through month 18; it becomes relevant exactly where Part 1 already flags GCC exp
 
 ## 6.11 Risk Feasibility Summary
 
-| #   | Risk                                                                                                  | Likelihood             | Impact      | Discussed in          |
-| --- | ----------------------------------------------------------------------------------------------------- | ---------------------- | ----------- | --------------------- |
-| 1   | Support bottleneck appears before the first support hire is made, as tenant count grows               | High                   | Medium      | §6.5 Operational      |
-| 2   | Two-sided marketplace cold start slows the 0–6 month objective                                        | Medium                 | High        | §6.6 Commercial       |
-| 3   | Catalog-only Platinum features tested by a paying customer before backend enforcement completes       | Medium                 | Medium-High | §6.3 Technical        |
-| 4   | Break-even tenant count (55, blended) not reached within the modeled 12–18 month window               | Medium                 | High        | §6.4, §6.13 Financial |
-| 5   | GCC e-invoicing obligations (Saudi ZATCA, UAE mandate) unresolved in the product before GCC launch    | Medium                 | Medium-High | §6.7 Legal            |
-| 6   | Founder time constraint limits sales throughput with no commercial hire funded yet                    | Medium-High            | High        | §6.6, §6.8            |
-| 7   | Single-region infrastructure becomes a blocker at GCC/EU entry rather than pre-emptively resolved     | Low / Medium (18–24mo) | High        | §6.3, §6.10           |
-| 8   | Lebanon digital tax-submission mandate (Oct 2025 signal, scope unverified) applies in unreviewed ways | Low-Medium             | Medium      | §6.7 Legal            |
+| #   | Risk                                                                                                                                                   | Likelihood             | Impact      | Discussed in          |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------- | ----------- | --------------------- |
+| 1   | Support bottleneck appears before the first support hire is made, as tenant count grows                                                                | High                   | Medium      | §6.5 Operational      |
+| 2   | Two-sided marketplace cold start slows the 0–6 month objective                                                                                         | Medium                 | High        | §6.6 Commercial       |
+| 3   | Remaining catalog-only Platinum strings (developer API, advanced reports, central purchasing) tested by a paying customer before closure or disclosure | Medium                 | Medium-High | §6.3 Technical        |
+| 4   | Break-even tenant count (55, blended) not reached within the modeled 12–18 month window                                                                | Medium                 | High        | §6.4, §6.13 Financial |
+| 5   | GCC e-invoicing obligations (Saudi ZATCA, UAE mandate) unresolved in the product before GCC launch                                                     | Medium                 | Medium-High | §6.7 Legal            |
+| 6   | Founder time constraint limits sales throughput with no commercial hire funded yet                                                                     | Medium-High            | High        | §6.6, §6.8            |
+| 7   | Single-region infrastructure becomes a blocker at GCC/EU entry rather than pre-emptively resolved                                                      | Low / Medium (18–24mo) | High        | §6.3, §6.10           |
+| 8   | Lebanon digital tax-submission mandate (Oct 2025 signal, scope unverified) applies in unreviewed ways                                                  | Low-Medium             | Medium      | §6.7 Legal            |
 
 ---
 

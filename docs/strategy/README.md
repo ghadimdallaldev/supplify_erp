@@ -37,9 +37,16 @@ internal-only.
 | 15  | Implementation Roadmap (Month 1–36)                                        | [15_implementation_roadmap.md](./15_implementation_roadmap.md)                       | Draft — complete |
 | 16  | Appendices (glossary, methodology, references)                             | [16_appendices.md](./16_appendices.md)                                               | Draft — complete |
 
-All sixteen parts are authored as of 2026-07-01. A light consistency pass across dependent
-parts is recommended before external distribution — notably timeline alignment across Parts
-9, 12, and 15, and replacing modeled LTV/CAC/churn with live cohort data after launch.
+All sixteen parts are authored as of 2026-07-01. A **July 2026 product-status pass** reconciles
+Parts 1, 4–6, 8–11, 13, 15, and 16 against shipped work: **WhatsApp Meta Cloud API**
+integration (tier-gated notifications; ops toggle), **Platinum enforcement** for smart quick
+lists, outbound notification webhooks, and custom catalog domains (`docs/product/PLATINUM_CATALOG_ONLY_FEATURES.md`),
+and **invoice integrity** hardening (migration `0183`). Remaining Platinum catalog gaps
+(full developer API, advanced report strings, central purchasing, etc.) stay disclosed.
+
+A light consistency pass across dependent parts is still recommended before external
+distribution — notably timeline alignment across Parts 9, 12, and 15, and replacing modeled
+LTV/CAC/churn with live cohort data after launch.
 Part 13 §13.2 has been reconciled against Part 4 (Supy confirmed as primary Lebanon
 competitor). Start with [16_appendices.md](./16_appendices.md) §16.5 for the master index,
 glossary, and recommended reading orders.

@@ -237,13 +237,14 @@ PostgreSQL enum `order_status` (evolved across migrations `0021`, `0028`, `0069`
 
 ### Adjacent ordering features
 
-| Feature              | Description                                                                  |
-| -------------------- | ---------------------------------------------------------------------------- |
-| **Quick lists**      | Saved templates; scheduled re-order via cron (`scheduled-orders.service.js`) |
-| **Order calendar**   | Redis-backed delivery calendar (`/api/orders/calendar`)                      |
-| **Order amendments** | Post-place line changes; plan `order_amendments`                             |
-| **Supplier decline** | Required `decline_reason`; migration `0108` cancellation metadata            |
-| **Smart reorder**    | Forecast job `reorder-forecast.job.js`; plan `smart_reorder`                 |
+| Feature              | Description                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------ |
+| **Quick lists**      | Saved templates; scheduled re-order via cron (`scheduled-orders.service.js`)               |
+| **Order calendar**   | Redis-backed delivery calendar (`/api/orders/calendar`)                                    |
+| **Order amendments** | Post-place line changes; plan `order_amendments`                                           |
+| **Supplier decline** | Required `decline_reason`; migration `0108` cancellation metadata                          |
+| **Smart reorder**    | Forecast job `reorder-forecast.job.js`; plan `smart_reorder`                               |
+| **Recipe costing**   | Purchasing-linked recipe costs; cron `recipe-recalc.job.js`; plan `recipe_costing` (Gold+) |
 
 ```mermaid
 stateDiagram-v2

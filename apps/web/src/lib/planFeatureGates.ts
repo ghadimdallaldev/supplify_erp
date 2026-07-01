@@ -31,6 +31,11 @@ export function canUseQuickLists(entitlements?: Entitlements | null): boolean {
   return isEntitlementFeatureEnabled(entitlements, 'quick_lists')
 }
 
+/** Purchasing-linked recipe costing (Gold+). */
+export function canUseRecipeCosting(entitlements?: Entitlements | null): boolean {
+  return isEntitlementFeatureEnabled(entitlements, 'recipe_costing')
+}
+
 /** Supplier customer growth (import, invite, sponsor, metrics). */
 export function canUseSupplierGrowth(entitlements?: Entitlements | null): boolean {
   return isEntitlementFeatureEnabled(entitlements, 'supplier_growth')

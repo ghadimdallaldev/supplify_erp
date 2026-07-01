@@ -25,6 +25,7 @@ import {
   ShoppingBasket,
   Gift,
   UserPlus,
+  ChefHat,
   ClipboardList,
 } from 'lucide-react'
 import type { WorkspacePersonaProfile } from '../../lib/workspaceRoleProfile'
@@ -95,6 +96,7 @@ export type BuildSidebarSectionsInput = {
   financeInvoicesEnabled: boolean
   fulfillmentEnabled: boolean
   quickListsEnabled: boolean
+  recipeCostingEnabled: boolean
   disputesEnabled: boolean
   promotionsEnabled: boolean
   supplierGrowthEnabled: boolean
@@ -117,6 +119,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
     financeInvoicesEnabled,
     fulfillmentEnabled,
     quickListsEnabled,
+    recipeCostingEnabled,
     disputesEnabled,
     promotionsEnabled,
     supplierGrowthEnabled,
@@ -244,6 +247,24 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
     ].filter((item) => navItemAllowed(item, can, canAny))
 
     const acct: SidebarNavItem[] = [
+      ...(recipeCostingEnabled
+        ? [
+            {
+              nameKey: 'recipeCosting',
+              href: '/app/recipe-costing',
+              icon: ChefHat,
+              permission: 'RECIPES_VIEW',
+              testId: 'nav-recipe-costing',
+            },
+            {
+              nameKey: 'recipes',
+              href: '/app/recipes',
+              icon: ClipboardList,
+              permission: 'RECIPES_VIEW',
+              testId: 'nav-recipes',
+            },
+          ]
+        : []),
       {
         nameKey: 'inventory',
         href: '/app/restaurant-inventory',

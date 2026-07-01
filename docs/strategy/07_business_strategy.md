@@ -126,10 +126,10 @@ company should sequence by execution risk, not theoretical TAM):
    revenue via integration-tier pricing (e.g., an "integrations" add-on) once specific
    integrations exist; speculative until Part 11's integration roadmap is prioritized and
    built.
-5. **API/webhooks as a paid tier differentiator** — currently sold on Platinum's catalog
-   but not fully built (`tier-matrix.md` §7); closing this gap is as much a trust/legal
-   issue (selling something not yet delivered) as a revenue opportunity, and should be
-   prioritized primarily for that reason.
+5. **API/webhooks as a paid tier differentiator** — `api_integrations` / `full_api_webhooks`
+   (developer read API + order/invoice events) remains catalog-only; **notification webhooks**
+   (`email_whatsapp_webhook`) are enforced (July 2026). Closing the developer API gap is
+   still a trust/legal priority for Platinum IT buyers.
 
 ## 7.8 Expansion (Revenue Lens)
 

@@ -60,15 +60,15 @@ structural market risks already named in Part 13.
 
 ### Weaknesses
 
-| Factor                                     | Evidence                                                                                                | Strategic implication                                                                                                                |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Zero commercial traction**               | No live paying tenants (Part 1 §1.2; README)                                                            | Every strategic conclusion remains hypothesis until first cohort converts                                                            |
-| **Revenue collection not live**            | Billing gateway is a development stub (`apps/api/src/lib/billing/providers/stub.js`; Part 11 §11.1)     | Blocks Part 1's 0–6 month objective regardless of product depth                                                                      |
-| **Catalog–enforcement gap on Platinum**    | Six Platinum features priced but not fully backend-enforced (`docs/product/tier-matrix.md` §7; Part 11) | Trust and misrepresentation risk if Platinum sold before closure                                                                     |
-| **No public API/webhooks despite pricing** | `api_integrations` entitlements without issuance or dispatch subsystem (Part 11 §11.6)                  | Technical buyers will test claims; gap is high-visibility                                                                            |
-| **Bootstrapped balance sheet**             | No disclosed institutional capital (Part 1; README)                                                     | Cannot outspend Supy ($9.5M raised, Part 4 §4.2) or Foodics (Series C, $100M+ earmarked, Part 4 group 3) on brand or sales headcount |
-| **Single-region infrastructure**           | Railway, one deployment per environment (Part 1 §1.2; Part 11 §11.5)                                    | Acceptable for Lebanon launch; binds GCC enterprise and data-residency conversations                                                 |
-| **Integrations immaturity**                | WhatsApp service stub, no live POS/accounting sync (Part 11 §11.3)                                      | Weakens answer to "why not WhatsApp + spreadsheet," the stated problem (Part 1 §1.7)                                                 |
+| Factor                                     | Evidence                                                                                                                                                                            | Strategic implication                                                                                                                |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **Zero commercial traction**               | No live paying tenants (Part 1 §1.2; README)                                                                                                                                        | Every strategic conclusion remains hypothesis until first cohort converts                                                            |
+| **Revenue collection not live**            | Billing gateway is a development stub (`apps/api/src/lib/billing/providers/stub.js`; Part 11 §11.1)                                                                                 | Blocks Part 1's 0–6 month objective regardless of product depth                                                                      |
+| **Catalog–enforcement gap on Platinum**    | **Partially closed (July 2026):** smart quick lists, notification webhooks, custom domains enforced; **eight** strings still catalog-only (`PLATINUM_CATALOG_ONLY_FEATURES.md`)     | Trust risk reduced for top demo paths; developer API and advanced report strings remain high-visibility gaps                         |
+| **No public API/webhooks despite pricing** | `api_integrations` (`full_api_webhooks`) still has no API-key issuance or order/invoice webhook platform (Part 11 §11.6) — distinct from **notification** webhooks (shipped `0182`) | Technical buyers will test `api_integrations` claims specifically                                                                    |
+| **Bootstrapped balance sheet**             | No disclosed institutional capital (Part 1; README)                                                                                                                                 | Cannot outspend Supy ($9.5M raised, Part 4 §4.2) or Foodics (Series C, $100M+ earmarked, Part 4 group 3) on brand or sales headcount |
+| **Single-region infrastructure**           | Railway, one deployment per environment (Part 1 §1.2; Part 11 §11.5)                                                                                                                | Acceptable for Lebanon launch; binds GCC enterprise and data-residency conversations                                                 |
+| **Integrations immaturity**                | WhatsApp Meta Cloud API **shipped** (July 2026; ops-disabled by default on Railway); no live POS/accounting sync (Part 11 §11.3)                                                    | WhatsApp objection answerable once credentials enabled; spreadsheet/POS gaps remain                                                  |
 
 ### Opportunities
 
@@ -83,14 +83,14 @@ structural market risks already named in Part 13.
 
 ### Threats
 
-| Factor                                    | Source                                                                                       | Strategic implication                                                                                                                                                        |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Supy — confirmed Lebanon presence**     | Only competitor in Part 4 group 1 with sourced active Lebanon market (Part 4 §4.2)           | **Primary competitive threat** for multi-branch procurement narrative; must win on two-sided depth, price, and local execution, not on "no incumbent"                        |
-| **Supy Gulf incumbency and AI marketing** | 3,000–3,500+ claimed restaurants, Gemini/Claude invoice pipeline claimed (Part 4 §4.2)       | Sets buyer expectations on AI/OCR even where Supplify's deterministic smart-reorder is real but LLM layer may be off by default (`AI_ENABLED`, Part 11 §11.2)                |
-| **Foodics / Rewaa in GCC**                | 33,500+ branches (Foodics claim, Part 4 group 3); Rewaa retail/F&B POS (Part 4 group 3 §4.7) | Formidable distribution and capital when Supplify reaches 18–24 month GCC objective (Part 1 §1.6) — different category today, convergent if they add procurement marketplace |
-| **Lebanon macro/political risk**          | Currency collapse, banking freeze, active conflict (Part 13 §13.3)                           | Can invalidate payment, sales travel, and tenant solvency assumptions simultaneously                                                                                         |
-| **Two-sided cold start**                  | Both sides must be sold for marketplace value (Part 1 §1.11)                                 | Launch sequencing error (restaurants without linked suppliers, or reverse) produces churn before PMF is observable                                                           |
-| **Selling unbuilt Platinum**              | Catalog-only features (Part 11)                                                              | Reputational and legal risk undermines trust — the product's core value proposition (Part 1 §1.5)                                                                            |
+| Factor                                    | Source                                                                                         | Strategic implication                                                                                                                                                        |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Supy — confirmed Lebanon presence**     | Only competitor in Part 4 group 1 with sourced active Lebanon market (Part 4 §4.2)             | **Primary competitive threat** for multi-branch procurement narrative; must win on two-sided depth, price, and local execution, not on "no incumbent"                        |
+| **Supy Gulf incumbency and AI marketing** | 3,000–3,500+ claimed restaurants, Gemini/Claude invoice pipeline claimed (Part 4 §4.2)         | Sets buyer expectations on AI/OCR even where Supplify's deterministic smart-reorder is real but LLM layer may be off by default (`AI_ENABLED`, Part 11 §11.2)                |
+| **Foodics / Rewaa in GCC**                | 33,500+ branches (Foodics claim, Part 4 group 3); Rewaa retail/F&B POS (Part 4 group 3 §4.7)   | Formidable distribution and capital when Supplify reaches 18–24 month GCC objective (Part 1 §1.6) — different category today, convergent if they add procurement marketplace |
+| **Lebanon macro/political risk**          | Currency collapse, banking freeze, active conflict (Part 13 §13.3)                             | Can invalidate payment, sales travel, and tenant solvency assumptions simultaneously                                                                                         |
+| **Two-sided cold start**                  | Both sides must be sold for marketplace value (Part 1 §1.11)                                   | Launch sequencing error (restaurants without linked suppliers, or reverse) produces churn before PMF is observable                                                           |
+| **Selling unbuilt Platinum**              | Remaining catalog-only strings (developer API, advanced reports, central purchasing — Part 11) | Reputational risk if those specific claims are sold without disclosure                                                                                                       |
 
 **SWOT synthesis:** Supplify's internal S–W profile is atypical for pre-launch companies —
 product depth exceeds commercial maturity. External O–T profile is dominated by **Supy in
@@ -137,8 +137,8 @@ drivers**, not footnotes — consistent with Part 13's disclosure standard.
 
 - **Operator behavior:** Purchasing still coordinated via phone, WhatsApp, and spreadsheets
   (Part 1 §1.7; `docs/sales/01_problem.md`). _Implication:_ Change management and trust
-  outweigh feature checklists in early sales; WhatsApp API integration (Part 11 §11.3) is
-  socially aligned, not merely technical.
+  outweigh feature checklists in early sales; **WhatsApp Cloud API is integrated** (July 2026) but requires per-environment Meta credentials and `WHATSAPP_ENABLED=true` before
+  live sends — default Railway config keeps it off/log-only (Part 11 §11.3).
 - **Workforce:** Lebanon F&B sector estimated 80,000+ employees, ~18 per establishment
   (Part 1 §1.7). _Implication:_ Staff-facing modules (receiving, driver, staff portal) are
   adoption enablers for multi-user venues, not optional extras.
@@ -163,8 +163,9 @@ drivers**, not footnotes — consistent with Part 13's disclosure standard.
   and PCI scope at launch — deliberate legal simplification.
 - **Data residency not enforced in code** (Part 11 §11.4): Legal exposure grows with GCC/EU
   enterprise buyers; SOC 2 not claimed — correct honesty for pre-launch.
-- **Platinum catalog-only features:** Potential misrepresentation if sold without
-  enforcement (Part 13 §13.1) — legal/reputational, not only product debt.
+- **Remaining Platinum catalog-only strings:** Potential misrepresentation if **developer
+  API, advanced custom reports, or central purchasing** are sold without disclosure — smart
+  quick lists, notification webhooks, and custom domains are enforced (July 2026).
 
 ### Environmental
 
@@ -242,16 +243,16 @@ bundle procurement into POS.
 VRIO tests whether resources sustain advantage or merely parity. Pre-launch, **O**
 (organization) is the weakest link — assets exist; commercial capture does not.
 
-| Resource / capability                                      | Valuable?                                          | Rare?                                                              | Inimitable?                                                           | Organized to capture?                                                            | Verdict                                                         |
-| ---------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| Two-sided order–fulfillment–finance domain model           | Yes — addresses stated fragmentation (Part 1 §1.7) | Moderate — Choco had it; Supy lacks full supplier-side marketplace | Moderate — 180 migrations of coupled workflows take time to replicate | **No** — zero paying tenants; billing stub                                       | **Unused potential**                                            |
-| API-layer plan enforcement (`requireFeature`/`checkLimit`) | Yes — credible monetization                        | Uncommon at this depth in SMB tier                                 | Moderate                                                              | Partial — enforcement exists; add-on billing manual (Part 7 §7.2)                | **Temporary parity** until competitors match or Supplify scales |
-| Bilingual schema (AR/EN catalog)                           | Yes for MENA                                       | Rare among US/EU entrants (Part 4)                                 | Moderate — copyable over time                                         | Partial — product supports; GTM not started                                      | **Latent advantage**                                            |
-| GPS logistics + driver dispatch                            | Yes for distributors                               | Uncommon in procurement-only tools                                 | Moderate                                                              | **No** commercial proof                                                          | **Differentiator if sold to suppliers first**                   |
-| Smart reorder + LLM assist (Gold/Platinum)                 | Yes                                                | Growing table stakes (Supy AI marketing, Part 4)                   | Low if only LLM wrapper                                               | Weak — `AI_ENABLED` default false; "AI quick lists" catalog-only (Part 11 §11.2) | **Risk — marketing ahead of org reality**                       |
-| Founder Lebanon relationships                              | Yes for launch                                     | Yes locally                                                        | High short-term                                                       | Unknown externally                                                               | **Critical if activated in first 90 days**                      |
-| 225+ automated tests / security baseline                   | Yes — reduces defect risk                          | Common among mature startups                                       | Low alone                                                             | Yes — engineering discipline evident (Part 11 §11.5 perf work)                   | **Hygiene, not moat**                                           |
-| Supplier referral growth program                           | Yes — lowers CAC potential                         | Uncommon in POS competitors                                        | Moderate                                                              | **Not yet** — no conversions                                                     | **Latent PLG asset**                                            |
+| Resource / capability                                      | Valuable?                                          | Rare?                                                              | Inimitable?                                                           | Organized to capture?                                                         | Verdict                                                         |
+| ---------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Two-sided order–fulfillment–finance domain model           | Yes — addresses stated fragmentation (Part 1 §1.7) | Moderate — Choco had it; Supy lacks full supplier-side marketplace | Moderate — 186 migrations of coupled workflows take time to replicate | **No** — zero paying tenants; billing stub                                    | **Unused potential**                                            |
+| API-layer plan enforcement (`requireFeature`/`checkLimit`) | Yes — credible monetization                        | Uncommon at this depth in SMB tier                                 | Moderate                                                              | Partial — enforcement exists; add-on billing manual (Part 7 §7.2)             | **Temporary parity** until competitors match or Supplify scales |
+| Bilingual schema (AR/EN catalog)                           | Yes for MENA                                       | Rare among US/EU entrants (Part 4)                                 | Moderate — copyable over time                                         | Partial — product supports; GTM not started                                   | **Latent advantage**                                            |
+| GPS logistics + driver dispatch                            | Yes for distributors                               | Uncommon in procurement-only tools                                 | Moderate                                                              | **No** commercial proof                                                       | **Differentiator if sold to suppliers first**                   |
+| Smart reorder + LLM assist (Gold/Platinum)                 | Yes                                                | Growing table stakes (Supy AI marketing, Part 4)                   | Low if only LLM wrapper                                               | Weak — `AI_ENABLED` default false; smart quick lists **enforced** (July 2026) | **Organize** — verify `AI_ENABLED` before LLM marketing         |
+| Founder Lebanon relationships                              | Yes for launch                                     | Yes locally                                                        | High short-term                                                       | Unknown externally                                                            | **Critical if activated in first 90 days**                      |
+| 225+ automated tests / security baseline                   | Yes — reduces defect risk                          | Common among mature startups                                       | Low alone                                                             | Yes — engineering discipline evident (Part 11 §11.5 perf work)                | **Hygiene, not moat**                                           |
+| Supplier referral growth program                           | Yes — lowers CAC potential                         | Uncommon in POS competitors                                        | Moderate                                                              | **Not yet** — no conversions                                                  | **Latent PLG asset**                                            |
 
 **VRIO synthesis:** Supplify's only **potentially sustainable** advantages are (1)
 integrated two-sided workflows plus logistics, (2) bilingual catalog infrastructure, and
@@ -310,13 +311,13 @@ Porter's value chain adapted to Supplify's **platform operator** model (both sid
 
 ### Primary activities
 
-| Activity                                 | Supplify today                                                        | Value created             | Gap vs. best-in-class                                               |
-| ---------------------------------------- | --------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------- |
-| **Inbound logistics (supplier catalog)** | CSV/ZIP bulk import, bilingual fields, contract pricing (Part 1 §1.2) | Supplier onboarding speed | No live distributor EDI integrations (Part 11)                      |
-| **Operations (order–fulfill–receive)**   | Full workflow + GPS + receiving QA (Part 1 §1.2)                      | Core marketplace value    | WhatsApp stub — operational comms still fragmented off-platform     |
-| **Outbound logistics**                   | Driver dispatch, routes, POD (Part 1 §1.2)                            | Supplier differentiation  | Mobile app not at web parity (Part 1 §1.2)                          |
-| **Marketing & sales**                    | Not yet commercial                                                    | —                         | Entire function pre-revenue; founder-led (Part 7 §7.11)             |
-| **Service**                              | RBAC, chat, disputes; no scaled support org                           | Trust                     | Support staffing assumption in Part 6 §6.4 — not yet hired at scale |
+| Activity                                 | Supplify today                                                        | Value created             | Gap vs. best-in-class                                                                   |
+| ---------------------------------------- | --------------------------------------------------------------------- | ------------------------- | --------------------------------------------------------------------------------------- |
+| **Inbound logistics (supplier catalog)** | CSV/ZIP bulk import, bilingual fields, contract pricing (Part 1 §1.2) | Supplier onboarding speed | No live distributor EDI integrations (Part 11)                                          |
+| **Operations (order–fulfill–receive)**   | Full workflow + GPS + receiving QA + invoice integrity (Part 1 §1.2)  | Core marketplace value    | WhatsApp notifications integrated when ops-enabled; not a replacement for informal chat |
+| **Outbound logistics**                   | Driver dispatch, routes, POD (Part 1 §1.2)                            | Supplier differentiation  | Mobile app not at web parity (Part 1 §1.2)                                              |
+| **Marketing & sales**                    | Not yet commercial                                                    | —                         | Entire function pre-revenue; founder-led (Part 7 §7.11)                                 |
+| **Service**                              | RBAC, chat, disputes; no scaled support org                           | Trust                     | Support staffing assumption in Part 6 §6.4 — not yet hired at scale                     |
 
 ### Support activities
 
@@ -340,15 +341,17 @@ adding net-new modules.
 Ansoff maps growth strategies by product/market combination. All cells are **options post-
 launch**; none have empirical win rates yet.
 
-|                                                              | **Existing product** (current Supplify platform)                                                                                     | **New product** (future capabilities)                                                                                     |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| **Existing market** (Lebanon F&B restaurants + distributors) | **Market penetration** _(primary 0–12 mo)_ — activate trials, convert to Gold, achieve break-even ~55 blended tenants (Part 6 §6.13) | **Product development** — live payment gateway, WhatsApp API, close Platinum gaps (Part 11 §11.1)                         |
-| **New market** (GCC, Jordan)                                 | **Market development** _(18–24 mo target)_ — same product, repricing TBD (Part 7 §7.8)                                               | **Diversification** _(24–36 mo)_ — packaging/cleaning/equipment suppliers (Part 1 §1.6); take-rate/payments (Part 7 §7.5) |
+|                                                              | **Existing product** (current Supplify platform)                                                                                     | **New product** (future capabilities)                                                                                                                           |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Existing market** (Lebanon F&B restaurants + distributors) | **Market penetration** _(primary 0–12 mo)_ — activate trials, convert to Gold, achieve break-even ~55 blended tenants (Part 6 §6.13) | **Product development** — live payment gateway; close **remaining** Platinum catalog gaps (developer API, advanced reports, central purchasing — Part 11 §11.1) |
+| **New market** (GCC, Jordan)                                 | **Market development** _(18–24 mo target)_ — same product, repricing TBD (Part 7 §7.8)                                               | **Diversification** _(24–36 mo)_ — packaging/cleaning/equipment suppliers (Part 1 §1.6); take-rate/payments (Part 7 §7.5)                                       |
 
 ### Recommended sequencing (explicit policy)
 
 1. **Penetration + product development (Lebanon):** Parallel but bounded — ship billing and
-   WhatsApp before scaling trials; do not sell Platinum until catalog gap closed (Part 11).
+   WhatsApp is integrated — enable per environment before scaling trials; do not sell
+   **remaining** catalog-only Platinum strings (developer API, advanced reports, central
+   purchasing) without disclosure (Part 11).
 2. **Market development (GCC):** Only after Lebanon cohort proves retention and unit
    economics placeholders replaced (Part 1 §1.6 12–18 month objective).
 3. **Diversification:** Category expansion and fintech are **optionality**, not rescue
@@ -374,7 +377,7 @@ is **assumed zero** unless noted.
 | **Platinum / Enterprise**                        | Lower volume, higher ACV                                                    | Zero                  | **Question Mark → potential Cash Cow** | Do not actively sell until enforcement gap closed (Part 7 §7.4)                                  |
 | **Paid promotions / deals**                      | Unknown — no tenant data                                                    | Zero                  | **Question Mark**                      | Keep admin-gated; do not expand to open ad marketplace (Part 7 §7.6)                             |
 | **GCC expansion (future)**                       | **High** — GCC foodservice large, digitization further along (Part 2 §2.13) | Zero                  | **Question Mark**                      | Delay investment until Lebanon Star path visible                                                 |
-| **Smart reorder / AI features**                  | **High** (AI narrative)                                                     | Zero                  | **Question Mark**                      | Fix honesty gap (catalog-only items); turn on LLM deliberately if marketed                       |
+| **Smart reorder / AI features**                  | **High** (AI narrative)                                                     | Zero                  | **Question Mark**                      | Smart quick lists enforced; verify `AI_ENABLED` before LLM marketing                             |
 | **Status quo substitute (WhatsApp)**             | N/A                                                                         | Dominant locally      | **Cash Cow for nobody but inertia**    | True "competitor" for share-of-wallet                                                            |
 
 **BCG synthesis:** Portfolio is **all Question Marks** — appropriate pre-launch. The
@@ -402,14 +405,15 @@ Gap analysis compares **current state**, **desired state** (Part 1 §1.6 objecti
 
 ### 5.10.2 Product–promise gaps
 
-| Gap                                      | Source                            | Target                    | Priority                            |
-| ---------------------------------------- | --------------------------------- | ------------------------- | ----------------------------------- |
-| Platinum catalog-only features (6 items) | `tier-matrix.md` §7               | Full enforcement 6–12 mo  | **P1** (before first Platinum sale) |
-| API/webhooks                             | Part 11 §11.6                     | v1 read API + webhooks    | **P1** for Platinum buyers          |
-| Add-on billing automation                | Part 7 §7.2                       | Self-serve billed add-ons | **P1**                              |
-| Free trial = Gold features parity        | Part 11 §11.1                     | Product decision + gating | **P2**                              |
-| WhatsApp integration                     | Stub service                      | Meta Cloud API live       | **P2** (GTM objection handler)      |
-| Mobile parity                            | Separate workstream (Part 1 §1.2) | Field/driver use cases    | **P2**                              |
+| Gap                                          | Source                              | Target                                       | Priority                                    |
+| -------------------------------------------- | ----------------------------------- | -------------------------------------------- | ------------------------------------------- |
+| Platinum catalog-only features (8 remaining) | `PLATINUM_CATALOG_ONLY_FEATURES.md` | Close developer API + report strings 6–12 mo | **P1** (before Platinum IT buyers)          |
+| Developer API + order webhooks               | Part 11 §11.6                       | v1 read API + event webhooks                 | **P1** for Platinum `api_integrations`      |
+| Notification webhooks                        | **Shipped** (`0182`, July 2026)     | Tenant Settings UI + signed dispatch         | **Done** (tenant must configure URL)        |
+| WhatsApp integration                         | **Shipped** (`0181`, July 2026)     | Enable Meta credentials per environment      | **P1** ops (code done; default off Railway) |
+| Add-on billing automation                    | Part 7 §7.2                         | Self-serve billed add-ons                    | **P1**                                      |
+| Free trial = Gold features parity            | Part 11 §11.1                       | Product decision + gating                    | **P2**                                      |
+| Mobile parity                                | Separate workstream (Part 1 §1.2)   | Field/driver use cases                       | **P2**                                      |
 
 ### 5.10.3 Competitive gaps
 
@@ -448,8 +452,10 @@ Parts 6, 7, and 11 — stated here as **strategic policy recommendations**, not 
 2. **Competitive stance:** Treat **Supy** as the benchmark in Lebanon; do not position
    against Foodics/Rewaa until GCC (different category: POS vs. marketplace). Do not
    dismiss **WhatsApp** — integrate it (Part 11) rather than only replacing it.
-3. **Monetization honesty:** Ship live billing before scaling trials; defer Platinum sales
-   until catalog enforcement closes (VRIO "organized" criterion).
+3. **Monetization honesty:** Ship live billing before scaling trials; sell Platinum's
+   **enforced** differentiators (smart lists, webhooks, custom domains) honestly; disclose
+   or defer developer API / advanced report / central-purchasing strings (VRIO "organized"
+   criterion).
 4. **Blue Ocean discipline:** Compete on two-sided operational depth + independent pricing,
    not AI OCR parity with Supy in Year 1.
 5. **Macro contingency:** Lebanon PESTLE factors (Part 13 §13.3) require USD billing,
@@ -476,8 +482,10 @@ cohort data at 6, 12, and 18 months per Part 1 §1.15 targets.
   assumptions).
 - Product roadmap and gaps: [Part 11](./11_product_strategy.md) (§11.1–11.3, §11.6–11.8).
 - Lebanon macro risk: [Part 13](./13_risk_management.md) (§13.3).
-- Codebase references: `docs/product/tier-matrix.md`; `apps/api/src/lib/billing/providers/stub.js`;
-  `apps/api/src/services/whatsapp.service.js`; internal codebase audit cited in Part 1 (2026-07-01).
+- Codebase references: `docs/product/tier-matrix.md`; `docs/product/PLATINUM_CATALOG_ONLY_FEATURES.md`;
+  `apps/api/src/lib/billing/providers/stub.js`;
+  `apps/api/src/services/whatsapp.service.js`; `apps/api/src/services/notification/webhook.js`;
+  internal codebase audit cited in Part 1 (2026-07-01).
 
 **Assumptions labeled in this part (not verified facts):**
 

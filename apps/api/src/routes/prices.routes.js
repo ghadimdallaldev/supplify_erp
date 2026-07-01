@@ -194,6 +194,15 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
       actor: req.userData.id,
     })
 
+    const { hookRecipeCostingAfterCatalogPriceChange } = await import(
+      '../services/recipe-purchasing-hooks.service.js'
+    )
+    hookRecipeCostingAfterCatalogPriceChange(
+      priceData.productId,
+      Number(priceData.amount),
+      'CATALOG'
+    )
+
     res.status(201).json({
       ok: true,
       data: { price: rows[0] },

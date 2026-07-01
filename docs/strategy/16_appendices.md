@@ -56,9 +56,11 @@ capital need (~$31k–$65k — Part 6 §6.9).
 not evidence of paid-channel viability (Part 7 §7.11; Part 12 §12.3).
 
 **Catalog-only feature.** A capability listed on the pricing tier matrix and in marketing
-copy but not fully backend-enforced. Six Platinum items and several cross-tier string gaps
-are disclosed in `docs/product/tier-matrix.md` §7 (Part 1 §1.2; Part 11 §11.1). Selling
-these without disclosure is a trust and potential misrepresentation risk (Part 13 §13.1).
+copy but not fully backend-enforced. **Four high-visibility Platinum items closed July 2026**
+(smart quick lists, notification webhooks, custom domains, WhatsApp code); **remaining**
+strings documented in `docs/product/PLATINUM_CATALOG_ONLY_FEATURES.md` (Part 1 §1.2; Part 11
+§11.1). Selling undisclosed remaining items is a trust and potential misrepresentation risk
+(Part 13 §13.1).
 
 **Churn (gross monthly).** Percentage of paying tenants canceling per month. Base-case model:
 **4%** (Part 7 §7.10). No actual cohort data exists.
@@ -141,10 +143,12 @@ restaurant POS or inventory tools (Foodics, Rewaa — Part 4 §4.3).
 strategy frameworks applied in Part 5 to pre-launch inputs. Interpretive, not predictive —
 no traction data exists to validate conclusions.
 
-**Platinum catalog-only gap.** Six features sold at Platinum ($349/mo) without full backend
-differentiation from Gold: AI quick lists, advanced/custom reports, full API/webhooks,
-white-label domain, real-time media read receipts, central purchasing (Part 11 §11.1). Part 1
-§1.6 targets closure in months 6–12.
+**Platinum catalog-only gap.** Platinum feature strings that still lack backend differentiation
+from Gold. **Closed July 2026:** smart quick lists, outbound notification webhooks, custom
+catalog domains, WhatsApp integration code (`PLATINUM_CATALOG_ONLY_FEATURES.md`). **Still open:**
+developer API + order/invoice webhooks, advanced/custom reports, central purchasing, and
+several cross-tier strings (Part 11 §11.1). Part 1 §1.6 targets closure of **remaining**
+items in months 6–12.
 
 **PLG (product-led growth).** Self-serve trial signup, in-app upgrade nudges, and usage-limit
 pressure as conversion levers — partially shipped; billing collection is the current blocker
@@ -157,7 +161,8 @@ every part header). Distinct from "beta with paying customers."
 fulfillment capability (Part 1 §1.2).
 
 **Quick lists.** Saved reorder templates with optional weekly automation. Gold includes
-scheduling; Platinum marketing claims "AI" automation that is catalog-only today (Part 11
+scheduling (`full_schedule`); Platinum adds **smart quantities + suggest** via
+`ai_smart_automation` — **enforced** July 2026 (`docs/features/ai-quick-lists.md`, Part 11
 §11.2).
 
 ### R–S
@@ -209,7 +214,8 @@ the primary upgrade trigger when features are already visible in trial (Part 7 �
 documentation, or a cited primary/secondary public source with methodology disclosed.
 
 **WhatsApp fragmentation.** The informal coordination channel (calls, messages) Supplify
-replaces — also a planned integration (Meta Cloud API stub exists; Part 11 §11.3).
+replaces — **Meta Cloud API integrated** July 2026; live sends require per-environment ops
+enablement (Part 11 §11.3).
 
 **ZATCA / UAE e-invoicing.** Saudi and UAE electronic invoicing compliance regimes relevant
 to GCC expansion (Part 6 §6.7; Part 14 §14.5). Not yet implemented in product.
@@ -288,7 +294,7 @@ Three categories appear throughout the document set:
 
 | Label                                | Meaning                               | Example                                                              |
 | ------------------------------------ | ------------------------------------- | -------------------------------------------------------------------- |
-| **Verified fact**                    | Codebase audit or cited source        | 180 migrations; Supy $9.5M raised                                    |
+| **Verified fact**                    | Codebase audit or cited source        | 186 migrations; Supy $9.5M raised                                    |
 | **Assumption / target / hypothesis** | Explicit forward or unvalidated claim | 4% churn; "tens" of tenants at 12 months                             |
 | **Data gap**                         | Known unknown, not invented           | Jordan establishment count; global chain/independent split (current) |
 
@@ -300,7 +306,8 @@ Rules:
 - **Never** cite vendor "hours saved" or adoption percentages without methodology — Part 1
   §1.7 explicitly rejects fabricated efficiency statistics.
 - Pre-launch **trust signals**: lead with product depth and pricing transparency; do not claim
-  customer logos, G2 reviews, or catalog-only AI features (Part 8 §8.2.3).
+  customer logos, G2 reviews, or **remaining** catalog-only Platinum strings (developer API,
+  advanced reports, central purchasing — Part 8 §8.2.3).
 
 ### 16.2.5 Framework application (Part 5)
 
@@ -332,21 +339,22 @@ map (§16.5).
 
 ### 16.3.1 Internal product and company documentation
 
-| Document                                                                                   | Role in strategy set                           |
-| ------------------------------------------------------------------------------------------ | ---------------------------------------------- |
-| `docs/onboarding/01-executive-overview.md`                                                 | Product inventory, migration counts            |
-| `docs/product/tier-matrix.md`                                                              | Pricing, limits, catalog-only gap register     |
-| `docs/product/feature-catalog-full.md`                                                     | Full capability inventory                      |
-| `docs/sales/01_problem.md`, `docs/sales/02_solution.md`                                    | Problem/solution framing                       |
-| `docs/sales/08_pricing_strategy.md`                                                        | Trial and upgrade mechanics                    |
-| `docs/sales/enterprise_checklist.md`                                                       | Enterprise sales template                      |
-| `docs/features/ai-smart-reorder.md`                                                        | Smart Reorder AI scope                         |
-| `docs/features/tenant-registration.md`, `docs/features/free-trial-expiry.md`               | Self-serve funnel                              |
-| `docs/architecture/tenancy.md`, `docs/architecture/access-control.md`                      | Multi-tenancy, RBAC                            |
-| `docs/onboarding/15-security-review.md`                                                    | Security posture (2026-06-17)                  |
-| `docs/operations/railway-environments.md`, `docs/operations/railway-performance-report.md` | Infrastructure                                 |
-| `PRODUCT.md`                                                                               | Brand personality and design principles        |
-| Internal codebase audit (2026-07-01)                                                       | Test counts, billing stub, feature enforcement |
+| Document                                                                                   | Role in strategy set                                   |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| `docs/onboarding/01-executive-overview.md`                                                 | Product inventory, migration counts                    |
+| `docs/product/PLATINUM_CATALOG_ONLY_FEATURES.md`                                           | Enforced vs catalog-only Platinum gap register         |
+| `docs/product/tier-matrix.md`                                                              | Pricing, limits, feature gating                        |
+| `docs/product/feature-catalog-full.md`                                                     | Full capability inventory                              |
+| `docs/sales/01_problem.md`, `docs/sales/02_solution.md`                                    | Problem/solution framing                               |
+| `docs/sales/08_pricing_strategy.md`                                                        | Trial and upgrade mechanics                            |
+| `docs/sales/enterprise_checklist.md`                                                       | Enterprise sales template                              |
+| `docs/features/ai-smart-reorder.md`                                                        | Smart Reorder AI scope                                 |
+| `docs/features/tenant-registration.md`, `docs/features/free-trial-expiry.md`               | Self-serve funnel                                      |
+| `docs/architecture/tenancy.md`, `docs/architecture/access-control.md`                      | Multi-tenancy, RBAC                                    |
+| `docs/onboarding/15-security-review.md`                                                    | Security posture (2026-06-17)                          |
+| `docs/operations/railway-environments.md`, `docs/operations/railway-performance-report.md` | Infrastructure                                         |
+| `PRODUCT.md`                                                                               | Brand personality and design principles                |
+| Internal codebase audit (July 2026)                                                        | Test counts, billing stub, Platinum enforcement status |
 
 ### 16.3.2 Global industry and market research
 
