@@ -41,5 +41,23 @@ export const notificationsApi = api.injectEndpoints({
       }),
       invalidatesTags: ['Notification'],
     }),
+    getNotificationWebhook: builder.query<
+      { allowed: boolean; webhook: { url: string; enabled: boolean; hasSecret: boolean } | null },
+      void
+    >({
+      query: () => '/api/notifications/webhook',
+      providesTags: ['NotificationWebhook'],
+    }),
+    updateNotificationWebhook: builder.mutation<
+      { webhook: { url: string; enabled: boolean; hasSecret: boolean } },
+      { url: string; enabled?: boolean; secret?: string }
+    >({
+      query: (body) => ({
+        url: '/api/notifications/webhook',
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['NotificationWebhook'],
+    }),
   }),
 })

@@ -120,6 +120,10 @@ export const financeApi = api.injectEndpoints({
       query: (params) => ({ url: '/api/invoices', params }),
       providesTags: ['RestaurantFinance'],
     }),
+    getSupplierInvoice: builder.query<any, string>({
+      query: (id) => `/api/invoices/${id}`,
+      providesTags: (_result, _error, id) => [{ type: 'RestaurantFinance', id }],
+    }),
     getSupplierReceivables: builder.query<any, void>({
       query: () => '/api/supplier/invoices/receivables',
       providesTags: ['SupplierOps', 'RestaurantFinance'],

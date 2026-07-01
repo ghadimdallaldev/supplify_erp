@@ -22,6 +22,8 @@ const CATEGORY_TEMPLATE_MAP = {
   order_fulfillment_issue: 'order.fulfillment_issue',
   out_of_stock: 'inventory.out_of_stock',
   system_updates: 'notification.generic',
+  welcome: 'auth.welcome',
+  admin_new_tenant: 'admin.new_tenant',
   promotions: 'deal.approved',
   reservation_created: 'reservation.new',
   reservation_rescheduled: 'reservation.rescheduled',
@@ -54,7 +56,22 @@ const CATEGORY_TEMPLATE_MAP = {
   deal_approved: 'deal.approved',
   deal_rejected: 'deal.rejected',
   deal_expired: 'deal.expired',
+  supplier_connection_request: 'supplier.access_request',
+  connection_request_accepted: 'growth.connection_accepted',
+  referral_registered: 'growth.referral_registered',
+  referral_reward_earned: 'growth.referral_reward',
+  sponsorship_gift_received: 'growth.sponsorship_gift',
+  sponsorship_expired: 'growth.sponsorship_expired',
   test: 'auth.test',
+}
+
+const NOTIFICATION_TYPE_TEMPLATE_MAP = {
+  supplier_connection_request: 'supplier.access_request',
+  connection_request_accepted: 'growth.connection_accepted',
+  referral_registered: 'growth.referral_registered',
+  referral_reward_earned: 'growth.referral_reward',
+  sponsorship_gift_received: 'growth.sponsorship_gift',
+  sponsorship_expired: 'growth.sponsorship_expired',
 }
 
 export function resolveNotificationTemplate(notificationCategory, notificationType) {
@@ -62,10 +79,17 @@ export function resolveNotificationTemplate(notificationCategory, notificationTy
   if (CATEGORY_TEMPLATE_MAP[cat]) return CATEGORY_TEMPLATE_MAP[cat]
 
   const type = String(notificationType || '').toLowerCase()
+  if (NOTIFICATION_TYPE_TEMPLATE_MAP[type]) return NOTIFICATION_TYPE_TEMPLATE_MAP[type]
   if (type.includes('order')) return 'order.placed'
   if (type.includes('invoice')) return 'invoice.issued'
   if (type.includes('dispute')) return 'dispute.opened'
   if (type.includes('reservation')) return 'reservation.new'
+  if (type.includes('staff')) return 'staff.shift'
+  if (type.includes('billing')) return 'billing.activated'
+  if (type.includes('deal')) return 'deal.approved'
+  if (type.includes('referral') || type.includes('sponsorship') || type.includes('connection')) {
+    return 'notification.generic'
+  }
 
   return 'notification.generic'
 }

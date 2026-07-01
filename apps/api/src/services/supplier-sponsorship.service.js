@@ -147,9 +147,10 @@ export async function sponsorProspect(supplierId, prospectId, { planCode, req = 
       tenantId: restaurantId,
       tenantType: 'RESTAURANT',
       notificationType: 'sponsorship_gift_received',
+      notificationCategory: 'sponsorship_gift_received',
       title: 'Supplify gift from your supplier',
       message: `Your supplier has gifted you one month of Supplify ${planRows[0].name}.`,
-      metadata: { supplierId, planCode: normalizedPlan },
+      metadata: { supplierId, planCode: normalizedPlan, ctaUrl: '/app/billing' },
     }).catch(() => {})
   }
 
@@ -192,10 +193,11 @@ export async function runSponsorshipExpiryJob() {
         tenantId: row.restaurant_id,
         tenantType: 'RESTAURANT',
         notificationType: 'sponsorship_expired',
+        notificationCategory: 'sponsorship_expired',
         title: 'Sponsored period ended',
         message:
           'Subscribe to continue using premium features. You may still qualify for a referral discount.',
-        metadata: { sponsorshipId: row.id },
+        metadata: { sponsorshipId: row.id, ctaUrl: '/app/billing' },
       }).catch(() => {})
     }
     expired += 1

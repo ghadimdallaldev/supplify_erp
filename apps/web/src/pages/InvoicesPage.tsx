@@ -1,4 +1,5 @@
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useState, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ensureNamespace } from '../i18n'
 import { Button } from '../components/ui/button'
@@ -22,6 +23,7 @@ import {
   useGetInvoiceAnalyticsQuery,
   useGetOverdueInvoicesQuery,
   useGetSupplierInvoicesQuery,
+  useGetSupplierInvoiceQuery,
   useGetCreditNotesQuery,
   useGetEntitlementsQuery,
 } from '../services/api'
@@ -39,6 +41,7 @@ import {
 } from '../components/invoices/lazyInvoiceDialogs'
 import { apiUrl } from '../lib/apiBase'
 import { applyReportDatePreset } from '../components/reports/ReportFiltersBar'
+import { invoiceRemainingBalance } from '../lib/invoiceBalance'
 
 type SupplierExportType = 'standard' | 'quickbooks' | 'payments'
 
@@ -65,6 +68,8 @@ export function InvoicesPage() {
   const [exportFrom, setExportFrom] = useState(() => defaultExportRange().from)
   const [exportTo, setExportTo] = useState(() => defaultExportRange().to)
   const [supplierExportType, setSupplierExportType] = useState<SupplierExportType>('standard')
+  const [listLimit] = useState(100)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // Payment form state
   const [paymentAmount, setPaymentAmount] = useState<number>(0)
@@ -89,20 +94,40 @@ export function InvoicesPage() {
     data: restaurantInvoicesData,
     isLoading: isLoadingRestaurant,
     refetch: refetchRestaurant,
-  } = useGetRestaurantInvoicesQuery({}, { skip: !isRestaurant })
+  } = useGetRestaurantInvoicesQuery(
+    {
+      limit: listLimit,
+      offset: 0,
+      ...(statusFilter !== 'ALL' ? { status: statusFilter } : {}),
+      ...(supplierFilter !== 'ALL' ? { supplier: supplierFilter } : {}),
+    },
+    { skip: !isRestaurant }
+  )
   const {
     data: supplierInvoicesData,
     isLoading: isLoadingSupplier,
     refetch: refetchSupplier,
-  } = useGetSupplierInvoicesQuery({}, { skip: isRestaurant })
+  } = useGetSupplierInvoicesQuery({ limit: listLimit, offset: 0 }, { skip: isRestaurant })
   const invoicesData = isRestaurant ? restaurantInvoicesData : supplierInvoicesData
   const isLoading = isRestaurant ? isLoadingRestaurant : isLoadingSupplier
   const refetch = isRestaurant ? refetchRestaurant : refetchSupplier
   const {
-    data: invoiceDetail,
-    isLoading: isLoadingDetail,
-    refetch: refetchDetail,
-  } = useGetRestaurantInvoiceQuery(selectedInvoice?.id || '', { skip: !selectedInvoice?.id })
+    data: restaurantInvoiceDetail,
+    isLoading: isLoadingRestaurantDetail,
+    refetch: refetchRestaurantDetail,
+  } = useGetRestaurantInvoiceQuery(selectedInvoice?.id || '', {
+    skip: !selectedInvoice?.id || !isRestaurant,
+  })
+  const {
+    data: supplierInvoiceDetail,
+    isLoading: isLoadingSupplierDetail,
+    refetch: refetchSupplierDetail,
+  } = useGetSupplierInvoiceQuery(selectedInvoice?.id || '', {
+    skip: !selectedInvoice?.id || isRestaurant,
+  })
+  const invoiceDetail = isRestaurant ? restaurantInvoiceDetail : supplierInvoiceDetail
+  const isLoadingDetail = isRestaurant ? isLoadingRestaurantDetail : isLoadingSupplierDetail
+  const refetchDetail = isRestaurant ? refetchRestaurantDetail : refetchSupplierDetail
   const { data: creditsData } = useGetInvoiceCreditsQuery(selectedInvoice?.id || '', {
     skip: !selectedInvoice?.id || paymentMode !== 'credit',
   })
@@ -134,9 +159,29 @@ export function InvoicesPage() {
   const creditNotes = creditsData?.creditNotes || []
 
   // Calculate remaining balance for selected invoice
-  const remainingBalance = selectedInvoice
-    ? parseFloat(selectedInvoice.total_amount || 0) - parseFloat(selectedInvoice.total_paid || 0)
-    : 0
+  const remainingBalance = invoiceRemainingBalance(selectedInvoice)
+
+  const openInvoiceById = useCallback((invoice: any, options?: { pay?: boolean }) => {
+    setSelectedInvoice(invoice)
+    setShowInvoiceDetail(true)
+    if (options?.pay) {
+      setPaymentMode('full')
+      setPaymentAmount(invoiceRemainingBalance(invoice))
+      setShowPaymentDialog(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    const invoiceId = searchParams.get('invoice')
+    if (!invoiceId || invoices.length === 0) return
+    const match = invoices.find((inv: any) => inv.id === invoiceId)
+    if (!match) return
+    openInvoiceById(match, { pay: searchParams.get('pay') === 'true' })
+    const next = new URLSearchParams(searchParams)
+    next.delete('invoice')
+    next.delete('pay')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, invoices, openInvoiceById, setSearchParams])
 
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesSearch =
@@ -174,10 +219,11 @@ export function InvoicesPage() {
   }
 
   const handleOpenPaymentDialog = (invoice: any) => {
+    const remaining = invoiceRemainingBalance(invoice)
     setSelectedInvoice(invoice)
     setShowPaymentDialog(true)
     setPaymentMode('full')
-    setPaymentAmount(remainingBalance)
+    setPaymentAmount(remaining)
     setCreditAmount(0)
     setSelectedCreditNoteId('')
     setPaymentMethod('BANK_TRANSFER')
@@ -400,11 +446,7 @@ export function InvoicesPage() {
         {isRestaurant && financeInvoicesEnabled && <SupplierStatementPanel />}
 
         {disputesEnabled && tenantCreditNotes.length > 0 && (
-          <InvoiceCreditNotesCard
-            tenantCreditNotes={tenantCreditNotes}
-            refetchCreditNotes={refetchCreditNotes}
-            refetch={refetch}
-          />
+          <InvoiceCreditNotesCard tenantCreditNotes={tenantCreditNotes} />
         )}
 
         <InvoiceStatsCards

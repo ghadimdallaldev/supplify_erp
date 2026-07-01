@@ -305,7 +305,13 @@
     "termsConditions": "Terms & Conditions",
     "termsPlaceholder": "Your terms and conditions for orders...",
     "paymentTermsPlaceholder": "Net 30",
+    "open": "Open",
+    "loading": "Loading business settings…",
     "save": "Save Business Settings",
+    "toast": {
+      "saved": "Business settings saved successfully",
+      "saveFailed": "Failed to save business settings"
+    },
     "days": {
       "monday": "Monday",
       "tuesday": "Tuesday",

@@ -28,6 +28,11 @@ import {
 } from '../../services/reviews.service.js'
 import { getTenantBranding, updateTenantBranding } from '../../services/branding.service.js'
 import {
+  mapSupplierBusinessSettingsRow,
+  serializeOperatingHoursForDb,
+  supplierBusinessSettingsUpdateSchema,
+} from '../../lib/supplier-business-settings.js'
+import {
   listFeaturedPackages,
   purchaseAndActivateFeaturedPlacement,
   listPlacementsForSupplier,
@@ -258,6 +263,97 @@ router.patch(
       const branding = await updateTenantBranding(supplierId, 'SUPPLIER', body)
       invalidateTenantProfileCache(supplierId, 'SUPPLIER')
       res.json({ ok: true, data: { branding }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/me/business',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER']),
+  requirePermission('SETTINGS_VIEW'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) throw new NotFoundError('Supplier not found')
+
+      const { rows } = await query(
+        `SELECT business_hours_json, minimum_order_amount, payment_terms, return_policy, terms_and_conditions
+         FROM supplier WHERE id = $1`,
+        [supplierId]
+      )
+      if (!rows.length) throw new NotFoundError('Supplier not found')
+
+      res.json({
+        ok: true,
+        data: { business: mapSupplierBusinessSettingsRow(rows[0]) },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.patch(
+  '/me/business',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER']),
+  requirePermission('SETTINGS_EDIT'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) throw new NotFoundError('Supplier not found')
+
+      const body = supplierBusinessSettingsUpdateSchema.parse(req.body)
+      const fields = []
+      const values = []
+      let paramIndex = 1
+
+      if (body.operatingHours !== undefined) {
+        fields.push(`business_hours_json = $${paramIndex++}`)
+        values.push(JSON.stringify(serializeOperatingHoursForDb(body.operatingHours)))
+      }
+      if (body.minimumOrderAmount !== undefined) {
+        fields.push(`minimum_order_amount = $${paramIndex++}`)
+        values.push(body.minimumOrderAmount)
+      }
+      if (body.paymentTerms !== undefined) {
+        fields.push(`payment_terms = $${paramIndex++}`)
+        values.push(body.paymentTerms)
+      }
+      if (body.returnPolicy !== undefined) {
+        fields.push(`return_policy = $${paramIndex++}`)
+        values.push(body.returnPolicy)
+      }
+      if (body.termsAndConditions !== undefined) {
+        fields.push(`terms_and_conditions = $${paramIndex++}`)
+        values.push(body.termsAndConditions)
+      }
+
+      values.push(supplierId)
+      const { rows } = await query(
+        `UPDATE supplier
+         SET ${fields.join(', ')}, updated_at = now()
+         WHERE id = $${paramIndex}
+         RETURNING business_hours_json, minimum_order_amount, payment_terms, return_policy, terms_and_conditions`,
+        values
+      )
+      if (!rows.length) throw new NotFoundError('Supplier not found')
+
+      await invalidateTenantProfileCache(supplierId, 'SUPPLIER')
+
+      res.json({
+        ok: true,
+        data: { business: mapSupplierBusinessSettingsRow(rows[0]) },
+        error: null,
+        requestId: req.requestId,
+      })
     } catch (err) {
       next(err)
     }

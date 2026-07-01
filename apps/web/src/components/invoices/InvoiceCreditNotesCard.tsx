@@ -1,25 +1,15 @@
 import { useTranslation } from 'react-i18next'
 import { Receipt } from 'lucide-react'
-import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
-import { Button } from '../ui/button'
 import { StatusBadge } from '../ui/status-badge'
 import { formatPrice } from '../../utils/format'
-import { useApplyCreditNoteMutation } from '../../services/api'
 
 type InvoiceCreditNotesCardProps = {
   tenantCreditNotes: Record<string, unknown>[]
-  refetchCreditNotes: () => void
-  refetch: () => void
 }
 
-export function InvoiceCreditNotesCard({
-  tenantCreditNotes,
-  refetchCreditNotes,
-  refetch,
-}: InvoiceCreditNotesCardProps) {
+export function InvoiceCreditNotesCard({ tenantCreditNotes }: InvoiceCreditNotesCardProps) {
   const { t } = useTranslation('invoices')
-  const [applyCreditNote] = useApplyCreditNoteMutation()
 
   return (
     <Card>
@@ -51,26 +41,8 @@ export function InvoiceCreditNotesCard({
                   <td className="py-2">
                     <StatusBadge status={String(cn.status || 'available')} />
                   </td>
-                  <td className="py-2 text-right">
-                    {cn.status !== 'applied' && cn.status !== 'APPLIED' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={async () => {
-                          try {
-                            await applyCreditNote({ id: String(cn.id) }).unwrap()
-                            toast.success(t('toasts.creditNoteApplied'))
-                            refetchCreditNotes()
-                            refetch()
-                          } catch (e: unknown) {
-                            const err = e as { data?: { error?: { message?: string } } }
-                            toast.error(err?.data?.error?.message || t('toasts.creditNoteFailed'))
-                          }
-                        }}
-                      >
-                        {t('creditNotes.apply')}
-                      </Button>
-                    )}
+                  <td className="py-2 text-right text-xs text-[var(--text-muted)]">
+                    {t('creditNotes.applyViaPayment')}
                   </td>
                 </tr>
               ))}

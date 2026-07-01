@@ -120,6 +120,7 @@ router.get(
 router.get(
   '/restaurant/invoice-aging',
   requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVOICES_VIEW'),
   handle(async (req, params) => {
     const restaurantId = await requireRestaurantId(req)
     return reports.restaurantInvoiceAging(restaurantId, params)
@@ -201,6 +202,7 @@ router.get(
 router.get(
   '/supplier/invoice-collection',
   requireRole(['SUPPLIER', 'ADMIN']),
+  requirePermission('INVOICES_VIEW'),
   handle(async (req, params) => {
     const supplierId = await requireSupplierId(req)
     return reports.supplierInvoiceCollection(supplierId, params)

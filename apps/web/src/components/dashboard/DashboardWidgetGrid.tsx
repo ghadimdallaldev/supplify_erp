@@ -456,8 +456,17 @@ export function DashboardWidgetGrid(props: any) {
                   </p>
                 ) : (
                   reorderSuggestions!.suggestions.slice(0, 3).map((s: any, idx: number) => {
+                    const coverageDays = (Number(s.lead_time_days) || 7) + 14
                     const qty =
-                      s.suggested_reorder_qty ?? Math.max(1, Math.ceil(s.avg_daily_usage_30day * 3))
+                      s.suggested_reorder_qty != null
+                        ? Math.ceil(Number(s.suggested_reorder_qty))
+                        : Math.max(
+                            Number(s.moq) || 1,
+                            Math.ceil(
+                              (Number(s.avg_daily_usage_30day) || 0) * coverageDays -
+                                (Number(s.current_qty) || 0)
+                            )
+                          )
                     const urgencyColor =
                       idx === 0 ? 'var(--red)' : idx === 1 ? 'var(--amber)' : 'var(--mint-mid)'
                     const isAdding = addingSuggestionId === s.id

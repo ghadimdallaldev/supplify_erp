@@ -216,6 +216,38 @@ export function SupplierStatementPanel() {
               testId="statement-closing"
             />
           </div>
+
+          {data?.invoices && data.invoices.length > 0 && (
+            <div className="overflow-x-auto rounded-lg border border-[var(--app-border)]">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-[var(--text-muted)]">
+                    <th className="p-2">{t('list.invoiceDate')}</th>
+                    <th className="p-2">{t('creditNotes.number')}</th>
+                    <th className="p-2 text-right">{t('detail.total')}</th>
+                    <th className="p-2">{t('list.status')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.invoices.map((inv) => (
+                    <tr key={inv.id} className="border-b border-[var(--app-border)]">
+                      <td className="p-2">{inv.invoice_date}</td>
+                      <td className="p-2">
+                        <a
+                          href={`/app/invoices?invoice=${inv.id}`}
+                          className="text-[var(--brand-mid)] hover:underline font-mono text-xs"
+                        >
+                          {inv.invoice_number}
+                        </a>
+                      </td>
+                      <td className="p-2 text-right">{formatCurrency(Number(inv.total_amount))}</td>
+                      <td className="p-2">{inv.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       ) : null}
     </div>

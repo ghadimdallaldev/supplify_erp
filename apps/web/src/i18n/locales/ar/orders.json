@@ -135,6 +135,8 @@
     "supplierUnknown": "تعذّر تحديد المورد لهذا الطلب",
     "savedWithIssues": "تم حفظ الاستلام. {{count}} عنصر(عناصر) بها مشكلات — قدّم نزاعاً واحداً للمورد.",
     "completedSuccess": "تم الاستلام بنجاح",
+    "completedWithInvoice": "اكتمل الاستلام — تم إصدار الفاتورة",
+    "viewInvoice": "عرض الفاتورة",
     "createFailed": "فشل إنشاء تقرير الاستلام",
     "dialog": {
       "title": "استلام الطلب #{{id}}",

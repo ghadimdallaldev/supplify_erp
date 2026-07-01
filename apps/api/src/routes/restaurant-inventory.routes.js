@@ -38,6 +38,7 @@ import {
   suppressReorderSuggestion,
   applyReorderAssistance,
 } from '../services/restaurant-reorder-assistance.service.js'
+import { computeSuggestedReorderQty } from '../lib/reorder-quantity.js'
 import {
   getCachedForecasts,
   refreshRestaurantForecasts,
@@ -111,7 +112,7 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
         SELECT
           restaurant_id,
           product_id,
-          AVG(ABS(quantity)) FILTER (WHERE type = 'SUBTRACT') AS avg_daily_usage
+          COALESCE(SUM(ABS(quantity)) FILTER (WHERE type = 'SUBTRACT'), 0) / 30.0 AS avg_daily_usage
         FROM inventory_movement_log
         WHERE restaurant_id = $1
           AND created_at >= NOW() - INTERVAL '30 days'
@@ -128,24 +129,20 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
         s.name AS supplier_name,
         COALESCE(ri.low_stock_threshold, 0) AS low_stock_threshold,
         b.name AS branch_name,
+        COALESCE(pis.lead_time_days, 7) AS lead_time_days,
+        COALESCE(pis.moq, 1) AS moq,
+        COALESCE(pis.order_multiple, 1) AS order_multiple,
         COALESCE(u.avg_daily_usage, 0) AS avg_daily_usage,
         CASE
           WHEN COALESCE(u.avg_daily_usage, 0) > 0
           THEN ROUND(ri.quantity / NULLIF(u.avg_daily_usage, 0))
           ELSE NULL
-        END AS days_of_stock,
-        CASE
-          WHEN ri.quantity <= COALESCE(ri.low_stock_threshold, 0) THEN
-            GREATEST(
-              COALESCE(u.avg_daily_usage, ri.low_stock_threshold * 2) * 21,
-              ri.low_stock_threshold * 2 - ri.quantity
-            )
-          ELSE NULL
-        END AS suggested_reorder_qty
+        END AS days_of_stock
       FROM restaurant_inventory ri
       JOIN product p ON p.id = ri.product_id
       LEFT JOIN product_category pc ON pc.id = p.category_id
       JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
       LEFT JOIN branch b ON b.id = ri.branch_id
       LEFT JOIN usage u
         ON u.restaurant_id = ri.restaurant_id AND u.product_id = ri.product_id
@@ -156,10 +153,26 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
       req
     )
 
+    // Compute reorder suggestion via the shared canonical formula so the list,
+    // the assistance panel and the dashboard widget all agree.
+    const inventory = rows.map((row) => {
+      const belowThreshold = Number(row.quantity) <= Number(row.low_stock_threshold || 0)
+      const suggested = computeSuggestedReorderQty({
+        currentQty: row.quantity,
+        avgDailyUsage: row.avg_daily_usage,
+        leadTimeDays: row.lead_time_days,
+        moq: row.moq,
+        orderMultiple: row.order_multiple,
+        belowThreshold,
+        unit: row.product_unit,
+      })
+      return { ...row, suggested_reorder_qty: suggested }
+    })
+
     mark(req, 'handler')
     res.json({
       ok: true,
-      data: { inventory: rows },
+      data: { inventory },
       error: null,
       requestId: req.requestId,
     })
@@ -756,20 +769,16 @@ router.get(
               AND iml2.type = 'SUBTRACT'
               AND iml2.created_at >= NOW() - INTERVAL '90 days'
           ), 0) as usage_90day,
-          -- Average daily usage over last 30 days
+          -- Average daily usage over last 30 days (total consumed / 30 calendar days).
+          -- Uses SUM/30 (not AVG of active days) to match the unified reorder-assistance path.
           COALESCE((
-            SELECT AVG(daily_usage)
-            FROM (
-              SELECT DATE(iml2.created_at) as usage_date, 
-                     SUM(ABS(iml2.quantity)) as daily_usage
-              FROM inventory_movement_log iml2
-              WHERE iml2.restaurant_id = iml.restaurant_id 
-                AND iml2.product_id = iml.product_id
-                AND iml2.type = 'SUBTRACT'
-                AND iml2.created_at >= NOW() - INTERVAL '30 days'
-              GROUP BY DATE(iml2.created_at)
-            ) daily
-          ), 0) as avg_daily_usage_30day,
+            SELECT SUM(ABS(iml2.quantity))
+            FROM inventory_movement_log iml2
+            WHERE iml2.restaurant_id = iml.restaurant_id
+              AND iml2.product_id = iml.product_id
+              AND iml2.type = 'SUBTRACT'
+              AND iml2.created_at >= NOW() - INTERVAL '30 days'
+          ), 0) / 30.0 as avg_daily_usage_30day,
           -- Calculate restock frequency (average days between ADD movements)
           COALESCE((
             SELECT AVG(days_diff)
@@ -963,9 +972,27 @@ router.get(
         [restaurantId]
       )
 
+      // Override the SQL-side suggested qty with the shared canonical formula
+      // (order-up-to minus on-hand + supplier MOQ/pack rounding) so numbers match
+      // the unified reorder-assistance panel and the inventory list.
+      const suggestions = rows.map((row) => {
+        const belowThreshold = Number(row.current_qty) <= Number(row.low_stock_threshold || 0)
+        const suggested = computeSuggestedReorderQty({
+          currentQty: row.current_qty,
+          avgDailyUsage: row.avg_daily_usage_30day,
+          leadTimeDays: row.lead_time_days,
+          lastOrderQty: row.last_order_qty,
+          moq: row.moq,
+          orderMultiple: row.order_multiple,
+          belowThreshold,
+          unit: row.product_unit,
+        })
+        return { ...row, suggested_reorder_qty: suggested }
+      })
+
       res.json({
         ok: true,
-        data: { suggestions: rows },
+        data: { suggestions },
         error: null,
         requestId: req.requestId,
       })

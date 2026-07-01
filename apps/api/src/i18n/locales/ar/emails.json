@@ -25,7 +25,8 @@
     "openAdmin": "فتح لوحة الإدارة",
     "reviewDeal": "مراجعة العرض",
     "reviewRequest": "مراجعة الطلب",
-    "viewNotifications": "عرض الإشعارات"
+    "viewNotifications": "عرض الإشعارات",
+    "viewRestaurants": "عرض المطاعم"
   },
   "auth": {
     "welcome": {
@@ -35,8 +36,10 @@
       "messageRestaurant": "حساب المطعم الخاص بك جاهز."
     },
     "team_invite": {
-      "subject": "أنت مدعو للانضمام إلى سبلايفاي",
+      "subject": "أنت مدعو للانضمام إلى {{tenantName}} على سبلايفاي",
       "title": "دعوة فريق",
+      "greeting": "مرحبًا،",
+      "greetingNamed": "مرحبًا {{name}}،",
       "message": "تمت دعوتك للانضمام إلى {{tenantName}} على سبلايفاي. استخدم الرابط أدناه للقبول."
     },
     "password_changed": {
@@ -145,7 +148,13 @@
       "subject": "رابط تسجيل الدخول لبوابة الموظفين",
       "title": "تسجيل الدخول لبوابة الموظفين"
     },
-    "invite": { "subject": "حساب بوابة الموظفين", "title": "الوصول لبوابة الموظفين" },
+    "invite": {
+      "subject": "حساب بوابة الموظفين",
+      "title": "الوصول لبوابة الموظفين",
+      "greeting": "مرحبًا،",
+      "greetingNamed": "مرحبًا {{name}}،",
+      "messageWithPassword": "فعّل مطعمك الوصول إلى بوابة الموظفين.\n\nسجّل الدخول عبر {{loginUrl}} بكلمة المرور المؤقتة: {{temporaryPassword}}\n\nغيّر كلمة المرور بعد أول تسجيل دخول."
+    },
     "shift": { "subject": "تحديث الوردية", "title": "تم تعيين وردية" },
     "swap": { "subject": "طلب تبديل وردية", "title": "تبديل وردية" },
     "pto": { "subject": "طلب إجازة", "title": "طلب إجازة" },
@@ -166,6 +175,28 @@
     "access_request": {
       "subject": "طلب وصول من مطعم",
       "title": "طلب وصول جديد"
+    }
+  },
+  "growth": {
+    "connection_accepted": {
+      "subject": "تم قبول الاتصال",
+      "title": "تم ربط المطعم"
+    },
+    "referral_registered": {
+      "subject": "اكتمل تسجيل الإحالة",
+      "title": "مرحبًا بك في سبلايفاي"
+    },
+    "referral_reward": {
+      "subject": "مكافأة إحالة مستحقة",
+      "title": "مكافأة إحالة"
+    },
+    "sponsorship_gift": {
+      "subject": "هدية تسجيل برعاية",
+      "title": "تم تفعيل الرعاية"
+    },
+    "sponsorship_expired": {
+      "subject": "انتهت فترة الرعاية",
+      "title": "انتهت الرعاية"
     }
   },
   "notification": {

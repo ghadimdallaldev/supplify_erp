@@ -8,6 +8,7 @@ import {
   createReplacementOrderFromDispute,
   NO_REPLACEMENT_LINES_MESSAGE,
 } from '../lib/dispute-replacement-order.js'
+import { applyCreditToInvoice } from './invoice.service.js'
 
 const ACTIVE_STATUSES = ['open', 'under_review', 'escalated']
 
@@ -585,6 +586,10 @@ export async function listCreditNotesForTenant(tenantId, tenantType) {
 }
 
 export async function applyCreditNote(creditNoteId, tenantId, tenantType, { invoiceId } = {}) {
+  if (!invoiceId) {
+    throw new ValidationError('invoiceId is required to apply a credit note')
+  }
+
   const column = tenantType === 'SUPPLIER' ? 'supplier_id' : 'restaurant_id'
   const { rows } = await query(`SELECT * FROM credit_note WHERE id = $1 AND ${column} = $2`, [
     creditNoteId,
@@ -596,26 +601,20 @@ export async function applyCreditNote(creditNoteId, tenantId, tenantType, { invo
     throw new ValidationError('Credit note is not available to apply')
   }
 
-  if (invoiceId) {
-    const { rows: inv } = await query(
-      `SELECT id FROM invoice WHERE id = $1 AND restaurant_id = $2 AND supplier_id = $3`,
-      [invoiceId, cn.restaurant_id, cn.supplier_id]
-    )
-    if (!inv.length) throw new ValidationError('Invoice does not match credit note parties')
-  }
+  const { rows: inv } = await query(
+    `SELECT id FROM invoice WHERE id = $1 AND restaurant_id = $2 AND supplier_id = $3`,
+    [invoiceId, cn.restaurant_id, cn.supplier_id]
+  )
+  if (!inv.length) throw new ValidationError('Invoice does not match credit note parties')
 
-  await query(
-    `
-    UPDATE credit_note
-    SET status = 'APPLIED',
-        applied_amount = credit_amount,
-        remaining_amount = 0,
-        updated_at = NOW()
-    WHERE id = $1
-    `,
-    [creditNoteId]
+  const result = await withTransaction((client) =>
+    applyCreditToInvoice(client, {
+      creditNoteId,
+      invoiceId,
+      creditAmount: Number(cn.remaining_amount),
+      recordedBy: null,
+    })
   )
 
-  const { rows: updated } = await query(`SELECT * FROM credit_note WHERE id = $1`, [creditNoteId])
-  return updated[0]
+  return result.creditNote
 }

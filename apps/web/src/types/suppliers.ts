@@ -14,6 +14,11 @@ export interface Supplier {
   brand_accent?: string
   brand_display_name?: string
   public_catalog_enabled?: boolean
+  minimum_order_amount?: number | null
+  payment_terms?: string | null
+  return_policy?: string | null
+  terms_and_conditions?: string | null
+  business_hours_json?: Record<string, SupplierBusinessDayHours>
   created_at: string
   updated_at: string
   /** List enrichment — active store-wide deal badge */
@@ -22,6 +27,37 @@ export interface Supplier {
   store_deal_id?: string | null
   store_deal_type?: 'percentage_discount' | 'fixed_discount' | null
   store_deal_discount_value?: number | null
+}
+
+export type SupplierBusinessDayKey =
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday'
+  | 'sunday'
+
+export interface SupplierBusinessDayHours {
+  open: string
+  close: string
+  closed: boolean
+}
+
+export interface SupplierBusinessSettings {
+  operatingHours: Record<SupplierBusinessDayKey, SupplierBusinessDayHours>
+  minimumOrderAmount: number | null
+  paymentTerms: string
+  returnPolicy: string
+  termsAndConditions: string
+}
+
+export interface UpdateSupplierBusinessSettingsRequest {
+  operatingHours?: Record<SupplierBusinessDayKey, SupplierBusinessDayHours>
+  minimumOrderAmount?: number | null
+  paymentTerms?: string | null
+  returnPolicy?: string | null
+  termsAndConditions?: string | null
 }
 
 export interface CreateSupplierRequest {

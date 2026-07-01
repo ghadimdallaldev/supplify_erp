@@ -359,8 +359,13 @@ export function OrderDetailPage() {
             <TabsTrigger value="items">{t('detail.tabs.items')}</TabsTrigger>
             {!isSupplier &&
               (invoicesData?.invoices?.length > 0 ||
-                order.status === 'COMPLETED' ||
-                order.status === 'DELIVERED') && (
+                [
+                  'COMPLETED',
+                  'DELIVERED',
+                  'RECEIVED_PARTIAL',
+                  'RECEIVED_FULL',
+                  'INVOICED',
+                ].includes(order.status)) && (
                 <TabsTrigger value="invoice">
                   {t('detail.tabs.invoice')}
                   {invoicesData?.invoices?.length > 0 && ` (${invoicesData.invoices.length})`}

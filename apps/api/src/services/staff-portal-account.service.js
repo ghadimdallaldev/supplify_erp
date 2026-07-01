@@ -237,6 +237,15 @@ export async function createStaffPortalAccount(staffId, restaurantId, { invitedB
     invitedByUserId,
   })
 
+  await sendStaffPortalAccountInvite({
+    to: email,
+    displayName,
+    loginUrl: buildStaffPortalLoginPageUrl(),
+    temporaryPassword: tempPassword,
+  }).catch((error) => {
+    logger.warn('Staff portal welcome email failed', { staffId, error: error.message })
+  })
+
   return {
     ...mapPortalAccessInfo(await getStaffPortalAccessRow(staffId, restaurantId)),
     temporaryPassword: tempPassword,
@@ -371,6 +380,15 @@ export async function resetStaffPortalAccess(staffId, restaurantId) {
   )
 
   await query(`DELETE FROM staff_portal_session WHERE staff_id = $1`, [staffId])
+
+  await sendStaffPortalAccountInvite({
+    to: email,
+    displayName: staff.display_name,
+    loginUrl: buildStaffPortalLoginPageUrl(),
+    temporaryPassword: tempPassword,
+  }).catch((error) => {
+    logger.warn('Staff portal password reset email failed', { staffId, error: error.message })
+  })
 
   return {
     ...mapPortalAccessInfo(await getStaffPortalAccessRow(staffId, restaurantId)),

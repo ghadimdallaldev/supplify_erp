@@ -85,13 +85,28 @@ export function getStatusSortRank(status: string) {
   return 2
 }
 
+// Default coverage window (supplier lead time 7d + 14d safety buffer) used only
+// as a client-side fallback. Keep in sync with SAFETY_BUFFER_DAYS + DEFAULT_LEAD_TIME_DAYS
+// in apps/api/src/lib/reorder-quantity.js. The server value is always preferred.
+const FALLBACK_COVERAGE_DAYS = 21
+
 export function calculateReorderQuantity(item: any) {
-  if (item.suggested_reorder_qty != null && item.suggested_reorder_qty > 0) {
+  // Prefer the server-computed, canonical suggestion whenever present.
+  if (item?.suggested_reorder_qty != null && Number(item.suggested_reorder_qty) > 0) {
     return Math.ceil(Number(item.suggested_reorder_qty))
   }
-  const { quantity, low_stock_threshold } = item
-  if (!low_stock_threshold || quantity > low_stock_threshold) return 0
-  const suggested = low_stock_threshold * 3 - quantity
+
+  const quantity = Number(item?.quantity) || 0
+  const lowStockThreshold = Number(item?.low_stock_threshold) || 0
+  if (!lowStockThreshold || quantity > lowStockThreshold) return 0
+
+  // Order-up-to fallback: cover expected usage across the coverage window, minus on-hand.
+  const leadTimeDays = Number(item?.lead_time_days) || 0
+  const coverageDays = leadTimeDays > 0 ? leadTimeDays + 14 : FALLBACK_COVERAGE_DAYS
+  const avgDailyUsage = Number(item?.avg_daily_usage) || Number(item?.avg_daily_usage_30day) || 0
+
+  const orderUpTo = avgDailyUsage > 0 ? avgDailyUsage * coverageDays : lowStockThreshold * 2
+  const suggested = Math.max(orderUpTo - quantity, Number(item?.moq) || 1)
   return Math.ceil(suggested)
 }
 

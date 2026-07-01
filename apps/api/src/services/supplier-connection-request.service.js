@@ -70,9 +70,14 @@ export async function createConnectionRequest(supplierId, prospectId, { req = nu
     tenantId: restaurantId,
     tenantType: 'RESTAURANT',
     notificationType: 'supplier_connection_request',
+    notificationCategory: 'supplier_connection_request',
     title: 'Supplier connection request',
     message: `${supplierRows[0]?.name || 'A supplier'} wants to connect with your restaurant on Supplify.`,
-    metadata: { connectionRequestId: rows[0].id, supplierId },
+    metadata: {
+      connectionRequestId: rows[0].id,
+      supplierId,
+      ctaUrl: '/app/suppliers',
+    },
   }).catch(() => {})
 
   if (req) {
@@ -137,9 +142,10 @@ export async function respondToConnectionRequest(
       tenantId: cr.supplier_id,
       tenantType: 'SUPPLIER',
       notificationType: 'connection_request_accepted',
+      notificationCategory: 'connection_request_accepted',
       title: 'Connection accepted',
       message: 'A restaurant accepted your connection request.',
-      metadata: { restaurantId, connectionRequestId: requestId },
+      metadata: { restaurantId, connectionRequestId: requestId, ctaUrl: '/app/restaurants' },
     }).catch(() => {})
   }
 

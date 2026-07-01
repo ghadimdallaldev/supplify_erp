@@ -25,7 +25,8 @@
     "openAdmin": "Open admin",
     "reviewDeal": "Review deal",
     "reviewRequest": "Review request",
-    "viewNotifications": "View notifications"
+    "viewNotifications": "View notifications",
+    "viewRestaurants": "View restaurants"
   },
   "auth": {
     "welcome": {
@@ -35,8 +36,10 @@
       "messageRestaurant": "Your restaurant account is ready."
     },
     "team_invite": {
-      "subject": "You are invited to join Supplify",
+      "subject": "You are invited to join {{tenantName}} on Supplify",
       "title": "Team invitation",
+      "greeting": "Hi,",
+      "greetingNamed": "Hi {{name}},",
       "message": "You have been invited to join {{tenantName}} on Supplify. Use the link below to accept."
     },
     "password_changed": {
@@ -139,7 +142,13 @@
       "subject": "Your Supplify staff portal sign-in link",
       "title": "Staff portal sign-in"
     },
-    "invite": { "subject": "Your Supplify staff portal account", "title": "Staff portal access" },
+    "invite": {
+      "subject": "Your Supplify staff portal account",
+      "title": "Staff portal access",
+      "greeting": "Hi,",
+      "greetingNamed": "Hi {{name}},",
+      "messageWithPassword": "Your restaurant enabled staff portal access.\n\nSign in at {{loginUrl}} with this temporary password: {{temporaryPassword}}\n\nChange your password after your first sign-in."
+    },
     "shift": { "subject": "Shift update", "title": "Shift assigned" },
     "swap": { "subject": "Shift swap request", "title": "Shift swap" },
     "pto": { "subject": "PTO request", "title": "Time off request" },
@@ -160,6 +169,28 @@
     "access_request": {
       "subject": "Restaurant access request",
       "title": "New access request"
+    }
+  },
+  "growth": {
+    "connection_accepted": {
+      "subject": "Connection accepted",
+      "title": "Restaurant connected"
+    },
+    "referral_registered": {
+      "subject": "Referral signup complete",
+      "title": "Welcome to Supplify"
+    },
+    "referral_reward": {
+      "subject": "Referral reward earned",
+      "title": "Referral reward"
+    },
+    "sponsorship_gift": {
+      "subject": "Sponsored onboarding gift",
+      "title": "Sponsorship activated"
+    },
+    "sponsorship_expired": {
+      "subject": "Sponsorship period ended",
+      "title": "Sponsorship ended"
     }
   },
   "notification": {

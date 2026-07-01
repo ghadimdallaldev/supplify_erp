@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Shield, FileText, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
 import {
-  LEGAL_DOCUMENTS,
   LEGAL_PACK_VERSION,
   type LegalDocumentSlug,
   legalDocumentPath,

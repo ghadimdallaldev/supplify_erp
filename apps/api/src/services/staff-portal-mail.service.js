@@ -59,10 +59,18 @@ This link expires at ${expiresLabel}. If you did not request it, you can ignore 
   return { delivered: Boolean(result.sent || result.logOnly), loginUrl, preview: result.preview }
 }
 
-export async function sendStaffPortalAccountInvite({ to, displayName, loginUrl }) {
+export async function sendStaffPortalAccountInvite({
+  to,
+  displayName,
+  loginUrl,
+  temporaryPassword,
+  locale,
+}) {
   const url = loginUrl || buildStaffPortalLoginPageUrl()
   const greeting = displayName ? `Hi ${displayName},` : 'Hi,'
-  const message = `${greeting}
+  const message = temporaryPassword
+    ? null
+    : `${greeting}
 
 Your restaurant enabled staff portal access. Sign in with your work email:
 ${url}
@@ -76,12 +84,20 @@ Use the password provided by your manager, or reset it from the login page if ne
     return { delivered: false, loginUrl: url, preview: true }
   }
 
-  await sendTemplateEmail({
+  const result = await sendTemplateEmail({
     to,
     template: 'staff.invite',
-    data: { message, loginUrl: url, ctaUrl: url, recipientName: displayName },
+    locale,
+    data: {
+      message,
+      loginUrl: url,
+      ctaUrl: url,
+      recipientName: displayName,
+      invitedName: displayName,
+      temporaryPassword,
+    },
     eventType: 'staff.invite',
-    eventKey: `staff:invite:${to}`,
+    eventKey: temporaryPassword ? `staff:invite:${to}:${Date.now()}` : `staff:invite:${to}`,
   })
-  return { delivered: true, loginUrl: url }
+  return { delivered: Boolean(result.sent || result.logOnly), loginUrl: url }
 }
