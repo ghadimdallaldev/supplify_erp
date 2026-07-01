@@ -28,6 +28,9 @@ export function QuickListScheduleDialog(props: any) {
     setScheduleTime,
     autoCreateOrder,
     setAutoCreateOrder,
+    useAiQuantities,
+    setUseAiQuantities,
+    showSmartQuantities,
     handleCreateScheduledOrder,
     daysOfWeek,
     toggleScheduleDay,
@@ -177,6 +180,27 @@ export function QuickListScheduleDialog(props: any) {
               {t('quickLists.scheduleDialog.autoCreateOrders')}
             </Label>
           </div>
+
+          {showSmartQuantities && (
+            <div className="flex items-start space-x-2 rounded-md border border-[var(--app-border)] p-3">
+              <input
+                type="checkbox"
+                id="useAiQuantities"
+                checked={useAiQuantities}
+                onChange={(e) => setUseAiQuantities(e.target.checked)}
+                className="mt-1 w-4 h-4"
+              />
+              <div>
+                <Label htmlFor="useAiQuantities" className="cursor-pointer font-medium">
+                  Smart quantities from usage forecast
+                </Label>
+                <p className="text-xs text-[var(--text-muted)] mt-1">
+                  When orders are auto-created, adjust line quantities using your inventory forecast
+                  (Platinum).
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4">
             <p className="text-sm text-[var(--brand-mid)]">

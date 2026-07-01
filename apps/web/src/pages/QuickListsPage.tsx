@@ -10,6 +10,8 @@ import {
   useScheduleQuickListMutation,
   useUnscheduleQuickListMutation,
   useGetQuickListQuery,
+  useSuggestQuickListItemsMutation,
+  useApplyQuickListSuggestionsMutation,
 } from '../services/api'
 import { RequirePermission } from '../components/RequirePermission'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
@@ -45,6 +47,7 @@ import {
   getPlanLimitGate,
   isQuickListSchedulingEnabled,
   getQuickListScheduleGate,
+  hasQuickListCapability,
 } from '../lib/planLimits'
 import { LimitExceededBanner } from '../components/LimitExceededBanner'
 import { EmptyState } from '../components/ui/empty-state'
@@ -81,12 +84,18 @@ export function QuickListsPage() {
   const [scheduleDays, setScheduleDays] = useState<string[]>(['MONDAY', 'WEDNESDAY', 'FRIDAY'])
   const [scheduleTime, setScheduleTime] = useState('09:00')
   const [autoCreateOrder, setAutoCreateOrder] = useState(true)
+  const [useAiQuantities, setUseAiQuantities] = useState(false)
 
   const { addItem } = useCartActions()
   const navigate = useNavigate()
 
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const quickListSchedulingEnabled = isQuickListSchedulingEnabled(entitlementsData?.entitlements)
+  const smartQuantitiesAllowed = hasQuickListCapability(
+    entitlementsData?.entitlements,
+    'aiQuantityAdjust'
+  )
+  const aiSuggestAllowed = hasQuickListCapability(entitlementsData?.entitlements, 'aiSuggest')
   const scheduledQuickListGate = getPlanLimitGate(
     entitlementsData?.entitlements,
     'scheduled_quick_lists'
@@ -104,6 +113,8 @@ export function QuickListsPage() {
   const [deleteQuickList] = useDeleteQuickListMutation()
   const [addItemToQuickList] = useAddItemToQuickListMutation()
   const [scheduleQuickList] = useScheduleQuickListMutation()
+  const [suggestQuickListItems, { isLoading: isSuggesting }] = useSuggestQuickListItemsMutation()
+  const [applyQuickListSuggestions] = useApplyQuickListSuggestionsMutation()
   const [unscheduleQuickList] = useUnscheduleQuickListMutation()
 
   const handleCreateList = async () => {
@@ -263,12 +274,14 @@ export function QuickListsPage() {
       }
       setScheduleTime(list.preferred_time ? list.preferred_time.slice(0, 5) : '09:00')
       setAutoCreateOrder(list.auto_create_order !== false)
+      setUseAiQuantities(Boolean(list.use_ai_quantities))
     } else {
       // Reset to defaults when creating new schedule
       setScheduleFrequency('WEEKLY')
       setScheduleDays(['MONDAY'])
       setScheduleTime('09:00')
       setAutoCreateOrder(true)
+      setUseAiQuantities(false)
     }
 
     setShowScheduledOrder(true)
@@ -290,6 +303,7 @@ export function QuickListsPage() {
               : undefined,
           preferredTime: scheduleTime,
           autoCreateOrder,
+          useAiQuantities: smartQuantitiesAllowed ? useAiQuantities : false,
         },
       }).unwrap()
 
@@ -314,6 +328,32 @@ export function QuickListsPage() {
             ? t('quickLists.toastScheduleRequiresSilver')
             : t('quickLists.toastScheduleFailed'))
       toast.error(message)
+    }
+  }
+
+  const handleSuggestItems = async (list: { id: string; name: string }) => {
+    try {
+      const result = await suggestQuickListItems(list.id).unwrap()
+      const proposals = result?.proposals ?? []
+      if (proposals.length === 0) {
+        toast.message('No new suggestions right now', {
+          description: 'Your list already matches current reorder recommendations.',
+        })
+        return
+      }
+      const applied = await applyQuickListSuggestions({
+        quickListId: list.id,
+        proposals: proposals.map((p: any) => ({
+          action: p.action,
+          productId: p.productId,
+          supplierId: p.supplierId,
+          quantity: p.quantity,
+        })),
+      }).unwrap()
+      toast.success(`Updated ${applied.applied} item(s) on "${list.name}"`)
+      refetch()
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Could not apply suggestions')
     }
   }
 
@@ -904,6 +944,18 @@ export function QuickListsPage() {
                         <ShoppingCart className="h-4 w-4 mr-1 shrink-0" />
                         {t('quickLists.order')}
                       </Button>
+                      {aiSuggestAllowed && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={isSuggesting}
+                          onClick={() => handleSuggestItems(list)}
+                          className={cardActionBtnClass()}
+                        >
+                          <Zap className="h-4 w-4 mr-1 shrink-0" />
+                          Suggest items
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1011,6 +1063,9 @@ export function QuickListsPage() {
                 setScheduleTime,
                 autoCreateOrder,
                 setAutoCreateOrder,
+                useAiQuantities,
+                setUseAiQuantities,
+                showSmartQuantities: smartQuantitiesAllowed,
                 handleCreateScheduledOrder,
                 daysOfWeek,
                 toggleScheduleDay,

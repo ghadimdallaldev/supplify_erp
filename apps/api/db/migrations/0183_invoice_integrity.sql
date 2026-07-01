@@ -5,6 +5,40 @@
 ALTER TABLE invoice ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branch(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_invoice_branch ON invoice(branch_id) WHERE branch_id IS NOT NULL;
 
+UPDATE invoice i
+SET branch_id = o.branch_id
+FROM customer_order o
+WHERE i.order_id = o.id
+  AND i.branch_id IS NULL
+  AND o.branch_id IS NOT NULL;
+
+-- Clean legacy duplicate rows before uniqueness constraints (seed/demo data)
+WITH ranked_invoices AS (
+  SELECT i.id,
+         ROW_NUMBER() OVER (
+           PARTITION BY i.order_id, i.supplier_id
+           ORDER BY
+             (SELECT COUNT(*) FROM payment p WHERE p.invoice_id = i.id) DESC,
+             i.paid_amount DESC NULLS LAST,
+             i.created_at DESC
+         ) AS rn
+  FROM invoice i
+  WHERE i.order_id IS NOT NULL
+)
+DELETE FROM invoice
+WHERE id IN (SELECT id FROM ranked_invoices WHERE rn > 1);
+
+WITH ranked_reports AS (
+  SELECT rr.id,
+         ROW_NUMBER() OVER (
+           PARTITION BY rr.order_id
+           ORDER BY rr.received_at DESC NULLS LAST, rr.created_at DESC
+         ) AS rn
+  FROM receiving_report rr
+)
+DELETE FROM receiving_report
+WHERE id IN (SELECT id FROM ranked_reports WHERE rn > 1);
+
 -- One commercial invoice per order per supplier
 CREATE UNIQUE INDEX IF NOT EXISTS uq_invoice_order_supplier
   ON invoice (order_id, supplier_id)

@@ -489,16 +489,13 @@ export function buildLimitExceededPayload(
   }
 }
 
+import { isQuickListSchedulingEnabled } from '../quick-list-tier.js'
+
 /**
  * Whether the plan allows scheduled / automated quick lists (Silver+ tiers).
  */
 export function isQuickListAutomationEnabled(featureValue) {
-  if (featureValue === true) return true
-  if (typeof featureValue === 'string') {
-    const v = featureValue.toLowerCase()
-    return v !== 'false' && v !== 'disabled' && v !== '' && v !== 'basic_manual_only'
-  }
-  return false
+  return isQuickListSchedulingEnabled(featureValue)
 }
 
 /**

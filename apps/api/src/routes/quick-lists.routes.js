@@ -12,6 +12,11 @@ import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { executeScheduledOrders } from '../services/scheduled-orders.service.js'
 import {
+  suggestQuickListItems,
+  applyQuickListSuggestions,
+} from '../services/quick-list-ai.service.js'
+import { hasQuickListCapability } from '../lib/quick-list-tier.js'
+import {
   checkLimit,
   getTenantSubscription,
   getRecommendedPlanNames,
@@ -64,6 +69,7 @@ const scheduleQuickListSchema = z
     daysOfWeek: z.array(z.string()).optional(), // ['MONDAY', 'WEDNESDAY', 'FRIDAY']
     preferredTime: z.string().optional(), // HH:MM format
     autoCreateOrder: z.boolean().default(true),
+    useAiQuantities: z.boolean().optional(),
     nextExecutionDate: z.string().optional(), // YYYY-MM-DD
   })
   .refine(
@@ -862,6 +868,26 @@ router.post(
 
       const quickList = lists[0]
 
+      const useAiQuantities = scheduleData.useAiQuantities === true
+      if (
+        useAiQuantities &&
+        !hasQuickListCapability(planFeatures?.quick_lists, 'aiQuantityAdjust')
+      ) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: buildFeatureNotAvailablePayload(
+            'quick_lists',
+            subscription?.plan_name || subscription?.plan_display_name,
+            'Platinum',
+            await getRecommendedPlanNames('RESTAURANT'),
+            undefined,
+            'RESTAURANT'
+          ),
+          requestId: req.requestId,
+        })
+      }
+
       if (!quickList.is_scheduled) {
         const scheduleLimit = await checkLimit(restaurantId, 'RESTAURANT', 'scheduled_quick_lists')
         if (
@@ -963,10 +989,11 @@ router.post(
         days_of_week = $2,
         preferred_time = $3,
         auto_create_order = $4,
-        next_execution_date = $5,
+        use_ai_quantities = $5,
+        next_execution_date = $6,
         status = 'ACTIVE',
         updated_at = now()
-      WHERE id = $6 AND restaurant_id = $7
+      WHERE id = $7 AND restaurant_id = $8
       RETURNING *
     `,
         [
@@ -974,6 +1001,7 @@ router.post(
           scheduleData.daysOfWeek ? JSON.stringify(scheduleData.daysOfWeek) : null,
           scheduleData.preferredTime || null,
           scheduleData.autoCreateOrder,
+          useAiQuantities,
           nextExecutionDate,
           id,
           restaurantId,
@@ -1105,6 +1133,55 @@ router.delete(
         },
         requestId: req.requestId,
       })
+    }
+  }
+)
+
+const aiSuggestApplySchema = z.object({
+  proposals: z
+    .array(
+      z.object({
+        action: z.enum(['add', 'update']),
+        productId: z.string().uuid(),
+        supplierId: z.string().uuid(),
+        quantity: z.number().positive(),
+      })
+    )
+    .min(1),
+})
+
+// Platinum: forecast-based item suggestions for a quick list
+router.post(
+  '/:id/ai-suggest',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const data = await suggestQuickListItems(restaurantId, req.params.id)
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (error) {
+      next(error)
+    }
+  }
+)
+
+// Platinum: apply selected suggestions to quick list items
+router.post(
+  '/:id/ai-suggest/apply',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  ordersCreateMutationGuard,
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const body = aiSuggestApplySchema.parse(req.body ?? {})
+      const data = await applyQuickListSuggestions(restaurantId, req.params.id, body.proposals)
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (error) {
+      next(error)
     }
   }
 )
