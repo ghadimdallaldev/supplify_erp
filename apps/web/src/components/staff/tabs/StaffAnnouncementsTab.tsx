@@ -14,8 +14,11 @@ import {
 } from '../../../services/staffApi'
 import { StaffPanel } from '../staffShared'
 
+import { useStaffWriteAccess } from '../staffShared'
+
 export function StaffAnnouncementsTab() {
   const { t } = useTranslation('staff')
+  const canWriteStaff = useStaffWriteAccess()
   const [announcementForm, setAnnouncementForm] = useState({
     title: '',
     body: '',
@@ -70,56 +73,60 @@ export function StaffAnnouncementsTab() {
         title={t('announcements.title')}
         description={t('announcements.description')}
         footer={
-          <Button onClick={handleCreateAnnouncement} disabled={creatingAnnouncement}>
-            {creatingAnnouncement ? t('announcements.publishing') : t('announcements.publish')}
-          </Button>
+          canWriteStaff ? (
+            <Button onClick={handleCreateAnnouncement} disabled={creatingAnnouncement}>
+              {creatingAnnouncement ? t('announcements.publishing') : t('announcements.publish')}
+            </Button>
+          ) : null
         }
       >
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
+        <fieldset disabled={!canWriteStaff} className="space-y-4">
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="announcementTitle">{t('announcements.titleLabel')}</Label>
+                <Input
+                  id="announcementTitle"
+                  value={announcementForm.title}
+                  onChange={(event) =>
+                    setAnnouncementForm((prev) => ({ ...prev, title: event.target.value }))
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="announcementRoles">{t('announcements.audienceRoles')}</Label>
+                <Input
+                  id="announcementRoles"
+                  value={announcementForm.roles}
+                  onChange={(event) =>
+                    setAnnouncementForm((prev) => ({ ...prev, roles: event.target.value }))
+                  }
+                />
+              </div>
+            </div>
             <div>
-              <Label htmlFor="announcementTitle">{t('announcements.titleLabel')}</Label>
-              <Input
-                id="announcementTitle"
-                value={announcementForm.title}
+              <Label htmlFor="announcementBody">{t('announcements.message')}</Label>
+              <Textarea
+                id="announcementBody"
+                rows={4}
+                value={announcementForm.body}
                 onChange={(event) =>
-                  setAnnouncementForm((prev) => ({ ...prev, title: event.target.value }))
+                  setAnnouncementForm((prev) => ({ ...prev, body: event.target.value }))
                 }
               />
             </div>
-            <div>
-              <Label htmlFor="announcementRoles">{t('announcements.audienceRoles')}</Label>
-              <Input
-                id="announcementRoles"
-                value={announcementForm.roles}
+            <label className="flex items-center gap-2 text-sm text-[var(--text)]">
+              <input
+                type="checkbox"
+                checked={announcementForm.requireAck}
                 onChange={(event) =>
-                  setAnnouncementForm((prev) => ({ ...prev, roles: event.target.value }))
+                  setAnnouncementForm((prev) => ({ ...prev, requireAck: event.target.checked }))
                 }
               />
-            </div>
+              {t('announcements.requireAck')}
+            </label>
           </div>
-          <div>
-            <Label htmlFor="announcementBody">{t('announcements.message')}</Label>
-            <Textarea
-              id="announcementBody"
-              rows={4}
-              value={announcementForm.body}
-              onChange={(event) =>
-                setAnnouncementForm((prev) => ({ ...prev, body: event.target.value }))
-              }
-            />
-          </div>
-          <label className="flex items-center gap-2 text-sm text-[var(--text)]">
-            <input
-              type="checkbox"
-              checked={announcementForm.requireAck}
-              onChange={(event) =>
-                setAnnouncementForm((prev) => ({ ...prev, requireAck: event.target.checked }))
-              }
-            />
-            {t('announcements.requireAck')}
-          </label>
-        </div>
+        </fieldset>
       </StaffPanel>
 
       <StaffPanel

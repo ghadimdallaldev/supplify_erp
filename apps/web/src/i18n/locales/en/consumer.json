@@ -401,6 +401,7 @@
     "saving": "Saving…",
     "saveProgram": "Save program",
     "programSaved": "Diner rewards program saved",
-    "unableSave": "Unable to save program"
+    "unableSave": "Unable to save program",
+    "readOnlyHint": "You can view the rewards program, but only catalog managers can change these settings."
   }
 }

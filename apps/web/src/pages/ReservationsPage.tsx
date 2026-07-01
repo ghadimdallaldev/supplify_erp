@@ -33,13 +33,19 @@ import { toast } from 'sonner'
 import { copyToClipboard } from '../utils/clipboard'
 import { RequirePermission } from '../components/RequirePermission'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
+import { usePermissions } from '../hooks/usePermissions'
 import { PageHeader } from '../components/ui/page-header'
 import { EmptyState } from '../components/ui/empty-state'
 import { Skeleton } from '../components/ui/skeleton'
 
 export function ReservationsPage() {
   const { t } = useTranslation('reservations')
+  const { t: tNav } = useTranslation('navigation')
   const { persona } = useWorkspaceRole()
+  const { canAny, isViewOnly } = usePermissions()
+  const canMutateReservations =
+    canAny('RESERVATIONS_CREATE', 'RESERVATIONS_EDIT', 'RESERVATIONS_MANAGE') &&
+    !isViewOnly('RESERVATIONS_VIEW')
 
   useEffect(() => {
     void ensureNamespace('reservations')
@@ -153,7 +159,7 @@ export function ReservationsPage() {
   }
 
   return (
-    <RequirePermission permission="RESERVATIONS_VIEW" title="reservations">
+    <RequirePermission permission="RESERVATIONS_VIEW" title={tNav('reservations')}>
       <PageShell maxWidth="wide" className="space-y-4" data-testid="reservations-page">
         <PageHeader
           title={reservationsTitle}
@@ -190,13 +196,15 @@ export function ReservationsPage() {
                   </SelectTrigger>
                 </Select>
               ) : null}
-              <ReservationCreateDrawer
-                tables={tables}
-                onCreated={() => {
-                  refetch()
-                  refetchAnalytics()
-                }}
-              />
+              {canMutateReservations ? (
+                <ReservationCreateDrawer
+                  tables={tables}
+                  onCreated={() => {
+                    refetch()
+                    refetchAnalytics()
+                  }}
+                />
+              ) : null}
             </div>
           }
         />
@@ -309,24 +317,26 @@ export function ReservationsPage() {
                       </Badge>
                     ) : null}
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="min-h-[40px] w-full sm:w-auto"
-                    disabled={promoting || entry.offer_status === 'offered'}
-                    onClick={async () => {
-                      try {
-                        await promoteWaitlist(String(entry.id)).unwrap()
-                        toast.success(t('toasts.offerSent'))
-                        refetchWaitlist()
-                        refetch()
-                      } catch {
-                        toast.error(t('toasts.promoteFailed'))
-                      }
-                    }}
-                  >
-                    {t('page.waitlistQueue.promote')}
-                  </Button>
+                  {canMutateReservations ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="min-h-[40px] w-full sm:w-auto"
+                      disabled={promoting || entry.offer_status === 'offered'}
+                      onClick={async () => {
+                        try {
+                          await promoteWaitlist(String(entry.id)).unwrap()
+                          toast.success(t('toasts.offerSent'))
+                          refetchWaitlist()
+                          refetch()
+                        } catch {
+                          toast.error(t('toasts.promoteFailed'))
+                        }
+                      }}
+                    >
+                      {t('page.waitlistQueue.promote')}
+                    </Button>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -354,14 +364,20 @@ export function ReservationsPage() {
             waitlist={waitlist}
             boardDate={selectedDate}
             branchId={branchId || undefined}
+            readOnly={!canMutateReservations}
           />
         )}
 
         <div className="space-y-6">
-          <PublicBookingSettingsCard />
+          <PublicBookingSettingsCard readOnly={!canMutateReservations} />
 
           <div className="overflow-x-hidden">
-            <ReservationTableBuilder tables={tables} reservations={reservations} defaultLiveView />
+            <ReservationTableBuilder
+              tables={tables}
+              reservations={reservations}
+              defaultLiveView
+              readOnly={!canMutateReservations}
+            />
           </div>
 
           <ReservationAnalyticsPanel

@@ -42,6 +42,7 @@ export const LAZY_NAMESPACES = [
   'disputes',
   'public',
   'branches',
+  'recipes',
 ] as const
 
 export type I18nNamespace = (typeof EAGER_NAMESPACES)[number] | (typeof LAZY_NAMESPACES)[number]

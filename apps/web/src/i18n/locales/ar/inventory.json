@@ -102,6 +102,8 @@
   "trend": {
     "title": "تحليل اتجاه المخزون",
     "description": "نظرة مرئية على حركات المخزون",
+    "show": "عرض التفاصيل",
+    "hide": "إخفاء التفاصيل",
     "totalMovements": "إجمالي الحركات",
     "recentAdditions": "الإضافات الأخيرة",
     "recentSubtractions": "الخصومات الأخيرة"
@@ -110,7 +112,17 @@
     "totalProducts": "إجمالي المنتجات",
     "inStock": "متوفر",
     "lowStock": "مخزون منخفض",
-    "outOfStock": "نفد المخزون"
+    "outOfStock": "نفد المخزون",
+    "tracked": "رموز متتبعة",
+    "ofTotal": "من الإجمالي"
+  },
+  "alerts": {
+    "attentionTitle": "المخزون يحتاج اهتماما",
+    "attentionLowStock": "{{count}} عناصر دون الحد الأدنى — راجعها وأعد الطلب قريبا.",
+    "attentionOutOfStock": "{{out}} نفدت، {{low}} منخفضة — أعد التخزين لتجنب انقطاع الخدمة.",
+    "viewLowStock": "تصفية المعرضة للخطر",
+    "viewItems": "الانتقال للقائمة",
+    "reorderAssist": "إعادة الطلب الذكية"
   },
   "filters": {
     "search": "بحث",
@@ -157,6 +169,7 @@
     "category": "الفئة",
     "supplier": "المورد",
     "quantity": "الكمية",
+    "stockLevel": "مستوى المخزون",
     "onHand": "في المخزون",
     "suggestedReorder": "إعادة طلب مقترحة",
     "status": "الحالة",

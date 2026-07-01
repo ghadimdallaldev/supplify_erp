@@ -58,6 +58,7 @@ export function ReservationTableBuilder({
   tables,
   reservations = [],
   defaultLiveView = false,
+  readOnly = false,
 }: ReservationTableBuilderProps) {
   const { t } = useTranslation('reservations')
   const shapePresets = useMemo(() => getShapePresets(), [t])
@@ -82,7 +83,7 @@ export function ReservationTableBuilder({
   const [gridSnap, setGridSnap] = useState(false)
   const [zoom, setZoom] = useState(1.0)
   const [zoneFilter, setZoneFilter] = useState<TableZone | 'all'>('all')
-  const [serviceMode, setServiceMode] = useState(defaultLiveView)
+  const [serviceMode, setServiceMode] = useState(defaultLiveView || readOnly)
 
   // Refs for keyboard handler (avoid stale closures)
   const editableTablesRef = useRef(editableTables)
@@ -447,8 +448,8 @@ export function ReservationTableBuilder({
     // Inactive: dimmed, not draggable/resizable
     const isInactive = !table.isActive
     // In service mode: no drag/resize
-    const disableDrag = isInactive || serviceMode || isFiltered
-    const disableResize = isInactive || serviceMode
+    const disableDrag = isInactive || serviceMode || isFiltered || readOnly
+    const disableResize = isInactive || serviceMode || readOnly
 
     const opacity = isInactive ? 0.3 : isFiltered ? 0.2 : 1
 
@@ -846,15 +847,17 @@ export function ReservationTableBuilder({
               <span className="opacity-60">{t('tableBuilder.shortcuts')}</span>
             </CardDescription>
           </div>
-          <Button
-            variant={serviceMode ? 'default' : 'outline'}
-            size="sm"
-            className={`shrink-0 flex items-center gap-2 rounded-full ${serviceMode ? 'bg-[var(--brand)] text-white hover:bg-[var(--brand-mid)]' : ''}`}
-            onClick={() => setServiceMode((v) => !v)}
-          >
-            <Eye className="h-4 w-4" />
-            {serviceMode ? t('tableBuilder.liveView') : t('tableBuilder.serviceMode')}
-          </Button>
+          {!readOnly ? (
+            <Button
+              variant={serviceMode ? 'default' : 'outline'}
+              size="sm"
+              className={`shrink-0 flex items-center gap-2 rounded-full ${serviceMode ? 'bg-[var(--brand)] text-white hover:bg-[var(--brand-mid)]' : ''}`}
+              onClick={() => setServiceMode((v) => !v)}
+            >
+              <Eye className="h-4 w-4" />
+              {serviceMode ? t('tableBuilder.liveView') : t('tableBuilder.serviceMode')}
+            </Button>
+          ) : null}
         </div>
       </CardHeader>
 
@@ -871,20 +874,22 @@ export function ReservationTableBuilder({
                   {t('tableBuilder.virtualFloorHint')}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {shapePresets.map(({ value, label, Icon }) => (
-                  <Button
-                    key={value}
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-1 rounded-full border-[var(--app-border)] bg-[var(--surface)] px-3 py-1 text-xs text-[var(--text-muted)] hover:border-[var(--brand)] hover:text-[var(--brand-mid)]"
-                    onClick={() => handleAddTable(value)}
-                  >
-                    <Icon className="h-3 w-3" />
-                    {label}
-                  </Button>
-                ))}
-              </div>
+              {!readOnly ? (
+                <div className="flex flex-wrap gap-2">
+                  {shapePresets.map(({ value, label, Icon }) => (
+                    <Button
+                      key={value}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-1 rounded-full border-[var(--app-border)] bg-[var(--surface)] px-3 py-1 text-xs text-[var(--text-muted)] hover:border-[var(--brand)] hover:text-[var(--brand-mid)]"
+                      onClick={() => handleAddTable(value)}
+                    >
+                      <Icon className="h-3 w-3" />
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
             {/* ── Toolbar ── */}
@@ -1065,20 +1070,22 @@ export function ReservationTableBuilder({
                   <span>{t('tableBuilder.stats.selected', { name: selectedTable.name })}</span>
                 )}
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    pushHistoryRef.current(editableTables)
-                    setEditableTables([])
-                  }}
-                >
-                  {t('tableBuilder.clearFloor')}
-                </Button>
-                <Button onClick={handleSave} disabled={isLoading}>
-                  {isLoading ? t('common.saving') : t('tableBuilder.saveLayout')}
-                </Button>
-              </div>
+              {!readOnly ? (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      pushHistoryRef.current(editableTables)
+                      setEditableTables([])
+                    }}
+                  >
+                    {t('tableBuilder.clearFloor')}
+                  </Button>
+                  <Button onClick={handleSave} disabled={isLoading}>
+                    {isLoading ? t('common.saving') : t('tableBuilder.saveLayout')}
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </div>
 

@@ -102,6 +102,8 @@
   "trend": {
     "title": "Stock Trend Analysis",
     "description": "Visual overview of your inventory movements",
+    "show": "Show details",
+    "hide": "Hide details",
     "totalMovements": "Total Movements",
     "recentAdditions": "Recent Additions",
     "recentSubtractions": "Recent Subtractions"
@@ -110,7 +112,17 @@
     "totalProducts": "Total Products",
     "inStock": "In Stock",
     "lowStock": "Low Stock",
-    "outOfStock": "Out of Stock"
+    "outOfStock": "Out of Stock",
+    "tracked": "SKUs tracked",
+    "ofTotal": "of total"
+  },
+  "alerts": {
+    "attentionTitle": "Stock needs attention",
+    "attentionLowStock": "{{count}} items are below minimum — review and reorder soon.",
+    "attentionOutOfStock": "{{out}} out of stock, {{low}} low — restock to avoid service gaps.",
+    "viewLowStock": "Filter at-risk",
+    "viewItems": "Jump to list",
+    "reorderAssist": "Smart reorder"
   },
   "filters": {
     "search": "Search",
@@ -157,6 +169,7 @@
     "category": "Category",
     "supplier": "Supplier",
     "quantity": "Quantity",
+    "stockLevel": "Stock level",
     "onHand": "On hand",
     "suggestedReorder": "Suggested reorder",
     "status": "Status",

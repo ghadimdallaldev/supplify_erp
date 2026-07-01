@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { format } from 'date-fns'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
+import { usePermissions } from '../../hooks/usePermissions'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
 import { SummaryStrip } from '../ui/app-panel'
@@ -41,6 +42,12 @@ export const initialStaffForm: StaffFormState = {
   wageRate: '',
   hireDate: '',
   profileColor: '#2563eb',
+}
+
+/** Staff roster mutations require edit/manage/invite permissions (matches API staffMutationGuard). */
+export function useStaffWriteAccess(): boolean {
+  const { canAny } = usePermissions()
+  return canAny('STAFF_EDIT', 'STAFF_MANAGE', 'STAFF_INVITE')
 }
 
 export const initialShiftForm: ShiftFormState = {

@@ -38,6 +38,7 @@ interface ReservationBoardProps {
   boardDate: string
   branchId?: string
   onOpenReservation?: (reservation: Reservation) => void
+  readOnly?: boolean
 }
 
 function SortableReservationCard({
@@ -46,6 +47,7 @@ function SortableReservationCard({
   onStatusChange,
   onAssignTables,
   updating,
+  readOnly = false,
 }: {
   reservation: Reservation
   tables: ReservationTable[]
@@ -54,10 +56,12 @@ function SortableReservationCard({
   boardDate: string
   branchId?: string
   updating: boolean
+  readOnly?: boolean
 }) {
   const { t } = useTranslation('reservations')
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: reservation.id,
+    disabled: readOnly,
   })
   const [pickTableId, setPickTableId] = useState(() => reservationTableIds(reservation)[0] ?? '')
 
@@ -112,15 +116,17 @@ function SortableReservationCard({
       className="group rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm transition hover:shadow-md"
     >
       <div className="flex gap-2">
-        <button
-          type="button"
-          className="mt-0.5 shrink-0 touch-none cursor-grab rounded p-1 text-[var(--text-muted)] hover:bg-[var(--brand-ultra)] active:cursor-grabbing"
-          aria-label={t('board.dragAriaLabel')}
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
+        {!readOnly ? (
+          <button
+            type="button"
+            className="mt-0.5 shrink-0 touch-none cursor-grab rounded p-1 text-[var(--text-muted)] hover:bg-[var(--brand-ultra)] active:cursor-grabbing"
+            aria-label={t('board.dragAriaLabel')}
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
+        ) : null}
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <div>
@@ -151,7 +157,8 @@ function SortableReservationCard({
             ) : null}
           </div>
 
-          {activeTables.length > 0 &&
+          {!readOnly &&
+          activeTables.length > 0 &&
           reservation.status !== 'CANCELLED' &&
           reservation.status !== 'COMPLETED' ? (
             <div
@@ -184,7 +191,7 @@ function SortableReservationCard({
             </div>
           ) : null}
 
-          {quickStatus?.length ? (
+          {!readOnly && quickStatus?.length ? (
             <div
               className="mt-3 flex flex-wrap gap-1"
               onPointerDown={stopDragPropagation}
@@ -244,6 +251,7 @@ export function ReservationBoard({
   waitlist,
   boardDate,
   branchId,
+  readOnly = false,
 }: ReservationBoardProps) {
   const { t } = useTranslation('reservations')
   const [updateStatus, { isLoading: updatingStatus }] = useUpdateReservationStatusMutation()
@@ -255,6 +263,7 @@ export function ReservationBoard({
       activationConstraint: { distance: 8 },
     })
   )
+  const dragSensors = readOnly ? [] : sensors
 
   const columns = useMemo(() => {
     return STATUS_COLUMN_META.map((column) => ({
@@ -346,7 +355,7 @@ export function ReservationBoard({
         </div>
       </CardHeader>
       <CardContent className="px-0">
-        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <DndContext sensors={dragSensors} onDragEnd={readOnly ? () => undefined : handleDragEnd}>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {columns.map((column) => (
               <div
@@ -380,6 +389,7 @@ export function ReservationBoard({
                           boardDate={boardDate}
                           branchId={branchId}
                           updating={updating}
+                          readOnly={readOnly}
                         />
                       ))
                     ) : (

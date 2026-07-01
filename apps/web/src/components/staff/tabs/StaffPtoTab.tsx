@@ -33,10 +33,11 @@ import type { StaffPtoRequest } from '../../../types'
 
 import { getApiErrorMessage } from '../../../lib/apiError'
 
-import { defaultAvailabilityBlocks, getWeekdayLabels } from '../staffShared'
+import { defaultAvailabilityBlocks, getWeekdayLabels, useStaffWriteAccess } from '../staffShared'
 
 export function StaffPtoTab() {
   const { t } = useTranslation('staff')
+  const canWriteStaff = useStaffWriteAccess()
   const weekdays = getWeekdayLabels(t)
   const [ptoForm, setPtoForm] = useState({
     staffId: '',
@@ -287,7 +288,7 @@ export function StaffPtoTab() {
                     </p>
                   ) : null}
 
-                  {request.status === 'PENDING' ? (
+                  {canWriteStaff && request.status === 'PENDING' ? (
                     <div className="mt-3 flex gap-2">
                       <Button
                         size="sm"
@@ -315,126 +316,23 @@ export function StaffPtoTab() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('pto.recordTitle')}</CardTitle>
+      {canWriteStaff ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('pto.recordTitle')}</CardTitle>
 
-          <CardDescription>{t('pto.recordDescription')}</CardDescription>
-        </CardHeader>
+            <CardDescription>{t('pto.recordDescription')}</CardDescription>
+          </CardHeader>
 
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="ptoStaff">{t('shared.staff')}</Label>
-
-            <Select
-              value={ptoForm.staffId}
-              onValueChange={(value) => setPtoForm((prev) => ({ ...prev, staffId: value }))}
-            >
-              <SelectTrigger id="ptoStaff" className="mt-1 w-full">
-                <option value="">{t('shared.selectStaff')}</option>
-
-                {staffMembers.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.displayName}
-                  </option>
-                ))}
-              </SelectTrigger>
-            </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="ptoType">{t('shared.type')}</Label>
-
-            <Select
-              value={ptoForm.type}
-              onValueChange={(value) => setPtoForm((prev) => ({ ...prev, type: value }))}
-            >
-              <SelectTrigger id="ptoType" className="mt-1 w-full">
-                {(['VACATION', 'SICK', 'PERSONAL', 'UNPAID', 'OTHER'] as const).map((type) => (
-                  <option key={type} value={type}>
-                    {t(`shared.ptoType.${type}`)}
-                  </option>
-                ))}
-              </SelectTrigger>
-            </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="ptoStart">{t('pto.startDate')}</Label>
-
-            <Input
-              id="ptoStart"
-              type="date"
-              value={ptoForm.startDate}
-              onChange={(event) =>
-                setPtoForm((prev) => ({ ...prev, startDate: event.target.value }))
-              }
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="ptoEnd">{t('pto.endDate')}</Label>
-
-            <Input
-              id="ptoEnd"
-              type="date"
-              value={ptoForm.endDate}
-              onChange={(event) => setPtoForm((prev) => ({ ...prev, endDate: event.target.value }))}
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="ptoHours">{t('pto.hoursOptional')}</Label>
-
-            <Input
-              id="ptoHours"
-              type="number"
-              min={0}
-              step={0.5}
-              value={ptoForm.hoursRequested}
-              onChange={(event) =>
-                setPtoForm((prev) => ({ ...prev, hoursRequested: event.target.value }))
-              }
-            />
-          </div>
-
-          <div className="sm:col-span-2">
-            <Label htmlFor="ptoReason">{t('shared.reason')}</Label>
-
-            <Input
-              id="ptoReason"
-              value={ptoForm.reason}
-              onChange={(event) => setPtoForm((prev) => ({ ...prev, reason: event.target.value }))}
-            />
-          </div>
-
-          <div className="sm:col-span-2 flex justify-end">
-            <Button onClick={handleCreatePto} disabled={creatingPto}>
-              {creatingPto ? t('pto.recording') : t('pto.recordPto')}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('pto.availabilityTitle')}</CardTitle>
-
-          <CardDescription>{t('pto.availabilityDescription')}</CardDescription>
-        </CardHeader>
-
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-4">
+          <CardContent className="grid gap-3 sm:grid-cols-2">
             <div>
-              <Label htmlFor="availabilityStaff">{t('shared.staff')}</Label>
+              <Label htmlFor="ptoStaff">{t('shared.staff')}</Label>
 
               <Select
-                value={availabilityForm.staffId}
-                onValueChange={(value) =>
-                  setAvailabilityForm((prev) => ({ ...prev, staffId: value }))
-                }
+                value={ptoForm.staffId}
+                onValueChange={(value) => setPtoForm((prev) => ({ ...prev, staffId: value }))}
               >
-                <SelectTrigger id="availabilityStaff" className="mt-1 w-full">
+                <SelectTrigger id="ptoStaff" className="mt-1 w-full">
                   <option value="">{t('shared.selectStaff')}</option>
 
                   {staffMembers.map((member) => (
@@ -447,18 +345,16 @@ export function StaffPtoTab() {
             </div>
 
             <div>
-              <Label htmlFor="availabilityDay">{t('pto.weekday')}</Label>
+              <Label htmlFor="ptoType">{t('shared.type')}</Label>
 
               <Select
-                value={availabilityForm.weekday}
-                onValueChange={(value) =>
-                  setAvailabilityForm((prev) => ({ ...prev, weekday: value }))
-                }
+                value={ptoForm.type}
+                onValueChange={(value) => setPtoForm((prev) => ({ ...prev, type: value }))}
               >
-                <SelectTrigger id="availabilityDay" className="mt-1 w-full">
-                  {weekdays.map((day, index) => (
-                    <option key={day} value={String(index)}>
-                      {day}
+                <SelectTrigger id="ptoType" className="mt-1 w-full">
+                  {(['VACATION', 'SICK', 'PERSONAL', 'UNPAID', 'OTHER'] as const).map((type) => (
+                    <option key={type} value={type}>
+                      {t(`shared.ptoType.${type}`)}
                     </option>
                   ))}
                 </SelectTrigger>
@@ -466,49 +362,162 @@ export function StaffPtoTab() {
             </div>
 
             <div>
-              <Label htmlFor="availabilityStart">{t('pto.start')}</Label>
+              <Label htmlFor="ptoStart">{t('pto.startDate')}</Label>
 
               <Input
-                id="availabilityStart"
-                type="time"
-                value={availabilityForm.start}
+                id="ptoStart"
+                type="date"
+                value={ptoForm.startDate}
                 onChange={(event) =>
-                  setAvailabilityForm((prev) => ({ ...prev, start: event.target.value }))
+                  setPtoForm((prev) => ({ ...prev, startDate: event.target.value }))
                 }
               />
             </div>
 
             <div>
-              <Label htmlFor="availabilityEnd">{t('pto.end')}</Label>
+              <Label htmlFor="ptoEnd">{t('pto.endDate')}</Label>
 
               <Input
-                id="availabilityEnd"
-                type="time"
-                value={availabilityForm.end}
+                id="ptoEnd"
+                type="date"
+                value={ptoForm.endDate}
                 onChange={(event) =>
-                  setAvailabilityForm((prev) => ({ ...prev, end: event.target.value }))
+                  setPtoForm((prev) => ({ ...prev, endDate: event.target.value }))
                 }
               />
             </div>
 
-            <div className="sm:col-span-4">
-              <Label htmlFor="availabilityNotes">{t('shared.notes')}</Label>
+            <div>
+              <Label htmlFor="ptoHours">{t('pto.hoursOptional')}</Label>
 
               <Input
-                id="availabilityNotes"
-                value={availabilityForm.notes}
+                id="ptoHours"
+                type="number"
+                min={0}
+                step={0.5}
+                value={ptoForm.hoursRequested}
                 onChange={(event) =>
-                  setAvailabilityForm((prev) => ({ ...prev, notes: event.target.value }))
+                  setPtoForm((prev) => ({ ...prev, hoursRequested: event.target.value }))
                 }
               />
             </div>
-          </div>
 
-          <div className="flex justify-end">
-            <Button onClick={handleSaveAvailability} disabled={savingAvailability}>
-              {savingAvailability ? t('shared.saving') : t('pto.saveAvailability')}
-            </Button>
-          </div>
+            <div className="sm:col-span-2">
+              <Label htmlFor="ptoReason">{t('shared.reason')}</Label>
+
+              <Input
+                id="ptoReason"
+                value={ptoForm.reason}
+                onChange={(event) =>
+                  setPtoForm((prev) => ({ ...prev, reason: event.target.value }))
+                }
+              />
+            </div>
+
+            <div className="sm:col-span-2 flex justify-end">
+              <Button onClick={handleCreatePto} disabled={creatingPto}>
+                {creatingPto ? t('pto.recording') : t('pto.recordPto')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('pto.availabilityTitle')}</CardTitle>
+
+          <CardDescription>{t('pto.availabilityDescription')}</CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          <fieldset disabled={!canWriteStaff} className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-4">
+              <div>
+                <Label htmlFor="availabilityStaff">{t('shared.staff')}</Label>
+
+                <Select
+                  value={availabilityForm.staffId}
+                  onValueChange={(value) =>
+                    setAvailabilityForm((prev) => ({ ...prev, staffId: value }))
+                  }
+                >
+                  <SelectTrigger id="availabilityStaff" className="mt-1 w-full">
+                    <option value="">{t('shared.selectStaff')}</option>
+
+                    {staffMembers.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.displayName}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="availabilityDay">{t('pto.weekday')}</Label>
+
+                <Select
+                  value={availabilityForm.weekday}
+                  onValueChange={(value) =>
+                    setAvailabilityForm((prev) => ({ ...prev, weekday: value }))
+                  }
+                >
+                  <SelectTrigger id="availabilityDay" className="mt-1 w-full">
+                    {weekdays.map((day, index) => (
+                      <option key={day} value={String(index)}>
+                        {day}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="availabilityStart">{t('pto.start')}</Label>
+
+                <Input
+                  id="availabilityStart"
+                  type="time"
+                  value={availabilityForm.start}
+                  onChange={(event) =>
+                    setAvailabilityForm((prev) => ({ ...prev, start: event.target.value }))
+                  }
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="availabilityEnd">{t('pto.end')}</Label>
+
+                <Input
+                  id="availabilityEnd"
+                  type="time"
+                  value={availabilityForm.end}
+                  onChange={(event) =>
+                    setAvailabilityForm((prev) => ({ ...prev, end: event.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="sm:col-span-4">
+                <Label htmlFor="availabilityNotes">{t('shared.notes')}</Label>
+
+                <Input
+                  id="availabilityNotes"
+                  value={availabilityForm.notes}
+                  onChange={(event) =>
+                    setAvailabilityForm((prev) => ({ ...prev, notes: event.target.value }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button onClick={handleSaveAvailability} disabled={savingAvailability}>
+                {savingAvailability ? t('shared.saving') : t('pto.saveAvailability')}
+              </Button>
+            </div>
+          </fieldset>
 
           {availability.length ? (
             <div className="rounded-xl border border-[var(--app-border)] bg-white shadow-sm">

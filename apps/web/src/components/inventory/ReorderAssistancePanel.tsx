@@ -31,7 +31,6 @@ import {
 import { toast } from 'sonner'
 import { cn } from '../../lib/utils'
 import { getUsageMeterDisplay } from '../../lib/usageDisplay'
-import { featureEnabled } from '../../lib/planLimits'
 import type {
   ReorderAiAskResult,
   ReorderAiExplainResult,
@@ -123,13 +122,14 @@ export function ReorderAssistancePanel({
   const visible = maxItems ? suggestions.slice(0, maxItems) : suggestions
   const canExplain = data?.smartReorder?.capabilities?.forecast === true
   const canAsk = data?.smartReorder?.capabilities?.seasonality === true
+  const canExplainLlm = data?.ai?.canExplainLlm === true
+  const canAskLlm = data?.ai?.canAskLlm === true
 
   const entitlements = entitlementsData?.entitlements
-  const aiPlatformEnabled = featureEnabled(entitlements?.features?.ai_platform)
   const aiRequestLimit = entitlements?.limits?.ai_requests_per_day ?? 0
   const aiRequestUsage = entitlements?.usage?.ai_requests_per_day ?? 0
   const showAiUsageMeter =
-    aiPlatformEnabled && typeof aiRequestLimit === 'number' && aiRequestLimit > 0
+    (canExplainLlm || canAskLlm) && typeof aiRequestLimit === 'number' && aiRequestLimit > 0
   const aiUsageMeter = showAiUsageMeter
     ? getUsageMeterDisplay(aiRequestUsage, aiRequestLimit)
     : null
@@ -210,6 +210,9 @@ export function ReorderAssistancePanel({
     if (!q || aiUsageAtCap) return
     try {
       const result = await askAssistance({ query: q }).unwrap()
+      if (result.usageLimited) {
+        toast.message(t('toast.aiDailyLimitReached'))
+      }
       if (result.matchedProducts.length === 0) {
         toast.message(result.clarifyingQuestion || t('toast.noMatchingProducts'))
         return
@@ -309,6 +312,9 @@ export function ReorderAssistancePanel({
                   size="sm"
                   disabled={isExplaining || suggestions.length === 0}
                   onClick={handleExplain}
+                  title={
+                    canExplainLlm ? undefined : 'AI assistant is off — showing rule-based summary'
+                  }
                 >
                   {isExplaining ? (
                     <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
@@ -328,6 +334,13 @@ export function ReorderAssistancePanel({
                       onKeyDown={(e) => e.key === 'Enter' && handleAsk()}
                       className="h-8 text-sm"
                       disabled={aiUsageAtCap}
+                      title={
+                        canAskLlm
+                          ? aiUsageAtCap
+                            ? 'Daily AI assist limit reached'
+                            : undefined
+                          : 'AI assistant is off — matching product names by keywords'
+                      }
                     />
                     <Button
                       size="sm"
@@ -356,6 +369,11 @@ export function ReorderAssistancePanel({
                     >
                       {aiUsageMeter.display}/{aiUsageMeter.limit} AI assists today
                       {aiUsageAtCap ? ' — limit reached' : ''}
+                    </p>
+                  )}
+                  {!canAskLlm && (
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Keyword matching only — enable AI platform for natural-language assist
                     </p>
                   )}
                 </div>

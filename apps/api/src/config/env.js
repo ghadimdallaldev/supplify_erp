@@ -311,6 +311,8 @@ export const config = {
   AI_PROVIDER: process.env.AI_PROVIDER || 'openai',
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
   AI_MODEL: process.env.AI_MODEL || 'gpt-4o-mini',
+  AI_REQUEST_TIMEOUT_MS: envInt(process.env.AI_REQUEST_TIMEOUT_MS, 30000),
+  AI_MAX_RETRIES: envInt(process.env.AI_MAX_RETRIES, 1),
   AI_MAX_REQUESTS_PER_TENANT_PER_DAY: envInt(process.env.AI_MAX_REQUESTS_PER_TENANT_PER_DAY, 50),
   /** Max size for bulk product image import ZIP uploads (default 2GB). */
   IMPORT_ZIP_MAX_BYTES: envInt(process.env.IMPORT_ZIP_MAX_BYTES, 2147483648),
