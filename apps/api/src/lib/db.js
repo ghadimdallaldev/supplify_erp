@@ -91,7 +91,6 @@ let lastPoolConnectAt = 0
 
 pool.on('connect', () => {
   lastPoolConnectAt = Date.now()
-  logger.debug('Database client connected')
 })
 
 function getKeepaliveIntervalMs() {
