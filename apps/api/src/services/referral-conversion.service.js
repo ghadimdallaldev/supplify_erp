@@ -115,12 +115,13 @@ export async function processReferralConversion({ restaurantId, planCode, client
     tenantId: attr.supplier_id,
     tenantType: 'SUPPLIER',
     notificationType: 'referral_reward_earned',
+    notificationCategory: 'referral_reward_earned',
     title: 'Referral reward earned',
     message:
       rewardType === 'free_month'
         ? 'A referred restaurant converted — you earned 1 free month.'
         : 'A referred restaurant converted — account credit was added.',
-    metadata: { restaurantId, attributionId: attr.id },
+    metadata: { restaurantId, attributionId: attr.id, ctaUrl: '/app/promotions' },
   }).catch(() => {})
 
   return { attributionId: attr.id, rewardType, rewardValue }

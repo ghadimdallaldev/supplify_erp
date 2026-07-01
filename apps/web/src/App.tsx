@@ -21,6 +21,7 @@ import { InviteAcceptPage } from './pages/InviteAcceptPage'
 import { BranchInviteAcceptPage } from './pages/BranchInviteAcceptPage'
 import { OAuthRedirect } from './components/OAuthRedirect'
 import { PageLoading } from './components/ui/page-loading'
+import { CustomDomainCatalogHost } from './components/public/CustomDomainCatalogHost'
 import { RequirePermission } from './components/RequirePermission'
 
 const DashboardPage = lazyNamedPage(() => import('./pages/DashboardPage'), 'DashboardPage')
@@ -74,6 +75,26 @@ const RestaurantOnboardingPage = lazyNamedPage(
   'RestaurantOnboardingPage'
 )
 const ReceivingPage = lazyNamedPage(() => import('./pages/ReceivingPage'), 'ReceivingPage')
+const RecipesListPage = lazyNamedPage(
+  () => import('./pages/recipes/RecipesListPage'),
+  'RecipesListPage'
+)
+const RecipeBuilderPage = lazyNamedPage(
+  () => import('./pages/recipes/RecipeBuilderPage'),
+  'RecipeBuilderPage'
+)
+const RecipeDetailPage = lazyNamedPage(
+  () => import('./pages/recipes/RecipeDetailPage'),
+  'RecipeDetailPage'
+)
+const RecipeCostingDashboardPage = lazyNamedPage(
+  () => import('./pages/recipes/RecipeCostingDashboardPage'),
+  'RecipeCostingDashboardPage'
+)
+const RecipePriceImpactPage = lazyNamedPage(
+  () => import('./pages/recipes/RecipePriceImpactPage'),
+  'RecipePriceImpactPage'
+)
 const SupplierCustomerGrowthPage = lazyNamedPage(
   () => import('./pages/SupplierCustomerGrowthPage'),
   'SupplierCustomerGrowthPage'
@@ -638,6 +659,54 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: 'app/recipes',
+        element: (
+          <LazyPage>
+            <RecipesListPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/recipes/new',
+        element: (
+          <LazyPage>
+            <RecipeBuilderPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/recipes/:id/edit',
+        element: (
+          <LazyPage>
+            <RecipeBuilderPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/recipes/:id',
+        element: (
+          <LazyPage>
+            <RecipeDetailPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/recipe-costing',
+        element: (
+          <LazyPage>
+            <RecipeCostingDashboardPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/recipe-costing/price-impact',
+        element: (
+          <LazyPage>
+            <RecipePriceImpactPage />
+          </LazyPage>
+        ),
+      },
+      {
         path: 'app/reservations',
         element: (
           <LazyPage>
@@ -858,7 +927,11 @@ const router = createBrowserRouter([
 ])
 
 export function App() {
-  return <RouterProvider router={router} future={ROUTER_FUTURE} />
+  return (
+    <CustomDomainCatalogHost>
+      <RouterProvider router={router} future={ROUTER_FUTURE} />
+    </CustomDomainCatalogHost>
+  )
 }
 
 export default App

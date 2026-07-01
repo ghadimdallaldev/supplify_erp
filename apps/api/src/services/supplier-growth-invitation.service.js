@@ -168,9 +168,10 @@ export async function acceptReferralOnRegistration({ token, restaurantId, client
     tenantId: restaurantId,
     tenantType: 'RESTAURANT',
     notificationType: 'referral_registered',
+    notificationCategory: 'referral_registered',
     title: 'Welcome to Supplify',
     message: 'Your supplier referral was applied. Enjoy your free trial.',
-    metadata: { supplierId: inv.supplier_id },
+    metadata: { supplierId: inv.supplier_id, ctaUrl: '/app' },
   }).catch(() => {})
 
   const trialDays = await getFreeSandboxDays()

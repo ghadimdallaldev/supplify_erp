@@ -4,7 +4,12 @@ import { Button } from '../ui/button'
 import { FileText } from 'lucide-react'
 import { LogoUpload } from '../LogoUpload'
 import { BrandingSettingsSection } from './BrandingSettingsSection'
-import { canUseCustomBranding, customBrandingUpgradeMessage } from '../../lib/planLimits'
+import { CustomDomainCard } from './CustomDomainCard'
+import {
+  canUseCustomBranding,
+  customBrandingUpgradeMessage,
+  hasBrandingCapability,
+} from '../../lib/planLimits'
 import { openBrowseUpgrade } from '../../lib/openBrowseUpgrade'
 import type { Entitlements } from '../../types'
 
@@ -108,7 +113,12 @@ export function TenantBrandingPanel({
       </Card>
 
       {brandingAllowed && (
-        <BrandingSettingsSection tenantType={tenantType} canEdit={canEditBranding} />
+        <>
+          <BrandingSettingsSection tenantType={tenantType} canEdit={canEditBranding} />
+          {tenantType === 'SUPPLIER' && (
+            <CustomDomainCard allowed={hasBrandingCapability(entitlements, 'customDomain')} />
+          )}
+        </>
       )}
     </>
   )

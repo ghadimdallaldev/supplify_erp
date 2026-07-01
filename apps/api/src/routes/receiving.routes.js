@@ -10,12 +10,21 @@ import {
 import { query, withTransaction } from '../lib/db.js'
 import { startStage, mark } from '../middlewares/request-timing.js'
 import { logger } from '../lib/logger.js'
-import { NotFoundError } from '../middlewares/errorHandler.js'
+import { ConflictError, NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
+import {
+  assertNoReceivingReport,
+  createInvoiceFromReceiving,
+  lockOrderForReceiving,
+} from '../services/invoice.service.js'
 import { requireFeature } from '../lib/subscription.js'
 import { notifyLeaveReviewIfEligible } from '../services/reviews.service.js'
 import { notifyInvoiceIssued } from '../services/notification.service.js'
 import { createLotFromReceivingLine } from '../services/inventory-expiry.service.js'
 import { earnLoyaltyOnOrderReceive } from '../services/loyalty.service.js'
+import {
+  hookRecipeCostingAfterReceiving,
+  hookRecipeCostingAfterInvoice,
+} from '../services/recipe-purchasing-hooks.service.js'
 import { resolveRequestLocale, localizedError } from '../i18n/index.js'
 
 const router = express.Router()
@@ -244,44 +253,6 @@ router.post(
         })
       }
 
-      // Get order details
-      const { rows: orders } = await query(
-        `
-      SELECT * FROM customer_order WHERE id = $1 AND restaurant_id = $2
-    `,
-        [orderId, restaurantId]
-      )
-
-      if (orders.length === 0) {
-        throw new NotFoundError('Order not found')
-      }
-
-      const order = orders[0]
-
-      if (!RECEIVABLE_ORDER_STATUSES.includes(order.status)) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: receivingErr(req, 'VALIDATION_ERROR', 'orderNotReady'),
-          requestId: req.requestId,
-        })
-      }
-
-      const { rows: existingReports } = await query(
-        `SELECT 1 FROM receiving_report
-         WHERE order_id = $1 AND status IN ('ACCEPTED', 'REJECTED', 'PARTIAL')
-         LIMIT 1`,
-        [orderId]
-      )
-      if (existingReports.length > 0) {
-        return res.status(409).json({
-          ok: false,
-          data: null,
-          error: receivingErr(req, 'CONFLICT', 'reportAlreadyExists'),
-          requestId: req.requestId,
-        })
-      }
-
       // Get supplier_id from the first order_item
       const { rows: items } = await query(
         `
@@ -363,8 +334,16 @@ router.post(
         status = 'PARTIAL'
       }
 
-      // Execute within transaction
+      // Execute within transaction (order lock + duplicate report check inside txn)
       const result = await withTransaction(async (client) => {
+        const order = await lockOrderForReceiving(client, orderId, restaurantId)
+
+        if (!RECEIVABLE_ORDER_STATUSES.includes(order.status)) {
+          throw new ValidationError('Order is not ready for receiving')
+        }
+
+        await assertNoReceivingReport(client, orderId)
+
         // Create receiving report
         const { rows: reports } = await client.query(
           `
@@ -531,119 +510,14 @@ router.post(
           [nextStatus, orderId]
         )
 
-        // Build invoice from received items (actual quantities/prices)
-        let createdInvoice = null
-        const { rows: rItems } = await client.query(
-          `
-        SELECT 
-          rli.product_id,
-          rli.order_item_id,
-          rli.product_name,
-          rli.product_sku as sku,
-          rli.received_quantity as quantity,
-          COALESCE(rli.actual_unit_price, rli.expected_unit_price) as unit_price
-        FROM receiving_line_item rli
-        WHERE rli.receiving_report_id = $1
-      `,
-          [report.id]
-        )
-
-        if (rItems.length > 0) {
-          // Generate minimal invoice based on orders.routes.js logic
-          const now = new Date()
-          const year = now.getFullYear()
-          const month = now.getMonth() + 1
-          let invoiceNumber = `INV-${year}-${String(month).padStart(2, '0')}-${String(Date.now()).slice(-6)}`
-          try {
-            const { rows: sequences } = await client.query(
-              `
-            INSERT INTO invoice_sequence (supplier_id, year, month, current_number, next_number)
-            VALUES ($1, $2, $3, 0, 1)
-            ON CONFLICT (supplier_id, year, month)
-            DO UPDATE SET next_number = invoice_sequence.next_number + 1
-            RETURNING next_number, prefix, format
-          `,
-              [supplierId, year, month]
-            )
-            if (sequences.length > 0) {
-              const seq = sequences[0]
-              const number = String(seq.next_number).padStart(6, '0')
-              invoiceNumber = `${seq.prefix || 'INV'}-${year}-${String(month).padStart(2, '0')}-${number}`
-            }
-          } catch (sequenceError) {
-            logger.warn('Failed to update invoice sequence during receiving creation', {
-              supplierId,
-              error: sequenceError.message,
-            })
-          }
-
-          let subtotal = 0
-          const taxRate = 0 // keep simple; tax config can be applied later
-          for (const it of rItems) {
-            subtotal += parseFloat(it.unit_price || 0) * parseFloat(it.quantity || 0)
-          }
-          const taxAmount = (subtotal * taxRate) / 100
-          const totalAmount = subtotal + taxAmount
-
-          const { rows: invRows } = await client.query(
-            `
-          INSERT INTO invoice (
-            invoice_number, supplier_id, restaurant_id, order_id,
-            invoice_date, issue_date, due_date,
-            subtotal, tax_amount, tax_rate, tax_included, total_amount,
-            balance_due, paid_amount, status, currency, payment_terms_days, notes
-          ) VALUES ($1, $2, $3, $4, now(), now(), now() + interval '30 days',
-            $5, $6, $7, false, $8, $8, 0, 'ISSUED', $9, 30, $10)
-          RETURNING *
-        `,
-            [
-              invoiceNumber,
-              supplierId,
-              restaurantId,
-              orderId,
-              subtotal,
-              taxAmount,
-              taxRate,
-              totalAmount,
-              order.currency || 'USD',
-              `Invoice after receiving for Order #${orderId.slice(0, 8)}`,
-            ]
-          )
-
-          const invoice = invRows[0]
-          createdInvoice = invoice
-          for (const it of rItems) {
-            const lineTotal = parseFloat(it.unit_price || 0) * parseFloat(it.quantity || 0)
-            await client.query(
-              `
-            INSERT INTO invoice_line_item (
-              invoice_id, product_id, description, sku,
-              quantity, unit_price, line_total, tax_rate, tax_amount, order_item_id
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-          `,
-              [
-                invoice.id,
-                it.product_id,
-                it.product_name,
-                it.sku,
-                it.quantity,
-                it.unit_price,
-                lineTotal,
-                taxRate,
-                0,
-                it.order_item_id,
-              ]
-            )
-          }
-
-          // Mark order as INVOICED
-          await client.query(
-            `
-          UPDATE customer_order SET status = 'INVOICED', updated_at = now() WHERE id = $1
-        `,
-            [orderId]
-          )
-        }
+        // Build invoice from accepted received items
+        const createdInvoice = await createInvoiceFromReceiving(client, {
+          order,
+          report,
+          supplierId,
+          restaurantId,
+          receivedBy: receivedBy || req.userData.id,
+        })
 
         const earnBaseAmount =
           totalActualCost > 0 ? totalActualCost : parseFloat(order.total_amount || 0)
@@ -672,13 +546,53 @@ router.post(
         logger.warn('Review prompt notification failed', { orderId, error: err.message })
       })
 
+      const costingItems = lineItems
+        .filter(
+          (item) =>
+            item.quality_status === 'ACCEPTED' && parseFloat(item.received_quantity || 0) > 0
+        )
+        .map((item) => ({
+          productId: item.productId,
+          supplierId,
+          unitPrice: item.actual_unit_price || item.expected_unit_price,
+          unit: item.unit || 'unit',
+        }))
+      hookRecipeCostingAfterReceiving(restaurantId, costingItems)
+      if (result.createdInvoice) {
+        hookRecipeCostingAfterInvoice(restaurantId, costingItems)
+      }
+
       res.status(201).json({
         ok: true,
-        data: { report: result.report },
+        data: { report: result.report, invoice: result.createdInvoice },
         error: null,
         requestId: req.requestId,
       })
     } catch (error) {
+      if (error instanceof ConflictError) {
+        return res.status(409).json({
+          ok: false,
+          data: null,
+          error: receivingErr(req, 'CONFLICT', 'reportAlreadyExists'),
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof ValidationError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: receivingErr(req, 'VALIDATION_ERROR', 'orderNotReady'),
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof NotFoundError) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: receivingErr(req, 'NOT_FOUND', 'orderNotFound'),
+          requestId: req.requestId,
+        })
+      }
       logger.error({
         message: 'Create receiving report error',
         error: error.message,

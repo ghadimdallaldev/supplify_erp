@@ -133,6 +133,22 @@ export function formatPlanFeatureCell(
     return { enabled, caption: enabled ? 'LLM assist' : undefined }
   }
 
+  if (featureKey === 'quick_lists') {
+    if (rawVal === false || rawVal == null || rawVal === '' || rawVal === 'basic_manual_only') {
+      return { enabled: false }
+    }
+    if (rawVal === 'automated_weekly') {
+      return { enabled: true, caption: 'Weekly schedule' }
+    }
+    if (rawVal === 'full_schedule' || rawVal === true) {
+      return { enabled: true, caption: 'Full schedule' }
+    }
+    if (rawVal === 'ai_smart_automation') {
+      return { enabled: true, caption: 'Smart quantities + suggest' }
+    }
+    return { enabled: true, caption: 'Included' }
+  }
+
   const enabled =
     typeof rawVal === 'boolean' ? rawVal : rawVal !== 'false' && rawVal != null && rawVal !== ''
   return { enabled }

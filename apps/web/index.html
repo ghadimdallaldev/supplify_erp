@@ -8,6 +8,15 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#5b21b6" />
+    <!-- Fonts: preconnect + parallel <link> instead of a render-blocking CSS @import.
+         A CSS @import waterfalls (app CSS → font CSS → font files); this loads the
+         font stylesheet in parallel with app CSS. display=swap paints text immediately. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
     <meta name="description" content="Supplify — restaurant & F&B supplier marketplace for orders, fulfillment, receiving, and reservations." />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />

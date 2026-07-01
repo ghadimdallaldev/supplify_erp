@@ -32,6 +32,7 @@ import './endpoints/admin'
 import './endpoints/impersonation'
 import './endpoints/catalogImport'
 import './endpoints/growth'
+import './endpoints/recipes'
 import './endpoints/loyalty'
 import './endpoints/runSheet'
 import '../staffApi'
@@ -130,6 +131,11 @@ export const {
   useBlockSupplierMutation,
   useUnblockSupplierMutation,
   useGetSupplierMeQuery,
+  useGetSupplierCustomDomainQuery,
+  useUpdateSupplierCustomDomainMutation,
+  useVerifySupplierCustomDomainMutation,
+  useGetSupplierBusinessSettingsQuery,
+  useUpdateSupplierBusinessSettingsMutation,
   useUpdateSupplierMutation,
   useUploadSupplierLogoMutation,
   useGetRestaurantMeQuery,
@@ -186,6 +192,8 @@ export const {
   useRemoveItemFromQuickListMutation,
   useScheduleQuickListMutation,
   useUnscheduleQuickListMutation,
+  useSuggestQuickListItemsMutation,
+  useApplyQuickListSuggestionsMutation,
   useGetRestaurantInventoryQuery,
   useGetRestaurantInventoryHistoryQuery,
   useAddRestaurantInventoryMutation,
@@ -225,6 +233,7 @@ export const {
   useGetOverdueInvoicesQuery,
   useGetRestaurantPayablesQuery,
   useGetSupplierInvoicesQuery,
+  useGetSupplierInvoiceQuery,
   useGetSupplierReceivablesQuery,
   useSendInvoiceReminderMutation,
   useRemindOverdueInvoicesMutation,
@@ -251,6 +260,8 @@ export const {
   useGetUnreadNotificationCountQuery,
   useGetNotificationPreferencesQuery,
   useUpdateNotificationPreferencesMutation,
+  useGetNotificationWebhookQuery,
+  useUpdateNotificationWebhookMutation,
   useGetBranchesQuery,
   useCreateBranchMutation,
   useUpdateBranchMutation,
@@ -298,6 +309,7 @@ export const {
   useMarkAllNotificationsReadMutation,
   useGetPublicRestaurantQuery,
   useGetPublicSupplierQuery,
+  useResolvePublicHostQuery,
   useGetPublicSupplierProductsQuery,
   useGetPublicSupplierPricedProductsQuery,
   useGetQuoteRequestsQuery,

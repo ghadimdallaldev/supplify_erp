@@ -9,7 +9,7 @@ import { formatDeliveryStatus } from '../../lib/deliveryStatusLabels'
 import { getGpsStatusLabel } from '../../lib/deliveryTrackingLabels'
 import { formatOrderRef, formatScheduledAt } from './fulfillmentDispatchUtils'
 import { DeliveryTrackingDrawer } from './DeliveryTrackingDrawer'
-import { ActiveDeliveriesMap } from '../maps/ActiveDeliveriesMap'
+import { LazyActiveDeliveriesMap } from '../maps/LazyActiveDeliveriesMap'
 
 type ViewMode = 'board' | 'map'
 
@@ -97,7 +97,7 @@ export function FulfillmentTrackingTab() {
               <p className="text-sm text-[var(--text-mid)]">{t('tracking.empty')}</p>
             </div>
           ) : viewMode === 'map' ? (
-            <ActiveDeliveriesMap orders={orders} onSelectOrder={setTrackingOrderId} />
+            <LazyActiveDeliveriesMap orders={orders} onSelectOrder={setTrackingOrderId} />
           ) : (
             <div className="overflow-x-auto -mx-1 px-1">
               <table className="w-full min-w-[720px] text-sm" data-testid="tracking-table">

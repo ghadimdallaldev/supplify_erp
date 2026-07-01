@@ -16,6 +16,10 @@ import {
   SUPPLIER_NOTIFICATION_DEFAULTS,
   SUPPLIER_NOTIFICATION_FIELD_KEYS,
 } from '../supplierSettingsShared'
+import {
+  NotificationChannelPlanNotice,
+  NotificationWebhookCard,
+} from '../../../notifications/NotificationWebhookCard'
 import { ensureNamespace } from '../../../../i18n'
 
 export function SupplierNotificationsTab() {
@@ -88,6 +92,7 @@ export function SupplierNotificationsTab() {
             </div>
           ) : (
             <>
+              <NotificationChannelPlanNotice />
               <div className="grid gap-3 md:grid-cols-2">
                 {SUPPLIER_NOTIFICATION_FIELD_KEYS.map((key) => (
                   <label
@@ -191,6 +196,8 @@ export function SupplierNotificationsTab() {
           )}
         </CardContent>
       </Card>
+
+      <NotificationWebhookCard />
     </div>
   )
 }

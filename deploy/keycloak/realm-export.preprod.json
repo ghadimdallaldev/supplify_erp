@@ -1,29 +1,46 @@
 {
   "realm": "supplify-preprod",
   "enabled": true,
-  "sslRequired": "external",
+  "sslRequired": "all",
   "registrationAllowed": true,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
   "editUsernameAllowed": false,
   "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
   "clients": [
     {
       "clientId": "supplify-api",
       "enabled": true,
-      "directAccessGrantsEnabled": true,
+      "directAccessGrantsEnabled": false,
       "standardFlowEnabled": true,
       "clientAuthenticatorType": "client-secret",
       "secret": "changeme",
       "redirectUris": [
-        "https://supplify-api-preprod.up.railway.app/auth/callback",
-        "https://supplify-api-preprod.up.railway.app/*"
+        "https://app-preprod.supplifyerp.com/auth/callback",
+        "https://app-preprod.supplifyerp.com/*",
+        "https://api-preprod.supplifyerp.com/auth/callback",
+        "https://api-preprod.supplifyerp.com/*",
+        "https://supplify-web-preprod-preprod.up.railway.app/auth/callback",
+        "https://supplify-web-preprod-preprod.up.railway.app/*",
+        "https://supplify-api-preprod-preprod.up.railway.app/auth/callback",
+        "https://supplify-api-preprod-preprod.up.railway.app/*"
       ],
-      "webOrigins": ["https://supplify-web-preprod.up.railway.app", "+"],
+      "webOrigins": [
+        "https://app-preprod.supplifyerp.com",
+        "https://api-preprod.supplifyerp.com",
+        "https://supplify-web-preprod-preprod.up.railway.app"
+      ],
       "protocol": "openid-connect",
       "attributes": {
-        "post.logout.redirect.uris": "https://supplify-api-preprod.up.railway.app/auth/register?continue=1##https://supplify-api-preprod.up.railway.app/auth/register##https://supplify-api-preprod.up.railway.app/*##https://supplify-web-preprod.up.railway.app/login##https://supplify-web-preprod.up.railway.app/*"
+        "post.logout.redirect.uris": "https://app-preprod.supplifyerp.com/login##https://app-preprod.supplifyerp.com/*##https://api-preprod.supplifyerp.com/auth/register?continue=1##https://api-preprod.supplifyerp.com/auth/register##https://api-preprod.supplifyerp.com/*##https://supplify-web-preprod-preprod.up.railway.app/login##https://supplify-web-preprod-preprod.up.railway.app/*"
       },
       "defaultClientScopes": ["web-origins", "profile", "roles", "email"],
       "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
@@ -33,14 +50,21 @@
       "enabled": true,
       "publicClient": true,
       "redirectUris": [
-        "https://supplify-api-preprod.up.railway.app/auth/callback",
-        "https://supplify-api-preprod.up.railway.app/*"
+        "https://app-preprod.supplifyerp.com/auth/callback",
+        "https://app-preprod.supplifyerp.com/*",
+        "https://api-preprod.supplifyerp.com/auth/callback",
+        "https://api-preprod.supplifyerp.com/*",
+        "https://supplify-web-preprod-preprod.up.railway.app/auth/callback",
+        "https://supplify-web-preprod-preprod.up.railway.app/*"
       ],
-      "webOrigins": ["https://supplify-web-preprod.up.railway.app", "+"],
+      "webOrigins": [
+        "https://app-preprod.supplifyerp.com",
+        "https://supplify-web-preprod-preprod.up.railway.app"
+      ],
       "protocol": "openid-connect",
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "https://supplify-web-preprod.up.railway.app/login##https://supplify-web-preprod.up.railway.app/*##https://supplify-api-preprod.up.railway.app/*"
+        "post.logout.redirect.uris": "https://app-preprod.supplifyerp.com/login##https://app-preprod.supplifyerp.com/*##https://api-preprod.supplifyerp.com/*##https://supplify-web-preprod-preprod.up.railway.app/login##https://supplify-web-preprod-preprod.up.railway.app/*"
       },
       "defaultClientScopes": ["web-origins", "profile", "roles", "email"],
       "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]

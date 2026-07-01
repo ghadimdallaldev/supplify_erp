@@ -143,8 +143,9 @@ export function resolveAllowedChannels(notificationsFeatureValue) {
     case 'in_app_and_email':
       return new Set(['in_app', 'email'])
     case 'email_and_whatsapp':
-    case 'email_whatsapp_webhook':
       return new Set(['in_app', 'email', 'whatsapp'])
+    case 'email_whatsapp_webhook':
+      return new Set(['in_app', 'email', 'whatsapp', 'webhook'])
     case 'in_app_only':
     default:
       return new Set(['in_app'])
@@ -1612,7 +1613,7 @@ export async function notifyAdminNewTenant(
         userId,
         userType: 'ADMIN',
         notificationType: 'SYSTEM',
-        notificationCategory: 'system_updates',
+        notificationCategory: 'admin_new_tenant',
         title: nt('admin.newTenantTitle', locale, { tenantType: tenantTypeLabel }),
         message: nt('admin.newTenantMessage', locale, {
           tenantType: tenantTypeLabel,
@@ -1622,7 +1623,7 @@ export async function notifyAdminNewTenant(
         locale,
         referenceId: tenantId,
         referenceType: 'TENANT',
-        metadata: { tenantType, tenantName, ctaUrl: '/admin' },
+        metadata: { tenantType, tenantName, contactEmail, ctaUrl: '/admin' },
       }).catch(() => {})
     }
   } catch (err) {

@@ -15,6 +15,7 @@ import { Loader2, Download, CreditCard, ArrowRightLeft, FileText } from 'lucide-
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { formatPrice } from '../../utils/format'
+import { invoiceRemainingBalance } from '../../lib/invoiceBalance'
 import { apiUrl } from '../../lib/apiBase'
 
 export function InvoiceDetailDialog(props: any) {
@@ -78,9 +79,7 @@ export function InvoiceDetailDialog(props: any) {
               {isRestaurant &&
                 canRecordPayments &&
                 selectedInvoice &&
-                parseFloat(selectedInvoice.balance_due || selectedInvoice.total_amount || 0) -
-                  parseFloat(selectedInvoice.total_paid || 0) >
-                  0 && (
+                invoiceRemainingBalance(selectedInvoice) > 0 && (
                   <Button
                     size="sm"
                     onClick={() => {

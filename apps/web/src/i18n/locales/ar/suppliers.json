@@ -305,7 +305,13 @@
     "termsConditions": "الشروط والأحكام",
     "termsPlaceholder": "شروطك وأحكامك للطلبات...",
     "paymentTermsPlaceholder": "صافٍ 30 يوماً",
+    "open": "مفتوح",
+    "loading": "جارٍ تحميل إعدادات الأعمال…",
     "save": "حفظ إعدادات الأعمال",
+    "toast": {
+      "saved": "تم حفظ إعدادات الأعمال بنجاح",
+      "saveFailed": "تعذّر حفظ إعدادات الأعمال"
+    },
     "days": {
       "monday": "الاثنين",
       "tuesday": "الثلاثاء",

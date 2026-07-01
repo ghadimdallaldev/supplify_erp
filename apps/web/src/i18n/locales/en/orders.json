@@ -135,6 +135,8 @@
     "supplierUnknown": "Could not determine supplier for this order",
     "savedWithIssues": "Receiving saved. {{count}} item(s) had issues — submit one dispute for the supplier.",
     "completedSuccess": "Receiving completed successfully",
+    "completedWithInvoice": "Receiving complete — invoice issued",
+    "viewInvoice": "View invoice",
     "createFailed": "Failed to create receiving report",
     "dialog": {
       "title": "Receive Order #{{id}}",

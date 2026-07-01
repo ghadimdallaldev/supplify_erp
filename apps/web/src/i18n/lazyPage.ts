@@ -3,7 +3,6 @@ import type { I18nNamespace } from './config'
 import { PAGE_I18N } from './pageNamespaces'
 import { getActiveLocale, i18n, loadNamespaces } from './index'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyComponent = ComponentType<any>
 
 /**

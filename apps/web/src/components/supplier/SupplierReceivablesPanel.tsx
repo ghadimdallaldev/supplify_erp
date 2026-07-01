@@ -223,7 +223,10 @@ export function SupplierReceivablesPanel() {
                     return (
                       <tr key={inv.id} className="border-t border-[var(--app-border)]">
                         <td className="px-3 py-2">
-                          <Link to="/app/invoices" className="text-[var(--brand)] font-medium">
+                          <Link
+                            to={`/app/invoices?invoice=${inv.id}`}
+                            className="text-[var(--brand)] font-medium"
+                          >
                             {inv.invoiceNumber}
                           </Link>
                         </td>

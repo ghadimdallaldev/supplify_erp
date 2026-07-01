@@ -354,11 +354,29 @@ export async function completeTenantRegistration({
 
   // Keycloak + welcome email are not required to finish signup; do not block the HTTP response.
   void ensureKeycloakRealmRole(normalizedEmail, kcRole)
+  void (async () => {
+    const { sendTemplateEmail } = await import('../services/email/email.service.js')
+    const { buildAppUrl } = await import('./app-url.js')
+    await sendTemplateEmail({
+      to: normalizedEmail,
+      template: 'auth.welcome',
+      locale: null,
+      data: {
+        tenantName: name,
+        tenantType: result.tenantType,
+        ctaUrl: buildAppUrl('/app'),
+      },
+      tenantId: result.tenant.id,
+      eventType: 'auth.welcome',
+      eventKey: `welcome:${userId}:${result.tenant.id}`,
+      entityId: result.tenant.id,
+    })
+  })().catch(() => {})
   void sendNotification({
     userId,
     userType: result.tenantType,
     notificationType: 'SYSTEM',
-    notificationCategory: 'system_updates',
+    notificationCategory: 'welcome',
     title: 'Welcome to Supplify',
     message:
       result.tenantType === 'SUPPLIER'
@@ -366,7 +384,13 @@ export async function completeTenantRegistration({
         : `Your restaurant account "${name}" is ready.`,
     referenceId: result.tenant.id,
     referenceType: 'TENANT',
-    metadata: { tenantId: result.tenant.id, tenantType: result.tenantType, tenantName: name },
+    metadata: {
+      tenantId: result.tenant.id,
+      tenantType: result.tenantType,
+      tenantName: name,
+      ctaUrl: '/app',
+      skipEmail: true,
+    },
   }).catch(() => {})
   void notifyAdminNewTenant({
     tenantId: result.tenant.id,

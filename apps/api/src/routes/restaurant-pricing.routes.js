@@ -629,6 +629,17 @@ router.patch('/:id', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (r
       throw new NotFoundError('Pricing not found')
     }
 
+    if (updateData.price != null) {
+      const { hookRecipeCostingAfterCatalogPriceChange } = await import(
+        '../services/recipe-purchasing-hooks.service.js'
+      )
+      hookRecipeCostingAfterCatalogPriceChange(
+        pricing.product_id,
+        Number(pricing.price),
+        'CONTRACT'
+      )
+    }
+
     res.json({
       ok: true,
       data: { pricing: mapPricingRow(pricing) },

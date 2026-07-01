@@ -224,3 +224,29 @@ export function notificationsMutationGuard(req, res, next) {
   }
   return next()
 }
+
+/** After RECIPES_VIEW on /api/recipes and /api/recipe-costing. */
+export function recipesMutationGuard(req, res, next) {
+  const method = req.method.toUpperCase()
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return next()
+  const path = req.path || ''
+  if (method === 'POST' && /\/deactivate$/.test(path)) {
+    return requireAnyPermission(P.RECIPES_EDIT, P.RECIPES_MANAGE)(req, res, next)
+  }
+  if (method === 'POST' && /\/duplicate$/.test(path)) {
+    return requireAnyPermission(P.RECIPES_EDIT, P.RECIPES_MANAGE)(req, res, next)
+  }
+  if (method === 'POST' && /\/recalculate$/.test(path)) {
+    return requireAnyPermission(P.RECIPES_EDIT, P.RECIPES_MANAGE)(req, res, next)
+  }
+  if (method === 'POST') {
+    return requireAnyPermission(P.RECIPES_EDIT, P.RECIPES_MANAGE)(req, res, next)
+  }
+  if (method === 'PATCH' || method === 'PUT') {
+    return requireAnyPermission(P.RECIPES_EDIT, P.RECIPES_MANAGE)(req, res, next)
+  }
+  if (method === 'DELETE') {
+    return requirePermission(P.RECIPES_MANAGE)(req, res, next)
+  }
+  return next()
+}

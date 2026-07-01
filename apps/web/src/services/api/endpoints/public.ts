@@ -26,6 +26,16 @@ export const publicApi = api.injectEndpoints({
         credentials: 'omit',
       }),
     }),
+    resolvePublicHost: builder.query<
+      { tenantId: string; tenantType: string; slug: string | null },
+      string
+    >({
+      query: (host) => ({
+        url: '/api/public/resolve-host',
+        params: { host },
+        credentials: 'omit',
+      }),
+    }),
     getPublicSupplierProducts: builder.query<
       PublicSupplierProductsResponse,
       { idOrSlug: string; page?: number; limit?: number; q?: string; category?: string }

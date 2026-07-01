@@ -1,6 +1,8 @@
 import { query } from '../lib/db.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { resolveSmartReorderCapabilities } from '../lib/smart-reorder-tier.js'
+import { computeSuggestedReorderQty } from '../lib/reorder-quantity.js'
+import { applySupplierPackRounding } from '../lib/reorder-unit-normalize.js'
 import { listRestaurantReminders } from './reorder-cadence.service.js'
 import { listExpiryLots } from './inventory-expiry.service.js'
 import { getCachedForecasts, refreshIfStale } from './reorder-forecast-cache.service.js'
@@ -38,7 +40,7 @@ function isSuppressed(suppressions, scopeType, scopeId) {
   return suppressions.some((s) => s.scope_type === scopeType && s.scope_id === String(scopeId))
 }
 
-async function fetchLowStockSuggestions(restaurantId) {
+async function fetchLowStockSuggestions(restaurantId, { branchId = null } = {}) {
   const { rows } = await query(
     `
     WITH usage_stats AS (
@@ -82,6 +84,8 @@ async function fetchLowStockSuggestions(restaurantId) {
       COALESCE(us.last_order_qty, 0) AS last_order_qty,
       COALESCE(us.days_since_last_order, 999) AS days_since_last_order,
       COALESCE(pis.lead_time_days, 7) AS lead_time_days,
+      COALESCE(pis.moq, 1) AS moq,
+      COALESCE(pis.order_multiple, 1) AS order_multiple,
       CASE
         WHEN ri.quantity <= COALESCE(ri.low_stock_threshold, 0) THEN 'URGENT'
         WHEN COALESCE(us.avg_daily_usage_30day, 0) > 0
@@ -89,20 +93,14 @@ async function fetchLowStockSuggestions(restaurantId) {
         WHEN COALESCE(us.avg_daily_usage_30day, 0) > 0
           AND ri.quantity / NULLIF(us.avg_daily_usage_30day, 0) < (COALESCE(pis.lead_time_days, 7) + 21) THEN 'MEDIUM'
         ELSE 'LOW'
-      END AS urgency_level,
-      CASE
-        WHEN ri.quantity <= COALESCE(ri.low_stock_threshold, 0) THEN
-          GREATEST(COALESCE(us.avg_daily_usage_30day, 0) * (COALESCE(pis.lead_time_days, 7) + 14), COALESCE(us.last_order_qty, 1), COALESCE(pis.moq, 1))
-        WHEN COALESCE(us.avg_daily_usage_30day, 0) > 0 THEN
-          GREATEST(COALESCE(us.avg_daily_usage_30day, 0) * (COALESCE(pis.lead_time_days, 7) + 14) - ri.quantity, COALESCE(pis.moq, 1))
-        ELSE NULL
-      END AS suggested_reorder_qty
+      END AS urgency_level
     FROM restaurant_inventory ri
     JOIN product p ON p.id = ri.product_id
     JOIN supplier s ON s.id = p.supplier_id
     LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
     LEFT JOIN usage_stats us ON us.product_id = ri.product_id
     WHERE ri.restaurant_id = $1
+      AND ($2::uuid IS NULL OR ri.branch_id = $2)
       AND (
         ri.quantity <= COALESCE(ri.low_stock_threshold, 0)
         OR (
@@ -121,21 +119,44 @@ async function fetchLowStockSuggestions(restaurantId) {
       ri.quantity ASC
     LIMIT 30
     `,
-    [restaurantId]
+    [restaurantId, branchId]
   )
 
   return rows.map((row) => {
-    const isLow = row.current_qty <= (row.low_stock_threshold || 0)
+    const belowThreshold = row.current_qty <= (row.low_stock_threshold || 0)
     const isFrequent = row.avg_daily_usage_30day >= 0.5 && row.days_since_last_order < 14
     let reasonCode = 'not_ordered_recently'
     let reasonLabel = `Last ordered ${row.days_since_last_order} days ago`
 
-    if (isLow) {
+    if (belowThreshold) {
       reasonCode = 'low_stock'
       reasonLabel = REASON_LABELS.low_stock
     } else if (isFrequent) {
       reasonCode = 'frequent'
       reasonLabel = REASON_LABELS.frequent
+    }
+
+    let suggestedQty = computeSuggestedReorderQty({
+      currentQty: row.current_qty,
+      avgDailyUsage: row.avg_daily_usage_30day,
+      leadTimeDays: row.lead_time_days,
+      lastOrderQty: row.last_order_qty,
+      moq: row.moq,
+      orderMultiple: row.order_multiple,
+      belowThreshold,
+      unit: row.product_unit,
+    })
+    if (suggestedQty == null) {
+      // Soft nudge (e.g. "not ordered recently") — suggest the last order size when known.
+      const lastQty = Math.ceil(Number(row.last_order_qty) || 0)
+      suggestedQty =
+        lastQty > 0
+          ? applySupplierPackRounding(
+              lastQty,
+              { moq: row.moq, orderMultiple: row.order_multiple },
+              row.product_unit
+            )
+          : null
     }
 
     return {
@@ -148,7 +169,7 @@ async function fetchLowStockSuggestions(restaurantId) {
       reasonCode,
       reasonLabel,
       urgency: row.urgency_level,
-      suggestedQty: Math.max(1, Math.ceil(row.suggested_reorder_qty || row.last_order_qty || 1)),
+      suggestedQty,
       currentQty: parseFloat(row.current_qty),
       scopeType: 'product',
       scopeId: String(row.product_id),
@@ -279,7 +300,7 @@ export async function getReorderAssistance(restaurantId, opts = {}) {
   const suppressions = await getActiveSuppressions(restaurantId)
 
   const [stock, cadence, expiry, quickList] = await Promise.all([
-    fetchLowStockSuggestions(restaurantId),
+    fetchLowStockSuggestions(restaurantId, { branchId }),
     fetchCadenceSuggestions(restaurantId),
     fetchExpirySuggestions(restaurantId),
     fetchQuickListSuggestions(restaurantId),
