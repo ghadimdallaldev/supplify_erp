@@ -150,6 +150,7 @@ function createRecipesRouter() {
           active: req.query.active,
           missingCost: req.query.missingCost,
           aboveTarget: req.query.aboveTarget,
+          onTarget: req.query.onTarget,
           recentlyImpacted: req.query.recentlyImpacted,
           productId: req.query.productId,
         },
