@@ -3,7 +3,11 @@ import { config } from '../../config/env.js'
 
 /** @type {import('./provider.js').AiProvider} */
 export function createOpenAiProvider() {
-  const client = new OpenAI({ apiKey: config.OPENAI_API_KEY })
+  const client = new OpenAI({
+    apiKey: config.OPENAI_API_KEY,
+    timeout: config.AI_REQUEST_TIMEOUT_MS,
+    maxRetries: config.AI_MAX_RETRIES,
+  })
 
   return {
     async completeJson({ system, user, schemaHint }) {

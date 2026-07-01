@@ -53,4 +53,15 @@ describe('ai-platform', () => {
     expect(await canUseReorderAiAsk('r1', 'RESTAURANT', 'full_90day_trends')).toBe(false)
     expect(await canUseReorderAiAsk('r1', 'RESTAURANT', 'ai_forecast_seasonality')).toBe(true)
   })
+
+  it('resolveReorderAiCapabilities reflects env, platform, and tier gates', async () => {
+    mockConfig.AI_ENABLED = true
+    mockConfig.OPENAI_API_KEY = 'sk-test'
+    const { resolveReorderAiCapabilities } = await import('./ai-platform.js')
+    const caps = await resolveReorderAiCapabilities('r1', 'RESTAURANT', 'ai_forecast_seasonality')
+    expect(caps.envEnabled).toBe(true)
+    expect(caps.platformEnabled).toBe(true)
+    expect(caps.canExplainLlm).toBe(true)
+    expect(caps.canAskLlm).toBe(true)
+  })
 })

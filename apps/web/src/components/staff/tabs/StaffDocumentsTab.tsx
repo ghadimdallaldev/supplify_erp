@@ -18,10 +18,11 @@ import {
   useGetStaffMembersQuery,
   useGetStaffPerformanceNotesQuery,
 } from '../../../services/staffApi'
-import { toDatetimeLocalValue } from '../staffShared'
+import { toDatetimeLocalValue, useStaffWriteAccess } from '../staffShared'
 
 export function StaffDocumentsTab() {
   const { t } = useTranslation('staff')
+  const canWriteStaff = useStaffWriteAccess()
   const [documentForm, setDocumentForm] = useState({
     staffId: '',
     docType: '',
@@ -187,9 +188,11 @@ export function StaffDocumentsTab() {
             </div>
           </div>
           <div className="flex justify-end">
-            <Button onClick={handleCreateDocument} disabled={creatingDocument}>
-              {creatingDocument ? t('documents.uploading') : t('documents.storeDocument')}
-            </Button>
+            {canWriteStaff ? (
+              <Button onClick={handleCreateDocument} disabled={creatingDocument}>
+                {creatingDocument ? t('documents.uploading') : t('documents.storeDocument')}
+              </Button>
+            ) : null}
           </div>
           {documentsLoading ? (
             <p className="text-sm text-[var(--text-muted)]">{t('documents.loadingDocuments')}</p>
@@ -313,9 +316,11 @@ export function StaffDocumentsTab() {
                   />
                 </div>
                 <div className="flex justify-end">
-                  <Button onClick={handleCreateIncident} disabled={creatingIncident}>
-                    {creatingIncident ? t('shared.saving') : t('documents.logIncidentButton')}
-                  </Button>
+                  {canWriteStaff ? (
+                    <Button onClick={handleCreateIncident} disabled={creatingIncident}>
+                      {creatingIncident ? t('shared.saving') : t('documents.logIncidentButton')}
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -415,9 +420,11 @@ export function StaffDocumentsTab() {
                   />
                 </div>
                 <div className="flex justify-end">
-                  <Button onClick={handleCreatePerformanceNote} disabled={creatingPerformance}>
-                    {creatingPerformance ? t('shared.saving') : t('documents.saveNote')}
-                  </Button>
+                  {canWriteStaff ? (
+                    <Button onClick={handleCreatePerformanceNote} disabled={creatingPerformance}>
+                      {creatingPerformance ? t('shared.saving') : t('documents.saveNote')}
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </div>

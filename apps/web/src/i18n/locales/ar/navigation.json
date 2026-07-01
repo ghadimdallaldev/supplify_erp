@@ -107,7 +107,11 @@
       "products": "كتالوج بحث",
       "orders": "شراء طلبات",
       "fulfillment": "تسليم شحن",
+      "reservations": "حجوزات استقبال قائمة انتظار",
       "staff": "فريق موظفون",
+      "guestMenu": "قائمة ضيوف متجر",
+      "guestOrders": "طلبات ضيوف مطبخ",
+      "guestRewards": "ولاء نقاط مكافآت",
       "settings": "تفضيلات حساب"
     }
   },

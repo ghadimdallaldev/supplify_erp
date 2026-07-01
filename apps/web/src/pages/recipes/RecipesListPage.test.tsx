@@ -26,6 +26,7 @@ vi.mock('../../services/api/endpoints/recipes', () => ({
           costPerPortion: 4.5,
           foodCostPct: 37.5,
           grossMarginPct: 62.5,
+          targetFoodCostPct: 30,
           calcStatus: 'WARNING',
           isActive: true,
           currency: 'USD',
@@ -41,6 +42,19 @@ vi.mock('../../services/api/endpoints/recipes', () => ({
     isError: false,
     refetch: vi.fn(),
   }),
+  useGetRecipeCostingDashboardQuery: () => ({
+    data: {
+      dashboard: {
+        stats: {
+          activeRecipes: 1,
+          aboveTargetFoodCost: 1,
+          missingCostData: 0,
+          recentlyImpacted: 0,
+          averageFoodCostPct: 37.5,
+        },
+      },
+    },
+  }),
   useRecalculateRecipeMutation: () => [vi.fn(), { isLoading: false }],
 }))
 
@@ -52,7 +66,7 @@ describe('RecipesListPage', () => {
       </MemoryRouter>
     )
     expect(screen.getByTestId('recipes-list-page')).toBeInTheDocument()
-    expect(screen.getByText('Chicken Sandwich')).toBeInTheDocument()
+    expect(screen.getAllByText('Chicken Sandwich').length).toBeGreaterThan(0)
     expect(screen.getByText('Food cost %')).toBeInTheDocument()
   })
 })

@@ -27,10 +27,16 @@ import {
 } from '../../../services/staffApi'
 import type { StaffShiftSwap } from '../../../types'
 import { getApiErrorMessage } from '../../../lib/apiError'
-import { clampToISODate, initialShiftForm, type ShiftFormState } from '../staffShared'
+import {
+  clampToISODate,
+  initialShiftForm,
+  type ShiftFormState,
+  useStaffWriteAccess,
+} from '../staffShared'
 
 export function StaffScheduleTab() {
   const { t } = useTranslation('staff')
+  const canWriteStaff = useStaffWriteAccess()
   const [isAddShiftOpen, setIsAddShiftOpen] = useState(false)
   const [shiftForm, setShiftForm] = useState<ShiftFormState>(initialShiftForm)
   const [swapForm, setSwapForm] = useState({
@@ -139,91 +145,93 @@ export function StaffScheduleTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <Dialog open={isAddShiftOpen} onOpenChange={setIsAddShiftOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline">{t('schedule.createShift')}</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t('schedule.scheduleShiftTitle')}</DialogTitle>
-              <DialogDescription>{t('schedule.scheduleShiftDescription')}</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div>
-                <Label htmlFor="shiftRole">{t('schedule.role')}</Label>
-                <Input
-                  id="shiftRole"
-                  value={shiftForm.role}
-                  onChange={(event) => handleShiftInputChange('role', event.target.value)}
-                  placeholder={t('schedule.rolePlaceholder')}
-                />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+      {canWriteStaff ? (
+        <div className="flex justify-end">
+          <Dialog open={isAddShiftOpen} onOpenChange={setIsAddShiftOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">{t('schedule.createShift')}</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t('schedule.scheduleShiftTitle')}</DialogTitle>
+                <DialogDescription>{t('schedule.scheduleShiftDescription')}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
                 <div>
-                  <Label htmlFor="shiftDate">{t('schedule.date')}</Label>
+                  <Label htmlFor="shiftRole">{t('schedule.role')}</Label>
                   <Input
-                    id="shiftDate"
-                    type="date"
-                    value={shiftForm.shiftDate}
-                    onChange={(event) => handleShiftInputChange('shiftDate', event.target.value)}
+                    id="shiftRole"
+                    value={shiftForm.role}
+                    onChange={(event) => handleShiftInputChange('role', event.target.value)}
+                    placeholder={t('schedule.rolePlaceholder')}
                   />
                 </div>
-                <div>
-                  <Label htmlFor="shiftStaff">{t('schedule.assignOptional')}</Label>
-                  <Select
-                    value={shiftForm.staffId}
-                    onValueChange={(value) => handleShiftInputChange('staffId', value)}
-                  >
-                    <SelectTrigger id="shiftStaff" className="mt-1 w-full">
-                      <option value="">{t('shared.unassigned')}</option>
-                      {staffMembers.map((member) => (
-                        <option key={member.id} value={member.id}>
-                          {member.displayName} · {member.role}
-                        </option>
-                      ))}
-                    </SelectTrigger>
-                  </Select>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor="shiftDate">{t('schedule.date')}</Label>
+                    <Input
+                      id="shiftDate"
+                      type="date"
+                      value={shiftForm.shiftDate}
+                      onChange={(event) => handleShiftInputChange('shiftDate', event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="shiftStaff">{t('schedule.assignOptional')}</Label>
+                    <Select
+                      value={shiftForm.staffId}
+                      onValueChange={(value) => handleShiftInputChange('staffId', value)}
+                    >
+                      <SelectTrigger id="shiftStaff" className="mt-1 w-full">
+                        <option value="">{t('shared.unassigned')}</option>
+                        {staffMembers.map((member) => (
+                          <option key={member.id} value={member.id}>
+                            {member.displayName} · {member.role}
+                          </option>
+                        ))}
+                      </SelectTrigger>
+                    </Select>
+                  </div>
                 </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor="startTime">{t('schedule.startTime')}</Label>
+                    <Input
+                      id="startTime"
+                      type="time"
+                      value={shiftForm.startTime}
+                      onChange={(event) => handleShiftInputChange('startTime', event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="endTime">{t('schedule.endTime')}</Label>
+                    <Input
+                      id="endTime"
+                      type="time"
+                      value={shiftForm.endTime}
+                      onChange={(event) => handleShiftInputChange('endTime', event.target.value)}
+                    />
+                  </div>
+                </div>
                 <div>
-                  <Label htmlFor="startTime">{t('schedule.startTime')}</Label>
+                  <Label htmlFor="shiftNotes">{t('shared.notes')}</Label>
                   <Input
-                    id="startTime"
-                    type="time"
-                    value={shiftForm.startTime}
-                    onChange={(event) => handleShiftInputChange('startTime', event.target.value)}
+                    id="shiftNotes"
+                    value={shiftForm.notes}
+                    onChange={(event) => handleShiftInputChange('notes', event.target.value)}
+                    placeholder={t('schedule.notesPlaceholder')}
                   />
                 </div>
-                <div>
-                  <Label htmlFor="endTime">{t('schedule.endTime')}</Label>
-                  <Input
-                    id="endTime"
-                    type="time"
-                    value={shiftForm.endTime}
-                    onChange={(event) => handleShiftInputChange('endTime', event.target.value)}
-                  />
-                </div>
               </div>
-              <div>
-                <Label htmlFor="shiftNotes">{t('shared.notes')}</Label>
-                <Input
-                  id="shiftNotes"
-                  value={shiftForm.notes}
-                  onChange={(event) => handleShiftInputChange('notes', event.target.value)}
-                  placeholder={t('schedule.notesPlaceholder')}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={handleCreateShift} disabled={creatingShift}>
-                {creatingShift ? t('schedule.scheduling') : t('schedule.scheduleShift')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+              <DialogFooter>
+                <Button onClick={handleCreateShift} disabled={creatingShift}>
+                  {creatingShift ? t('schedule.scheduling') : t('schedule.scheduleShift')}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -346,7 +354,7 @@ export function StaffScheduleTab() {
                     {t('shared.decisionNotePrefix', { note: swap.managerNote })}
                   </p>
                 ) : null}
-                {swap.status === 'REQUESTED' ? (
+                {canWriteStaff && swap.status === 'REQUESTED' ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button
                       size="sm"
@@ -372,77 +380,81 @@ export function StaffScheduleTab() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('schedule.logSwapTitle')}</CardTitle>
-          <CardDescription>{t('schedule.logSwapDescription')}</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="swapShift">{t('schedule.shift')}</Label>
-            <Select
-              value={swapForm.shiftId}
-              onValueChange={(value) => setSwapForm((prev) => ({ ...prev, shiftId: value }))}
-            >
-              <SelectTrigger id="swapShift" className="mt-1 w-full">
-                <option value="">{t('schedule.selectShift')}</option>
-                {shifts.map((shift) => (
-                  <option key={shift.id} value={shift.id}>
-                    {format(new Date(shift.startsAt), 'EEE, MMM d · p')} — {shift.role}
-                  </option>
-                ))}
-              </SelectTrigger>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="swapRequester">{t('schedule.requestedBy')}</Label>
-            <Select
-              value={swapForm.requestedBy}
-              onValueChange={(value) => setSwapForm((prev) => ({ ...prev, requestedBy: value }))}
-            >
-              <SelectTrigger id="swapRequester" className="mt-1 w-full">
-                <option value="">{t('schedule.chooseStaff')}</option>
-                {staffMembers.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.displayName}
-                  </option>
-                ))}
-              </SelectTrigger>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="swapCover">{t('schedule.proposedCover')}</Label>
-            <Select
-              value={swapForm.proposedCoverId}
-              onValueChange={(value) =>
-                setSwapForm((prev) => ({ ...prev, proposedCoverId: value }))
-              }
-            >
-              <SelectTrigger id="swapCover" className="mt-1 w-full">
-                <option value="">{t('schedule.openToTeam')}</option>
-                {staffMembers.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.displayName}
-                  </option>
-                ))}
-              </SelectTrigger>
-            </Select>
-          </div>
-          <div className="sm:col-span-2">
-            <Label htmlFor="swapReason">{t('shared.reason')}</Label>
-            <Input
-              id="swapReason"
-              value={swapForm.reason}
-              onChange={(event) => setSwapForm((prev) => ({ ...prev, reason: event.target.value }))}
-            />
-          </div>
-          <div className="sm:col-span-2 flex justify-end">
-            <Button onClick={handleCreateSwap} disabled={creatingSwap}>
-              {creatingSwap ? t('portal.dashboard.submitting') : t('schedule.submitSwap')}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {canWriteStaff ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('schedule.logSwapTitle')}</CardTitle>
+            <CardDescription>{t('schedule.logSwapDescription')}</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="swapShift">{t('schedule.shift')}</Label>
+              <Select
+                value={swapForm.shiftId}
+                onValueChange={(value) => setSwapForm((prev) => ({ ...prev, shiftId: value }))}
+              >
+                <SelectTrigger id="swapShift" className="mt-1 w-full">
+                  <option value="">{t('schedule.selectShift')}</option>
+                  {shifts.map((shift) => (
+                    <option key={shift.id} value={shift.id}>
+                      {format(new Date(shift.startsAt), 'EEE, MMM d · p')} — {shift.role}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="swapRequester">{t('schedule.requestedBy')}</Label>
+              <Select
+                value={swapForm.requestedBy}
+                onValueChange={(value) => setSwapForm((prev) => ({ ...prev, requestedBy: value }))}
+              >
+                <SelectTrigger id="swapRequester" className="mt-1 w-full">
+                  <option value="">{t('schedule.chooseStaff')}</option>
+                  {staffMembers.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.displayName}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="swapCover">{t('schedule.proposedCover')}</Label>
+              <Select
+                value={swapForm.proposedCoverId}
+                onValueChange={(value) =>
+                  setSwapForm((prev) => ({ ...prev, proposedCoverId: value }))
+                }
+              >
+                <SelectTrigger id="swapCover" className="mt-1 w-full">
+                  <option value="">{t('schedule.openToTeam')}</option>
+                  {staffMembers.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.displayName}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
+            </div>
+            <div className="sm:col-span-2">
+              <Label htmlFor="swapReason">{t('shared.reason')}</Label>
+              <Input
+                id="swapReason"
+                value={swapForm.reason}
+                onChange={(event) =>
+                  setSwapForm((prev) => ({ ...prev, reason: event.target.value }))
+                }
+              />
+            </div>
+            <div className="sm:col-span-2 flex justify-end">
+              <Button onClick={handleCreateSwap} disabled={creatingSwap}>
+                {creatingSwap ? t('portal.dashboard.submitting') : t('schedule.submitSwap')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   )
 }

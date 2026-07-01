@@ -150,4 +150,24 @@ describe('reorder-ai.service (LLM path)', () => {
 
     expect(result.matchedProducts[0]?.productId).toBe('p3')
   })
+
+  it('ask falls back to keyword matching when LLM returns invalid schema', async () => {
+    mockCompleteJson.mockResolvedValue({
+      data: { unexpected: true },
+      tokensIn: 12,
+      tokensOut: 0,
+      latencyMs: 8,
+    })
+
+    const { parseReorderIntent } = await import('./reorder-ai.service.js')
+    const result = await parseReorderIntent('r1', {
+      query: 'olive oil',
+      smartReorderFeatureValue: 'ai_forecast_seasonality',
+    })
+
+    expect(result.usedLlm).toBe(false)
+    expect(result.source).toBe('heuristic')
+    expect(result.matchedProducts.map((m) => m.productId)).toContain('p2')
+    expect(mockIncrementUsage).toHaveBeenCalledWith('r1', 'RESTAURANT', 'ai_requests_per_day', -1)
+  })
 })

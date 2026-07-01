@@ -74,6 +74,11 @@
       "cta": "Pay now"
     }
   },
+  "accessRestricted": {
+    "title": "Access restricted",
+    "description": "You don't have permission to view {{area}}. Your role is read-only or limited for this area — contact a workspace admin if you need access.",
+    "defaultArea": "this page"
+  },
   "toast": {
     "paymentReceivedAccountRestored": "Payment received. Your account has been restored.",
     "freePlanActive": "Your free plan is active.",

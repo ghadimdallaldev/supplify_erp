@@ -31,3 +31,25 @@ export async function canUseReorderAiAsk(tenantId, tenantType, smartReorderFeatu
   if (!(await isAiPlatformEnabledForTenant(tenantId, tenantType))) return false
   return hasSmartReorderCapability(smartReorderFeatureValue, 'seasonality')
 }
+
+/**
+ * Resolved LLM availability for reorder assistant UI and API metadata.
+ * Heuristic explain/ask still work when `canExplainLlm` / `canAskLlm` are false.
+ */
+export async function resolveReorderAiCapabilities(tenantId, tenantType, smartReorderFeatureValue) {
+  const envEnabled = isAiEnvEnabled()
+  const platformEnabled = envEnabled
+    ? await isAiPlatformEnabledForTenant(tenantId, tenantType)
+    : false
+  const [canExplainLlm, canAskLlm] = await Promise.all([
+    canUseReorderAiExplain(tenantId, tenantType, smartReorderFeatureValue),
+    canUseReorderAiAsk(tenantId, tenantType, smartReorderFeatureValue),
+  ])
+
+  return {
+    envEnabled,
+    platformEnabled,
+    canExplainLlm,
+    canAskLlm,
+  }
+}

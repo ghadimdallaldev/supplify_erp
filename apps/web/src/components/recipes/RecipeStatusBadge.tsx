@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
 
 const STATUS_STYLES: Record<string, string> = {
@@ -6,13 +7,13 @@ const STATUS_STYLES: Record<string, string> = {
   MISSING_DATA: 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200',
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  HEALTHY: 'Healthy',
-  WARNING: 'Above target',
-  MISSING_DATA: 'Missing data',
-}
-
 export function RecipeStatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation('recipes')
+  const label =
+    status === 'HEALTHY' || status === 'WARNING' || status === 'MISSING_DATA'
+      ? t(`status.${status}`)
+      : status
+
   return (
     <span
       className={cn(
@@ -20,7 +21,7 @@ export function RecipeStatusBadge({ status }: { status: string }) {
         STATUS_STYLES[status] || 'bg-muted text-muted-foreground'
       )}
     >
-      {STATUS_LABELS[status] || status}
+      {label}
     </span>
   )
 }

@@ -111,5 +111,10 @@ export function calculateReorderQuantity(item: any) {
 }
 
 export function summaryCardClass(active: boolean) {
-  return `cursor-pointer transition-shadow duration-200 ease hover:shadow-md ${active ? 'ring-2 ring-[var(--brand-mid)] ring-offset-2' : ''}`
+  return `cursor-pointer transition-all duration-200 ease hover:shadow-md hover:-translate-y-0.5 ${active ? 'ring-2 ring-[var(--brand-mid)] ring-offset-2 shadow-md' : ''}`
+}
+
+export function formatStockShare(count: number, total: number) {
+  if (!total || total <= 0) return '0%'
+  return `${Math.round((count / total) * 100)}%`
 }

@@ -46,7 +46,7 @@ vi.mock('../components/BranchSwitcher', () => ({
 
 vi.mock('../services/api', () => ({
   useGetEntitlementsQuery: () => ({
-    data: { entitlements: { plan: { code: 'gold' }, features: { reservations: true } } },
+    data: { entitlements: { plan: { code: 'gold' }, features: {} } },
   }),
   useGetDashboardStatsQuery: () => ({ data: {} }),
   useGetDisputesQuery: () => ({ data: { disputes: [] } }),
@@ -54,13 +54,14 @@ vi.mock('../services/api', () => ({
 }))
 
 describe('restaurant host sidebar', () => {
-  it('shows reservations only in operations section', () => {
+  it('shows reservations under overview for FOH host without core ops nav', () => {
     render(
       <MemoryRouter>
         <Sidebar />
       </MemoryRouter>
     )
     expect(screen.getByTestId('nav-reservations')).toBeInTheDocument()
+    expect(screen.getByText('OVERVIEW')).toBeInTheDocument()
     expect(screen.queryByTestId('nav-staff')).not.toBeInTheDocument()
     expect(screen.queryByTestId('nav-invoices')).not.toBeInTheDocument()
     expect(screen.queryByTestId('nav-orders')).not.toBeInTheDocument()
