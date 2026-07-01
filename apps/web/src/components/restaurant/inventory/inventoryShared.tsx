@@ -1,4 +1,5 @@
 import { Skeleton } from '../../ui/skeleton'
+import { cn } from '../../../lib/utils'
 
 export function InventoryTabLoading({ className }: { className?: string }) {
   return (
@@ -111,7 +112,10 @@ export function calculateReorderQuantity(item: any) {
 }
 
 export function summaryCardClass(active: boolean) {
-  return `cursor-pointer transition-all duration-200 ease hover:shadow-md hover:-translate-y-0.5 ${active ? 'ring-2 ring-[var(--brand-mid)] ring-offset-2 shadow-md' : ''}`
+  return cn(
+    'cursor-pointer transition-[box-shadow,transform,border-color] duration-200 ease hover:shadow-md hover:-translate-y-0.5',
+    active ? 'border-[var(--brand)] shadow-md' : ''
+  )
 }
 
 export function formatStockShare(count: number, total: number) {

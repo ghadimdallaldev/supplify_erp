@@ -1,11 +1,13 @@
+import { cn } from '../../lib/utils'
 import type { Recipe, RecipeCalcStatus } from '../../types/recipes'
 
-export type RecipeFilterKey = 'missingCost' | 'aboveTarget' | 'recentlyImpacted'
+export type RecipeFilterKey = 'missingCost' | 'aboveTarget' | 'onTarget' | 'recentlyImpacted'
 
 export function summaryCardClass(active: boolean) {
-  return `cursor-pointer transition-all duration-200 ease hover:shadow-md hover:-translate-y-0.5 ${
-    active ? 'ring-2 ring-[var(--brand-mid)] ring-offset-2 shadow-md' : ''
-  }`
+  return cn(
+    'cursor-pointer transition-[box-shadow,transform,border-color] duration-200 ease hover:shadow-md hover:-translate-y-0.5',
+    active ? 'border-[var(--brand)] shadow-md' : ''
+  )
 }
 
 export function formatRecipeShare(count: number, total: number) {
