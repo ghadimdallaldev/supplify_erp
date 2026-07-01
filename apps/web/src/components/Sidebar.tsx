@@ -21,6 +21,7 @@ import {
   canUseFinanceInvoices,
   canUseFulfillment,
   canUseQuickLists,
+  canUseRecipeCosting,
   canUseSupplierGrowth,
 } from '../lib/planFeatureGates'
 import { canViewSupplierGrowth } from '../lib/tenantRoles'
@@ -70,6 +71,7 @@ export function Sidebar({
   const financeInvoicesEnabled = canUseFinanceInvoices(entitlementsData?.entitlements)
   const fulfillmentEnabled = canUseFulfillment(entitlementsData?.entitlements)
   const quickListsEnabled = canUseQuickLists(entitlementsData?.entitlements)
+  const recipeCostingEnabled = canUseRecipeCosting(entitlementsData?.entitlements)
   const disputesEnabled = isEntitlementFeatureEnabled(
     entitlementsData?.entitlements,
     'disputes_returns'
@@ -111,6 +113,7 @@ export function Sidebar({
     financeInvoicesEnabled,
     fulfillmentEnabled,
     quickListsEnabled,
+    recipeCostingEnabled,
     disputesEnabled,
     promotionsEnabled,
     supplierGrowthEnabled,

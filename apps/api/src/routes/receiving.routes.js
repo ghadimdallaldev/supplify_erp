@@ -21,6 +21,10 @@ import { notifyLeaveReviewIfEligible } from '../services/reviews.service.js'
 import { notifyInvoiceIssued } from '../services/notification.service.js'
 import { createLotFromReceivingLine } from '../services/inventory-expiry.service.js'
 import { earnLoyaltyOnOrderReceive } from '../services/loyalty.service.js'
+import {
+  hookRecipeCostingAfterReceiving,
+  hookRecipeCostingAfterInvoice,
+} from '../services/recipe-purchasing-hooks.service.js'
 import { resolveRequestLocale, localizedError } from '../i18n/index.js'
 
 const router = express.Router()
@@ -541,6 +545,22 @@ router.post(
       }).catch((err) => {
         logger.warn('Review prompt notification failed', { orderId, error: err.message })
       })
+
+      const costingItems = lineItems
+        .filter(
+          (item) =>
+            item.quality_status === 'ACCEPTED' && parseFloat(item.received_quantity || 0) > 0
+        )
+        .map((item) => ({
+          productId: item.productId,
+          supplierId,
+          unitPrice: item.actual_unit_price || item.expected_unit_price,
+          unit: item.unit || 'unit',
+        }))
+      hookRecipeCostingAfterReceiving(restaurantId, costingItems)
+      if (result.createdInvoice) {
+        hookRecipeCostingAfterInvoice(restaurantId, costingItems)
+      }
 
       res.status(201).json({
         ok: true,

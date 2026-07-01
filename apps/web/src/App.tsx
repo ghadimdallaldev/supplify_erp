@@ -75,6 +75,26 @@ const RestaurantOnboardingPage = lazyNamedPage(
   'RestaurantOnboardingPage'
 )
 const ReceivingPage = lazyNamedPage(() => import('./pages/ReceivingPage'), 'ReceivingPage')
+const RecipesListPage = lazyNamedPage(
+  () => import('./pages/recipes/RecipesListPage'),
+  'RecipesListPage'
+)
+const RecipeBuilderPage = lazyNamedPage(
+  () => import('./pages/recipes/RecipeBuilderPage'),
+  'RecipeBuilderPage'
+)
+const RecipeDetailPage = lazyNamedPage(
+  () => import('./pages/recipes/RecipeDetailPage'),
+  'RecipeDetailPage'
+)
+const RecipeCostingDashboardPage = lazyNamedPage(
+  () => import('./pages/recipes/RecipeCostingDashboardPage'),
+  'RecipeCostingDashboardPage'
+)
+const RecipePriceImpactPage = lazyNamedPage(
+  () => import('./pages/recipes/RecipePriceImpactPage'),
+  'RecipePriceImpactPage'
+)
 const SupplierCustomerGrowthPage = lazyNamedPage(
   () => import('./pages/SupplierCustomerGrowthPage'),
   'SupplierCustomerGrowthPage'
@@ -635,6 +655,54 @@ const router = createBrowserRouter([
         element: (
           <LazyPage>
             <ReceivingPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/recipes',
+        element: (
+          <LazyPage>
+            <RecipesListPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/recipes/new',
+        element: (
+          <LazyPage>
+            <RecipeBuilderPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/recipes/:id/edit',
+        element: (
+          <LazyPage>
+            <RecipeBuilderPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/recipes/:id',
+        element: (
+          <LazyPage>
+            <RecipeDetailPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/recipe-costing',
+        element: (
+          <LazyPage>
+            <RecipeCostingDashboardPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/recipe-costing/price-impact',
+        element: (
+          <LazyPage>
+            <RecipePriceImpactPage />
           </LazyPage>
         ),
       },

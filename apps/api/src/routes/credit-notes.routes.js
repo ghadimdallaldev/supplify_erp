@@ -42,6 +42,12 @@ router.post('/:id/apply', requirePermission('INVOICES_MANAGE'), async (req, res,
     const creditNote = await applyCreditNote(req.params.id, tenantId, tenantType, {
       invoiceId: body.invoiceId,
     })
+    if (tenantType === 'RESTAURANT') {
+      const { hookRecipeCostingAfterCreditNote } = await import(
+        '../services/recipe-purchasing-hooks.service.js'
+      )
+      hookRecipeCostingAfterCreditNote(tenantId, body.invoiceId)
+    }
     res.json({ ok: true, data: { creditNote }, error: null, requestId: req.requestId })
   } catch (err) {
     next(err)
