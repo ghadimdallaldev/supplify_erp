@@ -228,13 +228,17 @@ export function registerCronJobs({ trackInterval }) {
   for (const job of jobs) {
     job.run()
     trackInterval(job.run, job.intervalMs)
-    logger.info(job.label, { intervalMs: job.intervalMs, job: job.name, ...job.extraLog })
   }
 
   logger.info({
     event: 'cron.registration_complete',
     jobCount: jobs.length,
     cronsEnabled: config.CRONS_ENABLED,
+    jobs: jobs.map((job) => ({
+      name: job.name,
+      intervalMs: job.intervalMs,
+      ...job.extraLog,
+    })),
   })
   return { registered: jobs.length, skipped: false }
 }

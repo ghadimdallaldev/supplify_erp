@@ -3,6 +3,7 @@ import { logger } from '../lib/logger.js'
 import { normalizeDaysOfWeek } from '../lib/quick-list-schedule.js'
 import { evaluateScheduledOrderLimit, incrementUsage } from '../lib/subscription.js'
 import { notifyScheduledOrderEvent, notifyOrderStatusChange } from './notification.service.js'
+import { applySmartQuantitiesToItems } from './quick-list-ai.service.js'
 
 const DUE_LISTS_BATCH_SIZE = 50
 
@@ -100,10 +101,13 @@ export async function executeScheduledOrders() {
 
           let outcome = 'reminder'
           let errorMessage = null
+          let aiAdjustments = null
 
           try {
             if (quickList.auto_create_order) {
-              const orders = await createOrderFromQuickList(quickList, client)
+              const result = await createOrderFromQuickList(quickList, client)
+              const orders = result?.orders
+              aiAdjustments = result?.aiAdjustments ?? null
               outcome = 'executed'
               if (orders?.length) {
                 postCommitNotifications.push({
@@ -128,10 +132,17 @@ export async function executeScheduledOrders() {
           await client.query(
             `
             UPDATE quick_list_execution
-            SET outcome = $1, error_message = $2
+            SET outcome = $1, error_message = $2, ai_adjustments = COALESCE($4::jsonb, ai_adjustments)
             WHERE id = $3
           `,
-            [outcome, errorMessage, ledgerId]
+            [
+              outcome,
+              errorMessage,
+              ledgerId,
+              typeof aiAdjustments !== 'undefined' && aiAdjustments
+                ? JSON.stringify(aiAdjustments)
+                : null,
+            ]
           )
 
           if (outcome === 'failed') {
@@ -204,12 +215,16 @@ async function createOrderFromQuickList(quickList, client) {
 
   if (items.length === 0) {
     logger.warn(`Quick list ${quickList.id} has no items, skipping order creation`)
-    return
+    return { orders: [], aiAdjustments: null }
   }
 
   const restaurantId = quickList.restaurant_id
 
-  const ordersToCreate = new Set(items.map((item) => item.supplier_id)).size
+  const smartResult = await applySmartQuantitiesToItems(restaurantId, quickList, items)
+  const workingItems = smartResult.items
+  const aiAdjustments = smartResult.adjustments
+
+  const ordersToCreate = new Set(workingItems.map((item) => item.supplier_id)).size
   const scheduleLimit = await evaluateScheduledOrderLimit(restaurantId, ordersToCreate)
 
   if (!scheduleLimit.allowed) {
@@ -230,7 +245,7 @@ async function createOrderFromQuickList(quickList, client) {
   }
 
   const supplierGroups = new Map()
-  for (const item of items) {
+  for (const item of workingItems) {
     if (!supplierGroups.has(item.supplier_id)) {
       supplierGroups.set(item.supplier_id, [])
     }
@@ -339,7 +354,7 @@ async function createOrderFromQuickList(quickList, client) {
     )
   }
 
-  return createdOrders
+  return { orders: createdOrders, aiAdjustments }
 }
 
 /**

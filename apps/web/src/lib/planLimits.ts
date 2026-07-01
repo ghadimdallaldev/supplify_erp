@@ -491,10 +491,73 @@ export function getPlanLimitGate(
 export function isQuickListSchedulingEnabled(
   entitlements: Entitlements | null | undefined
 ): boolean {
+  return resolveQuickListCapabilities(entitlements).capabilities.scheduling
+}
+
+export type QuickListCapability = 'aiQuantityAdjust' | 'aiSuggest' | 'fullSchedule'
+
+export function resolveQuickListCapabilities(entitlements: Entitlements | null | undefined) {
   const v = resolveEntitlementFeature(entitlements, 'quick_lists')
-  if (!featureEnabled(v)) return false
-  if (typeof v === 'string' && v.toLowerCase() === 'basic_manual_only') return false
-  return true
+  const raw = typeof v === 'string' ? v.trim().toLowerCase() : v
+  if (!featureEnabled(v)) {
+    return {
+      enabled: false,
+      tier: 'off' as const,
+      capabilities: {
+        scheduling: false,
+        fullSchedule: false,
+        aiQuantityAdjust: false,
+        aiSuggest: false,
+      },
+    }
+  }
+  let tier: 'off' | 'silver' | 'gold' | 'platinum' = 'gold'
+  if (raw === 'basic_manual_only' || raw === 'false' || raw === 'disabled') tier = 'off'
+  else if (raw === 'automated_weekly') tier = 'silver'
+  else if (raw === 'ai_smart_automation') tier = 'platinum'
+  else if (raw === 'full_schedule' || v === true) tier = 'gold'
+
+  const scheduling = tier !== 'off'
+  const fullSchedule = tier === 'gold' || tier === 'platinum'
+  const platinum = tier === 'platinum'
+
+  return {
+    enabled: scheduling,
+    tier,
+    capabilities: {
+      scheduling,
+      fullSchedule,
+      aiQuantityAdjust: platinum,
+      aiSuggest: platinum,
+    },
+  }
+}
+
+export function hasQuickListCapability(
+  entitlements: Entitlements | null | undefined,
+  capability: QuickListCapability
+): boolean {
+  return resolveQuickListCapabilities(entitlements).capabilities[capability] === true
+}
+
+export function resolveBrandingCapabilities(entitlements: Entitlements | null | undefined) {
+  const v = resolveEntitlementFeature(entitlements, 'custom_branding')
+  const raw = typeof v === 'string' ? v.trim().toLowerCase() : v
+  if (!featureEnabled(v)) {
+    return { enabled: false, capabilities: { logoAndColors: false, customDomain: false } }
+  }
+  const whiteLabel = raw === 'white_label_domain' || v === true
+  return {
+    enabled: true,
+    capabilities: { logoAndColors: true, customDomain: whiteLabel },
+  }
+}
+
+export function hasBrandingCapability(
+  entitlements: Entitlements | null | undefined,
+  capability: 'logoAndColors' | 'customDomain'
+): boolean {
+  return resolveBrandingCapabilities(entitlements).capabilities[capability] === true
 }
 
 /** Whether the tenant may schedule this list (respects scheduled_quick_lists cap). */

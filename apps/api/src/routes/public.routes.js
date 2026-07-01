@@ -42,6 +42,7 @@ import {
   listAuthenticatedRestaurantProducts,
   resolvePublicSupplierByIdOrSlug,
 } from '../services/public-supplier-catalog.service.js'
+import { resolveTenantByCustomHostname } from '../services/custom-domain.service.js'
 import { requireAuth, getRestaurantIdForRequest } from '../lib/rbac.js'
 
 const router = express.Router()
@@ -232,6 +233,38 @@ const publicSupplierProductsSchema = z.object({
   limit: z.coerce.number().int().positive().optional(),
   q: z.string().optional(),
   category: z.string().optional(),
+})
+
+router.get('/resolve-host', async (req, res) => {
+  try {
+    const host = String(req.query.host || '').trim()
+    if (!host) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'host query parameter is required' },
+        requestId: req.requestId,
+      })
+    }
+    const resolved = await resolveTenantByCustomHostname(host)
+    if (!resolved) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'HOST_NOT_FOUND', message: 'No verified custom domain for this host' },
+        requestId: req.requestId,
+      })
+    }
+    res.json({ ok: true, data: resolved, error: null, requestId: req.requestId })
+  } catch (error) {
+    logger.error('resolve-host failed', { error: error.message })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Unable to resolve host' },
+      requestId: req.requestId,
+    })
+  }
 })
 
 router.get('/suppliers/:idOrSlug', async (req, res) => {
