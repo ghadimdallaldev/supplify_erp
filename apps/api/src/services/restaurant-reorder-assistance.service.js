@@ -1,6 +1,7 @@
 import { query } from '../lib/db.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { resolveSmartReorderCapabilities } from '../lib/smart-reorder-tier.js'
+import { resolveReorderAiCapabilities } from '../lib/ai-platform.js'
 import { computeSuggestedReorderQty } from '../lib/reorder-quantity.js'
 import { applySupplierPackRounding } from '../lib/reorder-unit-normalize.js'
 import { listRestaurantReminders } from './reorder-cadence.service.js'
@@ -328,6 +329,16 @@ export async function getReorderAssistance(restaurantId, opts = {}) {
 
   const suggestions = mergeAndDedupe(filtered).slice(0, limit)
 
+  const ai =
+    smartReorderFeatureValue !== undefined
+      ? await resolveReorderAiCapabilities(restaurantId, 'RESTAURANT', smartReorderFeatureValue)
+      : {
+          envEnabled: false,
+          platformEnabled: false,
+          canExplainLlm: false,
+          canAskLlm: false,
+        }
+
   return {
     suggestions,
     total: suggestions.length,
@@ -335,6 +346,7 @@ export async function getReorderAssistance(restaurantId, opts = {}) {
       tier: capabilities.tier,
       capabilities: capabilities.capabilities,
     },
+    ai,
     forecasts: capabilities.capabilities.forecast ? forecasts.slice(0, limit) : [],
   }
 }

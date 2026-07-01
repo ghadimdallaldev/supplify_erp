@@ -323,7 +323,8 @@ export async function parseReorderIntent(restaurantId, opts) {
   }
 
   const aiPlatformOn = await isAiPlatformEnabledForTenant(restaurantId, 'RESTAURANT')
-  if (!isAiEnvEnabled() || !getAiProvider() || !aiPlatformOn) {
+  const provider = getAiProvider()
+  if (!isAiEnvEnabled() || !provider || !aiPlatformOn) {
     return keywordFallback()
   }
 
@@ -331,8 +332,6 @@ export async function parseReorderIntent(restaurantId, opts) {
   if (await isOverTenantDailyCeiling(restaurantId)) {
     return keywordFallback(true)
   }
-
-  const provider = getAiProvider()
 
   // Reserve a plan-usage unit up front; on limit fall back to heuristics
   // (symmetric with explain — no hard error).
@@ -363,6 +362,17 @@ export async function parseReorderIntent(restaurantId, opts) {
 
     if (!parsed.success) {
       await refundAiUsage(restaurantId)
+      await logAiRequest({
+        restaurantId,
+        userId: opts.userId,
+        endpoint: 'ask',
+        tokensIn: result.tokensIn,
+        tokensOut: result.tokensOut,
+        latencyMs: result.latencyMs,
+        success: false,
+        errorCode: 'invalid_schema',
+      })
+      return keywordFallback()
     }
 
     await logAiRequest({
@@ -372,19 +382,8 @@ export async function parseReorderIntent(restaurantId, opts) {
       tokensIn: result.tokensIn,
       tokensOut: result.tokensOut,
       latencyMs: result.latencyMs,
-      success: parsed.success,
-      errorCode: parsed.success ? null : 'invalid_schema',
+      success: true,
     })
-
-    if (!parsed.success) {
-      return {
-        intent: text,
-        matchedProducts: [],
-        clarifyingQuestion: 'Could not match products — try being more specific.',
-        source: 'heuristic',
-        usedLlm: false,
-      }
-    }
 
     return {
       intent: parsed.data.intent,

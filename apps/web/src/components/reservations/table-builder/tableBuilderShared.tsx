@@ -50,6 +50,8 @@ export interface ReservationTableBuilderProps {
   reservations?: Reservation[]
   /** When true, floor canvas shows guest names on assigned tables (Live view). */
   defaultLiveView?: boolean
+  /** View-only mode for users without reservation edit permissions. */
+  readOnly?: boolean
 }
 
 export interface ServiceInfo {

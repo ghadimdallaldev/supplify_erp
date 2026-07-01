@@ -8,6 +8,9 @@ const ROUTE_CHUNK_LOADERS: Record<string, () => Promise<unknown>> = {
   '/app/reports': () => import('../pages/reports/ReportsPage'),
   '/app/products': () => import('../pages/ProductsPage'),
   '/app/reservations': () => import('../pages/ReservationsPage'),
+  '/app/consumer-menu': () => import('../pages/consumer/MenuAdminPage'),
+  '/app/consumer-orders': () => import('../pages/consumer/ConsumerOrdersPage'),
+  '/app/consumer-loyalty': () => import('../pages/loyalty/ConsumerLoyaltyPage'),
   '/app/receiving': () => import('../pages/ReceivingPage'),
   '/app/promotions': () => import('../pages/promotions/PromotionsPage'),
 }

@@ -26,6 +26,7 @@ import { playNotificationSound, unlockNotificationAudio } from '../../lib/notifi
 import { toast } from 'sonner'
 import { Bell, BellOff } from 'lucide-react'
 import { ensureNamespace } from '../../i18n'
+import { usePermissions } from '../../hooks/usePermissions'
 
 type StatusFilter = 'ALL' | 'RECEIVED' | 'PREPARING' | 'SHIPPED'
 
@@ -71,11 +72,13 @@ function OrderCard({
   updating,
   onAdvance,
   t,
+  canManageOrders,
 }: {
   order: ConsumerOrderSummary
   updating: boolean
   onAdvance: (id: string, current: string) => void
   t: TFunction<'consumer'>
+  canManageOrders: boolean
 }) {
   const nextStatus = getNextConsumerOrderStatus(order.status)
   const lines = order.lines ?? []
@@ -126,7 +129,7 @@ function OrderCard({
               })}
             </p>
           </div>
-          {nextStatus && (
+          {canManageOrders && nextStatus && (
             <Button
               size="sm"
               variant="outline"
@@ -145,6 +148,8 @@ function OrderCard({
 
 export function ConsumerOrdersPage() {
   const { t } = useTranslation('consumer')
+  const { can } = usePermissions()
+  const canManageOrders = can('ORDERS_MANAGE')
 
   useEffect(() => {
     void ensureNamespace('consumer')
@@ -322,6 +327,7 @@ export function ConsumerOrdersPage() {
                       updating={updating}
                       onAdvance={advanceStatus}
                       t={t}
+                      canManageOrders={canManageOrders}
                     />
                   ))}
                   {!ordersByStatus[columnStatus]?.length && (
@@ -344,6 +350,7 @@ export function ConsumerOrdersPage() {
                 updating={updating}
                 onAdvance={advanceStatus}
                 t={t}
+                canManageOrders={canManageOrders}
               />
             ))}
           </div>
@@ -370,6 +377,7 @@ export function ConsumerOrdersPage() {
                   updating={updating}
                   onAdvance={advanceStatus}
                   t={t}
+                  canManageOrders={canManageOrders}
                 />
               ))}
             </div>

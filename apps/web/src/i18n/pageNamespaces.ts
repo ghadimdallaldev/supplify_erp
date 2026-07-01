@@ -24,6 +24,11 @@ export const PAGE_I18N: Record<string, I18nNamespace[]> = {
   SupplierSettingsPage: ['settings'],
   QuickListsPage: ['products', 'orders'],
   RestaurantInventoryPage: ['inventory'],
+  RecipesListPage: ['recipes'],
+  RecipeBuilderPage: ['recipes', 'products'],
+  RecipeDetailPage: ['recipes'],
+  RecipeCostingDashboardPage: ['recipes'],
+  RecipePriceImpactPage: ['recipes'],
   RestaurantOnboardingPage: ['onboarding'],
   ReceivingPage: ['inventory'],
   SupplierCustomerGrowthPage: ['suppliers'],
@@ -76,4 +81,5 @@ export const IDLE_PRELOAD_NAMESPACES: I18nNamespace[] = [
   'settings',
   'deals',
   'inventory',
+  'recipes',
 ]
