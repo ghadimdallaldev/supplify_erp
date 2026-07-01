@@ -88,8 +88,11 @@ export function RecipeSummaryCards({
         const Icon = card.icon
         const isActive =
           (card.key === 'ALL' && activeFilter === 'ALL') ||
-          (card.key === 'missingCost' && activeFilter === 'missingCost') ||
-          (card.key === 'aboveTarget' && activeFilter === 'aboveTarget')
+          (card.key === 'HEALTHY' && activeFilter === 'HEALTHY') ||
+          (card.key === 'missingCost' &&
+            (activeFilter === 'missingCost' || activeFilter === 'MISSING_DATA')) ||
+          (card.key === 'aboveTarget' &&
+            (activeFilter === 'aboveTarget' || activeFilter === 'WARNING'))
         return (
           <Card
             key={card.key}
@@ -97,7 +100,13 @@ export function RecipeSummaryCards({
             onClick={() => onFilter(card.key)}
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && onFilter(card.key)}
+            aria-pressed={isActive}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onFilter(card.key)
+              }
+            }}
           >
             <CardContent className="p-4 sm:pt-6">
               <div className="flex items-center justify-between gap-2">
