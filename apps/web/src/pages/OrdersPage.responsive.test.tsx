@@ -64,8 +64,8 @@ describe('OrdersPage responsive layout', () => {
   it('uses lg card/table split for order lists', () => {
     renderWithProviders(<OrdersPage />)
 
-    const cards = screen.getByTestId('orders-card-list')
-    const table = screen.getByTestId('orders-table-view')
+    const cards = screen.getByTestId('responsive-data-list-cards')
+    const table = screen.getByTestId('responsive-data-list-table')
     expectLgCardTableSplit(cards, table)
     expect(screen.getByTestId('order-row-order-abc12345')).toBeInTheDocument()
   })

@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { cn } from '../../lib/utils'
 
 export type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'muted'
 
@@ -74,6 +75,15 @@ const TONE_DOT_CLASSES: Record<StatusTone, string> = {
   info: 'bg-sky-500',
   neutral: 'bg-slate-400',
   muted: 'bg-[var(--app-border-mid)]',
+}
+
+export function StatusDot({ tone, className = '' }: { tone: StatusTone; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn('h-1.5 w-1.5 shrink-0 rounded-full', TONE_DOT_CLASSES[tone], className)}
+    />
+  )
 }
 
 const STATUS_LABEL_KEYS: Record<string, string> = {

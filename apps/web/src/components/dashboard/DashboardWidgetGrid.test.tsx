@@ -42,6 +42,7 @@ function renderRestaurantSpendTrend(overrides: Record<string, unknown> = {}) {
       spendTrendPeriodTotal={0}
       periodDays={30}
       onPeriodDaysChange={onPeriodDaysChange}
+      financeInvoicesEnabled
       lowStockItems={[]}
       smartReorderEnabled={false}
       inventoryMgmtEnabled={false}

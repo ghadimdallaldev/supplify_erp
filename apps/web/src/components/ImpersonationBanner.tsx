@@ -1,6 +1,7 @@
 import { useStopImpersonationMutation } from '../services/api'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { Button } from './ui/button'
+import { InfoBanner } from './ui/info-banner'
 import { UserX } from 'lucide-react'
 
 /**
@@ -30,29 +31,34 @@ export function ImpersonationBanner() {
 
   return (
     <div
-      className="sticky top-0 z-50 px-4 py-2 flex items-center justify-between gap-4 shadow-md border-b border-amber-700/20"
-      style={{ background: 'var(--amber-mid)', color: '#000' }}
+      className="sticky top-0 z-50 border-b border-[var(--amber-mid)]/35"
       role="status"
       aria-live="polite"
     >
-      <div className="flex items-center gap-2 min-w-0">
-        <UserX className="h-5 w-5 shrink-0" aria-hidden />
-        <span className="font-medium truncate">Impersonating {label}</span>
-        {impersonation?.expiresAt && (
-          <span className="text-sm opacity-90 hidden sm:inline">
-            (expires {new Date(impersonation.expiresAt).toLocaleString()})
-          </span>
-        )}
-      </div>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleStop}
-        disabled={stopping}
-        className="shrink-0 border-black/25 bg-black/10 text-black hover:bg-black/20"
-      >
-        {stopping ? 'Exiting…' : 'Exit impersonation'}
-      </Button>
+      <InfoBanner
+        tone="amber"
+        icon={UserX}
+        className="rounded-none border-x-0 border-t-0"
+        title={`Impersonating ${label}`}
+        description={
+          impersonation?.expiresAt ? (
+            <span className="hidden sm:inline">
+              Session expires {new Date(impersonation.expiresAt).toLocaleString()}
+            </span>
+          ) : undefined
+        }
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleStop}
+            disabled={stopping}
+            className="shrink-0 border-amber-800/25 bg-amber-900/5 text-amber-950 hover:bg-amber-900/10"
+          >
+            {stopping ? 'Exiting…' : 'Exit impersonation'}
+          </Button>
+        }
+      />
     </div>
   )
 }

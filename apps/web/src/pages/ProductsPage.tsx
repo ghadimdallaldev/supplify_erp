@@ -18,21 +18,13 @@ import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
-import { EmptyState } from '../components/ui/empty-state'
+import { ErrorState } from '../components/ui/error-state'
+import { ContentReveal } from '../components/ui/skeleton'
+import { TablePagination } from '../components/ui/table-pagination'
 import { filterControlClass } from '../components/ui/filter-control'
 import { DataTableShell } from '../components/ui/data-table-shell'
 import { cn } from '../lib/utils'
-import {
-  Plus,
-  Upload,
-  Image,
-  FileQuestion,
-  Heart,
-  ChevronLeft,
-  ChevronRight,
-  Package,
-  Loader2,
-} from 'lucide-react'
+import { Plus, Upload, Image, FileQuestion, Heart, Package, Loader2 } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useCartActions } from '../hooks/useCartActions'
@@ -366,7 +358,7 @@ export function ProductsPage() {
               isSupplier ? t('page.supplierDescription') : t('page.restaurantDescription')
             }
           />
-          <EmptyState
+          <ErrorState
             title={t('page.loadFailedTitle')}
             description={t('page.loadFailedDescription')}
             icon={<Package className="h-10 w-10" aria-hidden />}
@@ -382,251 +374,241 @@ export function ProductsPage() {
   }
 
   return (
-    <RequirePermission anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']} title="products">
-      <PageShell maxWidth="wide" data-testid="products-page">
-        <PageHeader
-          title={t('page.title')}
-          description={isSupplier ? t('page.supplierDescription') : t('page.restaurantDescription')}
-          actions={
-            <div className="flex flex-wrap gap-2">
-              {isSupplier ? (
-                <PermissionGate anyOf={['CATALOG_EDIT', 'CATALOG_MANAGE']}>
-                  <>
-                    <Button onClick={() => setShowAddProduct(true)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      {t('page.addProduct')}
-                    </Button>
-                    <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
-                      <Upload className="h-4 w-4 mr-2" />
-                      {t('page.bulkUpload')}
-                    </Button>
-                    <Button variant="outline" onClick={() => setShowImageImport(true)}>
-                      <Image className="h-4 w-4 mr-2" />
-                      {t('page.importImages')}
-                    </Button>
-                  </>
-                </PermissionGate>
-              ) : (
-                <PermissionGate permission="ORDERS_CREATE">
-                  <>
-                    <Button asChild variant="outline">
-                      <Link to="/app/quote-requests/new">
-                        <FileQuestion className="h-4 w-4 mr-2" />
-                        {t('page.requestBestPrice')}
-                      </Link>
-                    </Button>
-                    <Button asChild>
-                      <Link to="/app/cart">{t('page.viewCart')}</Link>
-                    </Button>
-                  </>
-                </PermissionGate>
-              )}
+    <ContentReveal>
+      <RequirePermission anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']} title="products">
+        <PageShell maxWidth="wide" data-testid="products-page">
+          <PageHeader
+            title={t('page.title')}
+            description={
+              isSupplier ? t('page.supplierDescription') : t('page.restaurantDescription')
+            }
+            actions={
+              <div className="flex flex-wrap gap-2">
+                {isSupplier ? (
+                  <PermissionGate anyOf={['CATALOG_EDIT', 'CATALOG_MANAGE']}>
+                    <>
+                      <Button onClick={() => setShowAddProduct(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        {t('page.addProduct')}
+                      </Button>
+                      <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
+                        <Upload className="h-4 w-4 mr-2" />
+                        {t('page.bulkUpload')}
+                      </Button>
+                      <Button variant="outline" onClick={() => setShowImageImport(true)}>
+                        <Image className="h-4 w-4 mr-2" />
+                        {t('page.importImages')}
+                      </Button>
+                    </>
+                  </PermissionGate>
+                ) : (
+                  <PermissionGate permission="ORDERS_CREATE">
+                    <>
+                      <Button asChild variant="outline">
+                        <Link to="/app/quote-requests/new">
+                          <FileQuestion className="h-4 w-4 mr-2" />
+                          {t('page.requestBestPrice')}
+                        </Link>
+                      </Button>
+                      <Button asChild>
+                        <Link to="/app/cart">{t('page.viewCart')}</Link>
+                      </Button>
+                    </>
+                  </PermissionGate>
+                )}
+              </div>
+            }
+          />
+          {isRestaurant && activeDeals.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 -mt-2">
+              <Badge variant="secondary">
+                {t('page.activeDeals', { count: activeDeals.length })}
+              </Badge>
+              <Button variant="link" size="sm" className="h-auto p-0" asChild>
+                <Link to="/app/deals">{t('page.viewAllDeals')}</Link>
+              </Button>
             </div>
-          }
-        />
-        {isRestaurant && activeDeals.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 -mt-2">
-            <Badge variant="secondary">
-              {t('page.activeDeals', { count: activeDeals.length })}
-            </Badge>
-            <Button variant="link" size="sm" className="h-auto p-0" asChild>
-              <Link to="/app/deals">{t('page.viewAllDeals')}</Link>
-            </Button>
-          </div>
-        )}
+          )}
 
-        <DataTableShell
-          data-testid="products-table-shell"
-          search={
-            <SearchHistoryDropdown
-              entityType="product"
-              value={search}
-              onChange={setSearch}
-              placeholder={t('page.searchPlaceholder')}
-              aria-label={t('page.searchAriaLabel')}
-              inputClassName={cn(filterControlClass, 'pl-10')}
-            />
-          }
-          filters={
-            <>
-              {isRestaurant && (
-                <Button
-                  variant={favoritesOnly ? 'default' : 'outline'}
-                  size="sm"
-                  className="h-10"
-                  onClick={() => setFavoritesOnly((prev) => !prev)}
-                >
-                  <Heart
-                    className={`mr-1.5 h-4 w-4 ${favoritesOnly ? 'fill-current' : ''}`}
-                    aria-hidden
-                  />
-                  {t('page.favorites')}
-                </Button>
-              )}
-              <ProductFilterFields
-                isSupplier={isSupplier}
-                supplierFilter={supplierFilter}
-                setSupplierFilter={setSupplierFilter}
-                uniqueSuppliers={uniqueSuppliers}
-                categoryId={categoryId}
-                setCategoryId={setCategoryId}
-                setCategory={setCategory}
-                categoriesData={categoriesData}
-                minPrice={minPrice}
-                maxPrice={maxPrice}
-                setMinPrice={setMinPrice}
-                setMaxPrice={setMaxPrice}
+          <DataTableShell
+            data-testid="products-table-shell"
+            stickyHeader
+            search={
+              <SearchHistoryDropdown
+                entityType="product"
+                value={search}
+                onChange={setSearch}
+                placeholder={t('page.searchPlaceholder')}
+                aria-label={t('page.searchAriaLabel')}
+                inputClassName={cn(filterControlClass, 'pl-10')}
               />
-            </>
-          }
-        >
-          <ProductTagFilters
-            isSupplier={isSupplier}
-            tagsData={tagsData}
-            selectedTags={selectedTags}
-            setSelectedTags={setSelectedTags}
-          />
-          <ProductActiveFilters
-            isSupplier={isSupplier}
-            supplierFilter={supplierFilter}
-            setSupplierFilter={setSupplierFilter}
-            categoryId={categoryId}
-            category={category}
-            setCategoryId={setCategoryId}
-            setCategory={setCategory}
-            categoriesData={categoriesData}
-            selectedTags={selectedTags}
-            setSelectedTags={setSelectedTags}
-            minPrice={minPrice}
-            maxPrice={maxPrice}
-            setMinPrice={setMinPrice}
-            setMaxPrice={setMaxPrice}
-          />
-          <div className="relative">
-            {isFetching && !showInitialLoad && (
-              <div
-                className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center bg-[var(--surface)]/70 pt-6"
-                aria-live="polite"
-                data-testid="products-table-fetching"
-              >
-                <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-muted)]">
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                  {t('page.updating')}
-                </div>
-              </div>
-            )}
-            <ProductCatalogTable
-              filteredProducts={filteredProducts}
+            }
+            filters={
+              <>
+                {isRestaurant && (
+                  <Button
+                    variant={favoritesOnly ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-10"
+                    onClick={() => setFavoritesOnly((prev) => !prev)}
+                  >
+                    <Heart
+                      className={`mr-1.5 h-4 w-4 ${favoritesOnly ? 'fill-current' : ''}`}
+                      aria-hidden
+                    />
+                    {t('page.favorites')}
+                  </Button>
+                )}
+                <ProductFilterFields
+                  isSupplier={isSupplier}
+                  supplierFilter={supplierFilter}
+                  setSupplierFilter={setSupplierFilter}
+                  uniqueSuppliers={uniqueSuppliers}
+                  categoryId={categoryId}
+                  setCategoryId={setCategoryId}
+                  setCategory={setCategory}
+                  categoriesData={categoriesData}
+                  minPrice={minPrice}
+                  maxPrice={maxPrice}
+                  setMinPrice={setMinPrice}
+                  setMaxPrice={setMaxPrice}
+                />
+              </>
+            }
+            footer={
+              (total != null ? total > 0 : filteredProducts.length > 0) ? (
+                <TablePagination
+                  data-testid="products-pagination"
+                  summary={
+                    <>
+                      {t('page.showingRange', { start: rangeStart, end: rangeEnd })}
+                      {total != null ? t('page.showingTotal', { total }) : ''}
+                    </>
+                  }
+                  hasPrevPage={hasPrevPage}
+                  hasNextPage={hasNextPage}
+                  isFetching={isFetching}
+                  onPrev={goToPrevPage}
+                  onNext={goToNextPage}
+                  prevLabel={t('page.previous')}
+                  nextLabel={t('page.next')}
+                />
+              ) : undefined
+            }
+          >
+            <ProductTagFilters
               isSupplier={isSupplier}
-              isRestaurant={isRestaurant}
-              onAddToCart={handleAddToCart}
-              onToggleFavorite={handleToggleFavorite}
-              onAdjustStock={(product) => {
-                setSelectedProductForAdjustment(product)
-                setShowInventoryAdjustment(true)
-              }}
-            />
-          </div>
-          {(total != null ? total > 0 : filteredProducts.length > 0) && (
-            <div
-              className="flex flex-col gap-3 border-t border-[var(--app-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-              data-testid="products-pagination"
-            >
-              <p className="text-sm text-[var(--text-muted)]">
-                {t('page.showingRange', { start: rangeStart, end: rangeEnd })}
-                {total != null ? t('page.showingTotal', { total }) : ''}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={!hasPrevPage || isFetching}
-                  onClick={goToPrevPage}
-                  data-testid="products-prev-page"
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  {t('page.previous')}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={!hasNextPage || isFetching}
-                  onClick={goToNextPage}
-                  data-testid="products-next-page"
-                >
-                  {t('page.next')}
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </DataTableShell>
-
-        <Suspense fallback={null}>
-          {showAddProduct && (
-            <LazyProductFormDialog
-              showAddProduct={showAddProduct}
-              setShowAddProduct={setShowAddProduct}
-              productForm={productForm}
-              setProductForm={setProductForm}
-              newTag={newTag}
-              setNewTag={setNewTag}
-              categoriesData={categoriesData}
               tagsData={tagsData}
-              warehousesData={warehousesData}
-              imagePreview={imagePreview}
-              handleImageSelect={handleImageSelect}
-              handleSubmitProduct={handleSubmitProduct}
-              isCreating={isCreating}
-              isUploadingImage={isUploadingImage}
+              selectedTags={selectedTags}
+              setSelectedTags={setSelectedTags}
             />
-          )}
-          {showImageImport && (
-            <LazyProductImageImportDialog
-              open={showImageImport}
-              onOpenChange={setShowImageImport}
+            <ProductActiveFilters
+              isSupplier={isSupplier}
+              supplierFilter={supplierFilter}
+              setSupplierFilter={setSupplierFilter}
+              categoryId={categoryId}
+              category={category}
+              setCategoryId={setCategoryId}
+              setCategory={setCategory}
+              categoriesData={categoriesData}
+              selectedTags={selectedTags}
+              setSelectedTags={setSelectedTags}
+              minPrice={minPrice}
+              maxPrice={maxPrice}
+              setMinPrice={setMinPrice}
+              setMaxPrice={setMaxPrice}
             />
-          )}
-          {showBulkUpload && (
-            <LazyProductBulkUploadDialog
-              showBulkUpload={showBulkUpload}
-              setShowBulkUpload={setShowBulkUpload}
-              uploadedFile={uploadedFile}
-              setUploadedFile={setUploadedFile}
-              uploadPreview={uploadPreview}
-              setUploadPreview={setUploadPreview}
-              importPreviewMeta={importPreviewMeta}
-              importErrors={importErrors}
-              importSummary={importSummary}
-              handleFileUpload={handleFileUpload}
-              downloadErrorReport={downloadErrorReport}
-              handleBulkSubmit={handleBulkSubmit}
-              importing={importing}
-              isCreating={isCreating}
-              importJob={importJob}
-              importJobActive={importJobActive}
-            />
-          )}
-          {showInventoryAdjustment && (
-            <LazyInventoryAdjustmentDialog
-              showInventoryAdjustment={showInventoryAdjustment}
-              setShowInventoryAdjustment={setShowInventoryAdjustment}
-              selectedProductForAdjustment={selectedProductForAdjustment}
-              setSelectedProductForAdjustment={setSelectedProductForAdjustment}
-              adjustmentType={adjustmentType}
-              setAdjustmentType={setAdjustmentType}
-              adjustmentQuantity={adjustmentQuantity}
-              setAdjustmentQuantity={setAdjustmentQuantity}
-              adjustmentReason={adjustmentReason}
-              setAdjustmentReason={setAdjustmentReason}
-              adjustmentNotes={adjustmentNotes}
-              setAdjustmentNotes={setAdjustmentNotes}
-            />
-          )}
-        </Suspense>
-      </PageShell>
-    </RequirePermission>
+            <div className="relative">
+              {isFetching && !showInitialLoad && (
+                <div
+                  className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center bg-[var(--surface)]/70 pt-6"
+                  aria-live="polite"
+                  data-testid="products-table-fetching"
+                >
+                  <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-muted)]">
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    {t('page.updating')}
+                  </div>
+                </div>
+              )}
+              <ProductCatalogTable
+                filteredProducts={filteredProducts}
+                isSupplier={isSupplier}
+                isRestaurant={isRestaurant}
+                onAddToCart={handleAddToCart}
+                onToggleFavorite={handleToggleFavorite}
+                onAdjustStock={(product) => {
+                  setSelectedProductForAdjustment(product)
+                  setShowInventoryAdjustment(true)
+                }}
+              />
+            </div>
+          </DataTableShell>
+
+          <Suspense fallback={null}>
+            {showAddProduct && (
+              <LazyProductFormDialog
+                showAddProduct={showAddProduct}
+                setShowAddProduct={setShowAddProduct}
+                productForm={productForm}
+                setProductForm={setProductForm}
+                newTag={newTag}
+                setNewTag={setNewTag}
+                categoriesData={categoriesData}
+                tagsData={tagsData}
+                warehousesData={warehousesData}
+                imagePreview={imagePreview}
+                handleImageSelect={handleImageSelect}
+                handleSubmitProduct={handleSubmitProduct}
+                isCreating={isCreating}
+                isUploadingImage={isUploadingImage}
+              />
+            )}
+            {showImageImport && (
+              <LazyProductImageImportDialog
+                open={showImageImport}
+                onOpenChange={setShowImageImport}
+              />
+            )}
+            {showBulkUpload && (
+              <LazyProductBulkUploadDialog
+                showBulkUpload={showBulkUpload}
+                setShowBulkUpload={setShowBulkUpload}
+                uploadedFile={uploadedFile}
+                setUploadedFile={setUploadedFile}
+                uploadPreview={uploadPreview}
+                setUploadPreview={setUploadPreview}
+                importPreviewMeta={importPreviewMeta}
+                importErrors={importErrors}
+                importSummary={importSummary}
+                handleFileUpload={handleFileUpload}
+                downloadErrorReport={downloadErrorReport}
+                handleBulkSubmit={handleBulkSubmit}
+                importing={importing}
+                isCreating={isCreating}
+                importJob={importJob}
+                importJobActive={importJobActive}
+              />
+            )}
+            {showInventoryAdjustment && (
+              <LazyInventoryAdjustmentDialog
+                showInventoryAdjustment={showInventoryAdjustment}
+                setShowInventoryAdjustment={setShowInventoryAdjustment}
+                selectedProductForAdjustment={selectedProductForAdjustment}
+                setSelectedProductForAdjustment={setSelectedProductForAdjustment}
+                adjustmentType={adjustmentType}
+                setAdjustmentType={setAdjustmentType}
+                adjustmentQuantity={adjustmentQuantity}
+                setAdjustmentQuantity={setAdjustmentQuantity}
+                adjustmentReason={adjustmentReason}
+                setAdjustmentReason={setAdjustmentReason}
+                adjustmentNotes={adjustmentNotes}
+                setAdjustmentNotes={setAdjustmentNotes}
+              />
+            )}
+          </Suspense>
+        </PageShell>
+      </RequirePermission>
+    </ContentReveal>
   )
 }

@@ -13,13 +13,16 @@ import { Button } from './ui/button'
 import { Bell, X, TrendingUp, Settings, Menu, Search, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 import { BranchSwitcher } from './BranchSwitcher'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useNotificationBadge } from '../hooks/useNotificationBadge'
 import { useImpersonation } from '../hooks/useImpersonation'
+import { usePermissions } from '../hooks/usePermissions'
 import { CommandPalette } from './search/CommandPalette'
+import { resolveHeaderContextAction } from './headerContextAction'
 import { cn } from '../lib/utils'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
+import { Plus } from 'lucide-react'
 
 const PAGE_NAMES: Record<string, string> = {
   '/app/dashboard': 'dashboard',
@@ -67,8 +70,14 @@ const PAGE_NAMES: Record<string, string> = {
 export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {}) {
   const { t } = useTranslation(['navigation', 'common'])
   const { user } = useAppSelector((state) => state.auth)
-  const { isImpersonating, isPlatformAdmin, isEffectiveSupplier, shouldLoadTenantEntitlements } =
-    useImpersonation()
+  const {
+    isImpersonating,
+    isPlatformAdmin,
+    isEffectiveSupplier,
+    isEffectiveRestaurant,
+    shouldLoadTenantEntitlements,
+  } = useImpersonation()
+  const { can } = usePermissions()
   const dispatch = useAppDispatch()
   const location = useLocation()
   const [logout] = useLogoutMutation()
@@ -174,6 +183,19 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
     'dashboard'
   const pageName = t(pageKey, { ns: 'navigation', defaultValue: pageKey })
 
+  const contextAction = resolveHeaderContextAction(
+    location.pathname,
+    can,
+    isEffectiveSupplier,
+    isEffectiveRestaurant
+  )
+  const contextActionLabel = contextAction
+    ? t(contextAction.labelKey, {
+        ns: contextAction.namespace,
+        defaultValue: contextAction.labelKey,
+      })
+    : null
+
   const initials = (user?.displayName || user?.email || 'U')
     .split(/[\s@]/)
     .filter(Boolean)
@@ -199,10 +221,31 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         </button>
       )}
 
-      <div className="min-w-0 flex-1">
-        <h1 className="truncate text-[15px] font-semibold text-[var(--text)] sm:text-base">
-          {pageName}
-        </h1>
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="min-w-0">
+          <p
+            className="hidden truncate text-xs font-medium text-[var(--text-muted)] md:block"
+            aria-current="page"
+          >
+            {pageName}
+          </p>
+          <h1 className="truncate text-[15px] font-semibold text-[var(--text)] sm:text-base md:hidden">
+            {pageName}
+          </h1>
+        </div>
+        {contextAction && contextActionLabel && (
+          <Button
+            asChild
+            size="sm"
+            className="hidden shrink-0 md:inline-flex"
+            style={{ background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }}
+          >
+            <Link to={contextAction.href} data-testid="header-context-action">
+              <Plus className="me-1.5" style={{ width: 14, height: 14 }} aria-hidden />
+              {contextActionLabel}
+            </Link>
+          </Button>
+        )}
       </div>
 
       {/* Right side controls */}
