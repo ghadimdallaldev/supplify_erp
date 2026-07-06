@@ -19,6 +19,8 @@ import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { filterControlClass } from '../components/ui/filter-control'
 import { DataTableShell } from '../components/ui/data-table-shell'
+import { TableScroll } from '../components/ui/table-scroll'
+import { CardActionGrid, cardActionBtnClass } from '../components/ui/card-layout'
 import { RequirePermission } from '../components/RequirePermission'
 import { EmptyState } from '../components/ui/empty-state'
 import { StatusBadge } from '../components/ui/status-badge'
@@ -48,6 +50,7 @@ import {
   Scale,
   ChevronLeft,
   ChevronRight,
+  X,
 } from 'lucide-react'
 
 /** @deprecated use filterControlClass from components/ui/filter-control */
@@ -605,7 +608,7 @@ export function OrdersPage() {
               </TabsList>
 
               <TabsContent value={activeTab} className="space-y-4">
-                <div className="space-y-4">
+                <div className="space-y-4 lg:hidden" data-testid="orders-card-list">
                   {filteredOrders?.map((order: any) => (
                     <Card
                       key={order.id}
@@ -698,7 +701,7 @@ export function OrdersPage() {
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                        <div className="flex flex-col gap-4">
                           {/* Order Items Preview */}
                           <div className="flex-1 min-w-0">
                             <div className="text-sm text-[var(--text-muted)] mb-2">
@@ -719,11 +722,12 @@ export function OrdersPage() {
                           </div>
 
                           {/* Action Buttons */}
-                          <div className="flex flex-wrap gap-2 w-full lg:w-auto lg:justify-end">
+                          <CardActionGrid>
                             {isSupplier && canEditOrders && order.status === 'PLACED' && (
                               <>
                                 <Button
                                   size="sm"
+                                  className={cardActionBtnClass()}
                                   onClick={() => handleStatusUpdate(order.id, 'ACKNOWLEDGED')}
                                   data-testid={`order-${order.id}-acknowledge`}
                                 >
@@ -733,6 +737,7 @@ export function OrdersPage() {
                                   <Button
                                     size="sm"
                                     variant="outline"
+                                    className={cardActionBtnClass()}
                                     onClick={() => {
                                       setDeclineOrderId(order.id)
                                       setDeclineOrderLabel(order.restaurant_name)
@@ -747,6 +752,7 @@ export function OrdersPage() {
                             {isSupplier && canEditOrders && order.status === 'ACKNOWLEDGED' && (
                               <Button
                                 size="sm"
+                                className={cardActionBtnClass()}
                                 onClick={() => handleStatusUpdate(order.id, 'PROCESSING')}
                                 data-testid={`order-${order.id}-start-processing`}
                               >
@@ -756,6 +762,7 @@ export function OrdersPage() {
                             {isSupplier && canEditOrders && order.status === 'PROCESSING' && (
                               <Button
                                 size="sm"
+                                className={cardActionBtnClass()}
                                 onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}
                                 data-testid={`order-${order.id}-ship`}
                               >
@@ -768,6 +775,7 @@ export function OrdersPage() {
                               updatingOrderId !== order.id && (
                                 <Button
                                   size="sm"
+                                  className={cardActionBtnClass()}
                                   onClick={() => handleStatusUpdate(order.id, 'DELIVERED')}
                                   disabled={false}
                                   data-testid={`order-${order.id}-deliver`}
@@ -781,7 +789,7 @@ export function OrdersPage() {
                                   size="sm"
                                   variant={order.status === 'DELIVERED' ? 'outline' : 'default'}
                                   disabled
-                                  className="cursor-not-allowed opacity-75"
+                                  className={`${cardActionBtnClass()} cursor-not-allowed opacity-75`}
                                 >
                                   {updatingOrderId === order.id ? (
                                     <>{t('page.updating')}</>
@@ -797,6 +805,7 @@ export function OrdersPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
+                                className={cardActionBtnClass()}
                                 onClick={() => handleSendReminder(order.id)}
                               >
                                 <AlertCircle className="h-4 w-4 mr-1" />
@@ -805,26 +814,248 @@ export function OrdersPage() {
                                   : t('page.sendReminder')}
                               </Button>
                             )}
-                            <Button variant="outline" size="sm" asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className={cardActionBtnClass()}
+                              asChild
+                            >
                               <Link to={`/app/orders/${order.id}`}>
                                 <FileText className="h-4 w-4 mr-1" />
                                 {t('page.viewDetails')}
                               </Link>
                             </Button>
                             {isSupplier && (
-                              <Button variant="outline" size="sm" asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className={cardActionBtnClass()}
+                                asChild
+                              >
                                 <Link to={`/app/orders/${order.id}?tab=packing`}>
                                   <Package className="h-4 w-4 mr-1" />
                                   {t('page.packingSlip')}
                                 </Link>
                               </Button>
                             )}
-                          </div>
+                          </CardActionGrid>
                         </div>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
+
+                {filteredOrders && filteredOrders.length > 0 && (
+                  <TableScroll
+                    aria-label={ordersTitle}
+                    className="hidden lg:block"
+                    data-testid="orders-table-view"
+                  >
+                    <table className="w-full min-w-[640px] border-collapse text-sm">
+                      <thead className="bg-[var(--brand-ultra)]/80">
+                        <tr>
+                          <th className="px-4 py-3 text-start text-xs font-semibold uppercase text-[var(--text-muted)]">
+                            Order
+                          </th>
+                          <th className="hidden px-4 py-3 text-start text-xs font-semibold uppercase text-[var(--text-muted)] lg:table-cell">
+                            Restaurant
+                          </th>
+                          <th className="px-4 py-3 text-start text-xs font-semibold uppercase text-[var(--text-muted)]">
+                            Status
+                          </th>
+                          <th className="hidden px-4 py-3 text-start text-xs font-semibold uppercase text-[var(--text-muted)] xl:table-cell">
+                            Placed
+                          </th>
+                          <th className="hidden px-4 py-3 text-end text-xs font-semibold uppercase text-[var(--text-muted)] lg:table-cell">
+                            {t('page.itemsLabel')}
+                          </th>
+                          <th className="px-4 py-3 text-end text-xs font-semibold uppercase text-[var(--text-muted)]">
+                            {t('page.total', { defaultValue: 'Total' })}
+                          </th>
+                          <th className="px-4 py-3 text-end text-xs font-semibold uppercase text-[var(--text-muted)]">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredOrders.map((order: any) => (
+                          <tr
+                            key={order.id}
+                            className="border-b border-[var(--app-border)] hover:bg-[var(--brand-ultra)]"
+                            data-testid={`order-table-row-${order.id}`}
+                          >
+                            <td className="px-4 py-3 align-middle">
+                              <Link
+                                to={`/app/orders/${order.id}`}
+                                className="font-medium text-[var(--brand-mid)] hover:underline"
+                              >
+                                {t('page.orderNumber', {
+                                  id: order.id.slice(-8).toUpperCase(),
+                                })}
+                              </Link>
+                            </td>
+                            <td className="hidden max-w-[10rem] truncate px-4 py-3 align-middle lg:table-cell">
+                              {order.restaurant_name}
+                            </td>
+                            <td className="px-4 py-3 align-middle">
+                              <StatusBadge
+                                status={order.status}
+                                label={resolveOrderStatusLabel(
+                                  t,
+                                  order,
+                                  isSupplier ? 'SUPPLIER' : 'RESTAURANT'
+                                )}
+                              />
+                            </td>
+                            <td className="hidden px-4 py-3 align-middle text-[var(--text-muted)] xl:table-cell">
+                              {new Date(order.placed_at || order.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="hidden px-4 py-3 text-end align-middle tabular-nums lg:table-cell">
+                              {order.items?.length || 0}
+                            </td>
+                            <td className="px-4 py-3 text-end align-middle font-semibold tabular-nums text-[var(--brand-mid)]">
+                              ${formatPrice(order.total_amount)}
+                            </td>
+                            <td className="px-4 py-3 text-end align-middle">
+                              <div className="flex flex-wrap justify-end gap-1.5">
+                                {isSupplier && canEditOrders && order.status === 'PLACED' && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      className="px-2.5 xl:px-3"
+                                      onClick={() => handleStatusUpdate(order.id, 'ACKNOWLEDGED')}
+                                      aria-label={t('page.acknowledge')}
+                                      title={t('page.acknowledge')}
+                                    >
+                                      <CheckCircle className="h-4 w-4 xl:mr-1" />
+                                      <span className="hidden xl:inline">
+                                        {t('page.acknowledge')}
+                                      </span>
+                                    </Button>
+                                    {canDeclineOrder && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="px-2.5 xl:px-3"
+                                        onClick={() => {
+                                          setDeclineOrderId(order.id)
+                                          setDeclineOrderLabel(order.restaurant_name)
+                                        }}
+                                        aria-label={t('page.decline')}
+                                        title={t('page.decline')}
+                                      >
+                                        <X className="h-4 w-4 xl:mr-1" />
+                                        <span className="hidden xl:inline">
+                                          {t('page.decline')}
+                                        </span>
+                                      </Button>
+                                    )}
+                                  </>
+                                )}
+                                {isSupplier && canEditOrders && order.status === 'ACKNOWLEDGED' && (
+                                  <Button
+                                    size="sm"
+                                    className="px-2.5 xl:px-3"
+                                    onClick={() => handleStatusUpdate(order.id, 'PROCESSING')}
+                                    aria-label={t('page.startProcessing')}
+                                    title={t('page.startProcessing')}
+                                  >
+                                    <Package className="h-4 w-4 xl:mr-1" />
+                                    <span className="hidden xl:inline">
+                                      {t('page.startProcessing')}
+                                    </span>
+                                  </Button>
+                                )}
+                                {isSupplier && canEditOrders && order.status === 'PROCESSING' && (
+                                  <Button
+                                    size="sm"
+                                    className="px-2.5 xl:px-3"
+                                    onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}
+                                    aria-label={t('page.markShipped')}
+                                    title={t('page.markShipped')}
+                                  >
+                                    <Truck className="h-4 w-4 xl:mr-1" />
+                                    <span className="hidden xl:inline">
+                                      {t('page.markShipped')}
+                                    </span>
+                                  </Button>
+                                )}
+                                {isSupplier &&
+                                  canEditOrders &&
+                                  order.status === 'SHIPPED' &&
+                                  updatingOrderId !== order.id && (
+                                    <Button
+                                      size="sm"
+                                      className="px-2.5 xl:px-3"
+                                      onClick={() => handleStatusUpdate(order.id, 'DELIVERED')}
+                                      aria-label={t('page.markDelivered')}
+                                      title={t('page.markDelivered')}
+                                    >
+                                      <Truck className="h-4 w-4 xl:mr-1" />
+                                      <span className="hidden xl:inline">
+                                        {t('page.markDelivered')}
+                                      </span>
+                                    </Button>
+                                  )}
+                                {!isSupplier && order.status === 'PLACED' && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="px-2.5 xl:px-3"
+                                    onClick={() => handleSendReminder(order.id)}
+                                    aria-label={t('page.sendReminder')}
+                                    title={t('page.sendReminder')}
+                                  >
+                                    <AlertCircle className="h-4 w-4 xl:mr-1" />
+                                    <span className="hidden xl:inline">
+                                      {t('page.sendReminder')}
+                                    </span>
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="px-2.5 xl:px-3"
+                                  asChild
+                                >
+                                  <Link
+                                    to={`/app/orders/${order.id}`}
+                                    aria-label={t('page.viewDetails')}
+                                    title={t('page.viewDetails')}
+                                  >
+                                    <FileText className="h-4 w-4 xl:mr-1" />
+                                    <span className="hidden xl:inline">
+                                      {t('page.viewDetails')}
+                                    </span>
+                                  </Link>
+                                </Button>
+                                {isSupplier && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="px-2.5 xl:px-3"
+                                    asChild
+                                  >
+                                    <Link
+                                      to={`/app/orders/${order.id}?tab=packing`}
+                                      aria-label={t('page.packingSlip')}
+                                      title={t('page.packingSlip')}
+                                    >
+                                      <Package className="h-4 w-4 xl:mr-1" />
+                                      <span className="hidden xl:inline">
+                                        {t('page.packingSlip')}
+                                      </span>
+                                    </Link>
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </TableScroll>
+                )}
 
                 {(!filteredOrders || filteredOrders.length === 0) && (
                   <EmptyState

@@ -22,6 +22,8 @@ import {
   formatAdminDate,
 } from './adminUi'
 import { cn } from '../../lib/utils'
+import { TableScroll } from '../ui/table-scroll'
+import { responsiveDataListClasses } from '../ui/responsive-data-list'
 import { ADMIN_EMPTY_STATE } from '../../lib/dealDisplayLabels'
 import {
   DEAL_PAGE_SIZES,
@@ -319,8 +321,28 @@ export function AdminDealsPanel() {
             />
           ) : (
             <div className="overflow-hidden rounded-lg border border-[var(--app-border)]">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="space-y-3 p-4 lg:hidden">
+                {pageDeals.map((deal) => (
+                  <article
+                    key={deal.id}
+                    className="rounded-lg border border-[var(--app-border)] p-3 space-y-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-medium">{String(deal.name || deal.title || 'Deal')}</p>
+                      <AdminStatusBadge status={String(deal.status || '')} />
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {String(deal.supplier_name || '—')}
+                    </p>
+                    <p className="text-sm">{formatDealValue(deal)}</p>
+                  </article>
+                ))}
+              </div>
+              <TableScroll
+                aria-label={t('deals.title')}
+                className="hidden lg:block border-0 rounded-none"
+              >
+                <table className="w-full min-w-[720px] text-sm">
                   <thead>
                     <tr className="border-b bg-[var(--app-bg-subtle)]/80 text-left text-xs">
                       <th className="w-8 px-2 py-2.5" aria-label={t('common.expandRowAriaLabel')} />
@@ -597,7 +619,7 @@ export function AdminDealsPanel() {
                     })}
                   </tbody>
                 </table>
-              </div>
+              </TableScroll>
               <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 border-t bg-[var(--app-bg-subtle)]/30 text-xs text-[var(--text-muted)]">
                 <p>
                   Showing {(safePage - 1) * pageSize + 1}–

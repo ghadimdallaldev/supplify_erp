@@ -31,6 +31,8 @@ import { StatusBadge } from '../components/ui/status-badge'
 import { Skeleton } from '../components/ui/skeleton'
 import { Select, SelectTrigger } from '../components/ui/select'
 import { DataTableShell } from '../components/ui/data-table-shell'
+import { TableScroll } from '../components/ui/table-scroll'
+import { CardActionGrid, cardActionBtnClass } from '../components/ui/card-layout'
 import {
   resolveSupplierInventoryStatus,
   countSupplierLowStockItems,
@@ -252,114 +254,175 @@ export function InventoryPage() {
                   </span>
                 }
               >
-                <table className="w-full min-w-[640px]">
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--app-border)' }}>
-                      <th className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                        {t('supplierPage.table.product')}
-                      </th>
-                      <th className="hidden py-3 px-4 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] md:table-cell">
-                        {t('supplierPage.table.warehouse')}
-                      </th>
-                      <th className="hidden py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] sm:table-cell">
-                        {t('supplierPage.table.onHand')}
-                      </th>
-                      <th className="hidden py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] md:table-cell">
-                        {t('supplierPage.table.reserved')}
-                      </th>
-                      <th className="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                        {t('supplierPage.table.available')}
-                      </th>
-                      <th className="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                        {t('supplierPage.table.status')}
-                      </th>
-                      <th className="py-3 px-4 text-center text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                        {t('supplierPage.table.actions')}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {inventory.map((item: any) => (
-                      <tr
-                        key={item.id}
-                        style={{ borderBottom: '1px solid var(--app-border)' }}
-                        className="transition-colors hover:bg-[var(--brand-ultra)]"
-                      >
-                        <td className="py-3 px-4">
-                          <div>
-                            <p className="text-sm font-medium text-[var(--text)]">
-                              {item.product_name}
-                            </p>
-                            <p className="text-xs text-[var(--text-muted)]">{item.sku}</p>
-                          </div>
-                        </td>
-                        <td className="hidden py-3 px-4 md:table-cell">
-                          {item.warehouse_name ? (
-                            <div className="flex items-center gap-2">
-                              <Warehouse className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
-                              <div>
-                                <p className="text-sm font-medium text-[var(--text)]">
-                                  {item.warehouse_name}
-                                </p>
-                                {item.warehouse_code && (
-                                  <p className="text-xs text-[var(--text-muted)]">
-                                    {item.warehouse_code}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-sm text-[var(--text-muted)]">—</span>
-                          )}
-                        </td>
-                        <td className="hidden py-3 px-4 text-right sm:table-cell">
-                          <span className="text-sm font-medium text-[var(--text)]">
-                            {formatNumber(
-                              parseFloat(String(item.available_qty || 0)) +
-                                parseFloat(String(item.reserved_qty || 0)),
-                              { maximumFractionDigits: 2 }
-                            )}
-                          </span>
-                        </td>
-                        <td className="hidden py-3 px-4 text-right md:table-cell">
-                          <span className="text-sm" style={{ color: 'var(--amber)' }}>
-                            {item.reserved_qty || 0}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <span className="text-sm font-medium" style={{ color: 'var(--mint)' }}>
-                            {item.available_qty || 0}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right">{renderInventoryStatus(item)}</td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center justify-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedProduct(item)
-                                setShowAdjustment(true)
-                              }}
-                            >
-                              {t('supplierPage.table.adjust')}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedProduct(item)
-                                setShowSettings(true)
-                              }}
-                            >
-                              <Settings className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
+                <div
+                  className="divide-y divide-[var(--app-border)] lg:hidden"
+                  data-testid="inventory-card-list"
+                >
+                  {inventory.map((item: any) => (
+                    <div key={item.id} className="space-y-3 p-4">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-[var(--text)]">
+                          {item.product_name}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)]">{item.sku}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {renderInventoryStatus(item)}
+                        <Badge variant="outline" className="tabular-nums">
+                          {t('supplierPage.table.available')}: {item.available_qty || 0}
+                        </Badge>
+                      </div>
+                      <CardActionGrid>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={cardActionBtnClass()}
+                          onClick={() => {
+                            setSelectedProduct(item)
+                            setShowAdjustment(true)
+                          }}
+                        >
+                          {t('supplierPage.table.adjust')}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={cardActionBtnClass({ iconOnly: true })}
+                          onClick={() => {
+                            setSelectedProduct(item)
+                            setShowSettings(true)
+                          }}
+                          aria-label={t('supplierPage.settingsDialog.title')}
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                      </CardActionGrid>
+                    </div>
+                  ))}
+                </div>
+                <TableScroll
+                  aria-label={t('supplierPage.title')}
+                  className="hidden border-0 lg:block"
+                  data-testid="inventory-table-view"
+                >
+                  <table className="w-full min-w-[640px]">
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--app-border)' }}>
+                        <th className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                          {t('supplierPage.table.product')}
+                        </th>
+                        <th className="hidden py-3 px-4 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] xl:table-cell">
+                          {t('supplierPage.table.warehouse')}
+                        </th>
+                        <th className="hidden py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] lg:table-cell">
+                          {t('supplierPage.table.onHand')}
+                        </th>
+                        <th className="hidden py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] xl:table-cell">
+                          {t('supplierPage.table.reserved')}
+                        </th>
+                        <th className="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                          {t('supplierPage.table.available')}
+                        </th>
+                        <th className="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                          {t('supplierPage.table.status')}
+                        </th>
+                        <th className="py-3 px-4 text-center text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                          {t('supplierPage.table.actions')}
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {inventory.map((item: any) => (
+                        <tr
+                          key={item.id}
+                          style={{ borderBottom: '1px solid var(--app-border)' }}
+                          className="transition-colors hover:bg-[var(--brand-ultra)]"
+                        >
+                          <td className="py-3 px-4">
+                            <div>
+                              <p className="text-sm font-medium text-[var(--text)]">
+                                {item.product_name}
+                              </p>
+                              <p className="text-xs text-[var(--text-muted)]">{item.sku}</p>
+                            </div>
+                          </td>
+                          <td className="hidden py-3 px-4 xl:table-cell">
+                            {item.warehouse_name ? (
+                              <div className="flex items-center gap-2">
+                                <Warehouse className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                                <div>
+                                  <p className="text-sm font-medium text-[var(--text)]">
+                                    {item.warehouse_name}
+                                  </p>
+                                  {item.warehouse_code && (
+                                    <p className="text-xs text-[var(--text-muted)]">
+                                      {item.warehouse_code}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-[var(--text-muted)]">—</span>
+                            )}
+                          </td>
+                          <td className="hidden py-3 px-4 text-right lg:table-cell">
+                            <span className="text-sm font-medium text-[var(--text)]">
+                              {formatNumber(
+                                parseFloat(String(item.available_qty || 0)) +
+                                  parseFloat(String(item.reserved_qty || 0)),
+                                { maximumFractionDigits: 2 }
+                              )}
+                            </span>
+                          </td>
+                          <td className="hidden py-3 px-4 text-right xl:table-cell">
+                            <span className="text-sm" style={{ color: 'var(--amber)' }}>
+                              {item.reserved_qty || 0}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <span className="text-sm font-medium" style={{ color: 'var(--mint)' }}>
+                              {item.available_qty || 0}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">{renderInventoryStatus(item)}</td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="px-2.5 xl:px-3"
+                                onClick={() => {
+                                  setSelectedProduct(item)
+                                  setShowAdjustment(true)
+                                }}
+                                aria-label={t('supplierPage.table.adjust')}
+                                title={t('supplierPage.table.adjust')}
+                              >
+                                <Package className="h-4 w-4 xl:mr-1" />
+                                <span className="hidden xl:inline">
+                                  {t('supplierPage.table.adjust')}
+                                </span>
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="px-2.5"
+                                onClick={() => {
+                                  setSelectedProduct(item)
+                                  setShowSettings(true)
+                                }}
+                                aria-label={t('supplierPage.settingsDialog.title')}
+                                title={t('supplierPage.settingsDialog.title')}
+                              >
+                                <Settings className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </TableScroll>
               </DataTableShell>
             )}
           </>
@@ -452,8 +515,8 @@ export function InventoryPage() {
                   </CardHeader>
                   <CardContent className="p-0">
                     {warehouse.inventory && warehouse.inventory.length > 0 ? (
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
+                      <TableScroll aria-label={warehouse.name}>
+                        <table className="w-full min-w-[480px]">
                           <thead className="bg-[var(--brand-ultra)]">
                             <tr>
                               <th className="px-4 py-2 text-left text-xs font-medium text-[var(--text-muted)]">
@@ -511,7 +574,7 @@ export function InventoryPage() {
                             ))}
                           </tbody>
                         </table>
-                      </div>
+                      </TableScroll>
                     ) : (
                       <div className="py-8 text-center text-sm text-[var(--text-muted)]">
                         {t('supplierPage.warehouseView.noInventory')}

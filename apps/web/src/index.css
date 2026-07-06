@@ -351,6 +351,7 @@
     min-width: 0;
     flex: 1;
     flex-direction: column;
+    overflow-x: hidden;
   }
 
   .admin-topbar {

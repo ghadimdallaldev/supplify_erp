@@ -6,6 +6,7 @@ import { Input } from '../ui/input'
 import { StatusBadge } from '../ui/status-badge'
 import { AppPanel, SummaryStrip } from '../ui/app-panel'
 import { TableScroll } from '../ui/table-scroll'
+import { responsiveDataListClasses } from '../ui/responsive-data-list'
 import { Filter, Flag, Loader2, RefreshCw, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -383,61 +384,83 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
             }
           />
         ) : (
-          <TableScroll aria-label={t('features.globalTableAriaLabel')}>
-            <table className="w-full min-w-[640px] text-sm">
-              <thead>
-                <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                  <th className="px-4 py-3">Feature</th>
-                  <th className="px-4 py-3">Global mode</th>
-                  <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--app-border)]">
-                {filteredGlobalFlags.map((flag) => (
-                  <tr
-                    key={flag.featureKey}
-                    className="transition-colors hover:bg-[var(--brand-ultra)]/35"
+          <>
+            <div className="space-y-3 lg:hidden">
+              {filteredGlobalFlags.map((flag) => (
+                <article
+                  key={flag.featureKey}
+                  className="rounded-xl border border-[var(--app-border)] p-4 space-y-2"
+                >
+                  <p className="font-medium">{flag.featureName}</p>
+                  <p className="font-mono text-xs text-[var(--text-muted)]">{flag.featureKey}</p>
+                  <Badge
+                    variant="outline"
+                    className={cn('text-xs font-medium', globalModeTone(flag.globalOverride))}
                   >
-                    <td className="px-4 py-3.5">
-                      <p className="font-medium text-[var(--text)]">{flag.featureName}</p>
-                      <p className="mt-0.5 font-mono text-xs text-[var(--text-muted)]">
-                        {flag.featureKey}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <Badge
-                        variant="outline"
-                        className={cn('text-xs font-medium', globalModeTone(flag.globalOverride))}
-                      >
-                        {globalModeLabel(flag.globalOverride)}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex flex-wrap justify-end gap-2">
-                        {(['inherit', 'on', 'off'] as const).map((mode) => (
-                          <Button
-                            key={mode}
-                            size="sm"
-                            variant={
-                              (mode === 'inherit' && flag.globalOverride === null) ||
-                              (mode === 'on' && flag.globalOverride === true) ||
-                              (mode === 'off' && flag.globalOverride === false)
-                                ? 'default'
-                                : 'outline'
-                            }
-                            disabled={updatingGlobal}
-                            onClick={() => handleGlobalChange(flag.featureKey, mode)}
-                          >
-                            {mode}
-                          </Button>
-                        ))}
-                      </div>
-                    </td>
+                    {globalModeLabel(flag.globalOverride)}
+                  </Badge>
+                </article>
+              ))}
+            </div>
+            <TableScroll
+              aria-label={t('features.globalTableAriaLabel')}
+              className="hidden lg:block"
+            >
+              <table className="w-full min-w-[640px] text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                    <th className="px-4 py-3">Feature</th>
+                    <th className="px-4 py-3">Global mode</th>
+                    <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableScroll>
+                </thead>
+                <tbody className="divide-y divide-[var(--app-border)]">
+                  {filteredGlobalFlags.map((flag) => (
+                    <tr
+                      key={flag.featureKey}
+                      className="transition-colors hover:bg-[var(--brand-ultra)]/35"
+                    >
+                      <td className="px-4 py-3.5">
+                        <p className="font-medium text-[var(--text)]">{flag.featureName}</p>
+                        <p className="mt-0.5 font-mono text-xs text-[var(--text-muted)]">
+                          {flag.featureKey}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <Badge
+                          variant="outline"
+                          className={cn('text-xs font-medium', globalModeTone(flag.globalOverride))}
+                        >
+                          {globalModeLabel(flag.globalOverride)}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          {(['inherit', 'on', 'off'] as const).map((mode) => (
+                            <Button
+                              key={mode}
+                              size="sm"
+                              variant={
+                                (mode === 'inherit' && flag.globalOverride === null) ||
+                                (mode === 'on' && flag.globalOverride === true) ||
+                                (mode === 'off' && flag.globalOverride === false)
+                                  ? 'default'
+                                  : 'outline'
+                              }
+                              disabled={updatingGlobal}
+                              onClick={() => handleGlobalChange(flag.featureKey, mode)}
+                            >
+                              {mode}
+                            </Button>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableScroll>
+          </>
         )}
       </AppPanel>
 
@@ -541,80 +564,96 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
             }
           />
         ) : (
-          <TableScroll aria-label={t('features.tenantTableAriaLabel')}>
-            <table className="w-full min-w-[720px] text-sm">
-              <thead>
-                <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                  <th className="px-4 py-3">Feature</th>
-                  <th className="px-4 py-3">Effective</th>
-                  <th className="px-4 py-3">Source</th>
-                  <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--app-border)]">
-                {filteredEffectiveFeatures.map((feature) => {
-                  const on = isFeatureOn(feature.enabled)
-                  return (
-                    <tr
-                      key={feature.featureKey}
-                      className="transition-colors hover:bg-[var(--brand-ultra)]/35"
-                    >
-                      <td className="px-4 py-3.5">
-                        <p className="font-medium text-[var(--text)]">{feature.featureName}</p>
-                        <p className="mt-0.5 font-mono text-xs text-[var(--text-muted)]">
-                          {feature.featureKey}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <StatusBadge
-                          status={on ? 'ACTIVE' : 'INACTIVE'}
-                          label={effectiveStatusLabel(feature.enabled)}
-                        />
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <Badge
-                          variant="outline"
-                          className={cn('text-xs font-medium', sourceTone(feature.source))}
-                        >
-                          {sourceLabel(feature.source)}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <Button
-                            size="sm"
+          <>
+            <div className="space-y-3 lg:hidden">
+              {filteredEffectiveFeatures.map((feature) => (
+                <article
+                  key={feature.featureKey}
+                  className="rounded-xl border border-[var(--app-border)] p-4 space-y-2"
+                >
+                  <p className="font-medium">{feature.featureName}</p>
+                  <StatusBadge status={feature.enabled ? 'ACTIVE' : 'INACTIVE'} />
+                </article>
+              ))}
+            </div>
+            <TableScroll
+              aria-label={t('features.tenantTableAriaLabel')}
+              className="hidden lg:block"
+            >
+              <table className="w-full min-w-[720px] text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                    <th className="px-4 py-3">Feature</th>
+                    <th className="px-4 py-3">Effective</th>
+                    <th className="px-4 py-3">Source</th>
+                    <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--app-border)]">
+                  {filteredEffectiveFeatures.map((feature) => {
+                    const on = isFeatureOn(feature.enabled)
+                    return (
+                      <tr
+                        key={feature.featureKey}
+                        className="transition-colors hover:bg-[var(--brand-ultra)]/35"
+                      >
+                        <td className="px-4 py-3.5">
+                          <p className="font-medium text-[var(--text)]">{feature.featureName}</p>
+                          <p className="mt-0.5 font-mono text-xs text-[var(--text-muted)]">
+                            {feature.featureKey}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <StatusBadge
+                            status={on ? 'ACTIVE' : 'INACTIVE'}
+                            label={effectiveStatusLabel(feature.enabled)}
+                          />
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <Badge
                             variant="outline"
-                            disabled={savingOverride || clearingOverride}
-                            onClick={() => handleTenantToggle(feature, true)}
+                            className={cn('text-xs font-medium', sourceTone(feature.source))}
                           >
-                            Force on
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={savingOverride || clearingOverride}
-                            onClick={() => handleTenantToggle(feature, false)}
-                          >
-                            Force off
-                          </Button>
-                          {feature.source === 'tenant_override' && (
+                            {sourceLabel(feature.source)}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <div className="flex flex-wrap justify-end gap-2">
                             <Button
                               size="sm"
-                              variant="ghost"
+                              variant="outline"
                               disabled={savingOverride || clearingOverride}
-                              onClick={() => handleClearOverride(feature.featureKey)}
+                              onClick={() => handleTenantToggle(feature, true)}
                             >
-                              Clear override
+                              Force on
                             </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </TableScroll>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={savingOverride || clearingOverride}
+                              onClick={() => handleTenantToggle(feature, false)}
+                            >
+                              Force off
+                            </Button>
+                            {feature.source === 'tenant_override' && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={savingOverride || clearingOverride}
+                                onClick={() => handleClearOverride(feature.featureKey)}
+                              >
+                                Clear override
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </TableScroll>
+          </>
         )}
       </AppPanel>
     </>

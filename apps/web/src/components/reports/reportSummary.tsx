@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { formatPrice } from '../../utils/format'
 import { ensureNamespace } from '../../i18n'
+import { TableScroll } from '../ui/table-scroll'
 
 export type ReportDef = {
   key: string
@@ -147,7 +148,7 @@ export function ReportDataTable({
 
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--app-border)]">
-      <div className="overflow-x-auto">
+      <TableScroll aria-label="Report data" className="rounded-none border-0">
         <table className="w-full min-w-[480px] text-sm" data-testid="report-data-table">
           <thead>
             <tr className="border-b border-[var(--app-border)] bg-[var(--brand-ultra)]/30 text-left text-[var(--text-mid)]">
@@ -178,7 +179,7 @@ export function ReportDataTable({
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
       {rows.length > 20 ? (
         <p className="border-t border-[var(--app-border)] px-4 py-2 text-xs text-[var(--text-muted)]">
           {t('table.showingRows', { total: rows.length })}

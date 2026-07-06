@@ -1,9 +1,11 @@
 import { useTranslation } from 'react-i18next'
+import { SlidersHorizontal } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
 import { Label } from '../ui/label'
 import { Select, SelectTrigger } from '../ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { filterControlClass } from '../ui/filter-control'
 import { cn } from '../../lib/utils'
 
@@ -55,8 +57,54 @@ export function ProductFilterFields({
   | 'setMaxPrice'
 >) {
   const { t } = useTranslation('products')
+  const hasPriceFilter = Boolean(minPrice || maxPrice)
+
+  const priceRangeFields = (
+    <>
+      <Label className="mb-1.5 block text-xs font-medium text-[var(--text-muted)] xl:sr-only">
+        {t('filters.priceRange')}
+      </Label>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          placeholder={t('filters.minPrice')}
+          aria-label={t('filters.minPriceAria')}
+          value={minPrice}
+          onChange={(e) => setMinPrice(e.target.value)}
+          min="0"
+          step="0.01"
+          className={cn(filterControlClass, 'min-w-0 sm:max-w-[7.5rem]')}
+        />
+        <span className="shrink-0 text-sm text-[var(--text-muted)]">–</span>
+        <Input
+          type="number"
+          placeholder={t('filters.maxPrice')}
+          aria-label={t('filters.maxPriceAria')}
+          value={maxPrice}
+          onChange={(e) => setMaxPrice(e.target.value)}
+          min="0"
+          step="0.01"
+          className={cn(filterControlClass, 'min-w-0 sm:max-w-[7.5rem]')}
+        />
+        {hasPriceFilter && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10 shrink-0 px-3"
+            onClick={() => {
+              setMinPrice('')
+              setMaxPrice('')
+            }}
+          >
+            {t('filters.clear')}
+          </Button>
+        )}
+      </div>
+    </>
+  )
+
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-12 xl:items-end w-full">
+    <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-12 xl:items-end">
       {!isSupplier && (
         <div className="min-w-0 xl:col-span-2">
           <Label htmlFor="product-supplier-filter" className="sr-only">
@@ -96,47 +144,34 @@ export function ProductFilterFields({
         </Select>
       </div>
       {!isSupplier && (
-        <div className="min-w-0 sm:col-span-2 xl:col-span-4">
-          <Label className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">
-            {t('filters.priceRange')}
-          </Label>
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              placeholder={t('filters.minPrice')}
-              aria-label={t('filters.minPriceAria')}
-              value={minPrice}
-              onChange={(e) => setMinPrice(e.target.value)}
-              min="0"
-              step="0.01"
-              className={cn(filterControlClass, 'min-w-0 sm:max-w-[7.5rem]')}
-            />
-            <span className="shrink-0 text-sm text-[var(--text-muted)]">–</span>
-            <Input
-              type="number"
-              placeholder={t('filters.maxPrice')}
-              aria-label={t('filters.maxPriceAria')}
-              value={maxPrice}
-              onChange={(e) => setMaxPrice(e.target.value)}
-              min="0"
-              step="0.01"
-              className={cn(filterControlClass, 'min-w-0 sm:max-w-[7.5rem]')}
-            />
-            {(minPrice || maxPrice) && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-10 shrink-0 px-3"
-                onClick={() => {
-                  setMinPrice('')
-                  setMaxPrice('')
-                }}
-              >
-                {t('filters.clear')}
-              </Button>
-            )}
+        <>
+          <div className="min-w-0 xl:hidden">
+            <Label className="sr-only">{t('filters.priceRange')}</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant={hasPriceFilter ? 'default' : 'outline'}
+                  className={cn(filterControlClass, 'w-full justify-start gap-2')}
+                >
+                  <SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden />
+                  {t('filters.priceRange')}
+                  {hasPriceFilter && (
+                    <Badge variant="secondary" className="ms-auto text-xs">
+                      {minPrice || '0'}–{maxPrice || '∞'}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-[min(calc(100vw-2rem),20rem)]">
+                {priceRangeFields}
+              </PopoverContent>
+            </Popover>
           </div>
-        </div>
+          <div className="hidden min-w-0 sm:col-span-2 xl:col-span-4 xl:block">
+            {priceRangeFields}
+          </div>
+        </>
       )}
     </div>
   )

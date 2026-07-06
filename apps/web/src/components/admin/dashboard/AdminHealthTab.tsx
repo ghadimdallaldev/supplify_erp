@@ -15,6 +15,7 @@ import { Badge } from '../../ui/badge'
 import { Input } from '../../ui/input'
 import { AppPanel, SummaryStrip } from '../../ui/app-panel'
 import { TableScroll } from '../../ui/table-scroll'
+import { responsiveDataListClasses } from '../../ui/responsive-data-list'
 import { useGetAdminOverviewQuery, useGetAdminHealthQuery } from '../../../services/api'
 import {
   AdminEmptyState,
@@ -276,13 +277,47 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                   description={`${emailFailures.length} failed delivery attempt${emailFailures.length === 1 ? '' : 's'}`}
                   testId="admin-health-email-failures"
                 >
-                  <TableScroll aria-label={t('health.emailFailuresTableAriaLabel')}>
+                  <div className="space-y-3 lg:hidden">
+                    {emailFailures.map((e, i) => (
+                      <article
+                        key={e.id || i}
+                        className="rounded-xl border border-[var(--app-border)] p-4 space-y-2"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <Badge
+                            variant="outline"
+                            className="border-amber-200 bg-amber-50 text-xs font-medium text-amber-800"
+                          >
+                            {e.eventType}
+                          </Badge>
+                          <time className="text-xs text-[var(--text-muted)]">
+                            {formatAdminDateTime(e.createdAt)}
+                          </time>
+                        </div>
+                        <p className="font-mono text-xs">{e.recipientRedacted}</p>
+                        <p className="text-sm truncate" title={e.errorMessage}>
+                          {e.errorMessage || '—'}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                  <TableScroll
+                    aria-label={t('health.emailFailuresTableAriaLabel')}
+                    className="hidden lg:block"
+                  >
                     <table className="w-full min-w-[640px] text-sm">
                       <thead>
                         <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                           <th className="px-4 py-3">{t('common.table.time')}</th>
                           <th className="px-4 py-3">Event</th>
-                          <th className="hidden px-4 py-3 md:table-cell">Recipient</th>
+                          <th
+                            className={cn(
+                              'hidden px-4 py-3',
+                              responsiveDataListClasses.columnSecondary
+                            )}
+                          >
+                            Recipient
+                          </th>
                           <th className="px-4 py-3">Error</th>
                         </tr>
                       </thead>
@@ -303,7 +338,12 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                                 {e.eventType}
                               </Badge>
                             </td>
-                            <td className="hidden px-4 py-3.5 font-mono text-xs md:table-cell">
+                            <td
+                              className={cn(
+                                'hidden px-4 py-3.5 font-mono text-xs',
+                                responsiveDataListClasses.columnSecondary
+                              )}
+                            >
                               {e.recipientRedacted}
                             </td>
                             <td
@@ -397,99 +437,166 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                         }
                       />
                     ) : (
-                      <TableScroll aria-label={t('health.apiErrorsTableAriaLabel')}>
-                        <table className="w-full min-w-[880px] text-sm">
-                          <thead>
-                            <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                              <th className="px-4 py-3">{t('common.table.time')}</th>
-                              <th className="px-4 py-3">Method</th>
-                              <th className="px-4 py-3">{t('common.table.status')}</th>
-                              <th className="hidden px-4 py-3 lg:table-cell">Source</th>
-                              <th className="hidden px-4 py-3 md:table-cell">Request ID</th>
-                              <th className="hidden px-4 py-3 xl:table-cell">
-                                {t('common.table.user')}
-                              </th>
-                              <th className="hidden px-4 py-3 lg:table-cell">
-                                {t('common.table.tenant')}
-                              </th>
-                              <th className="px-4 py-3">Message</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-[var(--app-border)]">
-                            {filteredApiErrors.map((e, i) => (
-                              <tr
-                                key={e.id || i}
-                                className="transition-colors hover:bg-[var(--brand-ultra)]/35"
-                              >
-                                <td
-                                  className="whitespace-nowrap px-4 py-3.5 text-xs text-[var(--text-muted)]"
-                                  title={e.createdAt ? String(e.createdAt) : undefined}
+                      <>
+                        <div className="space-y-3 lg:hidden">
+                          {filteredApiErrors.map((e, i) => (
+                            <article
+                              key={e.id || i}
+                              className="rounded-xl border border-[var(--app-border)] p-4 space-y-2"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <Badge
+                                  variant="outline"
+                                  className={cn('font-mono text-xs', statusCodeTone(e.statusCode))}
                                 >
+                                  {e.statusCode || e.type || '—'}
+                                </Badge>
+                                <time className="text-xs text-[var(--text-muted)]">
                                   {formatAdminDateTime(e.createdAt ?? e.created_at)}
-                                </td>
-                                <td className="px-4 py-3.5 font-mono text-xs text-[var(--text-muted)]">
-                                  {e.method || '—'}
-                                </td>
-                                <td className="px-4 py-3.5">
-                                  {e.statusCode ? (
-                                    <Badge
-                                      variant="outline"
-                                      className={cn(
-                                        'font-mono text-xs',
-                                        statusCodeTone(e.statusCode)
-                                      )}
-                                    >
-                                      {e.statusCode}
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-xs text-[var(--text-muted)]">
-                                      {e.type || '—'}
-                                    </span>
+                                </time>
+                              </div>
+                              <p className="font-mono text-xs text-[var(--text-muted)]">
+                                {e.method || '—'}
+                              </p>
+                              <p className="text-sm truncate" title={e.message}>
+                                {e.message || '—'}
+                              </p>
+                            </article>
+                          ))}
+                        </div>
+                        <TableScroll
+                          aria-label={t('health.apiErrorsTableAriaLabel')}
+                          className="hidden lg:block"
+                        >
+                          <table className="w-full min-w-[880px] text-sm">
+                            <thead>
+                              <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                                <th className="px-4 py-3">{t('common.table.time')}</th>
+                                <th className="px-4 py-3">Method</th>
+                                <th className="px-4 py-3">{t('common.table.status')}</th>
+                                <th
+                                  className={cn(
+                                    'hidden px-4 py-3',
+                                    responsiveDataListClasses.columnTertiary
                                   )}
-                                </td>
-                                <td
-                                  className="hidden max-w-[180px] truncate px-4 py-3.5 text-[var(--text-muted)] lg:table-cell"
-                                  title={e.source}
                                 >
-                                  {e.source || '—'}
-                                </td>
-                                <td
-                                  className="hidden max-w-[120px] truncate px-4 py-3.5 font-mono text-xs text-[var(--text-muted)] md:table-cell"
-                                  title={e.requestId}
+                                  Source
+                                </th>
+                                <th
+                                  className={cn(
+                                    'hidden px-4 py-3',
+                                    responsiveDataListClasses.columnSecondary
+                                  )}
                                 >
-                                  {e.requestId && e.requestId !== '-' ? e.requestId : '—'}
-                                </td>
-                                <td
-                                  className="hidden max-w-[140px] truncate px-4 py-3.5 text-xs text-[var(--text-muted)] xl:table-cell"
-                                  title={
-                                    e.userId && e.userId !== 'anon'
-                                      ? `${e.role || ''} ${e.userId}`.trim()
-                                      : undefined
-                                  }
+                                  Request ID
+                                </th>
+                                <th
+                                  className={cn(
+                                    'hidden px-4 py-3',
+                                    responsiveDataListClasses.columnTertiary
+                                  )}
                                 >
-                                  {formatUserLabel(e.userId, e.role)}
-                                </td>
-                                <td
-                                  className="hidden max-w-[120px] truncate px-4 py-3.5 text-xs text-[var(--text-muted)] lg:table-cell"
-                                  title={
-                                    e.tenantId && e.tenantId !== '-'
-                                      ? `${e.tenantType || ''}:${e.tenantId}`.trim()
-                                      : undefined
-                                  }
+                                  {t('common.table.user')}
+                                </th>
+                                <th
+                                  className={cn(
+                                    'hidden px-4 py-3',
+                                    responsiveDataListClasses.columnTertiary
+                                  )}
                                 >
-                                  {formatTenantLabel(e.tenantType, e.tenantId)}
-                                </td>
-                                <td
-                                  className="max-w-[260px] truncate px-4 py-3.5 text-[var(--text)]"
-                                  title={e.message}
-                                >
-                                  {e.message || '—'}
-                                </td>
+                                  {t('common.table.tenant')}
+                                </th>
+                                <th className="px-4 py-3">Message</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </TableScroll>
+                            </thead>
+                            <tbody className="divide-y divide-[var(--app-border)]">
+                              {filteredApiErrors.map((e, i) => (
+                                <tr
+                                  key={e.id || i}
+                                  className="transition-colors hover:bg-[var(--brand-ultra)]/35"
+                                >
+                                  <td
+                                    className="whitespace-nowrap px-4 py-3.5 text-xs text-[var(--text-muted)]"
+                                    title={e.createdAt ? String(e.createdAt) : undefined}
+                                  >
+                                    {formatAdminDateTime(e.createdAt ?? e.created_at)}
+                                  </td>
+                                  <td className="px-4 py-3.5 font-mono text-xs text-[var(--text-muted)]">
+                                    {e.method || '—'}
+                                  </td>
+                                  <td className="px-4 py-3.5">
+                                    {e.statusCode ? (
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          'font-mono text-xs',
+                                          statusCodeTone(e.statusCode)
+                                        )}
+                                      >
+                                        {e.statusCode}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-xs text-[var(--text-muted)]">
+                                        {e.type || '—'}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td
+                                    className={cn(
+                                      'hidden max-w-[180px] truncate px-4 py-3.5 text-[var(--text-muted)]',
+                                      responsiveDataListClasses.columnTertiary
+                                    )}
+                                    title={e.source}
+                                  >
+                                    {e.source || '—'}
+                                  </td>
+                                  <td
+                                    className={cn(
+                                      'hidden max-w-[120px] truncate px-4 py-3.5 font-mono text-xs text-[var(--text-muted)]',
+                                      responsiveDataListClasses.columnSecondary
+                                    )}
+                                    title={e.requestId}
+                                  >
+                                    {e.requestId && e.requestId !== '-' ? e.requestId : '—'}
+                                  </td>
+                                  <td
+                                    className={cn(
+                                      'hidden max-w-[140px] truncate px-4 py-3.5 text-xs text-[var(--text-muted)]',
+                                      responsiveDataListClasses.columnTertiary
+                                    )}
+                                    title={
+                                      e.userId && e.userId !== 'anon'
+                                        ? `${e.role || ''} ${e.userId}`.trim()
+                                        : undefined
+                                    }
+                                  >
+                                    {formatUserLabel(e.userId, e.role)}
+                                  </td>
+                                  <td
+                                    className={cn(
+                                      'hidden max-w-[120px] truncate px-4 py-3.5 text-xs text-[var(--text-muted)]',
+                                      responsiveDataListClasses.columnTertiary
+                                    )}
+                                    title={
+                                      e.tenantId && e.tenantId !== '-'
+                                        ? `${e.tenantType || ''}:${e.tenantId}`.trim()
+                                        : undefined
+                                    }
+                                  >
+                                    {formatTenantLabel(e.tenantType, e.tenantId)}
+                                  </td>
+                                  <td
+                                    className="max-w-[260px] truncate px-4 py-3.5 text-[var(--text)]"
+                                    title={e.message}
+                                  >
+                                    {e.message || '—'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </TableScroll>
+                      </>
                     )}
                   </>
                 )}

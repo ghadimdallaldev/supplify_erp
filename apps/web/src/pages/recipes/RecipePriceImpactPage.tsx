@@ -18,6 +18,8 @@ import { EmptyState } from '../../components/ui/empty-state'
 import { Skeleton } from '../../components/ui/skeleton'
 import { cn } from '../../lib/utils'
 import { ensureNamespace } from '../../i18n'
+import { TableScroll } from '../../components/ui/table-scroll'
+import { responsiveDataListClasses } from '../../components/ui/responsive-data-list'
 
 export function RecipePriceImpactPage() {
   const { t } = useTranslation('recipes')
@@ -166,29 +168,97 @@ export function RecipePriceImpactPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                  <div className="space-y-3 p-4 lg:hidden">
+                    {group.impactedRecipes.map((r) => (
+                      <article
+                        key={r.recipeId}
+                        className={cn(
+                          'rounded-lg border border-[var(--app-border)] p-3',
+                          r.status === 'WARNING' && 'bg-[var(--amber-pale)]/20'
+                        )}
+                      >
+                        <Link
+                          to={`/app/recipes/${r.recipeId}`}
+                          className="font-medium hover:underline"
+                        >
+                          {r.recipeName}
+                        </Link>
+                        {canViewCosts && (
+                          <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <p className="text-xs text-[var(--text-muted)]">
+                                {t('table.oldCost')}
+                              </p>
+                              <p className="tabular-nums">
+                                {r.oldCostPerPortion != null
+                                  ? formatPrice(r.oldCostPerPortion)
+                                  : '—'}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-[var(--text-muted)]">
+                                {t('table.newCost')}
+                              </p>
+                              <p className="font-medium tabular-nums">
+                                {r.newCostPerPortion != null
+                                  ? formatPrice(r.newCostPerPortion)
+                                  : '—'}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        <div className="mt-2">
+                          <RecipeStatusBadge status={r.status} />
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                  <TableScroll
+                    aria-label={t('priceImpact.title')}
+                    className="hidden lg:block border-0 rounded-none"
+                  >
+                    <table className="w-full min-w-[560px] text-sm">
                       <thead className="bg-[var(--brand-ultra)] text-left">
                         <tr>
                           <th className="px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]">
                             {t('table.recipe')}
                           </th>
                           {canViewCosts && (
-                            <th className="px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]">
+                            <th
+                              className={cn(
+                                'px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]',
+                                responsiveDataListClasses.columnSecondary
+                              )}
+                            >
                               {t('table.oldCost')}
                             </th>
                           )}
                           {canViewCosts && (
-                            <th className="px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]">
+                            <th
+                              className={cn(
+                                'px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]',
+                                responsiveDataListClasses.columnSecondary
+                              )}
+                            >
                               {t('table.newCost')}
                             </th>
                           )}
                           {canViewCosts && (
-                            <th className="px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]">
+                            <th
+                              className={cn(
+                                'px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]',
+                                responsiveDataListClasses.columnTertiary
+                              )}
+                            >
                               {t('table.foodCostPct')}
                             </th>
                           )}
-                          <th className="px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]">
+                          <th
+                            className={cn(
+                              'px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]',
+                              responsiveDataListClasses.columnSecondary
+                            )}
+                          >
                             {t('table.status')}
                           </th>
                         </tr>
@@ -211,21 +281,36 @@ export function RecipePriceImpactPage() {
                               </Link>
                             </td>
                             {canViewCosts && (
-                              <td className="px-4 py-3 tabular-nums">
+                              <td
+                                className={cn(
+                                  'px-4 py-3 tabular-nums',
+                                  responsiveDataListClasses.columnSecondary
+                                )}
+                              >
                                 {r.oldCostPerPortion != null
                                   ? formatPrice(r.oldCostPerPortion)
                                   : '—'}
                               </td>
                             )}
                             {canViewCosts && (
-                              <td className="px-4 py-3 font-medium tabular-nums">
+                              <td
+                                className={cn(
+                                  'px-4 py-3 font-medium tabular-nums',
+                                  responsiveDataListClasses.columnSecondary
+                                )}
+                              >
                                 {r.newCostPerPortion != null
                                   ? formatPrice(r.newCostPerPortion)
                                   : '—'}
                               </td>
                             )}
                             {canViewCosts && (
-                              <td className="px-4 py-3">
+                              <td
+                                className={cn(
+                                  'px-4 py-3',
+                                  responsiveDataListClasses.columnTertiary
+                                )}
+                              >
                                 <div className="min-w-[7rem] max-w-xs">
                                   <FoodCostBar
                                     foodCostPct={r.newFoodCostPct}
@@ -241,14 +326,16 @@ export function RecipePriceImpactPage() {
                                 </div>
                               </td>
                             )}
-                            <td className="px-4 py-3">
+                            <td
+                              className={cn('px-4 py-3', responsiveDataListClasses.columnSecondary)}
+                            >
                               <RecipeStatusBadge status={r.status} />
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                  </div>
+                  </TableScroll>
                 </CardContent>
               </Card>
             )

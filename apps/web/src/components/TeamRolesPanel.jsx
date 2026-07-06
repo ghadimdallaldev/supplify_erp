@@ -20,8 +20,10 @@ import { Textarea } from './ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { RolePermissionChecklist } from './RolePermissionChecklist'
 import { TableScroll } from './ui/table-scroll'
+import { splitRowClass } from './ui/card-layout'
 import { EmptyState } from './ui/empty-state'
 import { labelForPermission } from '../lib/permissionLabels'
+import { cn } from '../lib/utils'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import {
   useGetEntitlementsQuery,
@@ -209,46 +211,93 @@ export function TeamRolesPanel({
         ) : (
           <>
             {advancedRolesEnabled && roleUsers.length > 0 && (
-              <TableScroll aria-label="Team members and roles">
-                <table className="w-full min-w-[320px] text-sm">
-                  <thead className="bg-[var(--brand-ultra)] text-left">
-                    <tr>
-                      <th className="p-3 font-medium">User</th>
-                      <th className="p-3 font-medium">Role</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {roleUsers.map((u) => (
-                      <tr key={u.id} className="border-t">
-                        <td className="p-3">
-                          <p className="font-medium">{u.display_name || u.email}</p>
-                          <p className="text-xs text-[var(--text-muted)]">{u.email}</p>
-                        </td>
-                        <td className="p-3">
-                          <Select
-                            value={u.role_id || ''}
-                            onValueChange={(roleId) => {
-                              const role = roles.find((r) => r.id === roleId)
-                              handleAssignRole(u.id, roleId, role?.name)
-                            }}
-                          >
-                            <SelectTrigger className="w-[200px]" placeholder="Select role">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {roleOptions.map((r) => (
-                                <SelectItem key={r.id} value={r.id}>
-                                  {r.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </td>
+              <>
+                <div className="space-y-3 lg:hidden" data-testid="team-roles-card-list">
+                  {roleUsers.map((u) => (
+                    <div
+                      key={u.id}
+                      className={cn(
+                        splitRowClass,
+                        'items-start rounded-lg border border-[var(--app-border)] p-4'
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium">{u.display_name || u.email}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{u.email}</p>
+                      </div>
+                      <Select
+                        value={u.role_id || ''}
+                        onValueChange={(roleId) => {
+                          const role = roles.find((r) => r.id === roleId)
+                          handleAssignRole(u.id, roleId, role?.name)
+                        }}
+                      >
+                        <SelectTrigger className="w-full sm:w-[11rem]" placeholder="Select role">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {roleOptions.map((r) => (
+                            <SelectItem key={r.id} value={r.id}>
+                              {r.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+                <TableScroll
+                  aria-label="Team members and roles"
+                  className="hidden lg:block"
+                  data-testid="team-roles-table"
+                >
+                  <table className="w-full min-w-[320px] text-sm">
+                    <thead className="bg-[var(--brand-ultra)] text-left">
+                      <tr>
+                        <th className="p-3 font-medium">User</th>
+                        <th className="hidden xl:table-cell p-3 font-medium">Email</th>
+                        <th className="p-3 font-medium">Role</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </TableScroll>
+                    </thead>
+                    <tbody>
+                      {roleUsers.map((u) => (
+                        <tr key={u.id} className="border-t">
+                          <td className="p-3">
+                            <p className="font-medium">{u.display_name || u.email}</p>
+                            <p className="text-xs text-[var(--text-muted)] xl:hidden">{u.email}</p>
+                          </td>
+                          <td className="hidden xl:table-cell p-3 text-sm text-[var(--text-muted)]">
+                            {u.email}
+                          </td>
+                          <td className="p-3">
+                            <Select
+                              value={u.role_id || ''}
+                              onValueChange={(roleId) => {
+                                const role = roles.find((r) => r.id === roleId)
+                                handleAssignRole(u.id, roleId, role?.name)
+                              }}
+                            >
+                              <SelectTrigger
+                                className="w-full max-w-[9rem] xl:w-[200px]"
+                                placeholder="Select role"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {roleOptions.map((r) => (
+                                  <SelectItem key={r.id} value={r.id}>
+                                    {r.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </TableScroll>
+              </>
             )}
 
             {teamMembers.length === 0 && !(advancedRolesEnabled && roleUsers.length > 0) ? (

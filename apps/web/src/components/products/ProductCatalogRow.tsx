@@ -1,11 +1,13 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Package, Plus, TrendingUp, Heart } from 'lucide-react'
+import { Package, Plus, TrendingUp, Heart, Eye } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { formatNumber } from '../../utils/format'
 import { ContractPriceDisplay } from '../ContractPriceDisplay'
 import { AddToOrderingListButton } from '../ordering/AddToOrderingListButton'
+import { CardActionGrid, cardActionBtnClass } from '../ui/card-layout'
+import { responsiveDataListClasses } from '../ui/responsive-data-list'
 import { cn } from '../../lib/utils'
 
 type ProductCatalogRowProps = {
@@ -69,6 +71,26 @@ function FavoriteButton({
   )
 }
 
+function TagBadges({ product }: { product: any }) {
+  if (!product.tags || !Array.isArray(product.tags) || product.tags.length === 0) {
+    return null
+  }
+  return (
+    <>
+      {product.tags.slice(0, 3).map((tag: string, idx: number) => (
+        <Badge key={idx} variant="outline" className="text-xs">
+          {tag}
+        </Badge>
+      ))}
+      {product.tags.length > 3 && (
+        <Badge variant="outline" className="text-xs">
+          +{product.tags.length - 3}
+        </Badge>
+      )}
+    </>
+  )
+}
+
 function CategoryBadges({
   product,
   layout,
@@ -87,6 +109,7 @@ function CategoryBadges({
         {!isSupplier && product.supplier_name ? (
           <Badge variant="outline">{product.supplier_name}</Badge>
         ) : null}
+        <TagBadges product={product} />
       </div>
     )
   }
@@ -94,20 +117,9 @@ function CategoryBadges({
   return (
     <div className="flex flex-col gap-1">
       <Badge variant="secondary">{categoryLabel}</Badge>
-      {product.tags && Array.isArray(product.tags) && product.tags.length > 0 && (
-        <div className="mt-1 flex flex-wrap gap-1">
-          {product.tags.slice(0, 3).map((tag: string, idx: number) => (
-            <Badge key={idx} variant="outline" className="text-xs">
-              {tag}
-            </Badge>
-          ))}
-          {product.tags.length > 3 && (
-            <Badge variant="outline" className="text-xs">
-              +{product.tags.length - 3}
-            </Badge>
-          )}
-        </div>
-      )}
+      <div className={cn('mt-1 flex flex-wrap gap-1', responsiveDataListClasses.tagsInCell)}>
+        <TagBadges product={product} />
+      </div>
     </div>
   )
 }
@@ -161,29 +173,78 @@ function ProductActions({
   'product' | 'isSupplier' | 'layout' | 'onAddToCart' | 'onAdjustStock'
 >) {
   const { t } = useTranslation('products')
-  const buttonClass = layout === 'card' ? 'flex-1 sm:flex-none' : undefined
+  const compactTable = layout === 'table'
+
+  if (layout === 'card') {
+    return (
+      <CardActionGrid columns={isSupplier ? 2 : 3}>
+        {!isSupplier && (
+          <>
+            <Button
+              size="sm"
+              className={cardActionBtnClass()}
+              onClick={() => onAddToCart(product)}
+              disabled={!product.available_qty || product.available_qty <= 0}
+              data-testid={`product-add-to-cart-${product.id}`}
+            >
+              <Plus className="me-1 h-4 w-4 shrink-0" />
+              {t('catalog.addToCart')}
+            </Button>
+            {product.supplier_id ? (
+              <div className="[&_button]:h-auto [&_button]:min-h-9 [&_button]:w-full [&_button]:justify-center [&_button]:whitespace-normal [&_button]:px-2 [&_button]:py-2 [&_button]:text-xs [&_button]:leading-snug">
+                <AddToOrderingListButton
+                  productId={product.id}
+                  supplierId={product.supplier_id}
+                  productName={product.name}
+                  defaultUnit={product.unit}
+                />
+              </div>
+            ) : null}
+          </>
+        )}
+        {isSupplier && (
+          <Button
+            size="sm"
+            variant="outline"
+            className={cardActionBtnClass()}
+            onClick={() => onAdjustStock(product)}
+          >
+            <TrendingUp className="me-1 h-4 w-4 shrink-0" />
+            {t('catalog.adjustStock')}
+          </Button>
+        )}
+        <Button variant="outline" size="sm" className={cardActionBtnClass()} asChild>
+          <Link to={`/app/products/${product.id}`}>{t('catalog.view')}</Link>
+        </Button>
+      </CardActionGrid>
+    )
+  }
 
   return (
-    <div className={layout === 'card' ? 'flex flex-wrap gap-2' : 'flex items-center gap-2'}>
+    <div className="flex items-center gap-1.5 xl:gap-2">
       {!isSupplier && (
         <>
           <Button
             size="sm"
-            className={buttonClass}
+            className={cn(compactTable && 'h-8 w-8 px-0 xl:h-9 xl:w-auto xl:px-3')}
             onClick={() => onAddToCart(product)}
             disabled={!product.available_qty || product.available_qty <= 0}
             data-testid={`product-add-to-cart-${product.id}`}
+            aria-label={t('catalog.addToCart')}
+            title={t('catalog.addToCart')}
           >
-            <Plus className={layout === 'card' ? 'me-1 h-4 w-4' : 'h-4 w-4 me-1'} />
-            {t('catalog.addToCart')}
+            <Plus className={cn('h-4 w-4', responsiveDataListClasses.actionIconGap)} />
+            <span className={responsiveDataListClasses.actionLabel}>{t('catalog.addToCart')}</span>
           </Button>
           {product.supplier_id && (
-            <AddToOrderingListButton
-              productId={product.id}
-              supplierId={product.supplier_id}
-              productName={product.name}
-              defaultUnit={product.unit}
-            />
+            <div className="hidden xl:block">
+              <AddToOrderingListButton
+                productId={product.id}
+                supplierId={product.supplier_id}
+                productName={product.name}
+                defaultUnit={product.unit}
+              />
+            </div>
           )}
         </>
       )}
@@ -191,15 +252,29 @@ function ProductActions({
         <Button
           size="sm"
           variant="outline"
-          className={buttonClass}
+          className={cn(compactTable && 'h-8 w-8 px-0 xl:h-9 xl:w-auto xl:px-3')}
           onClick={() => onAdjustStock(product)}
+          aria-label={t('catalog.adjustStock')}
+          title={t('catalog.adjustStock')}
         >
-          <TrendingUp className={layout === 'card' ? 'me-1 h-4 w-4' : 'h-4 w-4 me-1'} />
-          {t('catalog.adjustStock')}
+          <TrendingUp className={cn('h-4 w-4', responsiveDataListClasses.actionIconGap)} />
+          <span className={responsiveDataListClasses.actionLabel}>{t('catalog.adjustStock')}</span>
         </Button>
       )}
-      <Button variant="outline" size="sm" className={buttonClass} asChild>
-        <Link to={`/app/products/${product.id}`}>{t('catalog.view')}</Link>
+      <Button
+        variant="outline"
+        size="sm"
+        className={cn(compactTable && 'h-8 w-8 px-0 xl:h-9 xl:w-auto xl:px-3')}
+        asChild
+      >
+        <Link
+          to={`/app/products/${product.id}`}
+          aria-label={t('catalog.view')}
+          title={t('catalog.view')}
+        >
+          <Eye className={cn('h-4 w-4', responsiveDataListClasses.actionIconGap)} />
+          <span className={responsiveDataListClasses.actionLabel}>{t('catalog.view')}</span>
+        </Link>
       </Button>
     </div>
   )
@@ -274,7 +349,13 @@ export function ProductCatalogRow({
       <td className={cn(cellClassName, isLastRow && 'border-b-0')}>
         <CategoryBadges product={product} layout="table" isSupplier={isSupplier} />
       </td>
-      <td className={cn(cellClassName, isLastRow && 'border-b-0')}>
+      <td
+        className={cn(
+          cellClassName,
+          isLastRow && 'border-b-0',
+          responsiveDataListClasses.columnTertiary
+        )}
+      >
         <p className="text-sm text-[var(--text-muted)]">
           {product.supplier_name || t('catalog.notAvailable')}
         </p>

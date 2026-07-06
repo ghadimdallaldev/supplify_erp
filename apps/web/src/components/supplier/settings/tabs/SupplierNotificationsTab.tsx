@@ -21,6 +21,7 @@ import {
   NotificationWebhookCard,
 } from '../../../notifications/NotificationWebhookCard'
 import { ensureNamespace } from '../../../../i18n'
+import { splitRowClass } from '../../../ui/card-layout'
 
 export function SupplierNotificationsTab() {
   const { t } = useTranslation('suppliers')
@@ -99,7 +100,7 @@ export function SupplierNotificationsTab() {
                     key={key}
                     className="flex flex-col gap-2 rounded-xl border p-4 hover:bg-[var(--brand-ultra)] cursor-pointer"
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    <div className={splitRowClass}>
                       <span className="text-sm font-medium text-[var(--text)]">
                         {t(`notifications.fields.${key}.label`)}
                       </span>

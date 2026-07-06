@@ -16,6 +16,8 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Select, SelectTrigger } from '../ui/select'
 import { TableScroll } from '../ui/table-scroll'
+import { responsiveDataListClasses } from '../ui/responsive-data-list'
+import { cn } from '../../lib/utils'
 
 type SortKey = 'pressure' | 'name' | 'status'
 
@@ -175,197 +177,235 @@ export function AdminTenantUsageTable({
           description={t('usage.noMatchingTenantsDescription')}
         />
       ) : mode === 'supplier' ? (
-        <TableScroll aria-label={t('usage.supplierUsageTableAriaLabel')}>
-          <table className="w-full min-w-[960px] text-sm">
-            <thead>
-              <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-start text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                <th className="px-4 py-3">{t('common.supplier')}</th>
-                <th className="px-4 py-3">{t('common.table.plan')}</th>
-                <th className="px-4 py-3">{t('common.table.products')}</th>
-                <th className="px-4 py-3">{t('common.table.warehouses')}</th>
-                <th className="px-4 py-3">{t('common.table.activeDeals')}</th>
-                <th className="px-4 py-3">{t('common.table.storage')}</th>
-                <th className="px-4 py-3">{t('common.table.usageStatus')}</th>
-                <th className="px-4 py-3 text-end">{t('common.table.actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--app-border)]">
-              {filteredSuppliers.map((s) => (
-                <tr key={s.id} className="transition-colors hover:bg-[var(--brand-ultra)]/35">
-                  <td className="px-4 py-3.5 font-medium text-[var(--text)]">{s.name}</td>
-                  <td className="px-4 py-3.5 text-sm text-[var(--text-mid)]">{s.planLabel}</td>
-                  <td className="px-4 py-3.5">
-                    <UsageMetricCell
-                      used={s.productCount}
-                      limit={s.productLimit}
-                      status={s.productStatus}
-                    />
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <UsageMetricCell
-                      used={s.warehouseCount}
-                      limit={s.warehouseLimit}
-                      status={s.warehouseStatus}
-                    />
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <UsageMetricCell
-                      used={s.dealsCount}
-                      limit={s.dealsLimit}
-                      status={s.dealsStatus}
-                    />
-                  </td>
-                  <td className="px-4 py-3.5">
-                    {s.storageUsed != null ? (
-                      <UsageMetricCell
-                        used={s.storageUsed}
-                        limit={s.storageLimit}
-                        status={s.storageStatus}
-                      />
-                    ) : (
-                      <span className="text-xs text-[var(--text-mid)]">
-                        {t('common.notAvailable')}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <UsageStatusBadge status={s.status} />
-                  </td>
-                  <td className="px-4 py-3.5 text-end">
-                    <div className="flex justify-end gap-1.5">
-                      {onDiagnostics && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-2.5 text-xs"
-                          onClick={() => onDiagnostics(s.id, s.name)}
-                        >
-                          {t('common.tooltips.diagnostics')}
-                        </Button>
-                      )}
-                      {onChangePlan && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-2.5 text-xs"
-                          onClick={() => onChangePlan(s.id, s.name, 'SUPPLIER')}
-                        >
-                          {t('common.table.plan')}
-                        </Button>
-                      )}
-                    </div>
-                  </td>
+        <>
+          <div className="space-y-3 lg:hidden">
+            {filteredSuppliers.map((s) => (
+              <article
+                key={s.id}
+                className="rounded-xl border border-[var(--app-border)] p-4 space-y-2"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-medium">{s.name}</p>
+                  <UsageStatusBadge status={s.status} />
+                </div>
+                <p className="text-xs text-[var(--text-mid)]">{s.planLabel}</p>
+              </article>
+            ))}
+          </div>
+          <TableScroll
+            aria-label={t('usage.supplierUsageTableAriaLabel')}
+            className="hidden lg:block"
+          >
+            <table className="w-full min-w-[960px] text-sm">
+              <thead>
+                <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-start text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  <th className="px-4 py-3">{t('common.supplier')}</th>
+                  <th className="px-4 py-3">{t('common.table.plan')}</th>
+                  <th className="px-4 py-3">{t('common.table.products')}</th>
+                  <th className="px-4 py-3">{t('common.table.warehouses')}</th>
+                  <th className="px-4 py-3">{t('common.table.activeDeals')}</th>
+                  <th className="px-4 py-3">{t('common.table.storage')}</th>
+                  <th className="px-4 py-3">{t('common.table.usageStatus')}</th>
+                  <th className="px-4 py-3 text-end">{t('common.table.actions')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </TableScroll>
+              </thead>
+              <tbody className="divide-y divide-[var(--app-border)]">
+                {filteredSuppliers.map((s) => (
+                  <tr key={s.id} className="transition-colors hover:bg-[var(--brand-ultra)]/35">
+                    <td className="px-4 py-3.5 font-medium text-[var(--text)]">{s.name}</td>
+                    <td className="px-4 py-3.5 text-sm text-[var(--text-mid)]">{s.planLabel}</td>
+                    <td className="px-4 py-3.5">
+                      <UsageMetricCell
+                        used={s.productCount}
+                        limit={s.productLimit}
+                        status={s.productStatus}
+                      />
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <UsageMetricCell
+                        used={s.warehouseCount}
+                        limit={s.warehouseLimit}
+                        status={s.warehouseStatus}
+                      />
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <UsageMetricCell
+                        used={s.dealsCount}
+                        limit={s.dealsLimit}
+                        status={s.dealsStatus}
+                      />
+                    </td>
+                    <td className="px-4 py-3.5">
+                      {s.storageUsed != null ? (
+                        <UsageMetricCell
+                          used={s.storageUsed}
+                          limit={s.storageLimit}
+                          status={s.storageStatus}
+                        />
+                      ) : (
+                        <span className="text-xs text-[var(--text-mid)]">
+                          {t('common.notAvailable')}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <UsageStatusBadge status={s.status} />
+                    </td>
+                    <td className="px-4 py-3.5 text-end">
+                      <div className="flex justify-end gap-1.5">
+                        {onDiagnostics && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-2.5 text-xs"
+                            onClick={() => onDiagnostics(s.id, s.name)}
+                          >
+                            {t('common.tooltips.diagnostics')}
+                          </Button>
+                        )}
+                        {onChangePlan && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-2.5 text-xs"
+                            onClick={() => onChangePlan(s.id, s.name, 'SUPPLIER')}
+                          >
+                            {t('common.table.plan')}
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScroll>
+        </>
       ) : (
-        <TableScroll aria-label={t('usage.restaurantUsageTableAriaLabel')}>
-          <table className="w-full min-w-[960px] text-sm">
-            <thead>
-              <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-start text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                <th className="px-4 py-3">{t('common.restaurant')}</th>
-                <th className="px-4 py-3">{t('common.table.plan')}</th>
-                <th className="px-4 py-3">{t('common.table.ordersToday')}</th>
-                <th className="px-4 py-3">{t('common.table.orders30d')}</th>
-                <th className="px-4 py-3">{t('common.table.suppliers')}</th>
-                <th className="px-4 py-3">{t('common.table.inventorySkus')}</th>
-                <th className="px-4 py-3">{t('common.table.storage')}</th>
-                <th className="px-4 py-3">Usage status</th>
-                <th className="px-4 py-3 text-end">{t('common.table.actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--app-border)]">
-              {filteredRestaurants.map((r) => (
-                <tr key={r.id} className="transition-colors hover:bg-[var(--brand-ultra)]/35">
-                  <td className="px-4 py-3.5 font-medium text-[var(--text)]">{r.name}</td>
-                  <td className="px-4 py-3.5 text-sm text-[var(--text-mid)]">{r.planLabel}</td>
-                  <td className="px-4 py-3.5">
-                    {r.ordersToday != null ? (
-                      <UsageMetricCell
-                        used={r.ordersToday}
-                        limit={r.dailyLimit}
-                        status={r.ordersTodayStatus}
-                      />
-                    ) : (
-                      <span className="text-xs text-[var(--text-mid)]">
-                        {t('common.notAvailable')}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3.5 tabular-nums text-[var(--text)]">{r.orders30d}</td>
-                  <td className="px-4 py-3.5">
-                    <UsageMetricCell
-                      used={r.connectedSuppliers}
-                      limit={r.suppliersLimit}
-                      status={
-                        r.connectedSuppliers != null
-                          ? computeUsageStatus(r.connectedSuppliers, r.suppliersLimit)
-                          : 'unknown'
-                      }
-                    />
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <UsageMetricCell
-                      used={r.inventorySkus}
-                      limit={r.inventoryLimit}
-                      status={
-                        r.inventorySkus != null
-                          ? computeUsageStatus(r.inventorySkus, r.inventoryLimit)
-                          : 'unknown'
-                      }
-                    />
-                  </td>
-                  <td className="px-4 py-3.5">
-                    {r.storageUsed != null ? (
-                      <UsageMetricCell
-                        used={r.storageUsed}
-                        limit={r.storageLimit}
-                        status={computeUsageStatus(r.storageUsed, r.storageLimit)}
-                      />
-                    ) : (
-                      <span className="text-xs text-[var(--text-mid)]">
-                        {t('common.notAvailable')}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <UsageStatusBadge status={r.status} />
-                  </td>
-                  <td className="px-4 py-3.5 text-end">
-                    <div className="flex justify-end gap-1.5">
-                      {onDiagnostics && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-2.5 text-xs"
-                          onClick={() => onDiagnostics(r.id, r.name)}
-                        >
-                          Diagnostics
-                        </Button>
-                      )}
-                      {onChangePlan && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-2.5 text-xs"
-                          onClick={() => onChangePlan(r.id, r.name, 'RESTAURANT')}
-                        >
-                          Plan
-                        </Button>
-                      )}
-                    </div>
-                  </td>
+        <>
+          <div className="space-y-3 lg:hidden">
+            {filteredRestaurants.map((r) => (
+              <article
+                key={r.id}
+                className="rounded-xl border border-[var(--app-border)] p-4 space-y-2"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-medium">{r.name}</p>
+                  <UsageStatusBadge status={r.status} />
+                </div>
+                <p className="text-xs text-[var(--text-mid)]">{r.planLabel}</p>
+              </article>
+            ))}
+          </div>
+          <TableScroll
+            aria-label={t('usage.restaurantUsageTableAriaLabel')}
+            className="hidden lg:block"
+          >
+            <table className="w-full min-w-[960px] text-sm">
+              <thead>
+                <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-start text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  <th className="px-4 py-3">{t('common.restaurant')}</th>
+                  <th className="px-4 py-3">{t('common.table.plan')}</th>
+                  <th className="px-4 py-3">{t('common.table.ordersToday')}</th>
+                  <th className="px-4 py-3">{t('common.table.orders30d')}</th>
+                  <th className="px-4 py-3">{t('common.table.suppliers')}</th>
+                  <th className="px-4 py-3">{t('common.table.inventorySkus')}</th>
+                  <th className="px-4 py-3">{t('common.table.storage')}</th>
+                  <th className="px-4 py-3">Usage status</th>
+                  <th className="px-4 py-3 text-end">{t('common.table.actions')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </TableScroll>
+              </thead>
+              <tbody className="divide-y divide-[var(--app-border)]">
+                {filteredRestaurants.map((r) => (
+                  <tr key={r.id} className="transition-colors hover:bg-[var(--brand-ultra)]/35">
+                    <td className="px-4 py-3.5 font-medium text-[var(--text)]">{r.name}</td>
+                    <td className="px-4 py-3.5 text-sm text-[var(--text-mid)]">{r.planLabel}</td>
+                    <td className="px-4 py-3.5">
+                      {r.ordersToday != null ? (
+                        <UsageMetricCell
+                          used={r.ordersToday}
+                          limit={r.dailyLimit}
+                          status={r.ordersTodayStatus}
+                        />
+                      ) : (
+                        <span className="text-xs text-[var(--text-mid)]">
+                          {t('common.notAvailable')}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5 tabular-nums text-[var(--text)]">{r.orders30d}</td>
+                    <td className="px-4 py-3.5">
+                      <UsageMetricCell
+                        used={r.connectedSuppliers}
+                        limit={r.suppliersLimit}
+                        status={
+                          r.connectedSuppliers != null
+                            ? computeUsageStatus(r.connectedSuppliers, r.suppliersLimit)
+                            : 'unknown'
+                        }
+                      />
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <UsageMetricCell
+                        used={r.inventorySkus}
+                        limit={r.inventoryLimit}
+                        status={
+                          r.inventorySkus != null
+                            ? computeUsageStatus(r.inventorySkus, r.inventoryLimit)
+                            : 'unknown'
+                        }
+                      />
+                    </td>
+                    <td className="px-4 py-3.5">
+                      {r.storageUsed != null ? (
+                        <UsageMetricCell
+                          used={r.storageUsed}
+                          limit={r.storageLimit}
+                          status={computeUsageStatus(r.storageUsed, r.storageLimit)}
+                        />
+                      ) : (
+                        <span className="text-xs text-[var(--text-mid)]">
+                          {t('common.notAvailable')}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <UsageStatusBadge status={r.status} />
+                    </td>
+                    <td className="px-4 py-3.5 text-end">
+                      <div className="flex justify-end gap-1.5">
+                        {onDiagnostics && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-2.5 text-xs"
+                            onClick={() => onDiagnostics(r.id, r.name)}
+                          >
+                            Diagnostics
+                          </Button>
+                        )}
+                        {onChangePlan && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-2.5 text-xs"
+                            onClick={() => onChangePlan(r.id, r.name, 'RESTAURANT')}
+                          >
+                            Plan
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScroll>
+        </>
       )}
     </div>
   )

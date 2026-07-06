@@ -375,10 +375,10 @@ export function RestaurantsPage() {
       )}
 
       {/* Search and Filters */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+      <div className="min-w-0 space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-[var(--text-muted)]" />
             <Input
               placeholder={t('list.searchPlaceholder')}
               value={search}
@@ -386,7 +386,7 @@ export function RestaurantsPage() {
               className="pl-10"
             />
           </div>
-          <div className="w-64">
+          <div className="w-full sm:w-64">
             <Input
               placeholder={t('list.cityPlaceholder')}
               value={cityFilter}
@@ -465,7 +465,7 @@ export function RestaurantsPage() {
           </CardContent>
         </Card>
       ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2 xl:grid-cols-3">
           {filteredAndSortedRestaurants.map((restaurant: any) => {
             const locationLine = formatAddressLine(restaurant.address_json)
             const thirtyDaysAgo = new Date()

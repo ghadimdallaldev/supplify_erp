@@ -7,6 +7,8 @@ import { Input } from '../../ui/input'
 import { Select, SelectTrigger } from '../../ui/select'
 import { AppPanel, SummaryStrip } from '../../ui/app-panel'
 import { TableScroll } from '../../ui/table-scroll'
+import { responsiveDataListClasses } from '../../ui/responsive-data-list'
+import { cn } from '../../../lib/utils'
 import { StatusBadge } from '../../ui/status-badge'
 import {
   useGetAdminSubscriptionsQuery,
@@ -21,7 +23,6 @@ import {
   AdminSectionHeader,
   formatAdminDate,
 } from '../adminUi'
-import { cn } from '../../../lib/utils'
 
 export type AdminChangePlanTarget = {
   id: string
@@ -303,116 +304,170 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
             }
           />
         ) : (
-          <TableScroll aria-label={t('subscriptions.tenantSubscriptionsTableAriaLabel')}>
-            <table className="w-full min-w-[880px] text-sm">
-              <thead>
-                <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                  <th className="px-4 py-3">{t('common.table.tenant')}</th>
-                  <th className="px-4 py-3">{t('common.table.plan')}</th>
-                  <th className="px-4 py-3">{t('common.table.status')}</th>
-                  <th className="hidden px-4 py-3 md:table-cell">Type</th>
-                  <th className="hidden px-4 py-3 lg:table-cell">Created</th>
-                  <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--app-border)]">
-                {filteredSubscriptions.map((sub) => (
-                  <tr key={sub.id} className="transition-colors hover:bg-[var(--brand-ultra)]/35">
-                    <td className="px-4 py-3.5">
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-[var(--text)]">
-                          {sub.tenant_name || t('subscriptions.unknownTenant')}
-                        </p>
-                        <p className="truncate text-xs text-[var(--text-muted)]">
-                          {sub.tenant_email || '—'}
-                        </p>
-                        {needsAttention(sub) && (
-                          <Badge
-                            variant="outline"
-                            className="mt-1.5 border-amber-200 bg-amber-50 text-[10px] font-medium text-amber-800"
-                          >
-                            Needs attention
-                          </Badge>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <Badge variant="outline" className="font-normal">
-                        {formatPlanDisplayName(sub.plan_code, sub.plan_name)}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <StatusBadge status={sub.status} />
-                    </td>
-                    <td className="hidden px-4 py-3.5 md:table-cell">
-                      <Badge
-                        variant="outline"
-                        className={cn('text-xs capitalize', tenantTypeTone(sub.tenant_type))}
-                      >
-                        {sub.tenant_type.toLowerCase()}
-                      </Badge>
-                    </td>
-                    <td className="hidden px-4 py-3.5 text-xs text-[var(--text-muted)] lg:table-cell">
-                      {formatAdminDate(sub.created_at)}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex flex-wrap justify-end gap-2">
-                        {sub.lock_reason === 'free_sandbox_expired' && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={isExtendingTrial}
-                            onClick={async () => {
-                              try {
-                                await extendFreeTrial({ id: sub.id }).unwrap()
-                                toast.success(t('subscriptionsToasts.trialExtended'))
-                              } catch {
-                                toast.error(t('subscriptionsToasts.trialExtendFailed'))
-                              }
-                            }}
-                          >
-                            Extend trial
-                          </Button>
-                        )}
-                        {(sub.account_locked_at || sub.lock_reason === 'pending_activation') && (
-                          <Button
-                            size="sm"
-                            disabled={isUnlocking}
-                            onClick={async () => {
-                              try {
-                                await unlockSubscription({
-                                  id: sub.id,
-                                  reason: 'admin_activation',
-                                }).unwrap()
-                                toast.success(t('subscriptionsToasts.activated'))
-                              } catch {
-                                toast.error(t('subscriptionsToasts.activateFailed'))
-                              }
-                            }}
-                          >
-                            Activate
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            onOpenChangePlan({
-                              id: sub.id,
-                              tenant_type: sub.tenant_type,
-                              tenant_name: sub.tenant_name,
-                            })
-                          }
-                        >
-                          Change plan
-                        </Button>
-                      </div>
-                    </td>
+          <>
+            <div className="space-y-3 lg:hidden">
+              {filteredSubscriptions.map((sub) => (
+                <article
+                  key={sub.id}
+                  className="rounded-xl border border-[var(--app-border)] p-4 space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">
+                        {sub.tenant_name || t('subscriptions.unknownTenant')}
+                      </p>
+                      <p className="truncate text-xs text-[var(--text-muted)]">
+                        {sub.tenant_email || '—'}
+                      </p>
+                    </div>
+                    <StatusBadge status={sub.status} />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="font-normal">
+                      {formatPlanDisplayName(sub.plan_code, sub.plan_name)}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className={cn('text-xs capitalize', tenantTypeTone(sub.tenant_type))}
+                    >
+                      {sub.tenant_type.toLowerCase()}
+                    </Badge>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <TableScroll
+              aria-label={t('subscriptions.tenantSubscriptionsTableAriaLabel')}
+              className="hidden lg:block"
+            >
+              <table className="w-full min-w-[880px] text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                    <th className="px-4 py-3">{t('common.table.tenant')}</th>
+                    <th className="px-4 py-3">{t('common.table.plan')}</th>
+                    <th className="px-4 py-3">{t('common.table.status')}</th>
+                    <th
+                      className={cn('hidden px-4 py-3', responsiveDataListClasses.columnSecondary)}
+                    >
+                      Type
+                    </th>
+                    <th
+                      className={cn('hidden px-4 py-3', responsiveDataListClasses.columnTertiary)}
+                    >
+                      Created
+                    </th>
+                    <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableScroll>
+                </thead>
+                <tbody className="divide-y divide-[var(--app-border)]">
+                  {filteredSubscriptions.map((sub) => (
+                    <tr key={sub.id} className="transition-colors hover:bg-[var(--brand-ultra)]/35">
+                      <td className="px-4 py-3.5">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-[var(--text)]">
+                            {sub.tenant_name || t('subscriptions.unknownTenant')}
+                          </p>
+                          <p className="truncate text-xs text-[var(--text-muted)]">
+                            {sub.tenant_email || '—'}
+                          </p>
+                          {needsAttention(sub) && (
+                            <Badge
+                              variant="outline"
+                              className="mt-1.5 border-amber-200 bg-amber-50 text-[10px] font-medium text-amber-800"
+                            >
+                              Needs attention
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <Badge variant="outline" className="font-normal">
+                          {formatPlanDisplayName(sub.plan_code, sub.plan_name)}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <StatusBadge status={sub.status} />
+                      </td>
+                      <td
+                        className={cn(
+                          'hidden px-4 py-3.5',
+                          responsiveDataListClasses.columnSecondary
+                        )}
+                      >
+                        <Badge
+                          variant="outline"
+                          className={cn('text-xs capitalize', tenantTypeTone(sub.tenant_type))}
+                        >
+                          {sub.tenant_type.toLowerCase()}
+                        </Badge>
+                      </td>
+                      <td
+                        className={cn(
+                          'hidden px-4 py-3.5 text-xs text-[var(--text-muted)]',
+                          responsiveDataListClasses.columnTertiary
+                        )}
+                      >
+                        {formatAdminDate(sub.created_at)}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          {sub.lock_reason === 'free_sandbox_expired' && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={isExtendingTrial}
+                              onClick={async () => {
+                                try {
+                                  await extendFreeTrial({ id: sub.id }).unwrap()
+                                  toast.success(t('subscriptionsToasts.trialExtended'))
+                                } catch {
+                                  toast.error(t('subscriptionsToasts.trialExtendFailed'))
+                                }
+                              }}
+                            >
+                              Extend trial
+                            </Button>
+                          )}
+                          {(sub.account_locked_at || sub.lock_reason === 'pending_activation') && (
+                            <Button
+                              size="sm"
+                              disabled={isUnlocking}
+                              onClick={async () => {
+                                try {
+                                  await unlockSubscription({
+                                    id: sub.id,
+                                    reason: 'admin_activation',
+                                  }).unwrap()
+                                  toast.success(t('subscriptionsToasts.activated'))
+                                } catch {
+                                  toast.error(t('subscriptionsToasts.activateFailed'))
+                                }
+                              }}
+                            >
+                              Activate
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              onOpenChangePlan({
+                                id: sub.id,
+                                tenant_type: sub.tenant_type,
+                                tenant_name: sub.tenant_name,
+                              })
+                            }
+                          >
+                            Change plan
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableScroll>
+          </>
         )}
       </AppPanel>
     </>
