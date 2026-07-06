@@ -39,6 +39,7 @@ import {
   NotificationWebhookCard,
 } from '../components/notifications/NotificationWebhookCard'
 import { ensureNamespace } from '../i18n'
+import { splitRowClass } from '../components/ui/card-layout'
 
 const DEFAULT_NOTIFICATION_PREFS = {
   emailEnabled: true,
@@ -103,7 +104,10 @@ function LanguageSettingsPanel() {
   return (
     <section
       data-testid="admin-settings-language"
-      className="flex flex-col gap-4 overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-5"
+      className={cn(
+        splitRowClass,
+        'overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4 sm:items-center sm:gap-6 sm:p-5'
+      )}
     >
       <div className="min-w-0">
         <h2 className="text-base font-medium text-[var(--text)]">{t('language.title')}</h2>
@@ -145,7 +149,8 @@ function SettingsToggleRow({
   return (
     <div
       className={cn(
-        'flex items-start justify-between gap-3 rounded-lg border p-3',
+        splitRowClass,
+        'items-start rounded-lg border p-3',
         comingSoon
           ? 'border-dashed border-[var(--app-border)] opacity-70'
           : 'border-[var(--app-border)]'
@@ -553,7 +558,10 @@ export function SettingsPage() {
                   {NOTIFICATION_FIELD_KEYS.map((key) => (
                     <div
                       key={key}
-                      className="flex items-start justify-between gap-3 rounded-lg border border-[var(--app-border)] p-3"
+                      className={cn(
+                        splitRowClass,
+                        'items-start rounded-lg border border-[var(--app-border)] p-3'
+                      )}
                     >
                       <div>
                         <p className="text-sm font-medium text-[var(--text)]">

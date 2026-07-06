@@ -536,7 +536,7 @@ export function UpgradeModal() {
             {/* Comparison table */}
             {showComparison && (
               <div className="overflow-x-auto rounded-lg border border-[var(--app-border)]">
-                <div className="min-w-[520px]">
+                <div className="w-[calc(100vw-2rem)] max-w-lg">
                   {/* Header row */}
                   <div
                     className="grid border-b border-[var(--app-border)] bg-[var(--bg)]"

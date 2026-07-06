@@ -7,6 +7,7 @@ import { Input } from '../../ui/input'
 import { Select, SelectTrigger } from '../../ui/select'
 import { AppPanel } from '../../ui/app-panel'
 import { TableScroll } from '../../ui/table-scroll'
+import { responsiveDataListClasses } from '../../ui/responsive-data-list'
 import { useGetAdminAuditLogsQuery } from '../../../services/api'
 import {
   AdminEmptyState,
@@ -245,13 +246,43 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
           />
         ) : (
           <>
-            <TableScroll aria-label={t('audit.tableAriaLabel')}>
+            <div className="space-y-3 lg:hidden">
+              {logs.map((log) => (
+                <article
+                  key={log.id}
+                  className="rounded-xl border border-[var(--app-border)] p-4 space-y-2"
+                  onClick={() => setAuditExpandedId(auditExpandedId === log.id ? null : log.id)}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <AuditActionBadge actionType={log.action_type} />
+                    <time className="text-xs text-[var(--text-muted)]">
+                      {formatAdminDateTime(log.created_at)}
+                    </time>
+                  </div>
+                  <p className="text-sm font-medium text-[var(--text)]">{log.admin_name || '—'}</p>
+                  {log.action_description && (
+                    <p className="text-xs text-[var(--text-mid)] line-clamp-2">
+                      {log.action_description}
+                    </p>
+                  )}
+                </article>
+              ))}
+            </div>
+            <TableScroll aria-label={t('audit.tableAriaLabel')} className="hidden lg:block">
               <table className="w-full min-w-[880px] text-sm">
                 <thead>
                   <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                     <th className="px-4 py-3">Action</th>
-                    <th className="hidden px-4 py-3 md:table-cell">Target</th>
-                    <th className="hidden px-4 py-3 lg:table-cell">Description</th>
+                    <th
+                      className={cn('hidden px-4 py-3', responsiveDataListClasses.columnSecondary)}
+                    >
+                      Target
+                    </th>
+                    <th
+                      className={cn('hidden px-4 py-3', responsiveDataListClasses.columnTertiary)}
+                    >
+                      Description
+                    </th>
                     <th className="px-4 py-3">Admin</th>
                     <th className="px-4 py-3">{t('common.table.time')}</th>
                     <th className="px-4 py-3 w-10" aria-label={t('common.expandRowAriaLabel')} />
@@ -269,7 +300,12 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
                           <td className="px-4 py-3.5">
                             <AuditActionBadge actionType={log.action_type} />
                           </td>
-                          <td className="hidden px-4 py-3.5 md:table-cell">
+                          <td
+                            className={cn(
+                              'hidden px-4 py-3.5',
+                              responsiveDataListClasses.columnSecondary
+                            )}
+                          >
                             {log.target_entity_type ? (
                               <Badge variant="outline" className="text-xs font-normal">
                                 {log.target_entity_type}
@@ -278,7 +314,12 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
                               <span className="text-xs text-[var(--text-muted)]">—</span>
                             )}
                           </td>
-                          <td className="hidden max-w-[280px] px-4 py-3.5 text-[var(--text-mid)] lg:table-cell">
+                          <td
+                            className={cn(
+                              'hidden max-w-[280px] px-4 py-3.5 text-[var(--text-mid)]',
+                              responsiveDataListClasses.columnTertiary
+                            )}
+                          >
                             <span className="line-clamp-2">{log.action_description || '—'}</span>
                           </td>
                           <td className="px-4 py-3.5 font-medium text-[var(--text)]">

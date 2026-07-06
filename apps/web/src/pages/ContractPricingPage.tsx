@@ -28,6 +28,9 @@ import { usePermissions } from '../hooks/usePermissions'
 import { formatPrice } from '../utils/format'
 import { toast } from 'sonner'
 import { Loader2, Plus, Pencil, Ban, Search } from 'lucide-react'
+import { TableScroll } from '../components/ui/table-scroll'
+import { responsiveDataListClasses } from '../components/ui/responsive-data-list'
+import { cn } from '../lib/utils'
 import { ensureNamespace } from '../i18n'
 
 const AGREEMENT_TYPES = ['CUSTOM', 'VOLUME', 'RELATIONSHIP', 'SPECIAL'] as const
@@ -240,7 +243,7 @@ export function ContractPricingPage() {
               <p className="text-center py-12 text-[var(--text-muted)]">{t('pricing.empty')}</p>
             ) : (
               <>
-                <div className="divide-y md:hidden">
+                <div className="divide-y lg:hidden">
                   {pricing.map((row) => {
                     const active = row.is_active !== false
                     return (
@@ -301,16 +304,37 @@ export function ContractPricingPage() {
                     )
                   })}
                 </div>
-                <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full text-sm">
+                <TableScroll aria-label={t('pricing.title')} className="hidden lg:block">
+                  <table className="w-full min-w-[720px] text-sm">
                     <thead>
                       <tr className="border-b border-[var(--app-border)] text-left text-[var(--text-muted)]">
                         <th className="px-4 py-3 font-medium">{t('pricing.restaurant')}</th>
                         <th className="px-4 py-3 font-medium">{t('pricing.product')}</th>
-                        <th className="px-4 py-3 font-medium">{t('pricing.catalog')}</th>
+                        <th
+                          className={cn(
+                            'px-4 py-3 font-medium',
+                            responsiveDataListClasses.columnSecondary
+                          )}
+                        >
+                          {t('pricing.catalog')}
+                        </th>
                         <th className="px-4 py-3 font-medium">{t('pricing.contract')}</th>
-                        <th className="px-4 py-3 font-medium">{t('pricing.valid')}</th>
-                        <th className="px-4 py-3 font-medium">{t('pricing.status')}</th>
+                        <th
+                          className={cn(
+                            'px-4 py-3 font-medium',
+                            responsiveDataListClasses.columnTertiary
+                          )}
+                        >
+                          {t('pricing.valid')}
+                        </th>
+                        <th
+                          className={cn(
+                            'px-4 py-3 font-medium',
+                            responsiveDataListClasses.columnSecondary
+                          )}
+                        >
+                          {t('pricing.status')}
+                        </th>
                         <th className="px-4 py-3 font-medium">{t('pricing.actions')}</th>
                       </tr>
                     </thead>
@@ -326,7 +350,9 @@ export function ContractPricingPage() {
                                 {row.product_sku}
                               </div>
                             </td>
-                            <td className="px-4 py-3">
+                            <td
+                              className={cn('px-4 py-3', responsiveDataListClasses.columnSecondary)}
+                            >
                               {row.catalog_price != null
                                 ? formatPrice(Number(row.catalog_price))
                                 : '—'}
@@ -341,7 +367,12 @@ export function ContractPricingPage() {
                                 </Badge>
                               )}
                             </td>
-                            <td className="px-4 py-3 text-xs text-[var(--text-muted)]">
+                            <td
+                              className={cn(
+                                'px-4 py-3 text-xs text-[var(--text-muted)]',
+                                responsiveDataListClasses.columnTertiary
+                              )}
+                            >
                               {row.contract_start_date
                                 ? String(row.contract_start_date).slice(0, 10)
                                 : '—'}{' '}
@@ -350,7 +381,9 @@ export function ContractPricingPage() {
                                 ? String(row.contract_end_date).slice(0, 10)
                                 : '—'}
                             </td>
-                            <td className="px-4 py-3">
+                            <td
+                              className={cn('px-4 py-3', responsiveDataListClasses.columnSecondary)}
+                            >
                               <Badge variant={active ? 'default' : 'secondary'}>
                                 {active ? t('pricing.statusActive') : t('pricing.statusInactive')}
                               </Badge>
@@ -358,7 +391,12 @@ export function ContractPricingPage() {
                             <td className="px-4 py-3">
                               {canManage && (
                                 <div className="flex gap-2">
-                                  <Button size="sm" variant="outline" onClick={() => openEdit(row)}>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openEdit(row)}
+                                    title={t('pricing.edit')}
+                                  >
                                     <Pencil className="h-3 w-3" />
                                   </Button>
                                   {active && (
@@ -366,6 +404,7 @@ export function ContractPricingPage() {
                                       size="sm"
                                       variant="outline"
                                       onClick={() => handleDeactivate(String(row.id))}
+                                      title={t('pricing.deactivate')}
                                     >
                                       <Ban className="h-3 w-3" />
                                     </Button>
@@ -378,7 +417,7 @@ export function ContractPricingPage() {
                       })}
                     </tbody>
                   </table>
-                </div>
+                </TableScroll>
               </>
             )}
           </CardContent>
