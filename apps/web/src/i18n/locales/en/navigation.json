@@ -94,6 +94,8 @@
     "allCaughtUp": "You're all caught up",
     "notificationsEmptyHint": "Order updates and alerts will appear here.",
     "logoutTitle": "{{name}} — click to logout",
+    "openUserMenu": "Account menu for {{name}}",
+    "logout": "Log out",
     "loggedOutSuccess": "Logged out successfully",
     "logoutFailed": "Logout failed",
     "workspaceContext": "{{type}}: {{name}}{{rolePart}}"

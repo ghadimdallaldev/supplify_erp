@@ -10,7 +10,7 @@ import {
 } from '../services/api'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { Button } from './ui/button'
-import { Bell, X, TrendingUp, Settings, ChevronRight, Menu, Search } from 'lucide-react'
+import { Bell, X, TrendingUp, Settings, Menu, Search, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 import { BranchSwitcher } from './BranchSwitcher'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -19,6 +19,7 @@ import { useImpersonation } from '../hooks/useImpersonation'
 import { CommandPalette } from './search/CommandPalette'
 import { cn } from '../lib/utils'
 import { LanguageSwitcher } from './LanguageSwitcher'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
 const PAGE_NAMES: Record<string, string> = {
   '/app/dashboard': 'dashboard',
@@ -72,6 +73,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
   const location = useLocation()
   const [logout] = useLogoutMutation()
   const [commandOpen, setCommandOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notificationsMounted, setNotificationsMounted] = useState(false)
   const [notificationsVisible, setNotificationsVisible] = useState(false)
   const navigate = useNavigate()
@@ -124,17 +126,6 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
     })
     .filter(({ pct }) => pct >= 80)
     .slice(0, 3)
-  const workspace = user?.workspace
-  const workspaceLabel =
-    workspace?.tenantName &&
-    t('header.workspaceContext', {
-      type:
-        workspace.tenantType === 'SUPPLIER'
-          ? t('workspace.supplier', { ns: 'common' })
-          : t('workspace.restaurant', { ns: 'common' }),
-      name: workspace.tenantName,
-      rolePart: workspace.roleName ? ` · ${workspace.roleName}` : '',
-    })
   const showUpgrade = (!isPlatformAdmin || isImpersonating) && user?.role !== 'PENDING'
   const isAdminPortalRoute =
     isPlatformAdmin && !isImpersonating && location.pathname.startsWith('/app/admin')
@@ -208,35 +199,17 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         </button>
       )}
 
-      {/* Breadcrumb */}
-      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
-        <span className="hidden text-[13px] font-normal text-[var(--text-muted)]/80 xs:inline">
-          {t('brand', { ns: 'common' })}
-        </span>
-        <ChevronRight
-          size={13}
-          className="hidden shrink-0 text-[var(--text-muted)]/50 xs:block rtl:rotate-180"
-        />
-        <span className="truncate text-[13px] font-medium text-[var(--text)]">{pageName}</span>
-        {workspaceLabel && (
-          <>
-            <ChevronRight
-              size={13}
-              className="hidden shrink-0 text-[var(--text-muted)]/50 sm:block rtl:rotate-180"
-            />
-            <span
-              className="hidden max-w-[8rem] truncate text-xs font-normal text-[var(--text-muted)]/80 sm:inline md:max-w-[14rem]"
-              data-testid="workspace-context"
-            >
-              {workspaceLabel}
-            </span>
-          </>
-        )}
+      <div className="min-w-0 flex-1">
+        <h1 className="truncate text-[15px] font-semibold text-[var(--text)] sm:text-base">
+          {pageName}
+        </h1>
       </div>
 
       {/* Right side controls */}
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-        <BranchSwitcher />
+        <div className="hidden md:block">
+          <BranchSwitcher />
+        </div>
 
         {showUpgrade && (
           <>
@@ -453,29 +426,63 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
           )}
         </div>
 
-        <LanguageSwitcher compact />
-
-        {/* Settings icon button */}
-        <button
-          type="button"
-          className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)]"
-          onClick={() => navigate('/app/settings')}
-          aria-label={t('settings')}
-          title={t('settings')}
-        >
-          <Settings size={15} />
-        </button>
-
-        {/* User avatar */}
-        <button
-          type="button"
-          data-testid="logout-button"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--brand)] to-[var(--mint-mid)] text-[11px] font-semibold text-white ring-1 ring-[var(--app-border)]/30 transition-opacity hover:opacity-90"
-          title={t('header.logoutTitle', { name: user?.displayName || user?.email })}
-          onClick={handleLogout}
-        >
-          {initials}
-        </button>
+        <Popover open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              data-testid="user-menu-trigger"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--brand)] to-[var(--mint-mid)] text-[11px] font-semibold text-white ring-1 ring-[var(--app-border)]/30 transition-opacity hover:opacity-90"
+              aria-label={t('header.openUserMenu', {
+                name: user?.displayName || user?.email || '',
+              })}
+            >
+              {initials}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-56 p-0">
+            <div className="border-b border-[var(--app-border)]/40 px-3 py-2.5">
+              <p className="truncate text-sm font-semibold text-[var(--text)]">
+                {user?.displayName || user?.email}
+              </p>
+              {user?.displayName && user?.email && (
+                <p className="truncate text-xs text-[var(--text-muted)]">{user.email}</p>
+              )}
+            </div>
+            <div className="p-1">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-[var(--text)] transition-colors hover:bg-[var(--brand-ultra)]/50"
+                onClick={() => {
+                  setUserMenuOpen(false)
+                  navigate('/app/settings')
+                }}
+              >
+                <Settings size={15} className="shrink-0 text-[var(--text-muted)]" />
+                {t('settings')}
+              </button>
+            </div>
+            <div className="border-t border-[var(--app-border)]/40 px-3 py-2.5">
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                {t('language.switch', { ns: 'common' })}
+              </p>
+              <LanguageSwitcher compact />
+            </div>
+            <div className="border-t border-[var(--app-border)]/40 p-1">
+              <button
+                type="button"
+                data-testid="logout-button"
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-[var(--red)] transition-colors hover:bg-[var(--brand-ultra)]/50"
+                onClick={() => {
+                  setUserMenuOpen(false)
+                  void handleLogout()
+                }}
+              >
+                <LogOut size={15} className="shrink-0" />
+                {t('header.logout')}
+              </button>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </header>
   )
