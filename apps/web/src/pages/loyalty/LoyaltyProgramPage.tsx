@@ -23,6 +23,7 @@ import {
 import { ensureNamespace } from '../../i18n'
 import { formatNumber } from '../../utils/format'
 import { Skeleton } from '../../components/ui/skeleton'
+import { TableScroll } from '../../components/ui/table-scroll'
 
 export function LoyaltyProgramPage() {
   const { t } = useTranslation('loyalty')
@@ -201,7 +202,7 @@ export function LoyaltyProgramPage() {
           ) : balances.length === 0 ? (
             <p className="text-sm text-[var(--text-mid)]">{t('balances.empty')}</p>
           ) : (
-            <div className="overflow-x-auto">
+            <TableScroll aria-label={t('balances.title')}>
               <table className="w-full min-w-[32rem] text-left text-sm">
                 <thead>
                   <tr className="border-b border-[var(--app-border)] text-xs text-[var(--text-mid)]">
@@ -233,7 +234,7 @@ export function LoyaltyProgramPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
         </LoyaltyPanel>
       </PageShell>

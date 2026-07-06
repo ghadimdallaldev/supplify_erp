@@ -375,6 +375,7 @@ export function DashboardPage() {
 
       {showDashboardCalendar && (
         <div
+          className="min-w-0"
           style={{
             marginTop: DASHBOARD_CALENDAR_EXTRA_GAP,
             background: 'var(--surface)',

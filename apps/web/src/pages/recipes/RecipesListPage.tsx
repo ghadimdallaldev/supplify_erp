@@ -29,6 +29,8 @@ import { EmptyState } from '../../components/ui/empty-state'
 import { Skeleton } from '../../components/ui/skeleton'
 import { cn } from '../../lib/utils'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
+import { TableScroll } from '../../components/ui/table-scroll'
+import { responsiveDataListClasses } from '../../components/ui/responsive-data-list'
 import { ensureNamespace } from '../../i18n'
 import type { Recipe } from '../../types/recipes'
 
@@ -119,7 +121,7 @@ export function RecipesListPage() {
     [recipes]
   )
 
-  const isDesktop = useMediaQuery('(min-width: 768px)', true)
+  const isDesktop = useMediaQuery('(min-width: 1024px)', true)
 
   const applySearch = () => {
     const next = new URLSearchParams(searchParams)
@@ -402,37 +404,67 @@ export function RecipesListPage() {
 
             {/* Single layout — avoid rendering mobile + desktop rows twice */}
             {isDesktop ? (
-              <div className="overflow-x-auto rounded-lg border border-[var(--app-border)]">
-                <table className="w-full text-sm">
+              <TableScroll aria-label={t('list.recipeList')}>
+                <table className="w-full min-w-[640px] text-sm">
                   <thead className="bg-[var(--brand-ultra)] text-left">
                     <tr>
                       <th className="px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]">
                         {t('table.recipe')}
                       </th>
-                      <th className="px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]">
+                      <th
+                        className={cn(
+                          'px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]',
+                          responsiveDataListClasses.columnSecondary
+                        )}
+                      >
                         {t('table.category')}
                       </th>
                       {canViewCosts && (
-                        <th className="px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]">
+                        <th
+                          className={cn(
+                            'px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]',
+                            responsiveDataListClasses.columnSecondary
+                          )}
+                        >
                           {t('table.sellingPrice')}
                         </th>
                       )}
                       {canViewCosts && (
-                        <th className="px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]">
+                        <th
+                          className={cn(
+                            'px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]',
+                            responsiveDataListClasses.columnSecondary
+                          )}
+                        >
                           {t('table.costPerPortion')}
                         </th>
                       )}
                       {canViewCosts && (
-                        <th className="px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]">
+                        <th
+                          className={cn(
+                            'px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]',
+                            responsiveDataListClasses.columnTertiary
+                          )}
+                        >
                           {t('table.foodCostPct')}
                         </th>
                       )}
                       {canViewCosts && (
-                        <th className="px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]">
+                        <th
+                          className={cn(
+                            'px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]',
+                            responsiveDataListClasses.columnTertiary
+                          )}
+                        >
                           {t('table.marginPct')}
                         </th>
                       )}
-                      <th className="px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]">
+                      <th
+                        className={cn(
+                          'px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]',
+                          responsiveDataListClasses.columnSecondary
+                        )}
+                      >
                         {t('table.status')}
                       </th>
                       <th className="px-4 py-3 text-xs font-medium uppercase text-[var(--text-muted)]">
@@ -463,23 +495,35 @@ export function RecipesListPage() {
                             </p>
                           ) : null}
                         </td>
-                        <td className="px-4 py-4 text-[var(--text-muted)]">
+                        <td
+                          className={cn(
+                            'px-4 py-4 text-[var(--text-muted)]',
+                            responsiveDataListClasses.columnSecondary
+                          )}
+                        >
                           {recipe.category || '—'}
                         </td>
                         {canViewCosts && (
-                          <td className="px-4 py-4">
+                          <td
+                            className={cn('px-4 py-4', responsiveDataListClasses.columnSecondary)}
+                          >
                             {recipe.sellingPrice != null ? formatPrice(recipe.sellingPrice) : '—'}
                           </td>
                         )}
                         {canViewCosts && (
-                          <td className="px-4 py-4 font-medium">
+                          <td
+                            className={cn(
+                              'px-4 py-4 font-medium',
+                              responsiveDataListClasses.columnSecondary
+                            )}
+                          >
                             {recipe.costPerPortion != null
                               ? formatPrice(recipe.costPerPortion)
                               : t('detail.missing')}
                           </td>
                         )}
                         {canViewCosts && (
-                          <td className="px-4 py-4">
+                          <td className={cn('px-4 py-4', responsiveDataListClasses.columnTertiary)}>
                             <div className="min-w-[8rem] max-w-xs">
                               <FoodCostBar
                                 foodCostPct={recipe.foodCostPct}
@@ -490,13 +534,13 @@ export function RecipesListPage() {
                           </td>
                         )}
                         {canViewCosts && (
-                          <td className="px-4 py-4">
+                          <td className={cn('px-4 py-4', responsiveDataListClasses.columnTertiary)}>
                             {recipe.grossMarginPct != null
                               ? `${recipe.grossMarginPct.toFixed(1)}%`
                               : '—'}
                           </td>
                         )}
-                        <td className="px-4 py-4">
+                        <td className={cn('px-4 py-4', responsiveDataListClasses.columnSecondary)}>
                           <RecipeStatusBadge status={recipe.calcStatus} />
                         </td>
                         <td className="px-4 py-4">
@@ -516,7 +560,7 @@ export function RecipesListPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableScroll>
             ) : (
               <div className="space-y-3">
                 {recipes.map((recipe) => (

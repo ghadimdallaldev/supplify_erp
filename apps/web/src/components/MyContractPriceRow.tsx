@@ -3,6 +3,7 @@ import { ContractPriceDisplay } from './ContractPriceDisplay'
 import { formatPrice } from '../utils/format'
 import { cn } from '../lib/utils'
 import { Tag } from 'lucide-react'
+import { responsiveDataListClasses } from './ui/responsive-data-list'
 
 export type MyContractPriceRowData = {
   id: string | number
@@ -114,13 +115,23 @@ export function MyContractPriceTableRow({ row }: { row: MyContractPriceRowData }
           <p className="mt-0.5 text-xs font-medium text-[var(--mint)]">{savings}</p>
         ) : null}
       </td>
-      <td className="px-4 py-3 text-sm text-[var(--text-mid)] tabular-nums">
+      <td
+        className={cn(
+          'px-4 py-3 text-sm text-[var(--text-mid)] tabular-nums',
+          responsiveDataListClasses.columnSecondary
+        )}
+      >
         {catalogPrice != null ? formatPrice(catalogPrice) : '—'}
       </td>
-      <td className="px-4 py-3 text-xs text-[var(--text-mid)] whitespace-nowrap">
+      <td
+        className={cn(
+          'px-4 py-3 text-xs text-[var(--text-mid)] whitespace-nowrap',
+          responsiveDataListClasses.columnTertiary
+        )}
+      >
         {formatValidity(row.contract_start_date, row.contract_end_date)}
       </td>
-      <td className="px-4 py-3">
+      <td className={cn('px-4 py-3', responsiveDataListClasses.columnTertiary)}>
         <div className="flex flex-wrap gap-1">
           {row.agreement_type ? (
             <Badge variant="outline" className="text-[10px]">

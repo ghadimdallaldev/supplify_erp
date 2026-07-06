@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { Filter, Loader2, Minus, Plus, RefreshCw, Search, X } from 'lucide-react'
 import { AppPanel, SummaryStrip } from '../ui/app-panel'
 import { TableScroll } from '../ui/table-scroll'
+import { responsiveDataListClasses } from '../ui/responsive-data-list'
 import {
   AdminEmptyState,
   AdminErrorState,
@@ -483,42 +484,74 @@ export function AdminLimitsTab() {
           >
             <div className="space-y-6">
               {activeAddons.length > 0 ? (
-                <TableScroll aria-label={t('limits.addonsTableAriaLabel')}>
-                  <table className="w-full min-w-[520px] text-sm">
-                    <thead>
-                      <tr className="border-b bg-[var(--app-bg-subtle)]/50 text-left text-xs text-[var(--text-muted)]">
-                        <th className="px-3 py-2">Type</th>
-                        <th className="px-3 py-2">Qty</th>
-                        <th className="px-3 py-2">Unit price</th>
-                        <th className="px-3 py-2 text-right">{t('common.table.actions')}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {activeAddons.map((a) => {
-                        const key = String(a.addon_key)
-                        const qty = Number(a.quantity) || 0
-                        return (
-                          <tr key={String(a.id)} className="hover:bg-[var(--brand-ultra)]/30">
-                            <td className="px-3 py-2 font-medium">{formatAddonKeyLabel(key)}</td>
-                            <td className="px-3 py-2">{qty}</td>
-                            <td className="px-3 py-2 text-[var(--text-muted)]">
-                              {a.unit_price_monthly != null ? `$${a.unit_price_monthly}/mo` : '—'}
-                            </td>
-                            <td className="px-3 py-2 text-right">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => editAddonRow(key, qty)}
-                              >
-                                Edit
-                              </Button>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </TableScroll>
+                <>
+                  <div className="space-y-3 lg:hidden">
+                    {activeAddons.map((a) => {
+                      const key = String(a.addon_key)
+                      const qty = Number(a.quantity) || 0
+                      return (
+                        <article
+                          key={String(a.id)}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-[var(--app-border)] p-4"
+                        >
+                          <div>
+                            <p className="font-medium">{formatAddonKeyLabel(key)}</p>
+                            <p className="text-sm text-[var(--text-muted)]">
+                              Qty {qty}
+                              {a.unit_price_monthly != null ? ` · $${a.unit_price_monthly}/mo` : ''}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => editAddonRow(key, qty)}
+                          >
+                            Edit
+                          </Button>
+                        </article>
+                      )
+                    })}
+                  </div>
+                  <TableScroll
+                    aria-label={t('limits.addonsTableAriaLabel')}
+                    className="hidden lg:block"
+                  >
+                    <table className="w-full min-w-[520px] text-sm">
+                      <thead>
+                        <tr className="border-b bg-[var(--app-bg-subtle)]/50 text-left text-xs text-[var(--text-muted)]">
+                          <th className="px-3 py-2">Type</th>
+                          <th className="px-3 py-2">Qty</th>
+                          <th className="px-3 py-2">Unit price</th>
+                          <th className="px-3 py-2 text-right">{t('common.table.actions')}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {activeAddons.map((a) => {
+                          const key = String(a.addon_key)
+                          const qty = Number(a.quantity) || 0
+                          return (
+                            <tr key={String(a.id)} className="hover:bg-[var(--brand-ultra)]/30">
+                              <td className="px-3 py-2 font-medium">{formatAddonKeyLabel(key)}</td>
+                              <td className="px-3 py-2">{qty}</td>
+                              <td className="px-3 py-2 text-[var(--text-muted)]">
+                                {a.unit_price_monthly != null ? `$${a.unit_price_monthly}/mo` : '—'}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => editAddonRow(key, qty)}
+                                >
+                                  Edit
+                                </Button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </TableScroll>
+                </>
               ) : (
                 <AdminEmptyState
                   title={t('limits.noAddonsTitle')}

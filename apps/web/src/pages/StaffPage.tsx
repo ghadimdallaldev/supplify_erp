@@ -36,7 +36,7 @@ export function StaffPage() {
 
   return (
     <RequirePermission permission="STAFF_VIEW" title={t('page.permissionTitle')}>
-      <PageShell data-testid="staff-page">
+      <PageShell data-testid="staff-page" className="overflow-x-hidden">
         <PageHeader title={t('page.title')} description={t('page.description')} />
 
         <Tabs

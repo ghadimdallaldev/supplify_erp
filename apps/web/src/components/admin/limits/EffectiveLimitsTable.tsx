@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { TableScroll } from '../../ui/table-scroll'
+import { responsiveDataListClasses } from '../../ui/responsive-data-list'
+import { cn } from '../../../lib/utils'
 import { AdminEmptyState, AdminLoadingState } from '../adminUi'
 import { UsageProgressBar } from '../UsageProgressBar'
 import { UsageStatusBadge } from '../UsageStatusBadge'
@@ -68,24 +70,66 @@ export function EffectiveLimitsTable({
           {t('limits.atRiskCount', { count: atRiskCount })}
         </p>
       )}
-      <TableScroll aria-label={t('limits.effectiveLimitsTableAriaLabel')}>
+      <div className="space-y-3 lg:hidden">
+        {rows.map((row) => (
+          <article
+            key={row.key}
+            className="rounded-xl border border-[var(--app-border)] p-4 space-y-2"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="font-medium">{formatLimitKeyLabel(row.key)}</p>
+              <UsageStatusBadge status={row.status} />
+            </div>
+            <p className="text-sm text-[var(--text-muted)]">
+              {row.used} / {formatLimitValue(row.effective)} in use
+            </p>
+            {row.effective != null && row.effective !== -1 && (
+              <UsageProgressBar used={row.used} limit={row.effective} status={row.status} />
+            )}
+          </article>
+        ))}
+      </div>
+      <TableScroll
+        aria-label={t('limits.effectiveLimitsTableAriaLabel')}
+        className="hidden lg:block"
+      >
         <table className="w-full min-w-[820px] text-sm">
           <thead>
             <tr className="border-b bg-[var(--app-bg-subtle)]/50 text-start text-xs text-[var(--text-muted)]">
               <th className="px-3 py-2">{t('common.table.limit')}</th>
-              <th className="px-3 py-2">{t('common.table.planBase')}</th>
-              <th className="px-3 py-2">{t('common.table.override')}</th>
+              <th className={cn('px-3 py-2', responsiveDataListClasses.columnSecondary)}>
+                {t('common.table.planBase')}
+              </th>
+              <th className={cn('px-3 py-2', responsiveDataListClasses.columnTertiary)}>
+                {t('common.table.override')}
+              </th>
               <th className="px-3 py-2">{t('common.table.effective')}</th>
-              <th className="px-3 py-2">{t('common.table.inUse')}</th>
-              <th className="px-3 py-2">{t('common.table.status')}</th>
+              <th className={cn('px-3 py-2', responsiveDataListClasses.columnSecondary)}>
+                {t('common.table.inUse')}
+              </th>
+              <th className={cn('px-3 py-2', responsiveDataListClasses.columnSecondary)}>
+                {t('common.table.status')}
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {rows.map((row) => (
               <tr key={row.key} className="hover:bg-[var(--brand-ultra)]/30">
                 <td className="px-3 py-2 font-medium">{formatLimitKeyLabel(row.key)}</td>
-                <td className="px-3 py-2 text-[var(--text-muted)]">{formatLimitValue(row.base)}</td>
-                <td className="px-3 py-2 text-[var(--text-muted)]">
+                <td
+                  className={cn(
+                    'px-3 py-2 text-[var(--text-muted)]',
+                    responsiveDataListClasses.columnSecondary
+                  )}
+                >
+                  {formatLimitValue(row.base)}
+                </td>
+                <td
+                  className={cn(
+                    'px-3 py-2 text-[var(--text-muted)]',
+                    responsiveDataListClasses.columnTertiary
+                  )}
+                >
                   {row.override ? (
                     <span title={row.override.reason ?? undefined}>
                       {row.override.value}
@@ -96,7 +140,12 @@ export function EffectiveLimitsTable({
                   )}
                 </td>
                 <td className="px-3 py-2 font-medium">{formatLimitValue(row.effective)}</td>
-                <td className="px-3 py-2 min-w-[140px]">
+                <td
+                  className={cn(
+                    'px-3 py-2 min-w-[140px]',
+                    responsiveDataListClasses.columnSecondary
+                  )}
+                >
                   <div className="text-xs">
                     {row.used} / {formatLimitValue(row.effective)}
                   </div>
@@ -104,7 +153,7 @@ export function EffectiveLimitsTable({
                     <UsageProgressBar used={row.used} limit={row.effective} status={row.status} />
                   )}
                 </td>
-                <td className="px-3 py-2">
+                <td className={cn('px-3 py-2', responsiveDataListClasses.columnSecondary)}>
                   <UsageStatusBadge status={row.status} />
                 </td>
               </tr>

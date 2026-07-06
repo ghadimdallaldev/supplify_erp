@@ -44,7 +44,7 @@ import { TableScroll } from '../../components/ui/table-scroll'
 import { EmptyState } from '../../components/ui/empty-state'
 import { formatPrice } from '../../utils/format'
 import { toast } from 'sonner'
-import { Loader2, Scale } from 'lucide-react'
+import { Check, Eye, Loader2, Scale, X } from 'lucide-react'
 import { ensureNamespace } from '../../i18n'
 
 type DisputeRow = {
@@ -337,17 +337,27 @@ export function DisputesPage() {
                   isSupplier && canManageSupplierDisputes ? (id) => setRejectId(id) : undefined
                 }
               />
-              <TableScroll aria-label={t('disputes.title')} className="hidden md:block">
-                <table className="w-full min-w-[720px] text-sm">
+              <TableScroll
+                aria-label={t('disputes.title')}
+                className="hidden lg:block"
+                data-testid="disputes-table-view"
+              >
+                <table className="w-full min-w-[640px] text-sm">
                   <thead>
                     <tr className="border-b bg-[var(--brand-ultra)]/40 text-left text-[var(--text-muted)]">
                       <th className="px-4 py-3 pl-5 font-medium">{t('disputes.table.order')}</th>
                       {isSupplier && (
-                        <th className="px-4 py-3 font-medium">{t('disputes.table.restaurant')}</th>
+                        <th className="hidden px-4 py-3 font-medium xl:table-cell">
+                          {t('disputes.table.restaurant')}
+                        </th>
                       )}
-                      <th className="px-4 py-3 font-medium">{t('disputes.table.type')}</th>
+                      <th className="hidden px-4 py-3 font-medium lg:table-cell">
+                        {t('disputes.table.type')}
+                      </th>
                       <th className="px-4 py-3 font-medium">{t('disputes.table.status')}</th>
-                      <th className="px-4 py-3 font-medium">{t('disputes.table.amount')}</th>
+                      <th className="hidden px-4 py-3 font-medium lg:table-cell">
+                        {t('disputes.table.amount')}
+                      </th>
                       <th className="px-4 py-3 pr-5 text-right font-medium">
                         {t('disputes.table.actions')}
                       </th>
@@ -376,11 +386,11 @@ export function DisputesPage() {
                             )}
                           </td>
                           {isSupplier && (
-                            <td className="px-4 py-3 text-sm">
+                            <td className="hidden px-4 py-3 text-sm xl:table-cell">
                               {String(dispute.restaurantName ?? dispute.restaurant_name ?? '—')}
                             </td>
                           )}
-                          <td className="px-4 py-3 capitalize">
+                          <td className="hidden px-4 py-3 capitalize lg:table-cell">
                             <Link
                               to={`/app/disputes/${dispute.id}`}
                               className="text-[var(--brand-mid)] hover:underline"
@@ -393,22 +403,28 @@ export function DisputesPage() {
                               {String(dispute.status)}
                             </Badge>
                           </td>
-                          <td className="px-4 py-3 tabular-nums">
+                          <td className="hidden px-4 py-3 tabular-nums lg:table-cell">
                             {disputedAmount != null
                               ? `$${formatPrice(Number(disputedAmount))}`
                               : '—'}
                           </td>
                           <td className="px-4 py-3 pr-5 text-right">
-                            <div className="flex flex-wrap justify-end gap-2">
+                            <div className="flex flex-wrap justify-end gap-1.5">
                               {isSupplier &&
                                 canManageSupplierDisputes &&
                                 dispute.status === 'open' && (
                                   <Button
                                     size="sm"
                                     variant="outline"
+                                    className="px-2.5 xl:px-3"
                                     onClick={() => handleReview(String(dispute.id))}
+                                    aria-label={t('disputes.actions.review')}
+                                    title={t('disputes.actions.review')}
                                   >
-                                    {t('disputes.actions.review')}
+                                    <Eye className="h-4 w-4 xl:mr-1" />
+                                    <span className="hidden xl:inline">
+                                      {t('disputes.actions.review')}
+                                    </span>
                                   </Button>
                                 )}
                               {isSupplier &&
@@ -418,16 +434,28 @@ export function DisputesPage() {
                                   <>
                                     <Button
                                       size="sm"
+                                      className="px-2.5 xl:px-3"
                                       onClick={() => setResolveId(String(dispute.id))}
+                                      aria-label={t('disputes.actions.resolve')}
+                                      title={t('disputes.actions.resolve')}
                                     >
-                                      {t('disputes.actions.resolve')}
+                                      <Check className="h-4 w-4 xl:mr-1" />
+                                      <span className="hidden xl:inline">
+                                        {t('disputes.actions.resolve')}
+                                      </span>
                                     </Button>
                                     <Button
                                       size="sm"
                                       variant="outline"
+                                      className="px-2.5 xl:px-3"
                                       onClick={() => setRejectId(String(dispute.id))}
+                                      aria-label={t('disputes.actions.reject')}
+                                      title={t('disputes.actions.reject')}
                                     >
-                                      {t('disputes.actions.reject')}
+                                      <X className="h-4 w-4 xl:mr-1" />
+                                      <span className="hidden xl:inline">
+                                        {t('disputes.actions.reject')}
+                                      </span>
                                     </Button>
                                   </>
                                 )}

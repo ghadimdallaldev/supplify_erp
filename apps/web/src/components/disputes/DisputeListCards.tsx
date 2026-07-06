@@ -68,7 +68,7 @@ export function DisputeListCards({
   }, [])
 
   return (
-    <div className="space-y-3 md:hidden">
+    <div className="space-y-3 lg:hidden" data-testid="disputes-card-list">
       {disputes.map((dispute) => {
         const orderId = dispute.orderId || dispute.order_id
         const disputedAmount = dispute.disputedAmount ?? dispute.disputed_amount

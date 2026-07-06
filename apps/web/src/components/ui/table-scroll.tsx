@@ -6,10 +6,12 @@ export function TableScroll({
   children,
   className,
   'aria-label': ariaLabel = 'Scrollable table',
+  'data-testid': testId,
 }: {
   children: ReactNode
   className?: string
   'aria-label'?: string
+  'data-testid'?: string
 }) {
   return (
     <div
@@ -22,6 +24,7 @@ export function TableScroll({
       )}
       role="region"
       aria-label={ariaLabel}
+      data-testid={testId}
       tabIndex={0}
     >
       {children}

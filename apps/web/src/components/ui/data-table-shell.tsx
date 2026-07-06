@@ -4,6 +4,12 @@ import { cn } from '../../lib/utils'
 /**
  * Consistent wrapper for data tables: a toolbar row with search, filters, and
  * actions above a horizontally scrollable content area.
+ *
+ * For hybrid card/table pages, prefer {@link ResponsiveDataList} from
+ * `./responsive-data-list` (cards below `lg`, compact table at `lg`–`xl`, full
+ * table at `xl+`) and wrap table markup in {@link TableScroll} from
+ * `./table-scroll` with a descriptive `aria-label`. The inner `overflow-x-auto`
+ * below remains a fallback when children are not wrapped in `TableScroll`.
  */
 export function DataTableShell({
   search,

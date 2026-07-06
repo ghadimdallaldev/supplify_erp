@@ -21,6 +21,7 @@ import { Input } from '../../ui/input'
 import { Select, SelectTrigger } from '../../ui/select'
 import { AppPanel, SummaryStrip } from '../../ui/app-panel'
 import { TableScroll } from '../../ui/table-scroll'
+import { responsiveDataListClasses } from '../../ui/responsive-data-list'
 import {
   useGetAdminSuppliersQuery,
   useGetAdminRestaurantsQuery,
@@ -36,6 +37,7 @@ import {
 } from '../adminUi'
 import { formatPlanDisplayName } from '../../../lib/planComparison'
 import { formatCurrency } from '../../../utils/format'
+import { cn } from '../../../lib/utils'
 import type { AdminTenantType } from '../../../lib/adminTenantSearch'
 import type { AdminResetPasswordTarget } from '../AdminResetPasswordDialog'
 import { usePermissions } from '../../../hooks/usePermissions'
@@ -502,16 +504,138 @@ export function AdminTenantsTab({
               />
             ) : (
               <>
-                <TableScroll aria-label={t('tenants.suppliersTableAriaLabel')}>
+                <div className="space-y-3 lg:hidden">
+                  {filteredSuppliers.map((supplier) => (
+                    <article
+                      key={supplier.id}
+                      className="rounded-xl border border-[var(--app-border)] p-4 space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-[var(--text)]">{supplier.name}</p>
+                          <p className="truncate text-xs text-[var(--text-muted)]">
+                            {supplier.contact_email}
+                          </p>
+                        </div>
+                        <StatusBadge status={supplier.subscription_status || 'NONE'} />
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <Badge variant="outline" className="font-normal">
+                          {formatPlanDisplayName(
+                            supplier.plan_code,
+                            supplier.plan_name || 'Free Trial'
+                          )}
+                        </Badge>
+                        <span className="text-[var(--text-muted)]">
+                          {supplier.product_count || 0} products · {supplier.warehouse_count || 0}{' '}
+                          warehouses
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <AdminTooltip label={t('common.tooltips.diagnostics')}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2"
+                            onClick={() =>
+                              onTenantDiag({
+                                id: supplier.id,
+                                tenantType: 'SUPPLIER',
+                                name: supplier.name || supplier.id,
+                              })
+                            }
+                          >
+                            <Stethoscope className="h-4 w-4" />
+                          </Button>
+                        </AdminTooltip>
+                        <AdminTooltip label={t('common.tooltips.impersonate')}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2"
+                            onClick={() =>
+                              handleStartImpersonation(
+                                supplier.id,
+                                'SUPPLIER',
+                                supplier.name || supplier.id
+                              )
+                            }
+                          >
+                            <UserCog className="h-4 w-4" />
+                          </Button>
+                        </AdminTooltip>
+                        {canResetPassword && supplier.contact_email && (
+                          <AdminTooltip label={t('common.tooltips.resetPassword')}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-2"
+                              onClick={() =>
+                                onPasswordReset({
+                                  email: supplier.contact_email!,
+                                  displayName: supplier.name || supplier.contact_email!,
+                                })
+                              }
+                            >
+                              <KeyRound className="h-4 w-4" />
+                            </Button>
+                          </AdminTooltip>
+                        )}
+                        <AdminTooltip label={t('common.tooltips.changePlan')}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2"
+                            onClick={() =>
+                              openChangePlanForTenant(
+                                supplier.subscription_id,
+                                'SUPPLIER',
+                                supplier.name || supplier.id,
+                                'supplier'
+                              )
+                            }
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </AdminTooltip>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <TableScroll
+                  aria-label={t('tenants.suppliersTableAriaLabel')}
+                  className="hidden lg:block"
+                >
                   <table className="w-full min-w-[880px] text-sm">
                     <thead>
                       <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                         <th className="px-4 py-3">{t('common.supplier')}</th>
                         <th className="px-4 py-3">{t('common.table.plan')}</th>
                         <th className="px-4 py-3">{t('common.table.status')}</th>
-                        <th className="hidden px-4 py-3 md:table-cell">Products</th>
-                        <th className="hidden px-4 py-3 lg:table-cell">Warehouses</th>
-                        <th className="hidden px-4 py-3 sm:table-cell">Revenue</th>
+                        <th
+                          className={cn(
+                            'hidden px-4 py-3',
+                            responsiveDataListClasses.columnSecondary
+                          )}
+                        >
+                          Products
+                        </th>
+                        <th
+                          className={cn(
+                            'hidden px-4 py-3',
+                            responsiveDataListClasses.columnTertiary
+                          )}
+                        >
+                          Warehouses
+                        </th>
+                        <th
+                          className={cn(
+                            'hidden px-4 py-3',
+                            responsiveDataListClasses.columnSecondary
+                          )}
+                        >
+                          Revenue
+                        </th>
                         <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
                       </tr>
                     </thead>
@@ -542,13 +666,28 @@ export function AdminTenantsTab({
                           <td className="px-4 py-3.5">
                             <StatusBadge status={supplier.subscription_status || 'NONE'} />
                           </td>
-                          <td className="hidden px-4 py-3.5 text-[var(--text-muted)] md:table-cell">
+                          <td
+                            className={cn(
+                              'hidden px-4 py-3.5 text-[var(--text-muted)]',
+                              responsiveDataListClasses.columnSecondary
+                            )}
+                          >
                             {supplier.product_count || 0}
                           </td>
-                          <td className="hidden px-4 py-3.5 text-[var(--text-muted)] lg:table-cell">
+                          <td
+                            className={cn(
+                              'hidden px-4 py-3.5 text-[var(--text-muted)]',
+                              responsiveDataListClasses.columnTertiary
+                            )}
+                          >
                             {supplier.warehouse_count || 0}
                           </td>
-                          <td className="hidden px-4 py-3.5 tabular-nums text-[var(--text-muted)] sm:table-cell">
+                          <td
+                            className={cn(
+                              'hidden px-4 py-3.5 tabular-nums text-[var(--text-muted)]',
+                              responsiveDataListClasses.columnSecondary
+                            )}
+                          >
                             {formatCurrency(supplier.total_revenue)}
                           </td>
                           <td className="px-4 py-3.5">
@@ -699,15 +838,132 @@ export function AdminTenantsTab({
               />
             ) : (
               <>
-                <TableScroll aria-label={t('tenants.restaurantsTableAriaLabel')}>
+                <div className="space-y-3 lg:hidden">
+                  {filteredRestaurants.map((restaurant) => (
+                    <article
+                      key={restaurant.id}
+                      className="rounded-xl border border-[var(--app-border)] p-4 space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-[var(--text)]">
+                            {restaurant.name}
+                          </p>
+                          <p className="truncate text-xs text-[var(--text-muted)]">
+                            {restaurant.contact_email}
+                          </p>
+                        </div>
+                        <StatusBadge status={restaurant.subscription_status || 'NONE'} />
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <Badge variant="outline" className="font-normal">
+                          {formatPlanDisplayName(
+                            restaurant.plan_code,
+                            restaurant.plan_name || 'Free Trial'
+                          )}
+                        </Badge>
+                        <span className="text-[var(--text-muted)]">
+                          {restaurant.orders_last_30d || 0} orders (30d) ·{' '}
+                          {formatCurrency(restaurant.total_spent)} spent
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <AdminTooltip label={t('common.tooltips.diagnostics')}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2"
+                            onClick={() =>
+                              onTenantDiag({
+                                id: restaurant.id,
+                                tenantType: 'RESTAURANT',
+                                name: restaurant.name || restaurant.id,
+                              })
+                            }
+                          >
+                            <Stethoscope className="h-4 w-4" />
+                          </Button>
+                        </AdminTooltip>
+                        <AdminTooltip label={t('common.tooltips.impersonate')}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2"
+                            onClick={() =>
+                              handleStartImpersonation(
+                                restaurant.id,
+                                'RESTAURANT',
+                                restaurant.name || restaurant.id
+                              )
+                            }
+                          >
+                            <UserCog className="h-4 w-4" />
+                          </Button>
+                        </AdminTooltip>
+                        {canResetPassword && restaurant.contact_email && (
+                          <AdminTooltip label={t('common.tooltips.resetPassword')}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-2"
+                              onClick={() =>
+                                onPasswordReset({
+                                  email: restaurant.contact_email!,
+                                  displayName: restaurant.name || restaurant.contact_email!,
+                                })
+                              }
+                            >
+                              <KeyRound className="h-4 w-4" />
+                            </Button>
+                          </AdminTooltip>
+                        )}
+                        <AdminTooltip label={t('common.tooltips.changePlan')}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2"
+                            onClick={() =>
+                              openChangePlanForTenant(
+                                restaurant.subscription_id,
+                                'RESTAURANT',
+                                restaurant.name || restaurant.id,
+                                'restaurant'
+                              )
+                            }
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </AdminTooltip>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <TableScroll
+                  aria-label={t('tenants.restaurantsTableAriaLabel')}
+                  className="hidden lg:block"
+                >
                   <table className="w-full min-w-[760px] text-sm">
                     <thead>
                       <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                         <th className="px-4 py-3">{t('common.restaurant')}</th>
                         <th className="px-4 py-3">{t('common.table.plan')}</th>
                         <th className="px-4 py-3">{t('common.table.status')}</th>
-                        <th className="hidden px-4 py-3 md:table-cell">Orders (30d)</th>
-                        <th className="hidden px-4 py-3 sm:table-cell">Total spent</th>
+                        <th
+                          className={cn(
+                            'hidden px-4 py-3',
+                            responsiveDataListClasses.columnSecondary
+                          )}
+                        >
+                          Orders (30d)
+                        </th>
+                        <th
+                          className={cn(
+                            'hidden px-4 py-3',
+                            responsiveDataListClasses.columnSecondary
+                          )}
+                        >
+                          Total spent
+                        </th>
                         <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
                       </tr>
                     </thead>
@@ -738,10 +994,20 @@ export function AdminTenantsTab({
                           <td className="px-4 py-3.5">
                             <StatusBadge status={restaurant.subscription_status || 'NONE'} />
                           </td>
-                          <td className="hidden px-4 py-3.5 text-[var(--text-muted)] md:table-cell">
+                          <td
+                            className={cn(
+                              'hidden px-4 py-3.5 text-[var(--text-muted)]',
+                              responsiveDataListClasses.columnSecondary
+                            )}
+                          >
                             {restaurant.orders_last_30d || 0}
                           </td>
-                          <td className="hidden px-4 py-3.5 tabular-nums text-[var(--text-muted)] sm:table-cell">
+                          <td
+                            className={cn(
+                              'hidden px-4 py-3.5 tabular-nums text-[var(--text-muted)]',
+                              responsiveDataListClasses.columnSecondary
+                            )}
+                          >
                             {formatCurrency(restaurant.total_spent)}
                           </td>
                           <td className="px-4 py-3.5">

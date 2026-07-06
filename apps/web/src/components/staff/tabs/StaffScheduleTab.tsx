@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
+import { splitRowClass } from '../../ui/card-layout'
+import { TableScroll } from '../../ui/table-scroll'
 import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
 import {
@@ -246,8 +248,8 @@ export function StaffScheduleTab() {
               <p>{t('schedule.noUpcomingShifts')}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-[var(--app-border)] text-sm">
+            <TableScroll aria-label={t('schedule.upcomingTitle')}>
+              <table className="min-w-[640px] w-full divide-y divide-[var(--app-border)] text-sm">
                 <thead className="bg-[var(--brand-ultra)]">
                   <tr>
                     <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">
@@ -305,7 +307,7 @@ export function StaffScheduleTab() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
         </CardContent>
       </Card>
@@ -328,7 +330,7 @@ export function StaffScheduleTab() {
                 key={swap.id}
                 className="rounded-xl border border-[var(--app-border)] bg-white p-4 shadow-sm"
               >
-                <div className="flex items-center justify-between">
+                <div className={splitRowClass}>
                   <div>
                     <p className="text-sm font-semibold text-[var(--text)]">
                       {swap.requester?.name} → {swap.cover?.name || t('schedule.waitingForCover')}
