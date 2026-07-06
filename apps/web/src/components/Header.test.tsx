@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, fireEvent } from '@testing-library/react'
 import { Header } from './Header'
 import { renderWithProviders } from '../test/utils'
 
@@ -47,6 +47,7 @@ describe('Header', () => {
   it('should render header with content', () => {
     renderWithProviders(<Header />)
     expect(screen.getByTestId('header')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('user-menu-trigger'))
     expect(screen.getByTestId('logout-button')).toBeInTheDocument()
     expect(screen.getByTestId('language-switcher')).toBeInTheDocument()
   })
