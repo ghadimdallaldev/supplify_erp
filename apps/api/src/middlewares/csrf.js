@@ -62,6 +62,11 @@ export async function csrfProtection(req, res, next) {
     return next()
   }
 
+  // Meta WhatsApp inbound webhooks
+  if (req.path.startsWith('/webhooks/')) {
+    return next()
+  }
+
   // E2E helpers use shared secret header, not session cookies
   if (req.path.startsWith('/api/e2e')) {
     return next()
