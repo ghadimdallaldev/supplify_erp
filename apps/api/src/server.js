@@ -95,6 +95,7 @@ import {
   shouldExposeMemoryOnHealth,
   startMemoryMonitor,
 } from './lib/memory-monitor.js'
+import { whatsappWebhookRoutes } from './routes/whatsapp-webhook.routes.js'
 
 validateProductionConfig()
 logEmailBootMode()
@@ -255,6 +256,13 @@ const promotionsWriteLimiter = config.RATE_LIMIT_ENABLED
     })
   : noopLimiter
 
+// Meta WhatsApp webhooks — raw body required for X-Hub-Signature-256 verification.
+app.use(
+  '/webhooks/whatsapp',
+  express.raw({ type: 'application/json', limit: '1mb' }),
+  whatsappWebhookRoutes
+)
+
 app.use('/auth', authLimiter)
 app.use('/api/public', publicLimiter)
 app.use(limiter)
@@ -301,7 +309,7 @@ app.use(activeTenantContext)
 app.use(billingAccessMiddleware)
 
 // CSRF protection for state-changing operations (skip for public APIs)
-const csrfBypassPrefixes = ['/api/public']
+const csrfBypassPrefixes = ['/api/public', '/webhooks']
 app.use((req, res, next) => {
   if (csrfBypassPrefixes.some((prefix) => req.path.startsWith(prefix))) {
     return next()
