@@ -24,8 +24,8 @@ KEYCLOAK_ADMIN_PASSWORD=<Keycloak container admin password>
 Optional override only if needed:
 
 ```env
-# Email defaults load from development/api.env (EMAIL_LOG_ONLY=true).
-# Set SMTP_PASS in secrets.env.example only when testing real SMTP sends.
+# Email: Resend SMTP from development/api.env (EMAIL_LOG_ONLY=false).
+# SMTP_PASS is required in dashboard secrets (see secrets.env.example).
 ```
 
 ## Web service
