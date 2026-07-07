@@ -36,10 +36,10 @@ Non-secret email settings load from `deploy/railway/<env>/api.env` (`EMAIL_*`, `
 
 **Dashboard secret (once):** `SMTP_PASS` — see `secrets.env.example`.
 
-| Environment    | Default behavior                            |
-| -------------- | ------------------------------------------- |
-| development    | `EMAIL_LOG_ONLY=true` (log only)            |
-| preprod / prod | SMTP host in git + `SMTP_PASS` in dashboard |
+| Environment    | Default behavior                                  |
+| -------------- | ------------------------------------------------- |
+| development    | Resend SMTP (`development/api.env`) + `SMTP_PASS` |
+| preprod / prod | Resend SMTP in git + `SMTP_PASS` in dashboard     |
 
 Test: `pnpm --filter @supplify/api email:test`
 

@@ -19,7 +19,6 @@ export function buildNativeInfraEnv(dockerVars = readDockerEnv()) {
     : dockerVars.KEYCLOAK_PORT || '8180'
   const redisPort = dockerVars.REDIS_PORT || '6379'
   const minioPort = dockerVars.MINIO_API_PORT || '9000'
-  const mailpitSmtpPort = dockerVars.MAILPIT_SMTP_PORT || dockerVars.SMTP_PORT || '1025'
 
   return {
     DATABASE_URL: buildNativeDatabaseUrl(dockerVars),
@@ -41,14 +40,5 @@ export function buildNativeInfraEnv(dockerVars = readDockerEnv()) {
     WEB_ORIGIN: 'http://localhost:5173',
     WEB_ORIGINS: 'http://localhost:5173,http://localhost:4000',
     STAFF_PORTAL_BASE_URL: dockerVars.STAFF_PORTAL_BASE_URL || 'http://localhost:5173',
-    EMAIL_ENABLED: dockerVars.EMAIL_ENABLED || 'true',
-    EMAIL_PROVIDER: dockerVars.EMAIL_PROVIDER || 'smtp',
-    EMAIL_LOG_ONLY: dockerVars.EMAIL_LOG_ONLY || 'false',
-    EMAIL_FROM_NAME: dockerVars.EMAIL_FROM_NAME || 'Supplify',
-    EMAIL_FROM_ADDRESS: dockerVars.EMAIL_FROM_ADDRESS || 'noreply@supplify.local',
-    SMTP_HOST: 'localhost',
-    SMTP_PORT: mailpitSmtpPort,
-    SMTP_SECURE: dockerVars.SMTP_SECURE || 'false',
-    SMTP_FROM: dockerVars.SMTP_FROM || dockerVars.EMAIL_FROM_ADDRESS || 'noreply@supplify.local',
   }
 }
