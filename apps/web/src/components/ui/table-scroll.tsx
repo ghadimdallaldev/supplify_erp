@@ -28,13 +28,13 @@ export function TableScroll({
     <div
       className={cn(
         'table-scroll mx-0 w-full min-w-0 overflow-x-auto rounded-lg border border-[var(--app-border)]',
-        '[&_th]:px-4 [&_th]:py-3 [&_td]:px-4 [&_td]:py-3',
+        '[&_th]:px-3 [&_th]:py-2.5 [&_td]:px-3 [&_td]:py-2.5 xl:[&_th]:px-4 xl:[&_td]:px-4',
         '[&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-[var(--text-muted)]',
         '[&_tbody_tr]:border-b [&_tbody_tr]:border-[var(--app-border)]',
         '[&_tbody_tr]:transition-colors [&_tbody_tr]:hover:bg-[var(--brand-ultra)]',
         '[&_tbody_tr[data-state=selected]]:bg-[var(--brand-pale)]',
-        '[&_th:first-child]:ps-5 [&_td:first-child]:ps-5',
-        '[&_th:last-child]:pe-5 [&_td:last-child]:pe-5',
+        '[&_th:first-child]:ps-4 [&_td:first-child]:ps-4 xl:[&_th:first-child]:ps-5 xl:[&_td:first-child]:ps-5',
+        '[&_th:last-child]:pe-4 [&_td:last-child]:pe-4 xl:[&_th:last-child]:pe-5 xl:[&_td:last-child]:pe-5',
         stickyHeader && [
           '[&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10',
           '[&_thead_th]:bg-[var(--surface)] [&_thead_th]:shadow-[0_1px_0_var(--app-border)]',

@@ -41,10 +41,10 @@ export function KpiCard({
   const trendContent = trend ?? sparkline
   return (
     <Card
-      className={cn('kpi-card', size === 'sm' ? 'p-3 sm:p-3.5' : 'p-4 sm:p-5', className)}
+      className={cn('kpi-card', size === 'sm' ? 'p-3 sm:p-3.5' : 'p-3.5 xl:p-5', className)}
       data-testid={testId}
     >
-      <div className="mb-3 flex items-center gap-2.5">
+      <div className="mb-2.5 flex items-center gap-2.5 xl:mb-3">
         <div
           className={cn('rounded-lg', size === 'sm' ? 'p-1.5' : 'p-2')}
           style={{ background: styles.bg }}
@@ -60,7 +60,7 @@ export function KpiCard({
       <p
         className={cn(
           'font-bold tabular-nums leading-none tracking-tight text-[var(--text)]',
-          size === 'sm' ? 'text-lg sm:text-xl' : 'text-2xl sm:text-[1.75rem]'
+          size === 'sm' ? 'text-lg sm:text-xl' : 'text-2xl xl:text-[1.75rem]'
         )}
       >
         {value}

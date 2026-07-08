@@ -1,8 +1,7 @@
 import { Navigate } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import {
-  useGetDashboardStatsQuery,
-  useGetOrdersQuery,
+  useGetDashboardSummaryQuery,
   useGetReorderSuggestionsQuery,
   useGetExpirySummaryQuery,
   useGetReorderRemindersQuery,
@@ -11,7 +10,6 @@ import {
   useGetQuickListsQuery,
   useAddItemToQuickListMutation,
   useGetEntitlementsQuery,
-  useGetInventoryListQuery,
 } from '../services/api'
 import { usePermissions } from '../hooks/usePermissions'
 import { ContentReveal, Skeleton } from '../components/ui/skeleton'
@@ -73,13 +71,14 @@ export function DashboardPage() {
   const isAdminNotImpersonating = isPlatformAdmin && !isImpersonating
   const skipDashboardData = isAdminNotImpersonating || isDriverRole
   const {
-    data: stats,
+    data: summary,
     isLoading,
     error,
     refetch,
-  } = useGetDashboardStatsQuery(undefined, {
+  } = useGetDashboardSummaryQuery(undefined, {
     skip: skipDashboardData,
   })
+  const stats = summary?.stats
 
   const isRestaurant = isEffectiveRestaurant
   const isSupplier = isEffectiveSupplier
@@ -92,13 +91,6 @@ export function DashboardPage() {
   const showRestaurantSection = (flag: keyof NonNullable<typeof restaurantLayout>) =>
     !isRestaurant || !restaurantLayout || restaurantLayout[flag]
 
-  const { data: ordersData } = useGetOrdersQuery(
-    { limit: isRestaurant ? 200 : 7, offset: 0 },
-    { skip: skipDashboardData }
-  )
-  const { data: inventoryData } = useGetInventoryListQuery(undefined, {
-    skip: skipDashboardData || !isSupplier || !can('INVENTORY_VIEW'),
-  })
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: !shouldLoadTenantEntitlements,
   })
@@ -183,7 +175,7 @@ export function DashboardPage() {
   }
 
   // ── Derived data ─────────────────────────────────────────────────────────
-  const orders = (ordersData?.orders || []).slice(0, 7)
+  const orders = (summary?.recentOrders || []).slice(0, 7)
 
   const invoiceSpendTrend = Array.isArray(invoiceAnalytics?.points)
     ? invoiceAnalytics.points.map((p: any) => ({
@@ -191,17 +183,14 @@ export function DashboardPage() {
         value: Number(p.total) || 0,
       }))
     : []
-  const orderSpendTrend = buildOrderSpendTrend(
-    isRestaurant ? ordersData?.orders || [] : [],
-    financeInvoicesEnabled ? periodDays : SPEND_TREND_DAYS
-  )
+  const orderSpendTrend = summary?.spendTrend?.length
+    ? summary.spendTrend
+    : buildOrderSpendTrend(orders, SPEND_TREND_DAYS)
   const spendTrendSource: 'invoices' | 'orders' | null =
     invoiceSpendTrend.length > 0 ? 'invoices' : orderSpendTrend.length > 0 ? 'orders' : null
   const spendTrend = spendTrendSource === 'invoices' ? invoiceSpendTrend : orderSpendTrend
   const spendTrendPeriodTotal = spendTrend.reduce((sum, p) => sum + p.value, 0)
-  const lowStockItems = (inventoryData?.inventory || [])
-    .filter((item: any) => item.isLowStock)
-    .slice(0, 3)
+  const lowStockItems = summary?.lowStockPreview || []
 
   // ── KPI definitions ──────────────────────────────────────────────────────
   const supplierKpis: KpiCardProps[] = [

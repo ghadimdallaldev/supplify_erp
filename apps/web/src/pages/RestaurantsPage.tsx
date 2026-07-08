@@ -63,6 +63,7 @@ export function RestaurantsPage() {
     {
       limit: 1000,
       offset: 0,
+      includeItems: true,
     },
     { skip: !isSupplier }
   )

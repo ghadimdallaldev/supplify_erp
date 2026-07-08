@@ -111,7 +111,7 @@ export function InventoryTab({
   const [showTrend, setShowTrend] = useState(false)
   const itemsSectionRef = useRef<HTMLDivElement>(null)
 
-  const { data, isLoading, error, refetch } = useGetRestaurantInventoryQuery()
+  const { data, isLoading, error, refetch } = useGetRestaurantInventoryQuery({ limit: 500 })
   const { data: historyData } = useGetRestaurantInventoryHistoryQuery(
     { limit: 50 },
     { skip: !showTrend }

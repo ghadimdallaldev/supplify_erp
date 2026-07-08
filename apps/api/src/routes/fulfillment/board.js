@@ -39,6 +39,7 @@ import {
 } from '../../lib/delivery-tracking-payload.js'
 import { rolloverAssignmentToNextDay } from '../../services/delivery-rollover.service.js'
 import { invalidateUserAuthCaches } from '../../lib/access-cache.js'
+import { getCache, setCache } from '../../lib/cache.js'
 
 import {
   resolveRouteReorderAccess,
@@ -288,6 +289,65 @@ function mapDispatchOrder(row) {
 }
 
 const DISPATCH_BUCKET_LIMIT = 500
+const DISPATCH_CACHE_TTL_SECONDS = 45
+
+function dispatchCacheKey(supplierId, days, warehouseId) {
+  return `fulfillment:dispatch:v1:${supplierId}:${days}:${warehouseId || 'all'}`
+}
+
+function buildDispatchBaseSelect() {
+  return `
+      SELECT DISTINCT ON (o.id)
+        o.id,
+        o.status AS order_status,
+        o.total_amount,
+        COALESCE(o.placed_at, o.created_at) AS created_at,
+        r.name AS restaurant_name,
+        COALESCE(oic.item_count, 0) AS item_count,
+        da.id AS assignment_id,
+        da.status AS assignment_status,
+        da.assigned_at,
+        da.delivered_at,
+        da.scheduled_delivery_date,
+        da.rolled_over_at,
+        d.id AS driver_id,
+        d.full_name AS driver_name,
+        d.phone AS driver_phone,
+        d.vehicle_type,
+        d.vehicle_plate,
+        (pod.order_id IS NOT NULL) AS has_pod,
+        ar.route_id AS active_route_id,
+        ar.route_number AS active_route_number,
+        ar.route_status AS active_route_status
+      FROM customer_order o
+      JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
+      JOIN restaurant r ON r.id = o.restaurant_id
+      LEFT JOIN (
+        SELECT order_id, COUNT(*)::int AS item_count
+        FROM order_item
+        WHERE supplier_id = $1
+        GROUP BY order_id
+      ) oic ON oic.order_id = o.id
+      LEFT JOIN (SELECT DISTINCT order_id FROM proof_of_delivery) pod ON pod.order_id = o.id
+      LEFT JOIN LATERAL (
+        SELECT * FROM driver_assignments da2
+        WHERE da2.order_id = o.id AND da2.status NOT IN ('reassigned')
+        ORDER BY da2.created_at DESC
+        LIMIT 1
+      ) da ON true
+      LEFT JOIN drivers d ON d.id = da.driver_id
+      LEFT JOIN LATERAL (
+        SELECT dr.id AS route_id, dr.route_number, dr.status AS route_status
+        FROM route_stop rs
+        JOIN delivery_route dr ON dr.id = rs.route_id
+        WHERE rs.order_id = o.id
+          AND dr.supplier_id = $1
+          AND dr.status IN ('PLANNED', 'IN_PROGRESS')
+        LIMIT 1
+      ) ar ON true
+      WHERE o.status IN ('PLACED', 'PENDING_APPROVAL', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED')
+  `
+}
 
 function parseDispatchQuery(query = {}) {
   const days = Math.min(Math.max(parseInt(String(query.days ?? 14), 10) || 14, 1), 90)
@@ -308,54 +368,24 @@ router.get('/dispatch', async (req, res) => {
 
     const { days } = parseDispatchQuery(req.query)
     const whFilter = await warehouseFilterClause(req, supplierId, 2)
+    const warehouseId = parseWarehouseFilter(req) || null
+    const cacheKey = dispatchCacheKey(supplierId, days, warehouseId)
+    const cached = await getCache(cacheKey)
+    if (cached) {
+      return res.json({
+        ok: true,
+        data: cached,
+        error: null,
+        requestId: req.requestId,
+      })
+    }
+
     const params = [supplierId, ...whFilter.params]
     const dateParamIndex = params.length + 1
     params.push(days)
     const placedSinceClause = `AND COALESCE(o.placed_at, o.created_at) >= NOW() - ($${dateParamIndex}::int * INTERVAL '1 day')`
 
-    const baseSelect = `
-      SELECT DISTINCT ON (o.id)
-        o.id,
-        o.status AS order_status,
-        o.total_amount,
-        COALESCE(o.placed_at, o.created_at) AS created_at,
-        r.name AS restaurant_name,
-        (SELECT COUNT(*)::int FROM order_item oi WHERE oi.order_id = o.id AND oi.supplier_id = $1) AS item_count,
-        da.id AS assignment_id,
-        da.status AS assignment_status,
-        da.assigned_at,
-        da.delivered_at,
-        da.scheduled_delivery_date,
-        da.rolled_over_at,
-        d.id AS driver_id,
-        d.full_name AS driver_name,
-        d.phone AS driver_phone,
-        d.vehicle_type,
-        d.vehicle_plate,
-        EXISTS (SELECT 1 FROM proof_of_delivery pod WHERE pod.order_id = o.id) AS has_pod,
-        ar.route_id AS active_route_id,
-        ar.route_number AS active_route_number,
-        ar.route_status AS active_route_status
-      FROM customer_order o
-      JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
-      JOIN restaurant r ON r.id = o.restaurant_id
-      LEFT JOIN LATERAL (
-        SELECT * FROM driver_assignments da2
-        WHERE da2.order_id = o.id AND da2.status NOT IN ('reassigned')
-        ORDER BY da2.created_at DESC
-        LIMIT 1
-      ) da ON true
-      LEFT JOIN drivers d ON d.id = da.driver_id
-      LEFT JOIN LATERAL (
-        SELECT dr.id AS route_id, dr.route_number, dr.status AS route_status
-        FROM route_stop rs
-        JOIN delivery_route dr ON dr.id = rs.route_id
-        WHERE rs.order_id = o.id
-          AND dr.supplier_id = $1
-          AND dr.status IN ('PLANNED', 'IN_PROGRESS')
-        LIMIT 1
-      ) ar ON true
-      WHERE o.status IN ('PLACED', 'PENDING_APPROVAL', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED')
+    const baseSelect = `${buildDispatchBaseSelect()}
         ${placedSinceClause}
         ${whFilter.clause}
     `
@@ -438,23 +468,27 @@ router.get('/dispatch', async (req, res) => {
       return card
     }
 
+    const responseData = {
+      pending: unassigned.map(mapWithLocation),
+      assigned: assigned.map(mapWithLocation),
+      out_for_delivery: outForDelivery.map(mapWithLocation),
+      delivered_today: deliveredToday.map(mapWithLocation),
+      windowDays: days,
+      bucketLimit,
+      truncated,
+      stats: {
+        pending: unassigned.length,
+        assigned: assigned.length,
+        outForDelivery: outForDelivery.length,
+        deliveredToday: deliveredToday.length,
+      },
+    }
+
+    await setCache(cacheKey, responseData, DISPATCH_CACHE_TTL_SECONDS).catch(() => {})
+
     res.json({
       ok: true,
-      data: {
-        pending: unassigned.map(mapWithLocation),
-        assigned: assigned.map(mapWithLocation),
-        out_for_delivery: outForDelivery.map(mapWithLocation),
-        delivered_today: deliveredToday.map(mapWithLocation),
-        windowDays: days,
-        bucketLimit,
-        truncated,
-        stats: {
-          pending: unassigned.length,
-          assigned: assigned.length,
-          outForDelivery: outForDelivery.length,
-          deliveredToday: deliveredToday.length,
-        },
-      },
+      data: responseData,
       error: null,
       requestId: req.requestId,
     })
