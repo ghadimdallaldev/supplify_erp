@@ -11,17 +11,17 @@ import {
   useGetIncomingDisputesQuery,
   useGetEntitlementsQuery,
 } from '../services/api'
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
-import { Skeleton } from '../components/ui/skeleton'
+import { ContentReveal, Skeleton } from '../components/ui/skeleton'
+import { ErrorState } from '../components/ui/error-state'
+import { TablePagination } from '../components/ui/table-pagination'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { filterControlClass } from '../components/ui/filter-control'
 import { DataTableShell } from '../components/ui/data-table-shell'
 import { RequirePermission } from '../components/RequirePermission'
-import { EmptyState } from '../components/ui/empty-state'
-import { StatusBadge } from '../components/ui/status-badge'
 import { Input } from '../components/ui/input'
 import { Select, SelectTrigger } from '../components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
@@ -34,21 +34,7 @@ import {
   DialogTitle,
 } from '../components/ui/dialog'
 import { Label } from '../components/ui/label'
-import {
-  ShoppingCart,
-  Search,
-  Package,
-  Truck,
-  FileText,
-  CheckCircle,
-  Clock,
-  Filter,
-  Plus,
-  AlertCircle,
-  Scale,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react'
+import { Search, Filter, Plus, AlertCircle } from 'lucide-react'
 
 /** @deprecated use filterControlClass from components/ui/filter-control */
 const ordersFilterControlClass = filterControlClass
@@ -59,10 +45,8 @@ import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { toast } from 'sonner'
 import { formatPrice } from '../utils/format'
 import { DeclineOrderDialog } from '../components/orders/DeclineOrderDialog'
-import { resolveOrderStatusLabel } from '../components/orders/detail/orderDetailShared'
+import { OrdersResponsiveList } from '../components/orders/OrdersResponsiveList'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
-import { getActiveDisputeForOrder } from '../lib/disputeHelpers'
-import { isDisputeReplacementOrder } from '../lib/orderPlacement'
 
 const ORDERS_PAGE_SIZE = 20
 
@@ -274,29 +258,6 @@ export function OrdersPage() {
       product.sku?.toLowerCase().includes(productSearch.toLowerCase())
   )
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'ACKNOWLEDGED':
-        return <CheckCircle className="h-4 w-4" />
-      case 'PROCESSING':
-        return <Package className="h-4 w-4" />
-      case 'SHIPPED':
-        return <Truck className="h-4 w-4" />
-      case 'DELIVERED':
-        return <Truck className="h-4 w-4" />
-      case 'RECEIVED_PARTIAL':
-      case 'RECEIVED_FULL':
-      case 'RECEIVED_WITH_DISPUTE':
-        return <CheckCircle className="h-4 w-4" />
-      case 'INVOICED':
-        return <FileText className="h-4 w-4" />
-      case 'COMPLETED':
-        return <CheckCircle className="h-4 w-4" />
-      default:
-        return <Clock className="h-4 w-4" />
-    }
-  }
-
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
 
   const handleStatusUpdate = async (
@@ -367,6 +328,8 @@ export function OrdersPage() {
   const hasNextPage = total != null ? offset + pageSize < total : filteredOrders.length === pageSize
   const hasPrevPage = offset > 0
 
+  const hasActiveFilters = Boolean(debouncedSearch || status || hasAdvancedFilters)
+
   const clearAllFilters = () => {
     setSearch('')
     setDebouncedSearch('')
@@ -406,704 +369,463 @@ export function OrdersPage() {
   if (error) {
     const errorMessage = (error as any)?.data?.error?.message || t('page.loadFailedTitle')
     return (
-      <EmptyState
-        title={t('page.loadFailedTitle')}
-        description={errorMessage}
-        icon={<AlertCircle className="h-10 w-10" aria-hidden />}
-        action={
-          <Button onClick={() => refetch()} variant="outline">
-            {t('page.tryAgain')}
-          </Button>
-        }
-      />
+      <PageShell maxWidth="wide">
+        <ErrorState
+          title={t('page.loadFailedTitle')}
+          description={errorMessage}
+          icon={<AlertCircle className="h-10 w-10" aria-hidden />}
+          action={
+            <Button onClick={() => refetch()} variant="outline">
+              {t('page.tryAgain')}
+            </Button>
+          }
+        />
+      </PageShell>
     )
   }
 
   return (
-    <RequirePermission permission="ORDERS_VIEW" title="orders">
-      <PageShell data-testid="orders-page" maxWidth="wide">
-        <PageHeader
-          title={ordersTitle}
-          description={ordersDescription}
-          actions={
-            <>
-              {isSupplier && canCreateOrders && (
-                <Button onClick={() => setShowManualOrderDialog(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t('page.createOrder')}
-                </Button>
-              )}
-              {!isSupplier && canCreateOrders && (
-                <Button asChild>
-                  <Link to="/app/cart" data-testid="orders-create-new-order">
+    <ContentReveal>
+      <RequirePermission permission="ORDERS_VIEW" title="orders">
+        <PageShell data-testid="orders-page" maxWidth="wide">
+          <PageHeader
+            title={ordersTitle}
+            description={ordersDescription}
+            actions={
+              <>
+                {isSupplier && canCreateOrders && (
+                  <Button onClick={() => setShowManualOrderDialog(true)}>
                     <Plus className="h-4 w-4 mr-2" />
-                    {t('page.createNewOrder')}
-                  </Link>
-                </Button>
-              )}
-            </>
-          }
-        />
+                    {t('page.createOrder')}
+                  </Button>
+                )}
+                {!isSupplier && canCreateOrders && (
+                  <Button asChild>
+                    <Link to="/app/cart" data-testid="orders-create-new-order">
+                      <Plus className="h-4 w-4 mr-2" />
+                      {t('page.createNewOrder')}
+                    </Link>
+                  </Button>
+                )}
+              </>
+            }
+          />
 
-        <DataTableShell
-          data-testid="orders-table-shell"
-          search={
-            <div className="relative min-w-0">
-              <Search
-                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
-                aria-hidden
-              />
-              <Input
-                placeholder={
-                  isSupplier
-                    ? t('page.searchSupplierPlaceholder')
-                    : t('page.searchRestaurantPlaceholder')
-                }
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className={`${ordersFilterControlClass} pl-11 pr-4`}
-                aria-label={t('page.searchAriaLabel')}
-              />
+          <DataTableShell
+            data-testid="orders-table-shell"
+            stickyHeader
+            search={
+              <div className="relative min-w-0">
+                <Search
+                  className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
+                  aria-hidden
+                />
+                <Input
+                  placeholder={
+                    isSupplier
+                      ? t('page.searchSupplierPlaceholder')
+                      : t('page.searchRestaurantPlaceholder')
+                  }
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className={`${ordersFilterControlClass} pl-11 pr-4`}
+                  aria-label={t('page.searchAriaLabel')}
+                />
+              </div>
+            }
+            filters={
+              <>
+                <Select
+                  className="w-full sm:w-[12.5rem]"
+                  value={status}
+                  onValueChange={(value) => {
+                    setStatus(value)
+                    if (value) setActiveTab('all')
+                  }}
+                >
+                  <SelectTrigger className="shadow-sm" aria-label={t('page.filterStatusAriaLabel')}>
+                    <option value="">{t('page.allStatuses')}</option>
+                    {ORDER_STATUS_FILTER_VALUES.map((statusValue) => (
+                      <option key={statusValue} value={statusValue}>
+                        {t(`status.${statusValue}`)}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 shrink-0 gap-2 px-4 whitespace-nowrap"
+                  onClick={() => setMoreFiltersOpen(true)}
+                  aria-expanded={moreFiltersOpen}
+                >
+                  <Filter className="h-4 w-4" />
+                  {t('page.moreFilters')}
+                  {hasAdvancedFilters ? (
+                    <Badge variant="secondary" className="ml-0.5 px-2 py-0 text-xs font-medium">
+                      {t('page.filtersOn')}
+                    </Badge>
+                  ) : null}
+                </Button>
+              </>
+            }
+          >
+            <div className="p-4 sm:p-5">
+              {(debouncedSearch || status || hasAdvancedFilters) && (
+                <div className="mb-4 border-b border-[var(--app-border)] pb-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="mr-1 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                      {t('page.activeFilters')}
+                    </span>
+                    {debouncedSearch ? (
+                      <Badge variant="outline" className="px-2.5 py-1 font-normal">
+                        {t('page.filterSearch', { value: debouncedSearch })}
+                      </Badge>
+                    ) : null}
+                    {status ? (
+                      <Badge variant="outline" className="px-2.5 py-1 font-normal">
+                        {t('page.filterStatus', {
+                          value: t(`status.${status}`, { defaultValue: status }),
+                        })}
+                      </Badge>
+                    ) : null}
+                    {dateFrom ? (
+                      <Badge variant="outline" className="px-2.5 py-1 font-normal">
+                        {t('page.filterFrom', { value: dateFrom })}
+                      </Badge>
+                    ) : null}
+                    {dateTo ? (
+                      <Badge variant="outline" className="px-2.5 py-1 font-normal">
+                        {t('page.filterTo', { value: dateTo })}
+                      </Badge>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-3 text-xs"
+                      onClick={clearAllFilters}
+                    >
+                      {t('page.clearAll')}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <Dialog open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
+                <DialogContent size="sm">
+                  <DialogHeader>
+                    <DialogTitle>{t('page.moreFiltersTitle')}</DialogTitle>
+                    <DialogDescription>{t('page.moreFiltersDescription')}</DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <Label htmlFor="orders-date-from">{t('page.placedFrom')}</Label>
+                      <Input
+                        id="orders-date-from"
+                        type="date"
+                        className="mt-1"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="orders-date-to">{t('page.placedTo')}</Label>
+                      <Input
+                        id="orders-date-to"
+                        type="date"
+                        className="mt-1"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter className="gap-2 sm:gap-0">
+                    <Button type="button" variant="outline" onClick={clearAllFilters}>
+                      {t('page.clearAll')}
+                    </Button>
+                    <Button type="button" onClick={() => setMoreFiltersOpen(false)}>
+                      {t('page.apply')}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              {/* Order Tabs */}
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+                <TabsList className="h-auto w-full flex-wrap justify-start gap-1 p-1.5">
+                  <TabsTrigger value="all" className="px-3 py-2">
+                    {t('page.tabs.all')}
+                  </TabsTrigger>
+                  <TabsTrigger value="new" className="px-3 py-2">
+                    {t('page.tabs.new')}
+                  </TabsTrigger>
+                  <TabsTrigger value="processing" className="px-3 py-2">
+                    {t('page.tabs.processing')}
+                  </TabsTrigger>
+                  <TabsTrigger value="shipped" className="px-3 py-2">
+                    {t('page.tabs.shipped')}
+                  </TabsTrigger>
+                  <TabsTrigger value="completed" className="px-3 py-2">
+                    {t('page.tabs.completed')}
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value={activeTab} className="space-y-4">
+                  <OrdersResponsiveList
+                    orders={filteredOrders}
+                    t={t}
+                    ordersTitle={ordersTitle}
+                    isSupplier={isSupplier}
+                    canEditOrders={canEditOrders}
+                    canDeclineOrder={canDeclineOrder}
+                    canCreateOrders={canCreateOrders}
+                    disputesEnabled={disputesEnabled}
+                    allDisputes={allDisputes}
+                    updatingOrderId={updatingOrderId}
+                    hasActiveFilters={hasActiveFilters}
+                    activeTab={activeTab}
+                    onStatusUpdate={handleStatusUpdate}
+                    onSendReminder={handleSendReminder}
+                    onDecline={(orderId, label) => {
+                      setDeclineOrderId(orderId)
+                      setDeclineOrderLabel(label)
+                    }}
+                  />
+                </TabsContent>
+              </Tabs>
+
+              {(total != null ? total > 0 : filteredOrders.length > 0) && (
+                <TablePagination
+                  className="mt-4 pt-4"
+                  data-testid="orders-pagination"
+                  summary={
+                    <>
+                      {t('page.paginationShowing', { start: rangeStart, end: rangeEnd })}
+                      {total != null ? t('page.paginationOf', { total }) : ''}
+                    </>
+                  }
+                  hasPrevPage={hasPrevPage}
+                  hasNextPage={hasNextPage}
+                  isFetching={isFetching}
+                  onPrev={() => setOffset((prev) => Math.max(0, prev - pageSize))}
+                  onNext={() => setOffset((prev) => prev + pageSize)}
+                  prevLabel={t('page.previous')}
+                  nextLabel={t('page.next')}
+                />
+              )}
             </div>
-          }
-          filters={
-            <>
-              <Select
-                className="w-full sm:w-[12.5rem]"
-                value={status}
-                onValueChange={(value) => {
-                  setStatus(value)
-                  if (value) setActiveTab('all')
-                }}
-              >
-                <SelectTrigger className="shadow-sm" aria-label={t('page.filterStatusAriaLabel')}>
-                  <option value="">{t('page.allStatuses')}</option>
-                  {ORDER_STATUS_FILTER_VALUES.map((statusValue) => (
-                    <option key={statusValue} value={statusValue}>
-                      {t(`status.${statusValue}`)}
-                    </option>
-                  ))}
-                </SelectTrigger>
-              </Select>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10 shrink-0 gap-2 px-4 whitespace-nowrap"
-                onClick={() => setMoreFiltersOpen(true)}
-                aria-expanded={moreFiltersOpen}
-              >
-                <Filter className="h-4 w-4" />
-                {t('page.moreFilters')}
-                {hasAdvancedFilters ? (
-                  <Badge variant="secondary" className="ml-0.5 px-2 py-0 text-xs font-medium">
-                    {t('page.filtersOn')}
-                  </Badge>
-                ) : null}
-              </Button>
-            </>
-          }
-        >
-          <div className="p-4 sm:p-5">
-            {(debouncedSearch || status || hasAdvancedFilters) && (
-              <div className="mb-4 border-b border-[var(--app-border)] pb-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="mr-1 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-                    {t('page.activeFilters')}
-                  </span>
-                  {debouncedSearch ? (
-                    <Badge variant="outline" className="px-2.5 py-1 font-normal">
-                      {t('page.filterSearch', { value: debouncedSearch })}
-                    </Badge>
-                  ) : null}
-                  {status ? (
-                    <Badge variant="outline" className="px-2.5 py-1 font-normal">
-                      {t('page.filterStatus', {
-                        value: t(`status.${status}`, { defaultValue: status }),
-                      })}
-                    </Badge>
-                  ) : null}
-                  {dateFrom ? (
-                    <Badge variant="outline" className="px-2.5 py-1 font-normal">
-                      {t('page.filterFrom', { value: dateFrom })}
-                    </Badge>
-                  ) : null}
-                  {dateTo ? (
-                    <Badge variant="outline" className="px-2.5 py-1 font-normal">
-                      {t('page.filterTo', { value: dateTo })}
-                    </Badge>
-                  ) : null}
+          </DataTableShell>
+
+          {/* Manual Order Creation Dialog */}
+          {isSupplier && (
+            <Dialog open={showManualOrderDialog} onOpenChange={setShowManualOrderDialog}>
+              <DialogContent size="lg">
+                <DialogHeader>
+                  <DialogTitle>{t('page.manualOrderTitle')}</DialogTitle>
+                  <DialogDescription>{t('page.manualOrderDescription')}</DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  {/* Restaurant Selection */}
+                  <div className="space-y-2">
+                    <Label htmlFor="restaurant">{t('page.restaurantRequired')}</Label>
+                    <Select value={selectedRestaurant} onValueChange={setSelectedRestaurant}>
+                      <SelectTrigger id="restaurant">
+                        <option value="">
+                          {(restaurantsData?.restaurants?.length ?? 0) === 0
+                            ? t('page.noEligibleRestaurants')
+                            : t('page.selectRestaurant')}
+                        </option>
+                        {restaurantsData?.restaurants?.map((restaurant: any) => (
+                          <option key={restaurant.id} value={restaurant.id}>
+                            {restaurant.name}
+                          </option>
+                        ))}
+                      </SelectTrigger>
+                    </Select>
+                    {(restaurantsData?.restaurants?.length ?? 0) === 0 && (
+                      <p className="text-xs text-[var(--text-muted)]">
+                        {t('page.eligibleRestaurantsHint')}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Order Notes */}
+                  <div className="space-y-2">
+                    <Label htmlFor="orderNotes">{t('page.orderNotes')}</Label>
+                    <textarea
+                      id="orderNotes"
+                      rows={3}
+                      className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
+                      placeholder={t('page.orderNotesPlaceholder')}
+                      value={orderNotes}
+                      onChange={(e) => setOrderNotes(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Products in Order */}
+                  {manualOrderItems.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>{t('page.productsInOrder')}</Label>
+                      <div className="border rounded-md divide-y">
+                        {manualOrderItems.map((item) => (
+                          <div
+                            key={item.productId}
+                            className="flex items-center justify-between p-3"
+                          >
+                            <div className="flex-1">
+                              <p className="font-medium">{item.productName}</p>
+                              <p className="text-sm text-[var(--text-muted)]">
+                                {t('page.priceEach', { price: formatPrice(item.price) })}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  handleUpdateQuantity(item.productId, item.quantity - 1)
+                                }
+                              >
+                                -
+                              </Button>
+                              <span className="w-12 text-center">{item.quantity}</span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  handleUpdateQuantity(item.productId, item.quantity + 1)
+                                }
+                              >
+                                +
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add Products Button */}
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-3 text-xs"
-                    onClick={clearAllFilters}
+                    variant="outline"
+                    onClick={() => setShowProductSelection(true)}
+                    className="w-full"
                   >
-                    {t('page.clearAll')}
+                    <Plus className="h-4 w-4 mr-2" />
+                    {t('page.addProducts')}
                   </Button>
                 </div>
-              </div>
-            )}
 
-            <Dialog open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
-              <DialogContent size="sm">
-                <DialogHeader>
-                  <DialogTitle>{t('page.moreFiltersTitle')}</DialogTitle>
-                  <DialogDescription>{t('page.moreFiltersDescription')}</DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <Label htmlFor="orders-date-from">{t('page.placedFrom')}</Label>
-                    <Input
-                      id="orders-date-from"
-                      type="date"
-                      className="mt-1"
-                      value={dateFrom}
-                      onChange={(e) => setDateFrom(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="orders-date-to">{t('page.placedTo')}</Label>
-                    <Input
-                      id="orders-date-to"
-                      type="date"
-                      className="mt-1"
-                      value={dateTo}
-                      onChange={(e) => setDateTo(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <DialogFooter className="gap-2 sm:gap-0">
-                  <Button type="button" variant="outline" onClick={clearAllFilters}>
-                    {t('page.clearAll')}
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowManualOrderDialog(false)
+                      setSelectedRestaurant('')
+                      setOrderNotes('')
+                      setManualOrderItems([])
+                    }}
+                  >
+                    {t('page.cancel')}
                   </Button>
-                  <Button type="button" onClick={() => setMoreFiltersOpen(false)}>
-                    {t('page.apply')}
+                  <Button
+                    disabled={
+                      !selectedRestaurant || manualOrderItems.length === 0 || isCreatingManualOrder
+                    }
+                    onClick={handleCreateOrder}
+                  >
+                    {isCreatingManualOrder ? t('page.creating') : t('page.createOrder')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+          )}
 
-            {/* Order Tabs */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <TabsList className="h-auto w-full flex-wrap justify-start gap-1 p-1.5">
-                <TabsTrigger value="all" className="px-3 py-2">
-                  {t('page.tabs.all')}
-                </TabsTrigger>
-                <TabsTrigger value="new" className="px-3 py-2">
-                  {t('page.tabs.new')}
-                </TabsTrigger>
-                <TabsTrigger value="processing" className="px-3 py-2">
-                  {t('page.tabs.processing')}
-                </TabsTrigger>
-                <TabsTrigger value="shipped" className="px-3 py-2">
-                  {t('page.tabs.shipped')}
-                </TabsTrigger>
-                <TabsTrigger value="completed" className="px-3 py-2">
-                  {t('page.tabs.completed')}
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value={activeTab} className="space-y-4">
-                <div className="space-y-4">
-                  {filteredOrders?.map((order: any) => (
-                    <Card
-                      key={order.id}
-                      className="hover:shadow-md transition-shadow"
-                      data-testid={`order-row-${order.id}`}
-                    >
-                      <CardHeader className="pb-4">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
-                              <CardTitle className="text-lg">
-                                {t('page.orderNumber', {
-                                  id: order.id.slice(-8).toUpperCase(),
-                                })}
-                              </CardTitle>
-                              <span className="inline-flex items-center gap-1">
-                                <span className="text-[var(--text-muted)]" aria-hidden>
-                                  {getStatusIcon(order.status)}
-                                </span>
-                                <StatusBadge
-                                  status={order.status}
-                                  label={resolveOrderStatusLabel(
-                                    t,
-                                    order,
-                                    isSupplier ? 'SUPPLIER' : 'RESTAURANT'
-                                  )}
-                                />
-                                {isDisputeReplacementOrder(order) && (
-                                  <Badge variant="secondary">{t('page.replacement')}</Badge>
-                                )}
-                                {disputesEnabled &&
-                                  getActiveDisputeForOrder(allDisputes, order.id) && (
-                                    <Badge
-                                      variant="outline"
-                                      className="border-amber-400 text-amber-800 bg-amber-50"
-                                    >
-                                      <Scale className="h-3 w-3 mr-1" aria-hidden />
-                                      {t('page.disputeOpen')}
-                                    </Badge>
-                                  )}
-                                {!isSupplier &&
-                                  order.status === 'CANCELLED' &&
-                                  order.cancelled_by === 'SUPPLIER' &&
-                                  order.cancel_reason && (
-                                    <p className="text-xs text-red-700 mt-1 max-w-md">
-                                      {order.cancel_reason}
-                                    </p>
-                                  )}
-                              </span>
-                              {order.status === 'PLACED' && isSupplier && (
-                                <Badge variant="destructive">{t('page.actionRequired')}</Badge>
-                              )}
-                            </div>
-                            <div className="text-sm text-[var(--text-muted)] space-y-1">
-                              <div>{t('page.restaurant', { name: order.restaurant_name })}</div>
-                              <div>
-                                {t('page.placed', {
-                                  date: new Date(
-                                    order.placed_at || order.created_at
-                                  ).toLocaleString(),
-                                })}
-                              </div>
-                              {!isSupplier && order.status === 'DELIVERED' && (
-                                <div className="mt-2 p-2 rounded bg-[var(--brand-ultra)] text-[var(--brand-mid)] border border-[var(--app-border)] text-xs">
-                                  {t('page.deliveredReceiveHintBefore')}{' '}
-                                  <Link
-                                    to={`/app/receiving?order=${order.id}`}
-                                    className="underline"
-                                  >
-                                    {t('page.deliveredReceiveLink')}
-                                  </Link>{' '}
-                                  {t('page.deliveredReceiveHintAfter')}
-                                </div>
-                              )}
-                              {isSupplier && order.status === 'DELIVERED' && (
-                                <div className="mt-2 p-2 rounded bg-[var(--amber-pale)] text-[var(--amber)] border border-[var(--amber-mid)]/35 text-xs">
-                                  {t('page.awaitingReceivingHint')}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-left sm:text-right shrink-0">
-                            <div className="text-xl sm:text-2xl font-bold text-[var(--brand-mid)]">
-                              {`$${formatPrice(order.total_amount)}`}
-                            </div>
-                            <div className="text-sm text-[var(--text-muted)]">
-                              {t('page.itemsCount', { count: order.items?.length || 0 })}
-                            </div>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                          {/* Order Items Preview */}
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm text-[var(--text-muted)] mb-2">
-                              {t('page.itemsLabel')}
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {order.items?.slice(0, 3).map((item: any, idx: number) => (
-                                <Badge key={idx} variant="outline" className="text-xs">
-                                  {item.product_name} × {item.quantity}
-                                </Badge>
-                              ))}
-                              {order.items && order.items.length > 3 && (
-                                <Badge variant="outline" className="text-xs">
-                                  {t('page.moreItems', { count: order.items.length - 3 })}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Action Buttons */}
-                          <div className="flex flex-wrap gap-2 w-full lg:w-auto lg:justify-end">
-                            {isSupplier && canEditOrders && order.status === 'PLACED' && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleStatusUpdate(order.id, 'ACKNOWLEDGED')}
-                                  data-testid={`order-${order.id}-acknowledge`}
-                                >
-                                  {t('page.acknowledge')}
-                                </Button>
-                                {canDeclineOrder && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setDeclineOrderId(order.id)
-                                      setDeclineOrderLabel(order.restaurant_name)
-                                    }}
-                                    data-testid={`order-${order.id}-decline`}
-                                  >
-                                    {t('page.decline')}
-                                  </Button>
-                                )}
-                              </>
-                            )}
-                            {isSupplier && canEditOrders && order.status === 'ACKNOWLEDGED' && (
-                              <Button
-                                size="sm"
-                                onClick={() => handleStatusUpdate(order.id, 'PROCESSING')}
-                                data-testid={`order-${order.id}-start-processing`}
-                              >
-                                {t('page.startProcessing')}
-                              </Button>
-                            )}
-                            {isSupplier && canEditOrders && order.status === 'PROCESSING' && (
-                              <Button
-                                size="sm"
-                                onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}
-                                data-testid={`order-${order.id}-ship`}
-                              >
-                                {t('page.markShipped')}
-                              </Button>
-                            )}
-                            {isSupplier &&
-                              canEditOrders &&
-                              order.status === 'SHIPPED' &&
-                              updatingOrderId !== order.id && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleStatusUpdate(order.id, 'DELIVERED')}
-                                  disabled={false}
-                                  data-testid={`order-${order.id}-deliver`}
-                                >
-                                  {t('page.markDelivered')}
-                                </Button>
-                              )}
-                            {isSupplier &&
-                              (updatingOrderId === order.id || order.status === 'DELIVERED') && (
-                                <Button
-                                  size="sm"
-                                  variant={order.status === 'DELIVERED' ? 'outline' : 'default'}
-                                  disabled
-                                  className="cursor-not-allowed opacity-75"
-                                >
-                                  {updatingOrderId === order.id ? (
-                                    <>{t('page.updating')}</>
-                                  ) : (
-                                    <>
-                                      <CheckCircle className="h-4 w-4 mr-1" />
-                                      {t('page.delivered')}
-                                    </>
-                                  )}
-                                </Button>
-                              )}
-                            {!isSupplier && order.status === 'PLACED' && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleSendReminder(order.id)}
-                              >
-                                <AlertCircle className="h-4 w-4 mr-1" />
-                                {order.reminder_count > 0
-                                  ? t('page.remindCount', { count: order.reminder_count })
-                                  : t('page.sendReminder')}
-                              </Button>
-                            )}
-                            <Button variant="outline" size="sm" asChild>
-                              <Link to={`/app/orders/${order.id}`}>
-                                <FileText className="h-4 w-4 mr-1" />
-                                {t('page.viewDetails')}
-                              </Link>
-                            </Button>
-                            {isSupplier && (
-                              <Button variant="outline" size="sm" asChild>
-                                <Link to={`/app/orders/${order.id}?tab=packing`}>
-                                  <Package className="h-4 w-4 mr-1" />
-                                  {t('page.packingSlip')}
-                                </Link>
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-
-                {(!filteredOrders || filteredOrders.length === 0) && (
-                  <EmptyState
-                    title={
-                      debouncedSearch || status || hasAdvancedFilters || activeTab !== 'all'
-                        ? t('page.emptyFilteredTitle')
-                        : t('page.emptyTitle')
-                    }
-                    description={
-                      debouncedSearch || status || hasAdvancedFilters || activeTab !== 'all'
-                        ? t('page.emptyFilteredDescription')
-                        : !isSupplier
-                          ? t('page.emptyRestaurantDescription')
-                          : t('page.emptySupplierDescription')
-                    }
-                    icon={<ShoppingCart className="h-10 w-10" aria-hidden />}
-                    action={
-                      !isSupplier &&
-                      canCreateOrders &&
-                      !debouncedSearch &&
-                      !status &&
-                      !hasAdvancedFilters &&
-                      activeTab === 'all' ? (
-                        <Button asChild>
-                          <Link to="/app/cart">
-                            <Plus className="h-4 w-4 mr-2" />
-                            {t('page.createFirstOrder')}
-                          </Link>
-                        </Button>
-                      ) : undefined
-                    }
-                  />
-                )}
-              </TabsContent>
-            </Tabs>
-
-            {(total != null ? total > 0 : filteredOrders.length > 0) && (
-              <div
-                className="mt-4 flex flex-col gap-3 border-t border-[var(--app-border)] pt-4 sm:flex-row sm:items-center sm:justify-between"
-                data-testid="orders-pagination"
-              >
-                <p className="text-sm text-[var(--text-muted)]">
-                  {t('page.paginationShowing', { start: rangeStart, end: rangeEnd })}
-                  {total != null ? t('page.paginationOf', { total }) : ''}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={!hasPrevPage || isFetching}
-                    onClick={() => setOffset((prev) => Math.max(0, prev - pageSize))}
-                    data-testid="orders-prev-page"
-                  >
-                    <ChevronLeft className="mr-1 h-4 w-4" />
-                    {t('page.previous')}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={!hasNextPage || isFetching}
-                    onClick={() => setOffset((prev) => prev + pageSize)}
-                    data-testid="orders-next-page"
-                  >
-                    {t('page.next')}
-                    <ChevronRight className="ml-1 h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </DataTableShell>
-
-        {/* Manual Order Creation Dialog */}
-        {isSupplier && (
-          <Dialog open={showManualOrderDialog} onOpenChange={setShowManualOrderDialog}>
-            <DialogContent size="lg">
+          {/* Product Selection Dialog */}
+          <Dialog open={showProductSelection} onOpenChange={setShowProductSelection}>
+            <DialogContent size="xl">
               <DialogHeader>
-                <DialogTitle>{t('page.manualOrderTitle')}</DialogTitle>
-                <DialogDescription>{t('page.manualOrderDescription')}</DialogDescription>
+                <DialogTitle>{t('page.selectProductsTitle')}</DialogTitle>
+                <DialogDescription>{t('page.selectProductsDescription')}</DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4">
-                {/* Restaurant Selection */}
-                <div className="space-y-2">
-                  <Label htmlFor="restaurant">{t('page.restaurantRequired')}</Label>
-                  <Select value={selectedRestaurant} onValueChange={setSelectedRestaurant}>
-                    <SelectTrigger id="restaurant">
-                      <option value="">
-                        {(restaurantsData?.restaurants?.length ?? 0) === 0
-                          ? t('page.noEligibleRestaurants')
-                          : t('page.selectRestaurant')}
-                      </option>
-                      {restaurantsData?.restaurants?.map((restaurant: any) => (
-                        <option key={restaurant.id} value={restaurant.id}>
-                          {restaurant.name}
-                        </option>
-                      ))}
-                    </SelectTrigger>
-                  </Select>
-                  {(restaurantsData?.restaurants?.length ?? 0) === 0 && (
-                    <p className="text-xs text-[var(--text-muted)]">
-                      {t('page.eligibleRestaurantsHint')}
-                    </p>
-                  )}
-                </div>
-
-                {/* Order Notes */}
-                <div className="space-y-2">
-                  <Label htmlFor="orderNotes">{t('page.orderNotes')}</Label>
-                  <textarea
-                    id="orderNotes"
-                    rows={3}
-                    className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
-                    placeholder={t('page.orderNotesPlaceholder')}
-                    value={orderNotes}
-                    onChange={(e) => setOrderNotes(e.target.value)}
+                {/* Search */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+                  <Input
+                    placeholder={t('page.searchProductsPlaceholder')}
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    className="pl-10"
                   />
                 </div>
 
-                {/* Products in Order */}
-                {manualOrderItems.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>{t('page.productsInOrder')}</Label>
-                    <div className="border rounded-md divide-y">
-                      {manualOrderItems.map((item) => (
-                        <div key={item.productId} className="flex items-center justify-between p-3">
-                          <div className="flex-1">
-                            <p className="font-medium">{item.productName}</p>
-                            <p className="text-sm text-[var(--text-muted)]">
-                              {t('page.priceEach', { price: formatPrice(item.price) })}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                handleUpdateQuantity(item.productId, item.quantity - 1)
-                              }
-                            >
-                              -
-                            </Button>
-                            <span className="w-12 text-center">{item.quantity}</span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                handleUpdateQuantity(item.productId, item.quantity + 1)
-                              }
-                            >
-                              +
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                {/* Product List */}
+                <div className="border rounded-md max-h-96 overflow-y-auto divide-y">
+                  {filteredProducts?.map((product: any) => (
+                    <div
+                      key={product.id}
+                      className="flex items-center justify-between p-4 hover:bg-[var(--brand-ultra)]"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium">{product.name}</p>
+                        <p className="text-sm text-[var(--text-muted)]">{product.sku}</p>
+                        <p className="text-sm font-semibold text-[var(--mint)]">
+                          ${formatPrice(product.price)} / {product.unit}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          handleAddProductToOrder(product)
+                          toast.success(t('toast.productAdded', { name: product.name }))
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        {t('page.add')}
+                      </Button>
                     </div>
-                  </div>
-                )}
+                  ))}
 
-                {/* Add Products Button */}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowProductSelection(true)}
-                  className="w-full"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t('page.addProducts')}
-                </Button>
+                  {(!filteredProducts || filteredProducts.length === 0) && (
+                    <div className="text-center py-8 text-[var(--text-muted)]">
+                      {t('page.noProductsFound')}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowManualOrderDialog(false)
-                    setSelectedRestaurant('')
-                    setOrderNotes('')
-                    setManualOrderItems([])
-                  }}
-                >
-                  {t('page.cancel')}
-                </Button>
-                <Button
-                  disabled={
-                    !selectedRestaurant || manualOrderItems.length === 0 || isCreatingManualOrder
-                  }
-                  onClick={handleCreateOrder}
-                >
-                  {isCreatingManualOrder ? t('page.creating') : t('page.createOrder')}
+                <Button variant="outline" onClick={() => setShowProductSelection(false)}>
+                  {t('page.done')}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        )}
 
-        {/* Product Selection Dialog */}
-        <Dialog open={showProductSelection} onOpenChange={setShowProductSelection}>
-          <DialogContent size="xl">
-            <DialogHeader>
-              <DialogTitle>{t('page.selectProductsTitle')}</DialogTitle>
-              <DialogDescription>{t('page.selectProductsDescription')}</DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-                <Input
-                  placeholder={t('page.searchProductsPlaceholder')}
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              {/* Product List */}
-              <div className="border rounded-md max-h-96 overflow-y-auto divide-y">
-                {filteredProducts?.map((product: any) => (
-                  <div
-                    key={product.id}
-                    className="flex items-center justify-between p-4 hover:bg-[var(--brand-ultra)]"
-                  >
-                    <div className="flex-1">
-                      <p className="font-medium">{product.name}</p>
-                      <p className="text-sm text-[var(--text-muted)]">{product.sku}</p>
-                      <p className="text-sm font-semibold text-[var(--mint)]">
-                        ${formatPrice(product.price)} / {product.unit}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        handleAddProductToOrder(product)
-                        toast.success(t('toast.productAdded', { name: product.name }))
-                      }}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      {t('page.add')}
-                    </Button>
-                  </div>
-                ))}
-
-                {(!filteredProducts || filteredProducts.length === 0) && (
-                  <div className="text-center py-8 text-[var(--text-muted)]">
-                    {t('page.noProductsFound')}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowProductSelection(false)}>
-                {t('page.done')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <DeclineOrderDialog
-          open={Boolean(declineOrderId)}
-          onOpenChange={(open) => {
-            if (!open) {
+          <DeclineOrderDialog
+            open={Boolean(declineOrderId)}
+            onOpenChange={(open) => {
+              if (!open) {
+                setDeclineOrderId(null)
+                setDeclineOrderLabel(undefined)
+              }
+            }}
+            orderLabel={declineOrderLabel}
+            isSubmitting={Boolean(declineOrderId && updatingOrderId === declineOrderId)}
+            onConfirm={async (reason) => {
+              if (!declineOrderId) return
+              await handleStatusUpdate(declineOrderId, 'CANCELLED', { decline_reason: reason })
               setDeclineOrderId(null)
               setDeclineOrderLabel(undefined)
-            }
-          }}
-          orderLabel={declineOrderLabel}
-          isSubmitting={Boolean(declineOrderId && updatingOrderId === declineOrderId)}
-          onConfirm={async (reason) => {
-            if (!declineOrderId) return
-            await handleStatusUpdate(declineOrderId, 'CANCELLED', { decline_reason: reason })
-            setDeclineOrderId(null)
-            setDeclineOrderLabel(undefined)
-          }}
-        />
-      </PageShell>
-    </RequirePermission>
+            }}
+          />
+        </PageShell>
+      </RequirePermission>
+    </ContentReveal>
   )
 }

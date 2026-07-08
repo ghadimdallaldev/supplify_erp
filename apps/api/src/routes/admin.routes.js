@@ -5,6 +5,8 @@ import { query } from '../lib/db.js'
 import { deliveredOrderStatusInSql } from '../lib/order-statuses.js'
 import { logger } from '../lib/logger.js'
 import { z } from 'zod'
+import { getCache, setCache } from '../lib/cache.js'
+import { buildDashboardSummary } from '../services/dashboard-summary.service.js'
 
 const router = express.Router()
 
@@ -293,6 +295,68 @@ router.get(
           name: 'INTERNAL_ERROR',
           message: 'Failed to get dashboard statistics',
           details: error.message,
+        },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
+
+const DASHBOARD_SUMMARY_CACHE_TTL_SECONDS = 60
+
+function dashboardSummaryCacheKey(tenantType, tenantId) {
+  return `dashboard:summary:v1:${tenantType}:${tenantId}`
+}
+
+// Lightweight dashboard bundle: stats + recent orders + spend trend / low-stock preview
+router.get(
+  '/dashboard/summary',
+  requireAuth,
+  requireRole(['RESTAURANT', 'SUPPLIER']),
+  async (req, res) => {
+    try {
+      const tenant = await getRequestTenant(req)
+      if (!tenant || (tenant.tenantType !== 'RESTAURANT' && tenant.tenantType !== 'SUPPLIER')) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Tenant context required' },
+          requestId: req.requestId,
+        })
+      }
+
+      const cacheKey = dashboardSummaryCacheKey(tenant.tenantType, tenant.tenantId)
+      const cached = await getCache(cacheKey)
+      if (cached) {
+        return res.json({
+          ok: true,
+          data: cached,
+          error: null,
+          requestId: req.requestId,
+        })
+      }
+
+      const data = await buildDashboardSummary(tenant)
+      await setCache(cacheKey, data, DASHBOARD_SUMMARY_CACHE_TTL_SECONDS).catch(() => {})
+
+      res.json({
+        ok: true,
+        data,
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error({
+        message: 'Get dashboard summary error',
+        error: error.message,
+        stack: error.stack,
+      })
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get dashboard summary',
         },
         requestId: req.requestId,
       })

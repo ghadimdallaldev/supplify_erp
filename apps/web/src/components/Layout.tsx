@@ -26,7 +26,7 @@ import { isAtEntitlementLimit, shouldShowEntitlementLimit, featureEnabled } from
 import { getAppSocket, releaseAppSocket } from '../lib/appSocket'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { shouldLoadBillingStatus, shouldRedirectToActivate } from '../lib/billingActivationRedirect'
-import { OfflineBanner } from './OfflineBanner'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { RestaurantMobileNav } from './RestaurantMobileNav'
 import { SupplierMobileNav } from './SupplierMobileNav'
 import { isBillingAlertVisible, LayoutTenantAlerts } from './LayoutTenantAlerts'
@@ -238,6 +238,8 @@ export function Layout() {
     blockedCountLast7d >= 3 &&
     planBlockNudgeMessage
 
+  const isOnline = useOnlineStatus()
+
   const isAdminExperience =
     isPlatformAdmin &&
     !isImpersonating &&
@@ -249,7 +251,6 @@ export function Layout() {
         <BranchProvider>
           <div className="min-h-screen min-h-[100dvh]" style={{ background: 'var(--bg)' }}>
             <ImpersonationBanner />
-            <OfflineBanner />
             <UpgradeModal />
             <PaymentModal />
             {isAdminExperience ? (
@@ -271,6 +272,7 @@ export function Layout() {
                   <Header onOpenMobileNav={() => setMobileNavOpen(true)} />
                   {showTenantBanners && (
                     <LayoutTenantAlerts
+                      showOfflineBanner={!isOnline}
                       showDealsBanner={
                         isEffectiveRestaurant && featureEnabled(e?.features?.supplier_deals)
                       }
@@ -290,7 +292,7 @@ export function Layout() {
                       }}
                     />
                   )}
-                  <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden p-3 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:p-4 md:p-6 lg:pb-6">
+                  <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden p-3 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:p-4 lg:pb-6 xl:p-6">
                     <Outlet />
                   </main>
                 </div>

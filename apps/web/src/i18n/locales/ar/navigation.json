@@ -94,6 +94,8 @@
     "allCaughtUp": "لا توجد إشعارات جديدة",
     "notificationsEmptyHint": "ستظهر تحديثات الطلبات والتنبيهات هنا.",
     "logoutTitle": "{{name}} — انقر لتسجيل الخروج",
+    "openUserMenu": "قائمة الحساب لـ {{name}}",
+    "logout": "تسجيل الخروج",
     "loggedOutSuccess": "تم تسجيل الخروج بنجاح",
     "logoutFailed": "فشل تسجيل الخروج",
     "workspaceContext": "{{type}}: {{name}}{{rolePart}}"

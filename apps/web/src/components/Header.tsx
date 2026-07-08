@@ -10,15 +10,19 @@ import {
 } from '../services/api'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { Button } from './ui/button'
-import { Bell, X, TrendingUp, Settings, ChevronRight, Menu, Search } from 'lucide-react'
+import { Bell, X, TrendingUp, Settings, Menu, Search, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 import { BranchSwitcher } from './BranchSwitcher'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useNotificationBadge } from '../hooks/useNotificationBadge'
 import { useImpersonation } from '../hooks/useImpersonation'
+import { usePermissions } from '../hooks/usePermissions'
 import { CommandPalette } from './search/CommandPalette'
+import { resolveHeaderContextAction } from './headerContextAction'
 import { cn } from '../lib/utils'
 import { LanguageSwitcher } from './LanguageSwitcher'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
+import { Plus } from 'lucide-react'
 
 const PAGE_NAMES: Record<string, string> = {
   '/app/dashboard': 'dashboard',
@@ -66,12 +70,19 @@ const PAGE_NAMES: Record<string, string> = {
 export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {}) {
   const { t } = useTranslation(['navigation', 'common'])
   const { user } = useAppSelector((state) => state.auth)
-  const { isImpersonating, isPlatformAdmin, isEffectiveSupplier, shouldLoadTenantEntitlements } =
-    useImpersonation()
+  const {
+    isImpersonating,
+    isPlatformAdmin,
+    isEffectiveSupplier,
+    isEffectiveRestaurant,
+    shouldLoadTenantEntitlements,
+  } = useImpersonation()
+  const { can } = usePermissions()
   const dispatch = useAppDispatch()
   const location = useLocation()
   const [logout] = useLogoutMutation()
   const [commandOpen, setCommandOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notificationsMounted, setNotificationsMounted] = useState(false)
   const [notificationsVisible, setNotificationsVisible] = useState(false)
   const navigate = useNavigate()
@@ -124,17 +135,6 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
     })
     .filter(({ pct }) => pct >= 80)
     .slice(0, 3)
-  const workspace = user?.workspace
-  const workspaceLabel =
-    workspace?.tenantName &&
-    t('header.workspaceContext', {
-      type:
-        workspace.tenantType === 'SUPPLIER'
-          ? t('workspace.supplier', { ns: 'common' })
-          : t('workspace.restaurant', { ns: 'common' }),
-      name: workspace.tenantName,
-      rolePart: workspace.roleName ? ` · ${workspace.roleName}` : '',
-    })
   const showUpgrade = (!isPlatformAdmin || isImpersonating) && user?.role !== 'PENDING'
   const isAdminPortalRoute =
     isPlatformAdmin && !isImpersonating && location.pathname.startsWith('/app/admin')
@@ -183,6 +183,19 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
     'dashboard'
   const pageName = t(pageKey, { ns: 'navigation', defaultValue: pageKey })
 
+  const contextAction = resolveHeaderContextAction(
+    location.pathname,
+    can,
+    isEffectiveSupplier,
+    isEffectiveRestaurant
+  )
+  const contextActionLabel = contextAction
+    ? t(contextAction.labelKey, {
+        ns: contextAction.namespace,
+        defaultValue: contextAction.labelKey,
+      })
+    : null
+
   const initials = (user?.displayName || user?.email || 'U')
     .split(/[\s@]/)
     .filter(Boolean)
@@ -194,7 +207,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
   return (
     <header
       data-testid="header"
-      className="flex h-14 min-h-14 shrink-0 items-center gap-2 border-b border-[var(--app-border)]/40 bg-[var(--surface)] px-3 pt-[env(safe-area-inset-top)] sm:gap-3 sm:px-5 lg:px-6"
+      className="flex h-14 min-h-14 shrink-0 items-center gap-2 border-b border-[var(--app-border)]/40 bg-[var(--surface)] px-3 pt-[env(safe-area-inset-top)] sm:gap-3 sm:px-4 xl:px-6"
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
       {onOpenMobileNav && !isAdminPortalRoute && (
@@ -208,35 +221,38 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         </button>
       )}
 
-      {/* Breadcrumb */}
-      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
-        <span className="hidden text-[13px] font-normal text-[var(--text-muted)]/80 xs:inline">
-          {t('brand', { ns: 'common' })}
-        </span>
-        <ChevronRight
-          size={13}
-          className="hidden shrink-0 text-[var(--text-muted)]/50 xs:block rtl:rotate-180"
-        />
-        <span className="truncate text-[13px] font-medium text-[var(--text)]">{pageName}</span>
-        {workspaceLabel && (
-          <>
-            <ChevronRight
-              size={13}
-              className="hidden shrink-0 text-[var(--text-muted)]/50 sm:block rtl:rotate-180"
-            />
-            <span
-              className="hidden max-w-[8rem] truncate text-xs font-normal text-[var(--text-muted)]/80 sm:inline md:max-w-[14rem]"
-              data-testid="workspace-context"
-            >
-              {workspaceLabel}
-            </span>
-          </>
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="min-w-0">
+          <p
+            className="hidden truncate text-xs font-medium text-[var(--text-muted)] md:block"
+            aria-current="page"
+          >
+            {pageName}
+          </p>
+          <h1 className="truncate text-[15px] font-semibold text-[var(--text)] sm:text-base md:hidden">
+            {pageName}
+          </h1>
+        </div>
+        {contextAction && contextActionLabel && (
+          <Button
+            asChild
+            size="sm"
+            className="hidden shrink-0 md:inline-flex"
+            style={{ background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }}
+          >
+            <Link to={contextAction.href} data-testid="header-context-action">
+              <Plus className="me-1.5" style={{ width: 14, height: 14 }} aria-hidden />
+              {contextActionLabel}
+            </Link>
+          </Button>
         )}
       </div>
 
       {/* Right side controls */}
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-        <BranchSwitcher />
+        <div className="hidden md:block">
+          <BranchSwitcher />
+        </div>
 
         {showUpgrade && (
           <>
@@ -282,7 +298,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         </button>
         <button
           type="button"
-          className="hidden h-8 min-w-[140px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--app-border)]/50 bg-[var(--brand-ultra)]/30 px-2.5 text-start transition-colors hover:border-[var(--app-border)]/70 hover:bg-[var(--brand-ultra)]/50 md:flex lg:min-w-[200px]"
+          className="hidden h-8 min-w-[130px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--app-border)]/50 bg-[var(--brand-ultra)]/30 px-2.5 text-start transition-colors hover:border-[var(--app-border)]/70 hover:bg-[var(--brand-ultra)]/50 md:flex lg:min-w-[160px] xl:min-w-[200px]"
           aria-label={t('header.openCommandPalette')}
           onClick={openCommandPalette}
         >
@@ -453,29 +469,63 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
           )}
         </div>
 
-        <LanguageSwitcher compact />
-
-        {/* Settings icon button */}
-        <button
-          type="button"
-          className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)]"
-          onClick={() => navigate('/app/settings')}
-          aria-label={t('settings')}
-          title={t('settings')}
-        >
-          <Settings size={15} />
-        </button>
-
-        {/* User avatar */}
-        <button
-          type="button"
-          data-testid="logout-button"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--brand)] to-[var(--mint-mid)] text-[11px] font-semibold text-white ring-1 ring-[var(--app-border)]/30 transition-opacity hover:opacity-90"
-          title={t('header.logoutTitle', { name: user?.displayName || user?.email })}
-          onClick={handleLogout}
-        >
-          {initials}
-        </button>
+        <Popover open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              data-testid="user-menu-trigger"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--brand)] to-[var(--mint-mid)] text-[11px] font-semibold text-white ring-1 ring-[var(--app-border)]/30 transition-opacity hover:opacity-90"
+              aria-label={t('header.openUserMenu', {
+                name: user?.displayName || user?.email || '',
+              })}
+            >
+              {initials}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-56 p-0">
+            <div className="border-b border-[var(--app-border)]/40 px-3 py-2.5">
+              <p className="truncate text-sm font-semibold text-[var(--text)]">
+                {user?.displayName || user?.email}
+              </p>
+              {user?.displayName && user?.email && (
+                <p className="truncate text-xs text-[var(--text-muted)]">{user.email}</p>
+              )}
+            </div>
+            <div className="p-1">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-[var(--text)] transition-colors hover:bg-[var(--brand-ultra)]/50"
+                onClick={() => {
+                  setUserMenuOpen(false)
+                  navigate('/app/settings')
+                }}
+              >
+                <Settings size={15} className="shrink-0 text-[var(--text-muted)]" />
+                {t('settings')}
+              </button>
+            </div>
+            <div className="border-t border-[var(--app-border)]/40 px-3 py-2.5">
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                {t('language.switch', { ns: 'common' })}
+              </p>
+              <LanguageSwitcher compact />
+            </div>
+            <div className="border-t border-[var(--app-border)]/40 p-1">
+              <button
+                type="button"
+                data-testid="logout-button"
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-[var(--red)] transition-colors hover:bg-[var(--brand-ultra)]/50"
+                onClick={() => {
+                  setUserMenuOpen(false)
+                  void handleLogout()
+                }}
+              >
+                <LogOut size={15} className="shrink-0" />
+                {t('header.logout')}
+              </button>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </header>
   )

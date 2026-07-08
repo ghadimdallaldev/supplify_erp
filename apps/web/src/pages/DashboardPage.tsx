@@ -1,8 +1,7 @@
 import { Navigate } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import {
-  useGetDashboardStatsQuery,
-  useGetOrdersQuery,
+  useGetDashboardSummaryQuery,
   useGetReorderSuggestionsQuery,
   useGetExpirySummaryQuery,
   useGetReorderRemindersQuery,
@@ -11,10 +10,11 @@ import {
   useGetQuickListsQuery,
   useAddItemToQuickListMutation,
   useGetEntitlementsQuery,
-  useGetInventoryListQuery,
 } from '../services/api'
 import { usePermissions } from '../hooks/usePermissions'
-import { Skeleton } from '../components/ui/skeleton'
+import { ContentReveal, Skeleton } from '../components/ui/skeleton'
+import { ErrorState } from '../components/ui/error-state'
+import { Button } from '../components/ui/button'
 import { ShoppingCart, Users, Building2, DollarSign, AlertTriangle, TrendingUp } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -34,11 +34,12 @@ import { formatCurrency } from '../utils/format'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { Badge } from '../components/ui/badge'
+import { KpiCard } from '../components/ui/kpi-card'
 import {
   DASHBOARD_CALENDAR_EXTRA_GAP,
-  DashboardSummaryStrip,
-  KpiCard,
   buildOrderSpendTrend,
+  dashboardKpiTone,
+  SPEND_TREND_DAYS,
   type KpiCardProps,
   type SpendTrendPeriodDays,
 } from '../components/dashboard/dashboardShared'
@@ -70,12 +71,14 @@ export function DashboardPage() {
   const isAdminNotImpersonating = isPlatformAdmin && !isImpersonating
   const skipDashboardData = isAdminNotImpersonating || isDriverRole
   const {
-    data: stats,
+    data: summary,
     isLoading,
     error,
-  } = useGetDashboardStatsQuery(undefined, {
+    refetch,
+  } = useGetDashboardSummaryQuery(undefined, {
     skip: skipDashboardData,
   })
+  const stats = summary?.stats
 
   const isRestaurant = isEffectiveRestaurant
   const isSupplier = isEffectiveSupplier
@@ -88,13 +91,6 @@ export function DashboardPage() {
   const showRestaurantSection = (flag: keyof NonNullable<typeof restaurantLayout>) =>
     !isRestaurant || !restaurantLayout || restaurantLayout[flag]
 
-  const { data: ordersData } = useGetOrdersQuery(
-    { limit: isRestaurant ? 200 : 7, offset: 0 },
-    { skip: skipDashboardData }
-  )
-  const { data: inventoryData } = useGetInventoryListQuery(undefined, {
-    skip: skipDashboardData || !isSupplier || !can('INVENTORY_VIEW'),
-  })
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: !shouldLoadTenantEntitlements,
   })
@@ -121,8 +117,8 @@ export function DashboardPage() {
   })
   const [addItemToQuickList] = useAddItemToQuickListMutation()
   const [addingSuggestionId, setAddingSuggestionId] = useState<string | null>(null)
-  const [periodDays, setPeriodDays] = useState<SpendTrendPeriodDays>(30)
   const financeInvoicesEnabled = canUseFinanceInvoices(entitlementsData?.entitlements)
+  const [periodDays, setPeriodDays] = useState<SpendTrendPeriodDays>(SPEND_TREND_DAYS)
   const { data: invoiceAnalytics } = useGetInvoiceAnalyticsQuery(
     { period: periodDays },
     { skip: !isRestaurant || !financeInvoicesEnabled }
@@ -161,21 +157,25 @@ export function DashboardPage() {
     return <DashboardLoading />
   }
 
-  // ── Error ────────────────────────────────────────────────────────────────
   if (error) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 64 }} data-testid="dashboard-page">
-        <AlertTriangle size={32} style={{ color: 'var(--brand)', margin: '0 auto 12px' }} />
-        <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
-          {t('error.loadFailed')}
-        </p>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('error.refreshHint')}</p>
-      </div>
+      <PageShell data-testid="dashboard-page" maxWidth="wide">
+        <ErrorState
+          title={t('error.loadFailed')}
+          description={t('error.refreshHint')}
+          icon={<AlertTriangle className="h-10 w-10" aria-hidden />}
+          action={
+            <Button variant="outline" onClick={() => refetch()}>
+              {t('error.retry', { defaultValue: 'Try again' })}
+            </Button>
+          }
+        />
+      </PageShell>
     )
   }
 
   // ── Derived data ─────────────────────────────────────────────────────────
-  const orders = (ordersData?.orders || []).slice(0, 7)
+  const orders = (summary?.recentOrders || []).slice(0, 7)
 
   const invoiceSpendTrend = Array.isArray(invoiceAnalytics?.points)
     ? invoiceAnalytics.points.map((p: any) => ({
@@ -183,17 +183,14 @@ export function DashboardPage() {
         value: Number(p.total) || 0,
       }))
     : []
-  const orderSpendTrend = buildOrderSpendTrend(
-    isRestaurant ? ordersData?.orders || [] : [],
-    periodDays
-  )
+  const orderSpendTrend = summary?.spendTrend?.length
+    ? summary.spendTrend
+    : buildOrderSpendTrend(orders, SPEND_TREND_DAYS)
   const spendTrendSource: 'invoices' | 'orders' | null =
     invoiceSpendTrend.length > 0 ? 'invoices' : orderSpendTrend.length > 0 ? 'orders' : null
   const spendTrend = spendTrendSource === 'invoices' ? invoiceSpendTrend : orderSpendTrend
   const spendTrendPeriodTotal = spendTrend.reduce((sum, p) => sum + p.value, 0)
-  const lowStockItems = (inventoryData?.inventory || [])
-    .filter((item: any) => item.isLowStock)
-    .slice(0, 3)
+  const lowStockItems = summary?.lowStockPreview || []
 
   // ── KPI definitions ──────────────────────────────────────────────────────
   const supplierKpis: KpiCardProps[] = [
@@ -292,118 +289,119 @@ export function DashboardPage() {
     : baseKpis
 
   return (
-    <PageShell data-testid="dashboard-page" maxWidth="wide">
-      {persona.readOnly && (
-        <p
-          className="m-0 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-3 py-2.5 text-xs text-[var(--text-muted)]"
-          role="status"
-        >
-          {t('readOnlyWorkspace', { roleLabel: persona.roleLabel })}
-        </p>
-      )}
+    <ContentReveal>
+      <PageShell data-testid="dashboard-page" maxWidth="wide">
+        {persona.readOnly && (
+          <p
+            className="m-0 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-3 py-2.5 text-xs text-[var(--text-muted)]"
+            role="status"
+          >
+            {t('readOnlyWorkspace', { roleLabel: persona.roleLabel })}
+          </p>
+        )}
 
-      <DashboardPostOnboardingBanners
-        isRestaurant={isRestaurant}
-        isSupplier={isSupplier}
-        showRestaurantCta={showRestaurantSection('showPostOnboardingCta')}
-        totalOrders={stats?.totalOrders ?? 0}
-        totalProducts={stats?.totalProducts ?? 0}
-      />
-
-      <PageHeader
-        title={dashboardConfig?.title ?? `${greeting}, ${firstName}`}
-        description={dashboardConfig?.description ?? formattedDate}
-        actions={
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Badge variant="outline">{persona.roleLabel}</Badge>
-            <Badge variant="default">{planName}</Badge>
-          </div>
-        }
-      />
-
-      {isRestaurant ? (
-        <DashboardSummaryStrip
-          metrics={kpis.map((kpi) => ({
-            label: kpi.label,
-            value: kpi.value,
-            hint: kpi.meta,
-            tone: kpi.kpiKey === 'pending' ? 'amber' : kpi.kpiKey === 'orders' ? 'mint' : 'default',
-          }))}
-        />
-      ) : (
-        <div className="dashboard-kpi-grid">
-          {kpis.map((kpi) => (
-            <KpiCard key={kpi.label} {...kpi} />
-          ))}
-        </div>
-      )}
-
-      <Suspense
-        fallback={
-          <div className="dashboard-content-grid">
-            <Skeleton className="h-64 rounded-xl" />
-            <Skeleton className="h-64 rounded-xl" />
-            <Skeleton className="h-64 rounded-xl" />
-          </div>
-        }
-      >
-        <LazyDashboardWidgetGrid
+        <DashboardPostOnboardingBanners
           isRestaurant={isRestaurant}
           isSupplier={isSupplier}
-          showRestaurantSection={showRestaurantSection}
-          orders={orders}
-          stats={stats}
-          spendTrend={spendTrend}
-          spendTrendSource={spendTrendSource}
-          spendTrendPeriodTotal={spendTrendPeriodTotal}
-          periodDays={periodDays}
-          onPeriodDaysChange={setPeriodDays}
-          lowStockItems={lowStockItems}
-          smartReorderEnabled={smartReorderEnabled}
-          inventoryMgmtEnabled={inventoryMgmtEnabled}
-          reorderSuggestions={reorderSuggestions}
-          reorderRemindersData={reorderRemindersData}
-          expirySummaryData={expirySummaryData}
-          atRiskData={atRiskData}
-          quickListsData={quickListsData}
-          addingSuggestionId={addingSuggestionId}
-          setAddingSuggestionId={setAddingSuggestionId}
-          addItemToQuickList={addItemToQuickList}
-          restaurantLayout={restaurantLayout}
+          showRestaurantCta={showRestaurantSection('showPostOnboardingCta')}
+          totalOrders={stats?.totalOrders ?? 0}
+          totalProducts={stats?.totalProducts ?? 0}
         />
-      </Suspense>
 
-      {showDashboardCalendar && (
-        <div
-          style={{
-            marginTop: DASHBOARD_CALENDAR_EXTRA_GAP,
-            background: 'var(--surface)',
-            border: '1px solid var(--app-border)',
-            borderRadius: 12,
-            overflow: 'hidden',
-          }}
-        >
-          <Suspense
-            fallback={
-              <div className="p-6">
-                <Skeleton className="h-8 w-48 mb-4" />
-                <Skeleton className="h-64 w-full" />
-              </div>
-            }
-          >
-            <CalendarView
-              role={
-                effectiveRole === 'ADMIN' ||
-                effectiveRole === 'RESTAURANT' ||
-                effectiveRole === 'SUPPLIER'
-                  ? effectiveRole
-                  : null
-              }
-              isAdmin={user?.role === 'ADMIN'}
+        <PageHeader
+          title={dashboardConfig?.title ?? `${greeting}, ${firstName}`}
+          description={dashboardConfig?.description ?? formattedDate}
+          actions={
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge variant="outline">{persona.roleLabel}</Badge>
+              <Badge variant="default">{planName}</Badge>
+            </div>
+          }
+        />
+
+        <div className="dashboard-kpi-grid" data-testid="dashboard-kpi-grid">
+          {kpis.map((kpi) => (
+            <KpiCard
+              key={kpi.kpiKey}
+              label={kpi.label}
+              value={kpi.value}
+              icon={kpi.Icon}
+              tone={dashboardKpiTone(kpi.kpiKey)}
+              description={kpi.meta}
+              testId={`dashboard-kpi-${kpi.kpiKey}`}
             />
-          </Suspense>
+          ))}
         </div>
-      )}
-    </PageShell>
+
+        <Suspense
+          fallback={
+            <div className="dashboard-content-grid">
+              <Skeleton className="h-64 rounded-xl" />
+              <Skeleton className="h-64 rounded-xl" />
+              <Skeleton className="h-64 rounded-xl" />
+            </div>
+          }
+        >
+          <LazyDashboardWidgetGrid
+            isRestaurant={isRestaurant}
+            isSupplier={isSupplier}
+            showRestaurantSection={showRestaurantSection}
+            orders={orders}
+            stats={stats}
+            spendTrend={spendTrend}
+            spendTrendSource={spendTrendSource}
+            spendTrendPeriodTotal={spendTrendPeriodTotal}
+            periodDays={financeInvoicesEnabled ? periodDays : SPEND_TREND_DAYS}
+            onPeriodDaysChange={financeInvoicesEnabled ? setPeriodDays : undefined}
+            financeInvoicesEnabled={financeInvoicesEnabled}
+            lowStockItems={lowStockItems}
+            smartReorderEnabled={smartReorderEnabled}
+            inventoryMgmtEnabled={inventoryMgmtEnabled}
+            reorderSuggestions={reorderSuggestions}
+            reorderRemindersData={reorderRemindersData}
+            expirySummaryData={expirySummaryData}
+            atRiskData={atRiskData}
+            quickListsData={quickListsData}
+            addingSuggestionId={addingSuggestionId}
+            setAddingSuggestionId={setAddingSuggestionId}
+            addItemToQuickList={addItemToQuickList}
+            restaurantLayout={restaurantLayout}
+          />
+        </Suspense>
+
+        {showDashboardCalendar && (
+          <div
+            className="min-w-0"
+            style={{
+              marginTop: DASHBOARD_CALENDAR_EXTRA_GAP,
+              background: 'var(--surface)',
+              border: '1px solid var(--app-border)',
+              borderRadius: 12,
+              overflow: 'hidden',
+            }}
+          >
+            <Suspense
+              fallback={
+                <div className="p-6">
+                  <Skeleton className="h-8 w-48 mb-4" />
+                  <Skeleton className="h-64 w-full" />
+                </div>
+              }
+            >
+              <CalendarView
+                role={
+                  effectiveRole === 'ADMIN' ||
+                  effectiveRole === 'RESTAURANT' ||
+                  effectiveRole === 'SUPPLIER'
+                    ? effectiveRole
+                    : null
+                }
+                isAdmin={user?.role === 'ADMIN'}
+              />
+            </Suspense>
+          </div>
+        )}
+      </PageShell>
+    </ContentReveal>
   )
 }

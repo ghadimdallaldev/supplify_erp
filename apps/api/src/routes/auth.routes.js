@@ -397,6 +397,14 @@ router.get('/me', requireAuth, async (req, res) => {
 
     const accessType = user.role === 'STAFF_PORTAL' ? 'staff_portal' : 'platform'
     let staffPortal = null
+    const legalPromise = getUserLegalAcceptanceStatus({
+      userId: user.id,
+      role: user.role,
+      tenantType: tenant?.tenantType ?? workspace?.tenantType ?? null,
+    })
+    const adminPrefsPromise =
+      user.role === 'ADMIN' ? getAdminUserPreferences(user.id) : Promise.resolve(null)
+
     if (user.role === 'STAFF_PORTAL') {
       const { getStaffMemberForPortalUser } = await import('../lib/staff-portal-auth.js')
       const staffMember = await getStaffMemberForPortalUser(user.id)
@@ -409,16 +417,7 @@ router.get('/me', requireAuth, async (req, res) => {
       }
     }
 
-    const legalStatus = await getUserLegalAcceptanceStatus({
-      userId: user.id,
-      role: user.role,
-      tenantType: tenant?.tenantType ?? workspace?.tenantType ?? null,
-    })
-
-    let adminPreferences = null
-    if (user.role === 'ADMIN') {
-      adminPreferences = await getAdminUserPreferences(user.id)
-    }
+    const [legalStatus, adminPreferences] = await Promise.all([legalPromise, adminPrefsPromise])
 
     const meMs = Number(process.hrtime.bigint() - meT0) / 1e6
     if (meMs >= 400) {

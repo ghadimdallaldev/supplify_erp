@@ -388,7 +388,7 @@ export function InvoicesPage() {
                 {t('page.exportCsv')}
               </Button>
             ) : (
-              <div className="flex flex-wrap items-end gap-2">
+              <div className="flex min-w-0 flex-wrap items-end gap-2">
                 <div>
                   <Label htmlFor="export-from" className="text-xs text-[var(--text-mid)]">
                     {t('page.from')}

@@ -146,7 +146,7 @@ export function DealsPage() {
         ) : null}
 
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" aria-busy="true">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-busy="true">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
@@ -174,7 +174,7 @@ export function DealsPage() {
             onClearExpiringSoon={() => setExpiringSoon(false)}
           />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             {promotions.map((p) => (
               <div
                 key={String(p.id)}

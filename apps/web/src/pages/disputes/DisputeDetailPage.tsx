@@ -325,7 +325,7 @@ export function DisputeDetailPage() {
               <CardTitle className="text-base">{t('detail.lineItems')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 p-4 sm:p-6 sm:pt-0">
-              <div className="space-y-2 md:hidden">
+              <div className="space-y-2 lg:hidden">
                 {items.map((item) => (
                   <div
                     key={String(item.id)}
@@ -352,29 +352,48 @@ export function DisputeDetailPage() {
                   </div>
                 ))}
               </div>
-              <TableScroll aria-label={t('detail.lineItemsAriaLabel')} className="hidden md:block">
-                <table className="w-full min-w-[520px] text-sm">
+              <TableScroll aria-label={t('detail.lineItemsAriaLabel')} className="hidden lg:block">
+                <table className="w-full min-w-[480px] text-sm">
                   <thead>
                     <tr className="border-b bg-[var(--brand-ultra)]/40 text-left text-[var(--text-muted)]">
                       <th className="px-4 py-3 pl-5 font-medium">{t('detail.product')}</th>
-                      <th className="px-4 py-3 font-medium">{t('detail.ordered')}</th>
-                      <th className="px-4 py-3 font-medium">{t('detail.received')}</th>
-                      <th className="px-4 py-3 pr-5 font-medium">{t('detail.issue')}</th>
+                      <th className="hidden px-4 py-3 font-medium lg:table-cell">
+                        {t('detail.ordered')}
+                      </th>
+                      <th className="hidden px-4 py-3 font-medium lg:table-cell">
+                        {t('detail.received')}
+                      </th>
+                      <th className="hidden px-4 py-3 pr-5 font-medium xl:table-cell">
+                        {t('detail.issue')}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((item) => (
                       <tr key={String(item.id)} className="border-b border-[var(--app-border)]">
                         <td className="px-4 py-3 pl-5">
-                          {String(item.product_name ?? item.productName ?? '—')}
+                          <div>
+                            <p className="font-medium">
+                              {String(item.product_name ?? item.productName ?? '—')}
+                            </p>
+                            <p className="mt-0.5 text-xs text-[var(--text-muted)] xl:hidden">
+                              {t('detail.orderedQty', {
+                                qty: String(item.quantity_ordered ?? item.quantityOrdered ?? '—'),
+                              })}{' '}
+                              ·{' '}
+                              {t('detail.receivedQty', {
+                                qty: String(item.quantity_received ?? item.quantityReceived ?? '—'),
+                              })}
+                            </p>
+                          </div>
                         </td>
-                        <td className="px-4 py-3 tabular-nums">
+                        <td className="hidden px-4 py-3 tabular-nums lg:table-cell">
                           {String(item.quantity_ordered ?? item.quantityOrdered ?? '—')}
                         </td>
-                        <td className="px-4 py-3 tabular-nums">
+                        <td className="hidden px-4 py-3 tabular-nums lg:table-cell">
                           {String(item.quantity_received ?? item.quantityReceived ?? '—')}
                         </td>
-                        <td className="px-4 py-3 pr-5 text-[var(--text-muted)]">
+                        <td className="hidden px-4 py-3 pr-5 text-[var(--text-muted)] xl:table-cell">
                           {String(item.issue_description ?? item.issueDescription ?? '—')}
                         </td>
                       </tr>

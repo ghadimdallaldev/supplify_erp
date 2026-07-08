@@ -6,6 +6,8 @@ import { AppPanel } from '../ui/app-panel'
 import { Badge } from '../ui/badge'
 import { Select, SelectTrigger } from '../ui/select'
 import { TableScroll } from '../ui/table-scroll'
+import { responsiveDataListClasses } from '../ui/responsive-data-list'
+import { cn } from '../../lib/utils'
 import { useGetAdminUsersQuery } from '../../services/api'
 import { AdminResetPasswordDialog, type AdminResetPasswordTarget } from './AdminResetPasswordDialog'
 import {
@@ -15,7 +17,6 @@ import {
   formatAdminDate,
 } from './adminUi'
 import { KeyRound, Loader2, Search, Users, X } from 'lucide-react'
-import { cn } from '../../lib/utils'
 
 type AdminUserRow = {
   id: string
@@ -182,98 +183,174 @@ export function AdminUsersTab() {
             }
           />
         ) : (
-          <TableScroll aria-label={t('users.platformUsersTableAriaLabel')}>
-            <table className="w-full min-w-[720px] text-sm">
-              <thead>
-                <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                  <th className="px-4 py-3">{t('common.table.user')}</th>
-                  <th className="px-4 py-3">{t('common.table.role')}</th>
-                  <th className="hidden px-4 py-3 md:table-cell">
-                    {t('common.table.tenantAccess')}
-                  </th>
-                  <th className="hidden px-4 py-3 lg:table-cell">{t('common.table.joined')}</th>
-                  <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--app-border)]">
-                {filteredUsers.map((user) => (
-                  <tr key={user.id} className="transition-colors hover:bg-[var(--brand-ultra)]/35">
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <span
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--brand-pale)] text-xs font-semibold text-[var(--brand)]"
-                          aria-hidden
-                        >
-                          {userInitials(user)}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-[var(--text)]">
-                            {user.display_name || user.email}
-                          </p>
-                          <p className="truncate text-xs text-[var(--text-muted)]">{user.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5">
+          <>
+            <div className="space-y-3 lg:hidden">
+              {filteredUsers.map((user) => (
+                <article
+                  key={user.id}
+                  className="rounded-xl border border-[var(--app-border)] p-4 space-y-3"
+                >
+                  <div className="flex items-start gap-3">
+                    <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--brand-pale)] text-xs font-semibold text-[var(--brand)]"
+                      aria-hidden
+                    >
+                      {userInitials(user)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-[var(--text)]">
+                        {user.display_name || user.email}
+                      </p>
+                      <p className="truncate text-xs text-[var(--text-muted)]">{user.email}</p>
                       <Badge
                         variant="outline"
-                        className={cn('text-xs capitalize', roleTone(String(user.role || '')))}
+                        className={cn('mt-2 text-xs capitalize', roleTone(String(user.role || '')))}
                       >
                         {String(user.role || 'unknown')
                           .replace(/_/g, ' ')
                           .toLowerCase()}
                       </Badge>
-                    </td>
-                    <td className="hidden px-4 py-3.5 md:table-cell">
-                      {Array.isArray(user.tenant_roles) && user.tenant_roles.length > 0 ? (
-                        <div className="flex max-w-xs flex-wrap gap-1.5">
-                          {user.tenant_roles.slice(0, 4).map((tr, index) => (
-                            <Badge
-                              key={`${user.id}-${tr.tenantId ?? index}`}
-                              variant="outline"
-                              className="text-[11px] font-normal"
-                            >
-                              {tr.roleName || t('common.member')}
-                              {tr.tenantType ? ` · ${tr.tenantType}` : ''}
-                            </Badge>
-                          ))}
-                          {user.tenant_roles.length > 4 && (
-                            <Badge variant="outline" className="text-[11px] font-normal">
-                              {t('common.more', { count: user.tenant_roles.length - 4 })}
-                            </Badge>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-[var(--text-muted)]">
-                          {t('common.noTenantLinks')}
-                        </span>
-                      )}
-                    </td>
-                    <td className="hidden px-4 py-3.5 text-xs text-[var(--text-muted)] lg:table-cell">
-                      {formatAdminDate(user.created_at)}
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setResetTarget({
-                            userId: user.id,
-                            email: user.email,
-                            displayName: user.display_name,
-                          })
-                        }
-                      >
-                        <KeyRound className="mr-1.5 h-4 w-4" />
-                        {t('users.resetPassword')}
-                      </Button>
-                    </td>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() =>
+                      setResetTarget({
+                        userId: user.id,
+                        email: user.email,
+                        displayName: user.display_name,
+                      })
+                    }
+                  >
+                    <KeyRound className="mr-1.5 h-4 w-4" />
+                    {t('users.resetPassword')}
+                  </Button>
+                </article>
+              ))}
+            </div>
+            <TableScroll
+              aria-label={t('users.platformUsersTableAriaLabel')}
+              className="hidden lg:block"
+            >
+              <table className="w-full min-w-[720px] text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                    <th className="px-4 py-3">{t('common.table.user')}</th>
+                    <th className="px-4 py-3">{t('common.table.role')}</th>
+                    <th
+                      className={cn('hidden px-4 py-3', responsiveDataListClasses.columnSecondary)}
+                    >
+                      {t('common.table.tenantAccess')}
+                    </th>
+                    <th
+                      className={cn('hidden px-4 py-3', responsiveDataListClasses.columnTertiary)}
+                    >
+                      {t('common.table.joined')}
+                    </th>
+                    <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableScroll>
+                </thead>
+                <tbody className="divide-y divide-[var(--app-border)]">
+                  {filteredUsers.map((user) => (
+                    <tr
+                      key={user.id}
+                      className="transition-colors hover:bg-[var(--brand-ultra)]/35"
+                    >
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <span
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--brand-pale)] text-xs font-semibold text-[var(--brand)]"
+                            aria-hidden
+                          >
+                            {userInitials(user)}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-[var(--text)]">
+                              {user.display_name || user.email}
+                            </p>
+                            <p className="truncate text-xs text-[var(--text-muted)]">
+                              {user.email}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <Badge
+                          variant="outline"
+                          className={cn('text-xs capitalize', roleTone(String(user.role || '')))}
+                        >
+                          {String(user.role || 'unknown')
+                            .replace(/_/g, ' ')
+                            .toLowerCase()}
+                        </Badge>
+                      </td>
+                      <td
+                        className={cn(
+                          'hidden px-4 py-3.5',
+                          responsiveDataListClasses.columnSecondary
+                        )}
+                      >
+                        {Array.isArray(user.tenant_roles) && user.tenant_roles.length > 0 ? (
+                          <div className="flex max-w-xs flex-wrap gap-1.5">
+                            {user.tenant_roles.slice(0, 4).map((tr, index) => (
+                              <Badge
+                                key={`${user.id}-${tr.tenantId ?? index}`}
+                                variant="outline"
+                                className="text-[11px] font-normal"
+                              >
+                                {tr.roleName || t('common.member')}
+                                {tr.tenantType ? ` · ${tr.tenantType}` : ''}
+                              </Badge>
+                            ))}
+                            {user.tenant_roles.length > 4 && (
+                              <Badge variant="outline" className="text-[11px] font-normal">
+                                {t('common.more', { count: user.tenant_roles.length - 4 })}
+                              </Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-[var(--text-muted)]">
+                            {t('common.noTenantLinks')}
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        className={cn(
+                          'hidden px-4 py-3.5 text-xs text-[var(--text-muted)]',
+                          responsiveDataListClasses.columnTertiary
+                        )}
+                      >
+                        {formatAdminDate(user.created_at)}
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setResetTarget({
+                              userId: user.id,
+                              email: user.email,
+                              displayName: user.display_name,
+                            })
+                          }
+                          title={t('users.resetPassword')}
+                        >
+                          <KeyRound className="h-4 w-4 xl:mr-1.5" />
+                          <span className={responsiveDataListClasses.actionLabel}>
+                            {t('users.resetPassword')}
+                          </span>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableScroll>
+          </>
         )}
       </AppPanel>
 

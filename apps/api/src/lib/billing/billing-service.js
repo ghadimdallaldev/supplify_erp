@@ -368,6 +368,7 @@ export async function checkoutSubscription({
   if (!subscription) {
     throw Object.assign(new Error('No subscription found'), { name: 'NOT_FOUND' })
   }
+  const previousPlanId = subscription.plan_id
 
   const periodStart = new Date()
   const periodEnd = billingCycle === 'YEARLY' ? addDays(periodStart, 365) : addDays(periodStart, 30)
@@ -440,6 +441,27 @@ export async function checkoutSubscription({
       await processReferralConversion({ restaurantId: tenantId, planCode: plan.code, client })
     }
 
+    const { notifyBillingActivated, notifyBillingPlanChanged } = await import(
+      '../../services/notification.service.js'
+    )
+    notifyBillingActivated({
+      tenantId,
+      tenantType,
+      planName: plan.name,
+    }).catch(() => {})
+    if (previousPlanId && previousPlanId !== plan.id) {
+      const { rows: prevPlanRows } = await query(
+        'SELECT name FROM subscription_plan WHERE id = $1',
+        [previousPlanId]
+      )
+      notifyBillingPlanChanged({
+        tenantId,
+        tenantType,
+        planName: plan.name,
+        previousPlanName: prevPlanRows[0]?.name || null,
+      }).catch(() => {})
+    }
+
     return {
       success: true,
       invoice,
@@ -479,6 +501,18 @@ async function applyFreePlan(tenantId, tenantType, plan) {
     )
   }
   await invalidateBillingSubscriptionCache(tenantId, tenantType)
+  const updatedSub = await getSubscriptionForBilling(tenantId, tenantType)
+  if (wasPendingActivation) {
+    const { notifyBillingTrialStarted } = await import('../../services/notification.service.js')
+    notifyBillingTrialStarted({
+      tenantId,
+      tenantType,
+      planName: plan.name,
+      trialEndsAt: updatedSub?.free_sandbox_expires_at
+        ? new Date(updatedSub.free_sandbox_expires_at).toLocaleDateString()
+        : null,
+    }).catch(() => {})
+  }
   return {
     success: true,
     plan: plan.code,
@@ -799,6 +833,15 @@ export async function extendFreeSandboxTrial(
   const { rows: updatedRows } = await query('SELECT * FROM subscription WHERE id = $1', [
     subscriptionId,
   ])
+  const { notifyBillingTrialExtended } = await import('../../services/notification.service.js')
+  notifyBillingTrialExtended({
+    tenantId: sub.tenant_id,
+    tenantType: sub.tenant_type,
+    trialDays,
+    trialEndsAt: updatedRows[0]?.free_sandbox_expires_at
+      ? new Date(updatedRows[0].free_sandbox_expires_at).toLocaleDateString()
+      : null,
+  }).catch(() => {})
   return {
     subscription: updatedRows[0],
     freeTrialDays: trialDays,
@@ -849,6 +892,19 @@ export async function unlockSubscriptionAccount(
       { tenantId: sub.tenant_id, tenantType: sub.tenant_type },
       { unlockedBy, adminUserId, freeTrialDays: trialDays, freeTrialExtended: true }
     )
+    const { rows: updatedRows } = await query(
+      'SELECT free_sandbox_expires_at FROM subscription WHERE id = $1',
+      [subscriptionId]
+    )
+    const { notifyBillingTrialExtended } = await import('../../services/notification.service.js')
+    notifyBillingTrialExtended({
+      tenantId: sub.tenant_id,
+      tenantType: sub.tenant_type,
+      trialDays,
+      trialEndsAt: updatedRows[0]?.free_sandbox_expires_at
+        ? new Date(updatedRows[0].free_sandbox_expires_at).toLocaleDateString()
+        : null,
+    }).catch(() => {})
     return
   }
 

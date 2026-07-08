@@ -4,6 +4,10 @@ import { LayoutDashboard, ShoppingCart, Package, ShoppingBag, MessageSquare } fr
 import { usePermissions } from '../hooks/usePermissions'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
+import { useAppSelector } from '../hooks/redux'
+import { useGetDashboardStatsQuery } from '../services/api'
+import { StatusDot } from './ui/status-badge'
+import type { StatusTone } from './ui/status-badge'
 import { cn } from '../lib/utils'
 
 type MobileNavItem = {
@@ -12,6 +16,7 @@ type MobileNavItem = {
   icon: typeof LayoutDashboard
   permission?: string
   testId: string
+  badge?: { count: number; tone: StatusTone }
 }
 
 function isActive(pathname: string, href: string) {
@@ -21,12 +26,30 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
+function MobileNavBadge({ count, tone }: { count: number; tone: StatusTone }) {
+  if (count <= 0) return null
+
+  return (
+    <span className="absolute -end-1 -top-0.5 flex items-center gap-0.5 rounded-full border border-[var(--surface)] bg-[var(--surface)] px-1 py-px shadow-sm">
+      <StatusDot tone={tone} />
+      <span className="text-[9px] font-bold leading-none text-[var(--text)]">
+        {count > 9 ? '9+' : count}
+      </span>
+    </span>
+  )
+}
+
 export function RestaurantMobileNav() {
   const { t } = useTranslation('navigation')
   const location = useLocation()
   const { can } = usePermissions()
   const { isEffectiveRestaurant } = useImpersonation()
   const { persona } = useWorkspaceRole()
+  const cartItemCount = useAppSelector((state) => state.cart.items.length)
+  const { data: statsData } = useGetDashboardStatsQuery(undefined, {
+    skip: !isEffectiveRestaurant,
+  })
+  const pendingOrders = Number(statsData?.pendingOrders) || 0
 
   const isRestaurantUser = isEffectiveRestaurant
   if (!isRestaurantUser) return null
@@ -50,6 +73,7 @@ export function RestaurantMobileNav() {
       icon: ShoppingCart,
       permission: 'ORDERS_VIEW',
       testId: 'mobile-nav-orders',
+      badge: { count: pendingOrders, tone: 'warning' as const },
     },
     {
       nameKey: 'cart',
@@ -57,6 +81,7 @@ export function RestaurantMobileNav() {
       icon: ShoppingBag,
       permission: 'ORDERS_CREATE',
       testId: 'mobile-nav-cart',
+      badge: { count: cartItemCount, tone: 'info' as const },
     },
     {
       nameKey: 'products',
@@ -91,11 +116,28 @@ export function RestaurantMobileNav() {
               to={item.href}
               data-testid={item.testId}
               className={cn(
-                'flex min-h-[2.75rem] min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[10px] font-medium transition-colors touch-manipulation',
+                'erp-pressable flex min-h-[2.75rem] min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[10px] font-medium touch-manipulation',
                 active ? 'text-[var(--brand)]' : 'text-[var(--text-muted)]'
               )}
             >
-              <Icon className="h-5 w-5 shrink-0" aria-hidden />
+              <span className="relative flex h-8 w-8 items-center justify-center">
+                {active ? (
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 rounded-full bg-[var(--brand-pale)]"
+                  />
+                ) : null}
+                <Icon
+                  className={cn(
+                    'relative h-5 w-5 shrink-0',
+                    active ? 'text-[var(--brand)]' : 'text-[var(--text-muted)]'
+                  )}
+                  aria-hidden
+                />
+                {item.badge ? (
+                  <MobileNavBadge count={item.badge.count} tone={item.badge.tone} />
+                ) : null}
+              </span>
               <span className="truncate">{t(item.nameKey)}</span>
             </Link>
           )

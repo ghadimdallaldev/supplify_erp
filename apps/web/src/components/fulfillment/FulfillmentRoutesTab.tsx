@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { MapPin } from 'lucide-react'
+import { Eye, MapPin } from 'lucide-react'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Skeleton } from '../ui/skeleton'
+import { TableScroll } from '../ui/table-scroll'
+import { responsiveDataListClasses } from '../ui/responsive-data-list'
 import { useGetFulfillmentRouteQuery, useGetFulfillmentRoutesQuery } from '../../services/api'
+import { cn } from '../../lib/utils'
 import { FulfillmentRouteDetailPanel } from './FulfillmentRouteDetailPanel'
 import { DeliveryTrackingDrawer } from './DeliveryTrackingDrawer'
 
@@ -75,7 +78,7 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
             </div>
           ) : (
             <>
-              <div className="space-y-3 sm:hidden" data-testid="routes-mobile-list">
+              <div className="space-y-3 lg:hidden" data-testid="routes-mobile-list">
                 {routes.map((route) => (
                   <article
                     key={route.id}
@@ -115,17 +118,41 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
                   </article>
                 ))}
               </div>
-              <div className="hidden overflow-x-auto -mx-1 px-1 sm:block">
+              <TableScroll aria-label={t('routes.title')} className="hidden lg:block">
                 <table className="w-full min-w-[720px] text-sm" data-testid="routes-table">
                   <thead>
                     <tr className="border-b text-left text-[var(--text-muted)]">
                       <th className="p-2 font-medium">{t('routes.table.route')}</th>
-                      <th className="p-2 font-medium">{t('routes.table.driver')}</th>
-                      <th className="p-2 font-medium">{t('routes.table.date')}</th>
-                      <th className="p-2 font-medium">{t('routes.table.area')}</th>
-                      <th className="p-2 font-medium">{t('routes.table.stops')}</th>
-                      <th className="p-2 font-medium">{t('routes.table.progress')}</th>
-                      <th className="p-2 font-medium">{t('routes.table.status')}</th>
+                      <th
+                        className={cn('p-2 font-medium', responsiveDataListClasses.columnSecondary)}
+                      >
+                        {t('routes.table.driver')}
+                      </th>
+                      <th
+                        className={cn('p-2 font-medium', responsiveDataListClasses.columnTertiary)}
+                      >
+                        {t('routes.table.date')}
+                      </th>
+                      <th
+                        className={cn('p-2 font-medium', responsiveDataListClasses.columnTertiary)}
+                      >
+                        {t('routes.table.area')}
+                      </th>
+                      <th
+                        className={cn('p-2 font-medium', responsiveDataListClasses.columnSecondary)}
+                      >
+                        {t('routes.table.stops')}
+                      </th>
+                      <th
+                        className={cn('p-2 font-medium', responsiveDataListClasses.columnTertiary)}
+                      >
+                        {t('routes.table.progress')}
+                      </th>
+                      <th
+                        className={cn('p-2 font-medium', responsiveDataListClasses.columnSecondary)}
+                      >
+                        {t('routes.table.status')}
+                      </th>
                       <th className="p-2 font-medium text-right">{t('routes.table.action')}</th>
                     </tr>
                   </thead>
@@ -138,17 +165,41 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
                         }`}
                       >
                         <td className="p-2 font-medium">{route.routeLabel}</td>
-                        <td className="p-2">{route.driverName}</td>
-                        <td className="p-2 whitespace-nowrap">
+                        <td className={cn('p-2', responsiveDataListClasses.columnSecondary)}>
+                          {route.driverName}
+                        </td>
+                        <td
+                          className={cn(
+                            'p-2 whitespace-nowrap',
+                            responsiveDataListClasses.columnTertiary
+                          )}
+                        >
                           {route.scheduledDate
                             ? new Date(route.scheduledDate).toLocaleDateString()
                             : '—'}
                         </td>
-                        <td className="p-2 text-[var(--text-muted)]">{route.area || '—'}</td>
-                        <td className="p-2 tabular-nums">
+                        <td
+                          className={cn(
+                            'p-2 text-[var(--text-muted)]',
+                            responsiveDataListClasses.columnTertiary
+                          )}
+                        >
+                          {route.area || '—'}
+                        </td>
+                        <td
+                          className={cn(
+                            'p-2 tabular-nums',
+                            responsiveDataListClasses.columnSecondary
+                          )}
+                        >
                           {Array.isArray(route.stops) ? route.stops.length : route.stops}
                         </td>
-                        <td className="p-2 text-xs text-[var(--text-muted)]">
+                        <td
+                          className={cn(
+                            'p-2 text-xs text-[var(--text-muted)]',
+                            responsiveDataListClasses.columnTertiary
+                          )}
+                        >
                           {t('routes.table.progressSummary', {
                             done: route.completedStops,
                             failed: route.failedStops,
@@ -157,7 +208,7 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
                             ? t('routes.table.rescheduled', { count: route.rescheduledStops })
                             : ''}
                         </td>
-                        <td className="p-2">
+                        <td className={cn('p-2', responsiveDataListClasses.columnSecondary)}>
                           <Badge variant={route.status === 'IN_PROGRESS' ? 'default' : 'secondary'}>
                             {route.status}
                           </Badge>
@@ -167,15 +218,19 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
                             size="sm"
                             variant="outline"
                             onClick={() => setSelectedId(route.id)}
+                            title={t('routes.table.view')}
                           >
-                            {t('routes.table.view')}
+                            <Eye className="h-3.5 w-3.5 xl:hidden" aria-hidden />
+                            <span className={responsiveDataListClasses.actionLabel}>
+                              {t('routes.table.view')}
+                            </span>
                           </Button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableScroll>
             </>
           )}
         </div>

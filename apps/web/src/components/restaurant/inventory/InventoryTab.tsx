@@ -62,8 +62,9 @@ import {
 import { InventoryStockBar } from './InventoryStockBar'
 import { InventoryLowStockBanner } from './InventoryLowStockBanner'
 import { ensureNamespace } from '../../../i18n'
+import { CardActionGrid, cardActionBtnClass } from '../../ui/card-layout'
+import { TableScroll } from '../../ui/table-scroll'
 import { cn } from '../../../lib/utils'
-import { useMediaQuery } from '../../../hooks/useMediaQuery'
 
 export interface InventoryTabProps {
   wasteTrackingEnabled: boolean
@@ -110,7 +111,7 @@ export function InventoryTab({
   const [showTrend, setShowTrend] = useState(false)
   const itemsSectionRef = useRef<HTMLDivElement>(null)
 
-  const { data, isLoading, error, refetch } = useGetRestaurantInventoryQuery()
+  const { data, isLoading, error, refetch } = useGetRestaurantInventoryQuery({ limit: 500 })
   const { data: historyData } = useGetRestaurantInventoryHistoryQuery(
     { limit: 50 },
     { skip: !showTrend }
@@ -122,7 +123,6 @@ export function InventoryTab({
 
   const inventory = useMemo(() => data?.inventory ?? [], [data?.inventory])
   const history = useMemo(() => historyData?.history ?? [], [historyData?.history])
-  const isDesktop = useMediaQuery('(min-width: 768px)', true)
   const trackedProductIds = useMemo(
     () => new Set(inventory.map((item: { product_id: string }) => item.product_id)),
     [inventory]
@@ -886,248 +886,254 @@ export function InventoryTab({
                 )
               }
             />
-          ) : isDesktop ? (
-            <div className="overflow-x-auto rounded-lg border border-[var(--app-border)]">
-              <table className="w-full">
-                <thead className="bg-[var(--brand-ultra)]">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                      {t('table.product')}
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                      {t('table.category')}
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                      {t('table.supplier')}
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                      {t('table.stockLevel')}
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                      {t('table.suggestedReorder')}
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                      {t('table.status')}
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                      {t('table.lastUpdated')}
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
-                      {t('table.actions')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--app-border)]">
-                  {filteredInventory.map((item: any) => {
-                    const status = getStockStatus(item.quantity, item.low_stock_threshold)
-                    const reorderQty = calculateReorderQuantity(item)
-                    return (
-                      <tr
-                        key={item.id}
-                        className={cn(
-                          'hover:bg-[var(--brand-ultra)]',
-                          status === 'OUT_OF_STOCK' && 'bg-[var(--red-pale)]/30',
-                          status === 'LOW_STOCK' && 'bg-[var(--amber-pale)]/20'
-                        )}
-                      >
-                        <td className="px-4 py-4">
-                          <div>
-                            <p className="font-medium text-[var(--text)]">{item.product_name}</p>
-                            <p className="text-sm text-[var(--text-muted)]">{item.product_sku}</p>
+          ) : (
+            <>
+              <div className="space-y-3 lg:hidden">
+                {filteredInventory.map((item: any) => {
+                  const status = getStockStatus(item.quantity, item.low_stock_threshold)
+                  const reorderQty = calculateReorderQuantity(item)
+                  const isPinned = pinnedItems.has(item.product_id)
+                  return (
+                    <div
+                      key={item.id}
+                      className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-[var(--text)]">
+                            {item.product_name}
+                          </p>
+                          <p className="truncate text-xs text-[var(--text-muted)]">
+                            {item.product_sku}
+                            {getItemCategory(item) ? ` · ${getItemCategory(item)}` : ''}
+                            {item.supplier_name ? ` · ${item.supplier_name}` : ''}
+                          </p>
+                        </div>
+                        <StatusBadge status={status} className="shrink-0" />
+                      </div>
+
+                      <div className="mt-3 space-y-2">
+                        <InventoryStockBar
+                          quantity={item.quantity}
+                          lowStockThreshold={item.low_stock_threshold}
+                          unit={item.product_unit}
+                        />
+                        {reorderQty > 0 ? (
+                          <div className="flex items-center justify-between rounded-lg bg-[var(--amber-pale)]/50 px-3 py-2 text-sm">
+                            <span className="text-[var(--text-muted)]">
+                              {t('table.suggestedReorder')}
+                            </span>
+                            <span className="font-semibold text-[var(--amber)]">
+                              {reorderQty} {item.product_unit}
+                            </span>
                           </div>
-                        </td>
-                        <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                          {getItemCategory(item) || '-'}
-                        </td>
-                        <td className="px-4 py-4 text-sm text-[var(--text)]">
-                          {item.supplier_name}
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="min-w-[10rem] max-w-xs space-y-1">
-                            <InventoryStockBar
-                              quantity={item.quantity}
-                              lowStockThreshold={item.low_stock_threshold}
-                              unit={item.product_unit}
-                            />
-                            {item.days_of_stock != null ? (
-                              <p className="text-xs text-[var(--text-muted)]">
-                                {t('table.daysLeft', {
-                                  count: Math.round(Number(item.days_of_stock)),
-                                })}
-                              </p>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          {reorderQty > 0 ? (
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-[var(--amber)]">
-                                {reorderQty}
-                              </span>
-                              <Badge variant="outline" className="text-xs">
-                                {t('reorder.suggested')}
-                              </Badge>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-xs"
-                                onClick={() => {
-                                  const query = item.product_sku || item.product_name
-                                  navigate(`/app/products?q=${encodeURIComponent(query)}`)
-                                }}
-                              >
-                                {t('reorder.order')}
-                              </Button>
-                            </div>
-                          ) : (
-                            <span className="text-[var(--text-muted)]">-</span>
+                        ) : null}
+                      </div>
+
+                      <CardActionGrid className="mt-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenAdjustDialog(item, 'ADD')}
+                          className={cardActionBtnClass()}
+                        >
+                          <Plus className="mr-1.5 h-4 w-4 shrink-0" />
+                          {t('table.add')}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
+                          className={cardActionBtnClass()}
+                        >
+                          <Minus className="mr-1.5 h-4 w-4 shrink-0" />
+                          {t('table.reduce')}
+                        </Button>
+                        <Button
+                          variant={isPinned ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => handlePinToggle(item.product_id)}
+                          className={cardActionBtnClass()}
+                        >
+                          <Pin
+                            className={`mr-1.5 h-4 w-4 shrink-0 ${isPinned ? 'fill-current' : ''}`}
+                          />
+                          {isPinned ? t('table.pinned') : t('table.pin')}
+                        </Button>
+                        {wasteTrackingEnabled ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={`${cardActionBtnClass()} border-[var(--amber-mid)]/40 text-[var(--amber-mid)]`}
+                            onClick={() => {
+                              onNavigateToWaste(item.product_id)
+                            }}
+                          >
+                            <Recycle className="mr-1.5 h-4 w-4 shrink-0" />
+                            {t('table.waste')}
+                          </Button>
+                        ) : null}
+                      </CardActionGrid>
+                    </div>
+                  )
+                })}
+              </div>
+              <TableScroll aria-label={t('items.title')} className="hidden lg:block">
+                <table className="w-full min-w-[640px]">
+                  <thead className="bg-[var(--brand-ultra)]">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                        {t('table.product')}
+                      </th>
+                      <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)] lg:table-cell">
+                        {t('table.category')}
+                      </th>
+                      <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)] xl:table-cell">
+                        {t('table.supplier')}
+                      </th>
+                      <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)] lg:table-cell">
+                        {t('table.stockLevel')}
+                      </th>
+                      <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)] xl:table-cell">
+                        {t('table.suggestedReorder')}
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                        {t('table.status')}
+                      </th>
+                      <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)] xl:table-cell">
+                        {t('table.lastUpdated')}
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-[var(--text-muted)]">
+                        {t('table.actions')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--app-border)]">
+                    {filteredInventory.map((item: any) => {
+                      const status = getStockStatus(item.quantity, item.low_stock_threshold)
+                      const reorderQty = calculateReorderQuantity(item)
+                      return (
+                        <tr
+                          key={item.id}
+                          className={cn(
+                            'hover:bg-[var(--brand-ultra)]',
+                            status === 'OUT_OF_STOCK' && 'bg-[var(--red-pale)]/30',
+                            status === 'LOW_STOCK' && 'bg-[var(--amber-pale)]/20'
                           )}
-                        </td>
-                        <td className="px-4 py-4">
-                          <StatusBadge status={status} />
-                        </td>
-                        <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                          {new Date(item.updated_at).toLocaleDateString(i18n.language)}
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex gap-2">
-                            <Button
-                              variant={pinnedItems.has(item.product_id) ? 'default' : 'outline'}
-                              size="sm"
-                              onClick={() => handlePinToggle(item.product_id)}
-                              title={
-                                pinnedItems.has(item.product_id)
-                                  ? t('table.unpinItem')
-                                  : t('table.pinToTop')
-                              }
-                            >
-                              <Pin
-                                className={`h-4 w-4 ${pinnedItems.has(item.product_id) ? 'fill-current' : ''}`}
+                        >
+                          <td className="px-4 py-4">
+                            <div>
+                              <p className="font-medium text-[var(--text)]">{item.product_name}</p>
+                              <p className="text-sm text-[var(--text-muted)]">{item.product_sku}</p>
+                            </div>
+                          </td>
+                          <td className="hidden px-4 py-4 text-sm text-[var(--text-muted)] lg:table-cell">
+                            {getItemCategory(item) || '-'}
+                          </td>
+                          <td className="hidden px-4 py-4 text-sm text-[var(--text)] xl:table-cell">
+                            {item.supplier_name}
+                          </td>
+                          <td className="hidden px-4 py-4 lg:table-cell">
+                            <div className="min-w-[10rem] max-w-xs space-y-1">
+                              <InventoryStockBar
+                                quantity={item.quantity}
+                                lowStockThreshold={item.low_stock_threshold}
+                                unit={item.product_unit}
                               />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleOpenAdjustDialog(item, 'ADD')}
-                              title={t('table.addInventory')}
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
-                              title={t('table.countCorrection')}
-                            >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                            {wasteTrackingEnabled ? (
+                              {item.days_of_stock != null ? (
+                                <p className="text-xs text-[var(--text-muted)]">
+                                  {t('table.daysLeft', {
+                                    count: Math.round(Number(item.days_of_stock)),
+                                  })}
+                                </p>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td className="hidden px-4 py-4 xl:table-cell">
+                            {reorderQty > 0 ? (
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-[var(--amber)]">
+                                  {reorderQty}
+                                </span>
+                                <Badge variant="outline" className="text-xs">
+                                  {t('reorder.suggested')}
+                                </Badge>
+                              </div>
+                            ) : (
+                              <span className="text-[var(--text-muted)]">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4">
+                            <StatusBadge status={status} />
+                          </td>
+                          <td className="hidden px-4 py-4 text-sm text-[var(--text-muted)] xl:table-cell">
+                            {new Date(item.updated_at).toLocaleDateString(i18n.language)}
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex gap-1.5">
+                              <Button
+                                variant={pinnedItems.has(item.product_id) ? 'default' : 'outline'}
+                                size="sm"
+                                className="px-2.5"
+                                onClick={() => handlePinToggle(item.product_id)}
+                                aria-label={
+                                  pinnedItems.has(item.product_id)
+                                    ? t('table.unpinItem')
+                                    : t('table.pinToTop')
+                                }
+                                title={
+                                  pinnedItems.has(item.product_id)
+                                    ? t('table.unpinItem')
+                                    : t('table.pinToTop')
+                                }
+                              >
+                                <Pin
+                                  className={`h-4 w-4 ${pinnedItems.has(item.product_id) ? 'fill-current' : ''}`}
+                                />
+                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="text-[var(--amber-mid)] border-[var(--amber-mid)]/40"
-                                onClick={() => {
-                                  onNavigateToWaste(item.product_id)
-                                }}
-                                title={t('table.logWaste')}
+                                className="px-2.5"
+                                onClick={() => handleOpenAdjustDialog(item, 'ADD')}
+                                aria-label={t('table.addInventory')}
+                                title={t('table.addInventory')}
                               >
-                                <Recycle className="h-4 w-4" />
+                                <Plus className="h-4 w-4" />
                               </Button>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredInventory.map((item: any) => {
-                const status = getStockStatus(item.quantity, item.low_stock_threshold)
-                const reorderQty = calculateReorderQuantity(item)
-                const isPinned = pinnedItems.has(item.product_id)
-                return (
-                  <div
-                    key={item.id}
-                    className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-[var(--text)]">
-                          {item.product_name}
-                        </p>
-                        <p className="truncate text-xs text-[var(--text-muted)]">
-                          {item.product_sku}
-                          {getItemCategory(item) ? ` · ${getItemCategory(item)}` : ''}
-                          {item.supplier_name ? ` · ${item.supplier_name}` : ''}
-                        </p>
-                      </div>
-                      <StatusBadge status={status} className="shrink-0" />
-                    </div>
-
-                    <div className="mt-3 space-y-2">
-                      <InventoryStockBar
-                        quantity={item.quantity}
-                        lowStockThreshold={item.low_stock_threshold}
-                        unit={item.product_unit}
-                      />
-                      {reorderQty > 0 ? (
-                        <div className="flex items-center justify-between rounded-lg bg-[var(--amber-pale)]/50 px-3 py-2 text-sm">
-                          <span className="text-[var(--text-muted)]">
-                            {t('table.suggestedReorder')}
-                          </span>
-                          <span className="font-semibold text-[var(--amber)]">
-                            {reorderQty} {item.product_unit}
-                          </span>
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[var(--app-border)] pt-3">
-                      <Button
-                        variant="outline"
-                        size="touch"
-                        onClick={() => handleOpenAdjustDialog(item, 'ADD')}
-                      >
-                        <Plus className="mr-1.5 h-4 w-4" />
-                        {t('table.add')}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="touch"
-                        onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
-                      >
-                        <Minus className="mr-1.5 h-4 w-4" />
-                        {t('table.reduce')}
-                      </Button>
-                      <Button
-                        variant={isPinned ? 'default' : 'outline'}
-                        size="touch"
-                        onClick={() => handlePinToggle(item.product_id)}
-                      >
-                        <Pin className={`mr-1.5 h-4 w-4 ${isPinned ? 'fill-current' : ''}`} />
-                        {isPinned ? t('table.pinned') : t('table.pin')}
-                      </Button>
-                      {wasteTrackingEnabled ? (
-                        <Button
-                          variant="outline"
-                          size="touch"
-                          className="border-[var(--amber-mid)]/40 text-[var(--amber-mid)]"
-                          onClick={() => {
-                            onNavigateToWaste(item.product_id)
-                          }}
-                        >
-                          <Recycle className="mr-1.5 h-4 w-4" />
-                          {t('table.waste')}
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="px-2.5"
+                                onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
+                                aria-label={t('table.countCorrection')}
+                                title={t('table.countCorrection')}
+                              >
+                                <Minus className="h-4 w-4" />
+                              </Button>
+                              {wasteTrackingEnabled ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="px-2.5 text-[var(--amber-mid)] border-[var(--amber-mid)]/40"
+                                  onClick={() => {
+                                    onNavigateToWaste(item.product_id)
+                                  }}
+                                  aria-label={t('table.logWaste')}
+                                  title={t('table.logWaste')}
+                                >
+                                  <Recycle className="h-4 w-4" />
+                                </Button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </TableScroll>
+            </>
           )}
         </CardContent>
       </Card>

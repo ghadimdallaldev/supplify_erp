@@ -1,12 +1,15 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ClipboardList } from 'lucide-react'
+import { ClipboardList, ExternalLink } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Input } from '../ui/input'
 import { Skeleton } from '../ui/skeleton'
 import { splitRowClass } from '../ui/card-layout'
+import { TableScroll } from '../ui/table-scroll'
+import { responsiveDataListClasses } from '../ui/responsive-data-list'
 import { formatPrice } from '../../utils/format'
+import { cn } from '../../lib/utils'
 import { useGetOrdersQuery, useGetWarehousesQuery } from '../../services/api'
 import { useMemo, useState } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
@@ -26,6 +29,7 @@ export function FulfillmentPickListsTab() {
   } = useGetOrdersQuery({
     limit: 500,
     offset: 0,
+    includeItems: true,
     warehouseId: warehouseFilter !== 'ALL' ? warehouseFilter : undefined,
     warehouse_id: warehouseFilter !== 'ALL' ? warehouseFilter : undefined,
   })
@@ -135,7 +139,7 @@ export function FulfillmentPickListsTab() {
           </div>
         ) : (
           <>
-            <div className="space-y-3 md:hidden" data-testid="picklists-cards">
+            <div className="space-y-3 lg:hidden" data-testid="picklists-cards">
               {pickOrders.map((order) => (
                 <article
                   key={order.id}
@@ -178,16 +182,34 @@ export function FulfillmentPickListsTab() {
                 </article>
               ))}
             </div>
-            <div className="hidden overflow-x-auto -mx-1 px-1 md:block">
+            <TableScroll aria-label={t('pickLists.title')} className="hidden lg:block">
               <table className="w-full min-w-[560px] text-sm" data-testid="picklists-table">
                 <thead>
                   <tr className="border-b text-left text-[var(--text-muted)]">
                     <th className="p-2 font-medium">{t('pickLists.table.order')}</th>
-                    <th className="p-2 font-medium">{t('pickLists.table.restaurant')}</th>
-                    <th className="p-2 font-medium">{t('pickLists.table.items')}</th>
-                    <th className="p-2 font-medium">{t('pickLists.table.total')}</th>
-                    <th className="p-2 font-medium">{t('pickLists.table.warehouse')}</th>
-                    <th className="p-2 font-medium">{t('pickLists.table.status')}</th>
+                    <th
+                      className={cn('p-2 font-medium', responsiveDataListClasses.columnSecondary)}
+                    >
+                      {t('pickLists.table.restaurant')}
+                    </th>
+                    <th
+                      className={cn('p-2 font-medium', responsiveDataListClasses.columnSecondary)}
+                    >
+                      {t('pickLists.table.items')}
+                    </th>
+                    <th
+                      className={cn('p-2 font-medium', responsiveDataListClasses.columnSecondary)}
+                    >
+                      {t('pickLists.table.total')}
+                    </th>
+                    <th className={cn('p-2 font-medium', responsiveDataListClasses.columnTertiary)}>
+                      {t('pickLists.table.warehouse')}
+                    </th>
+                    <th
+                      className={cn('p-2 font-medium', responsiveDataListClasses.columnSecondary)}
+                    >
+                      {t('pickLists.table.status')}
+                    </th>
                     <th className="p-2 font-medium text-right">{t('pickLists.table.action')}</th>
                   </tr>
                 </thead>
@@ -198,25 +220,56 @@ export function FulfillmentPickListsTab() {
                       className="border-b border-[var(--app-border)] hover:bg-[var(--brand-ultra)]"
                     >
                       <td className="p-2 font-mono text-xs">#{order.orderRef}</td>
-                      <td className="p-2">{order.restaurantName}</td>
-                      <td className="p-2 tabular-nums">{order.itemCount}</td>
-                      <td className="p-2 tabular-nums">{formatPrice(order.totalAmount)}</td>
-                      <td className="p-2 text-[var(--text-muted)]">{order.warehouseName || '—'}</td>
-                      <td className="p-2">
+                      <td className={cn('p-2', responsiveDataListClasses.columnSecondary)}>
+                        {order.restaurantName}
+                      </td>
+                      <td
+                        className={cn(
+                          'p-2 tabular-nums',
+                          responsiveDataListClasses.columnSecondary
+                        )}
+                      >
+                        {order.itemCount}
+                      </td>
+                      <td
+                        className={cn(
+                          'p-2 tabular-nums',
+                          responsiveDataListClasses.columnSecondary
+                        )}
+                      >
+                        {formatPrice(order.totalAmount)}
+                      </td>
+                      <td
+                        className={cn(
+                          'p-2 text-[var(--text-muted)]',
+                          responsiveDataListClasses.columnTertiary
+                        )}
+                      >
+                        {order.warehouseName || '—'}
+                      </td>
+                      <td className={cn('p-2', responsiveDataListClasses.columnSecondary)}>
                         <Badge variant={order.status === 'SHIPPED' ? 'default' : 'secondary'}>
                           {order.status}
                         </Badge>
                       </td>
                       <td className="p-2 text-right">
                         <Button variant="outline" size="sm" asChild>
-                          <Link to={`/app/orders/${order.id}`}>{t('pickLists.table.open')}</Link>
+                          <Link
+                            to={`/app/orders/${order.id}`}
+                            title={t('pickLists.table.openOrder')}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5 xl:hidden" aria-hidden />
+                            <span className={responsiveDataListClasses.actionLabel}>
+                              {t('pickLists.table.open')}
+                            </span>
+                          </Link>
                         </Button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           </>
         )}
       </div>

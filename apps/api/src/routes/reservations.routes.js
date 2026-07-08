@@ -9,6 +9,7 @@ import {
   notifyReservationCreated,
   notifyReservationWaitlist,
   notifyGuestReservationConfirmation,
+  notifyGuestReservationUpdate,
   notifyReservationStaffEvent,
 } from '../services/notification.service.js'
 import {
@@ -734,6 +735,17 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
       void notifyReservationStaffEvent(reservation, 'cancelled').catch((err) =>
         logger.warn('Reservation cancel notification failed', { error: err.message })
       )
+      try {
+        const { rows: restaurantRows } = await query('SELECT name FROM restaurant WHERE id = $1', [
+          restaurantId,
+        ])
+        await notifyGuestReservationUpdate(reservation, restaurantRows[0]?.name, 'cancelled')
+      } catch (notifyError) {
+        logger.warn('Guest reservation cancel notification failed', {
+          error: notifyError.message,
+          reservationId: reservation.id,
+        })
+      }
     } else if (payload.status === 'WAITLIST') {
       void notifyReservationWaitlist(reservation).catch((err) =>
         logger.warn('Reservation waitlist notification failed', { error: err.message })

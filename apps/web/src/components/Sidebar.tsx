@@ -26,6 +26,7 @@ import {
 } from '../lib/planFeatureGates'
 import { canViewSupplierGrowth } from '../lib/tenantRoles'
 import { formatPlanDisplayName } from '../lib/planComparison'
+import { cn } from '../lib/utils'
 import { buildSidebarSections } from './sidebar/sidebarNavConfig'
 import { SidebarNavSection } from './sidebar/SidebarNavSection'
 
@@ -78,12 +79,12 @@ export function Sidebar({
   )
   const { data: restaurantDisputesData } = useGetDisputesQuery(undefined, {
     skip: !disputesEnabled || isSupplier || !user,
-    pollingInterval: 30_000,
+    pollingInterval: 60_000,
     skipPollingIfUnfocused: true,
   })
   const { data: supplierDisputesData } = useGetIncomingDisputesQuery(undefined, {
     skip: !disputesEnabled || !isSupplier || !user || isDriverRole || !can('FULFILLMENT_VIEW'),
-    pollingInterval: 30_000,
+    pollingInterval: 60_000,
     skipPollingIfUnfocused: true,
   })
   const activeDisputeCount = countActiveDisputes(
@@ -145,7 +146,7 @@ export function Sidebar({
       className={[
         'flex flex-col border-e border-[var(--app-border)]/40 bg-[var(--surface)] font-sans',
         'h-screen overflow-y-auto',
-        'fixed inset-y-0 start-0 z-50 w-[min(100vw-3rem,14rem)] lg:sticky lg:w-56 lg:translate-x-0',
+        'fixed inset-y-0 start-0 z-50 w-[min(100vw-3rem,14rem)] lg:sticky lg:w-52 lg:translate-x-0 xl:w-56',
         'transition-transform duration-200',
         mobileOpen ? 'translate-x-0' : 'max-lg:-translate-x-full max-lg:rtl:translate-x-full',
       ].join(' ')}
@@ -209,17 +210,12 @@ export function Sidebar({
         </div>
         {planLabel && (
           <span
-            style={{
-              background: planCode === 'free' ? 'var(--amber-pale)' : 'var(--brand-pale)',
-              color: planCode === 'free' ? 'var(--amber)' : 'var(--brand-mid)',
-              fontSize: 9,
-              fontWeight: 700,
-              borderRadius: 4,
-              padding: '2px 6px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              flexShrink: 0,
-            }}
+            className={cn(
+              'shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide',
+              planCode === 'free'
+                ? 'bg-[var(--amber-pale)] text-[var(--amber)]'
+                : 'bg-[var(--brand-pale)] text-[var(--brand-mid)]'
+            )}
           >
             {formatPlanDisplayName(planCode, planLabel)}
           </span>

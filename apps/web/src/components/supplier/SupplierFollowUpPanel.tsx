@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   useGetSupplierReorderAssistanceQuery,
   useCreateReorderReminderDraftMutation,
+  useSendReorderReminderDraftMutation,
   useGetEntitlementsQuery,
 } from '../../services/api'
 import { featureEnabled } from '../../lib/planLimits'
@@ -33,6 +34,7 @@ export function SupplierFollowUpPanel({ className }: { className?: string }) {
     skip: !smartReorderEnabled,
   })
   const [createDraft, { isLoading: drafting }] = useCreateReorderReminderDraftMutation()
+  const [sendDraft, { isLoading: sending }] = useSendReorderReminderDraftMutation()
   const [draft, setDraft] = useState<ReminderDraft | null>(null)
   const [draftOpen, setDraftOpen] = useState(false)
   const [busyRestaurantId, setBusyRestaurantId] = useState<string | null>(null)
@@ -181,6 +183,19 @@ export function SupplierFollowUpPanel({ className }: { className?: string }) {
         onClose={() => {
           setDraftOpen(false)
           setDraft(null)
+        }}
+        sending={sending}
+        onSend={async (draftId) => {
+          try {
+            const result = await sendDraft({ draftId }).unwrap()
+            if (result?.draft?.sent) {
+              toast.success(t('followUp.toast.reminderSent'))
+              setDraftOpen(false)
+              setDraft(null)
+            }
+          } catch (e: any) {
+            toast.error(e?.data?.error?.message || t('followUp.toast.sendFailed'))
+          }
         }}
       />
     </>

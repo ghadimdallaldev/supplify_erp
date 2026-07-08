@@ -1,7 +1,7 @@
 import { AlertTriangle } from 'lucide-react'
 import { Button } from './ui/button'
+import { InfoBanner } from './ui/info-banner'
 import { getLimitUpgradeCopy } from '../lib/upgradeCopy'
-import { splitRowClass } from './ui/card-layout'
 import { useAppDispatch, useAppSelector } from '../hooks/redux'
 import { showMonetizationBlock } from '../features/monetization/monetizationSlice'
 import { resolveUpgradeUrl } from '../lib/externallyControlledFeatures'
@@ -48,51 +48,53 @@ export function LimitExceededBanner({
   const valueProp = upgradeCopy?.value
   const resolvedUpgradeUrl = resolveUpgradeUrl(upgradeUrl, null, user?.role)
 
+  const description = (
+    <>
+      <p>
+        {currentUsage} / {limitValue} used
+        {currentPlan && ` on ${currentPlan}`}
+      </p>
+      {recommendedPlans.length > 0 && (
+        <p className="mt-0.5">
+          Upgrade to {recommendedPlans.slice(0, 2).join(' or ')} for higher limits.
+        </p>
+      )}
+      {valueProp && <p className="mt-1 max-w-md">{valueProp}</p>}
+    </>
+  )
+
   return (
-    <div
-      className={`${splitRowClass} rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 ${className}`}
-      role="alert"
-      title={valueProp ?? undefined}
-    >
-      <div className="flex items-center gap-3">
-        <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" aria-hidden />
-        <div>
-          <p className="font-medium">Limit reached: {label}</p>
-          <p className="text-sm text-amber-800">
-            {currentUsage} / {limitValue} used
-            {currentPlan && ` on ${currentPlan}`}
-          </p>
-          {recommendedPlans.length > 0 && (
-            <p className="text-xs text-amber-700 mt-0.5">
-              Upgrade to {recommendedPlans.slice(0, 2).join(' or ')} for higher limits.
-            </p>
-          )}
-          {valueProp && <p className="text-xs text-amber-700 mt-1 max-w-md">{valueProp}</p>}
-        </div>
-      </div>
-      <Button
-        size="sm"
-        variant="outline"
-        className="shrink-0 whitespace-normal border-amber-300 bg-[var(--surface)] hover:bg-amber-100"
-        onClick={() =>
-          dispatch(
-            showMonetizationBlock({
-              type: 'limit',
-              payload: {
-                limitKey,
-                limitValue,
-                currentUsage,
-                currentPlan: currentPlan ?? null,
-                recommendedPlans,
-                upgradeUrl: resolvedUpgradeUrl,
-              },
-            })
-          )
-        }
-        title={valueProp ?? `Upgrade to ${planToUnlock} for higher ${label} limit`}
-      >
-        Upgrade
-      </Button>
-    </div>
+    <InfoBanner
+      tone="amber"
+      icon={AlertTriangle}
+      title={`Limit reached: ${label}`}
+      description={description}
+      className={className}
+      action={
+        <Button
+          size="sm"
+          variant="outline"
+          className="shrink-0 whitespace-normal border-amber-300 bg-[var(--surface)] hover:bg-amber-100"
+          onClick={() =>
+            dispatch(
+              showMonetizationBlock({
+                type: 'limit',
+                payload: {
+                  limitKey,
+                  limitValue,
+                  currentUsage,
+                  currentPlan: currentPlan ?? null,
+                  recommendedPlans,
+                  upgradeUrl: resolvedUpgradeUrl,
+                },
+              })
+            )
+          }
+          title={valueProp ?? `Upgrade to ${planToUnlock} for higher ${label} limit`}
+        >
+          Upgrade
+        </Button>
+      }
+    />
   )
 }

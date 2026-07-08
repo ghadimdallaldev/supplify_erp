@@ -168,7 +168,7 @@ export function ConsumerOrdersPage() {
   )
 
   const { data, isLoading, refetch } = useGetConsumerOrdersQuery(queryArgs, {
-    pollingInterval: 5000,
+    pollingInterval: 15_000,
     skipPollingIfUnfocused: true,
   })
   const [updateStatus, { isLoading: updating }] = useUpdateConsumerOrderStatusMutation()

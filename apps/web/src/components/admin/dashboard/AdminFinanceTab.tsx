@@ -4,6 +4,7 @@ import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
 import { AppPanel, SummaryStrip } from '../../ui/app-panel'
 import { TableScroll } from '../../ui/table-scroll'
+import { responsiveDataListClasses } from '../../ui/responsive-data-list'
 import { useGetAdminFinancialOverviewQuery } from '../../../services/api'
 import { formatPlanDisplayName } from '../../../lib/planComparison'
 import { formatCurrency } from '../../../utils/format'
@@ -245,12 +246,50 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
                 description={`${overdueTenants.length} tenant${overdueTenants.length === 1 ? '' : 's'} with past-due invoices`}
                 testId="admin-finance-overdue"
               >
-                <TableScroll aria-label={t('finance.overdueBalancesTableAriaLabel')}>
+                <div className="space-y-3 lg:hidden">
+                  {overdueTenants.map((tenant, i) => (
+                    <article
+                      key={`${tenant.tenant_id}-${i}-card`}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-[var(--app-border)] p-4"
+                    >
+                      <div>
+                        <span className="font-mono text-xs text-[var(--text)]">
+                          {tenant.tenant_id?.slice(0, 8) ?? '?'}
+                        </span>
+                        {tenant.tenant_type && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              'ml-2 text-xs capitalize',
+                              tenantTypeTone(tenant.tenant_type)
+                            )}
+                          >
+                            {tenant.tenant_type.toLowerCase()}
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="font-semibold tabular-nums text-[var(--red)]">
+                        {formatCurrency(tenant.overdue_amount ?? 0)}
+                      </span>
+                    </article>
+                  ))}
+                </div>
+                <TableScroll
+                  aria-label={t('finance.overdueBalancesTableAriaLabel')}
+                  className="hidden lg:block"
+                >
                   <table className="w-full min-w-[480px] text-sm">
                     <thead>
                       <tr className="border-b border-[var(--app-border)] bg-[var(--red-pale)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--red)]">
                         <th className="px-4 py-3">{t('common.table.tenant')}</th>
-                        <th className="hidden px-4 py-3 sm:table-cell">Type</th>
+                        <th
+                          className={cn(
+                            'hidden px-4 py-3',
+                            responsiveDataListClasses.columnSecondary
+                          )}
+                        >
+                          Type
+                        </th>
                         <th className="px-4 py-3 text-right">Overdue</th>
                       </tr>
                     </thead>
@@ -279,7 +318,12 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
                               </Badge>
                             )}
                           </td>
-                          <td className="hidden px-4 py-3.5 sm:table-cell">
+                          <td
+                            className={cn(
+                              'hidden px-4 py-3.5',
+                              responsiveDataListClasses.columnSecondary
+                            )}
+                          >
                             {tenant.tenant_type ? (
                               <Badge
                                 variant="outline"

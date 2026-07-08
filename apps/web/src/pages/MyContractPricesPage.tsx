@@ -22,6 +22,11 @@ import {
 import { Search, AlertCircle, Filter } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ensureNamespace } from '../i18n'
+import {
+  ResponsiveDataList,
+  responsiveDataListClasses,
+} from '../components/ui/responsive-data-list'
+import { cn } from '../lib/utils'
 
 export function MyContractPricesPage() {
   const { t } = useTranslation('contracts')
@@ -175,32 +180,47 @@ export function MyContractPricesPage() {
               />
             </div>
           ) : (
-            <>
-              <div className="divide-y divide-[var(--app-border)] md:hidden">
-                {pricing.map((row) => (
-                  <MyContractPriceRow key={String(row.id)} row={row} />
-                ))}
-              </div>
-              <div className="hidden overflow-x-auto md:block">
-                <table className="w-full min-w-[720px] text-sm" data-testid="contract-prices-table">
-                  <thead>
-                    <tr className="border-b border-[var(--app-border)] text-left text-[var(--text-mid)]">
-                      <th className="px-4 py-3 font-medium">{t('myPrices.table.supplier')}</th>
-                      <th className="px-4 py-3 font-medium">{t('myPrices.table.product')}</th>
-                      <th className="px-4 py-3 font-medium">{t('myPrices.table.yourPrice')}</th>
-                      <th className="px-4 py-3 font-medium">{t('myPrices.table.catalogPrice')}</th>
-                      <th className="px-4 py-3 font-medium">{t('myPrices.table.valid')}</th>
-                      <th className="px-4 py-3 font-medium">{t('myPrices.table.terms')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pricing.map((row) => (
-                      <MyContractPriceTableRow key={String(row.id)} row={row} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
+            <ResponsiveDataList
+              items={pricing}
+              keyExtractor={(row) => String(row.id)}
+              tableAriaLabel={t('myPrices.title')}
+              tableMinWidth={720}
+              renderCard={(row) => <MyContractPriceRow row={row} />}
+              tableHeader={
+                <thead>
+                  <tr className="border-b border-[var(--app-border)] text-left text-[var(--text-mid)]">
+                    <th className="px-4 py-3 font-medium">{t('myPrices.table.supplier')}</th>
+                    <th className="px-4 py-3 font-medium">{t('myPrices.table.product')}</th>
+                    <th className="px-4 py-3 font-medium">{t('myPrices.table.yourPrice')}</th>
+                    <th
+                      className={cn(
+                        'px-4 py-3 font-medium',
+                        responsiveDataListClasses.columnSecondary
+                      )}
+                    >
+                      {t('myPrices.table.catalogPrice')}
+                    </th>
+                    <th
+                      className={cn(
+                        'px-4 py-3 font-medium',
+                        responsiveDataListClasses.columnTertiary
+                      )}
+                    >
+                      {t('myPrices.table.valid')}
+                    </th>
+                    <th
+                      className={cn(
+                        'px-4 py-3 font-medium',
+                        responsiveDataListClasses.columnTertiary
+                      )}
+                    >
+                      {t('myPrices.table.terms')}
+                    </th>
+                  </tr>
+                </thead>
+              }
+              renderTableRow={(row) => <MyContractPriceTableRow row={row} />}
+            />
           )}
 
           {isFetching && !showInitialLoad && pricing.length > 0 ? (

@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ChevronDown, ChevronUp, Layers, Lock } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronUp, Layers, Lock, WifiOff } from 'lucide-react'
 import { BillingOverdueBanner } from './billing/BillingOverdueBanner'
 import { LimitExceededBanner } from './LimitExceededBanner'
 import { InfoBanner } from './ui/info-banner'
@@ -18,9 +18,11 @@ type AlertSlot = {
   node: ReactNode
 }
 
-const bannerStackClass = 'mx-3 flex flex-col gap-2 pt-2 sm:mx-6'
+const bannerStackClass =
+  'mx-3 flex min-h-0 flex-col gap-1.5 border-b border-[var(--app-border)]/30 pb-2 pt-2 sm:mx-6'
 
 type LayoutTenantAlertsProps = {
+  showOfflineBanner?: boolean
   showDealsBanner: boolean
   showBillingBanner: boolean
   showExternalFeaturesBanner: boolean
@@ -45,6 +47,7 @@ export function LayoutTenantAlerts(props: LayoutTenantAlertsProps) {
   const [expanded, setExpanded] = useState(false)
 
   const {
+    showOfflineBanner = false,
     showDealsBanner,
     showBillingBanner,
     showExternalFeaturesBanner,
@@ -62,6 +65,23 @@ export function LayoutTenantAlerts(props: LayoutTenantAlertsProps) {
 
   const alerts = useMemo(() => {
     const slots: AlertSlot[] = []
+
+    if (showOfflineBanner) {
+      slots.push({
+        id: 'offline',
+        priority: -1,
+        node: (
+          <InfoBanner
+            key="offline"
+            tone="amber"
+            icon={WifiOff}
+            data-testid="offline-banner"
+            title="You're offline"
+            description="Live data may be unavailable until your connection returns."
+          />
+        ),
+      })
+    }
 
     if (showBillingBanner) {
       slots.push({ id: 'billing', priority: 0, node: <BillingOverdueBanner key="billing" /> })
@@ -284,6 +304,7 @@ export function LayoutTenantAlerts(props: LayoutTenantAlertsProps) {
 
     return slots.sort((a, b) => a.priority - b.priority)
   }, [
+    showOfflineBanner,
     showBillingBanner,
     atLimitEntries,
     e,
@@ -305,7 +326,7 @@ export function LayoutTenantAlerts(props: LayoutTenantAlertsProps) {
 
   if (alerts.length === 1 || expanded) {
     return (
-      <div className={bannerStackClass}>
+      <div className={bannerStackClass} aria-live="polite">
         {alerts.map((alert) => alert.node)}
         {alerts.length > 1 && expanded ? (
           <div className="flex justify-center">
@@ -324,7 +345,7 @@ export function LayoutTenantAlerts(props: LayoutTenantAlertsProps) {
   }
 
   return (
-    <div className={bannerStackClass}>
+    <div className={bannerStackClass} aria-live="polite">
       {alerts[0].node}
       <div className="flex justify-center">
         <button
