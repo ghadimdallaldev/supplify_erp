@@ -8,13 +8,22 @@
       color 0.15s ease,
       transform 0.15s ease;
   }
+  .sidebar-nav-item[data-active='true'] {
+    background: var(--brand-pale);
+    color: var(--text);
+    font-weight: 500;
+  }
   @media (hover: hover) and (pointer: fine) {
-    .sidebar-nav-item:hover {
+    .sidebar-nav-item:not([data-active='true']):hover {
       background: var(--brand-ultra);
       color: var(--text-mid);
       margin-inline-start: 2px;
     }
-    [dir='rtl'] .sidebar-nav-item:hover {
+    .sidebar-nav-item[data-active='true']:hover {
+      background: var(--brand-pale);
+      color: var(--text);
+    }
+    [dir='rtl'] .sidebar-nav-item:not([data-active='true']):hover {
       margin-inline-start: -2px;
     }
   }
@@ -981,7 +990,7 @@
       animation: none;
       transform: none;
     }
-    .sidebar-nav-item:hover {
+    .sidebar-nav-item:not([data-active='true']):hover {
       transform: none;
     }
     .hover-lift:hover,

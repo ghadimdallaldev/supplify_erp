@@ -52,6 +52,10 @@ import {
 } from '../../lib/billing/billing-service.js'
 import { clampFreeTrialDays } from '../../lib/platform-settings.js'
 import {
+  notifyBillingCancelled,
+  notifyBillingPlanChanged,
+} from '../../services/notification.service.js'
+import {
   validatePlanLimitsAndFeatures,
   validateFreePlanTrialDays,
   validateEnterprisePlanActivation,
@@ -601,6 +605,24 @@ router.patch('/subscriptions/:id', async (req, res) => {
     }
 
     await invalidateTenantSubscriptionCache(existing.tenant_id, existing.tenant_type)
+    if (updateData.status === 'CANCELLED') {
+      notifyBillingCancelled({
+        tenantId: existing.tenant_id,
+        tenantType: existing.tenant_type,
+      }).catch(() => {})
+    }
+    if (updateData.planId && newPlan && !planChangeApplyAtPeriodEnd) {
+      const { rows: oldPlanRows } = await query(
+        'SELECT name FROM subscription_plan WHERE id = $1',
+        [existing.plan_id]
+      )
+      notifyBillingPlanChanged({
+        tenantId: existing.tenant_id,
+        tenantType: existing.tenant_type,
+        planName: newPlan.name,
+        previousPlanName: oldPlanRows[0]?.name || existingPlanCode || null,
+      }).catch(() => {})
+    }
     try {
       const { emitEntitlementsRefreshNotice } = await import('../../lib/socket.js')
       emitEntitlementsRefreshNotice({

@@ -26,6 +26,7 @@ import {
 } from '../lib/planFeatureGates'
 import { canViewSupplierGrowth } from '../lib/tenantRoles'
 import { formatPlanDisplayName } from '../lib/planComparison'
+import { cn } from '../lib/utils'
 import { buildSidebarSections } from './sidebar/sidebarNavConfig'
 import { SidebarNavSection } from './sidebar/SidebarNavSection'
 
@@ -209,17 +210,12 @@ export function Sidebar({
         </div>
         {planLabel && (
           <span
-            style={{
-              background: planCode === 'free' ? 'var(--amber-pale)' : 'var(--brand-pale)',
-              color: planCode === 'free' ? 'var(--amber)' : 'var(--brand-mid)',
-              fontSize: 9,
-              fontWeight: 700,
-              borderRadius: 4,
-              padding: '2px 6px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              flexShrink: 0,
-            }}
+            className={cn(
+              'shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide',
+              planCode === 'free'
+                ? 'bg-[var(--amber-pale)] text-[var(--amber)]'
+                : 'bg-[var(--brand-pale)] text-[var(--brand-mid)]'
+            )}
           >
             {formatPlanDisplayName(planCode, planLabel)}
           </span>

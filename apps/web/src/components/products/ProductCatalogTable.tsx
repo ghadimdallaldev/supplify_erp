@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
 import { EmptyState } from '../ui/empty-state'
 import { ResponsiveDataList, responsiveDataListClasses } from '../ui/responsive-data-list'
+import { tableHeadCellClass } from '../ui/table-scroll'
 import { ProductCatalogRow } from './ProductCatalogRow'
 
 type ProductCatalogTableProps = {
@@ -14,8 +15,7 @@ type ProductCatalogTableProps = {
   onAdjustStock: (product: any) => void
 }
 
-const thClass =
-  'border-b border-[var(--app-border)] text-start text-sm font-semibold text-[var(--text-mid)]'
+const thClass = cn('border-b border-[var(--app-border)] text-start', tableHeadCellClass)
 const tdClass = 'border-b border-[var(--app-border)] align-middle'
 
 export function ProductCatalogTable({

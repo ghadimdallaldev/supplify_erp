@@ -42,8 +42,8 @@ export function SidebarNavSection({
     badges
 
   return (
-    <div className="mb-1.5">
-      <div className="section-label px-1.5 pb-0.5 pt-2 text-[var(--sidebar-section)]">
+    <div className="mb-3 first:mb-2">
+      <div className="section-label px-1.5 pb-1 pt-3 text-[var(--sidebar-section)] first:pt-1.5">
         {sectionLabel}
       </div>
       {section.items.map((item) => (
@@ -94,36 +94,25 @@ function SidebarNavLink({
     <Link
       to={item.href}
       aria-current={isActive ? 'page' : undefined}
+      data-active={isActive ? 'true' : undefined}
       onMouseEnter={() => prefetchRouteChunk(item.href)}
       onFocus={() => prefetchRouteChunk(item.href)}
       onClick={() => onNavigate?.()}
       data-testid={item.testId || `nav-${label.toLowerCase().replace(/\s+/g, '-')}`}
       className={cn(
-        'sidebar-nav-item relative mb-px flex h-[34px] items-center gap-2 rounded-md px-2 text-[13px] no-underline',
+        'sidebar-nav-item relative mb-0.5 flex h-[34px] items-center gap-2 rounded-lg px-2.5 text-[13px] no-underline',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30 focus-visible:ring-offset-1',
-        isActive
-          ? 'bg-[var(--brand-pale)] font-semibold text-[var(--brand)]'
-          : 'font-medium text-[var(--text-muted)]'
+        isActive ? 'font-medium text-[var(--text)]' : 'font-medium text-[var(--text-muted)]'
       )}
     >
       {isActive && (
-        <span
-          aria-hidden
-          className="absolute start-0 top-1/2 h-[18px] w-px -translate-y-1/2 rounded-e bg-[var(--mint-mid)]"
-        />
+        <span aria-hidden className="size-[2px] shrink-0 rounded-full bg-[var(--brand)]" />
       )}
-      <span
-        className={cn(
-          'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
-          isActive ? 'bg-[var(--brand)]/10' : 'bg-[var(--brand-ultra)]'
-        )}
-      >
-        <item.icon
-          size={14}
-          className={isActive ? 'text-[var(--brand)]' : 'text-[var(--text-muted)]'}
-          aria-hidden
-        />
-      </span>
+      <item.icon
+        size={15}
+        className={cn('shrink-0', isActive ? 'text-[var(--brand)]' : 'text-[var(--text-muted)]')}
+        aria-hidden
+      />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {showPendingBadge && (
         <NavCountBadge count={pendingOrders} variant="amber" title={t('badge.pendingOrders')} />

@@ -54,8 +54,35 @@ import {
   executeRestaurantInventoryImport,
 } from '../services/restaurant-inventory-import.service.js'
 import { writeAuditLog } from '../lib/audit.js'
+import { notifyLowStock } from '../services/notification.service.js'
 
 const router = express.Router()
+
+async function maybeNotifyRestaurantLowStock({
+  restaurantId,
+  productId,
+  currentQty,
+  threshold,
+  productName,
+}) {
+  if (threshold == null || Number(threshold) <= 0) return
+  if (Number(currentQty) > Number(threshold)) return
+
+  await query(
+    `
+    INSERT INTO inventory_alert (product_id, warehouse_id, alert_type, threshold_value, current_value)
+    VALUES ($1, NULL, 'LOW_STOCK', $2, $3)
+    ON CONFLICT DO NOTHING
+    `,
+    [productId, threshold, currentQty]
+  ).catch(() => {})
+
+  notifyLowStock(
+    { restaurant_id: restaurantId, product_id: productId, name: productName || 'Product' },
+    currentQty,
+    threshold
+  ).catch(() => {})
+}
 
 async function getSmartReorderFeatureValue(req) {
   const tenant = req.tenantContext
@@ -339,7 +366,7 @@ router.post(
         // Get current inventory
         const { rows: inventory } = await client.query(
           `
-        SELECT quantity FROM restaurant_inventory
+        SELECT quantity, low_stock_threshold FROM restaurant_inventory
         WHERE restaurant_id = $1 AND product_id = $2
         FOR UPDATE
       `,
@@ -352,6 +379,7 @@ router.post(
 
         const balanceBefore = Number(inventory[0].quantity)
         const balanceAfter = Math.max(0, balanceBefore - adjustmentData.quantity)
+        const lowStockThreshold = Number(inventory[0].low_stock_threshold || 0)
 
         // Calculate unit cost and total cost if provided
         const unitCost = adjustmentData.unitCost || null
@@ -413,7 +441,18 @@ router.post(
           ]
         )
 
-        return adjustment
+        return { adjustment, balanceAfter, lowStockThreshold }
+      })
+
+      const { rows: productNameRow } = await query(`SELECT p.name FROM product p WHERE p.id = $1`, [
+        productId,
+      ])
+      await maybeNotifyRestaurantLowStock({
+        restaurantId,
+        productId,
+        currentQty: result.balanceAfter,
+        threshold: result.lowStockThreshold,
+        productName: productNameRow[0]?.name,
       })
 
       await markReorderForecastDirty(restaurantId, {
@@ -430,7 +469,7 @@ router.post(
 
       res.status(201).json({
         ok: true,
-        data: { adjustment: result },
+        data: { adjustment: result.adjustment },
         error: null,
         requestId: req.requestId,
       })
@@ -447,6 +486,96 @@ router.post(
           name: 'INTERNAL_ERROR',
           message: 'Failed to adjust inventory',
           details: error.message,
+        },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
+
+router.patch(
+  '/:productId',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_EDIT'),
+  async (req, res) => {
+    try {
+      const { productId } = req.params
+      const payload = updateInventorySchema.parse(req.body)
+      if (payload.quantity === undefined && payload.lowStockThreshold === undefined) {
+        throw new ValidationError('Provide quantity and/or lowStockThreshold to update')
+      }
+
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        throw new ValidationError('Restaurant not found')
+      }
+
+      const { rows: existing } = await query(
+        `SELECT ri.quantity, ri.low_stock_threshold, p.name AS product_name
+         FROM restaurant_inventory ri
+         JOIN product p ON p.id = ri.product_id
+         WHERE ri.restaurant_id = $1 AND ri.product_id = $2`,
+        [restaurantId, productId]
+      )
+      if (!existing.length) {
+        throw new NotFoundError('Product not found in inventory')
+      }
+
+      const nextQty =
+        payload.quantity !== undefined ? payload.quantity : Number(existing[0].quantity)
+      const nextThreshold =
+        payload.lowStockThreshold !== undefined
+          ? payload.lowStockThreshold
+          : Number(existing[0].low_stock_threshold || 0)
+
+      const { rows: updated } = await query(
+        `UPDATE restaurant_inventory
+         SET quantity = COALESCE($3, quantity),
+             low_stock_threshold = COALESCE($4, low_stock_threshold),
+             updated_at = now()
+         WHERE restaurant_id = $1 AND product_id = $2
+         RETURNING *`,
+        [restaurantId, productId, payload.quantity ?? null, payload.lowStockThreshold ?? null]
+      )
+
+      await maybeNotifyRestaurantLowStock({
+        restaurantId,
+        productId,
+        currentQty: nextQty,
+        threshold: nextThreshold,
+        productName: existing[0].product_name,
+      })
+
+      await markReorderForecastDirty(restaurantId, {
+        productId,
+        reason: 'inventory_patch',
+      })
+
+      res.json({
+        ok: true,
+        data: { inventory: updated[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error({
+        message: 'Patch restaurant inventory error',
+        error: error.message,
+        stack: error.stack,
+      })
+      const status =
+        error.name === 'VALIDATION_ERROR' || error.name === 'ValidationError'
+          ? 400
+          : error.name === 'NOT_FOUND' || error.name === 'NotFoundError'
+            ? 404
+            : 500
+      res.status(status).json({
+        ok: false,
+        data: null,
+        error: {
+          name: error.name || 'INVENTORY_PATCH_ERROR',
+          message: error.message || 'Failed to update inventory',
         },
         requestId: req.requestId,
       })

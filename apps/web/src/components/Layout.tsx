@@ -26,7 +26,7 @@ import { isAtEntitlementLimit, shouldShowEntitlementLimit, featureEnabled } from
 import { getAppSocket, releaseAppSocket } from '../lib/appSocket'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { shouldLoadBillingStatus, shouldRedirectToActivate } from '../lib/billingActivationRedirect'
-import { OfflineBanner } from './OfflineBanner'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { RestaurantMobileNav } from './RestaurantMobileNav'
 import { SupplierMobileNav } from './SupplierMobileNav'
 import { isBillingAlertVisible, LayoutTenantAlerts } from './LayoutTenantAlerts'
@@ -238,6 +238,8 @@ export function Layout() {
     blockedCountLast7d >= 3 &&
     planBlockNudgeMessage
 
+  const isOnline = useOnlineStatus()
+
   const isAdminExperience =
     isPlatformAdmin &&
     !isImpersonating &&
@@ -249,7 +251,6 @@ export function Layout() {
         <BranchProvider>
           <div className="min-h-screen min-h-[100dvh]" style={{ background: 'var(--bg)' }}>
             <ImpersonationBanner />
-            <OfflineBanner />
             <UpgradeModal />
             <PaymentModal />
             {isAdminExperience ? (
@@ -271,6 +272,7 @@ export function Layout() {
                   <Header onOpenMobileNav={() => setMobileNavOpen(true)} />
                   {showTenantBanners && (
                     <LayoutTenantAlerts
+                      showOfflineBanner={!isOnline}
                       showDealsBanner={
                         isEffectiveRestaurant && featureEnabled(e?.features?.supplier_deals)
                       }

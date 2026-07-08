@@ -124,3 +124,60 @@ export async function notifyGuestReservationConfirmation(reservation, restaurant
 
   return results
 }
+
+/**
+ * Notify a guest when their reservation is cancelled or rescheduled by the restaurant.
+ */
+export async function notifyGuestReservationUpdate(reservation, restaurantName, event) {
+  const customerName = reservation.customer_name || reservation.customerName || 'Guest'
+  const customerPhone = reservation.customer_phone || reservation.customerPhone || null
+  const customerEmail = reservation.customer_email || reservation.customerEmail || null
+  const partySize = reservation.party_size || reservation.partySize || 0
+  const scheduledAt = reservation.scheduled_at || reservation.scheduledAt
+  const venue = restaurantName || 'the restaurant'
+
+  if (!customerPhone && !customerEmail) {
+    return { email: false, whatsapp: false }
+  }
+
+  const timeLabel = formatReservationTime(scheduledAt)
+  const isCancelled = event === 'cancelled'
+  const title = isCancelled
+    ? `Reservation cancelled at ${venue}`
+    : `Reservation updated at ${venue}`
+  const message = isCancelled
+    ? `Hi ${customerName}, your reservation for ${partySize} guests at ${venue} on ${timeLabel} has been cancelled.`
+    : `Hi ${customerName}, your reservation for ${partySize} at ${venue} has been moved to ${timeLabel}.`
+
+  const results = { email: false, whatsapp: false }
+  const template = isCancelled ? 'reservation.cancelled' : 'reservation.rescheduled'
+
+  if (customerEmail) {
+    try {
+      const result = await sendTemplateEmail({
+        to: customerEmail,
+        template,
+        subject: title,
+        data: { title, message, tenantName: venue },
+        eventType: `guest_reservation_${event}`,
+        eventKey: `reservation:guest:${reservation.id}:${event}`,
+        entityId: reservation.id,
+        skipDedup: false,
+      })
+      results.email = Boolean(result.sent || result.logOnly || result.preview)
+    } catch (error) {
+      logger.error('Guest reservation update email failed', { error: error.message, event })
+    }
+  }
+
+  if (customerPhone) {
+    try {
+      const waResult = await sendWhatsAppMessageService({ to: customerPhone, message })
+      results.whatsapp = Boolean(waResult.sent)
+    } catch (error) {
+      logger.error('Guest reservation update WhatsApp failed', { error: error.message, event })
+    }
+  }
+
+  return results
+}

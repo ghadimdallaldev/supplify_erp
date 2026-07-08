@@ -242,6 +242,7 @@ export const {
   useGetSupplierReorderIntelligenceQuery,
   useGetSupplierReorderAssistanceQuery,
   useCreateReorderReminderDraftMutation,
+  useSendReorderReminderDraftMutation,
   useGetSupplierDeliveryBoardQuery,
   usePreviewProductImportMutation,
   useExecuteProductImportMutation,

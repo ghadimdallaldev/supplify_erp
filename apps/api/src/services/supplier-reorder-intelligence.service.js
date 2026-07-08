@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js'
+import { notifyTenantUsers } from './notification/in-app.js'
 
 const DEFAULT_GRACE_DAYS = 7
 const MIN_ORDERS_FOR_PATTERN = 2
@@ -184,5 +185,55 @@ Your supplier team`
     body: rows[0].body,
     suggestedProducts: customer.suggestedProducts,
     autoSent: false,
+  }
+}
+
+export async function sendReorderReminderDraft(supplierId, draftId, sentBy) {
+  const { rows } = await query(
+    `
+    SELECT d.*, r.name AS restaurant_name
+    FROM supplier_reorder_reminder_draft d
+    JOIN restaurant r ON r.id = d.restaurant_id
+    WHERE d.id = $1 AND d.supplier_id = $2 AND d.status = 'draft'
+    `,
+    [draftId, supplierId]
+  )
+  if (!rows.length) return null
+
+  const draft = rows[0]
+  await notifyTenantUsers({
+    tenantId: draft.restaurant_id,
+    tenantType: 'RESTAURANT',
+    notificationType: 'REORDER',
+    notificationCategory: 'reorder_cadence_missed',
+    title: draft.subject,
+    message: draft.body,
+    referenceId: draft.id,
+    referenceType: 'REORDER_REMINDER',
+    metadata: {
+      supplier_id: supplierId,
+      draft_id: draft.id,
+      sent_by: sentBy || null,
+      ctaUrl: '/app/orders',
+    },
+  })
+
+  const { rows: updated } = await query(
+    `
+    UPDATE supplier_reorder_reminder_draft
+    SET status = 'sent', sent_at = now(), updated_at = now()
+    WHERE id = $1
+    RETURNING *
+    `,
+    [draftId]
+  )
+
+  return {
+    id: updated[0].id,
+    status: updated[0].status,
+    subject: updated[0].subject,
+    body: updated[0].body,
+    sent: true,
+    restaurantName: draft.restaurant_name,
   }
 }

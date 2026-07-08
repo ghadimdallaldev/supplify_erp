@@ -28,8 +28,10 @@ import { usePermissions } from '../hooks/usePermissions'
 import { formatPrice } from '../utils/format'
 import { toast } from 'sonner'
 import { Loader2, Plus, Pencil, Ban, Search } from 'lucide-react'
-import { TableScroll } from '../components/ui/table-scroll'
-import { responsiveDataListClasses } from '../components/ui/responsive-data-list'
+import {
+  ResponsiveDataList,
+  responsiveDataListClasses,
+} from '../components/ui/responsive-data-list'
 import { cn } from '../lib/utils'
 import { ensureNamespace } from '../i18n'
 
@@ -58,6 +60,8 @@ const emptyForm: FormState = {
   minOrderQuantity: '',
   notes: '',
 }
+
+type ContractPricingRow = Record<string, unknown>
 
 export function ContractPricingPage() {
   const { t } = useTranslation('contracts')
@@ -242,183 +246,172 @@ export function ContractPricingPage() {
             ) : pricing.length === 0 ? (
               <p className="text-center py-12 text-[var(--text-muted)]">{t('pricing.empty')}</p>
             ) : (
-              <>
-                <div className="divide-y lg:hidden">
-                  {pricing.map((row) => {
-                    const active = row.is_active !== false
-                    return (
-                      <div key={String(row.id)} className="space-y-3 p-4">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="font-medium">{String(row.product_name)}</p>
-                            <p className="text-xs text-[var(--text-muted)]">{row.product_sku}</p>
-                            <p className="mt-1 text-sm">{String(row.restaurant_name)}</p>
-                          </div>
-                          <Badge variant={active ? 'default' : 'secondary'}>
-                            {active ? t('pricing.statusActive') : t('pricing.statusInactive')}
+              <ResponsiveDataList<ContractPricingRow>
+                items={pricing as ContractPricingRow[]}
+                keyExtractor={(row) => String(row.id)}
+                tableAriaLabel={t('pricing.title')}
+                tableMinWidth={720}
+                renderCard={(row) => {
+                  const active = row.is_active !== false
+                  return (
+                    <div className="space-y-3 p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium">{String(row.product_name)}</p>
+                          <p className="text-xs text-[var(--text-muted)]">
+                            {String(row.product_sku ?? '')}
+                          </p>
+                          <p className="mt-1 text-sm">{String(row.restaurant_name)}</p>
+                        </div>
+                        <Badge variant={active ? 'default' : 'secondary'}>
+                          {active ? t('pricing.statusActive') : t('pricing.statusInactive')}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <p className="text-xs text-[var(--text-muted)]">{t('pricing.catalog')}</p>
+                          <p>
+                            {row.catalog_price != null
+                              ? formatPrice(Number(row.catalog_price))
+                              : '—'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-[var(--text-muted)]">
+                            {t('pricing.contract')}
+                          </p>
+                          <p className="font-semibold">{formatPrice(Number(row.price))}</p>
+                        </div>
+                      </div>
+                      {canManage && (
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => openEdit(row)}
+                          >
+                            <Pencil className="mr-1 h-3 w-3" />
+                            {t('pricing.edit')}
+                          </Button>
+                          {active && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => handleDeactivate(String(row.id))}
+                            >
+                              <Ban className="mr-1 h-3 w-3" />
+                              {t('pricing.deactivate')}
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                }}
+                tableHeader={
+                  <thead>
+                    <tr className="border-b border-[var(--app-border)] text-left text-[var(--text-muted)]">
+                      <th className="px-4 py-3 font-medium">{t('pricing.restaurant')}</th>
+                      <th className="px-4 py-3 font-medium">{t('pricing.product')}</th>
+                      <th
+                        className={cn(
+                          'px-4 py-3 font-medium',
+                          responsiveDataListClasses.columnSecondary
+                        )}
+                      >
+                        {t('pricing.catalog')}
+                      </th>
+                      <th className="px-4 py-3 font-medium">{t('pricing.contract')}</th>
+                      <th
+                        className={cn(
+                          'px-4 py-3 font-medium',
+                          responsiveDataListClasses.columnTertiary
+                        )}
+                      >
+                        {t('pricing.valid')}
+                      </th>
+                      <th
+                        className={cn(
+                          'px-4 py-3 font-medium',
+                          responsiveDataListClasses.columnSecondary
+                        )}
+                      >
+                        {t('pricing.status')}
+                      </th>
+                      <th className="px-4 py-3 font-medium">{t('pricing.actions')}</th>
+                    </tr>
+                  </thead>
+                }
+                renderTableRow={(row) => {
+                  const active = row.is_active !== false
+                  return (
+                    <tr className="border-b border-[var(--app-border)]">
+                      <td className="px-4 py-3">{String(row.restaurant_name)}</td>
+                      <td className="px-4 py-3">
+                        <div>{String(row.product_name)}</div>
+                        <div className="text-xs text-[var(--text-muted)]">
+                          {String(row.product_sku ?? '')}
+                        </div>
+                      </td>
+                      <td className={cn('px-4 py-3', responsiveDataListClasses.columnSecondary)}>
+                        {row.catalog_price != null ? formatPrice(Number(row.catalog_price)) : '—'}
+                      </td>
+                      <td className="px-4 py-3 font-semibold">
+                        {formatPrice(Number(row.price))}
+                        {row.contract_discount_percentage != null && (
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            {t('pricing.discountOff', {
+                              percent: row.contract_discount_percentage,
+                            })}
                           </Badge>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <p className="text-xs text-[var(--text-muted)]">
-                              {t('pricing.catalog')}
-                            </p>
-                            <p>
-                              {row.catalog_price != null
-                                ? formatPrice(Number(row.catalog_price))
-                                : '—'}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-[var(--text-muted)]">
-                              {t('pricing.contract')}
-                            </p>
-                            <p className="font-semibold">{formatPrice(Number(row.price))}</p>
-                          </div>
-                        </div>
+                        )}
+                      </td>
+                      <td
+                        className={cn(
+                          'px-4 py-3 text-xs text-[var(--text-muted)]',
+                          responsiveDataListClasses.columnTertiary
+                        )}
+                      >
+                        {row.contract_start_date
+                          ? String(row.contract_start_date).slice(0, 10)
+                          : '—'}{' '}
+                        → {row.contract_end_date ? String(row.contract_end_date).slice(0, 10) : '—'}
+                      </td>
+                      <td className={cn('px-4 py-3', responsiveDataListClasses.columnSecondary)}>
+                        <Badge variant={active ? 'default' : 'secondary'}>
+                          {active ? t('pricing.statusActive') : t('pricing.statusInactive')}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
                         {canManage && (
                           <div className="flex gap-2">
                             <Button
                               size="sm"
                               variant="outline"
-                              className="flex-1"
                               onClick={() => openEdit(row)}
+                              title={t('pricing.edit')}
                             >
-                              <Pencil className="mr-1 h-3 w-3" />
-                              {t('pricing.edit')}
+                              <Pencil className="h-3 w-3" />
                             </Button>
                             {active && (
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="flex-1"
                                 onClick={() => handleDeactivate(String(row.id))}
+                                title={t('pricing.deactivate')}
                               >
-                                <Ban className="mr-1 h-3 w-3" />
-                                {t('pricing.deactivate')}
+                                <Ban className="h-3 w-3" />
                               </Button>
                             )}
                           </div>
                         )}
-                      </div>
-                    )
-                  })}
-                </div>
-                <TableScroll aria-label={t('pricing.title')} className="hidden lg:block">
-                  <table className="w-full min-w-[720px] text-sm">
-                    <thead>
-                      <tr className="border-b border-[var(--app-border)] text-left text-[var(--text-muted)]">
-                        <th className="px-4 py-3 font-medium">{t('pricing.restaurant')}</th>
-                        <th className="px-4 py-3 font-medium">{t('pricing.product')}</th>
-                        <th
-                          className={cn(
-                            'px-4 py-3 font-medium',
-                            responsiveDataListClasses.columnSecondary
-                          )}
-                        >
-                          {t('pricing.catalog')}
-                        </th>
-                        <th className="px-4 py-3 font-medium">{t('pricing.contract')}</th>
-                        <th
-                          className={cn(
-                            'px-4 py-3 font-medium',
-                            responsiveDataListClasses.columnTertiary
-                          )}
-                        >
-                          {t('pricing.valid')}
-                        </th>
-                        <th
-                          className={cn(
-                            'px-4 py-3 font-medium',
-                            responsiveDataListClasses.columnSecondary
-                          )}
-                        >
-                          {t('pricing.status')}
-                        </th>
-                        <th className="px-4 py-3 font-medium">{t('pricing.actions')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pricing.map((row) => {
-                        const active = row.is_active !== false
-                        return (
-                          <tr key={String(row.id)} className="border-b border-[var(--app-border)]">
-                            <td className="px-4 py-3">{String(row.restaurant_name)}</td>
-                            <td className="px-4 py-3">
-                              <div>{String(row.product_name)}</div>
-                              <div className="text-xs text-[var(--text-muted)]">
-                                {row.product_sku}
-                              </div>
-                            </td>
-                            <td
-                              className={cn('px-4 py-3', responsiveDataListClasses.columnSecondary)}
-                            >
-                              {row.catalog_price != null
-                                ? formatPrice(Number(row.catalog_price))
-                                : '—'}
-                            </td>
-                            <td className="px-4 py-3 font-semibold">
-                              {formatPrice(Number(row.price))}
-                              {row.contract_discount_percentage != null && (
-                                <Badge variant="outline" className="ml-2 text-xs">
-                                  {t('pricing.discountOff', {
-                                    percent: row.contract_discount_percentage,
-                                  })}
-                                </Badge>
-                              )}
-                            </td>
-                            <td
-                              className={cn(
-                                'px-4 py-3 text-xs text-[var(--text-muted)]',
-                                responsiveDataListClasses.columnTertiary
-                              )}
-                            >
-                              {row.contract_start_date
-                                ? String(row.contract_start_date).slice(0, 10)
-                                : '—'}{' '}
-                              →{' '}
-                              {row.contract_end_date
-                                ? String(row.contract_end_date).slice(0, 10)
-                                : '—'}
-                            </td>
-                            <td
-                              className={cn('px-4 py-3', responsiveDataListClasses.columnSecondary)}
-                            >
-                              <Badge variant={active ? 'default' : 'secondary'}>
-                                {active ? t('pricing.statusActive') : t('pricing.statusInactive')}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-3">
-                              {canManage && (
-                                <div className="flex gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => openEdit(row)}
-                                    title={t('pricing.edit')}
-                                  >
-                                    <Pencil className="h-3 w-3" />
-                                  </Button>
-                                  {active && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleDeactivate(String(row.id))}
-                                      title={t('pricing.deactivate')}
-                                    >
-                                      <Ban className="h-3 w-3" />
-                                    </Button>
-                                  )}
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </TableScroll>
-              </>
+                      </td>
+                    </tr>
+                  )
+                }}
+              />
             )}
           </CardContent>
         </Card>
