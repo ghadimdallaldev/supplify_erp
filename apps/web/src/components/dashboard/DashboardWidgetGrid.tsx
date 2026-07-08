@@ -13,7 +13,7 @@ import { Skeleton } from '../ui/skeleton'
 import { StatusBadge } from '../ui/status-badge'
 import { formatCurrency } from '../../utils/format'
 import {
-  SectionCard,
+  DashboardWidgetPanel,
   SPEND_TREND_PERIOD_OPTIONS,
   type SpendTrendPeriodDays,
   DASHBOARD_GRID_GAP,
@@ -36,6 +36,7 @@ export function DashboardWidgetGrid(props: any) {
     spendTrendPeriodTotal,
     periodDays = 30,
     onPeriodDaysChange,
+    financeInvoicesEnabled = false,
     lowStockItems,
     smartReorderEnabled,
     inventoryMgmtEnabled,
@@ -68,17 +69,12 @@ export function DashboardWidgetGrid(props: any) {
       <div className="dashboard-content-grid">
         {/* Col 1 — Recent Orders */}
         {showRestaurantSection('showRecentOrders') && (
-          <SectionCard
+          <DashboardWidgetPanel
             title={t('widgets.recentOrders.title')}
             action={
               <Link
                 to="/app/orders"
-                style={{
-                  fontSize: 11,
-                  color: 'var(--brand)',
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                }}
+                className="text-[11px] font-semibold text-[var(--brand)] no-underline hover:underline"
               >
                 {t('widgets.recentOrders.viewAll')}
               </Link>
@@ -161,12 +157,12 @@ export function DashboardWidgetGrid(props: any) {
                 ))
               )}
             </div>
-          </SectionCard>
+          </DashboardWidgetPanel>
         )}
 
         {/* Col 2 — Supplier: order status bars | Restaurant: spend trend */}
         {isSupplier ? (
-          <SectionCard title={t('widgets.orderStatus.title')}>
+          <DashboardWidgetPanel title={t('widgets.orderStatus.title')}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}>
               {[
                 {
@@ -251,43 +247,37 @@ export function DashboardWidgetGrid(props: any) {
                 </span>
               </div>
             </div>
-          </SectionCard>
+          </DashboardWidgetPanel>
         ) : showRestaurantSection('showSpendTrend') ? (
-          <SectionCard
+          <DashboardWidgetPanel
             title={t('widgets.spendTrend.title')}
             action={
-              <div
-                style={{ display: 'flex', alignItems: 'center', gap: 3 }}
-                role="group"
-                aria-label={t('widgets.spendTrend.periodAriaLabel')}
-                data-testid="spend-trend-period-toggle"
-              >
-                {SPEND_TREND_PERIOD_OPTIONS.map((days) => (
-                  <button
-                    key={days}
-                    type="button"
-                    data-testid={`spend-trend-period-${days}d`}
-                    aria-pressed={periodDays === days}
-                    onClick={() => onPeriodDaysChange?.(days as SpendTrendPeriodDays)}
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: '3px 6px',
-                      borderRadius: 5,
-                      border:
-                        periodDays === days
-                          ? '1px solid var(--brand-mid)'
-                          : '1px solid var(--app-border)',
-                      background: periodDays === days ? 'var(--brand-pale)' : 'var(--surface)',
-                      color: periodDays === days ? 'var(--brand)' : 'var(--text-muted)',
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    {t('widgets.spendTrend.periodDays', { days })}
-                  </button>
-                ))}
-              </div>
+              financeInvoicesEnabled && onPeriodDaysChange ? (
+                <div
+                  className="flex items-center gap-0.5"
+                  role="group"
+                  aria-label={t('widgets.spendTrend.periodAriaLabel')}
+                  data-testid="spend-trend-period-toggle"
+                >
+                  {SPEND_TREND_PERIOD_OPTIONS.map((days) => (
+                    <button
+                      key={days}
+                      type="button"
+                      data-testid={`spend-trend-period-${days}d`}
+                      aria-pressed={periodDays === days}
+                      onClick={() => onPeriodDaysChange(days as SpendTrendPeriodDays)}
+                      className="cursor-pointer rounded-[5px] border px-1.5 py-0.5 text-[10px] font-bold font-[inherit]"
+                      style={{
+                        borderColor: periodDays === days ? 'var(--brand-mid)' : 'var(--app-border)',
+                        background: periodDays === days ? 'var(--brand-pale)' : 'var(--surface)',
+                        color: periodDays === days ? 'var(--brand)' : 'var(--text-muted)',
+                      }}
+                    >
+                      {t('widgets.spendTrend.periodDays', { days })}
+                    </button>
+                  ))}
+                </div>
+              ) : undefined
             }
           >
             {spendTrend.length > 0 ? (
@@ -343,12 +333,12 @@ export function DashboardWidgetGrid(props: any) {
                 )}
               </span>
             </div>
-          </SectionCard>
+          </DashboardWidgetPanel>
         ) : null}
 
         {/* Col 3 — Restaurant: reorder | Supplier: low stock */}
         {(isSupplier || showRestaurantSection('showReorderAlerts')) && (
-          <SectionCard
+          <DashboardWidgetPanel
             title={
               isSupplier
                 ? t('widgets.stockAlerts.lowStockTitle')
@@ -579,7 +569,7 @@ export function DashboardWidgetGrid(props: any) {
                 )}
               </div>
             ) : null}
-          </SectionCard>
+          </DashboardWidgetPanel>
         )}
       </div>
 
@@ -601,7 +591,7 @@ export function DashboardWidgetGrid(props: any) {
           }}
         >
           {isRestaurant && inventoryMgmtEnabled && expirySummaryData?.summary ? (
-            <SectionCard
+            <DashboardWidgetPanel
               title={t('widgets.expiry.title')}
               action={
                 <Link
@@ -644,13 +634,13 @@ export function DashboardWidgetGrid(props: any) {
                     ))}
                 </ul>
               )}
-            </SectionCard>
+            </DashboardWidgetPanel>
           ) : null}
 
           {isRestaurant &&
           smartReorderEnabled &&
           (reorderRemindersData?.reminders?.length ?? 0) > 0 ? (
-            <SectionCard
+            <DashboardWidgetPanel
               title={t('widgets.reorderReminders.title')}
               action={
                 <Link
@@ -678,11 +668,11 @@ export function DashboardWidgetGrid(props: any) {
                     )
                   )}
               </ul>
-            </SectionCard>
+            </DashboardWidgetPanel>
           ) : null}
 
           {isSupplier && (atRiskData?.atRisk?.length ?? 0) > 0 ? (
-            <SectionCard
+            <DashboardWidgetPanel
               title={t('widgets.atRisk.title')}
               action={
                 <Link
@@ -716,11 +706,11 @@ export function DashboardWidgetGrid(props: any) {
                     )
                   )}
               </ul>
-            </SectionCard>
+            </DashboardWidgetPanel>
           ) : null}
 
           {isSupplier && growthMetrics ? (
-            <SectionCard
+            <DashboardWidgetPanel
               title={t('widgets.customerGrowth.title')}
               action={
                 <Link
@@ -762,7 +752,7 @@ export function DashboardWidgetGrid(props: any) {
                   </div>
                 </div>
               </div>
-            </SectionCard>
+            </DashboardWidgetPanel>
           ) : null}
         </div>
       ) : null}

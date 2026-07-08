@@ -6,6 +6,7 @@ import {
   notifyReservationCreated,
   notifyReservationWaitlist,
   notifyGuestReservationConfirmation,
+  notifyGuestReservationUpdate,
   notifyReservationStaffEvent,
 } from '../services/notification.service.js'
 import { config } from '../config/env.js'
@@ -1339,6 +1340,18 @@ router.post('/reservations/manage/reschedule', async (req, res) => {
     void notifyReservationStaffEvent(rows[0], 'rescheduled').catch((err) =>
       logger.warn('Reservation reschedule notification failed', { error: err.message })
     )
+
+    try {
+      const { rows: restaurantRows } = await query('SELECT name FROM restaurant WHERE id = $1', [
+        rows[0].restaurant_id,
+      ])
+      await notifyGuestReservationUpdate(rows[0], restaurantRows[0]?.name, 'rescheduled')
+    } catch (notifyError) {
+      logger.warn('Guest reservation reschedule notification failed', {
+        error: notifyError.message,
+        reservationId: rows[0].id,
+      })
+    }
 
     res.json({
       ok: true,

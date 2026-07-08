@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { cn } from '../../lib/utils'
+import { tableHeadCellClass } from './table-scroll'
 
 /**
  * Consistent wrapper for data tables: a toolbar row with search, filters, and
@@ -15,15 +16,20 @@ export function DataTableShell({
   search,
   filters,
   actions,
+  footer,
   children,
   className,
+  stickyHeader = false,
   'data-testid': testId,
 }: {
   search?: ReactNode
   filters?: ReactNode
   actions?: ReactNode
+  footer?: ReactNode
   children: ReactNode
   className?: string
+  /** Keep column headers visible while scrolling table content. */
+  stickyHeader?: boolean
   'data-testid'?: string
 }) {
   const hasToolbar = Boolean(search || filters || actions)
@@ -42,7 +48,25 @@ export function DataTableShell({
           {actions && <div className="flex flex-wrap items-center gap-2 sm:ms-auto">{actions}</div>}
         </div>
       )}
-      <div className="overflow-x-auto">{children}</div>
+      <div
+        className={cn(
+          'overflow-x-auto',
+          '[&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-[var(--text-muted)]',
+          '[&_tbody_tr]:border-b [&_tbody_tr]:border-[var(--app-border)]',
+          '[&_tbody_tr]:transition-colors [&_tbody_tr]:hover:bg-[var(--brand-ultra)]',
+          '[&_tbody_tr[data-state=selected]]:bg-[var(--brand-pale)]',
+          stickyHeader && [
+            '[&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10',
+            '[&_thead_th]:bg-[var(--surface)] [&_thead_th]:shadow-[0_1px_0_var(--app-border)]',
+          ]
+        )}
+      >
+        {children}
+      </div>
+      {footer}
     </div>
   )
 }
+
+/** Shared class for manual table header cells (prefer TableScroll defaults). */
+export { tableHeadCellClass }

@@ -34,6 +34,7 @@ import { getSupplierRunSheet } from '../services/supplier-run-sheet.service.js'
 import {
   getReorderIntelligence,
   createReorderReminderDraft,
+  sendReorderReminderDraft,
 } from '../services/supplier-reorder-intelligence.service.js'
 import {
   getSupplierReorderAssistance,
@@ -286,6 +287,24 @@ router.get(
       const graceDays = req.query.grace_days ? parseInt(req.query.grace_days, 10) : undefined
       const data = await getReorderIntelligence(supplierId, { graceDays })
       res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/reorder-intelligence/reminder-drafts/:draftId/send',
+  smartReorderGate,
+  requireAnyPermission('ORDERS_MANAGE', 'PROMOTIONS_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const result = await sendReorderReminderDraft(supplierId, req.params.draftId, req.userData.id)
+      if (!result) {
+        throw new ValidationError('Reminder draft not found or already sent')
+      }
+      res.json({ ok: true, data: { draft: result }, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)
     }

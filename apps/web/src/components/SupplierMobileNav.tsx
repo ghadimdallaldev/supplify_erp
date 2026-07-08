@@ -4,9 +4,11 @@ import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { canViewSupplierGrowth } from '../lib/tenantRoles'
 import { useImpersonation } from '../hooks/useImpersonation'
-import { useGetEntitlementsQuery } from '../services/api'
+import { useGetEntitlementsQuery, useGetDashboardStatsQuery } from '../services/api'
 import { canUseSupplierGrowth } from '../lib/planFeatureGates'
 import { isNavItemActive } from './sidebar/sidebarNavConfig'
+import { StatusDot } from './ui/status-badge'
+import type { StatusTone } from './ui/status-badge'
 import { cn } from '../lib/utils'
 
 type MobileNavItem = {
@@ -16,6 +18,20 @@ type MobileNavItem = {
   permission?: string
   anyOf?: string[]
   testId: string
+  badge?: { count: number; tone: StatusTone }
+}
+
+function MobileNavBadge({ count, tone }: { count: number; tone: StatusTone }) {
+  if (count <= 0) return null
+
+  return (
+    <span className="absolute -end-1 -top-0.5 flex items-center gap-0.5 rounded-full border border-[var(--surface)] bg-[var(--surface)] px-1 py-px shadow-sm">
+      <StatusDot tone={tone} />
+      <span className="text-[9px] font-bold leading-none text-[var(--text)]">
+        {count > 9 ? '9+' : count}
+      </span>
+    </span>
+  )
 }
 
 export function SupplierMobileNav() {
@@ -26,6 +42,10 @@ export function SupplierMobileNav() {
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: !shouldLoadTenantEntitlements,
   })
+  const { data: statsData } = useGetDashboardStatsQuery(undefined, {
+    skip: !isEffectiveSupplier,
+  })
+  const pendingOrders = Number(statsData?.pendingOrders) || 0
 
   if (!isEffectiveSupplier) return null
 
@@ -46,6 +66,7 @@ export function SupplierMobileNav() {
       icon: ShoppingCart,
       permission: 'ORDERS_VIEW',
       testId: 'mobile-nav-orders',
+      badge: { count: pendingOrders, tone: 'warning' as const },
     },
     ...(supplierGrowthEnabled
       ? [
@@ -80,13 +101,30 @@ export function SupplierMobileNav() {
               to={item.href}
               data-testid={item.testId}
               className={cn(
-                'flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors touch-manipulation',
+                'erp-pressable flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-2 py-2 text-[10px] font-medium touch-manipulation',
                 active
-                  ? 'text-[var(--brand-mid)]'
+                  ? 'text-[var(--brand)]'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-mid)]'
               )}
             >
-              <Icon className="h-5 w-5" aria-hidden />
+              <span className="relative flex h-8 w-8 items-center justify-center">
+                {active ? (
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 rounded-full bg-[var(--brand-pale)]"
+                  />
+                ) : null}
+                <Icon
+                  className={cn(
+                    'relative h-5 w-5',
+                    active ? 'text-[var(--brand)]' : 'text-[var(--text-muted)]'
+                  )}
+                  aria-hidden
+                />
+                {item.badge ? (
+                  <MobileNavBadge count={item.badge.count} tone={item.badge.tone} />
+                ) : null}
+              </span>
               {item.name}
             </Link>
           )

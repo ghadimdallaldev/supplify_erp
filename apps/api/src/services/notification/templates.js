@@ -97,7 +97,12 @@ const CATEGORY_PREF_MAP = {
   billing_payment_failed: 'notify_billing',
   billing_cancelled: 'notify_billing',
   billing_plan_changed: 'notify_billing',
-  quote_request_received: 'notify_order_new',
+  supplier_connection_request: 'notify_promotions',
+  connection_request_accepted: 'notify_promotions',
+  connection_request_declined: 'notify_promotions',
+  invoice_reminder_manual: 'notify_invoice_overdue',
+  invoice_reminder_due: 'notify_invoice_overdue',
+  invoice_reminder_overdue: 'notify_invoice_overdue',
   quote_response_received: 'notify_order_new',
   billing_trial_extended: 'notify_billing',
   billing_account_locked: 'notify_billing',
@@ -432,6 +437,8 @@ export async function notifyDriverDeliveryMilestone({ order, supplierId, milesto
       order_id: order.id,
       milestone,
       driver_name: driverName || null,
+      skipEmail: true,
+      skipWhatsapp: true,
     },
   }
 
@@ -1282,6 +1289,48 @@ export async function notifyBillingCancelled({ tenantId, tenantType }, locale = 
       message: nt('billing.cancelledMessage', userLocale),
     }),
     {},
+    locale
+  )
+}
+
+export async function notifyBillingPlanChanged(
+  { tenantId, tenantType, planName, previousPlanName },
+  locale = DEFAULT_LOCALE
+) {
+  return notifyBillingEvent(
+    tenantId,
+    tenantType,
+    'billing_plan_changed',
+    (userLocale) => ({
+      title: nt('billing.planChangedTitle', userLocale),
+      message: nt('billing.planChangedMessage', userLocale, {
+        planSuffix: planName ? nt('billing.trialStartedPlan', userLocale, { planName }) : '',
+        previousSuffix: previousPlanName
+          ? nt('billing.planChangedPrevious', userLocale, { previousPlanName })
+          : '',
+      }),
+    }),
+    { planName, previousPlanName },
+    locale
+  )
+}
+
+export async function notifyBillingTrialExtended(
+  { tenantId, tenantType, trialEndsAt, trialDays },
+  locale = DEFAULT_LOCALE
+) {
+  return notifyBillingEvent(
+    tenantId,
+    tenantType,
+    'billing_trial_extended',
+    (userLocale) => ({
+      title: nt('billing.trialExtendedTitle', userLocale),
+      message: nt('billing.trialExtendedMessage', userLocale, {
+        daysSuffix: trialDays ? nt('billing.trialExtendedDays', userLocale, { trialDays }) : '',
+        endsSuffix: trialEndsAt ? nt('billing.trialStartedEnds', userLocale, { trialEndsAt }) : '',
+      }),
+    }),
+    { trialEndsAt, trialDays },
     locale
   )
 }

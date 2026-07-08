@@ -58,6 +58,7 @@ const CATEGORY_TEMPLATE_MAP = {
   deal_expired: 'deal.expired',
   supplier_connection_request: 'supplier.access_request',
   connection_request_accepted: 'growth.connection_accepted',
+  connection_request_declined: 'growth.connection_declined',
   referral_registered: 'growth.referral_registered',
   referral_reward_earned: 'growth.referral_reward',
   sponsorship_gift_received: 'growth.sponsorship_gift',
@@ -68,6 +69,7 @@ const CATEGORY_TEMPLATE_MAP = {
 const NOTIFICATION_TYPE_TEMPLATE_MAP = {
   supplier_connection_request: 'supplier.access_request',
   connection_request_accepted: 'growth.connection_accepted',
+  connection_request_declined: 'growth.connection_declined',
   referral_registered: 'growth.referral_registered',
   referral_reward_earned: 'growth.referral_reward',
   sponsorship_gift_received: 'growth.sponsorship_gift',

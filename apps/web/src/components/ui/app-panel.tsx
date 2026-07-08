@@ -4,6 +4,8 @@ import { cn } from '../../lib/utils'
 export function AppPanel({
   title,
   description,
+  action,
+  titleClassName,
   children,
   footer,
   className,
@@ -11,6 +13,8 @@ export function AppPanel({
 }: {
   title: string
   description?: string
+  action?: ReactNode
+  titleClassName?: string
   children: ReactNode
   footer?: ReactNode
   className?: string
@@ -24,11 +28,20 @@ export function AppPanel({
         className
       )}
     >
-      <header className="border-b border-[var(--app-border)] px-4 py-4 sm:px-5">
-        <h2 className="text-base font-medium text-[var(--text)]">{title}</h2>
-        {description ? (
-          <p className="mt-0.5 text-sm text-[var(--text-mid)]">{description}</p>
-        ) : null}
+      <header className="border-b border-[var(--app-border)] px-4 py-3 sm:px-5">
+        <div
+          className={cn('flex items-center justify-between gap-3', description && 'items-start')}
+        >
+          <div className="min-w-0">
+            <h2 className={cn('text-base font-medium text-[var(--text)]', titleClassName)}>
+              {title}
+            </h2>
+            {description ? (
+              <p className="mt-0.5 text-sm text-[var(--text-mid)]">{description}</p>
+            ) : null}
+          </div>
+          {action ? <div className="shrink-0">{action}</div> : null}
+        </div>
       </header>
       <div className="p-4 sm:p-5">{children}</div>
       {footer ? (

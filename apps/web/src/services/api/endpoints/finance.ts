@@ -171,6 +171,16 @@ export const financeApi = api.injectEndpoints({
       }),
       invalidatesTags: ['SupplierOps'],
     }),
+    sendReorderReminderDraft: builder.mutation<
+      { draft: { id: string; status: string; sent: boolean } },
+      { draftId: string }
+    >({
+      query: ({ draftId }) => ({
+        url: `/api/supplier/reorder-intelligence/reminder-drafts/${draftId}/send`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['SupplierOps'],
+    }),
     getSupplierDeliveryBoard: builder.query<
       any,
       { date?: string; status?: string; driverId?: string; area?: string } | void

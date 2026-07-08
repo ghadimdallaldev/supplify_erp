@@ -176,6 +176,10 @@
       "subject": "Connection accepted",
       "title": "Restaurant connected"
     },
+    "connection_declined": {
+      "subject": "Connection declined",
+      "title": "Connection request declined"
+    },
     "referral_registered": {
       "subject": "Referral signup complete",
       "title": "Welcome to Supplify"
