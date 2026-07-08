@@ -367,7 +367,7 @@ Also available via API (not always separate pages):
 | Service                       | Description                                                                                                                               |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | **File storage**              | S3/MinIO presigned uploads; product images (single + bulk ZIP job); server-side `putObject` for optimized imports; storage quota metering |
-| **Notifications**             | In-app log, email (SMTP), WhatsApp (Meta Cloud API planned), Web Push (VAPID); user preferences                                           |
+| **Notifications**             | In-app log, email (SMTP), WhatsApp (Meta Cloud API), Web Push (VAPID), Platinum outbound webhooks; user preferences                       |
 | **Web Push (PWA)**            | `usePushNotifications`, service worker `static/sw.js`, `/api/push/*` (opt-in `push_enabled`)                                              |
 | **Realtime**                  | Socket.IO for chat + layout events (cookie JWT auth; `getAppSocket()`; optional Redis adapter for multi-replica)                          |
 | **Audit logging**             | Admin actions, impersonation, plan changes                                                                                                |
@@ -535,12 +535,13 @@ Overrides: admin can set per-tenant limit overrides; API returns `LIMIT_EXCEEDED
 | -------- | -------------------------------------------------------------------------------------------------------------------- |
 | In-app   | `notification_log` + header bell; toast/sound via `useNotificationAlerts`; **team-wide** `notifyTenantUsers`         |
 | Email    | SMTP (Resend recommended)                                                                                            |
-| WhatsApp | Meta Cloud API server send (planned)                                                                                 |
+| WhatsApp | Meta Cloud API server send via `whatsapp.service.js` (tier + `whatsapp_enabled` + phone)                             |
+| Webhook  | Platinum outbound HTTP (`notification/webhook.js`); tenant URL + secret in Settings                                  |
 | Push     | Web Push via VAPID (`web-push`); `GET /api/push/vapid-public-key`, subscribe/unsubscribe; service worker at `/sw.js` |
 
 ### Notification categories (preference keys)
 
-Orders (new, acknowledged, processing, shipped, delivered, cancelled/declined), messages, invoices (issued, overdue), payments, inventory (low/out of stock), reservations (created, waitlist, guest cancel/reschedule), staff (PTO, swap), scheduled orders, disputes, amendments, system updates, promotions, test.
+Orders (new, acknowledged, processing, shipped, delivered, cancelled/declined), messages, invoices (issued, overdue, collections reminders), payments, inventory (low/out of stock — supplier + restaurant), reservations (created, waitlist, staff events, guest confirm/cancel/reschedule), staff (PTO, swap, shift, announcements, documents), scheduled orders, disputes, amendments, billing lifecycle (trial, activate, renew, fail, lock, cancel, plan change), growth (connection request/accept/decline, referral, sponsorship), supplier reorder reminder send, role changed (email), driver milestones (in-app only), promotions, test.
 
 ### Triggers (examples)
 
@@ -556,14 +557,16 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled/declined), 
 
 ## 14. Background jobs & automation
 
-| Job                                       | Schedule                 | Purpose                                                                             |
-| ----------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------- |
-| Scheduled quick-list orders               | Every 5 min (dev config) | Auto-create orders from quick lists                                                 |
-| Invoice overdue check                     | Every 24h                | Mark overdue, notify                                                                |
-| Subscription billing                      | Every 1h                 | Grace period, account lock, renewals                                                |
-| Free Trial expiry (`free-sandbox-expiry`) | Every 1h + startup       | Lock `free` tenants when `free_sandbox_expires_at` passed; read-only GET after lock |
-| Reservations schema ensure                | API startup              | Runtime migration guard                                                             |
-| Staff schema ensure                       | API startup              | Runtime migration guard                                                             |
+| Job                                       | Schedule                 | Purpose                                                                                       |
+| ----------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------- |
+| Scheduled quick-list orders               | Every 5 min (dev config) | Auto-create orders from quick lists                                                           |
+| Invoice overdue check                     | Every 24h                | Mark overdue, notify                                                                          |
+| Subscription billing                      | Every 1h                 | Grace period, account lock, renewals                                                          |
+| Free Trial expiry (`free-sandbox-expiry`) | Every 1h + startup       | `notifyBillingTrialExpired` then lock; `notifyBillingAccountLocked`; read-only GET after lock |
+| Trial ending soon                         | Every 1h                 | `notifyBillingTrialEnding` (2-day and 1-day reminders)                                        |
+| Email retry / digest                      | 1h / 24h                 | Failed SMTP retry; daily digest for `notify_email_digest` users                               |
+| Reservations schema ensure                | API startup              | Runtime migration guard                                                                       |
+| Staff schema ensure                       | API startup              | Runtime migration guard                                                                       |
 
 ---
 

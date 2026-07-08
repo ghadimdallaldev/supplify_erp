@@ -323,6 +323,7 @@ export async function sendNotification({
         isPrefEnabled(prefs, 'email_enabled') &&
         !!contact?.email,
       whatsapp:
+        !metadataPayload.skipWhatsapp &&
         allowedChannels.has('whatsapp') &&
         isPrefEnabled(prefs, 'whatsapp_enabled') &&
         !!contact?.phone,
@@ -379,6 +380,9 @@ export async function sendNotification({
 
     if (metadataPayload.skipEmail) {
       delete metadataPayload.skipEmail
+    }
+    if (metadataPayload.skipWhatsapp) {
+      delete metadataPayload.skipWhatsapp
     }
 
     if (channels.email && contact?.email) {

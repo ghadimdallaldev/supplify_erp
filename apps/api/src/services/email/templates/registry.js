@@ -441,6 +441,7 @@ register(TEMPLATE_REGISTRY, 'supplier.access_request', (d, locale = 'en') => {
 
 const growthTemplates = {
   'growth.connection_accepted': { cta: '/app/restaurants', ctaLabel: 'viewRestaurants' },
+  'growth.connection_declined': { cta: '/app/restaurants', ctaLabel: 'viewRestaurants' },
   'growth.referral_registered': { cta: '/app', ctaLabel: 'openSupplify' },
   'growth.referral_reward': { cta: '/app/promotions', ctaLabel: 'viewDeals' },
   'growth.sponsorship_gift': { cta: '/app/billing', ctaLabel: 'manageBilling' },

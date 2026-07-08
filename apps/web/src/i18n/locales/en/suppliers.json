@@ -514,7 +514,9 @@
     "toast": {
       "createFailed": "Could not create reminder",
       "openingChat": "Opening chat — paste your message when ready",
-      "prepareFailed": "Failed to prepare message"
+      "prepareFailed": "Failed to prepare message",
+      "reminderSent": "Reminder sent to restaurant",
+      "sendFailed": "Failed to send reminder"
     }
   },
   "fulfillmentIssue": {

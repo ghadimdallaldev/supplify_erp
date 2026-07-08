@@ -5,7 +5,7 @@
 | Channel      | Implementation                                                  | Notes                                                                                                                                      |
 | ------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Email**    | [nodemailer](https://nodemailer.com/) SMTP (Resend recommended) | `SMTP_*` on the API                                                                                                                        |
-| **WhatsApp** | Meta Cloud API server send (planned)                            | Server send pending Phase 2; no deep-link fallback                                                                                         |
+| **WhatsApp** | Meta Cloud API via `whatsapp.service.js`                        | Server-side send when tier includes WhatsApp and `whatsapp_enabled` is on                                                                  |
 | **In-app**   | `notification_log` table                                        | Bell icon; **toast + sound** via `useNotificationAlerts` (~10s); **Socket.IO `notification_new`** for sub-second delivery when tab is open |
 | **Push**     | Web Push (VAPID) via `web-push`                                 | Opt-in (`push_enabled`); requires `VAPID_*` env — see [notifications-and-alerts.md](../features/notifications-and-alerts.md)               |
 
@@ -24,12 +24,12 @@ If SMTP is not configured, emails are logged only (safe for local dev).
 
 ### WhatsApp behavior
 
-When **WhatsApp** is enabled in preferences and a phone number exists, the API calls `whatsapp.service.js` for server-side delivery (Meta Cloud API — planned).
+When **WhatsApp** is enabled in preferences and a phone number exists, the API calls `whatsapp.service.js` for server-side delivery via the Meta Cloud API.
 
-Guest reservation confirmations:
+Guest reservation confirmations and updates (cancelled/rescheduled by restaurant):
 
-- **Email** → sent to `customer_email` when provided
-- **Phone** → server-side WhatsApp when Meta API is configured
+- **Email** → `reservation.confirmation`, `reservation.cancelled`, `reservation.rescheduled`
+- **Phone** → server-side WhatsApp with the same message body
 
 ---
 
@@ -47,36 +47,41 @@ Most tenant events use **`notifyTenantUsers`**: every user in `tenant_user_roles
 | Acknowledged, processing, shipped, delivered | Restaurant team   | matching status                                                                                  |
 | Cancelled by **restaurant**                  | Supplier team     | `CANCELLED`                                                                                      |
 | **Declined by supplier** (reason required)   | Restaurant team   | `CANCELLED`; message includes `cancel_reason` — [order-decline.md](../features/order-decline.md) |
-| Order approval pending                       | Assigned approver | `order_approval`                                                                                 |
 | Order amendment created/accepted/rejected    | Counterparty team | `order_amendment`                                                                                |
 | Order reminder (restaurant)                  | Supplier team     | `PLACED`                                                                                         |
 
 ### Reservations
 
-| Event                        | Recipient(s)                |
-| ---------------------------- | --------------------------- |
-| New reservation              | Restaurant team             |
-| Waitlist                     | Restaurant team             |
-| Guest cancel / reschedule    | Restaurant team             |
-| Staff status change          | Restaurant team             |
-| Confirmed / waitlist (guest) | Guest email + WhatsApp link |
+| Event                                    | Recipient(s)                                     |
+| ---------------------------------------- | ------------------------------------------------ |
+| New reservation                          | Restaurant team                                  |
+| Waitlist                                 | Restaurant team                                  |
+| Guest cancel / reschedule                | Restaurant team                                  |
+| Staff cancel (guest)                     | Restaurant team only                             |
+| Staff cancel / reschedule (guest notify) | Guest email + WhatsApp when restaurant initiates |
+| Staff status change                      | Restaurant team                                  |
+| Confirmed / waitlist (guest)             | Guest email + WhatsApp                           |
 
 See [reservations-foh.md](../features/reservations-foh.md).
 
 ### Other (tenant-wide where noted)
 
-| Event                        | Recipient(s)                |
-| ---------------------------- | --------------------------- |
-| Invoice issued               | Restaurant team             |
-| Invoice overdue              | Restaurant + supplier teams |
-| Payment received             | Supplier team               |
-| Low / out of stock           | Supplier or restaurant team |
-| Chat message                 | Counterparty team           |
-| Dispute opened               | Supplier team               |
-| Dispute resolved             | Restaurant team             |
-| Staff PTO / swap             | Restaurant team             |
-| Scheduled quick list         | Restaurant team             |
-| Post-receiving review prompt | Restaurant team             |
+| Event                                                                                    | Recipient(s)                               |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Invoice issued                                                                           | Restaurant team                            |
+| Invoice overdue                                                                          | Restaurant + supplier teams                |
+| Payment received                                                                         | Supplier team                              |
+| Low / out of stock                                                                       | Supplier or restaurant team                |
+| Chat message                                                                             | Counterparty team                          |
+| Dispute opened                                                                           | Supplier team                              |
+| Dispute resolved                                                                         | Restaurant team                            |
+| Staff PTO / swap                                                                         | Restaurant team                            |
+| Scheduled quick list                                                                     | Restaurant team                            |
+| Post-receiving review prompt                                                             | Restaurant team                            |
+| Billing trial started / ending / expired / extended                                      | Tenant billing admins (`notify_billing`)   |
+| Billing activated / renewed / payment failed / cancelled / plan changed / account locked | Tenant billing admins                      |
+| Supplier reorder reminder (manual send)                                                  | Restaurant team (`reorder_cadence_missed`) |
+| Role changed (team assign)                                                               | Assigned user email (`auth.role_changed`)  |
 
 ### Supplier customer growth
 
@@ -84,6 +89,7 @@ See [reservations-foh.md](../features/reservations-foh.md).
 | ------------------------------------------ | --------------------------- |
 | Connection request (supplier → restaurant) | Restaurant team             |
 | Connection accepted                        | Supplier team               |
+| Connection declined                        | Supplier team               |
 | Referral registered                        | Restaurant team             |
 | Referral reward earned                     | Supplier team               |
 | Sponsorship gift received                  | Restaurant team             |
@@ -122,7 +128,7 @@ Insert notification_log (in-app)
 Emit Socket.IO notification_new (foreground realtime)
     ↓
 Email via nodemailer (if emailEnabled + email)
-WhatsApp link in metadata (if whatsappEnabled + phone)
+WhatsApp via Meta Cloud API (if whatsappEnabled + phone)
     ↓
 Update log with delivery results
 ```
@@ -134,6 +140,9 @@ Update log with delivery results
 **Unit tests**
 
 - `apps/api/src/services/notification.service.test.js`
+- `apps/api/src/services/supplier-reorder-intelligence.service.test.js`
+- `apps/api/src/lib/billing/billing-service.test.js`
+- `apps/api/src/jobs/free-sandbox-expiry.job.test.js`
 - `apps/api/src/lib/whatsapp.test.js`
 - `apps/api/src/lib/socket.test.js`, `socket-auth.test.js`
 - `apps/web/src/hooks/useNotificationAlerts.test.tsx`, `useChatRealtime.test.ts`
@@ -143,9 +152,9 @@ Update log with delivery results
 1. Set SMTP env vars (or rely on log-only mode)
 2. Settings → Notifications → toggle Email / WhatsApp / types → Save
 3. Trigger an order or reservation
-4. Check bell icon; use **Open in WhatsApp** when shown
+4. Check bell icon; confirm email/WhatsApp delivery in logs when configured
 
 ---
 
-**Last updated:** June 2026  
-**Version:** 2.2.0 (Socket.IO realtime alerts, unified app socket, multi-replica Redis adapter)
+**Last updated:** July 2026  
+**Version:** 2.3.0 (full notification wiring: billing lifecycle, guest reservation updates, connection declined, reorder send, restaurant low stock, role changed email, WhatsApp server send)

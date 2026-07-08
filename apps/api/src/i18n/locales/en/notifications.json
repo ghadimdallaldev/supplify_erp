@@ -208,6 +208,12 @@
     "paymentFailedMessage": "We could not process your subscription payment.{{reasonSuffix}} Update your payment method to avoid interruption.",
     "cancelledTitle": "Subscription cancelled",
     "cancelledMessage": "Your Supplify subscription has been cancelled.",
+    "planChangedTitle": "Plan updated",
+    "planChangedMessage": "Your Supplify subscription{{planSuffix}} has been updated.{{previousSuffix}}",
+    "planChangedPrevious": " Previous plan: {{previousPlanName}}.",
+    "trialExtendedTitle": "Trial extended",
+    "trialExtendedMessage": "Your free trial has been extended{{daysSuffix}}.{{endsSuffix}}",
+    "trialExtendedDays": " by {{trialDays}} day(s)",
     "accountLockedTitle": "Account restricted",
     "accountLockedMessage": "Write access is restricted{{reasonSuffix}}. Visit billing to restore access.",
     "reasonPrefix": ": {{reason}}"

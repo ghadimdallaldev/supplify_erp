@@ -17,10 +17,20 @@ vi.mock('../lib/subscription.js', () => ({
   invalidateTenantSubscriptionCache: (...args) => mockInvalidate(...args),
 }))
 
+const mockNotifyBillingTrialExpired = vi.fn().mockResolvedValue([])
+const mockNotifyBillingAccountLocked = vi.fn().mockResolvedValue([])
+
+vi.mock('../services/notification.service.js', () => ({
+  notifyBillingTrialExpired: (...args) => mockNotifyBillingTrialExpired(...args),
+  notifyBillingAccountLocked: (...args) => mockNotifyBillingAccountLocked(...args),
+}))
+
 describe('runFreeSandboxExpiryJob', () => {
   beforeEach(() => {
     mockQuery.mockReset()
     mockInvalidate.mockClear()
+    mockNotifyBillingTrialExpired.mockClear()
+    mockNotifyBillingAccountLocked.mockClear()
   })
 
   it('does not lock subscriptions when none are expired', async () => {
@@ -51,6 +61,8 @@ describe('runFreeSandboxExpiryJob', () => {
     expect(mockQuery).toHaveBeenCalledWith(expect.any(String), [LOCK_REASON_FREE_SANDBOX_EXPIRED])
     expect(mockInvalidate).toHaveBeenCalledWith('rest-1', 'RESTAURANT')
     expect(mockInvalidate).toHaveBeenCalledWith('sup-1', 'SUPPLIER')
+    expect(mockNotifyBillingTrialExpired).toHaveBeenCalledTimes(2)
+    expect(mockNotifyBillingAccountLocked).toHaveBeenCalledTimes(2)
   })
 
   it('logs and continues when cache invalidation fails', async () => {

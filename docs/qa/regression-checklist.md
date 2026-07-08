@@ -392,18 +392,20 @@ WHERE id = '<subscription_id>';
 > **Spec:** [supplier-customer-growth.md](../features/supplier-customer-growth.md) · **Migration:** `0169_supplier_growth_program.sql`  
 > **Prereq:** Supplier user with `CUSTOMERS_IMPORT` / `CUSTOMERS_MANAGE`; sample CSV with restaurant name + email.
 
-| ID     | Steps                                                           | Expected                                                                  | Pass? |
-| ------ | --------------------------------------------------------------- | ------------------------------------------------------------------------- | ----- |
-| GRW-01 | Supplier → `/app/customer-growth` → upload CSV → preview        | Valid/error row counts; no server error                                   |       |
-| GRW-02 | Run import                                                      | Prospects created; auto-match sets `existing_supplify` when email matches |       |
-| GRW-03 | Matched prospect → **Connect**                                  | Restaurant receives connection request notification                       |       |
-| GRW-04 | Restaurant → accept connection request                          | `supplier_follow` row; prospect `lifecycle_status = connected`            |       |
-| GRW-05 | Unmatched prospect → **Invite** (link)                          | Invite URL copied; `supplier_growth_invitation` pending                   |       |
-| GRW-06 | Open `/register?ref={token}` → complete restaurant registration | Referral attribution; 30-day Free Trial; auto-follow supplier             |       |
-| GRW-07 | Referred restaurant → first paid checkout (Silver)              | 20% discount on invoice; supplier reward granted per admin config         |       |
-| GRW-08 | Supplier → **Sponsor** prospect (Silver)                        | Respects plan yearly limit; restaurant gets 1 month paid plan             |       |
-| GRW-09 | Dashboard → Customer Growth widget                              | Shows imported / invited / converted counts                               |       |
-| GRW-10 | Admin → Plans → Growth program settings → save discount %       | `PATCH /api/admin-dashboard/growth-settings` persists                     |       |
+| ID      | Steps                                                           | Expected                                                                  | Pass? |
+| ------- | --------------------------------------------------------------- | ------------------------------------------------------------------------- | ----- |
+| GRW-01  | Supplier → `/app/customer-growth` → upload CSV → preview        | Valid/error row counts; no server error                                   |       |
+| GRW-02  | Run import                                                      | Prospects created; auto-match sets `existing_supplify` when email matches |       |
+| GRW-03  | Matched prospect → **Connect**                                  | Restaurant receives connection request notification                       |       |
+| GRW-03b | Restaurant → **decline** connection request                     | Supplier receives `connection_request_declined` notification              |       |
+| GRW-04  | Restaurant → accept connection request                          | `supplier_follow` row; prospect `lifecycle_status = connected`            |       |
+| GRW-05  | Unmatched prospect → **Invite** (link)                          | Invite URL copied; `supplier_growth_invitation` pending                   |       |
+| GRW-06  | Open `/register?ref={token}` → complete restaurant registration | Referral attribution; 30-day Free Trial; auto-follow supplier             |       |
+| GRW-07  | Referred restaurant → first paid checkout (Silver)              | 20% discount on invoice; supplier reward granted per admin config         |       |
+| GRW-08  | Supplier → **Sponsor** prospect (Silver)                        | Respects plan yearly limit; restaurant gets 1 month paid plan             |       |
+| GRW-09  | Dashboard → Customer Growth widget                              | Shows imported / invited / converted counts                               |       |
+| GRW-10  | Admin → Plans → Growth program settings → save discount %       | `PATCH /api/admin-dashboard/growth-settings` persists                     |       |
+| GRW-11  | Supplier follow-up → reminder draft → **Send reminder**         | Restaurant team notified (`reorder_reminder`); draft status `sent`        |       |
 
 ## 4.8 Shell UI (Layout, Header, Sidebar)
 
@@ -426,6 +428,8 @@ WHERE id = '<subscription_id>';
 
 ## 4.9 Notifications preferences
 
+> **Spec:** [notifications-summary.md](../product/notifications-summary.md) · [notifications-and-alerts.md](../features/notifications-and-alerts.md)
+
 | ID     | Steps                                                   | Expected                                          | Pass? |
 | ------ | ------------------------------------------------------- | ------------------------------------------------- | ----- |
 | UX-10  | Settings → notifications (restaurant/supplier/admin)    | Toggles: email, WhatsApp, in-app, per-event types |       |
@@ -433,6 +437,12 @@ WHERE id = '<subscription_id>';
 | UX-12  | Trigger event (e.g. new order) with in-app on           | Notification appears in header                    |       |
 | UX-12a | Same event as UX-12 (foreground tab)                    | Toast ~10s + short sound; optional browser banner |       |
 | UX-12b | Log in as **second team user** (not contact_email only) | Same event visible in bell + toast for that user  |       |
+| NOT-01 | Gold+ tenant: email + WhatsApp enabled                  | Order placed → supplier in-app + email (+ WA)     |       |
+| NOT-02 | Staff cancels reservation (guest had email/phone)       | Guest cancel email/WhatsApp; staff notified       |       |
+| NOT-03 | Paid checkout completes                                 | `billing_activated` notification                  |       |
+| NOT-04 | Admin extends free trial                                | `billing_trial_extended` notification             |       |
+| NOT-05 | Assign tenant role to team user                         | Assignee receives `auth.role_changed` email       |       |
+| NOT-06 | `POST /api/notifications/test` with `emailTo`           | Test email delivered or log-only (dev)            |       |
 
 ## 4.10 Realtime & impersonation
 

@@ -173,7 +173,7 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 - Advanced forecasting & custom reports
 - Central purchasing
 - Full fulfillment routing suite
-- Email + SMS + webhook notifications
+- Email + WhatsApp + in-app + outbound notification webhooks
 - Full API + webhooks
 - Dedicated same-day support
 - White-label domain branding

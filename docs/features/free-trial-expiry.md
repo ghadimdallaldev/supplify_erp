@@ -64,6 +64,7 @@ sequenceDiagram
 
 - `apps/api/src/jobs/free-sandbox-expiry.job.js` — hourly (+ on API startup)
 - Sets `account_locked_at`, `lock_reason = 'free_sandbox_expired'`
+- Sends `notifyBillingTrialExpired` then `notifyBillingAccountLocked` (email + WhatsApp when tier/prefs allow)
 - Skips rows where `free_sandbox_expires_at` is still in the future (including after admin extend)
 
 ## Web

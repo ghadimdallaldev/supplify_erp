@@ -80,7 +80,8 @@ Dispatch, delivery board, route detail, command center, and `GET /api/orders/:id
 
 - Restaurants see live map only after dispatch starts (`picked_up` / `out_for_delivery`), not for planned routes or driver-assigned-but-not-dispatched states
 - Restaurants see latest point only for their order (no history, no route stops, driver phone hidden by default)
-- No email per GPS ping
+- No email or WhatsApp per GPS ping (driver milestones are in-app only)
+- Driver delivery milestones (`driver_assigned`, `out_for_delivery`, `delivered`, `failed_delivery`) notify restaurant + supplier teams in-app only
 - Driver/supplier GPS polling uses assignment statuses: `assigned`, `picked_up`, `out_for_delivery`
 
 ---

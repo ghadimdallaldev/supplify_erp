@@ -343,13 +343,13 @@ Warehouse inventory syncs on order status change via `syncWarehouseFulfillmentOn
 
 ### Supplier operations
 
-| Prefix                       | Capabilities                                             |
-| ---------------------------- | -------------------------------------------------------- |
-| `/api/supplier`              | Catalog, orders, settings (`supplier-ops.routes.js`)     |
-| `/api/suppliers`             | Public profile, follow, search                           |
-| `/api/inventory`             | Supplier stock                                           |
-| `/api/promotions` (supplier) | Create/manage deals                                      |
-| `/api/supplier-growth`       | Customer import, invites (via `supplier_growth` feature) |
+| Prefix                       | Capabilities                                                                |
+| ---------------------------- | --------------------------------------------------------------------------- |
+| `/api/supplier`              | Catalog, orders, settings, reorder reminder send (`supplier-ops.routes.js`) |
+| `/api/suppliers`             | Public profile, follow, search                                              |
+| `/api/inventory`             | Supplier stock                                                              |
+| `/api/promotions` (supplier) | Create/manage deals                                                         |
+| `/api/supplier-growth`       | Customer import, invites (via `supplier_growth` feature)                    |
 
 ### Platform admin
 
@@ -363,11 +363,12 @@ Warehouse inventory syncs on order status change via `syncWarehouseFulfillmentOn
 
 ### Communications
 
-| Prefix                    | Capabilities                                                     |
-| ------------------------- | ---------------------------------------------------------------- |
-| `/api/chat/conversations` | Multi-party chat (`chats_per_day` / `open_conversations` limits) |
-| `/api/notifications`      | In-app notification feed                                         |
-| `/api/push`               | Web push subscription                                            |
+| Prefix                    | Capabilities                                                          |
+| ------------------------- | --------------------------------------------------------------------- |
+| `/api/chat/conversations` | Multi-party chat (`chats_per_day` / `open_conversations` limits)      |
+| `/api/notifications`      | In-app feed, preferences, test send, Platinum outbound webhook config |
+| `/api/push`               | Web Push subscribe/unsubscribe                                        |
+| `/api/push`               | Web push subscription                                                 |
 
 ---
 

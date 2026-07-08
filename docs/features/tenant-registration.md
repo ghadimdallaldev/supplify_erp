@@ -31,9 +31,21 @@ While `pending_activation` is set (`account_locked_at` + `lock_reason` on `subsc
 | **Admin unlock**                 | Admin console                                                                                  | `POST …/subscriptions/:id/unlock`                                     |
 | **Admin extend Free Trial**      | Admin → Subscriptions → **Extend trial** (expired trial)                                       | `POST …/extend-free-trial` (`days` 7–90)                              |
 
-Free checkout calls `applyFreePlan`, which clears `account_locked_at` and `lock_reason`, sets `free_sandbox_expires_at`, and records `account.activated` in `billing_event`.
+Free checkout calls `applyFreePlan`, which clears `account_locked_at` and `lock_reason`, sets `free_sandbox_expires_at`, and records `account.activated` in `billing_event`. On first activation, `notifyBillingTrialStarted` is sent to the tenant team.
 
 After trial expiry, tenants remain able to **log in and view** data; writes require upgrade or admin extend. See [free-trial-expiry.md](./free-trial-expiry.md).
+
+## Notifications on signup
+
+| Event               | Channel                         | Notes                                                                 |
+| ------------------- | ------------------------------- | --------------------------------------------------------------------- |
+| Welcome             | Email (`auth.welcome`) + in-app | Direct email to registrant; in-app uses `skipEmail` on duplicate path |
+| New tenant (admin)  | In-app + email                  | `notifyAdminNewTenant` to platform admins                             |
+| Free trial started  | In-app + email + WhatsApp       | After registration subscription + on `applyFreePlan` activation       |
+| Paid plan activated | In-app + email + WhatsApp       | `notifyBillingActivated` on successful checkout                       |
+| Plan changed        | In-app + email + WhatsApp       | `notifyBillingPlanChanged` on checkout or admin plan PATCH            |
+
+See [notifications-summary.md](../product/notifications-summary.md).
 
 **Referral signup:** When a restaurant completes registration with `referralToken` (from supplier invite URL `/register?ref=…`), the system records attribution, applies the platform Free Trial, auto-follows the referring supplier, and preserves eligibility for the referral first-paid discount. See [supplier-customer-growth.md](./supplier-customer-growth.md).
 

@@ -67,7 +67,7 @@ Single-tenant checklist for regression and release testing. For **routes, roles,
 
 - [ ] **Quick lists** — CRUD, stat cards/empty state, add to cart/order.
 - [ ] **Suppliers** — list (stat cards), detail, follow/request if present.
-- [ ] **Reservations** — board (branch-aware when multi-branch), create, status flow, waitlist offer accept/decline (`/reserve/waitlist/:token/...`), analytics, booking link, table builder, **table assignment**, guest cancel/reschedule → staff notification (see [reservations-foh.md](../features/reservations-foh.md)).
+- [ ] **Reservations** — board (branch-aware when multi-branch), create, status flow, waitlist offer accept/decline (`/reserve/waitlist/:token/...`), analytics, booking link, table builder, **table assignment**, guest cancel/reschedule → staff + guest notifications when restaurant initiates (see [reservations-foh.md](../features/reservations-foh.md)).
 
 ---
 
@@ -87,7 +87,7 @@ Single-tenant checklist for regression and release testing. For **routes, roles,
 
 - [ ] **Onboarding** — if shown, complete steps.
 - [ ] **Settings** — profile, notifications, subscription/billing links.
-- [ ] **Notifications** — trigger order/reservation event; bell + toast + sound for team users (not only account owner).
+- [ ] **Notifications** — trigger order/reservation event; bell + toast + sound for team users; email/WhatsApp when Gold+ tier and prefs enabled (`POST /api/notifications/test` for smoke).
 
 ---
 
@@ -104,6 +104,7 @@ Single-tenant checklist for regression and release testing. For **routes, roles,
 - [ ] **Restaurants** list/detail.
 - [ ] **Invoices** list/create/issue.
 - [ ] **Chat** and **supplier settings** (warehouses, notifications).
+- [ ] **Customer follow-up** — create reorder reminder draft → **Send reminder** → restaurant receives in-app/email/WhatsApp (Gold+).
 
 ---
 

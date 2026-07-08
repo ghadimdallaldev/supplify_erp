@@ -62,7 +62,21 @@ See [../operations/storage-uploads.md](../operations/storage-uploads.md) for whe
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | API | preprod, prod | — | Email transport (Resend recommended); `SMTP_PASS` only in Railway secrets |
 | `MAILPIT_SMTP_PORT` / `MAILPIT_UI_PORT` | Docker local | dev | `1025` / `8025` | Mailpit fake SMTP in root `docker-compose.yml`; UI at http://localhost:8025 |
 
-See [../features/email-system.md](../features/email-system.md) for templates, dedup, and coverage matrix.
+See [../features/notifications-and-alerts.md](../features/notifications-and-alerts.md) for templates, triggers, push, and WhatsApp.
+
+### WhatsApp (Meta Cloud API)
+
+| Variable                        | Used by | Required  | Default | Notes                            |
+| ------------------------------- | ------- | --------- | ------- | -------------------------------- |
+| `WHATSAPP_ENABLED`              | API     | optional  | `false` | Master switch for server send    |
+| `WHATSAPP_LOG_ONLY`             | API     | dev       | `false` | Log only, no network send        |
+| `WHATSAPP_ACCESS_TOKEN`         | API     | when live | —       | Meta Business API token (secret) |
+| `WHATSAPP_PHONE_NUMBER_ID`      | API     | when live | —       | Meta phone number ID             |
+| `WHATSAPP_API_VERSION`          | API     | optional  | `v21.0` | Graph API version                |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | API     | webhook   | —       | Meta webhook challenge           |
+| `WHATSAPP_APP_SECRET`           | API     | webhook   | —       | Inbound signature verification   |
+
+See [../features/notifications-and-alerts.md](../features/notifications-and-alerts.md) § WhatsApp.
 | `PAYMENTS_MODE` | API | all | `mock`/`test`/`live` | **mock blocked in preprod/prod** |
 | `BILLING_GATEWAY` | API | optional | `stub` | Overrides mode mapping |
 | `PAYMENTS_PROVIDER` | API | live | `stripe` | Future provider id |

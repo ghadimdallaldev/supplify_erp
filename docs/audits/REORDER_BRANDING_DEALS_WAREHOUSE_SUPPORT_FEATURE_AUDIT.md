@@ -82,7 +82,7 @@ Approach: extend existing services and routes; no app rewrite; preserve pricing,
 
 | 1 | Restaurant reorder assistance | Unified `ReorderAssistancePanel`, suppression API, plan-gated cadence cron, settings toggle |
 
-| 2 | Supplier follow-up | `SupplierFollowUpPanel`, reminder draft → optional chat URL, deduped notifications |
+| 2 | Supplier follow-up | `SupplierFollowUpPanel`, reminder draft → optional chat URL or **Send reminder** (email/WhatsApp to restaurant), deduped notifications |
 
 | 3 | White labeling | Brand colors on tenant, `TenantBrandingProvider`, settings UI, CSS variables |
 

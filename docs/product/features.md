@@ -185,12 +185,13 @@ Tests: `subscriptions.routes.test.js`, `feature-flags.test.js`, `subscription.te
 
 ## Notifications
 
-| Feature              | Web route                        | API prefix           | Notes                                                                       |
-| -------------------- | -------------------------------- | -------------------- | --------------------------------------------------------------------------- |
-| In-app notifications | Header bell + toasts             | `/api/notifications` | Team-wide via `notifyTenantUsers`; `useNotificationAlerts` in Layout        |
-| Email                | Settings → Notifications         | —                    | SMTP (Resend / Mailpit)                                                     |
-| WhatsApp             | Settings → Notifications         | —                    | Meta Cloud API server send (planned)                                        |
-| Web Push (PWA)       | Settings (restaurant onboarding) | `/api/push`          | VAPID keys on API; `usePushNotifications` + `/sw.js`; opt-in `push_enabled` |
+| Feature              | Web route                        | API prefix                   | Notes                                                                       |
+| -------------------- | -------------------------------- | ---------------------------- | --------------------------------------------------------------------------- |
+| In-app notifications | Header bell + toasts             | `/api/notifications`         | Team-wide via `notifyTenantUsers`; `useNotificationAlerts` in Layout        |
+| Email                | Settings → Notifications         | —                            | SMTP (Resend / Mailpit)                                                     |
+| WhatsApp             | Settings → Notifications         | —                            | Meta Cloud API server send via `whatsapp.service.js` (Gold+ tier + prefs)   |
+| Outbound webhooks    | Settings → Notifications         | `/api/notifications/webhook` | Platinum signed HTTP dispatch for tenant events                             |
+| Web Push (PWA)       | Settings (restaurant onboarding) | `/api/push`                  | VAPID keys on API; `usePushNotifications` + `/sw.js`; opt-in `push_enabled` |
 
 See [notifications-summary.md](./notifications-summary.md) and [notifications-and-alerts.md](../features/notifications-and-alerts.md).
 

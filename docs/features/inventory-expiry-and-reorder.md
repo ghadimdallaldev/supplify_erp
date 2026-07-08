@@ -34,6 +34,8 @@ Operational features for restaurant inventory expiry, supplier shortage/substitu
 - One grouped notification per restaurant per day per alert kind
 - Optional `snoozed_until` on ledger rows (future UI)
 
+**Restaurant aggregate low stock:** When `restaurant_inventory.quantity` crosses below `low_stock_threshold` on adjust or PATCH, `notifyLowStock` fires (category `low_stock`, pref `notify_low_stock`). Supplier low stock uses separate paths in `inventory.routes.js`.
+
 ---
 
 ## Feature 2: Supplier shortage / substitution chat

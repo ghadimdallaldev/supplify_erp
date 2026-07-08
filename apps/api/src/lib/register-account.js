@@ -12,7 +12,11 @@ import {
   resolveWorkspaceScope,
 } from './workspace-membership.js'
 import { createPendingActivationSubscription } from './billing/subscription-activation.js'
-import { sendNotification, notifyAdminNewTenant } from '../services/notification.service.js'
+import {
+  sendNotification,
+  notifyAdminNewTenant,
+  notifyBillingTrialStarted,
+} from '../services/notification.service.js'
 import { recordRegistrationLegalAcceptances } from './legal-acceptance.js'
 import { logger } from './logger.js'
 
@@ -397,6 +401,11 @@ export async function completeTenantRegistration({
     tenantType: result.tenantType,
     tenantName: name,
     contactEmail: normalizedEmail,
+  }).catch(() => {})
+  void notifyBillingTrialStarted({
+    tenantId: result.tenant.id,
+    tenantType: result.tenantType,
+    planName: 'Free',
   }).catch(() => {})
 
   return result

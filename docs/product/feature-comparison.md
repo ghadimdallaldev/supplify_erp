@@ -58,15 +58,15 @@
 
 ### Finance & Payments
 
-| Feature               | Supplier         | Restaurant                     | Notes      |
-| --------------------- | ---------------- | ------------------------------ | ---------- |
-| Create Invoices       | ✅ Can create    | ❌ Can only view               | Expected   |
-| Send Invoices         | ✅ Automatic     | ✅ Receives them               | Expected   |
-| Track Payments        | ✅ Can track     | ✅ Can track                   | ✅ Aligned |
-| Payment History       | ✅ Full history  | ✅ Payment records             | ✅ Aligned |
-| Revenue Reports       | ✅ Available     | ✅ Available                   | ✅ Aligned |
-| Expense Tracking      | ❌ Missing       | ✅ Available                   | ⚠️ Missing |
-| Payment Notifications | ✅ Gets notified | ❌ No notification when paying | ⚠️ Missing |
+| Feature               | Supplier         | Restaurant                      | Notes                              |
+| --------------------- | ---------------- | ------------------------------- | ---------------------------------- |
+| Create Invoices       | ✅ Can create    | ❌ Can only view                | Expected                           |
+| Send Invoices         | ✅ Automatic     | ✅ Receives them                | Expected                           |
+| Track Payments        | ✅ Can track     | ✅ Can track                    | ✅ Aligned                         |
+| Payment History       | ✅ Full history  | ✅ Payment records              | ✅ Aligned                         |
+| Revenue Reports       | ✅ Available     | ✅ Available                    | ✅ Aligned                         |
+| Expense Tracking      | ❌ Missing       | ✅ Available                    | ⚠️ Missing                         |
+| Payment Notifications | ✅ Gets notified | ✅ Notified on payment received | ✅ Wired (`notifyPaymentReceived`) |
 
 ### Relationships
 

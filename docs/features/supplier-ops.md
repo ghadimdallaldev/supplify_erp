@@ -143,13 +143,26 @@ Full spec: [supplier-customer-growth.md](./supplier-customer-growth.md) · Migra
 | Run sheet             | `/run-sheet`                            | command center gate | Daily ops brief — see above                                                                                                 |
 | Accounting export     | `/invoices/export*`                     | `finance_invoices`  | CSV + QuickBooks — see above                                                                                                |
 | Collections reminders | `/invoices/*remind*`                    | `finance_invoices`  | Manual + cron — see above                                                                                                   |
-| Reorder intelligence  | `/reorder-intelligence`                 | `smart_reorder`     | At-risk customers, reminder drafts                                                                                          |
+| Reorder intelligence  | `/reorder-intelligence`                 | `smart_reorder`     | At-risk customers, reminder drafts, **send reminder** (see below)                                                           |
 | Reorder assistance    | `/reorder-assistance`                   | `smart_reorder`     | Follow-up draft messages                                                                                                    |
 | Delivery board        | `/deliveries/board`                     | `fulfillment`       | Date/status/driver/area filters; driver-scoped when driver-only RBAC; zone join via `delivery-zone-join` + migration `0165` |
 | Product substitutes   | `/products/:productId/substitutes`      | —                   | CRUD substitute products                                                                                                    |
 | Order substitutions   | `/orders/:orderId/substitutions/*`      | `order_amendments`  | Propose/accept/reject item swaps                                                                                            |
 | Fulfillment issues    | `/orders/:orderId/fulfillment-issues/*` | —                   | Shortage, substitution, open-chat                                                                                           |
 | At-risk cadence       | `/reorder-cadence/at-risk`              | `smart_reorder`     | Customers overdue for reorder                                                                                               |
+
+### Reorder reminder send
+
+Suppliers create a **draft** from follow-up / reorder intelligence, then optionally **send** it to the restaurant team (email + WhatsApp via `notifyTenantUsers`, category `reorder_reminder`).
+
+| Method | Path                                                  | Description                                      |
+| ------ | ----------------------------------------------------- | ------------------------------------------------ |
+| POST   | `/reorder-intelligence/:restaurantId/reminder-draft`  | Create draft (subject + body); optional chat URL |
+| POST   | `/reorder-intelligence/reminder-drafts/:draftId/send` | Mark draft `sent`; notify restaurant team        |
+
+**Web:** `SupplierFollowUpPanel` → **Reminder** → `ReorderReminderReviewDialog` → **Send reminder** (or copy / open chat).
+
+Service: `supplier-reorder-intelligence.service.js` (`createReorderReminderDraft`, `sendReorderReminderDraft`).
 
 ## RBAC & plan gates
 
@@ -160,18 +173,18 @@ Full spec: [supplier-customer-growth.md](./supplier-customer-growth.md) · Migra
 
 ## Tests
 
-| File                                                                 | Covers                                                               |
-| -------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `apps/web/src/components/supplier/supplierPainKiller.test.tsx`       | Receivables empty state, command center mock                         |
-| `apps/api/src/services/supplier-run-sheet.service.test.js`           | Run sheet aggregation                                                |
-| `apps/api/src/services/collections-reminders.service.test.js`        | Reminder dedup + bulk send                                           |
-| `apps/api/src/services/supplier-accounting-export.service.test.js`   | CSV / QuickBooks export                                              |
-| `apps/api/src/services/product-import.service.test.js`               | CSV + XLSX parse                                                     |
-| `apps/api/src/services/product-image-import.service.test.js`         | SKU/mapping match logic, CSV parse                                   |
-| `apps/api/src/services/image-import-worker.test.js`                  | Background job dispatch                                              |
-| `apps/api/src/services/image-optimization.service.test.js`           | Format validation, optimization                                      |
-| `apps/web/src/components/products/ProductImageImportDialog.test.tsx` | Import dialog preview UX                                             |
-| Dev API route matrix                                                 | `/api/supplier/command-center`, `/api/supplier/invoices/receivables` |
+| File                                                                  | Covers                                       |
+| --------------------------------------------------------------------- | -------------------------------------------- |
+| `apps/web/src/components/supplier/supplierPainKiller.test.tsx`        | Receivables empty state, command center mock |
+| `apps/api/src/services/supplier-run-sheet.service.test.js`            | Run sheet aggregation                        |
+| `apps/api/src/services/collections-reminders.service.test.js`         | Reminder dedup + bulk send                   |
+| `apps/api/src/services/supplier-accounting-export.service.test.js`    | CSV / QuickBooks export                      |
+| `apps/api/src/services/product-import.service.test.js`                | CSV + XLSX parse                             |
+| `apps/api/src/services/product-image-import.service.test.js`          | SKU/mapping match logic, CSV parse           |
+| `apps/api/src/services/image-import-worker.test.js`                   | Background job dispatch                      |
+| `apps/api/src/services/image-optimization.service.test.js`            | Format validation, optimization              |
+| `apps/web/src/components/products/ProductImageImportDialog.test.tsx`  | Import dialog preview UX                     |
+| `apps/api/src/services/supplier-reorder-intelligence.service.test.js` | Reminder draft + send notification           |
 
 ## See also
 

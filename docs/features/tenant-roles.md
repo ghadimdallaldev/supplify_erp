@@ -58,15 +58,15 @@ Table `user_workspace_membership` (migration `0104_user_workspace_membership.sql
 
 All management routes require `requireAuth`, `resolveTenantContext`, and `requireFeature('advanced_roles')`. System roles are seeded on first access when the feature is enabled.
 
-| Method | Path                              | Permission      | Notes                                  |
-| ------ | --------------------------------- | --------------- | -------------------------------------- |
-| GET    | `/api/roles`                      | SETTINGS_VIEW   | List roles + permissions + user counts |
-| POST   | `/api/roles`                      | SETTINGS_MANAGE | Create custom role                     |
-| PATCH  | `/api/roles/:id`                  | SETTINGS_MANAGE | System: description only               |
-| DELETE | `/api/roles/:id`                  | SETTINGS_MANAGE | Custom only; 409 if users assigned     |
-| GET    | `/api/roles/users`                | SETTINGS_VIEW   | Users with role                        |
-| POST   | `/api/roles/users/:userId/assign` | SETTINGS_MANAGE | Owner role: assigner must be Owner     |
-| GET    | `/api/roles/:id/permissions`      | SETTINGS_VIEW   | Checklist data for UI                  |
+| Method | Path                              | Permission      | Notes                                                                           |
+| ------ | --------------------------------- | --------------- | ------------------------------------------------------------------------------- |
+| GET    | `/api/roles`                      | SETTINGS_VIEW   | List roles + permissions + user counts                                          |
+| POST   | `/api/roles`                      | SETTINGS_MANAGE | Create custom role                                                              |
+| PATCH  | `/api/roles/:id`                  | SETTINGS_MANAGE | System: description only                                                        |
+| DELETE | `/api/roles/:id`                  | SETTINGS_MANAGE | Custom only; 409 if users assigned                                              |
+| GET    | `/api/roles/users`                | SETTINGS_VIEW   | Users with role                                                                 |
+| POST   | `/api/roles/users/:userId/assign` | SETTINGS_MANAGE | Owner role: assigner must be Owner; sends `auth.role_changed` email to assignee |
+| GET    | `/api/roles/:id/permissions`      | SETTINGS_VIEW   | Checklist data for UI                                                           |
 
 ## Migration
 

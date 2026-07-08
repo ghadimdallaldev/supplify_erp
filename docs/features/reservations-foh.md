@@ -43,7 +43,17 @@ Migration `0103_reservation_availability_indexes.sql` supports slot/overlap quer
 | Guest cancel / reschedule  | `notifyReservationStaffEvent`              |
 | Staff status change        | Restaurant team                            |
 
-Guests receive email/WhatsApp via `notifyGuestReservationConfirmation` when applicable.
+## Guest notifications (email + WhatsApp)
+
+Direct sends via `notifyGuestReservationConfirmation` and `notifyGuestReservationUpdate` in `notification/email.js` (bypass tenant prefs; require guest email and/or phone).
+
+| Event                         | Recipient | Templates / notes                                            |
+| ----------------------------- | --------- | ------------------------------------------------------------ |
+| Confirmed / waitlisted        | Guest     | `reservation.confirmation`, `reservation.waitlist`           |
+| Cancelled by restaurant staff | Guest     | `reservation.cancelled`                                      |
+| Rescheduled by restaurant     | Guest     | `reservation.rescheduled`                                    |
+| Guest self-cancel             | —         | Staff notified only (guest already knows)                    |
+| Waitlist table offer          | Guest     | `reservation.waitlist_offer` (+ WhatsApp) — see waitlist doc |
 
 Foreground alerts: `useNotificationAlerts` in `Layout` (toast ~10s, sound, browser notification when permitted).
 

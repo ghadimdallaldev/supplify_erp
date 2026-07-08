@@ -147,6 +147,16 @@ export async function respondToConnectionRequest(
       message: 'A restaurant accepted your connection request.',
       metadata: { restaurantId, connectionRequestId: requestId, ctaUrl: '/app/restaurants' },
     }).catch(() => {})
+  } else {
+    await notifyTenantUsers({
+      tenantId: cr.supplier_id,
+      tenantType: 'SUPPLIER',
+      notificationType: 'connection_request_declined',
+      notificationCategory: 'connection_request_declined',
+      title: 'Connection declined',
+      message: 'A restaurant declined your connection request.',
+      metadata: { restaurantId, connectionRequestId: requestId, ctaUrl: '/app/restaurants' },
+    }).catch(() => {})
   }
 
   if (req) {

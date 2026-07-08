@@ -24,9 +24,11 @@ type Props = {
   draft: ReminderDraft | null
   open: boolean
   onClose: () => void
+  onSend?: (draftId: string) => void | Promise<void>
+  sending?: boolean
 }
 
-export function ReorderReminderReviewDialog({ draft, open, onClose }: Props) {
+export function ReorderReminderReviewDialog({ draft, open, onClose, onSend, sending }: Props) {
   if (!draft) return null
 
   return (
@@ -60,6 +62,18 @@ export function ReorderReminderReviewDialog({ draft, open, onClose }: Props) {
           {draft.chatUrl ? (
             <Button variant="default" asChild>
               <a href={draft.chatUrl}>Open in chat</a>
+            </Button>
+          ) : null}
+          {onSend && draft.status === 'draft' ? (
+            <Button
+              variant="default"
+              data-testid="reminder-draft-send"
+              disabled={sending}
+              onClick={() => {
+                void onSend(draft.id)
+              }}
+            >
+              {sending ? 'Sending…' : 'Send reminder'}
             </Button>
           ) : null}
           <Button

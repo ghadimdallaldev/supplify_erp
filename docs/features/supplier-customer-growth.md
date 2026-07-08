@@ -151,10 +151,13 @@ Supplier system roles (migration seeds):
 | ----------------------------- | ---------------------------------------- |
 | `supplier_connection_request` | Supplier requests connection             |
 | `connection_request_accepted` | Restaurant accepts                       |
+| `connection_request_declined` | Restaurant declines (supplier team)      |
 | `referral_registered`         | Restaurant completes signup via referral |
 | `referral_reward_earned`      | Supplier earns conversion reward         |
 | `sponsorship_gift_received`   | Restaurant receives sponsored plan       |
 | `sponsorship_expired`         | Sponsored period ends                    |
+
+**Invite channels:** Email uses `auth.team_invite` / growth invite templates. WhatsApp prospect invites return a `wa.me` share link for the supplier to send manually (not server-side API send).
 
 ## Tests
 

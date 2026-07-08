@@ -18,8 +18,11 @@ Team members receive the same in-app (and email/push when enabled) alerts as the
 | In-app   | `notification_log` + header bell; foreground toast + optional browser banner via `useNotificationAlerts` |
 | Realtime | Socket.IO `notification_new` and `entitlements_refresh` on the app socket                                |
 | Email    | Plan tier + `email_enabled` + per-category `notify_*` toggles; HTML templates (see below)                |
-| WhatsApp | Tier + toggle; server send via Meta Cloud API (planned)                                                  |
+| WhatsApp | Tier + toggle; server send via `whatsapp.service.js` (Meta Cloud API)                                    |
 | Web Push | Opt-in `push_enabled` + VAPID keys (see below)                                                           |
+| Webhook  | Platinum tier — outbound signed HTTP to tenant-configured URL (`notification/webhook.js`)                |
+
+Driver delivery milestones (`driver_assigned`, `out_for_delivery`, `delivered`, etc.) are **in-app only** — email and WhatsApp are suppressed per ping (`skipEmail` + `skipWhatsapp` on metadata).
 
 ## Order events
 
@@ -34,7 +37,22 @@ See [ordering-decline.md](./ordering-decline.md).
 
 ## Other tenant-wide events
 
-Messages, invoices (issued/overdue), payments, inventory (low/out of stock), disputes, staff PTO/swap, scheduled quick lists, reservation staff events, post-receiving review prompts, order amendments.
+Messages, invoices (issued/overdue/reminders), payments, inventory (low/out of stock), disputes, staff PTO/swap, scheduled quick lists, reservation staff events, guest reservation updates, post-receiving review prompts, order amendments, billing lifecycle events, supplier reorder reminders, team role changes.
+
+## Billing events
+
+| Category                 | When                                                   |
+| ------------------------ | ------------------------------------------------------ |
+| `billing_trial_started`  | Free plan activation after registration                |
+| `billing_trial_ending`   | Cron: trial ending soon                                |
+| `billing_trial_expired`  | Free sandbox expiry job (before lock)                  |
+| `billing_trial_extended` | Admin or unlock extends free trial                     |
+| `billing_activated`      | Paid checkout succeeds                                 |
+| `billing_plan_changed`   | Admin plan change or paid checkout with different plan |
+| `billing_renewed`        | Subscription billing job renewal                       |
+| `billing_payment_failed` | Failed renewal charge                                  |
+| `billing_cancelled`      | Admin sets status `CANCELLED`                          |
+| `billing_account_locked` | Past-due lock or free sandbox expiry                   |
 
 ## Supplier customer growth
 
@@ -42,6 +60,7 @@ Messages, invoices (issued/overdue), payments, inventory (low/out of stock), dis
 | ----------------------------- | ------------------------------------------------------ |
 | `supplier_connection_request` | Restaurant team — supplier wants to connect            |
 | `connection_request_accepted` | Supplier team                                          |
+| `connection_request_declined` | Supplier team                                          |
 | `referral_registered`         | Restaurant team — completed signup via supplier invite |
 | `referral_reward_earned`      | Supplier team — referred restaurant converted to paid  |
 | `sponsorship_gift_received`   | Restaurant team — supplier sponsored onboarding        |
@@ -71,7 +90,7 @@ Business flow → notification.service (prefs/tier/in-app/push/WhatsApp)
               mailer.service (Nodemailer SMTP)
 ```
 
-Direct sends (guest waitlist, team invites, staff portal) call `email.service` without tenant notification prefs where appropriate.
+Direct sends (guest waitlist, team invites, staff portal, welcome email, role changed on assign) call `email.service` without tenant notification prefs where appropriate. Guest reservation updates use direct email + WhatsApp in `notification/email.js`.
 
 ### Environment variables
 
@@ -109,6 +128,30 @@ pnpm --filter @supplify/api email:test you@example.com
 3. Call `sendTemplateEmail` from the service layer
 
 Admin delivery log (redacted): [admin-panel-operations.md](./admin-panel-operations.md).
+
+---
+
+## WhatsApp (Meta Cloud API)
+
+Server-side send via `apps/api/src/services/whatsapp.service.js`. Gated by plan feature `notifications` (`email_and_whatsapp` or `email_whatsapp_webhook`), user pref `whatsapp_enabled`, and phone on `restaurant_contact_info` / `supplier_contact_info`.
+
+### Environment variables
+
+| Variable                        | Purpose                                     |
+| ------------------------------- | ------------------------------------------- |
+| `WHATSAPP_ENABLED`              | Master switch (default `false`)             |
+| `WHATSAPP_LOG_ONLY`             | Log payload, no network send (dev/preprod)  |
+| `WHATSAPP_ACCESS_TOKEN`         | Meta Business API token                     |
+| `WHATSAPP_PHONE_NUMBER_ID`      | Meta phone number ID                        |
+| `WHATSAPP_API_VERSION`          | Graph API version (default `v21.0`)         |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | Webhook verification                        |
+| `WHATSAPP_APP_SECRET`           | Signature verification for inbound webhooks |
+
+Webhook URL: `https://<api-host>/webhooks/whatsapp`
+
+Guest flows (reservation confirm/cancel/reschedule, waitlist offer) send WhatsApp directly when a guest phone is present, without tenant prefs.
+
+Dedup/audit: `whatsapp_delivery_log` (migration `0181`).
 
 ---
 

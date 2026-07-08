@@ -22,6 +22,8 @@ import { resolveWorkspaceScope } from '../lib/workspace-membership.js'
 import { assertCanAssignRole, assertCanGrantPermissions } from '../lib/rbac-guards.js'
 import { MAIN_ADMIN_ROLE_NAME } from '../lib/workspace-membership.js'
 import { syncDriverLinkForRoleAssignment } from '../lib/driver-user-link.js'
+import { sendTemplateEmail } from '../services/email/email.service.js'
+import { buildAppUrl } from '../lib/app-url.js'
 
 const router = express.Router()
 
@@ -448,6 +450,30 @@ router.post(
           driverId: driverId ?? undefined,
           createDriverProfile: createDriverProfile ?? true,
         })
+      }
+
+      const tenantTable = tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'
+      const { rows: tenantRows } = await query(`SELECT name FROM ${tenantTable} WHERE id = $1`, [
+        tenantId,
+      ])
+      const { rows: userRows } = await query(`SELECT email FROM app_user WHERE id = $1`, [
+        targetUserId,
+      ])
+      const targetEmail = userRows[0]?.email
+      if (targetEmail) {
+        sendTemplateEmail({
+          to: targetEmail,
+          template: 'auth.role_changed',
+          data: {
+            tenantName: tenantRows[0]?.name || 'your workspace',
+            roleName: role.name,
+            ctaUrl: buildAppUrl('/app'),
+          },
+          tenantId,
+          eventType: 'auth.role_changed',
+          eventKey: `role_changed:${targetUserId}:${roleId}:${Date.now()}`,
+          entityId: targetUserId,
+        }).catch(() => {})
       }
 
       res.json({

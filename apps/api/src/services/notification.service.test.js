@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   sendNotification,
   notifyGuestReservationConfirmation,
+  notifyGuestReservationUpdate,
+  notifyBillingPlanChanged,
+  notifyBillingTrialExtended,
   listTenantUserIds,
   notifyTenantUsers,
   getUserNotifications,
@@ -235,6 +238,91 @@ describe('Notification Service', () => {
       })
 
       expect(sendTemplateEmail).not.toHaveBeenCalled()
+    })
+
+    it('skips WhatsApp when metadata.skipWhatsapp is true', async () => {
+      const { sendWhatsAppMessage } = await import('./whatsapp.service.js')
+      const { getEntitlements } = await import('../lib/subscription.js')
+      getEntitlements.mockResolvedValue({ features: { notifications: 'email_and_whatsapp' } })
+
+      queryMock
+        .mockResolvedValueOnce({
+          rows: [{ ...basePrefs, whatsapp_enabled: true, notify_order_new: true }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ tenant_id: 'tenant-1', email: 'owner@test.com', phone: '+96170000000' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ email: 'owner@test.com', phone: '+96170000000' }] })
+        .mockResolvedValueOnce({ rows: [{ tenant_id: 'tenant-1' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'notif-1' }] })
+        .mockResolvedValueOnce({ rowCount: 1 })
+
+      await sendNotification({
+        userId: 'user-1',
+        userType: 'RESTAURANT',
+        notificationType: 'ORDER',
+        notificationCategory: 'shipped',
+        title: 'Driver update',
+        message: 'On the way',
+        metadata: { skipWhatsapp: true },
+      })
+
+      expect(sendWhatsAppMessage).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('notifyGuestReservationUpdate', () => {
+    it('sends cancelled template to guest email', async () => {
+      const { sendTemplateEmail } = await import('./email/email.service.js')
+      const result = await notifyGuestReservationUpdate(
+        {
+          id: 'res-1',
+          customer_name: 'Sam',
+          customer_email: 'sam@example.com',
+          party_size: 2,
+          scheduled_at: '2026-05-20T18:00:00.000Z',
+        },
+        'Golden Fork',
+        'cancelled'
+      )
+      expect(sendTemplateEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ template: 'reservation.cancelled' })
+      )
+      expect(result.email).toBe(true)
+    })
+  })
+
+  describe('billing notification helpers', () => {
+    it('notifyBillingPlanChanged fans out to tenant users', async () => {
+      const { getEntitlements } = await import('../lib/subscription.js')
+      getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_only' } })
+      queryMock
+        .mockResolvedValueOnce({ rows: [{ id: 'user-1' }] })
+        .mockResolvedValue({ rows: [{ ...basePrefs, notify_billing: true }] })
+
+      const sent = await notifyBillingPlanChanged({
+        tenantId: 'rest-1',
+        tenantType: 'RESTAURANT',
+        planName: 'Gold',
+        previousPlanName: 'Free',
+      })
+      expect(sent.length).toBeGreaterThan(0)
+    })
+
+    it('notifyBillingTrialExtended fans out to tenant users', async () => {
+      const { getEntitlements } = await import('../lib/subscription.js')
+      getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_only' } })
+      queryMock
+        .mockResolvedValueOnce({ rows: [{ id: 'user-1' }] })
+        .mockResolvedValue({ rows: [{ ...basePrefs, notify_billing: true }] })
+
+      const sent = await notifyBillingTrialExtended({
+        tenantId: 'rest-1',
+        tenantType: 'RESTAURANT',
+        trialDays: 5,
+        trialEndsAt: '2026-08-01',
+      })
+      expect(sent.length).toBeGreaterThan(0)
     })
   })
 

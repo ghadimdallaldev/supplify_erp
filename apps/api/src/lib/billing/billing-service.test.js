@@ -8,6 +8,12 @@ vi.mock('../db.js', () => ({
   withTransaction: async (fn) => fn({ query: (...args) => mockQuery(...args) }),
 }))
 
+vi.mock('../cache.js', () => ({
+  getCache: vi.fn().mockResolvedValue(null),
+  setCache: vi.fn().mockResolvedValue(undefined),
+  deleteCache: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('../platform-settings.js', () => ({
   getFreeSandboxDays: vi.fn().mockResolvedValue(7),
   clampFreeTrialDays: (days, fallback = 7) => {
@@ -15,6 +21,18 @@ vi.mock('../platform-settings.js', () => ({
     const base = Number.isFinite(n) ? Math.round(n) : fallback
     return Math.min(7, Math.max(3, base))
   },
+}))
+
+const mockNotifyBillingTrialStarted = vi.fn().mockResolvedValue([])
+const mockNotifyBillingActivated = vi.fn().mockResolvedValue([])
+const mockNotifyBillingPlanChanged = vi.fn().mockResolvedValue([])
+const mockNotifyBillingTrialExtended = vi.fn().mockResolvedValue([])
+
+vi.mock('../../services/notification.service.js', () => ({
+  notifyBillingTrialStarted: (...args) => mockNotifyBillingTrialStarted(...args),
+  notifyBillingActivated: (...args) => mockNotifyBillingActivated(...args),
+  notifyBillingPlanChanged: (...args) => mockNotifyBillingPlanChanged(...args),
+  notifyBillingTrialExtended: (...args) => mockNotifyBillingTrialExtended(...args),
 }))
 
 describe('computeBillingAccessState', () => {
@@ -164,6 +182,7 @@ describe('buildAccountLockedError', () => {
 describe('checkoutSubscription free plan', () => {
   beforeEach(() => {
     mockQuery.mockReset()
+    mockNotifyBillingTrialStarted.mockClear()
   })
 
   it('unlocks pending_activation when confirming free plan', async () => {
@@ -195,6 +214,16 @@ describe('checkoutSubscription free plan', () => {
       })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'sub-1',
+            tenant_id: 'sup-1',
+            tenant_type: 'SUPPLIER',
+            free_sandbox_expires_at: new Date().toISOString(),
+          },
+        ],
+      })
 
     const result = await checkoutSubscription({
       tenantId: 'sup-1',
@@ -213,12 +242,19 @@ describe('checkoutSubscription free plan', () => {
     expect(updateCall?.[0]).toMatch(/account_locked_at = NULL/)
     expect(updateCall?.[0]).toMatch(/lock_reason = NULL/)
     expect(updateCall?.[0]).toMatch(/free_sandbox_expires_at/)
+    expect(mockNotifyBillingTrialStarted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 'sup-1',
+        tenantType: 'SUPPLIER',
+      })
+    )
   })
 })
 
 describe('extendFreeSandboxTrial', () => {
   beforeEach(() => {
     mockQuery.mockReset()
+    mockNotifyBillingTrialExtended.mockClear()
   })
 
   it('extends expiry and clears lock for free plan', async () => {
@@ -249,6 +285,13 @@ describe('extendFreeSandboxTrial', () => {
     )
     expect(updateCall?.[0]).toMatch(/account_locked_at = NULL/)
     expect(updateCall?.[0]).toMatch(/lock_reason = NULL/)
+    expect(mockNotifyBillingTrialExtended).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 'r1',
+        tenantType: 'RESTAURANT',
+        trialDays: 5,
+      })
+    )
   })
 
   it('rejects extension for non-free plans', async () => {
@@ -284,6 +327,9 @@ describe('unlockSubscriptionAccount', () => {
       })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ free_sandbox_expires_at: new Date().toISOString() }],
+      })
 
     await unlockSubscriptionAccount('sub-free', { unlockedBy: 'admin', adminUserId: 'a1' })
 
