@@ -32,7 +32,15 @@ function ProductThumb({ product, size }: { product: any; size: 'sm' | 'md' }) {
   return (
     <div className={boxClass}>
       {thumbUrl ? (
-        <img src={thumbUrl} alt={product.name} className="h-full w-full object-cover" />
+        <img
+          src={thumbUrl}
+          alt={product.name}
+          loading="lazy"
+          decoding="async"
+          width={size === 'sm' ? 56 : 48}
+          height={size === 'sm' ? 56 : 48}
+          className="h-full w-full object-cover"
+        />
       ) : (
         <Package className="h-6 w-6 text-[var(--text-muted)]" />
       )}

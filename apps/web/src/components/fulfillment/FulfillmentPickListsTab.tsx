@@ -29,6 +29,7 @@ export function FulfillmentPickListsTab() {
   } = useGetOrdersQuery({
     limit: 500,
     offset: 0,
+    includeItems: true,
     warehouseId: warehouseFilter !== 'ALL' ? warehouseFilter : undefined,
     warehouse_id: warehouseFilter !== 'ALL' ? warehouseFilter : undefined,
   })

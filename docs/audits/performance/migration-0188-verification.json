@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-07-08T16:39:52.169Z",
+  "migrations": [],
+  "indexes": [
+    {
+      "name": "idx_invoice_restaurant_date",
+      "def": "CREATE INDEX idx_invoice_restaurant_date ON public.invoice USING btree (restaurant_id, invoice_date DESC)"
+    },
+    {
+      "name": "idx_invoice_supplier_date",
+      "def": "CREATE INDEX idx_invoice_supplier_date ON public.invoice USING btree (supplier_id, invoice_date DESC)"
+    }
+  ],
+  "explainPlan": [
+    "Limit  (cost=3.31..3.31 rows=1 width=52)",
+    "  InitPlan 1",
+    "    ->  Limit  (cost=0.00..1.01 rows=1 width=16)",
+    "          ->  Seq Scan on supplier  (cost=0.00..1.01 rows=1 width=16)",
+    "  ->  Sort  (cost=2.30..2.30 rows=1 width=52)",
+    "        Sort Key: i.issue_date DESC, i.invoice_number DESC",
+    "        ->  Seq Scan on invoice i  (cost=0.00..2.29 rows=1 width=52)",
+    "              Filter: (supplier_id = (InitPlan 1).col1)"
+  ]
+}

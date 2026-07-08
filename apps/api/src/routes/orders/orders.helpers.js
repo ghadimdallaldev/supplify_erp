@@ -25,6 +25,7 @@ import { notifyOrderStatusChange } from '../../services/notification.service.js'
 import {
   applyBestPromotionToOrder,
   hasActiveSupplierOrderPromotions,
+  hasActiveSupplierOrderPromotionsBatch,
 } from '../../services/promotions.service.js'
 import {
   applyPromotionByIdToOrder,
@@ -295,8 +296,8 @@ const orderListSchema = z.object({
     .default('0'),
   includeItems: z
     .string()
-    .transform((val) => val !== 'false')
-    .default('true'),
+    .transform((val) => val === 'true')
+    .default('false'),
 })
 
 // Helper function to create invoice from delivered order

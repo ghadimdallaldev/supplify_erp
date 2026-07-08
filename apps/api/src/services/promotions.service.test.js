@@ -158,4 +158,21 @@ describe('promotions.service', () => {
       ).resolves.toBe(false)
     })
   })
+
+  describe('hasActiveSupplierOrderPromotionsBatch', () => {
+    it('returns a map with promo flags per supplier', async () => {
+      const queryFn = vi.fn().mockResolvedValue({
+        rows: [{ supplier_id: 'supplier-1' }],
+      })
+      const { hasActiveSupplierOrderPromotionsBatch } = await import('./promotions.service.js')
+      const result = await hasActiveSupplierOrderPromotionsBatch(
+        queryFn,
+        ['supplier-1', 'supplier-2'],
+        'restaurant-1'
+      )
+      expect(result.get('supplier-1')).toBe(true)
+      expect(result.get('supplier-2')).toBe(false)
+      expect(queryFn).toHaveBeenCalledOnce()
+    })
+  })
 })

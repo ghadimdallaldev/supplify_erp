@@ -79,12 +79,12 @@ export function Sidebar({
   )
   const { data: restaurantDisputesData } = useGetDisputesQuery(undefined, {
     skip: !disputesEnabled || isSupplier || !user,
-    pollingInterval: 30_000,
+    pollingInterval: 60_000,
     skipPollingIfUnfocused: true,
   })
   const { data: supplierDisputesData } = useGetIncomingDisputesQuery(undefined, {
     skip: !disputesEnabled || !isSupplier || !user || isDriverRole || !can('FULFILLMENT_VIEW'),
-    pollingInterval: 30_000,
+    pollingInterval: 60_000,
     skipPollingIfUnfocused: true,
   })
   const activeDisputeCount = countActiveDisputes(

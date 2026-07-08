@@ -1,0 +1,31 @@
+{
+  "generatedAt": "2026-07-08T16:18:03.080Z",
+  "apiUrl": "https://api-dev.supplifyerp.com",
+  "health": {
+    "status": 200,
+    "env": "dev",
+    "redis": {
+      "connected": true
+    },
+    "dbPool": {
+      "total": 19,
+      "idle": 19,
+      "waiting": 0,
+      "max": 20
+    }
+  },
+  "ready": {
+    "status": 200,
+    "body": {
+      "status": "ok",
+      "service": "supplify-api",
+      "env": "dev"
+    }
+  },
+  "authWarm": {
+    "durations": [154, 140, 150, 116, 128],
+    "p50": 150,
+    "first": 154,
+    "last": 128
+  }
+}

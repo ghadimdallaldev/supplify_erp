@@ -80,7 +80,7 @@ import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
 const router = Router()
 
 const ADMIN_OVERVIEW_CACHE_KEY = 'admin:overview:v1'
-const ADMIN_OVERVIEW_CACHE_TTL_SECONDS = 120
+const ADMIN_OVERVIEW_CACHE_TTL_SECONDS = 180
 const ADMIN_ACTIVITY_CACHE_TTL_SECONDS = 90
 
 function adminActivityCacheKey({ limit, offset, type, days }) {
