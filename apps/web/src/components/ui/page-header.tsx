@@ -41,7 +41,7 @@ export function PageHeader({
         {breadcrumb && <div className="mb-1.5 text-xs text-[var(--text-muted)]">{breadcrumb}</div>}
         <h1
           className={cn(
-            'text-2xl font-semibold tracking-tight text-[var(--text)]',
+            'text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl',
             isCompact && 'text-xl sm:text-2xl'
           )}
         >

@@ -1,8 +1,8 @@
 # API Performance Audit Results
 
-**Generated:** 2026-07-08T16:19:32.227Z
-**Base URL:** https://api-preprod.supplifyerp.com
-**Samples per endpoint:** 10 (after 3 warmup)
+**Generated:** 2026-07-08T17:34:05.453Z
+**Base URL:** https://api-dev.supplifyerp.com
+**Samples per endpoint:** 5 (after 3 warmup)
 
 ## Infrastructure
 
@@ -10,7 +10,36 @@
 {
   "status": "ok",
   "service": "supplify-api",
-  "env": "preprod"
+  "env": "dev",
+  "ok": true,
+  "timestamp": "2026-07-08T17:33:36.136Z",
+  "storage": {
+    "ok": true,
+    "driver": "s3",
+    "endpoint": "https://t3.storageapi.dev",
+    "publicUrl": "https://t3.storageapi.dev",
+    "bucket": "buffered-stand-ookrhuvq89",
+    "buckets": ["buffered-stand-ookrhuvq89"]
+  },
+  "requestId": "b2b0b215",
+  "memory": {
+    "rssMb": 165.8,
+    "heapUsedMb": 58.2,
+    "heapTotalMb": 62,
+    "externalMb": 5,
+    "arrayBuffersMb": 5.3,
+    "activeHandles": 26,
+    "activeRequests": 0
+  },
+  "dbPool": {
+    "total": 18,
+    "idle": 18,
+    "waiting": 0,
+    "max": 20
+  },
+  "redis": {
+    "connected": true
+  }
 }
 ```
 
@@ -18,34 +47,32 @@
 
 | Endpoint                                        | Role       | avg   | p50   | p95   | max   | Budget | Status | Over |
 | ----------------------------------------------- | ---------- | ----- | ----- | ----- | ----- | ------ | ------ | ---- |
-| `/health`                                       | -          | 294ms | 250ms | 561ms | 561ms | 500ms  | OK     | YES  |
-| `/ready`                                        | -          | 265ms | 248ms | 376ms | 376ms | 500ms  | OK     | no   |
-| `/auth/me`                                      | restaurant | 308ms | 273ms | 455ms | 455ms | 800ms  | FAIL   | no   |
-| `/api/orders?limit=20`                          | restaurant | 282ms | 260ms | 390ms | 390ms | 500ms  | FAIL   | no   |
-| `/api/orders?limit=20&includeItems=false`       | restaurant | 269ms | 261ms | 353ms | 353ms | 500ms  | FAIL   | no   |
-| `/api/products?limit=20`                        | supplier   | 270ms | 258ms | 366ms | 366ms | 500ms  | FAIL   | no   |
-| `/api/products/categories`                      | supplier   | 258ms | 255ms | 287ms | 287ms | 500ms  | FAIL   | no   |
-| `/api/inventory?limit=100`                      | supplier   | 267ms | 263ms | 288ms | 288ms | 500ms  | FAIL   | no   |
-| `/api/orders?limit=20&includeItems=true`        | restaurant | 289ms | 271ms | 397ms | 397ms | 500ms  | FAIL   | no   |
-| `/api/admin/dashboard`                          | restaurant | 267ms | 262ms | 322ms | 322ms | 500ms  | FAIL   | no   |
-| `/api/billing/status`                           | restaurant | 285ms | 257ms | 460ms | 460ms | 500ms  | FAIL   | no   |
-| `/api/promotions/active`                        | restaurant | 309ms | 264ms | 534ms | 534ms | 500ms  | FAIL   | YES  |
-| `/api/quote-requests`                           | restaurant | 307ms | 256ms | 641ms | 641ms | 500ms  | FAIL   | YES  |
-| `/api/supplier/deliveries/board`                | supplier   | 280ms | 275ms | 340ms | 340ms | 1500ms | FAIL   | no   |
-| `/api/supplier/reorder-intelligence`            | supplier   | 294ms | 274ms | 437ms | 437ms | 500ms  | FAIL   | no   |
-| `/api/restaurant-inventory?limit=100&offset=0`  | restaurant | 280ms | 264ms | 333ms | 333ms | 1500ms | FAIL   | no   |
-| `/api/invoices?limit=50`                        | supplier   | 285ms | 271ms | 369ms | 369ms | 500ms  | FAIL   | no   |
-| `/api/fulfillment/dispatch`                     | supplier   | 277ms | 266ms | 314ms | 314ms | 1500ms | FAIL   | no   |
-| `/api/fulfillment/board`                        | supplier   | 259ms | 256ms | 287ms | 287ms | 1500ms | FAIL   | no   |
-| `/api/notifications/unread-count`               | restaurant | 270ms | 265ms | 296ms | 296ms | 500ms  | FAIL   | no   |
-| `/api/subscriptions/entitlements`               | restaurant | 292ms | 271ms | 440ms | 440ms | 500ms  | FAIL   | no   |
-| `/api/admin-dashboard/overview`                 | admin      | 260ms | 252ms | 293ms | 293ms | 1500ms | FAIL   | no   |
-| `/api/supplier/command-center`                  | supplier   | 275ms | 272ms | 337ms | 337ms | 1500ms | FAIL   | no   |
-| `/api/reports/restaurant/spend-by-supplier`     | restaurant | 263ms | 255ms | 349ms | 349ms | 1500ms | FAIL   | no   |
-| `/api/restaurant-inventory/reorder-suggestions` | restaurant | 259ms | 260ms | 270ms | 270ms | 500ms  | FAIL   | no   |
+| `/health`                                       | -          | 222ms | 148ms | 527ms | 527ms | 500ms  | OK     | YES  |
+| `/ready`                                        | -          | 123ms | 115ms | 160ms | 160ms | 500ms  | OK     | no   |
+| `/auth/me`                                      | restaurant | 145ms | 141ms | 159ms | 159ms | 800ms  | OK     | no   |
+| `/api/orders?limit=20`                          | restaurant | 120ms | 120ms | 136ms | 136ms | 500ms  | OK     | no   |
+| `/api/orders?limit=20&includeItems=false`       | restaurant | 116ms | 113ms | 125ms | 125ms | 500ms  | OK     | no   |
+| `/api/products?limit=20`                        | supplier   | 138ms | 125ms | 176ms | 176ms | 500ms  | OK     | no   |
+| `/api/products/categories`                      | supplier   | 139ms | 126ms | 207ms | 207ms | 500ms  | OK     | no   |
+| `/api/inventory?limit=100`                      | supplier   | 118ms | 115ms | 149ms | 149ms | 500ms  | OK     | no   |
+| `/api/orders?limit=20&includeItems=true`        | restaurant | 135ms | 123ms | 190ms | 190ms | 500ms  | OK     | no   |
+| `/api/admin/dashboard`                          | restaurant | 186ms | 207ms | 249ms | 249ms | 500ms  | OK     | no   |
+| `/api/billing/status`                           | restaurant | 125ms | 121ms | 142ms | 142ms | 500ms  | OK     | no   |
+| `/api/promotions/active`                        | restaurant | 118ms | 116ms | 134ms | 134ms | 500ms  | OK     | no   |
+| `/api/quote-requests`                           | restaurant | 119ms | 116ms | 136ms | 136ms | 500ms  | OK     | no   |
+| `/api/supplier/deliveries/board`                | supplier   | 138ms | 132ms | 162ms | 162ms | 1500ms | OK     | no   |
+| `/api/supplier/reorder-intelligence`            | supplier   | 118ms | 116ms | 128ms | 128ms | 500ms  | OK     | no   |
+| `/api/restaurant-inventory?limit=100&offset=0`  | restaurant | 123ms | 124ms | 131ms | 131ms | 1500ms | OK     | no   |
+| `/api/invoices?limit=50`                        | supplier   | 191ms | 134ms | 452ms | 452ms | 500ms  | OK     | no   |
+| `/api/fulfillment/dispatch`                     | supplier   | 120ms | 121ms | 124ms | 124ms | 1500ms | OK     | no   |
+| `/api/fulfillment/board`                        | supplier   | 127ms | 119ms | 144ms | 144ms | 1500ms | OK     | no   |
+| `/api/notifications/unread-count`               | restaurant | 122ms | 123ms | 133ms | 133ms | 500ms  | OK     | no   |
+| `/api/subscriptions/entitlements`               | restaurant | 128ms | 128ms | 138ms | 138ms | 500ms  | OK     | no   |
+| `/api/admin-dashboard/overview`                 | admin      | 118ms | 118ms | 124ms | 124ms | 1500ms | OK     | no   |
+| `/api/supplier/command-center`                  | supplier   | 116ms | 112ms | 126ms | 126ms | 1500ms | OK     | no   |
+| `/api/reports/restaurant/spend-by-supplier`     | restaurant | 117ms | 115ms | 126ms | 126ms | 1500ms | OK     | no   |
+| `/api/restaurant-inventory/reorder-suggestions` | restaurant | 130ms | 118ms | 176ms | 176ms | 500ms  | OK     | no   |
 
 ## Over budget (p95)
 
-- **health** p95=561ms (budget 500ms)
-- **promotions-active** p95=534ms (budget 500ms)
-- **quote-requests** p95=641ms (budget 500ms)
+- **health** p95=527ms (budget 500ms)

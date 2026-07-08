@@ -146,7 +146,7 @@ export function Sidebar({
       className={[
         'flex flex-col border-e border-[var(--app-border)]/40 bg-[var(--surface)] font-sans',
         'h-screen overflow-y-auto',
-        'fixed inset-y-0 start-0 z-50 w-[min(100vw-3rem,14rem)] lg:sticky lg:w-56 lg:translate-x-0',
+        'fixed inset-y-0 start-0 z-50 w-[min(100vw-3rem,14rem)] lg:sticky lg:w-52 lg:translate-x-0 xl:w-56',
         'transition-transform duration-200',
         mobileOpen ? 'translate-x-0' : 'max-lg:-translate-x-full max-lg:rtl:translate-x-full',
       ].join(' ')}

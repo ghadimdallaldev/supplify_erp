@@ -207,7 +207,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
   return (
     <header
       data-testid="header"
-      className="flex h-14 min-h-14 shrink-0 items-center gap-2 border-b border-[var(--app-border)]/40 bg-[var(--surface)] px-3 pt-[env(safe-area-inset-top)] sm:gap-3 sm:px-5 lg:px-6"
+      className="flex h-14 min-h-14 shrink-0 items-center gap-2 border-b border-[var(--app-border)]/40 bg-[var(--surface)] px-3 pt-[env(safe-area-inset-top)] sm:gap-3 sm:px-4 xl:px-6"
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
       {onOpenMobileNav && !isAdminPortalRoute && (
@@ -298,7 +298,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         </button>
         <button
           type="button"
-          className="hidden h-8 min-w-[140px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--app-border)]/50 bg-[var(--brand-ultra)]/30 px-2.5 text-start transition-colors hover:border-[var(--app-border)]/70 hover:bg-[var(--brand-ultra)]/50 md:flex lg:min-w-[200px]"
+          className="hidden h-8 min-w-[130px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--app-border)]/50 bg-[var(--brand-ultra)]/30 px-2.5 text-start transition-colors hover:border-[var(--app-border)]/70 hover:bg-[var(--brand-ultra)]/50 md:flex lg:min-w-[160px] xl:min-w-[200px]"
           aria-label={t('header.openCommandPalette')}
           onClick={openCommandPalette}
         >

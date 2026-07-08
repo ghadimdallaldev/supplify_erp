@@ -190,7 +190,7 @@ async function queryOrdersToPickWithPickLists(sql, supplierId, date) {
       ORDER BY pl2.created_at DESC
       LIMIT 1
     ) pl ON true
-    WHERE o.status = ANY($3::text[])
+    WHERE o.status = ANY($3::order_status[])
       AND ${sql.scheduledAtExpr}::date = $2::date
     ORDER BY o.id, o.created_at DESC
     LIMIT 100
@@ -213,7 +213,7 @@ async function queryOrdersToPickWithoutPickLists(sql, supplierId, date) {
     FROM customer_order o
     JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
     JOIN restaurant r ON r.id = o.restaurant_id
-    WHERE o.status = ANY($3::text[])
+    WHERE o.status = ANY($3::order_status[])
       AND ${sql.scheduledAtExpr}::date = $2::date
     ORDER BY o.id, o.created_at DESC
     LIMIT 100

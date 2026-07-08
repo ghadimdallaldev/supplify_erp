@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { screen, within } from '@testing-library/react'
 import { ProductCatalogTable } from './ProductCatalogTable'
-import { expectLgCardTableSplit } from '../../test/viewports'
+import { expectXlCardTableSplit } from '../../test/viewports'
 import { renderWithProviders } from '../../test/utils'
 
 const sampleProduct = {
@@ -12,7 +12,7 @@ const sampleProduct = {
 }
 
 describe('ProductCatalogTable responsive layout', () => {
-  it('uses lg card/table split via ResponsiveDataList', () => {
+  it('keeps cards through laptop widths and switches to tables at xl', () => {
     renderWithProviders(
       <ProductCatalogTable
         filteredProducts={[sampleProduct]}
@@ -26,7 +26,7 @@ describe('ProductCatalogTable responsive layout', () => {
 
     const cards = screen.getByTestId('responsive-data-list-cards')
     const table = screen.getByTestId('responsive-data-list-table')
-    expectLgCardTableSplit(cards, table)
+    expectXlCardTableSplit(cards, table)
     expect(screen.getByTestId('product-card-p1')).toBeInTheDocument()
   })
 })

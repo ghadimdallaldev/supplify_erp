@@ -6,7 +6,7 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
     <div
       ref={ref}
       className={cn(
-        'min-w-0 overflow-hidden rounded-xl border border-[var(--app-border-mid)] bg-[var(--surface)] text-[var(--text)] shadow-sm transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--app-border-mid)] hover:shadow-[0_6px_20px_-4px_rgba(15,23,42,0.12),0_2px_6px_-2px_rgba(15,23,42,0.08)] motion-reduce:transition-none',
+        'min-w-0 overflow-hidden rounded-lg border border-[var(--app-border-mid)] bg-[var(--surface)] text-[var(--text)] shadow-sm transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--app-border-mid)] hover:shadow-[0_6px_20px_-4px_rgba(15,23,42,0.12),0_2px_6px_-2px_rgba(15,23,42,0.08)] motion-reduce:transition-none',
         className
       )}
       {...props}
@@ -17,7 +17,7 @@ Card.displayName = 'Card'
 
 const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('flex flex-col space-y-1.5 p-4 sm:p-6', className)} {...props} />
+    <div ref={ref} className={cn('flex flex-col space-y-1.5 p-4 xl:p-6', className)} {...props} />
   )
 )
 CardHeader.displayName = 'CardHeader'
@@ -46,7 +46,7 @@ CardDescription.displayName = 'CardDescription'
 
 const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('p-4 pt-0 sm:p-6 sm:pt-0', className)} {...props} />
+    <div ref={ref} className={cn('p-4 pt-0 xl:p-6 xl:pt-0', className)} {...props} />
   )
 )
 CardContent.displayName = 'CardContent'
@@ -55,7 +55,7 @@ const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('flex flex-wrap items-center gap-2 p-4 pt-0 sm:p-6 sm:pt-0', className)}
+      className={cn('flex flex-wrap items-center gap-2 p-4 pt-0 xl:p-6 xl:pt-0', className)}
       {...props}
     />
   )

@@ -292,7 +292,7 @@ export function Layout() {
                       }}
                     />
                   )}
-                  <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden p-3 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:p-4 md:p-6 lg:pb-6">
+                  <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden p-3 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:p-4 lg:pb-6 xl:p-6">
                     <Outlet />
                   </main>
                 </div>

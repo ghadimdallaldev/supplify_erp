@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-08T16:18:03.080Z",
+  "generatedAt": "2026-07-08T17:33:36.552Z",
   "apiUrl": "https://api-dev.supplifyerp.com",
   "health": {
     "status": 200,
@@ -8,8 +8,8 @@
       "connected": true
     },
     "dbPool": {
-      "total": 19,
-      "idle": 19,
+      "total": 18,
+      "idle": 18,
       "waiting": 0,
       "max": 20
     }
@@ -22,10 +22,5 @@
       "env": "dev"
     }
   },
-  "authWarm": {
-    "durations": [154, 140, 150, 116, 128],
-    "p50": 150,
-    "first": 154,
-    "last": 128
-  }
+  "authWarm": null
 }

@@ -18,7 +18,7 @@ export function AdminShellPage({
     <div className="admin-page-shell flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-x-hidden">
       <PageShell
         maxWidth={maxWidth}
-        className="min-h-0 w-full min-w-0 flex-1 px-4 py-4 sm:px-6 sm:py-5"
+        className="min-h-0 w-full min-w-0 flex-1 px-3 py-3 sm:px-4 sm:py-4 xl:px-6 xl:py-5"
         data-testid={testId}
       >
         {children}

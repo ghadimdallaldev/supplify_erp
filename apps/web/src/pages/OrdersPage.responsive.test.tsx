@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { screen } from '@testing-library/react'
 import { OrdersPage } from './OrdersPage'
 import { renderWithProviders } from '../test/utils'
-import { expectLgCardTableSplit } from '../test/viewports'
+import { expectXlCardTableSplit } from '../test/viewports'
 
 const mockOrders = vi.fn()
 
@@ -61,12 +61,12 @@ describe('OrdersPage responsive layout', () => {
     })
   })
 
-  it('uses lg card/table split for order lists', () => {
+  it('keeps order cards through laptop widths and switches to tables at xl', () => {
     renderWithProviders(<OrdersPage />)
 
     const cards = screen.getByTestId('responsive-data-list-cards')
     const table = screen.getByTestId('responsive-data-list-table')
-    expectLgCardTableSplit(cards, table)
+    expectXlCardTableSplit(cards, table)
     expect(screen.getByTestId('order-row-order-abc12345')).toBeInTheDocument()
   })
 })
