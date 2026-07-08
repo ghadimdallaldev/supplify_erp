@@ -193,6 +193,41 @@ export async function hasActiveSupplierOrderPromotions(db, supplierId, restauran
   return rows.length > 0
 }
 
+const ACTIVE_ORDER_PROMO_BATCH_SQL = `
+  SELECT DISTINCT p.supplier_id
+  FROM promotions p
+  WHERE p.supplier_id = ANY($1::uuid[])
+    AND p.status = 'active'
+    AND p.type <> 'featured_listing'
+    AND COALESCE(p.payment_status, 'not_required') IN ('not_required', 'paid')
+    AND p.starts_at <= NOW()
+    AND (p.ends_at IS NULL OR p.ends_at > NOW())
+    AND (p.usage_limit IS NULL OR p.usage_count < p.usage_limit)
+    AND (
+      NOT EXISTS (SELECT 1 FROM promotion_restaurant_targets prt WHERE prt.promotion_id = p.id)
+      OR EXISTS (
+        SELECT 1 FROM promotion_restaurant_targets prt
+        WHERE prt.promotion_id = p.id AND prt.restaurant_id = $2
+      )
+    )
+`
+
+/**
+ * Batch promo preflight for multi-supplier carts (one query instead of N EXISTS checks).
+ * @returns {Map<string, boolean>}
+ */
+export async function hasActiveSupplierOrderPromotionsBatch(db, supplierIds, restaurantId) {
+  const uniqueIds = [...new Set(supplierIds.filter(Boolean))]
+  const result = new Map(uniqueIds.map((id) => [id, false]))
+  if (!uniqueIds.length) return result
+
+  const { rows } = await runQuery(db, ACTIVE_ORDER_PROMO_BATCH_SQL, [uniqueIds, restaurantId])
+  for (const row of rows) {
+    result.set(row.supplier_id, true)
+  }
+  return result
+}
+
 export async function loadActivePromotionsForSupplier(supplierId, restaurantId) {
   return fetchActivePromotionsForSupplier(query, supplierId, restaurantId)
 }

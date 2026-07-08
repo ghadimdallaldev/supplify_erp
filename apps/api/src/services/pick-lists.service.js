@@ -142,7 +142,7 @@ async function resolveEligibleOrderIds(supplierId, { scheduledDate, warehouseId,
       FROM customer_order o
       JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
       WHERE o.id = ANY($2::uuid[])
-        AND o.status = ANY($3::text[])
+        AND o.status = ANY($3::order_status[])
       `,
       [supplierId, orderIds, PICK_ELIGIBLE_ORDER_STATUSES]
     )
@@ -169,7 +169,7 @@ async function resolveEligibleOrderIds(supplierId, { scheduledDate, warehouseId,
     SELECT DISTINCT o.id
     FROM customer_order o
     JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
-    WHERE o.status = ANY($3::text[])
+    WHERE o.status = ANY($3::order_status[])
       AND NOT EXISTS (
         SELECT 1
         FROM pick_list pl

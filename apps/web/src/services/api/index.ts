@@ -164,6 +164,7 @@ export const {
   useSimulateWarehouseRoutingMutation,
   useGetOrderWarehouseAssignmentsQuery,
   useGetDashboardStatsQuery,
+  useGetDashboardSummaryQuery,
   useGetAuditLogsQuery,
   useGeneratePresignedUrlMutation,
   useAttachFileToProductMutation,

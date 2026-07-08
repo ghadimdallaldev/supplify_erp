@@ -25,7 +25,7 @@ import { z } from 'zod'
 import { notifyOrderStatusChange } from '../../services/notification.service.js'
 import {
   applyBestPromotionToOrder,
-  hasActiveSupplierOrderPromotions,
+  hasActiveSupplierOrderPromotionsBatch,
 } from '../../services/promotions.service.js'
 import {
   applyPromotionByIdToOrder,
@@ -240,22 +240,33 @@ router.post(
           )
           const supplierSubById = new Map(supplierSubscriptions)
 
+          const supplierBillingIds = await Promise.all(
+            supplierIds.map(async (supplierId) => [
+              supplierId,
+              await resolveOrgBillingTenantId(supplierId, 'SUPPLIER'),
+            ])
+          )
+          const billingIdBySupplier = new Map(supplierBillingIds)
+
+          const promoBySupplier =
+            restaurantDealsEnabled && supplierIds.length
+              ? await hasActiveSupplierOrderPromotionsBatch(query, supplierIds, restaurantId)
+              : new Map()
+
           await Promise.all(
             supplierIds.map(async (supplierId) => {
               const supplierSub = supplierSubById.get(supplierId)
-              const supplierBillingId = await resolveOrgBillingTenantId(supplierId, 'SUPPLIER')
-              const [hasPromos, multiWarehouseFeature] = await Promise.all([
-                restaurantDealsEnabled
-                  ? hasActiveSupplierOrderPromotions(query, supplierId, restaurantId)
-                  : Promise.resolve(false),
-                resolveFeatureEnabled(
-                  supplierBillingId,
-                  'SUPPLIER',
-                  'multi_warehouse',
-                  supplierSub?.features
-                ),
-              ])
-              supplierPromoEligibility.set(supplierId, hasPromos)
+              const supplierBillingId = billingIdBySupplier.get(supplierId)
+              supplierPromoEligibility.set(
+                supplierId,
+                restaurantDealsEnabled ? promoBySupplier.get(supplierId) === true : false
+              )
+              const multiWarehouseFeature = await resolveFeatureEnabled(
+                supplierBillingId,
+                'SUPPLIER',
+                'multi_warehouse',
+                supplierSub?.features
+              )
               supplierMultiWarehouse.set(supplierId, multiWarehouseFeature.enabled)
             })
           )

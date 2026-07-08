@@ -133,17 +133,30 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
       throw new ValidationError('Restaurant not found')
     }
 
-    const { rows } = await query(
-      `
-      WITH usage AS (
-        SELECT
-          restaurant_id,
-          product_id,
-          COALESCE(SUM(ABS(quantity)) FILTER (WHERE type = 'SUBTRACT'), 0) / 30.0 AS avg_daily_usage
-        FROM inventory_movement_log
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '100'), 10) || 100, 1), 500)
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0)
+
+    const [{ rows }, { rows: countRows }] = await Promise.all([
+      query(
+        `
+      WITH page_skus AS (
+        SELECT product_id
+        FROM restaurant_inventory
         WHERE restaurant_id = $1
-          AND created_at >= NOW() - INTERVAL '30 days'
-        GROUP BY restaurant_id, product_id
+        ORDER BY updated_at DESC, created_at DESC
+        LIMIT $2 OFFSET $3
+      ),
+      usage AS (
+        SELECT
+          iml.restaurant_id,
+          iml.product_id,
+          COALESCE(SUM(ABS(iml.quantity)), 0) / 30.0 AS avg_daily_usage
+        FROM inventory_movement_log iml
+        INNER JOIN page_skus ps ON ps.product_id = iml.product_id
+        WHERE iml.restaurant_id = $1
+          AND iml.type = 'SUBTRACT'
+          AND iml.created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY iml.restaurant_id, iml.product_id
       )
       SELECT
         ri.*,
@@ -166,6 +179,7 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
           ELSE NULL
         END AS days_of_stock
       FROM restaurant_inventory ri
+      INNER JOIN page_skus ps ON ps.product_id = ri.product_id
       JOIN product p ON p.id = ri.product_id
       LEFT JOIN product_category pc ON pc.id = p.category_id
       JOIN supplier s ON s.id = p.supplier_id
@@ -176,9 +190,17 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
       WHERE ri.restaurant_id = $1
       ORDER BY ri.updated_at DESC, ri.created_at DESC
     `,
-      [restaurantId],
-      req
-    )
+        [restaurantId, limit, offset],
+        req
+      ),
+      query(
+        `SELECT COUNT(*)::int AS total FROM restaurant_inventory WHERE restaurant_id = $1`,
+        [restaurantId],
+        req
+      ),
+    ])
+
+    const total = countRows[0]?.total ?? 0
 
     // Compute reorder suggestion via the shared canonical formula so the list,
     // the assistance panel and the dashboard widget all agree.
@@ -199,7 +221,7 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
     mark(req, 'handler')
     res.json({
       ok: true,
-      data: { inventory },
+      data: { inventory, total, limit, offset },
       error: null,
       requestId: req.requestId,
     })

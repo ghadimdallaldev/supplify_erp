@@ -36,7 +36,7 @@ export function RestaurantDetailPage() {
   const [isPinned, setIsPinned] = useState(false)
 
   const { data: restaurantsData } = useGetRestaurantsQuery({ limit: 1000, offset: 0 })
-  const { data: ordersData } = useGetOrdersQuery({ limit: 1000, offset: 0 })
+  const { data: ordersData } = useGetOrdersQuery({ limit: 1000, offset: 0, includeItems: true })
 
   const restaurant = restaurantsData?.restaurants.find((r) => r.id === id)
 

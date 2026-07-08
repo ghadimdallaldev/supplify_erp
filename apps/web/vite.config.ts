@@ -4,11 +4,29 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
+const isAnalyze = process.env.npm_lifecycle_event === 'analyze'
+
+async function loadVisualizer() {
+  if (!isAnalyze) return null
+  try {
+    const { visualizer } = await import('rollup-plugin-visualizer')
+    return visualizer({
+      filename: path.resolve(rootDir, 'dist/bundle-stats.html'),
+      gzipSize: true,
+      open: false,
+    })
+  } catch {
+    console.warn('[analyze] rollup-plugin-visualizer not installed; run pnpm install in apps/web')
+    return null
+  }
+}
+
+const visualizerPlugin = await loadVisualizer()
 
 // https://vitejs.dev/config/
 export default defineConfig({
   publicDir: path.resolve(rootDir, 'static'),
-  plugins: [react()],
+  plugins: [react(), visualizerPlugin].filter(Boolean),
   build: {
     rollupOptions: {
       output: {
@@ -35,15 +53,7 @@ export default defineConfig({
           // via React.lazy (dynamic import). Returning undefined here keeps it OUT
           // of the eager `vendor` catch-all and lets Rollup co-locate it with its
           // dynamic importers, so it only downloads when a map actually renders.
-          // (Forcing it into a named chunk made Rollup hoist a side-effect import
-          // into the entry, defeating the lazy split.)
           if (id.includes('node_modules/leaflet')) return
-          if (
-            id.includes('framer-motion') ||
-            id.includes('motion-dom') ||
-            id.includes('motion-utils')
-          )
-            return 'motion'
           if (id.includes('@radix-ui') || id.includes('lucide-react')) return 'ui-vendor'
           if (id.includes('react-router') || id.includes('@remix-run')) return 'router-vendor'
           if (id.includes('@reduxjs') || id.includes('react-redux')) return 'redux-vendor'

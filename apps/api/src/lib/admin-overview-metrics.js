@@ -212,8 +212,10 @@ export async function buildAdminOverviewMetrics() {
   const revenueRow = revenueRows[0] || {}
   const mrr = parseFloat(revenueRow.mrr || 0)
   const orderRow = orderStatsRows[0] || {}
-  const tenantLimitCounts = await buildTenantLimitOverviewCounts(safeOverviewQuery)
-  const aiReorderMetrics = await getAiReorderMetrics()
+  const [tenantLimitCounts, aiReorderMetrics] = await Promise.all([
+    buildTenantLimitOverviewCounts(safeOverviewQuery),
+    getAiReorderMetrics(),
+  ])
   const operational = await buildAdminOperationalOverviewCounters({ aiReorderMetrics })
   const aiPlatform = getAiPlatformConfigSummary()
 

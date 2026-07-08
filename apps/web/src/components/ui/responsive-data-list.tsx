@@ -12,8 +12,8 @@ export type CardBreakpoint = 'md' | 'lg' | 'xl'
  *
  * Viewport tiers:
  * - Below card breakpoint: card list
- * - lg–xl: compact table (hide tertiary columns, icon actions)
- * - xl+: full table (all columns, labeled actions)
+ * - At/above card breakpoint: table list
+ * - xl+: full column/action density where row classes opt in
  *
  * Column visibility (apply on th/td):
  * - Primary identifier + primary action: always visible in table mode
@@ -26,13 +26,13 @@ export type CardBreakpoint = 'md' | 'lg' | 'xl'
  * - Full table: labeled buttons
  */
 export const responsiveDataListClasses = {
-  cardContainer: (breakpoint: CardBreakpoint = 'lg') =>
+  cardContainer: (breakpoint: CardBreakpoint = 'xl') =>
     ({
       md: 'md:hidden',
       lg: 'lg:hidden',
       xl: 'xl:hidden',
     })[breakpoint],
-  tableContainer: (breakpoint: CardBreakpoint = 'lg') =>
+  tableContainer: (breakpoint: CardBreakpoint = 'xl') =>
     ({
       md: 'hidden md:block',
       lg: 'hidden lg:block',
@@ -67,7 +67,7 @@ export function ResponsiveDataList<T>({
   tableHeader,
   tableAriaLabel,
   tableMinWidth = 640,
-  cardBreakpoint = 'lg',
+  cardBreakpoint = 'xl',
   emptyState,
   className,
 }: ResponsiveDataListProps<T>) {

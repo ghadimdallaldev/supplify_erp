@@ -478,7 +478,7 @@ router.get('/', async (req, res) => {
 
     const countSql = params.inStock
       ? `
-      SELECT COUNT(DISTINCT p.id) as total
+      SELECT COUNT(*)::int as total
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
       ${inventoryJoin}
