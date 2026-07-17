@@ -61,10 +61,12 @@ describe('planComparison', () => {
     expect(RESTAURANT_FEATURE_KEYS).toContain('order_calendar')
   })
 
-  it('returns plan subtitles for known tiers', () => {
+  it('returns plan blurbs that distinguish Growth vs Scale by name', () => {
     expect(getPlanSubtitle('free')).toBe('Time-limited trial')
-    expect(getPlanSubtitle('silver')).toBe('Growth')
-    expect(getPlanSubtitle('gold')).toBe('Scale')
+    expect(getPlanSubtitle('silver')).toBe('For growing ops')
+    expect(getPlanSubtitle('gold', 'Supplier Growth')).toBe('For growing ops')
+    expect(getPlanSubtitle('platinum', 'Supplier Scale')).toBe('For multi-site volume')
+    expect(getPlanSubtitle('gold', 'Restaurant Scale')).toBe('For multi-site volume')
   })
 
   it('formats free as a 30-day trial, not a permanent free plan', () => {

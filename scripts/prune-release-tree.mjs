@@ -75,6 +75,18 @@ function pruneApiScripts() {
   }
 }
 
+/** Root scripts/ is mostly local/dev/ops tooling — keep only what Railway Docker setup needs. */
+function pruneRootScripts() {
+  const dir = path.join(ROOT, 'scripts')
+  if (!fs.existsSync(dir)) return
+  const keep = new Set(['ensure-pnpm.mjs', 'pnpm-run.mjs', 'ensure-docker-env.mjs', 'lib'])
+  for (const name of fs.readdirSync(dir)) {
+    if (!keep.has(name)) {
+      rm(path.join('scripts', name))
+    }
+  }
+}
+
 function patchServerJs() {
   const rel = 'apps/api/src/server.js'
   const abs = path.join(ROOT, rel)
@@ -188,16 +200,6 @@ const SHARED_FILES = [
   '.releaserc.js',
   'AGENTS.md',
   '.cursorrules',
-  'scripts/dev-native.mjs',
-  'scripts/dev-apps.mjs',
-  'scripts/dev-infra.mjs',
-  'scripts/run-local.mjs',
-  'scripts/run-local.sh',
-  'scripts/run-local.ps1',
-  'scripts/run-local.cmd',
-  'scripts/ensure-native-env.mjs',
-  'scripts/prune-release-tree.mjs',
-  'scripts/promote-release.mjs',
 ]
 
 console.log(`\nPruning release tree (tier=${tier})...\n`)
@@ -207,6 +209,7 @@ for (const f of SHARED_FILES) rmFile(f)
 
 removeTestFiles()
 pruneApiScripts()
+pruneRootScripts()
 patchServerJs()
 pruneDeployArtifacts()
 slimPackageJson()

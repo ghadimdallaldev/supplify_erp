@@ -339,9 +339,9 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                   </div>
                   <StatusBadge status={plan.is_active ? 'ACTIVE' : 'INACTIVE'} />
                 </div>
-                {plan.code && getPlanSubtitle(plan.code) ? (
+                {plan.code && getPlanSubtitle(plan.code, plan.name) ? (
                   <p className="mb-2 text-xs text-[var(--text-muted)]">
-                    {getPlanSubtitle(plan.code)}
+                    {getPlanSubtitle(plan.code, plan.name)}
                   </p>
                 ) : null}
                 <div className="mb-3">

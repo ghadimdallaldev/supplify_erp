@@ -236,8 +236,10 @@ export function SubscriptionInfo() {
                   subtle={recommendation?.reasonCode === 'CURRENT_BEST'}
                 />
               </div>
-              {getPlanSubtitle(plan.code) && (
-                <p className="text-sm text-[var(--text-muted)]">{getPlanSubtitle(plan.code)}</p>
+              {getPlanSubtitle(plan.code, plan.name) && (
+                <p className="text-sm text-[var(--text-muted)]">
+                  {getPlanSubtitle(plan.code, plan.name)}
+                </p>
               )}
               <p className="text-sm text-[var(--text-muted)]">Current Plan</p>
             </div>
