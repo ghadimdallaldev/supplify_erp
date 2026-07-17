@@ -92,3 +92,8 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 - **AI reorder assistant fixes (server-side)**: quota now only counts successful LLM calls (refund on failure), `explain` filters hallucinated product IDs, env `AI_MAX_REQUESTS_PER_TENANT_PER_DAY` is enforced, and `ask` degrades to a heuristic on limit (previously threw). Ask result gains an optional `usageLimited` flag (additive). Behavior only differs when `AI_ENABLED=true`; **no mobile change required**.
 - **Migrations**: `0181_whatsapp_delivery.sql`, `0182_notification_webhook.sql` before deployed use.
 - **Env**: `WHATSAPP_ENABLED`, `WHATSAPP_LOG_ONLY`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION` (see `apps/api/.env.example`).
+
+## 2026-07-17 — Orders list laptop density (web-only)
+
+- **Scope**: Denser `/app/orders` table layout (`OrdersResponsiveList`): compact type/padding, `#ID` nowrap, horizontal action row, table from `lg`.
+- **Reason**: Visual density for web laptop cockpits; no API or order lifecycle changes. Mobile order lists unchanged.
