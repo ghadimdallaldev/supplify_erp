@@ -170,12 +170,42 @@ export function normalizePlanCode(code: string | null | undefined): string {
   return LEGACY_PLAN_CODE_ALIASES[c] ?? c
 }
 
-/** Plan value subtitles (pricing psychology). */
+/** Short differentiators — never repeat the Growth/Scale name itself. */
+export const PLAN_TIER_BLURBS = {
+  trial: 'Time-limited trial',
+  growth: 'For growing ops',
+  scale: 'For multi-site volume',
+} as const
+
+export type PlanTierKind = keyof typeof PLAN_TIER_BLURBS
+
+/**
+ * Resolve Growth vs Scale from display name when possible.
+ * Important: supplier Growth is still DB code `gold`, so code-only maps are wrong.
+ */
+export function getPlanTierKind(
+  planCode: string | null | undefined,
+  planName?: string | null
+): PlanTierKind | null {
+  const code = normalizePlanCode(planCode)
+  if (!code) return null
+  if (code === 'free') return 'trial'
+
+  const hay = `${planName || ''} ${formatPlanDisplayName(planCode, planName)}`.toLowerCase()
+  if (/\bgrowth\b/.test(hay) || /\bsilver\b/.test(hay)) return 'growth'
+  if (/\bscale\b/.test(hay) || /\bplatinum\b/.test(hay)) return 'scale'
+
+  if (code === 'silver') return 'growth'
+  if (code === 'gold' || code === 'platinum') return 'scale'
+  return null
+}
+
+/** @deprecated Prefer PLAN_TIER_BLURBS / getPlanSubtitle(planCode, planName). */
 export const PLAN_SUBTITLES: Record<string, string> = {
-  free: 'Time-limited trial',
-  silver: 'Growth',
-  gold: 'Scale',
-  platinum: 'Scale',
+  free: PLAN_TIER_BLURBS.trial,
+  silver: PLAN_TIER_BLURBS.growth,
+  gold: PLAN_TIER_BLURBS.scale,
+  platinum: PLAN_TIER_BLURBS.scale,
 }
 
 /** User-facing plan name; DB code `free` is marketed as a 30-day trial, not forever-free. */
@@ -198,10 +228,13 @@ export function formatPlanDisplayName(
   return 'Plan'
 }
 
-export function getPlanSubtitle(planCode: string | null | undefined): string {
-  if (!planCode) return ''
-  const key = normalizePlanCode(planCode).replace(/\s/g, '')
-  return PLAN_SUBTITLES[key] ?? ''
+/** Pricing psychology blurb; pass planName so supplier Growth (code gold) is not labeled Scale. */
+export function getPlanSubtitle(
+  planCode: string | null | undefined,
+  planName?: string | null
+): string {
+  const kind = getPlanTierKind(planCode, planName)
+  return kind ? PLAN_TIER_BLURBS[kind] : ''
 }
 
 export function getLimitKeys(tenantType: 'RESTAURANT' | 'SUPPLIER'): readonly string[] {

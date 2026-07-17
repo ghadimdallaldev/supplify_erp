@@ -447,42 +447,49 @@ export function UpgradeModal() {
               </p>
             )}
 
-            {/* Plan cards */}
+            {/* Single aligned compare grid: headers + limits + features share columns */}
             {showPlans && (
-              <div
-                className={cn(
-                  'grid min-w-0 grid-cols-1 gap-3',
-                  colCount >= 2 && 'sm:grid-cols-2',
-                  colCount === 3 && 'lg:grid-cols-3',
-                  colCount >= 4 && 'xl:grid-cols-4'
-                )}
-              >
-                {plans.map((plan, i) => {
-                  const code = (plan.code || '').toLowerCase()
-                  const isCurrent = code === currentCode
-                  const isRecommended = code === recommendedCode && recommendedCode !== currentCode
-                  const isAbove = i > currentPlanIndex
-                  const isBelow = i < currentPlanIndex && !isCurrent
+              <div className="overflow-x-auto rounded-xl border border-[var(--app-border)]">
+                <div
+                  className="min-w-[min(100%,28rem)]"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: `minmax(7.5rem,1.2fr) repeat(${colCount}, minmax(8.5rem,1fr))`,
+                  }}
+                >
+                  {/* Corner + plan headers */}
+                  <div className="border-b border-[var(--app-border)] bg-[var(--bg)] p-3 sm:p-4">
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                      Compare
+                    </p>
+                  </div>
+                  {plans.map((plan, i) => {
+                    const code = (plan.code || '').toLowerCase()
+                    const isCurrent = code === currentCode
+                    const isRecommended =
+                      code === recommendedCode && recommendedCode !== currentCode
+                    const isAbove = i > currentPlanIndex
+                    const isBelow = i < currentPlanIndex && !isCurrent
+                    const planLabel = getPlanDisplayName(plan)
+                    const blurb = getPlanSubtitle(plan.code, plan.display_name || plan.name)
 
-                  return (
-                    <div
-                      key={plan.id ?? plan.code}
-                      className={`flex flex-col gap-2 rounded-lg border p-3 sm:p-4 ${
-                        isCurrent
-                          ? 'border-[var(--brand-mid)] bg-[var(--brand-ultra)] ring-1 ring-[var(--brand-mid)]'
-                          : isRecommended
-                            ? 'border-[var(--brand)] bg-[var(--surface)]'
-                            : 'border-[var(--app-border)] bg-[var(--surface)]'
-                      }`}
-                    >
-                      <div>
-                        <div className="flex flex-wrap items-center justify-between gap-1">
+                    return (
+                      <div
+                        key={plan.id ?? plan.code}
+                        className={cn(
+                          'flex flex-col gap-2 border-b border-s border-[var(--app-border)] p-3 sm:p-4',
+                          isCurrent && 'bg-[var(--brand-ultra)]',
+                          isRecommended && !isCurrent && 'bg-[var(--surface)]'
+                        )}
+                      >
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <span
-                            className={`text-xs font-semibold uppercase tracking-wide ${
-                              isCurrent ? 'text-[var(--brand-mid)]' : 'text-[var(--text-mid)]'
-                            }`}
+                            className={cn(
+                              'text-sm font-semibold leading-tight',
+                              isCurrent ? 'text-[var(--brand-mid)]' : 'text-[var(--text)]'
+                            )}
                           >
-                            {getPlanDisplayName(plan)}
+                            {planLabel}
                           </span>
                           {isCurrent && (
                             <span className="rounded-full bg-[var(--brand)] px-2 py-0.5 text-[10px] font-semibold text-white">
@@ -495,187 +502,146 @@ export function UpgradeModal() {
                             </span>
                           )}
                         </div>
-                        <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">
-                          {getPlanSubtitle(plan.code)}
+                        {blurb ? (
+                          <p className="text-[11px] leading-snug text-[var(--text-muted)]">
+                            {blurb}
+                          </p>
+                        ) : null}
+                        <p className="text-xl font-bold tracking-tight text-[var(--text)]">
+                          {getPlanPrice(plan)}
                         </p>
-                      </div>
-
-                      <p className="text-lg font-bold text-[var(--text)]">{getPlanPrice(plan)}</p>
-
-                      <div className="flex-1" />
-
-                      {isCurrent ? (
-                        <button
-                          type="button"
-                          disabled
-                          className="touch-target w-full cursor-default rounded-md border border-[var(--app-border)] bg-[var(--bg)] py-2 text-xs text-[var(--text-muted)]"
-                        >
-                          Current plan
-                        </button>
-                      ) : !canUpgrade ? (
-                        <button
-                          type="button"
-                          disabled
-                          className="touch-target w-full cursor-default rounded-md border border-[var(--app-border)] py-2 text-xs text-[var(--text-muted)]"
-                        >
-                          Ask owner
-                        </button>
-                      ) : isAbove ? (
-                        <button
-                          type="button"
-                          className="touch-target relative z-10 w-full cursor-pointer rounded-md py-2 text-xs font-semibold text-white"
-                          style={{
-                            background: isRecommended ? 'var(--brand)' : 'var(--brand-mid)',
-                          }}
-                          onClick={() => handleUpgrade(code)}
-                        >
-                          {pendingActivation
-                            ? t('upgradeModal.startTrialOf', { planName: getPlanDisplayName(plan) })
-                            : `Upgrade to ${getPlanDisplayName(plan)}`}
-                        </button>
-                      ) : isBelow ? (
-                        <button
-                          type="button"
-                          className="touch-target relative z-10 w-full cursor-pointer rounded-md border border-[var(--app-border)] py-2 text-xs text-[var(--text-muted)] hover:bg-[var(--bg)]"
-                          onClick={() => handleUpgrade(code)}
-                        >
-                          Downgrade to {getPlanDisplayName(plan)}
-                        </button>
-                      ) : null}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* Comparison table */}
-            {showComparison && (
-              <div className="overflow-x-auto rounded-lg border border-[var(--app-border)]">
-                <div className="w-[calc(100vw-2rem)] max-w-lg">
-                  {/* Header row */}
-                  <div
-                    className="grid border-b border-[var(--app-border)] bg-[var(--bg)]"
-                    style={{ gridTemplateColumns: `1.4fr repeat(${colCount}, 1fr)` }}
-                  >
-                    <div className="p-2 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
-                      Plan details
-                    </div>
-                    {plans.map((plan) => {
-                      const code = (plan.code || '').toLowerCase()
-                      const isCurrent = code === currentCode
-                      return (
-                        <div
-                          key={plan.code}
-                          className={`p-2 text-center ${isCurrent ? 'bg-[var(--brand-ultra)]' : ''}`}
-                        >
-                          <div
-                            className={`text-xs font-semibold ${
-                              isCurrent ? 'text-[var(--brand-mid)]' : 'text-[var(--text-mid)]'
-                            }`}
-                          >
-                            {getPlanDisplayName(plan)}
-                            {isCurrent && ' (current)'}
-                          </div>
+                        <div className="mt-auto pt-1">
+                          {isCurrent ? (
+                            <button
+                              type="button"
+                              disabled
+                              className="touch-target w-full cursor-default rounded-md border border-[var(--app-border)] bg-[var(--bg)] py-2 text-xs text-[var(--text-muted)]"
+                            >
+                              Current plan
+                            </button>
+                          ) : !canUpgrade ? (
+                            <button
+                              type="button"
+                              disabled
+                              className="touch-target w-full cursor-default rounded-md border border-[var(--app-border)] py-2 text-xs text-[var(--text-muted)]"
+                            >
+                              Ask owner
+                            </button>
+                          ) : isAbove ? (
+                            <button
+                              type="button"
+                              className="touch-target relative z-10 w-full cursor-pointer rounded-md py-2 text-xs font-semibold text-white"
+                              style={{
+                                background: isRecommended ? 'var(--brand)' : 'var(--brand-mid)',
+                              }}
+                              onClick={() => handleUpgrade(code)}
+                            >
+                              {pendingActivation
+                                ? t('upgradeModal.startTrialOf', { planName: planLabel })
+                                : `Upgrade to ${planLabel}`}
+                            </button>
+                          ) : isBelow ? (
+                            <button
+                              type="button"
+                              className="touch-target relative z-10 w-full cursor-pointer rounded-md border border-[var(--app-border)] py-2 text-xs text-[var(--text-muted)] hover:bg-[var(--bg)]"
+                              onClick={() => handleUpgrade(code)}
+                            >
+                              Downgrade to {planLabel}
+                            </button>
+                          ) : null}
                         </div>
-                      )
-                    })}
-                  </div>
-
-                  {/* Limit rows */}
-                  {limitKeys.map((key) => (
-                    <div
-                      key={key}
-                      className="grid border-b border-[var(--app-border)] last:border-b-0"
-                      style={{ gridTemplateColumns: `1.4fr repeat(${colCount}, 1fr)` }}
-                    >
-                      <div className="p-2 text-xs text-[var(--text-muted)]">
-                        {LIMIT_KEY_LABELS[key] ?? key}
                       </div>
-                      {plans.map((plan) => {
-                        const code = (plan.code || '').toLowerCase()
-                        const isCurrent = code === currentCode
-                        const rawVal = isCurrent
-                          ? (currentPlanRow?.limits?.[key] ?? entitlements?.limits?.[key])
-                          : plan.limits?.[key]
-                        const val = toLimitNum(rawVal)
-                        const curVal = toLimitNum(
-                          currentPlanRow?.limits?.[key] ?? entitlements?.limits?.[key]
-                        )
-                        const better = !isCurrent && isBetterLimit(val, curVal)
-                        const worse = !isCurrent && isWorseThanCurrent(val, curVal)
-                        return (
-                          <div
-                            key={plan.code}
-                            className={`p-2 text-center text-xs ${
-                              isCurrent
-                                ? 'bg-[var(--brand-ultra)] font-semibold text-[var(--brand-mid)]'
-                                : better
-                                  ? 'font-medium text-emerald-700'
-                                  : worse
-                                    ? 'text-[var(--text-muted)]'
-                                    : 'text-[var(--text)]'
-                            }`}
-                          >
-                            {formatLimit(val)}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ))}
+                    )
+                  })}
 
-                  {/* Feature rows */}
-                  {featureKeys.map((key) => (
-                    <div
-                      key={key}
-                      className="grid border-b border-[var(--app-border)] last:border-b-0"
-                      style={{ gridTemplateColumns: `1.4fr repeat(${colCount}, 1fr)` }}
-                    >
-                      <div className="p-2 text-xs text-[var(--text-muted)]">
-                        {FEATURE_KEY_LABELS[key] ?? key}
+                  {showComparison &&
+                    limitKeys.map((key) => (
+                      <div key={`limit-${key}`} className="contents">
+                        <div className="border-b border-[var(--app-border)] p-2.5 text-xs text-[var(--text-muted)] sm:p-3">
+                          {LIMIT_KEY_LABELS[key] ?? key}
+                        </div>
+                        {plans.map((plan) => {
+                          const code = (plan.code || '').toLowerCase()
+                          const isCurrent = code === currentCode
+                          const rawVal = isCurrent
+                            ? (currentPlanRow?.limits?.[key] ?? entitlements?.limits?.[key])
+                            : plan.limits?.[key]
+                          const val = toLimitNum(rawVal)
+                          const curVal = toLimitNum(
+                            currentPlanRow?.limits?.[key] ?? entitlements?.limits?.[key]
+                          )
+                          const better = !isCurrent && isBetterLimit(val, curVal)
+                          const worse = !isCurrent && isWorseThanCurrent(val, curVal)
+                          return (
+                            <div
+                              key={`${plan.code}-${key}`}
+                              className={cn(
+                                'border-b border-s border-[var(--app-border)] p-2.5 text-center text-xs sm:p-3',
+                                isCurrent &&
+                                  'bg-[var(--brand-ultra)] font-semibold text-[var(--brand-mid)]',
+                                better && 'font-medium text-emerald-700',
+                                worse && !isCurrent && 'text-[var(--text-muted)]',
+                                !isCurrent && !better && !worse && 'text-[var(--text)]'
+                              )}
+                            >
+                              {formatLimit(val)}
+                            </div>
+                          )
+                        })}
                       </div>
-                      {plans.map((plan) => {
-                        const code = (plan.code || '').toLowerCase()
-                        const isCurrent = code === currentCode
-                        const rawVal = isCurrent
-                          ? (currentPlanRow?.features?.[key] ?? entitlements?.features?.[key])
-                          : plan.features?.[key]
-                        const cell = formatPlanFeatureCell(key, rawVal)
-                        const curRaw =
-                          currentPlanRow?.features?.[key] ?? entitlements?.features?.[key]
-                        const curCell = formatPlanFeatureCell(key, curRaw)
-                        const better = !isCurrent && cell.enabled && !curCell.enabled
-                        return (
-                          <div
-                            key={plan.code}
-                            className={`flex flex-col items-center justify-center gap-0.5 p-2 ${
-                              isCurrent ? 'bg-[var(--brand-ultra)]' : ''
-                            }`}
-                          >
-                            {cell.enabled ? (
-                              <>
-                                <Check
-                                  className={`h-3.5 w-3.5 ${
-                                    isCurrent
-                                      ? 'text-[var(--brand-mid)]'
-                                      : better
-                                        ? 'text-emerald-600'
-                                        : 'text-[var(--text-muted)]'
-                                  }`}
-                                />
-                                {cell.caption && (
-                                  <span className="text-[9px] leading-tight text-[var(--text-muted)] text-center">
-                                    {cell.caption}
-                                  </span>
-                                )}
-                              </>
-                            ) : (
-                              <Minus className="h-3.5 w-3.5 text-[var(--app-border-mid)]" />
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ))}
+                    ))}
+
+                  {showComparison &&
+                    featureKeys.map((key) => (
+                      <div key={`feature-${key}`} className="contents">
+                        <div className="border-b border-[var(--app-border)] p-2.5 text-xs text-[var(--text-muted)] last:border-b-0 sm:p-3">
+                          {FEATURE_KEY_LABELS[key] ?? key}
+                        </div>
+                        {plans.map((plan) => {
+                          const code = (plan.code || '').toLowerCase()
+                          const isCurrent = code === currentCode
+                          const rawVal = isCurrent
+                            ? (currentPlanRow?.features?.[key] ?? entitlements?.features?.[key])
+                            : plan.features?.[key]
+                          const cell = formatPlanFeatureCell(key, rawVal)
+                          const curRaw =
+                            currentPlanRow?.features?.[key] ?? entitlements?.features?.[key]
+                          const curCell = formatPlanFeatureCell(key, curRaw)
+                          const better = !isCurrent && cell.enabled && !curCell.enabled
+                          return (
+                            <div
+                              key={`${plan.code}-f-${key}`}
+                              className={cn(
+                                'flex flex-col items-center justify-center gap-0.5 border-b border-s border-[var(--app-border)] p-2.5 last:border-b-0 sm:p-3',
+                                isCurrent && 'bg-[var(--brand-ultra)]'
+                              )}
+                            >
+                              {cell.enabled ? (
+                                <>
+                                  <Check
+                                    className={cn(
+                                      'h-3.5 w-3.5',
+                                      isCurrent
+                                        ? 'text-[var(--brand-mid)]'
+                                        : better
+                                          ? 'text-emerald-600'
+                                          : 'text-[var(--text-muted)]'
+                                    )}
+                                  />
+                                  {cell.caption && (
+                                    <span className="text-center text-[9px] leading-tight text-[var(--text-muted)]">
+                                      {cell.caption}
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                <Minus className="h-3.5 w-3.5 text-[var(--app-border-mid)]" />
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))}
                 </div>
               </div>
             )}
