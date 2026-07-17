@@ -353,8 +353,6 @@ export function UpgradeModal() {
         ? formatPlanDisplayName(recommendedCode)
         : null)
 
-  const colCount = Math.max(plans.length, 1)
-
   return (
     <Dialog
       key={openRevision}
@@ -447,199 +445,227 @@ export function UpgradeModal() {
               </p>
             )}
 
-            {/* Single aligned compare grid: headers + limits + features share columns */}
+            {/* Real table grid — CSS display:contents was breaking row borders */}
             {showPlans && (
               <div className="overflow-x-auto rounded-xl border border-[var(--app-border)]">
-                <div
-                  className="w-full"
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: `minmax(9rem, 11.5rem) repeat(${colCount}, minmax(0, 1fr))`,
-                  }}
-                >
-                  {/* Corner + plan headers */}
-                  <div className="sticky start-0 z-[1] border-b border-[var(--app-border)] bg-[var(--bg)] p-3 sm:p-4">
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
-                      Compare
-                    </p>
-                  </div>
-                  {plans.map((plan, i) => {
-                    const code = (plan.code || '').toLowerCase()
-                    const isCurrent = code === currentCode
-                    const isRecommended =
-                      code === recommendedCode && recommendedCode !== currentCode
-                    const isAbove = i > currentPlanIndex
-                    const isBelow = i < currentPlanIndex && !isCurrent
-                    const planLabel = getPlanDisplayName(plan)
-                    const blurb = getPlanSubtitle(plan.code, plan.display_name || plan.name)
-
-                    return (
-                      <div
-                        key={plan.id ?? plan.code}
-                        className={cn(
-                          'flex flex-col gap-2 border-b border-s border-[var(--app-border)] p-3 sm:p-4',
-                          isCurrent && 'bg-[var(--brand-ultra)]',
-                          isRecommended && !isCurrent && 'bg-[var(--surface)]'
-                        )}
+                <table className="w-full min-w-[40rem] table-fixed border-collapse">
+                  <colgroup>
+                    <col style={{ width: '11.5rem' }} />
+                    {plans.map((plan) => (
+                      <col key={`col-${plan.id ?? plan.code}`} />
+                    ))}
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th
+                        scope="col"
+                        className="border-b border-e border-[var(--app-border)] bg-[var(--bg)] p-3 text-start align-bottom sm:p-4"
                       >
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                          Compare
+                        </span>
+                      </th>
+                      {plans.map((plan, i) => {
+                        const code = (plan.code || '').toLowerCase()
+                        const isCurrent = code === currentCode
+                        const isRecommended =
+                          code === recommendedCode && recommendedCode !== currentCode
+                        const isAbove = i > currentPlanIndex
+                        const isBelow = i < currentPlanIndex && !isCurrent
+                        const planLabel = getPlanDisplayName(plan)
+                        const blurb = getPlanSubtitle(plan.code, plan.display_name || plan.name)
+                        const isLast = i === plans.length - 1
+
+                        return (
+                          <th
+                            key={plan.id ?? plan.code}
+                            scope="col"
                             className={cn(
-                              'text-sm font-semibold leading-tight',
-                              isCurrent ? 'text-[var(--brand-mid)]' : 'text-[var(--text)]'
+                              'border-b border-[var(--app-border)] p-3 text-start align-top font-normal sm:p-4',
+                              !isLast && 'border-e',
+                              isCurrent && 'bg-[var(--brand-ultra)]'
                             )}
                           >
-                            {planLabel}
-                          </span>
-                          {isCurrent && (
-                            <span className="rounded-full bg-[var(--brand)] px-2 py-0.5 text-[10px] font-semibold text-white">
-                              Your plan
-                            </span>
-                          )}
-                          {isRecommended && (
-                            <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold text-white">
-                              Recommended
-                            </span>
-                          )}
-                        </div>
-                        {blurb ? (
-                          <p className="text-[11px] leading-snug text-[var(--text-muted)]">
-                            {blurb}
-                          </p>
-                        ) : null}
-                        <p className="text-xl font-bold tracking-tight text-[var(--text)]">
-                          {getPlanPrice(plan)}
-                        </p>
-                        <div className="mt-auto pt-1">
-                          {isCurrent ? (
-                            <button
-                              type="button"
-                              disabled
-                              className="touch-target w-full cursor-default rounded-md border border-[var(--app-border)] bg-[var(--bg)] py-2 text-xs text-[var(--text-muted)]"
-                            >
-                              Current plan
-                            </button>
-                          ) : !canUpgrade ? (
-                            <button
-                              type="button"
-                              disabled
-                              className="touch-target w-full cursor-default rounded-md border border-[var(--app-border)] py-2 text-xs text-[var(--text-muted)]"
-                            >
-                              Ask owner
-                            </button>
-                          ) : isAbove ? (
-                            <button
-                              type="button"
-                              className="touch-target relative z-10 w-full cursor-pointer rounded-md py-2 text-xs font-semibold text-white"
-                              style={{
-                                background: isRecommended ? 'var(--brand)' : 'var(--brand-mid)',
-                              }}
-                              onClick={() => handleUpgrade(code)}
-                            >
-                              {pendingActivation
-                                ? t('upgradeModal.startTrialOf', { planName: planLabel })
-                                : `Upgrade to ${planLabel}`}
-                            </button>
-                          ) : isBelow ? (
-                            <button
-                              type="button"
-                              className="touch-target relative z-10 w-full cursor-pointer rounded-md border border-[var(--app-border)] py-2 text-xs text-[var(--text-muted)] hover:bg-[var(--bg)]"
-                              onClick={() => handleUpgrade(code)}
-                            >
-                              Downgrade to {planLabel}
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    )
-                  })}
-
-                  {showComparison &&
-                    limitKeys.map((key) => (
-                      <div key={`limit-${key}`} className="contents">
-                        <div className="sticky start-0 z-[1] border-b border-[var(--app-border)] bg-[var(--surface)] p-2.5 text-xs font-medium text-[var(--text-mid)] sm:p-3">
-                          {LIMIT_KEY_LABELS[key] ?? key}
-                        </div>
-                        {plans.map((plan) => {
-                          const code = (plan.code || '').toLowerCase()
-                          const isCurrent = code === currentCode
-                          const rawVal = isCurrent
-                            ? (currentPlanRow?.limits?.[key] ?? entitlements?.limits?.[key])
-                            : plan.limits?.[key]
-                          const val = toLimitNum(rawVal)
-                          const curVal = toLimitNum(
-                            currentPlanRow?.limits?.[key] ?? entitlements?.limits?.[key]
-                          )
-                          const better = !isCurrent && isBetterLimit(val, curVal)
-                          const worse = !isCurrent && isWorseThanCurrent(val, curVal)
-                          return (
-                            <div
-                              key={`${plan.code}-${key}`}
-                              className={cn(
-                                'border-b border-s border-[var(--app-border)] p-2.5 text-center text-sm tabular-nums sm:p-3',
-                                isCurrent &&
-                                  'bg-[var(--brand-ultra)] font-semibold text-[var(--brand-mid)]',
-                                better && 'font-medium text-emerald-700',
-                                worse && !isCurrent && 'text-[var(--text-muted)]',
-                                !isCurrent && !better && !worse && 'text-[var(--text)]'
-                              )}
-                            >
-                              {formatLimit(val)}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ))}
-
-                  {showComparison &&
-                    featureKeys.map((key) => (
-                      <div key={`feature-${key}`} className="contents">
-                        <div className="sticky start-0 z-[1] border-b border-[var(--app-border)] bg-[var(--surface)] p-2.5 text-xs font-medium text-[var(--text-mid)] last:border-b-0 sm:p-3">
-                          {FEATURE_KEY_LABELS[key] ?? key}
-                        </div>
-                        {plans.map((plan) => {
-                          const code = (plan.code || '').toLowerCase()
-                          const isCurrent = code === currentCode
-                          const rawVal = isCurrent
-                            ? (currentPlanRow?.features?.[key] ?? entitlements?.features?.[key])
-                            : plan.features?.[key]
-                          const cell = formatPlanFeatureCell(key, rawVal)
-                          const curRaw =
-                            currentPlanRow?.features?.[key] ?? entitlements?.features?.[key]
-                          const curCell = formatPlanFeatureCell(key, curRaw)
-                          const better = !isCurrent && cell.enabled && !curCell.enabled
-                          return (
-                            <div
-                              key={`${plan.code}-f-${key}`}
-                              className={cn(
-                                'flex flex-col items-center justify-center gap-0.5 border-b border-s border-[var(--app-border)] p-2.5 last:border-b-0 sm:p-3',
-                                isCurrent && 'bg-[var(--brand-ultra)]'
-                              )}
-                            >
-                              {cell.enabled ? (
-                                <>
-                                  <Check
-                                    className={cn(
-                                      'h-4 w-4',
-                                      isCurrent ? 'text-[var(--brand-mid)]' : 'text-emerald-600'
-                                    )}
-                                    strokeWidth={2.5}
-                                  />
-                                  {cell.caption && (
-                                    <span className="max-w-[6.5rem] text-center text-[10px] leading-tight text-[var(--text-muted)]">
-                                      {cell.caption}
-                                    </span>
+                            <div className="flex min-h-[9.5rem] flex-col gap-2">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span
+                                  className={cn(
+                                    'text-sm font-semibold leading-tight',
+                                    isCurrent ? 'text-[var(--brand-mid)]' : 'text-[var(--text)]'
                                   )}
-                                </>
-                              ) : (
-                                <Minus className="h-4 w-4 text-[var(--app-border-mid)]" />
-                              )}
+                                >
+                                  {planLabel}
+                                </span>
+                                {isCurrent && (
+                                  <span className="rounded-full bg-[var(--brand)] px-2 py-0.5 text-[10px] font-semibold text-white">
+                                    Your plan
+                                  </span>
+                                )}
+                                {isRecommended && (
+                                  <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                                    Recommended
+                                  </span>
+                                )}
+                              </div>
+                              {blurb ? (
+                                <p className="text-[11px] leading-snug text-[var(--text-muted)]">
+                                  {blurb}
+                                </p>
+                              ) : null}
+                              <p className="text-xl font-bold tracking-tight text-[var(--text)]">
+                                {getPlanPrice(plan)}
+                              </p>
+                              <div className="mt-auto pt-1">
+                                {isCurrent ? (
+                                  <button
+                                    type="button"
+                                    disabled
+                                    className="touch-target w-full cursor-default rounded-md border border-[var(--app-border)] bg-[var(--bg)] py-2 text-xs text-[var(--text-muted)]"
+                                  >
+                                    Current plan
+                                  </button>
+                                ) : !canUpgrade ? (
+                                  <button
+                                    type="button"
+                                    disabled
+                                    className="touch-target w-full cursor-default rounded-md border border-[var(--app-border)] py-2 text-xs text-[var(--text-muted)]"
+                                  >
+                                    Ask owner
+                                  </button>
+                                ) : isAbove ? (
+                                  <button
+                                    type="button"
+                                    className="touch-target relative z-10 w-full cursor-pointer rounded-md py-2 text-xs font-semibold text-white"
+                                    style={{
+                                      background: isRecommended
+                                        ? 'var(--brand)'
+                                        : 'var(--brand-mid)',
+                                    }}
+                                    onClick={() => handleUpgrade(code)}
+                                  >
+                                    {pendingActivation
+                                      ? t('upgradeModal.startTrialOf', { planName: planLabel })
+                                      : `Upgrade to ${planLabel}`}
+                                  </button>
+                                ) : isBelow ? (
+                                  <button
+                                    type="button"
+                                    className="touch-target relative z-10 w-full cursor-pointer rounded-md border border-[var(--app-border)] py-2 text-xs text-[var(--text-muted)] hover:bg-[var(--bg)]"
+                                    onClick={() => handleUpgrade(code)}
+                                  >
+                                    Downgrade to {planLabel}
+                                  </button>
+                                ) : null}
+                              </div>
                             </div>
-                          )
-                        })}
-                      </div>
-                    ))}
-                </div>
+                          </th>
+                        )
+                      })}
+                    </tr>
+                  </thead>
+                  {showComparison && (
+                    <tbody>
+                      {limitKeys.map((key) => (
+                        <tr key={`limit-${key}`} className="border-b border-[var(--app-border)]">
+                          <th
+                            scope="row"
+                            className="border-e border-[var(--app-border)] bg-[var(--surface)] px-3 py-2.5 text-start text-xs font-medium text-[var(--text-mid)]"
+                          >
+                            {LIMIT_KEY_LABELS[key] ?? key}
+                          </th>
+                          {plans.map((plan, i) => {
+                            const code = (plan.code || '').toLowerCase()
+                            const isCurrent = code === currentCode
+                            const rawVal = isCurrent
+                              ? (currentPlanRow?.limits?.[key] ?? entitlements?.limits?.[key])
+                              : plan.limits?.[key]
+                            const val = toLimitNum(rawVal)
+                            const curVal = toLimitNum(
+                              currentPlanRow?.limits?.[key] ?? entitlements?.limits?.[key]
+                            )
+                            const better = !isCurrent && isBetterLimit(val, curVal)
+                            const worse = !isCurrent && isWorseThanCurrent(val, curVal)
+                            const isLast = i === plans.length - 1
+                            return (
+                              <td
+                                key={`${plan.code}-${key}`}
+                                className={cn(
+                                  'px-3 py-2.5 text-center text-sm tabular-nums',
+                                  !isLast && 'border-e border-[var(--app-border)]',
+                                  isCurrent &&
+                                    'bg-[var(--brand-ultra)] font-semibold text-[var(--brand-mid)]',
+                                  better && 'font-medium text-emerald-700',
+                                  worse && !isCurrent && 'text-[var(--text-muted)]',
+                                  !isCurrent && !better && !worse && 'text-[var(--text)]'
+                                )}
+                              >
+                                {formatLimit(val)}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
+                      {featureKeys.map((key, rowIdx) => {
+                        const isLastRow = rowIdx === featureKeys.length - 1
+                        return (
+                          <tr
+                            key={`feature-${key}`}
+                            className={cn(!isLastRow && 'border-b border-[var(--app-border)]')}
+                          >
+                            <th
+                              scope="row"
+                              className="border-e border-[var(--app-border)] bg-[var(--surface)] px-3 py-2.5 text-start text-xs font-medium text-[var(--text-mid)]"
+                            >
+                              {FEATURE_KEY_LABELS[key] ?? key}
+                            </th>
+                            {plans.map((plan, i) => {
+                              const code = (plan.code || '').toLowerCase()
+                              const isCurrent = code === currentCode
+                              const rawVal = isCurrent
+                                ? (currentPlanRow?.features?.[key] ?? entitlements?.features?.[key])
+                                : plan.features?.[key]
+                              const cell = formatPlanFeatureCell(key, rawVal)
+                              const isLast = i === plans.length - 1
+                              return (
+                                <td
+                                  key={`${plan.code}-f-${key}`}
+                                  className={cn(
+                                    'px-3 py-2.5 text-center',
+                                    !isLast && 'border-e border-[var(--app-border)]',
+                                    isCurrent && 'bg-[var(--brand-ultra)]'
+                                  )}
+                                >
+                                  <div className="flex flex-col items-center justify-center gap-0.5">
+                                    {cell.enabled ? (
+                                      <>
+                                        <Check
+                                          className={cn(
+                                            'h-4 w-4',
+                                            isCurrent
+                                              ? 'text-[var(--brand-mid)]'
+                                              : 'text-emerald-600'
+                                          )}
+                                          strokeWidth={2.5}
+                                        />
+                                        {cell.caption && (
+                                          <span className="max-w-[7rem] text-center text-[10px] leading-tight text-[var(--text-muted)]">
+                                            {cell.caption}
+                                          </span>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <Minus className="h-4 w-4 text-[var(--app-border-mid)]" />
+                                    )}
+                                  </div>
+                                </td>
+                              )
+                            })}
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  )}
+                </table>
               </div>
             )}
 
