@@ -56,6 +56,16 @@ describe('executeScheduledOrders', () => {
     clientQueryMock.mockReset()
   })
 
+  it('excludes billing-locked restaurants from the due-list scan', async () => {
+    clientQueryMock.mockResolvedValueOnce({ rows: [] })
+
+    await executeScheduledOrders()
+
+    expect(String(clientQueryMock.mock.calls[0][0])).toContain('sub.account_locked_at IS NOT NULL')
+    expect(String(clientQueryMock.mock.calls[0][0])).toContain(
+      "sub.status IN ('TRIALING', 'ACTIVE', 'PAST_DUE')"
+    )
+  })
   it('returns zero when no lists are due', async () => {
     clientQueryMock.mockResolvedValueOnce({ rows: [] })
 

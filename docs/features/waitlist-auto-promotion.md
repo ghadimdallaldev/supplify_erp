@@ -1,5 +1,7 @@
 # Waitlist Auto-Promotion
 
+> Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+
 When a reservation is **cancelled**, the system automatically offers the next matching waitlist guest a table.
 
 **Plan gate:** `waitlist_auto_promo` — **Gold+** on restaurant plans. **Silver** and **Free** do not auto-offer on cancel (manual promote may still be available where implemented). See migration `0117_silver_tier_limits_features.sql`. Guests receive email/WhatsApp links to accept or decline within **2 hours**. Expired offers roll to the next person in queue.

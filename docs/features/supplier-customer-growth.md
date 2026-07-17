@@ -1,5 +1,7 @@
 # Supplier customer import, referral & sponsored onboarding
 
+> Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+
 Suppliers can import their existing restaurant customer base, match records to Supplify tenants, invite non-users, sponsor onboarding, and track conversion metrics. Referred restaurants receive platform benefits (30-day Free Trial + first-paid discount); suppliers earn rewards when referrals convert to paid subscriptions.
 
 **Migration:** `0169_supplier_growth_program.sql`  

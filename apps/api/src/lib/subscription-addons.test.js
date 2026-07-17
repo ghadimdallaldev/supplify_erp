@@ -4,6 +4,7 @@ import {
   canPurchaseLocationAddons,
   computeEffectiveWithAddons,
   defaultAddonUnitPrice,
+  isAddonKeyCompatibleWithPlan,
   isAddonKeyValidForTenant,
   ENTERPRISE_BRANCH_THRESHOLD,
 } from './subscription-addons.js'
@@ -14,9 +15,12 @@ describe('subscription-addons', () => {
     expect(addonKeyForLimitKey('SUPPLIER', 'branches')).toBe('supplier_extra_branch')
     expect(addonKeyForLimitKey('SUPPLIER', 'warehouses')).toBe('supplier_extra_warehouse')
     expect(addonKeyForLimitKey('RESTAURANT', 'warehouses')).toBe(null)
+    expect(addonKeyForLimitKey('SUPPLIER', 'active_customer_locations_monthly')).toBe(
+      'supplier_active_customer_locations_50'
+    )
   })
 
-  it('only Gold and Platinum can purchase location add-ons', () => {
+  it('only Growth and Scale plans can purchase location add-ons', () => {
     expect(canPurchaseLocationAddons('gold')).toBe(true)
     expect(canPurchaseLocationAddons('platinum')).toBe(true)
     expect(canPurchaseLocationAddons('silver')).toBe(false)
@@ -30,14 +34,28 @@ describe('subscription-addons', () => {
 
   it('returns default unit prices by tier', () => {
     expect(defaultAddonUnitPrice('restaurant_extra_branch', 'gold')).toBe(39)
-    expect(defaultAddonUnitPrice('restaurant_extra_branch', 'platinum')).toBe(49)
-    expect(defaultAddonUnitPrice('supplier_extra_warehouse', 'gold')).toBe(19)
+    expect(defaultAddonUnitPrice('restaurant_extra_branch', 'platinum')).toBe(null)
+    expect(defaultAddonUnitPrice('supplier_extra_warehouse', 'gold')).toBe(null)
+    expect(defaultAddonUnitPrice('supplier_extra_warehouse', 'platinum')).toBe(19)
+    expect(defaultAddonUnitPrice('supplier_active_customer_locations_50', 'platinum')).toBe(75)
+  })
+
+  it('validates add-on compatibility by plan code', () => {
+    expect(isAddonKeyCompatibleWithPlan('restaurant_extra_branch', 'gold')).toBe(true)
+    expect(isAddonKeyCompatibleWithPlan('restaurant_extra_branch', 'silver')).toBe(false)
+    expect(isAddonKeyCompatibleWithPlan('supplier_extra_branch', 'platinum')).toBe(true)
+    expect(isAddonKeyCompatibleWithPlan('supplier_extra_branch', 'gold')).toBe(false)
+    expect(isAddonKeyCompatibleWithPlan('supplier_active_customer_locations_50', 'platinum')).toBe(
+      true
+    )
+    expect(isAddonKeyCompatibleWithPlan('supplier_active_customer_locations_50', null)).toBe(false)
   })
 
   it('validates add-on keys per tenant type', () => {
     expect(isAddonKeyValidForTenant('RESTAURANT', 'restaurant_extra_branch')).toBe(true)
     expect(isAddonKeyValidForTenant('RESTAURANT', 'supplier_extra_warehouse')).toBe(false)
     expect(isAddonKeyValidForTenant('SUPPLIER', 'supplier_extra_warehouse')).toBe(true)
+    expect(isAddonKeyValidForTenant('SUPPLIER', 'supplier_active_customer_locations_50')).toBe(true)
   })
 
   it('enterprise branch threshold is 6', () => {

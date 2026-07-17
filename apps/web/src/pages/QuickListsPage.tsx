@@ -325,7 +325,7 @@ export function QuickListsPage() {
               key: apiError?.details?.limitKey ?? 'limit',
             })
           : apiError?.name === 'FEATURE_NOT_AVAILABLE'
-            ? t('quickLists.toastScheduleRequiresSilver')
+            ? t('quickLists.toastScheduleRequiresPaidPlan')
             : t('quickLists.toastScheduleFailed'))
       toast.error(message)
     }

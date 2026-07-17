@@ -21,6 +21,7 @@ import {
   normalizeInvitationEmail,
 } from './invitation-accept.js'
 import { sendTeamInvitationEmail } from '../services/invitation-mail.service.js'
+import { assertTenantUserSeatAvailable } from './subscription.js'
 
 export {
   generateInviteToken,
@@ -138,6 +139,10 @@ async function insertRestaurantInvitation({
     const scope = await resolveWorkspaceScope(restaurantId, 'RESTAURANT')
     await assertEmailCanJoinWorkspace(invitedEmail, scope)
   }
+
+  await assertTenantUserSeatAvailable(restaurantId, 'RESTAURANT', {
+    includePendingInvitations: true,
+  })
 
   const token = generateInviteToken()
   const expiresAt = inviteExpiresAt()
@@ -423,6 +428,10 @@ async function acceptRestaurantInvitationCore({
       },
       client
     )
+
+    await assertTenantUserSeatAvailable(row.restaurant_id, 'RESTAURANT', {
+      joiningUserId: existingUserId,
+    })
 
     let userId = existingUserId
     if (!userId) {

@@ -30,27 +30,73 @@ describe('activateFreePlan', () => {
   })
 
   describe('activateFreePlanFromPlans', () => {
-    it('returns error when no free plan exists', async () => {
+    it('returns error when no free trial plan exists', async () => {
       const result = await activateFreePlanFromPlans(dispatch, [
         { id: 'p1', code: 'silver', name: 'Silver' },
       ])
       expect(result).toEqual({
         ok: false,
-        message: 'Free plan is not available. Contact support.',
+        message: 'Trial activation is not available. Contact support.',
       })
     })
 
-    it('calls billing checkout without payment method for free plan', async () => {
+    it('returns error when no paid trial target exists', async () => {
       const result = await activateFreePlanFromPlans(dispatch, [
         { id: 'free-id', code: 'free', name: 'Free', price_per_month: 0 },
       ])
+      expect(result).toEqual({
+        ok: false,
+        message: 'Choose a paid plan to start your trial.',
+      })
+      expect(checkoutInitiateMock).not.toHaveBeenCalled()
+    })
+
+    it('ignores enterprise and admin-only plans as trial targets', async () => {
+      const result = await activateFreePlanFromPlans(dispatch, [
+        { id: 'free-id', code: 'free', name: 'Free', price_per_month: 0 },
+        { id: 'enterprise-id', code: 'enterprise', name: 'Enterprise' },
+        {
+          id: 'custom-id',
+          code: 'platinum',
+          name: 'Restaurant Custom',
+          requires_admin_assignment: true,
+        },
+      ])
+      expect(result).toEqual({
+        ok: false,
+        message: 'Choose a paid plan to start your trial.',
+      })
+      expect(checkoutInitiateMock).not.toHaveBeenCalled()
+    })
+
+    it('calls billing checkout for hidden free trial with selected paid target', async () => {
+      const result = await activateFreePlanFromPlans(
+        dispatch,
+        [
+          { id: 'free-id', code: 'free', name: 'Free', price_per_month: 0 },
+          { id: 'target-id', code: 'silver', name: 'Restaurant Growth' },
+        ],
+        'target-id'
+      )
       expect(result).toEqual({ ok: true })
       expect(checkoutInitiateMock).toHaveBeenCalledWith(
         expect.objectContaining({
           planId: 'free-id',
           billingCycle: 'MONTHLY',
           idempotencyKey: expect.any(String),
+          trialTargetPlanId: 'target-id',
         })
+      )
+    })
+
+    it('defaults trial target to the first public paid plan', async () => {
+      const result = await activateFreePlanFromPlans(dispatch, [
+        { id: 'free-id', code: 'free', name: 'Free', price_per_month: 0 },
+        { id: 'target-id', code: 'gold', name: 'Restaurant Scale' },
+      ])
+      expect(result).toEqual({ ok: true })
+      expect(checkoutInitiateMock).toHaveBeenCalledWith(
+        expect.objectContaining({ trialTargetPlanId: 'target-id' })
       )
     })
 
@@ -60,6 +106,7 @@ describe('activateFreePlan', () => {
       })
       const result = await activateFreePlanFromPlans(dispatch, [
         { id: 'free-id', code: 'free', name: 'Free' },
+        { id: 'target-id', code: 'silver', name: 'Restaurant Growth' },
       ])
       expect(result).toEqual({ ok: false, message: 'Plan not found' })
     })

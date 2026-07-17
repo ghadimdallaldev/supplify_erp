@@ -1,10 +1,30 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+vi.mock('../lib/db.js', () => ({
+  query: vi.fn(),
+  withTransaction: vi.fn(),
+}))
+
+vi.mock('../lib/audit.js', () => ({
+  writeSystemAuditLog: vi.fn(),
+}))
+
+vi.mock('../lib/logger.js', () => ({
+  logger: {
+    debug: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  },
+}))
+
 import * as XLSX from 'xlsx'
+import { query, withTransaction } from '../lib/db.js'
 import {
   parseImportFile,
   parseSpreadsheetBuffer,
   previewProductImport,
   countProductImportRows,
+  processProductImportJob,
   XLSX_MAX_BUFFER_BYTES,
   XLSX_MAX_COLS,
   XLSX_MAX_ROWS,
@@ -21,6 +41,12 @@ function buildXlsxBuffer(rows, { sheetName = 'Products', extraSheets = [] } = {}
 }
 
 describe('product-import.service', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    query.mockReset()
+    withTransaction.mockReset()
+  })
+
   it('parseImportFile parses CSV buffer', () => {
     const csv = Buffer.from('sku,name,price\nSKU-1,Alpha Coffee,12.50\nSKU-2,Beta Tea,8.00', 'utf8')
     const { headers, rows } = parseImportFile(csv, 'products.csv')
@@ -66,6 +92,40 @@ describe('product-import.service', () => {
     expect(countProductImportRows(buffer, 'rows.xlsx')).toBe(2)
   })
 
+  it('fails queued product imports before catalog writes when the supplier is locked', async () => {
+    query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'job-locked',
+            supplier_id: 'sup-locked',
+            status: 'pending',
+            preview_json: {
+              csv: 'sku,name\nSKU-1,Locked Product',
+              filename: 'products.csv',
+              partial: true,
+            },
+            created_by: 'user-1',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rowCount: 1 })
+
+    await expect(processProductImportJob('job-locked')).rejects.toThrow(/locked/)
+
+    expect(withTransaction).not.toHaveBeenCalled()
+    expect(String(query.mock.calls[1][0])).toContain('account_locked_at IS NULL')
+    const failedUpdate = query.mock.calls.find((call) =>
+      String(call[0]).includes('UPDATE catalog_product_import_job')
+    )
+    expect(failedUpdate?.[1]).toEqual([
+      'job-locked',
+      'failed',
+      null,
+      'Supplier account is locked; catalog import was not processed.',
+    ])
+  })
   it('parseImportFile rejects unsupported extensions', () => {
     expect(() => parseImportFile(Buffer.from('data'), 'notes.txt')).toThrow(/Unsupported/)
   })

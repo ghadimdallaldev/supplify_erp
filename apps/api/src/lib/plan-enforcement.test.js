@@ -203,8 +203,8 @@ describe('plan-enforcement', () => {
     })
   })
 
-  describe('Silver and Free Trial', () => {
-    it('Silver cannot use add-on path — upgrade to Gold', async () => {
+  describe('Growth and Free Trial', () => {
+    it('Growth cannot use add-on path - upgrade plan', async () => {
       vi.mocked(getTenantSubscription).mockResolvedValue(
         mockSubscription('silver', 'Silver', { branches: 1 })
       )
@@ -215,7 +215,7 @@ describe('plan-enforcement', () => {
 
       const result = await checkBranchLimit('rest-main')
       expect(result.allowed).toBe(false)
-      expect(result.action).toBe('UPGRADE_TO_GOLD')
+      expect(result.action).toBe('UPGRADE_PLAN')
     })
 
     it('Free Trial cannot use branch add-ons', async () => {
@@ -229,7 +229,7 @@ describe('plan-enforcement', () => {
 
       const result = await checkBranchLimit('rest-main')
       expect(result.allowed).toBe(false)
-      expect(result.action).toBe('UPGRADE_TO_GOLD')
+      expect(result.action).toBe('UPGRADE_PLAN')
     })
 
     it('Free Trial blocks warehouse creation', async () => {
@@ -243,7 +243,7 @@ describe('plan-enforcement', () => {
 
       const result = await checkWarehouseLimit('sup-1')
       expect(result.allowed).toBe(false)
-      expect(result.action).toBe('UPGRADE_TO_SILVER')
+      expect(result.action).toBe('UPGRADE_PLAN')
     })
   })
 

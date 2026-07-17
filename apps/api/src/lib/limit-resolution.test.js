@@ -160,6 +160,7 @@ describe('limit-resolution', () => {
     expect(RESTAURANT_LIMIT_KEYS).toContain('deal_redemptions_per_day')
     expect(RESTAURANT_LIMIT_KEYS).toContain('open_conversations')
     expect(SUPPLIER_LIMIT_KEYS).toContain('open_conversations')
+    expect(SUPPLIER_LIMIT_KEYS).toContain('ai_requests_per_day')
   })
 
   it('fills missing Free-tier supplier chat limits for settings UI', () => {

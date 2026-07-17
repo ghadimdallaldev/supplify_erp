@@ -1,14 +1,25 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { activeRestaurantDeal } from '../test/factories/deal-promotion.js'
+const mockQuery = vi.hoisted(() => vi.fn())
+
+vi.mock('../lib/db.js', () => ({
+  query: (...args) => mockQuery(...args),
+}))
+
 import {
   calculatePromotionDiscount,
   filterEligibleLineItems,
+  deactivateExpiredPromotions,
   hasActiveSupplierOrderPromotions,
   isPromotionEligible,
   selectBestPromotion,
 } from './promotions.service.js'
 
 describe('promotions.service', () => {
+  beforeEach(() => {
+    mockQuery.mockReset()
+  })
+
   const basePromo = activeRestaurantDeal()
 
   describe('isPromotionEligible', () => {
@@ -173,6 +184,22 @@ describe('promotions.service', () => {
       expect(result.get('supplier-1')).toBe(true)
       expect(result.get('supplier-2')).toBe(false)
       expect(queryFn).toHaveBeenCalledOnce()
+    })
+  })
+  describe('deactivateExpiredPromotions', () => {
+    it('activates scheduled promotions only for unlocked suppliers', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+
+      await deactivateExpiredPromotions()
+
+      const scheduledSql = String(mockQuery.mock.calls[0][0])
+      expect(scheduledSql).toContain('FROM subscription sub')
+      expect(scheduledSql).toContain('sub.tenant_id = promotions.supplier_id')
+      expect(scheduledSql).toContain("sub.tenant_type = 'SUPPLIER'")
+      expect(scheduledSql).toContain('sub.account_locked_at IS NULL')
     })
   })
 })

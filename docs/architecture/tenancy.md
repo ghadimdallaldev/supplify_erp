@@ -1,5 +1,7 @@
 # Supplify Tenancy Model
 
+> Pricing model note: plan names, prices, limits, and upgrade examples in this architecture note may reflect the legacy tier catalog. Current commercial guidance lives in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+
 ## Overview
 
 Supplify uses a multi-tenant architecture where each restaurant and supplier is a separate tenant with isolated data, subscription plans, and usage quotas.

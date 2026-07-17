@@ -1,23 +1,26 @@
+> Superseded by the four-plan pricing model.
+> This document is retained for historical implementation context around the legacy four-tier catalog. Current pricing, public plan names, limits, add-ons, trial behavior, AI allowances, and billing status live in [four-plan-pricing-model.md](./four-plan-pricing-model.md). Do not use this file as current commercial guidance.
+
 # Final tier matrix (post-migrations)
 
-**Verified:** 2026-05-28  
-**Catalog migrations:** `0116` (bronze→silver), `0117` (Silver), `0119` (Gold), `0120` (Platinum)  
-**Live check:** `pnpm run log:tier-limits`  
+**Verified:** 2026-05-28
+**Catalog migrations:** `0116` (bronzeÃ¢â€ â€™silver), `0117` (Silver), `0119` (Gold), `0120` (Platinum)
+**Live check:** `pnpm run log:tier-limits`
 **Related:** [SUBSCRIPTIONS.md](./SUBSCRIPTIONS.md), [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md), [ENTERPRISE.md](./ENTERPRISE.md)
 
 ---
 
 ## 1. Final plan names and prices
 
-| Code         | User-facing name |         Monthly |        Yearly | Active |     Self-serve     | Notes                                                                            |
-| ------------ | ---------------- | --------------: | ------------: | :----: | :----------------: | -------------------------------------------------------------------------------- |
-| `free`       | **Free Trial**   |           $0.00 |             — |  Yes   | Yes (time-limited) | Not “forever free”; see [free-trial-expiry.md](../features/free-trial-expiry.md) |
-| `silver`     | **Silver**       |      **$49.00** |   **$490.00** |  Yes   |        Yes         | First paid tier                                                                  |
-| `gold`       | **Gold**         |     **$149.00** | **$1,490.00** |  Yes   |        Yes         | Subtitle: “Most Popular”                                                         |
-| `platinum`   | **Platinum**     |     **$349.00** | **$3,490.00** |  Yes   |        Yes         | Subtitle: “Unlimited Ops”                                                        |
-| `enterprise` | **Enterprise**   | $0.00 (catalog) |             — | **No** |       **No**       | `requires_admin_assignment`; admin-only                                          |
+| Code         | User-facing name |         Monthly |        Yearly | Active |     Self-serve     | Notes                                                                                       |
+| ------------ | ---------------- | --------------: | ------------: | :----: | :----------------: | ------------------------------------------------------------------------------------------- |
+| `free`       | **Free Trial**   |           $0.00 |       Ã¢â‚¬â€ |  Yes   | Yes (time-limited) | Not Ã¢â‚¬Å“forever freeÃ¢â‚¬Â; see [free-trial-expiry.md](../features/free-trial-expiry.md) |
+| `silver`     | **Silver**       |      **$49.00** |   **$490.00** |  Yes   |        Yes         | First paid tier                                                                             |
+| `gold`       | **Gold**         |     **$149.00** | **$1,490.00** |  Yes   |        Yes         | Subtitle: Ã¢â‚¬Å“Most PopularÃ¢â‚¬Â                                                         |
+| `platinum`   | **Platinum**     |     **$349.00** | **$3,490.00** |  Yes   |        Yes         | Subtitle: Ã¢â‚¬Å“Unlimited OpsÃ¢â‚¬Â                                                        |
+| `enterprise` | **Enterprise**   | $0.00 (catalog) |       Ã¢â‚¬â€ | **No** |       **No**       | `requires_admin_assignment`; admin-only                                                     |
 
-**Bronze:** Removed from DB (`0116`). Legacy API input `bronze` → `silver` (`plan-codes.js`, `planComparison.ts`). UI never shows “Bronze” (`formatPlanDisplayName` maps Bronze → Silver).
+**Bronze:** Removed from DB (`0116`). Legacy API input `bronze` Ã¢â€ â€™ `silver` (`plan-codes.js`, `planComparison.ts`). UI never shows Ã¢â‚¬Å“BronzeÃ¢â‚¬Â (`formatPlanDisplayName` maps Bronze Ã¢â€ â€™ Silver).
 
 **Pricing verification:** Matches DB on verification run (Silver $49/$490, Gold $149/$1490, Platinum $349/$3490).
 
@@ -148,7 +151,7 @@ Branches are **org location accounts** (each branch is nearly a full account). W
 
 - **Silver / Free Trial:** cannot purchase add-ons; upgrade to Gold (branches) or Silver+ (first warehouse).
 - **Enterprise:** custom limits; self-serve add-ons disabled.
-- **Hard cap:** more than **6 total branch accounts** → contact sales for Enterprise (even if add-ons would allow more).
+- **Hard cap:** more than **6 total branch accounts** Ã¢â€ â€™ contact sales for Enterprise (even if add-ons would allow more).
 - **Grandfathering:** existing branches/warehouses are never deleted; tenants over the new included limit stay readable but cannot create more until upgrade or admin-granted add-ons.
 
 Storage: `tenant_subscription_addon` (admin PUT `/api/admin-dashboard/tenants/:tenantType/:id/subscription-addons/:addonKey`). No automated billing yet.
@@ -160,8 +163,8 @@ Storage: `tenant_subscription_addon` (admin PUT `/api/admin-dashboard/tenants/:t
 ### Limits (`checkLimit` / `requireWithinLimit`)
 
 - Enforced on create/send paths (orders, chat messages, branches, warehouses, SKUs, quick lists, deals, etc.).
-- **`-1` or missing effective limit** → treated as **unlimited** for enforcement (`resolveEffectiveLimit`).
-- **Restaurant `promotions` meter** → `notApplicable` (never unlimited-by-missing-key).
+- **`-1` or missing effective limit** Ã¢â€ â€™ treated as **unlimited** for enforcement (`resolveEffectiveLimit`).
+- **Restaurant `promotions` meter** Ã¢â€ â€™ `notApplicable` (never unlimited-by-missing-key).
 - **Daily meters** reset at midnight UTC (`orders_per_day`, `chats_per_day`, `deal_redemptions_per_day`).
 - **Storage (`storage_mb`):** tracked; product docs note grace period before hard block.
 
@@ -169,45 +172,45 @@ Storage: `tenant_subscription_addon` (admin PUT `/api/admin-dashboard/tenants/:t
 
 Binary on/off per key (non-empty string = on). **Tier strings are not compared** on most routes.
 
-| Area                     | Enforcement                                                                                                                        |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Branches                 | `plan-enforcement` + org-wide count + add-ons + Enterprise cap (6)                                                                 |
-| Warehouses               | `limits.warehouses` + add-ons (supplier org-wide count) + `warehouses` feature                                                     |
-| Smart reorder            | `smart_reorder` on/off; tier via `resolveSmartReorderCapabilities()` (see below)                                                   |
-| AI platform (LLM assist) | `ai_platform` + env `AI_ENABLED`; `ai_requests_per_day` on LLM calls only                                                          |
-| Reports / waste reports  | `reports` / `waste_tracking` on/off                                                                                                |
-| Advanced roles           | `advanced_roles`                                                                                                                   |
-| Activity log             | `tenant_audit_log`                                                                                                                 |
-| Waitlist auto-promo      | `waitlist_auto_promo`                                                                                                              |
-| Supplier promotions CRUD | `promotions` feature + `promotions` limit                                                                                          |
-| Restaurant deal redeem   | `supplier_deals` + `deal_redemptions_per_day`                                                                                      |
-| Notifications            | `resolveAllowedChannels(notifications)` → in-app, email, WhatsApp; Platinum `email_whatsapp_webhook` adds outbound webhook channel |
-| Custom branding PATCH    | `custom_branding` on/off; Platinum `white_label_domain` adds custom hostname via `resolveBrandingCapabilities()`                   |
+| Area                     | Enforcement                                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Branches                 | `plan-enforcement` + org-wide count + add-ons + Enterprise cap (6)                                                                         |
+| Warehouses               | `limits.warehouses` + add-ons (supplier org-wide count) + `warehouses` feature                                                             |
+| Smart reorder            | `smart_reorder` on/off; tier via `resolveSmartReorderCapabilities()` (see below)                                                           |
+| AI platform (LLM assist) | `ai_platform` + env `AI_ENABLED`; `ai_requests_per_day` on LLM calls only                                                                  |
+| Reports / waste reports  | `reports` / `waste_tracking` on/off                                                                                                        |
+| Advanced roles           | `advanced_roles`                                                                                                                           |
+| Activity log             | `tenant_audit_log`                                                                                                                         |
+| Waitlist auto-promo      | `waitlist_auto_promo`                                                                                                                      |
+| Supplier promotions CRUD | `promotions` feature + `promotions` limit                                                                                                  |
+| Restaurant deal redeem   | `supplier_deals` + `deal_redemptions_per_day`                                                                                              |
+| Notifications            | `resolveAllowedChannels(notifications)` Ã¢â€ â€™ in-app, email, WhatsApp; Platinum `email_whatsapp_webhook` adds outbound webhook channel |
+| Custom branding PATCH    | `custom_branding` on/off; Platinum `white_label_domain` adds custom hostname via `resolveBrandingCapabilities()`                           |
 
 **`smart_reorder` capabilities** (`resolveSmartReorderCapabilities()`):
 
 | Plan value / tier                | Assistance | Forecast (30/90d) | Explain endpoint | Ask endpoint | Seasonality / trend |
 | -------------------------------- | :--------: | :---------------: | :--------------: | :----------: | :-----------------: |
-| off / Silver                     |     —      |         —         |        —         |      —       |          —          |
-| `full_90day_trends` (Gold)       |     ✓      |         ✓         |        ✓         |      —       |          —          |
-| `ai_forecast_seasonality` (Plat) |     ✓      |         ✓         |        ✓         |      ✓       |          ✓          |
+| off / Silver                     |  Ã¢â‚¬â€   |      Ã¢â‚¬â€      |     Ã¢â‚¬â€      |   Ã¢â‚¬â€    |       Ã¢â‚¬â€       |
+| `full_90day_trends` (Gold)       |  Ã¢Å“â€œ   |      Ã¢Å“â€œ      |     Ã¢Å“â€œ      |   Ã¢â‚¬â€    |       Ã¢â‚¬â€       |
+| `ai_forecast_seasonality` (Plat) |  Ã¢Å“â€œ   |      Ã¢Å“â€œ      |     Ã¢Å“â€œ      |   Ã¢Å“â€œ    |       Ã¢Å“â€œ       |
 
 **`quick_lists` capabilities** (`resolveQuickListCapabilities()`):
 
 | Plan value / tier            | Scheduling | Full schedule | Smart quantities | Suggest items |
 | ---------------------------- | :--------: | :-----------: | :--------------: | :-----------: |
-| off / manual                 |     —      |       —       |        —         |       —       |
-| `automated_weekly` (Silver)  |     ✓      |       —       |        —         |       —       |
-| `full_schedule` (Gold)       |     ✓      |       ✓       |        —         |       —       |
-| `ai_smart_automation` (Plat) |     ✓      |       ✓       |        ✓         |       ✓       |
+| off / manual                 |  Ã¢â‚¬â€   |    Ã¢â‚¬â€    |     Ã¢â‚¬â€      |    Ã¢â‚¬â€    |
+| `automated_weekly` (Silver)  |  Ã¢Å“â€œ   |    Ã¢â‚¬â€    |     Ã¢â‚¬â€      |    Ã¢â‚¬â€    |
+| `full_schedule` (Gold)       |  Ã¢Å“â€œ   |    Ã¢Å“â€œ    |     Ã¢â‚¬â€      |    Ã¢â‚¬â€    |
+| `ai_smart_automation` (Plat) |  Ã¢Å“â€œ   |    Ã¢Å“â€œ    |     Ã¢Å“â€œ      |    Ã¢Å“â€œ    |
 
 See [ai-quick-lists.md](../features/ai-quick-lists.md).
 
 ### Free Trial behavior (unchanged)
 
-- Time-limited sandbox; expiry → read-only lock (`free_sandbox_expired`).
+- Time-limited sandbox; expiry Ã¢â€ â€™ read-only lock (`free_sandbox_expired`).
 - **Limits** remain low (see section 3).
-- **Features:** migration `0112` copied Gold feature JSON onto Free — trial tenants get **Gold-equivalent feature flags** with Free limits (intentional sandbox; do not market as production parity).
+- **Features:** migration `0112` copied Gold feature JSON onto Free Ã¢â‚¬â€ trial tenants get **Gold-equivalent feature flags** with Free limits (intentional sandbox; do not market as production parity).
 
 ---
 
@@ -217,28 +220,28 @@ See [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md) for
 
 ### Enforced Platinum strings (2026-07)
 
-- **Smart quick lists** — [ai-quick-lists.md](../features/ai-quick-lists.md)
-- **Notification webhooks** — migration `0182`, `GET/PUT /api/notifications/webhook`
-- **Custom catalog domain** — [custom-domains.md](../operations/custom-domains.md)
-- **Smart reorder** — [ai-smart-reorder.md](../features/ai-smart-reorder.md)
+- **Smart quick lists** Ã¢â‚¬â€ [ai-quick-lists.md](../features/ai-quick-lists.md)
+- **Notification webhooks** Ã¢â‚¬â€ migration `0182`, `GET/PUT /api/notifications/webhook`
+- **Custom catalog domain** Ã¢â‚¬â€ [custom-domains.md](../operations/custom-domains.md)
+- **Smart reorder** Ã¢â‚¬â€ [ai-smart-reorder.md](../features/ai-smart-reorder.md)
 
-### Cross-tier (string labels ≠ behavior) — still open
+### Cross-tier (string labels Ã¢â€°Â  behavior) Ã¢â‚¬â€ still open
 
-| Keys                          | Issue                                                                                              |
-| ----------------------------- | -------------------------------------------------------------------------------------------------- |
-| `reports`                     | `basic_kpis` vs `usage_cost_dashboards` vs `advanced_forecasting_custom_reports` — same route gate |
-| `smart_reorder`               | **Enforced** — see §6 capability table                                                             |
-| `quick_lists`                 | **Enforced** — see §6 capability table                                                             |
-| `notifications`               | **Enforced** for outbound webhooks (`email_whatsapp_webhook`)                                      |
-| `custom_branding`             | **Enforced** for custom domain (`white_label_domain`); logo/colors shared with Gold                |
-| `finance_invoices`            | `record_payments` / `expense_analytics` / `advanced_finance_dashboard` — same gate                 |
-| `receiving_quality`           | photos / scoring / `supplier_performance` — same gate                                              |
-| `waste_tracking` (restaurant) | `manual_entry` / `analytics_dashboard` / `cost_percentage_vs_sales` — same waste route gate        |
-| `api_integrations`            | `api_key_access` vs `full_api_webhooks` — no differentiated API product gate                       |
+| Keys                          | Issue                                                                                                    |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `reports`                     | `basic_kpis` vs `usage_cost_dashboards` vs `advanced_forecasting_custom_reports` Ã¢â‚¬â€ same route gate |
+| `smart_reorder`               | **Enforced** Ã¢â‚¬â€ see Ã‚Â§6 capability table                                                          |
+| `quick_lists`                 | **Enforced** Ã¢â‚¬â€ see Ã‚Â§6 capability table                                                          |
+| `notifications`               | **Enforced** for outbound webhooks (`email_whatsapp_webhook`)                                            |
+| `custom_branding`             | **Enforced** for custom domain (`white_label_domain`); logo/colors shared with Gold                      |
+| `finance_invoices`            | `record_payments` / `expense_analytics` / `advanced_finance_dashboard` Ã¢â‚¬â€ same gate                 |
+| `receiving_quality`           | photos / scoring / `supplier_performance` Ã¢â‚¬â€ same gate                                              |
+| `waste_tracking` (restaurant) | `manual_entry` / `analytics_dashboard` / `cost_percentage_vs_sales` Ã¢â‚¬â€ same waste route gate        |
+| `api_integrations`            | `api_key_access` vs `full_api_webhooks` Ã¢â‚¬â€ no differentiated API product gate                       |
 
 ### Reservations
 
-[PLANS.md](./PLANS.md) describes tiered reservations; **not re-verified in this pass** — treat as separate from subscription limit migrations.
+[PLANS.md](./PLANS.md) describes tiered reservations; **not re-verified in this pass** Ã¢â‚¬â€ treat as separate from subscription limit migrations.
 
 ---
 
@@ -265,8 +268,8 @@ Via **Admin Dashboard** (`/api/admin-dashboard`):
 Resolution order (`limit-resolution.js`):
 
 1. Plan default (`subscription_plan.limits`)
-2. **Plan override** (`plan_limit_override`) — increase only
-3. **Tenant override** (`tenant_limit_override`) — increase only
+2. **Plan override** (`plan_limit_override`) Ã¢â‚¬â€ increase only
+3. **Tenant override** (`tenant_limit_override`) Ã¢â‚¬â€ increase only
 
 Rules:
 
@@ -283,8 +286,8 @@ Feature overrides: tenant `feature_flag_override` and global `feature_flag.globa
 
 | Risk                                             | Severity               | Notes                                                                                                                        |
 | ------------------------------------------------ | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| **Free Trial feature parity with Gold (`0112`)** | High (GTM)             | Trial unlocks same feature flags as Gold; only limits differ — can confuse upgrade story                                     |
-| **Tier feature strings not enforced**            | Medium (Platinum/Gold) | Remaining catalog items: full API platform, advanced reports strings — see §7                                                |
+| **Free Trial feature parity with Gold (`0112`)** | High (GTM)             | Trial unlocks same feature flags as Gold; only limits differ Ã¢â‚¬â€ can confuse upgrade story                               |
+| **Tier feature strings not enforced**            | Medium (Platinum/Gold) | Remaining catalog items: full API platform, advanced reports strings Ã¢â‚¬â€ see Ã‚Â§7                                       |
 | **Webhook notification label**                   | Low (mitigated)        | Outbound notification webhooks shipped (`0182`)                                                                              |
 | **Storage soft enforcement**                     | Low                    | Documented grace; tenants may exceed before block                                                                            |
 | **Legacy `bronze` in API**                       | Low                    | Normalized to silver; stale clients safe                                                                                     |
@@ -301,7 +304,7 @@ Feature overrides: tenant `feature_flag_override` and global `feature_flag.globa
 
 ### Naming & pricing (UI)
 
-- [ ] Upgrade modal / Settings → Subscription shows **Free Trial** (not “Free” or “Bronze”)
+- [ ] Upgrade modal / Settings Ã¢â€ â€™ Subscription shows **Free Trial** (not Ã¢â‚¬Å“FreeÃ¢â‚¬Â or Ã¢â‚¬Å“BronzeÃ¢â‚¬Â)
 - [ ] Silver **$49/mo**, Gold **$149/mo**, Platinum **$349/mo**
 - [ ] No **Bronze** label anywhere in app or admin plan cards
 - [ ] **Approvals / Budgets** absent from plan features and feature-flag admin lists
@@ -325,7 +328,7 @@ Feature overrides: tenant `feature_flag_override` and global `feature_flag.globa
 - [ ] Silver: no smart reorder, no advanced roles, no audit log
 - [ ] Gold: multi-branch, smart reorder, audit log, logo branding
 - [ ] Platinum: unlimited branch create (within reason), white-label caption in upgrade UI
-- [ ] Free Trial expired → read-only (writes 402)
+- [ ] Free Trial expired Ã¢â€ â€™ read-only (writes 402)
 
 ### Admin
 
@@ -348,13 +351,13 @@ cd apps/web && npm run test:run -- src/lib/planComparison.test.ts src/lib/planLi
 ```
 Tiers: enterprise, free, gold, platinum, silver
 
-RESTAURANT — prices & storage
+RESTAURANT Ã¢â‚¬â€ prices & storage
   free      $0/mo    storage 50 MB
   silver    $49/mo   storage 500 MB
   gold      $149/mo  storage 10240 MB (10 GB)
   platinum  $349/mo  storage 30720 MB (30 GB), all operational limits unlimited
 
-SUPPLIER — prices & storage
+SUPPLIER Ã¢â‚¬â€ prices & storage
   free      $0/mo    storage 50 MB, warehouses 0, promotions 1
   silver    $49/mo   storage 500 MB, promotions 3
   gold      $149/mo  storage 10240 MB, promotions 25
@@ -369,17 +372,17 @@ Full output: run `pnpm run log:tier-limits` from `apps/api`.
 
 ## Verification summary (2026-05-28)
 
-| Check                            | Result                                                                              |
-| -------------------------------- | ----------------------------------------------------------------------------------- |
-| Bronze user-facing               | **Pass** (alias only)                                                               |
-| Free → Free Trial display        | **Pass**                                                                            |
-| Silver $49 / $490                | **Pass**                                                                            |
-| Gold $149 / $1490                | **Pass**                                                                            |
-| Platinum $349 / $3490            | **Pass**                                                                            |
-| Restaurant no `promotions` limit | **Pass**                                                                            |
-| Supplier `promotions` limit      | **Pass**                                                                            |
-| No approvals_budgets in UI       | **Pass**                                                                            |
-| Platinum catalog-only documented | **Pass** ([PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md)) |
-| Enterprise inactive/custom       | **Pass**                                                                            |
-| API tests (22)                   | **Pass**                                                                            |
-| Web plan tests (21)              | **Pass**                                                                            |
+| Check                             | Result                                                                              |
+| --------------------------------- | ----------------------------------------------------------------------------------- |
+| Bronze user-facing                | **Pass** (alias only)                                                               |
+| Free Ã¢â€ â€™ Free Trial display | **Pass**                                                                            |
+| Silver $49 / $490                 | **Pass**                                                                            |
+| Gold $149 / $1490                 | **Pass**                                                                            |
+| Platinum $349 / $3490             | **Pass**                                                                            |
+| Restaurant no `promotions` limit  | **Pass**                                                                            |
+| Supplier `promotions` limit       | **Pass**                                                                            |
+| No approvals_budgets in UI        | **Pass**                                                                            |
+| Platinum catalog-only documented  | **Pass** ([PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md)) |
+| Enterprise inactive/custom        | **Pass**                                                                            |
+| API tests (22)                    | **Pass**                                                                            |
+| Web plan tests (21)               | **Pass**                                                                            |

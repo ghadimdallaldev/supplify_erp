@@ -4,6 +4,7 @@ import { getReferralProgramConfig } from '../lib/platform-settings.js'
 import { getSubscriptionForBilling } from '../lib/billing/billing-service.js'
 import { notifyTenantUsers } from './notification/in-app.js'
 import { writeAuditLog } from '../lib/audit.js'
+import { assertSupplierActiveCustomerLocationCapacity } from '../lib/subscription.js'
 
 function addDays(date, days) {
   const d = new Date(date)
@@ -57,6 +58,10 @@ export async function sponsorProspect(supplierId, prospectId, { planCode, req = 
   )
   if (!prospects.length) throw new NotFoundError('Prospect not found')
   const prospect = prospects[0]
+
+  await assertSupplierActiveCustomerLocationCapacity(supplierId, {
+    action: 'growth.sponsor',
+  })
 
   const { rows: planRows } = await query(
     `SELECT id, code, name FROM subscription_plan

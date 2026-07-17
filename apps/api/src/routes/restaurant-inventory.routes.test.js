@@ -13,6 +13,8 @@ import {
 const mockGetTenantSubscription = vi.fn()
 const mockExplainReorderSuggestions = vi.fn()
 const mockParseReorderIntent = vi.fn()
+const mockGetReorderAiRecommendations = vi.fn()
+const mockRecordFeedback = vi.fn()
 
 vi.mock('../lib/db.js', () => ({
   query: vi.fn().mockResolvedValue({ rows: [] }),
@@ -73,6 +75,9 @@ vi.mock('../services/reorder-cadence.service.js', () => ({
 vi.mock('../services/restaurant-reorder-assistance.service.js', () => ({
   getReorderAssistance: vi.fn(),
   suppressReorderSuggestion: vi.fn(),
+  applyReorderAssistance: vi.fn(),
+  getReorderAiRecommendations: (...args) => mockGetReorderAiRecommendations(...args),
+  recordReorderRecommendationFeedback: (...args) => mockRecordFeedback(...args),
 }))
 
 vi.mock('../services/reorder-forecast-cache.service.js', () => ({
@@ -110,6 +115,12 @@ describe('restaurant inventory reorder AI routes', () => {
       matchedProducts: [{ productId: 'p1', productName: 'Tomatoes', suggestedQty: 3 }],
       interpretation: 'Reorder tomatoes',
     })
+    mockGetReorderAiRecommendations.mockResolvedValue({
+      recommendations: [],
+      usedLlm: false,
+      cached: false,
+    })
+    mockRecordFeedback.mockResolvedValue({ id: 'fb-1' })
 
     const { errorHandler } = await import('../middlewares/errorHandler.js')
     app = express()
@@ -182,6 +193,76 @@ describe('restaurant inventory reorder AI routes', () => {
         expect.objectContaining({
           query: 'tomatoes and onions',
           smartReorderFeatureValue: 'ai_forecast_seasonality',
+        })
+      )
+    })
+  })
+
+  describe('POST /api/restaurant-inventory/reorder-assistance/ai-recommend', () => {
+    it('returns 403 when tier has no forecast capability (basic/off)', async () => {
+      // Plan has smart_reorder enabled for the feature gate, but value is a non-forecast
+      // string that resolveSmartReorderCapabilities treats as basic (no forecast).
+      mockGetTenantSubscription.mockResolvedValue({
+        features: { smart_reorder: 'basic_alerts' },
+      })
+
+      const res = await request(app)
+        .post('/api/restaurant-inventory/reorder-assistance/ai-recommend')
+        .send({ limit: 3 })
+
+      expect(res.status).toBe(403)
+      expect(res.body.error?.name).toBe('FORBIDDEN')
+      expect(mockGetReorderAiRecommendations).not.toHaveBeenCalled()
+    })
+
+    it('calls getReorderAiRecommendations for gold tier', async () => {
+      mockGetTenantSubscription.mockResolvedValue({
+        features: { smart_reorder: 'full_90day_trends' },
+      })
+      mockGetReorderAiRecommendations.mockResolvedValue({
+        recommendations: [
+          { productId: 'p1', source: 'forecast', action: 'order', recommendedQuantity: 5 },
+        ],
+        usedLlm: false,
+        cached: false,
+      })
+
+      const res = await request(app)
+        .post('/api/restaurant-inventory/reorder-assistance/ai-recommend')
+        .send({ productIds: ['11111111-1111-1111-1111-111111111111'], limit: 3 })
+
+      expect(res.status).toBe(200)
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.recommendations).toHaveLength(1)
+      expect(mockGetReorderAiRecommendations).toHaveBeenCalledWith(
+        'restaurant-1',
+        expect.objectContaining({
+          smartReorderFeatureValue: 'full_90day_trends',
+          limit: 3,
+        })
+      )
+    })
+  })
+
+  describe('POST /api/restaurant-inventory/reorder-assistance/feedback', () => {
+    it('records feedback for a recommendation', async () => {
+      const res = await request(app)
+        .post('/api/restaurant-inventory/reorder-assistance/feedback')
+        .send({
+          productId: '11111111-1111-1111-1111-111111111111',
+          source: 'ai',
+          actionTaken: 'incorrect',
+          recommendedQuantity: 12,
+        })
+
+      expect(res.status).toBe(200)
+      expect(res.body.ok).toBe(true)
+      expect(mockRecordFeedback).toHaveBeenCalledWith(
+        'restaurant-1',
+        expect.objectContaining({
+          productId: '11111111-1111-1111-1111-111111111111',
+          source: 'ai',
+          actionTaken: 'incorrect',
         })
       )
     })

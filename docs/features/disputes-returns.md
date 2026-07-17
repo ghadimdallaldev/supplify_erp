@@ -1,6 +1,6 @@
 # Disputes & Returns
 
-Plan feature key: `disputes_returns` (included on **Free** and paid plans for both restaurants and suppliers; free tiers remain subject to usual order/product/chat limits).
+Plan feature key: `disputes_returns` (included in the selected trial target and paid Growth/Scale plans for both restaurants and suppliers; expired trials remain subject to account-lock rules).
 
 ## Overview
 

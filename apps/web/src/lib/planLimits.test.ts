@@ -240,7 +240,7 @@ describe('multi_branch feature gates', () => {
     } as Entitlements
     expect(multiBranchEnabled(silver)).toBe(false)
     expect(getBranchAddGate(silver, 1).canAdd).toBe(false)
-    expect(getBranchAddGate(silver, 1).reason).toBe('upgrade_to_gold')
+    expect(getBranchAddGate(silver, 1).reason).toBe('upgrade_plan')
   })
 
   it('Gold at included branch limit suggests add-on', () => {

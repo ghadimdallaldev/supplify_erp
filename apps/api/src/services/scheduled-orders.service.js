@@ -13,6 +13,14 @@ const DUE_LISTS_SQL = `
   JOIN restaurant r ON r.id = ql.restaurant_id
   WHERE ql.is_scheduled = true
     AND ql.status = 'ACTIVE'
+    AND NOT EXISTS (
+      SELECT 1
+      FROM subscription sub
+      WHERE sub.tenant_id = r.id
+        AND sub.tenant_type = 'RESTAURANT'
+        AND sub.status IN ('TRIALING', 'ACTIVE', 'PAST_DUE')
+        AND sub.account_locked_at IS NOT NULL
+    )
     AND ql.next_execution_date <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date
     AND (
       ql.next_execution_date < (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date

@@ -1,5 +1,7 @@
 # Supplier Follow
 
+> Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+
 Restaurants **follow** suppliers to curate their marketplace feed, unlock organic deal discovery, and establish an ongoing buyer–seller relationship. Follow status is stored in `supplier_follow` and enforced by plan limits.
 
 **Plan meter:** `suppliers_per_restaurant` — Free **1**, Silver **5**, Gold **30**, Platinum **unlimited** (see [tier-matrix.md](../product/tier-matrix.md)).

@@ -10,7 +10,7 @@ const sampleTenants: AdminTenantOption[] = [
     slug: 'ghadi-foods',
     email: 'ops@ghadi.test',
     planCode: 'gold',
-    planName: 'Gold',
+    planName: 'Supplier Growth',
     status: 'ACTIVE',
     isMainBranch: true,
     organizationId: 'org-1',
@@ -22,7 +22,7 @@ const sampleTenants: AdminTenantOption[] = [
     slug: 'downtown',
     email: 'chef@bistro.test',
     planCode: 'silver',
-    planName: 'Silver',
+    planName: 'Restaurant Growth',
     status: 'TRIALING',
     isMainBranch: false,
     organizationId: 'org-2',
@@ -93,7 +93,9 @@ describe('filterAdminLimitKeys', () => {
 
 describe('formatPlanCodeLabel', () => {
   it('labels known tiers', () => {
-    expect(formatPlanCodeLabel('free')).toBe('Free Trial')
-    expect(formatPlanCodeLabel('gold')).toBe('Gold')
+    expect(formatPlanCodeLabel('free')).toBe('30-day Free Trial')
+    expect(formatPlanCodeLabel('gold')).toBe('Growth / Scale')
+    expect(formatPlanCodeLabel('gold', 'SUPPLIER')).toBe('Supplier Growth')
+    expect(formatPlanCodeLabel('gold', 'RESTAURANT')).toBe('Restaurant Scale')
   })
 })

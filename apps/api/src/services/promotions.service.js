@@ -309,6 +309,14 @@ export async function deactivateExpiredPromotions() {
     WHERE status = 'scheduled'
       AND starts_at <= NOW()
       AND COALESCE(payment_status, 'not_required') IN ('not_required', 'paid')
+      AND EXISTS (
+        SELECT 1
+        FROM subscription sub
+        WHERE sub.tenant_id = promotions.supplier_id
+          AND sub.tenant_type = 'SUPPLIER'
+          AND sub.status IN ('ACTIVE', 'TRIALING', 'PAST_DUE')
+          AND sub.account_locked_at IS NULL
+      )
     RETURNING id
     `
   )

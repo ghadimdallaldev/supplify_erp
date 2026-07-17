@@ -50,13 +50,14 @@ Navigate to `/app/admin` (visible only to users with ADMIN role).
 
 **Admin → Plans**
 
-Shows all 4 Supplify plans:
+Shows the active tenant-specific commercial catalog:
 
-- Free Trial (`free` — time-limited, not forever-free)
-- Silver ($49/mo)
-- Gold ($149/mo)
-- Platinum ($349/mo)
+- Restaurant Growth (`silver`, RESTAURANT, $49/mo, $490/yr)
+- Restaurant Scale (`gold`, RESTAURANT, $149/mo, $1,490/yr)
+- Supplier Growth (`gold`, SUPPLIER, $149/mo, $1,490/yr)
+- Supplier Scale (`platinum`, SUPPLIER, $349/mo, $3,490/yr)
 
+The internal `free` row remains a 30-day trial state with a selected paid target plan. Hidden custom or enterprise rows may exist for admin-assigned exceptional accounts, but they are not public self-service plans.
 Each shows:
 
 - Pricing (monthly/yearly)
@@ -70,17 +71,17 @@ To change what a plan includes:
 
 1. Navigate to **Plans** tab
 2. Click "Edit" on any plan
-3. Modify limits (e.g., change Silver `orders_per_day` from 20 to 30)
-4. Modify features (e.g., enable `driver_management` on Silver for a pilot)
+3. Modify limits (e.g., change Supplier Growth `active_customer_locations_monthly` from 50 to 60)
+4. Modify features (e.g., enable `driver_management` on Supplier Growth for a pilot)
 5. Click "Save"
 
 **Impact:** All existing tenants on that plan inherit changes immediately.
 
-**Example:** Raising Silver restaurant `deal_redemptions_per_day`
+**Example:** Raising Supplier Growth `active_customer_locations_monthly`
 
-- Before: 10 redemptions/day (migration `0117` default)
-- After: 15 redemptions/day
-- Existing Silver tenants pick up the new cap on next entitlement refresh (~30s)
+- Before: 50 active customer locations/month
+- After: 60 active customer locations/month
+- Existing Supplier Growth tenants pick up the new cap on next entitlement refresh (~30s)
 
 ### Editing Plan Pricing
 
@@ -134,9 +135,9 @@ To upgrade or downgrade a tenant:
 - Upgrade prompts shown to tenant
 - Existing data remains accessible
 
-### Free Trial (plan code `free`)
+### 30-day trial (plan code `free`)
 
-**Platform default length:** Admin → **Platform settings** → Free Trial length (**7–90** days, default **30**). Applies to new Free activations.
+**Platform default length:** Admin -> **Platform settings** -> trial length (**7-90** days, default **30**). Applies to new trial activations.
 
 **Growth program:** Admin → **Plans** tab → **Growth program settings** — referral discount %, supplier reward type, sponsorship limits. See [supplier-customer-growth.md](../features/supplier-customer-growth.md).
 
@@ -146,7 +147,7 @@ To upgrade or downgrade a tenant:
 2. Click **Extend trial** (or call `POST /api/admin-dashboard/subscriptions/:id/extend-free-trial` with optional `{ "days": 30 }`)
 3. Lock clears; `free_sandbox_expires_at` is set from now + days (clamped **7–90**)
 
-**Unlock** on an expired Free Trial also extends expiry so the hourly expiry job does not immediately re-lock.
+**Unlock** on an expired trial also extends expiry so the hourly expiry job does not immediately re-lock.
 
 See [free-trial-expiry.md](../features/free-trial-expiry.md) and QA **BIL-FT-\*** in [regression-checklist.md](../qa/regression-checklist.md).
 
@@ -286,7 +287,7 @@ Features are controlled directly through subscription plans. Each plan has a `fe
 **To Enable/Disable Features:**
 
 1. Admin → Plans
-2. Select plan (Free, Silver, Gold, Platinum)
+2. Select a tenant-specific plan (Growth, Scale, trial target, or hidden custom/enterprise where applicable)
 3. Edit plan features
 4. Update the features JSONB field
 5. Save changes
@@ -407,9 +408,9 @@ Shows:
 ### Audit Log Examples
 
 ```
-[2025-01-15 14:23] Admin upgraded Restaurant "Joe's Diner" from Silver to Gold
+[2025-01-15 14:23] Admin upgraded Restaurant "Joe's Diner" from Restaurant Growth to Restaurant Scale
 - Changed by: admin@supplify.com
-- Impact: Limits increased (branches: 1→3, orders/day: 100→500)
+- Impact: Limits increased (active branches: 1->3)
 - Reason: Customer requested multi-location support
 ```
 

@@ -79,7 +79,7 @@ describe('subscription plan display names', () => {
     const { getEntitlements } = await import('./subscription.js')
     const result = await getEntitlements('tenant-1', 'SUPPLIER')
 
-    expect(result?.plan.name).toBe('Free Trial')
+    expect(result?.plan.name).toBe('30-day Free Trial')
     expect(result?.plan.code).toBe('free')
   })
 })

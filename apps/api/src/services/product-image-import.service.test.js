@@ -1,13 +1,39 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+vi.mock('../lib/db.js', () => ({
+  query: vi.fn(),
+  withTransaction: vi.fn(),
+}))
+
+vi.mock('../lib/audit.js', () => ({
+  writeSystemAuditLog: vi.fn(),
+}))
+
+vi.mock('../lib/logger.js', () => ({
+  logger: {
+    debug: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  },
+}))
+
+import { query, withTransaction } from '../lib/db.js'
 import {
   normalizeSkuKey,
   extractFilenameStem,
   parseMappingCsv,
   buildImageMatches,
   buildImageImportFailureCsv,
+  processImageImportJob,
 } from './product-image-import.service.js'
 
 describe('product-image-import.service', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    query.mockReset()
+    withTransaction.mockReset()
+  })
+
   describe('normalizeSkuKey', () => {
     it('lowercases and trims SKU values', () => {
       expect(normalizeSkuKey('  SKU-001  ')).toBe('sku-001')
@@ -119,6 +145,39 @@ ABC,file.webp`
       expect(csv).toContain("'=1+1")
       expect(csv).toContain("'+cmd")
       expect(csv).toContain("'@SUM(A1)")
+    })
+  })
+  describe('processImageImportJob', () => {
+    it('fails queued image imports before product image writes when the supplier is locked', async () => {
+      query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'img-job-locked',
+              supplier_id: 'sup-locked',
+              status: 'pending',
+              preview_json: {
+                allMatches: [{ sku: 'SKU-1', fileName: 'SKU-1.jpg', productId: 'prod-1' }],
+              },
+              source_file_key: 'imports/images.zip',
+              started_at: null,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rowCount: 1 })
+
+      await expect(processImageImportJob('img-job-locked')).rejects.toThrow(/locked/)
+
+      expect(withTransaction).not.toHaveBeenCalled()
+      expect(String(query.mock.calls[1][0])).toContain('account_locked_at IS NULL')
+      const failedUpdate = query.mock.calls.find((call) =>
+        String(call[0]).includes('UPDATE catalog_image_import_job')
+      )
+      expect(failedUpdate?.[1][6]).toBe('failed')
+      expect(failedUpdate?.[1][7]).toBe(
+        'Supplier account is locked; image import was not processed.'
+      )
     })
   })
 })

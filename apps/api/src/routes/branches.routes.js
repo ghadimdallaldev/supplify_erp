@@ -127,7 +127,7 @@ router.post('/', requireRole(['RESTAURANT', 'SUPPLIER']), multiBranchFeature, as
             limitValue: limitCheck.limit ?? 0,
             currentUsage: limitCheck.current ?? 0,
             currentPlan: limitCheck.currentPlan ?? null,
-            recommendedPlans: limitCheck.requiredPlan ? [limitCheck.requiredPlan] : ['Gold'],
+            recommendedPlans: limitCheck.requiredPlan ? [limitCheck.requiredPlan] : ['Scale'],
             upgradeUrl: '/app/settings?tab=subscription',
           },
         },

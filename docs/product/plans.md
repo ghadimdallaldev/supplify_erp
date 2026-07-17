@@ -1,18 +1,20 @@
 # Supplify Subscription Plans
 
+> Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [four-plan-pricing-model.md](./four-plan-pricing-model.md) and [plans-and-limits.md](./plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+
 ## Overview
 
 Supplify offers tiered subscription plans designed for **restaurants and suppliers** at various stages of growth. Plans are structured to provide value at every level, with clear upgrade paths and feature alignment.
 
-- **Same tiers for both:** Free, Silver, Gold, and Platinum apply to restaurants and suppliers (plan type: `restaurant_and_supplier`).
-- **Supplier limits:** Each tier defines limits for suppliers (e.g. products, warehouses, **chats_per_day**). Suppliers without an active subscription are auto-assigned the Free plan so chat and other features work (no "0/0" chat limit).
+- **Legacy catalog:** This historical page describes the old Free/Silver/Gold/Platinum catalog. Current public plans are Restaurant Growth, Restaurant Scale, Supplier Growth, and Supplier Scale.
+- **Current supplier metric:** Current supplier plans scale by active ordering customer locations. The internal trial row remains only for compatibility when no subscription exists.
 - **API:** Both roles can use `GET /api/subscriptions/current` and `GET /api/subscriptions/usage/:meterType` (e.g. `chats_per_day`). See [SUPPLIER_FEATURES.md](SUPPLIER_FEATURES.md#-subscription--plan-suppliers).
 
 ---
 
 ## Plan Tiers
 
-### 🌟 Free Trial (plan code: `free`)
+### Historical Free Trial (internal compatibility code: `free`)
 
 **Best for:** Time-limited evaluation — try the platform before upgrading (not a forever-free production tier)
 
@@ -47,7 +49,7 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 
 ---
 
-### 🥉 Silver Plan
+### Historical `silver` tier
 
 **Best for:** Single-location restaurants and small suppliers (first paid tier after Free Trial)
 
@@ -93,7 +95,7 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 
 ---
 
-### 🥇 Gold Plan
+### Historical `gold` tier
 
 **Best for:** Multi-location restaurants
 
@@ -141,7 +143,7 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 
 ---
 
-### 💎 Platinum Plan
+### Historical `platinum` tier
 
 **Best for:** Enterprise restaurant chains
 
@@ -222,7 +224,7 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 - **Gold:** Up to 3 warehouses
 - **Platinum:** 5 warehouses included; extra via add-on ($25/mo each on Platinum)
 
-**Enforcement:** Cannot create warehouses beyond plan limit. Free plan inventory defaults to "Unassigned."
+**Historical enforcement:** Cannot create warehouses beyond plan limit. Legacy trial inventory defaulted to "Unassigned."
 
 ### Orders Per Day
 

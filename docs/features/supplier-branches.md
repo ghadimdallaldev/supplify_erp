@@ -1,5 +1,7 @@
 # Supplier branch accounts & organization roles
 
+> Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+
 Supplier tenants can operate as a **multi-branch organization**: one parent org with several branch accounts (each branch is a full `supplier` tenant with its own catalog, orders, warehouses, staff, and settings).
 
 ## Concepts

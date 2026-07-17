@@ -1,5 +1,7 @@
 # Tenant role system
 
+> Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+
 Plan feature key: `advanced_roles` (**Gold** and **Platinum** only — off on Free Trial and **Silver**).
 
 Named roles let restaurant and supplier tenants assign **Owner**, **Manager**, and other predefined system roles, or create **custom roles** with a permission checklist. Permission checks in the API still use the existing `permissions.js` keys; this feature adds per-tenant storage and management UI.

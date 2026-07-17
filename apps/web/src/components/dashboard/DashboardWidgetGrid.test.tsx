@@ -12,11 +12,16 @@ vi.mock('../../hooks/usePermissions', () => ({
   usePermissions: () => ({ can: () => true }),
 }))
 
+const mockAiRecommend = vi.fn().mockReturnValue({
+  unwrap: () => Promise.resolve({ recommendations: [] }),
+})
+
 vi.mock('../../services/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../services/api')>()
   return {
     ...actual,
     useGetEntitlementsQuery: () => ({ data: undefined }),
+    useAiRecommendReorderAssistanceMutation: () => [mockAiRecommend, { isLoading: false }],
   }
 })
 
@@ -27,6 +32,10 @@ vi.mock('../../services/api/endpoints/growth', async (importOriginal) => {
     useGetSupplierGrowthMetricsQuery: () => ({ data: undefined }),
   }
 })
+
+vi.mock('./SpendTrendChart', () => ({
+  SpendTrendChart: () => <div data-testid="spend-trend-chart-mock" />,
+}))
 
 function renderRestaurantSpendTrend(overrides: Record<string, unknown> = {}) {
   const onPeriodDaysChange = vi.fn()

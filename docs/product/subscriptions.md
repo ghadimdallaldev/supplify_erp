@@ -1,18 +1,21 @@
+> Superseded by the four-plan pricing model.
+> This document is retained for historical implementation context around the legacy four-tier catalog. Current pricing, public plan names, limits, add-ons, trial behavior, AI allowances, and billing status live in [four-plan-pricing-model.md](./four-plan-pricing-model.md). Do not use this file as current commercial guidance.
+
 # Subscriptions and plan catalogs
 
 Plans are split by **tenant type**: each of Free, Silver, Gold, and Platinum exists as separate rows for **RESTAURANT** and **SUPPLIER** (`subscription_plan.code`). Limit keys are normalized per tenant type.
 
 **Canonical source (live DB):** migrations `0116_rename_bronze_to_silver.sql`, `0117_silver_tier_limits_features.sql`, `0119_gold_tier_limits_features.sql`, `0120_platinum_tier_limits_features.sql`, `0131_free_trial_deal_redemptions.sql`. Verify anytime with `pnpm run log:tier-limits`.
 
-**Platinum catalog-only strings:** Several Platinum feature values are marketing/catalog until implemented — see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md).
+**Platinum catalog-only strings:** Several Platinum feature values are marketing/catalog until implemented Ã¢â‚¬â€ see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md).
 
 ## Free Trial (plan code `free`)
 
-- **User-facing name:** Free Trial (not “forever free”).
-- **Duration:** `subscription.free_sandbox_expires_at`; default length from `platform_setting.free_sandbox_days` (**30**, admin-configurable **7–90**).
+- **User-facing name:** Free Trial (not Ã¢â‚¬Å“forever freeÃ¢â‚¬Â).
+- **Duration:** `subscription.free_sandbox_expires_at`; default length from `platform_setting.free_sandbox_days` (**30**, admin-configurable **7Ã¢â‚¬â€œ90**).
 - **During trial:** Broad sandbox features (`0112` parity with Gold feature JSON) with **low plan limits** still enforced.
-- **After expiry:** `lock_reason = 'free_sandbox_expired'` — **GET** APIs read-only; **writes 402**; billing/upgrade still available.
-- **Admin:** `POST …/extend-free-trial`, unlock extends expiry for expired trials.
+- **After expiry:** `lock_reason = 'free_sandbox_expired'` Ã¢â‚¬â€ **GET** APIs read-only; **writes 402**; billing/upgrade still available.
+- **Admin:** `POST Ã¢â‚¬Â¦/extend-free-trial`, unlock extends expiry for expired trials.
 
 Details: [free-trial-expiry.md](../features/free-trial-expiry.md).
 
@@ -38,7 +41,7 @@ Suppliers can import restaurant customers, send connection requests to existing 
 
 Legacy key `products` was replaced by `restaurant_inventory_skus` / `supplier_products_skus`.
 
-## Silver tier ($49/mo, $490/yr) — current catalog
+## Silver tier ($49/mo, $490/yr) Ã¢â‚¬â€ current catalog
 
 ### Restaurant Silver
 
@@ -57,7 +60,7 @@ Legacy key `products` was replaced by `restaurant_inventory_skus` / `supplier_pr
 | scheduled_quick_lists     |     3 |
 | deal_redemptions_per_day  |    10 |
 
-**Features on:** `chat`, `order_calendar`, `quick_lists` (automated_weekly), `receiving_quality` (photos), `disputes_returns`, `finance_invoices` (record_payments), `inventory_management`, `supplier_deals`, `supplier_reviews`, `order_amendments`, `notifications`, `push_notifications`, `reports` (`basic_kpis` — route gate is boolean; tier strings not differentiated in API yet).
+**Features on:** `chat`, `order_calendar`, `quick_lists` (automated_weekly), `receiving_quality` (photos), `disputes_returns`, `finance_invoices` (record_payments), `inventory_management`, `supplier_deals`, `supplier_reviews`, `order_amendments`, `notifications`, `push_notifications`, `reports` (`basic_kpis` Ã¢â‚¬â€ route gate is boolean; tier strings not differentiated in API yet).
 
 **Features off:** `smart_reorder`, `waitlist_auto_promo`, `advanced_roles`, `tenant_audit_log`, `custom_branding`, `multi_branch`, `api_integrations`, `feature_flags_access`, `fulfillment_tools`.
 
@@ -78,7 +81,7 @@ Legacy key `products` was replaced by `restaurant_inventory_skus` / `supplier_pr
 
 **Features off:** `driver_management`, `multi_warehouse`, `advanced_roles`, `tenant_audit_log`, `custom_branding`, `api_integrations`, `feature_flags_access`.
 
-## Gold tier ($149/mo, $1490/yr) — current catalog
+## Gold tier ($149/mo, $1490/yr) Ã¢â‚¬â€ current catalog
 
 ### Restaurant Gold
 
@@ -119,7 +122,7 @@ Legacy key `products` was replaced by `restaurant_inventory_skus` / `supplier_pr
 
 **Features on:** `multi_warehouse`, `driver_management`, `fulfillment_tools` (`warehouse_pick_pack`), `advanced_roles`, `tenant_audit_log`, `multi_branch`, `reports` (`usage_cost_dashboards`), `api_integrations` (`api_key_access`), `custom_branding` (`logo_colors`).
 
-## Platinum tier ($349/mo, $3490/yr) — current catalog
+## Platinum tier ($349/mo, $3490/yr) Ã¢â‚¬â€ current catalog
 
 Top self-serve tier: most operational meters **unlimited** (`-1`), but **branches are capped at 3** (add-ons available). **30 GB** storage (`30720` MB). Pricing unchanged.
 
@@ -133,9 +136,9 @@ Top self-serve tier: most operational meters **unlimited** (`-1`), but **branche
 | scheduled_order_grace_per_day |              0 |
 | ai_requests_per_day           |            100 |
 
-**Smart reorder (Platinum):** `smart_reorder` = `ai_forecast_seasonality` — Gold forecasts plus weekday seasonality and 7d/30d trend adjustment; adds `POST /reorder-assistance/ask` for natural-language product matching. LLM gated by `ai_platform` + env; metered via `ai_requests_per_day`.
+**Smart reorder (Platinum):** `smart_reorder` = `ai_forecast_seasonality` Ã¢â‚¬â€ Gold forecasts plus weekday seasonality and 7d/30d trend adjustment; adds `POST /reorder-assistance/ask` for natural-language product matching. LLM gated by `ai_platform` + env; metered via `ai_requests_per_day`.
 
-**Feature strings (see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md)):** Platinum **smart quick lists**, **notification webhooks**, and **custom catalog domains** are enforced (see feature docs). Still catalog-only: `advanced_forecasting_custom_reports`, `full_api_webhooks`, `central_purchasing`, etc. Smart reorder tier strings **are** enforced — see [ai-smart-reorder.md](../features/ai-smart-reorder.md).
+**Feature strings (see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md)):** Platinum **smart quick lists**, **notification webhooks**, and **custom catalog domains** are enforced (see feature docs). Still catalog-only: `advanced_forecasting_custom_reports`, `full_api_webhooks`, `central_purchasing`, etc. Smart reorder tier strings **are** enforced Ã¢â‚¬â€ see [ai-smart-reorder.md](../features/ai-smart-reorder.md).
 
 ### Supplier Platinum
 
@@ -150,40 +153,40 @@ Top self-serve tier: most operational meters **unlimited** (`-1`), but **branche
 
 ## Restaurant plan matrix (summary)
 
-| Plan     | branches | users | orders/day | suppliers |  SKUs | chats/day | open chats | storage |
-| -------- | -------: | ----: | ---------: | --------: | ----: | --------: | ---------: | ------: |
-| Free     |        1 |     1 |          3 |         1 |    10 |         3 |          1 |   50 MB |
-| Silver   |        1 |     3 |         20 |         5 |   250 |        30 |          5 |  500 MB |
-| Gold     |        2 |    15 |        100 |        30 | 3,000 |       500 |         30 |   10 GB |
-| Platinum |        3 |     ∞ |          ∞ |         ∞ |     ∞ |         ∞ |          ∞ |   30 GB |
+| Plan     | branches |  users | orders/day | suppliers |   SKUs | chats/day | open chats | storage |
+| -------- | -------: | -----: | ---------: | --------: | -----: | --------: | ---------: | ------: |
+| Free     |        1 |      1 |          3 |         1 |     10 |         3 |          1 |   50 MB |
+| Silver   |        1 |      3 |         20 |         5 |    250 |        30 |          5 |  500 MB |
+| Gold     |        2 |     15 |        100 |        30 |  3,000 |       500 |         30 |   10 GB |
+| Platinum |        3 | Ã¢Ë†Å¾ |     Ã¢Ë†Å¾ |    Ã¢Ë†Å¾ | Ã¢Ë†Å¾ |    Ã¢Ë†Å¾ |     Ã¢Ë†Å¾ |   30 GB |
 
-**Also (restaurant):** `deal_redemptions_per_day` **1** on Free (migration `0131`), **10** on Silver, **50** on Gold; quick_lists **50**, quick_list_items **500**, scheduled_quick_lists **15** on Gold — see [PLANS.md](./PLANS.md).
+**Also (restaurant):** `deal_redemptions_per_day` **1** on Free (migration `0131`), **10** on Silver, **50** on Gold; quick_lists **50**, quick_list_items **500**, scheduled_quick_lists **15** on Gold Ã¢â‚¬â€ see [PLANS.md](./PLANS.md).
 
-**Branches** = org-wide active location accounts (main + linked). **Add-ons** (Gold/Platinum only): see [FINAL_TIER_MATRIX.md](./FINAL_TIER_MATRIX.md) §5b. Effective limit = included + add-ons + overrides. Hard cap: **6 branches** → Enterprise.
+**Branches** = org-wide active location accounts (main + linked). **Add-ons** (Gold/Platinum only): see [FINAL_TIER_MATRIX.md](./FINAL_TIER_MATRIX.md) Ã‚Â§5b. Effective limit = included + add-ons + overrides. Hard cap: **6 branches** Ã¢â€ â€™ Enterprise.
 
 **Warehouses (supplier):** org-wide active warehouse count; restaurants have no warehouse limit.
 
-**chats_per_day** = messages **sent** per day (`POST …/messages`).
+**chats_per_day** = messages **sent** per day (`POST Ã¢â‚¬Â¦/messages`).
 
 ## Supplier plan matrix (summary)
 
-| Plan     | branches | warehouses | users |  SKUs | chats/day | promotions (active deals) | storage |
-| -------- | -------: | ---------: | ----: | ----: | --------: | ------------------------: | ------: |
-| Free     |        1 |          0 |     1 |    10 |         3 |                         1 |   50 MB |
-| Silver   |        1 |          1 |     3 |   250 |        30 |                         3 |  500 MB |
-| Gold     |        2 |          3 |    15 | 3,000 |       500 |                        25 |   10 GB |
-| Platinum |        3 |          5 |     ∞ |     ∞ |         ∞ |                         ∞ |   30 GB |
+| Plan     | branches | warehouses |  users |   SKUs | chats/day | promotions (active deals) | storage |
+| -------- | -------: | ---------: | -----: | -----: | --------: | ------------------------: | ------: |
+| Free     |        1 |          0 |      1 |     10 |         3 |                         1 |   50 MB |
+| Silver   |        1 |          1 |      3 |    250 |        30 |                         3 |  500 MB |
+| Gold     |        2 |          3 |     15 |  3,000 |       500 |                        25 |   10 GB |
+| Platinum |        3 |          5 | Ã¢Ë†Å¾ | Ã¢Ë†Å¾ |    Ã¢Ë†Å¾ |                    Ã¢Ë†Å¾ |   30 GB |
 
 ## Tier logger / admin display
 
-- **Explicit `-1`** in plan JSON → unlimited.
-- **Missing key** on a plan row → tier logger shows **`n/a`** (not unlimited). Restaurant plans do not include `promotions` in limits JSON.
+- **Explicit `-1`** in plan JSON Ã¢â€ â€™ unlimited.
+- **Missing key** on a plan row Ã¢â€ â€™ tier logger shows **`n/a`** (not unlimited). Restaurant plans do not include `promotions` in limits JSON.
 - **Admin plan cards** show only keys present in `subscription_plan.limits` JSON.
 
 ## Enforcement
 
-- **Feature entitlements:** `requireFeature(featureKey)` → **403** `FEATURE_NOT_AVAILABLE` when disabled on plan (and not overridden).
-- **Limits:** `checkLimit()` / `requireWithinLimit()` → **403** `LIMIT_EXCEEDED`. Non-applicable meters (e.g. `promotions` on restaurants) return `notApplicable` without treating as unlimited.
+- **Feature entitlements:** `requireFeature(featureKey)` Ã¢â€ â€™ **403** `FEATURE_NOT_AVAILABLE` when disabled on plan (and not overridden).
+- **Limits:** `checkLimit()` / `requireWithinLimit()` Ã¢â€ â€™ **403** `LIMIT_EXCEEDED`. Non-applicable meters (e.g. `promotions` on restaurants) return `notApplicable` without treating as unlimited.
 - **Permissions:** RBAC on routes (see [FEATURE_CATALOG.md](../product/FEATURE_CATALOG.md)).
 - **Subscription cache:** 30s TTL; invalidated on plan/checkout/admin changes.
 
@@ -195,27 +198,27 @@ Separate `enterprise` plan; `requires_admin_assignment = true`. See [ENTERPRISE.
 
 ## Admin
 
-- **Plans tab:** Filter RESTAURANT vs SUPPLIER. Plan **code** for paid entry tier is **`silver`** (legacy API alias `bronze` → `silver` in `plan-codes.js`).
+- **Plans tab:** Filter RESTAURANT vs SUPPLIER. Plan **code** for paid entry tier is **`silver`** (legacy API alias `bronze` Ã¢â€ â€™ `silver` in `plan-codes.js`).
 - **Subscriptions:** Target plan `tenant_type` must match subscription.
 
 ## Deal boost monetization (add-on)
 
-Supplier **deal promotion boosts** (paid visibility) use `promotion_pricing_config` / `deal_promotions` — separate from plan `promotions` limit (active deal count). Boost checkout may be stubbed (`waivePayment: true`) for testing.
+Supplier **deal promotion boosts** (paid visibility) use `promotion_pricing_config` / `deal_promotions` Ã¢â‚¬â€ separate from plan `promotions` limit (active deal count). Boost checkout may be stubbed (`waivePayment: true`) for testing.
 
 ## Entitlements endpoint
 
-**GET /api/subscriptions/entitlements/current** — plan, features, limits (with overrides), usage, `usageWindowMeta`.
+**GET /api/subscriptions/entitlements/current** Ã¢â‚¬â€ plan, features, limits (with overrides), usage, `usageWindowMeta`.
 
 ## Plan change preview
 
-**POST /api/admin-dashboard/subscriptions/:id/preview-change** — `willExceed`, `featureDiff`. **PATCH** with `planId` applies change; `allowExceedance` optional.
+**POST /api/admin-dashboard/subscriptions/:id/preview-change** Ã¢â‚¬â€ `willExceed`, `featureDiff`. **PATCH** with `planId` applies change; `allowExceedance` optional.
 
 ## Migration notes
 
-- **0044** — `tenant_type`, per-type catalogs.
-- **0116** — plan code `bronze` renamed to **`silver`** (display Silver).
-- **0117** — Silver limits/features tightened (first paid tier positioning).
-- **0119** — Gold limits/features rebalanced (finite caps; feature bundle unchanged vs pre-0119 marketing).
-- **0120** — Platinum limits/features normalized (30 GB storage, unlimited meters, waste_tracking fix, legacy keys removed).
-- **0169** — Supplier customer growth (import, referrals, sponsorship, billing credits); platform `free_sandbox_days` default **30** (range **7–90**).
-- **0063 / 0064** — historical Gold/Silver limit rebalances (superseded for Silver by 0117, Gold by 0119).
+- **0044** Ã¢â‚¬â€ `tenant_type`, per-type catalogs.
+- **0116** Ã¢â‚¬â€ plan code `bronze` renamed to **`silver`** (display Silver).
+- **0117** Ã¢â‚¬â€ Silver limits/features tightened (first paid tier positioning).
+- **0119** Ã¢â‚¬â€ Gold limits/features rebalanced (finite caps; feature bundle unchanged vs pre-0119 marketing).
+- **0120** Ã¢â‚¬â€ Platinum limits/features normalized (30 GB storage, unlimited meters, waste_tracking fix, legacy keys removed).
+- **0169** Ã¢â‚¬â€ Supplier customer growth (import, referrals, sponsorship, billing credits); platform `free_sandbox_days` default **30** (range **7Ã¢â‚¬â€œ90**).
+- **0063 / 0064** Ã¢â‚¬â€ historical Gold/Silver limit rebalances (superseded for Silver by 0117, Gold by 0119).

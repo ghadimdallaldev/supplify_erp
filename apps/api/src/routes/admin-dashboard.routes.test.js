@@ -30,6 +30,8 @@ vi.mock('../lib/impersonation.js', () => ({
 
 const mockGetEntitlements = vi.fn()
 const mockResolveActiveBillingSubscription = vi.fn()
+const mockExtendFreeSandboxTrial = vi.fn()
+const mockUnlockSubscriptionAccount = vi.fn()
 vi.mock('../lib/org-billing-tenant.js', () => ({
   resolveOrgBillingTenantId: vi.fn(async (tenantId) => tenantId),
   resolveActiveBillingSubscription: (...args) => mockResolveActiveBillingSubscription(...args),
@@ -49,7 +51,8 @@ vi.mock('../lib/org-billing-tenant.js', () => ({
 }))
 vi.mock('../lib/audit.js', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('../lib/billing/billing-service.js', () => ({
-  unlockSubscriptionAccount: vi.fn().mockResolvedValue(undefined),
+  extendFreeSandboxTrial: (...args) => mockExtendFreeSandboxTrial(...args),
+  unlockSubscriptionAccount: (...args) => mockUnlockSubscriptionAccount(...args),
 }))
 vi.mock('../lib/conversion-events.js', () => ({
   recordConversionEvent: vi.fn().mockResolvedValue(undefined),
@@ -105,6 +108,12 @@ describe('Admin Dashboard Routes', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
+    mockExtendFreeSandboxTrial.mockResolvedValue({
+      subscription: { id: 'sub-1', tenant_id: 'tenant-1', tenant_type: 'RESTAURANT' },
+      freeTrialDays: 30,
+      freeSandboxExpiresAt: '2026-08-15T00:00:00.000Z',
+    })
+    mockUnlockSubscriptionAccount.mockResolvedValue(undefined)
     mockResolveActiveBillingSubscription.mockImplementation(async (tenantId, tenantType) => ({
       billingTenantId: tenantId,
       usesOrgBilling: false,
@@ -125,6 +134,122 @@ describe('Admin Dashboard Routes', () => {
       next()
     })
     app.use('/api/admin-dashboard', adminDashboardRoutes)
+  })
+
+  describe('POST /subscriptions/:id/extend-free-trial', () => {
+    it('rejects extension days below platform bounds', async () => {
+      const res = await request(app)
+        .post('/api/admin-dashboard/subscriptions/sub-1/extend-free-trial')
+        .send({ days: 5 })
+        .expect(400)
+
+      expect(res.body.ok).toBe(false)
+      expect(res.body.error.message).toMatch(/between 7 and 90/)
+      expect(mockExtendFreeSandboxTrial).not.toHaveBeenCalled()
+    })
+
+    it('accepts extension days up to the platform maximum', async () => {
+      query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'sub-1',
+            tenant_id: 'tenant-1',
+            tenant_type: 'RESTAURANT',
+            plan_id: 'plan-free',
+            status: 'ACTIVE',
+          },
+        ],
+      })
+      mockExtendFreeSandboxTrial.mockResolvedValueOnce({
+        subscription: { id: 'sub-1', tenant_id: 'tenant-1', tenant_type: 'RESTAURANT' },
+        freeTrialDays: 90,
+        freeSandboxExpiresAt: '2026-10-14T00:00:00.000Z',
+      })
+
+      const res = await request(app)
+        .post('/api/admin-dashboard/subscriptions/sub-1/extend-free-trial')
+        .send({ days: 90 })
+        .expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.freeTrialDays).toBe(90)
+      expect(mockExtendFreeSandboxTrial).toHaveBeenCalledWith(
+        'sub-1',
+        expect.objectContaining({ days: 90, adminUserId: 'admin-1', unlockedBy: 'admin' })
+      )
+    })
+  })
+  describe('PUT /tenants/:tenantType/:id/subscription-addons/:addonKey', () => {
+    it('rejects add-ons that are not available on the tenant current plan', async () => {
+      mockGetEntitlements.mockResolvedValueOnce({
+        plan: { code: 'gold', name: 'Supplier Growth' },
+      })
+
+      const res = await request(app)
+        .put(
+          '/api/admin-dashboard/tenants/SUPPLIER/supplier-1/subscription-addons/supplier_extra_warehouse'
+        )
+        .send({ quantity: 1, reason: 'Needs another warehouse' })
+        .expect(400)
+
+      expect(res.body.ok).toBe(false)
+      expect(res.body.error.message).toMatch(/not available/)
+      expect(query).not.toHaveBeenCalled()
+    })
+
+    it('allows compatible Scale add-ons with catalog pricing', async () => {
+      mockGetEntitlements.mockResolvedValueOnce({
+        plan: { code: 'platinum', name: 'Supplier Scale' },
+      })
+      query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'addon-1',
+            tenant_id: 'supplier-1',
+            tenant_type: 'SUPPLIER',
+            addon_key: 'supplier_extra_warehouse',
+            quantity: 2,
+            unit_price_monthly: 19,
+            status: 'active',
+          },
+        ],
+      })
+
+      const res = await request(app)
+        .put(
+          '/api/admin-dashboard/tenants/SUPPLIER/supplier-1/subscription-addons/supplier_extra_warehouse'
+        )
+        .send({ quantity: 2, reason: 'Approved expansion' })
+        .expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.addon.unit_price_monthly).toBe(19)
+      expect(query.mock.calls[1][1]).toEqual([
+        'supplier-1',
+        'SUPPLIER',
+        'supplier_extra_warehouse',
+        2,
+        19,
+        JSON.stringify({ admin_reason: 'Approved expansion' }),
+      ])
+    })
+
+    it('allows removing a previously granted add-on even when the current plan is incompatible', async () => {
+      mockGetEntitlements.mockResolvedValueOnce({
+        plan: { code: 'gold', name: 'Supplier Growth' },
+      })
+      query.mockResolvedValueOnce({ rowCount: 1, rows: [] })
+
+      const res = await request(app)
+        .put(
+          '/api/admin-dashboard/tenants/SUPPLIER/supplier-1/subscription-addons/supplier_extra_warehouse'
+        )
+        .send({ quantity: 0, reason: 'Downgrade cleanup' })
+        .expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.cancelled).toBe(true)
+    })
   })
 
   describe('POST /subscriptions/:id/preview-change', () => {

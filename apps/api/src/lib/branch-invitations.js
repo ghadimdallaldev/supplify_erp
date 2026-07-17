@@ -24,6 +24,7 @@ import { syncDriverLinkForRoleAssignment } from './driver-user-link.js'
 import { assignOrgUserRole, invalidateOrgPermissionCaches } from './supplier-org.js'
 import { sendTeamInvitationEmail } from '../services/invitation-mail.service.js'
 import { logger } from './logger.js'
+import { assertTenantUserSeatAvailable } from './subscription.js'
 
 export function generateBranchInviteToken() {
   return generateInviteToken()
@@ -126,6 +127,10 @@ export async function createBranchInvitation({
     const scope = await resolveWorkspaceScope(supplierId, 'SUPPLIER')
     await assertEmailCanJoinWorkspace(invitedEmail, scope)
   }
+
+  await assertTenantUserSeatAvailable(supplierId, 'SUPPLIER', {
+    includePendingInvitations: true,
+  })
 
   const token = generateInviteToken()
   const expiresAt = inviteExpiresAt()
@@ -316,6 +321,10 @@ export async function acceptBranchInvitation({
       },
       client
     )
+
+    await assertTenantUserSeatAvailable(row.supplier_id, 'SUPPLIER', {
+      joiningUserId: existingUserId,
+    })
 
     let userId = existingUserId
     if (!userId) {

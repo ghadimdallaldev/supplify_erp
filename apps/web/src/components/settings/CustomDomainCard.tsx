@@ -78,9 +78,7 @@ export function CustomDomainCard({ allowed }: Props) {
         {!allowed ? (
           <div className="flex items-start gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-bg-subtle)]/40 p-4">
             <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
-            <p className="text-sm text-[var(--text-mid)]">
-              Custom domains are available on the Platinum plan.
-            </p>
+            <p className="text-sm text-[var(--text-mid)]">Custom domains are available on Scale.</p>
           </div>
         ) : (
           <>

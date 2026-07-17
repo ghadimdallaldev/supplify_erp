@@ -2,6 +2,7 @@ import { query } from '../lib/db.js'
 import { computeRestaurantForecasts } from './reorder-forecast.service.js'
 import { isFeatureEnabledForTenant } from '../lib/feature-flags.js'
 import { getEffectiveFeaturesForTenant } from '../lib/feature-flags.js'
+import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
 
 const STALE_HOURS = 24
 const NULL_UUID = '00000000-0000-0000-0000-000000000000'
@@ -46,6 +47,16 @@ export async function markReorderForecastDirty(
   } catch (error) {
     if (error.code === '42P01') return
     throw error
+  }
+
+  // Short AI recommend cache must not outlive dirty forecasts
+  try {
+    const { invalidateReorderAiRecommendCache } = await import(
+      './restaurant-reorder-assistance.service.js'
+    )
+    await invalidateReorderAiRecommendCache(restaurantId)
+  } catch {
+    // Best-effort — forecast dirty itself already succeeded
   }
 }
 
@@ -116,6 +127,15 @@ export async function saveRestaurantForecasts(restaurantId, forecasts) {
  * @param {{ featureValue?: unknown, branchId?: string | null, productIds?: string[], force?: boolean }} opts
  */
 export async function refreshRestaurantForecasts(restaurantId, opts = {}) {
+  if (
+    !(await isTenantUnlockedForBackgroundWrites({
+      tenantId: restaurantId,
+      tenantType: 'RESTAURANT',
+    }))
+  ) {
+    return { refreshed: 0, skipped: 'tenant_locked' }
+  }
+
   const enabled = opts.featureValue
     ? (await import('../lib/smart-reorder-tier.js')).resolveSmartReorderCapabilities(
         opts.featureValue
@@ -266,10 +286,33 @@ export async function refreshAllDirtyForecasts() {
   let restaurantIds = []
   try {
     const { rows: dirtyRows } = await query(
-      `SELECT DISTINCT restaurant_id FROM reorder_forecast_dirty`
+      `
+      SELECT DISTINCT d.restaurant_id
+      FROM reorder_forecast_dirty d
+      WHERE EXISTS (
+        SELECT 1
+        FROM subscription sub
+        WHERE sub.tenant_id = d.restaurant_id
+          AND sub.tenant_type = 'RESTAURANT'
+          AND sub.status IN ('ACTIVE', 'TRIALING', 'PAST_DUE')
+          AND sub.account_locked_at IS NULL
+      )
+      `
     )
     const { rows: staleRows } = await query(
-      `SELECT DISTINCT restaurant_id FROM reorder_forecast WHERE stale_after <= now()`
+      `
+      SELECT DISTINCT rf.restaurant_id
+      FROM reorder_forecast rf
+      WHERE rf.stale_after <= now()
+        AND EXISTS (
+          SELECT 1
+          FROM subscription sub
+          WHERE sub.tenant_id = rf.restaurant_id
+            AND sub.tenant_type = 'RESTAURANT'
+            AND sub.status IN ('ACTIVE', 'TRIALING', 'PAST_DUE')
+            AND sub.account_locked_at IS NULL
+        )
+      `
     )
     restaurantIds = [
       ...new Set([

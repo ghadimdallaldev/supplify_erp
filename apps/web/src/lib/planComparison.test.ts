@@ -7,9 +7,10 @@ import {
   SUPPLIER_FEATURE_KEYS,
   SUPPLIER_LIMIT_KEYS,
   getPlanSubtitle,
+  formatPlanDisplayName,
 } from './planComparison'
 
-/** Backend canonical keys (keep FE comparison table ⊆ API). */
+/** Backend canonical keys (keep FE comparison table within API). */
 const API_RESTAURANT_FEATURES = [
   'chat',
   'order_calendar',
@@ -62,9 +63,19 @@ describe('planComparison', () => {
 
   it('returns plan subtitles for known tiers', () => {
     expect(getPlanSubtitle('free')).toBe('Time-limited trial')
-    expect(getPlanSubtitle('gold')).toBe('Most Popular')
+    expect(getPlanSubtitle('silver')).toBe('Growth')
+    expect(getPlanSubtitle('gold')).toBe('Scale')
   })
 
+  it('formats free as a 30-day trial, not a permanent free plan', () => {
+    expect(formatPlanDisplayName('free')).toBe('30-day Free Trial')
+    expect(formatPlanDisplayName('free', 'Free')).toBe('30-day Free Trial')
+  })
+
+  it('surfaces active customer locations as the primary supplier scale meter', () => {
+    expect(SUPPLIER_LIMIT_KEYS[0]).toBe('active_customer_locations_monthly')
+    expect(LIMIT_KEY_LABELS.active_customer_locations_monthly).toBe('Active customer locations')
+  })
   it('includes deals and promotions keys for plan comparison (GATE-R19, GATE-S13)', () => {
     expect(RESTAURANT_FEATURE_KEYS).toContain('supplier_deals')
     expect(LIMIT_KEY_LABELS.deal_redemptions_per_day).toBe('Deal redemptions per day')

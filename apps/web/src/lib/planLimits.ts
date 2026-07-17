@@ -56,7 +56,7 @@ export function isEntitlementFeatureEnabled(
   return featureEnabled(entitlements?.planFeatures?.[key])
 }
 
-/** Plan allows multi-branch (Gold boolean, Platinum tier string, Silver off). */
+/** Plan allows multi-branch on Scale-capable plans. */
 export function multiBranchEnabled(entitlements: Entitlements | null | undefined): boolean {
   return isEntitlementFeatureEnabled(entitlements, 'multi_branch')
 }
@@ -68,7 +68,7 @@ export type BranchAddGate = {
     | 'at_limit'
     | 'feature_unavailable'
     | 'addon_or_upgrade'
-    | 'upgrade_to_gold'
+    | 'upgrade_plan'
     | 'contact_enterprise'
   current: number
   limit: number | null
@@ -144,7 +144,7 @@ export function getBranchAddGate(
 
   if (limit != null && limit !== -1) {
     if (currentCount >= limit) {
-      const reason = canBuyBranchAddons(entitlements) ? 'addon_or_upgrade' : 'upgrade_to_gold'
+      const reason = canBuyBranchAddons(entitlements) ? 'addon_or_upgrade' : 'upgrade_plan'
       return {
         canAdd: false,
         reason,
@@ -222,19 +222,20 @@ export function formatBranchGateMessage(gate: BranchAddGate): string {
 
   const planLower = plan.toLowerCase()
   if (
-    gate.reason === 'upgrade_to_gold' ||
+    gate.reason === 'upgrade_plan' ||
+    planLower.includes('growth') ||
     planLower.includes('silver') ||
     planLower.includes('bronze')
   ) {
-    return `Additional branch accounts require Gold or higher. Your plan is ${plan}. Upgrade to add more locations.`
+    return `Additional branch accounts require Scale. Your plan is ${plan}. Upgrade to add more locations.`
   }
   if (planLower.includes('free') || planLower.includes('trial')) {
-    return `Extra branches aren't available on Free Trial. Upgrade to Gold to add separate locations.`
+    return `Extra branches are not available during trial. Activate a Scale plan to add separate locations.`
   }
   if (planLower.includes('enterprise')) {
     return `Branch limits on Enterprise are set by your account team. Contact sales for changes.`
   }
-  return `Additional branch accounts aren't included on ${plan}. Upgrade to Gold or higher to add separate locations.`
+  return `Additional branch accounts are not included on ${plan}. Upgrade to Scale to add separate locations.`
 }
 
 export function canAddBranches(
@@ -244,12 +245,12 @@ export function canAddBranches(
   return getBranchAddGate(entitlements, currentCount).canAdd
 }
 
-/** Warehouse management feature (Silver+). */
+/** Warehouse management feature for supplier paid plans. */
 export function warehousesFeatureEnabled(entitlements: Entitlements | null | undefined): boolean {
   return isEntitlementFeatureEnabled(entitlements, 'warehouses')
 }
 
-/** Plan allows multi-warehouse routing (Gold+); supplier toggle is separate. */
+/** Plan allows multi-warehouse routing on Supplier Scale; supplier toggle is separate. */
 export function multiWarehousePlanEnabled(entitlements: Entitlements | null | undefined): boolean {
   return isEntitlementFeatureEnabled(entitlements, 'multi_warehouse')
 }
@@ -319,10 +320,10 @@ export function formatWarehouseGateMessage(gate: WarehouseAddGate): string {
     return `You've reached your included warehouse limit (${gate.current}/${gate.limit} on ${plan}). Add an extra warehouse add-on, upgrade your plan, or contact your administrator.`
   }
   if (gate.reason === 'upgrade_plan' && gate.limit === 0) {
-    return `Warehouses aren't available on Free Trial. Upgrade to Silver for your first warehouse.`
+    return `Warehouses are not available during trial. Activate Supplier Growth for your first warehouse.`
   }
   if (gate.reason === 'feature_unavailable') {
-    return `Warehouse management isn't included on ${plan}. Upgrade to Silver or higher.`
+    return `Warehouse management is not included on ${plan}. Activate Supplier Growth or upgrade to Supplier Scale.`
   }
   return `You've reached your warehouse limit (${gate.current}/${gate.limit}) on ${plan}. Upgrade for more warehouses.`
 }
@@ -335,14 +336,14 @@ export function canAddWarehouses(
   return getWarehouseAddGate(entitlements, currentCount).canAdd
 }
 
-/** Logo upload and brand theming (Gold: logo + colors; Platinum: white-label). */
+/** Logo upload and brand theming on advanced plans. */
 export function canUseCustomBranding(entitlements: Entitlements | null | undefined): boolean {
   return isEntitlementFeatureEnabled(entitlements, 'custom_branding')
 }
 
 export function customBrandingUpgradeMessage(planName?: string | null): string {
   const plan = planName ?? 'your current plan'
-  return `Custom branding isn't included on ${plan}. Upgrade to Gold for logo and colors, or Platinum for white-label.`
+  return `Custom branding is not included on ${plan}. Upgrade to Scale for advanced branding controls.`
 }
 
 export type OrderPlaceGate = {
@@ -570,7 +571,7 @@ export function getQuickListScheduleGate(
       canSchedule: false,
       current: 0,
       limit: null,
-      message: 'Scheduled quick lists require Silver or higher. Upgrade in Settings.',
+      message: 'Scheduled quick lists require a paid Growth or Scale plan. Upgrade in Settings.',
     }
   }
 

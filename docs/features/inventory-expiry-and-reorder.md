@@ -1,5 +1,7 @@
 # Supplify Restaurant Operations Features
 
+> Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+
 Operational features for restaurant inventory expiry, supplier shortage/substitution chat, ordering lists, and smart reorder reminders.
 
 ## Feature 1: Restaurant item expiry tracking

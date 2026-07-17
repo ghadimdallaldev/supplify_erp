@@ -79,6 +79,11 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 - **Scope**: Supplier loyalty configuration stub at `/app/loyalty` (`LoyaltyProgramPage`); APIs at `/api/loyalty/supplier/program` and balance endpoints. RTK types in `apps/web/src/services/api/endpoints/loyalty.ts`.
 - **Reason**: B2B loyalty program setup and balance review are supplier catalog/CRM cockpit workflows (web-first). Consumer-facing loyalty remains separate (`/app/consumer-loyalty`). Mobile can adopt supplier loyalty APIs in a later supplier CRM pass.
 
+## 2026-07-15 — AI-assisted restaurant Smart Reorder (web-first, additive API)
+
+- **API additive only**: New `POST /api/restaurant-inventory/reorder-assistance/ai-recommend` (batch LLM decisions with forecast fallback) and `POST .../feedback`. `GET /reorder-assistance` is unchanged in behavior (no LLM in the list path). Response fields on suggestions (`leadTimeDays`, `moq`, etc.) are additive.
+- **Mobile**: Can ignore `ai-recommend` / feedback and new AI source labels until a later pass. Existing mobile reorder flows that consume `suggested_reorder_qty` / assistance suggestions remain valid. Document-only deferral — no mobile change required for this release.
+
 ## 2026-07-01 — Reorder correctness, WhatsApp + webhook plumbing, AI fixes (server-first)
 
 - **Reorder suggestions (server is source of truth — no mobile change needed)**: Unified the reorder-quantity math behind `apps/api/src/lib/reorder-quantity.js` (order-up-to over lead time + 14-day buffer, minus on-hand, MOQ/pack rounding). Fixed a real bug in `GET /api/restaurant-inventory` (`avg_daily_usage` was averaged per movement row instead of per day). `GET /reorder-suggestions` and `/reorder-assistance` now agree. Quantities may shift for existing items; **mobile consumes the server `suggested_reorder_qty` value directly, so it inherits the fix automatically.** Additive fields on the inventory list rows: `lead_time_days`, `moq`, `order_multiple`.

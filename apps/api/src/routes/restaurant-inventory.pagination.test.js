@@ -59,6 +59,8 @@ vi.mock('../services/restaurant-reorder-assistance.service.js', () => ({
   getReorderAssistance: vi.fn(),
   suppressReorderSuggestion: vi.fn(),
   applyReorderAssistance: vi.fn(),
+  getReorderAiRecommendations: vi.fn(),
+  recordReorderRecommendationFeedback: vi.fn(),
 }))
 
 vi.mock('../services/reorder-forecast-cache.service.js', () => ({

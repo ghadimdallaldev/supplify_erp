@@ -1,21 +1,33 @@
 import { describe, expect, it } from 'vitest'
-import { formatPlanDisplayName, normalizePlanCode, PLAN_TIER_ORDER } from './plan-codes.js'
+import {
+  defaultPaidPlanCodeForTenant,
+  formatPlanDisplayName,
+  formatTenantPlanDisplayName,
+  normalizePlanCode,
+  PLAN_TIER_ORDER,
+} from './plan-codes.js'
 
 describe('plan-codes', () => {
-  it('maps free code to Free Trial label', () => {
-    expect(formatPlanDisplayName('free', 'Free')).toBe('Free Trial')
-    expect(formatPlanDisplayName('FREE')).toBe('Free Trial')
+  it('maps free code to 30-day Free Trial label', () => {
+    expect(formatPlanDisplayName('free', 'Free')).toBe('30-day Free Trial')
+    expect(formatPlanDisplayName('FREE')).toBe('30-day Free Trial')
   })
 
-  it('maps silver and legacy bronze alias', () => {
-    expect(formatPlanDisplayName('silver')).toBe('Silver')
+  it('maps legacy internal tier labels to Growth/Scale labels', () => {
+    expect(formatPlanDisplayName('silver')).toBe('Growth')
     expect(normalizePlanCode('bronze')).toBe('silver')
-    expect(formatPlanDisplayName('bronze', 'Bronze')).toBe('Silver')
+    expect(formatPlanDisplayName('bronze', 'Bronze')).toBe('Growth')
+    expect(formatPlanDisplayName('gold', 'Gold')).toBe('Scale')
+    expect(formatPlanDisplayName('platinum', 'Platinum')).toBe('Scale')
   })
 
-  it('preserves Gold and Platinum names', () => {
-    expect(formatPlanDisplayName('gold', 'Gold')).toBe('Gold')
-    expect(formatPlanDisplayName('platinum', 'Platinum')).toBe('Platinum')
+  it('formats tenant-specific public plan names for preserved internal codes', () => {
+    expect(formatTenantPlanDisplayName('silver', 'RESTAURANT', 'Silver')).toBe('Restaurant Growth')
+    expect(formatTenantPlanDisplayName('gold', 'RESTAURANT', 'Gold')).toBe('Restaurant Scale')
+    expect(formatTenantPlanDisplayName('gold', 'SUPPLIER', 'Gold')).toBe('Supplier Growth')
+    expect(formatTenantPlanDisplayName('platinum', 'SUPPLIER', 'Platinum')).toBe('Supplier Scale')
+    expect(defaultPaidPlanCodeForTenant('RESTAURANT')).toBe('silver')
+    expect(defaultPaidPlanCodeForTenant('SUPPLIER')).toBe('gold')
   })
 
   it('tier order excludes enterprise', () => {

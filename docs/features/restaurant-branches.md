@@ -1,5 +1,7 @@
 # Restaurant branches and invitations
 
+> Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+
 ## Model
 
 - **Restaurant organization** (`restaurant_organizations`) owns one or more **branch accounts** (`restaurant` rows with `organization_id`).
@@ -8,11 +10,11 @@
 
 ## Org-level roles
 
-| Role | Scope | Notes |
-|------|--------|--------|
-| Org Owner | All branches | Create/deactivate branches, assign org roles |
-| Org Manager | All branches | Manage branches; cannot deactivate main branch |
-| Org Viewer | All branches | Read-only |
+| Role             | Scope                  | Notes                                                 |
+| ---------------- | ---------------------- | ----------------------------------------------------- |
+| Org Owner        | All branches           | Create/deactivate branches, assign org roles          |
+| Org Manager      | All branches           | Manage branches; cannot deactivate main branch        |
+| Org Viewer       | All branches           | Read-only                                             |
 | Regional Manager | Assigned branches only | Branch access via `restaurant_org_user_branch_access` |
 
 ## Branch-level roles

@@ -148,7 +148,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
         features = parsePlanFeaturesJson(editPlanForm.featuresJson)
         setEditPlanJsonError(null)
       } catch (parseErr) {
-        const message = parseErr instanceof Error ? parseErr.message : 'Invalid JSON'
+        const message = parseErr instanceof Error ? parseErr.message : t('plans.invalidJson')
         setEditPlanJsonError(message)
         toast.error(message)
         return
@@ -197,7 +197,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
           title={t('plans.subscriptionPlansTitle')}
           action={
             <div className="flex items-center gap-2">
-              <span className="text-sm text-[var(--text-muted)]">Filter:</span>
+              <span className="text-sm text-[var(--text-muted)]">{t('plans.filterLabel')}</span>
               <Select
                 value={plansTenantFilter ?? ''}
                 onValueChange={(value) =>
@@ -207,7 +207,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                 }
               >
                 <SelectTrigger className="h-9 w-36">
-                  <option value="">All</option>
+                  <option value="">{t('common.all')}</option>
                   <option value="RESTAURANT">{t('common.restaurant')}</option>
                   <option value="SUPPLIER">{t('common.supplier')}</option>
                 </SelectTrigger>
@@ -216,19 +216,17 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                 <DialogTrigger asChild>
                   <Button>
                     <Plus className="mr-2 h-4 w-4" />
-                    Create Plan
+                    {t('plans.createPlanButton')}
                   </Button>
                 </DialogTrigger>
                 <DialogContent size="sm">
                   <DialogHeader>
                     <DialogTitle>{t('plans.createPlanTitle')}</DialogTitle>
-                    <DialogDescription>
-                      Add a subscription plan for restaurants or suppliers.
-                    </DialogDescription>
+                    <DialogDescription>{t('plans.createPlanDescription')}</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div>
-                      <Label>Code (e.g. free, silver)</Label>
+                      <Label>{t('plans.codeLabel')}</Label>
                       <Input
                         value={createPlanForm.code}
                         onChange={(e) => setCreatePlanForm((s) => ({ ...s, code: e.target.value }))}
@@ -236,7 +234,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                       />
                     </div>
                     <div>
-                      <Label>Name</Label>
+                      <Label>{t('plans.nameLabel')}</Label>
                       <Input
                         value={createPlanForm.name}
                         onChange={(e) => setCreatePlanForm((s) => ({ ...s, name: e.target.value }))}
@@ -244,7 +242,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                       />
                     </div>
                     <div>
-                      <Label>Tenant type</Label>
+                      <Label>{t('plans.tenantTypeLabel')}</Label>
                       <Select
                         value={createPlanForm.tenantType}
                         onValueChange={(value) =>
@@ -261,7 +259,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                       </Select>
                     </div>
                     <div>
-                      <Label>Description</Label>
+                      <Label>{t('plans.descriptionLabel')}</Label>
                       <Input
                         value={createPlanForm.description}
                         onChange={(e) =>
@@ -272,7 +270,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <Label>Price / month ($)</Label>
+                        <Label>{t('plans.priceMonthLabel')}</Label>
                         <Input
                           type="number"
                           min={0}
@@ -286,7 +284,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                         />
                       </div>
                       <div>
-                        <Label>Price / year ($)</Label>
+                        <Label>{t('plans.priceYearLabel')}</Label>
                         <Input
                           type="number"
                           min={0}
@@ -302,13 +300,13 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                     </div>
                     <div className="flex justify-end gap-2 pt-2">
                       <Button variant="outline" onClick={() => setCreatePlanOpen(false)}>
-                        Cancel
+                        {t('common.cancel')}
                       </Button>
                       <Button
                         onClick={handleCreatePlan}
                         disabled={!createPlanForm.code.trim() || !createPlanForm.name.trim()}
                       >
-                        Create
+                        {t('plans.createPlanButton')}
                       </Button>
                     </div>
                   </div>
@@ -328,12 +326,14 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <h3 className="text-base font-bold text-[var(--text)]">{plan.name}</h3>
                     <Badge variant="outline" className="text-[10px]">
-                      {plan.tenant_type === 'RESTAURANT' ? 'Restaurant' : 'Supplier'}
+                      {plan.tenant_type === 'RESTAURANT'
+                        ? t('common.restaurant')
+                        : t('common.supplier')}
                     </Badge>
                     {plan.code?.toLowerCase() === 'free' &&
                       platformSettings?.freeSandboxDays != null && (
                         <Badge variant="secondary" className="text-[10px]">
-                          {platformSettings.freeSandboxDays}d trial
+                          {t('plans.trialDaysBadge', { count: platformSettings.freeSandboxDays })}
                         </Badge>
                       )}
                   </div>
@@ -346,11 +346,11 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                 ) : null}
                 <div className="mb-3">
                   <p className="text-lg font-bold text-[var(--text)]">
-                    {formatPlanPrice(plan.price_per_month, '/mo')}
+                    {formatPlanPrice(plan.price_per_month, t('plans.monthSuffix'))}
                   </p>
                   {plan.price_per_year != null && plan.price_per_year > 0 && (
                     <p className="text-xs text-[var(--text-muted)]">
-                      {formatPlanPrice(plan.price_per_year, '/yr')}
+                      {formatPlanPrice(plan.price_per_year, t('plans.yearSuffix'))}
                     </p>
                   )}
                 </div>
@@ -361,8 +361,10 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                 )}
                 <div className="mb-3 space-y-1">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                    {plan.limits ? Object.keys(plan.limits).length : 0} limits ·{' '}
-                    {plan.features ? Object.keys(plan.features).length : 0} features
+                    {t('plans.limitsFeaturesCount', {
+                      limits: plan.limits ? Object.keys(plan.limits).length : 0,
+                      features: plan.features ? Object.keys(plan.features).length : 0,
+                    })}
                   </p>
                   {plan.limits && Object.keys(plan.limits).length > 0 ? (
                     Object.entries(plan.limits)
@@ -373,23 +375,25 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                           <span
                             className={`font-semibold ${value === -1 ? 'text-[var(--mint)]' : 'text-[var(--text)]'}`}
                           >
-                            {value === -1 ? '∞ unlimited' : String(value)}
+                            {value === -1 ? t('plans.unlimitedValueLabel') : String(value)}
                           </span>
                         </div>
                       ))
                   ) : (
-                    <p className="text-xs text-[var(--text-muted)]">No limits defined</p>
+                    <p className="text-xs text-[var(--text-muted)]">{t('plans.noLimitsDefined')}</p>
                   )}
                   {(plan.limits && Object.keys(plan.limits).length > 3) ||
                   (plan.features && Object.keys(plan.features).length > 0) ? (
                     <p className="text-[10px] text-[var(--text-muted)]">
-                      Edit plan for full details
+                      {t('plans.editForFullDetails')}
                     </p>
                   ) : null}
                 </div>
                 {plan.updated_at && (
                   <p className="text-xs text-[var(--text-muted)] mb-3">
-                    Updated {new Date(plan.updated_at).toLocaleDateString()}
+                    {t('common.updatedAt', {
+                      time: new Date(plan.updated_at).toLocaleDateString(),
+                    })}
                   </p>
                 )}
                 <div className="mt-4">
@@ -400,7 +404,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                     onClick={() => openEditPlanModal(plan)}
                   >
                     <Edit className="mr-2 h-4 w-4" />
-                    Edit
+                    {t('plans.editButton')}
                   </Button>
                 </div>
               </Card>
@@ -413,14 +417,12 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
         <DialogContent size="lg">
           <DialogHeader>
             <DialogTitle>{t('plans.editPlanTitle')}</DialogTitle>
-            <DialogDescription>
-              Update pricing, limits, features, trial days, and visibility for this plan.
-            </DialogDescription>
+            <DialogDescription>{t('plans.editPlanDescription')}</DialogDescription>
           </DialogHeader>
           {editPlanModal?.plan && (
             <div className="space-y-4 py-4">
               <div>
-                <Label>Name</Label>
+                <Label>{t('plans.nameLabel')}</Label>
                 <Input
                   value={editPlanForm.name}
                   onChange={(e) => setEditPlanForm((s) => ({ ...s, name: e.target.value }))}
@@ -428,7 +430,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                 />
               </div>
               <div>
-                <Label>Description</Label>
+                <Label>{t('plans.descriptionLabel')}</Label>
                 <Input
                   value={editPlanForm.description}
                   onChange={(e) => setEditPlanForm((s) => ({ ...s, description: e.target.value }))}
@@ -437,7 +439,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Price / month ($)</Label>
+                  <Label>{t('plans.priceMonthLabel')}</Label>
                   <Input
                     type="number"
                     min={0}
@@ -451,7 +453,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                   />
                 </div>
                 <div>
-                  <Label>Price / year ($)</Label>
+                  <Label>{t('plans.priceYearLabel')}</Label>
                   <Input
                     type="number"
                     min={0}
@@ -467,11 +469,11 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Trial days</Label>
+                  <Label>{t('plans.trialDaysLabel')}</Label>
                   <Input
                     type="number"
-                    min={editPlanModal.plan.code === 'free' ? 3 : 0}
-                    max={editPlanModal.plan.code === 'free' ? 7 : undefined}
+                    min={editPlanModal.plan.code === 'free' ? 7 : 0}
+                    max={editPlanModal.plan.code === 'free' ? 90 : undefined}
                     value={editPlanForm.trialDays}
                     onChange={(e) =>
                       setEditPlanForm((s) => ({
@@ -481,13 +483,11 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                     }
                   />
                   {editPlanModal.plan.code === 'free' ? (
-                    <p className="mt-1 text-xs text-amber-800">
-                      Free Trial catalog: trial days must be between 7 and 90.
-                    </p>
+                    <p className="mt-1 text-xs text-amber-800">{t('plans.freeTrialBoundsHelp')}</p>
                   ) : null}
                 </div>
                 <div>
-                  <Label>Display order</Label>
+                  <Label>{t('plans.displayOrderLabel')}</Label>
                   <Input
                     type="number"
                     min={0}
@@ -509,22 +509,20 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                   onChange={(e) => setEditPlanForm((s) => ({ ...s, isActive: e.target.checked }))}
                   className="rounded border-[var(--app-border-mid)]"
                 />
-                <Label htmlFor="edit-plan-active">Active</Label>
+                <Label htmlFor="edit-plan-active">{t('plans.activeLabel')}</Label>
               </div>
               <div>
-                <Label>Limits (JSON)</Label>
+                <Label>{t('plans.limitsJsonLabel')}</Label>
                 <Textarea
                   className="font-mono text-xs min-h-[140px]"
                   value={editPlanForm.limitsJson}
                   onChange={(e) => setEditPlanForm((s) => ({ ...s, limitsJson: e.target.value }))}
                   spellCheck={false}
                 />
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  Use -1 for unlimited. Numbers stay numbers; booleans are not valid limit values.
-                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">{t('plans.limitsJsonHelp')}</p>
               </div>
               <div>
-                <Label>Features (JSON)</Label>
+                <Label>{t('plans.featuresJsonLabel')}</Label>
                 <Textarea
                   className="font-mono text-xs min-h-[180px]"
                   value={editPlanForm.featuresJson}
@@ -532,8 +530,7 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                   spellCheck={false}
                 />
                 <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  true/false, tier strings (e.g. basic_kpis), or omit keys. Empty strings are
-                  rejected.
+                  {t('plans.featuresJsonHelp')}
                 </p>
               </div>
               {editPlanJsonError ? (
@@ -541,11 +538,8 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
               ) : null}
               {editPlanModal.plan.code === 'enterprise' && editPlanForm.isActive ? (
                 <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-                  <p className="font-semibold">Enterprise activation</p>
-                  <p className="mt-1 text-amber-900">
-                    Enterprise is admin-assigned only. Enabling the catalog row requires explicit
-                    confirmation.
-                  </p>
+                  <p className="font-semibold">{t('plans.enterpriseActivationTitle')}</p>
+                  <p className="mt-1 text-amber-900">{t('plans.enterpriseActivationMessage')}</p>
                   <label className="mt-2 flex cursor-pointer items-center gap-2">
                     <input
                       type="checkbox"
@@ -553,16 +547,16 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                       onChange={(e) => setConfirmEnterpriseActivation(e.target.checked)}
                       className="rounded border-[var(--app-border-mid)]"
                     />
-                    <span>I confirm Enterprise catalog activation</span>
+                    <span>{t('plans.enterpriseConfirmLabel')}</span>
                   </label>
                 </div>
               ) : null}
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" onClick={() => setEditPlanModal(null)}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button onClick={handleSaveEditPlan} disabled={!editPlanForm.name.trim()}>
-                  Save
+                  {t('common.save')}
                 </Button>
               </div>
             </div>

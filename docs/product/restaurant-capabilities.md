@@ -34,7 +34,7 @@ Concise map of restaurant-side features. Detailed specs live under [features/](.
 
 ## Plans & limits
 
-Restaurant tiers (Free → Platinum): branches, team users, reservations, reports, etc. See [plans-and-limits.md](./plans-and-limits.md).
+Restaurant plans now use Restaurant Growth and Restaurant Scale; restaurants scale primarily by active branches. See [plans-and-limits.md](./plans-and-limits.md).
 
 ## Access control
 

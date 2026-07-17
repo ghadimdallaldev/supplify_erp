@@ -163,7 +163,7 @@ export function AdminTenantPicker({
                     </div>
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[var(--text-muted)] mt-0.5">
                       {t.slug ? <span>@{t.slug}</span> : null}
-                      <span>Plan: {formatPlanCodeLabel(t.planCode)}</span>
+                      <span>Plan: {formatPlanCodeLabel(t.planCode, t.tenantType)}</span>
                       <AdminStatusBadge status={t.status} />
                       {!t.isMainBranch && t.organizationId ? (
                         <span className="text-amber-700">Branch (org)</span>
@@ -187,7 +187,7 @@ export function AdminTenantPicker({
           <span className="font-medium">{selected.name}</span>
           <span className="text-[var(--text-muted)]">
             {' '}
-            · {formatPlanCodeLabel(selected.planCode)} · {selected.status}
+            · {formatPlanCodeLabel(selected.planCode, selected.tenantType)} · {selected.status}
           </span>
           <span className="block text-xs text-[var(--text-muted)] mt-0.5 font-mono truncate">
             ID: {selected.id}

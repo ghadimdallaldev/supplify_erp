@@ -1,5 +1,7 @@
 # Monetization UX (Phase B)
 
+> Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [four-plan-pricing-model.md](./four-plan-pricing-model.md) and [plans-and-limits.md](./plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+
 Soft walls, upgrade nudges, and standardized API error payloads for plan/limit blocks.
 
 ## B1) Standardized API error payloads

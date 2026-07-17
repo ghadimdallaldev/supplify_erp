@@ -210,6 +210,8 @@ export const {
   useGetReorderAssistanceQuery,
   useExplainReorderAssistanceMutation,
   useAskReorderAssistanceMutation,
+  useAiRecommendReorderAssistanceMutation,
+  useFeedbackReorderAssistanceMutation,
   useApplyReorderAssistanceMutation,
   useSuppressReorderSuggestionMutation,
   usePreviewRestaurantInventoryImportMutation,

@@ -36,10 +36,12 @@ import {
   shouldShowEntitlementLimit,
 } from '../lib/planLimits'
 import { getLimitLabel as getPlanLimitLabel } from '../lib/planComparison'
+import { formatCurrency } from '../utils/format'
 
 /** Usage rows shown first in settings (supplier vs restaurant). */
 const LIMIT_DISPLAY_ORDER: Record<string, string[]> = {
   SUPPLIER: [
+    'active_customer_locations_monthly',
     'open_conversations',
     'chats_per_day',
     'supplier_products_skus',
@@ -47,6 +49,7 @@ const LIMIT_DISPLAY_ORDER: Record<string, string[]> = {
     'warehouses',
     'branches',
     'users',
+    'drivers',
     'storage_mb',
   ],
   RESTAURANT: [
@@ -58,6 +61,7 @@ const LIMIT_DISPLAY_ORDER: Record<string, string[]> = {
     'restaurant_inventory_skus',
     'branches',
     'users',
+    'drivers',
     'storage_mb',
   ],
 }
@@ -67,6 +71,20 @@ function getLimitLabel(tenantType: string, limitKey: string): string {
     return 'Chats'
   }
   return getPlanLimitLabel(limitKey)
+}
+function getAddonLabel(addonKey: string): string {
+  switch (addonKey) {
+    case 'restaurant_extra_branch':
+      return 'Additional branch'
+    case 'supplier_extra_branch':
+      return 'Additional supplier branch'
+    case 'supplier_extra_warehouse':
+      return 'Additional warehouse'
+    case 'supplier_active_customer_locations_50':
+      return 'Additional 50 active customer locations'
+    default:
+      return addonKey.split('_').join(' ')
+  }
 }
 
 export function SubscriptionInfo() {
@@ -155,6 +173,12 @@ export function SubscriptionInfo() {
   }
 
   const aiPlatformEnabled = isEntitlementFeatureEnabled(e, 'ai_platform')
+  const activeBillingAddons = (billing?.addons ?? e.addons ?? []).filter(
+    (addon) => (addon.quantity ?? 0) > 0
+  )
+  const recurringTotal = billing?.recurringTotal
+  const billingCycleLabel = (billing?.subscription?.billingCycle || 'MONTHLY').toUpperCase()
+  const recurringSuffix = billingCycleLabel === 'YEARLY' ? '/yr' : '/mo'
 
   const keyFeatureOffNotes = {
     chat: featureOffNote('chat'),
@@ -224,15 +248,53 @@ export function SubscriptionInfo() {
           {plan.price_monthly != null && (
             <p className="text-sm text-[var(--text-muted)]">
               ${plan.price_monthly}/mo
-              {plan.price_yearly != null && plan.price_yearly > 0 && ` · $${plan.price_yearly}/yr`}
+              {plan.price_yearly != null && plan.price_yearly > 0 && ` - $${plan.price_yearly}/yr`}
             </p>
+          )}
+          {(recurringTotal || activeBillingAddons.length > 0) && (
+            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium">Recurring total</span>
+                <span className="font-semibold">
+                  {formatCurrency(recurringTotal?.totalAmount ?? plan.price_monthly ?? 0)}
+                  {recurringSuffix}
+                </span>
+              </div>
+              {recurringTotal && recurringTotal.addonAmount > 0 && (
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Base {formatCurrency(recurringTotal.baseAmount)} + add-ons{' '}
+                  {formatCurrency(recurringTotal.addonAmount)}
+                </p>
+              )}
+              {activeBillingAddons.length > 0 && (
+                <ul className="mt-2 space-y-1 text-xs text-slate-700">
+                  {activeBillingAddons.map((addon) => (
+                    <li key={addon.key} className="flex items-center justify-between gap-3">
+                      <span>
+                        {getAddonLabel(addon.key)} x {addon.quantity}
+                      </span>
+                      <span>
+                        {addon.unitPriceMonthly != null
+                          ? `${formatCurrency(addon.unitPriceMonthly)}/mo each`
+                          : 'Custom price'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {activeBillingAddons.length > 0 && (
+                <p className="mt-2 text-xs text-[var(--text-muted)]">
+                  Add-ons are managed by Supplify admins and included in billing totals.
+                </p>
+              )}
+            </div>
           )}
           {billing?.access?.isPastDue && (
             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
               <p className="font-medium">
                 {billing.access.isLocked
-                  ? 'Account locked — payment required'
-                  : `Payment overdue — ${billing.access.daysUntilLock ?? 0} day(s) until lock`}
+                  ? 'Account locked - payment required'
+                  : `Payment overdue - ${billing.access.daysUntilLock ?? 0} day(s) until lock`}
               </p>
               <Button
                 type="button"
@@ -251,12 +313,10 @@ export function SubscriptionInfo() {
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   {billing?.access?.freeSandboxExpired ||
                   billing?.access?.lockReason === 'free_sandbox_expired' ? (
-                    <p>
-                      Your free testing period has ended. Upgrade to a paid plan to restore access.
-                    </p>
+                    <p>Your 30-day trial has ended. Upgrade to a paid plan to restore access.</p>
                   ) : (
                     <p>
-                      Free testing access ends{' '}
+                      Trial access ends{' '}
                       <span className="font-semibold">
                         {new Date(e.freeSandbox.expiresAt).toLocaleDateString()}
                       </span>
@@ -269,8 +329,8 @@ export function SubscriptionInfo() {
                 </div>
               )}
               <p className="text-sm text-[var(--text-muted)]">
-                Free Trial is time-limited and for evaluation only. Upgrade to a paid plan for
-                ongoing production use.
+                This 30-day trial is for evaluation only. Choose a paid plan for ongoing production
+                use.
               </p>
               <Button
                 type="button"
@@ -298,7 +358,7 @@ export function SubscriptionInfo() {
                   openCheckoutPayment(dispatch, {
                     planId: plan.id,
                     planCode: plan.code ?? 'gold',
-                    planName: plan.name || 'Plan',
+                    planName: formatPlanDisplayName(plan.code, plan.name),
                     priceMonthly: plan.price_monthly ?? 0,
                     priceYearly: plan.price_yearly ?? null,
                   })
@@ -316,7 +376,7 @@ export function SubscriptionInfo() {
           )}
         </div>
 
-        {/* Usage — top 3 near-limit highlighted */}
+        {/* Usage - top 3 near-limit highlighted */}
         <div className="space-y-4">
           <h4 className="font-semibold flex items-center gap-2">
             <TrendingUp className="w-4 h-4" />
@@ -611,7 +671,7 @@ export function SubscriptionInfo() {
               )}
               {!keyFeatureOffNotes.custom_branding && keyFeatureTierNotes.custom_branding && (
                 <p className="mt-1 text-xs text-slate-700">
-                  {keyFeatureTierNotes.custom_branding} Available on Gold and Platinum.
+                  {keyFeatureTierNotes.custom_branding} Available on Scale.
                 </p>
               )}
             </div>

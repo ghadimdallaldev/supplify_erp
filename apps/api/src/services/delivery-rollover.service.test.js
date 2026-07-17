@@ -68,6 +68,10 @@ describe('delivery-rollover.service', () => {
     })
 
     expect(rows.map((r) => r.id)).toEqual(['da-1'])
+    const sql = String(query.mock.calls[0][0])
+    expect(sql).toContain('FROM subscription sub')
+    expect(sql).toContain('sub.account_locked_at IS NULL')
+    expect(sql).toContain("sub.status IN ('ACTIVE', 'TRIALING', 'PAST_DUE')")
   })
 
   it('skips delivered assignments on rollover', async () => {
@@ -116,6 +120,51 @@ describe('delivery-rollover.service', () => {
     expect(outcome.reason).toBe('terminal_order')
   })
 
+  it('skips rollover writes when the supplier is locked during processing', async () => {
+    query.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'da-locked',
+          status: 'picked_up',
+          order_status: 'SHIPPED',
+          effective_delivery_date: '2026-06-08',
+          supplier_id: 'sup-locked',
+          order_id: 'ord-locked',
+          driver_id: 'drv-1',
+          address_json: {},
+          rolled_over_at: null,
+        },
+      ],
+    })
+
+    const clientQuery = vi.fn()
+    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    clientQuery
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'da-locked',
+            status: 'picked_up',
+            order_id: 'ord-locked',
+            supplier_id: 'sup-locked',
+            driver_id: 'drv-1',
+            notes: null,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const outcome = await rolloverAssignmentToNextDay({
+      assignmentId: 'da-locked',
+      force: true,
+    })
+
+    expect(outcome.ok).toBe(false)
+    expect(outcome.reason).toBe('tenant_locked')
+    expect(
+      clientQuery.mock.calls.some((c) => String(c[0]).includes("status = 'rescheduled'"))
+    ).toBe(false)
+  })
   it('rolls eligible assignment to rescheduled with next date', async () => {
     query.mockResolvedValueOnce({
       rows: [
@@ -153,6 +202,7 @@ describe('delivery-rollover.service', () => {
           },
         ],
       })
+      .mockResolvedValueOnce({ rows: [{ ok: 1 }] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ id: 'route-1' }] })

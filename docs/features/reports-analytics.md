@@ -1,5 +1,7 @@
 # Reports & Analytics
 
+> Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+
 Plan feature key: `reports`
 
 - **Silver:** `basic_kpis` — report routes return data (same boolean gate as Gold; tier-specific report depth not split in API yet).

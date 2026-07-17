@@ -1,5 +1,7 @@
 # Supplier vs Restaurant Feature Comparison
 
+> Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [four-plan-pricing-model.md](./four-plan-pricing-model.md) and [plans-and-limits.md](./plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+
 ## ✅ NOTIFICATIONS - STATUS
 
 ### Current Implementation:
@@ -79,13 +81,13 @@
 
 ### Subscription & plan
 
-| Feature                         | Supplier                                     | Restaurant                                 | Notes                                                             |
-| ------------------------------- | -------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------- |
-| Subscription tiers              | ✅ Same plans (Free, Silver, Gold, Platinum) | ✅ Same plans                              | Limits (chats_per_day, products, warehouses, etc.) apply to both. |
-| View current plan               | ✅ GET /api/subscriptions/current            | ✅ GET /api/subscriptions/current          | Suppliers and restaurants both supported.                         |
-| View usage (e.g. chats_per_day) | ✅ GET /api/subscriptions/usage/:meterType   | ✅ GET /api/subscriptions/usage/:meterType | Daily chat limit enforced for both.                               |
-| Plan & usage in Settings        | ✅ Settings → Plan & usage tab               | ✅ Onboarding / subscription UI            | Suppliers see plan, limits, and upgrade prompt.                   |
-| Auto-assign Free plan           | ✅ When no subscription exists               | ✅ When no subscription exists             | Lazy creation so chat/limits never show 0/0.                      |
+| Feature                         | Supplier                                   | Restaurant                                 | Notes                                                                                    |
+| ------------------------------- | ------------------------------------------ | ------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Subscription plans              | Growth and Scale plans by supplier type    | Growth and Scale plans by restaurant type  | Restaurants scale by branches; suppliers scale by active ordering customer locations.    |
+| View current plan               | ✅ GET /api/subscriptions/current          | ✅ GET /api/subscriptions/current          | Suppliers and restaurants both supported.                                                |
+| View usage (e.g. chats_per_day) | ✅ GET /api/subscriptions/usage/:meterType | ✅ GET /api/subscriptions/usage/:meterType | Daily chat limit enforced for both.                                                      |
+| Plan & usage in Settings        | ✅ Settings → Plan & usage tab             | ✅ Onboarding / subscription UI            | Suppliers see plan, limits, and upgrade prompt.                                          |
+| Internal trial row              | Used when no subscription exists           | Used when no subscription exists           | Internal compatibility row prevents 0/0 limits; public users choose a paid trial target. |
 
 ### Restaurant-Specific Features
 

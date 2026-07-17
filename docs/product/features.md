@@ -1,5 +1,7 @@
 # Feature catalog & verification
 
+> Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [four-plan-pricing-model.md](./four-plan-pricing-model.md) and [plans-and-limits.md](./plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+
 This document lists every major product area in Supplify, how it maps to API routes and web UI, who can access it, and how to verify it locally.
 
 ## Prerequisites
@@ -29,7 +31,7 @@ After seed (`scripts\run-local.cmd seed` or `pnpm db:seed` + `pnpm seed:demo-use
 
 ## New tenant signup & activation
 
-Fresh Keycloak users complete organization setup at `/register/complete`, then unlock the workspace at `/app/activate` (Free tier without a card, or paid checkout). See [tenant-registration.md](../features/tenant-registration.md) and QA Part 1–2 in [regression-checklist.md](../qa/regression-checklist.md).
+Fresh Keycloak users complete organization setup at `/register/complete`, then unlock the workspace at `/app/activate` by selecting a paid Growth/Scale trial target or completing paid checkout. See [tenant-registration.md](../features/tenant-registration.md) and QA Part 1-2 in [regression-checklist.md](../qa/regression-checklist.md).
 
 ## Roles & navigation
 

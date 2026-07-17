@@ -25,7 +25,7 @@ export function FeatureLockedCard({
   const navigate = useNavigate()
   const displayName = featureName || featureKey.replace(/_/g, ' ')
   const upgradeCopy = getFeatureUpgradeCopy(featureKey)
-  const planToUnlock = upgradeCopy?.plan ?? recommendedPlans[0] ?? 'Gold'
+  const planToUnlock = upgradeCopy?.plan ?? recommendedPlans[0] ?? 'Scale'
   const valueProp = upgradeCopy?.value
 
   return (

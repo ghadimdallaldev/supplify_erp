@@ -15,11 +15,13 @@ vi.mock('../cache.js', () => ({
 }))
 
 vi.mock('../platform-settings.js', () => ({
-  getFreeSandboxDays: vi.fn().mockResolvedValue(7),
-  clampFreeTrialDays: (days, fallback = 7) => {
+  getFreeSandboxDays: vi.fn().mockResolvedValue(30),
+  FREE_TRIAL_MIN_DAYS: 7,
+  FREE_TRIAL_MAX_DAYS: 90,
+  clampFreeTrialDays: (days, fallback = 30) => {
     const n = Number(days)
     const base = Number.isFinite(n) ? Math.round(n) : fallback
-    return Math.min(7, Math.max(3, base))
+    return Math.min(90, Math.max(7, base))
   },
 }))
 
@@ -185,6 +187,115 @@ describe('checkoutSubscription free plan', () => {
     mockNotifyBillingTrialStarted.mockClear()
   })
 
+  it('uses a selected active self-serve paid plan as the trial target', async () => {
+    const { checkoutSubscription } = await import('./billing-service.js')
+
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'plan-free',
+            code: 'free',
+            name: '30-day Free Trial',
+            tenant_type: 'RESTAURANT',
+            is_active: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'sub-1',
+            tenant_id: 'rest-1',
+            tenant_type: 'RESTAURANT',
+            plan_id: 'plan-free',
+            lock_reason: 'pending_activation',
+            account_locked_at: new Date().toISOString(),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'plan-scale',
+            code: 'gold',
+            name: 'Restaurant Scale',
+            price_per_month: 149,
+            price_per_year: 1490,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'sub-1',
+            tenant_id: 'rest-1',
+            tenant_type: 'RESTAURANT',
+            free_sandbox_expires_at: new Date().toISOString(),
+          },
+        ],
+      })
+
+    const result = await checkoutSubscription({
+      tenantId: 'rest-1',
+      tenantType: 'RESTAURANT',
+      planId: 'plan-free',
+      billingCycle: 'MONTHLY',
+      trialTargetPlanId: 'plan-scale',
+    })
+
+    expect(result?.trialTargetPlan).toEqual(
+      expect.objectContaining({ id: 'plan-scale', code: 'gold', name: 'Restaurant Scale' })
+    )
+    const targetLookup = mockQuery.mock.calls.find(
+      (call) => typeof call[0] === 'string' && call[0].includes('code NOT IN')
+    )
+    expect(targetLookup?.[0]).toContain("code NOT IN ('free', 'enterprise')")
+    expect(targetLookup?.[0]).toContain('COALESCE(requires_admin_assignment, false) = false')
+    expect(targetLookup?.[1]).toEqual(['plan-scale', 'RESTAURANT'])
+  })
+
+  it('rejects hidden custom or enterprise trial targets', async () => {
+    const { checkoutSubscription } = await import('./billing-service.js')
+
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'plan-free',
+            code: 'free',
+            name: '30-day Free Trial',
+            tenant_type: 'SUPPLIER',
+            is_active: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'sub-1',
+            tenant_id: 'sup-1',
+            tenant_type: 'SUPPLIER',
+            plan_id: 'plan-free',
+            lock_reason: 'pending_activation',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+
+    await expect(
+      checkoutSubscription({
+        tenantId: 'sup-1',
+        tenantType: 'SUPPLIER',
+        planId: 'plan-free',
+        billingCycle: 'MONTHLY',
+        trialTargetPlanId: 'enterprise-plan',
+      })
+    ).rejects.toMatchObject({ name: 'NOT_FOUND', message: 'Trial target plan not found' })
+  })
+
   it('unlocks pending_activation when confirming free plan', async () => {
     const { checkoutSubscription } = await import('./billing-service.js')
 
@@ -212,6 +323,17 @@ describe('checkoutSubscription free plan', () => {
           },
         ],
       })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'plan-growth',
+            code: 'gold',
+            name: 'Supplier Growth',
+            price_per_month: 99,
+            price_per_year: 990,
+          },
+        ],
+      })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
@@ -235,6 +357,9 @@ describe('checkoutSubscription free plan', () => {
     expect(result?.success).toBe(true)
     expect(result?.activated).toBe(true)
     expect(result?.pendingActivation).toBe(false)
+    expect(result?.trialTargetPlan).toEqual(
+      expect.objectContaining({ id: 'plan-growth', code: 'gold', name: 'Supplier Growth' })
+    )
 
     const updateCall = mockQuery.mock.calls.find(
       (call) => typeof call[0] === 'string' && call[0].includes('UPDATE subscription SET')
@@ -242,6 +367,7 @@ describe('checkoutSubscription free plan', () => {
     expect(updateCall?.[0]).toMatch(/account_locked_at = NULL/)
     expect(updateCall?.[0]).toMatch(/lock_reason = NULL/)
     expect(updateCall?.[0]).toMatch(/free_sandbox_expires_at/)
+    expect(updateCall?.[1]?.[4]).toBe('plan-growth')
     expect(mockNotifyBillingTrialStarted).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: 'sup-1',
@@ -277,9 +403,9 @@ describe('extendFreeSandboxTrial', () => {
         rows: [{ id: 'sub-free', free_sandbox_expires_at: new Date().toISOString() }],
       })
 
-    const result = await extendFreeSandboxTrial('sub-free', { days: 5, adminUserId: 'admin-1' })
+    const result = await extendFreeSandboxTrial('sub-free', { days: 30, adminUserId: 'admin-1' })
 
-    expect(result.freeTrialDays).toBe(5)
+    expect(result.freeTrialDays).toBe(30)
     const updateCall = mockQuery.mock.calls.find(
       (call) => typeof call[0] === 'string' && call[0].includes('free_sandbox_expires_at')
     )
@@ -289,8 +415,36 @@ describe('extendFreeSandboxTrial', () => {
       expect.objectContaining({
         tenantId: 'r1',
         tenantType: 'RESTAURANT',
-        trialDays: 5,
+        trialDays: 30,
       })
+    )
+  })
+
+  it('clamps extension days to platform bounds at the service layer', async () => {
+    const { extendFreeSandboxTrial } = await import('./billing-service.js')
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'sub-free',
+            tenant_id: 'r1',
+            tenant_type: 'RESTAURANT',
+            plan_code: 'free',
+            lock_reason: 'free_sandbox_expired',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ id: 'sub-free', free_sandbox_expires_at: new Date().toISOString() }],
+      })
+
+    const result = await extendFreeSandboxTrial('sub-free', { days: 5, adminUserId: 'admin-1' })
+
+    expect(result.freeTrialDays).toBe(7)
+    expect(mockNotifyBillingTrialExtended).toHaveBeenCalledWith(
+      expect.objectContaining({ trialDays: 7 })
     )
   })
 
@@ -300,7 +454,7 @@ describe('extendFreeSandboxTrial', () => {
       rows: [{ id: 'sub-gold', plan_code: 'gold', tenant_id: 'r1', tenant_type: 'RESTAURANT' }],
     })
 
-    await expect(extendFreeSandboxTrial('sub-gold', { days: 5 })).rejects.toMatchObject({
+    await expect(extendFreeSandboxTrial('sub-gold', { days: 30 })).rejects.toMatchObject({
       code: 'VALIDATION_ERROR',
     })
   })

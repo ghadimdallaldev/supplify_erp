@@ -1,5 +1,7 @@
 # Notifications & alerts
 
+> Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+
 How Supplify delivers in-app, email, push, and WhatsApp alerts — architecture, recipients, and configuration.
 
 ## Recipients
@@ -43,7 +45,7 @@ Messages, invoices (issued/overdue/reminders), payments, inventory (low/out of s
 
 | Category                 | When                                                   |
 | ------------------------ | ------------------------------------------------------ |
-| `billing_trial_started`  | Free plan activation after registration                |
+| `billing_trial_started`  | Selected paid-plan trial activation after registration |
 | `billing_trial_ending`   | Cron: trial ending soon                                |
 | `billing_trial_expired`  | Free sandbox expiry job (before lock)                  |
 | `billing_trial_extended` | Admin or unlock extends free trial                     |

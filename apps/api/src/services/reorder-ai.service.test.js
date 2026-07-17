@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockGetReorderAssistance = vi.fn()
 const mockIsAiPlatformEnabled = vi.fn()
 const mockCheckUsage = vi.fn()
+const mockIncrementUsage = vi.fn()
 const mockCompleteJson = vi.fn()
 
 vi.mock('../config/env.js', () => ({
@@ -19,7 +20,8 @@ vi.mock('../lib/ai/index.js', () => ({
 }))
 
 vi.mock('../lib/subscription.js', () => ({
-  checkAndIncrementUsage: (...args) => mockCheckUsage(...args),
+  reserveAiUsage: (...args) => mockCheckUsage(...args),
+  refundReservedAiUsage: (...args) => mockIncrementUsage(...args),
 }))
 
 vi.mock('../lib/db.js', () => ({
@@ -34,7 +36,8 @@ describe('reorder-ai.service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockIsAiPlatformEnabled.mockResolvedValue(false)
-    mockCheckUsage.mockResolvedValue({ allowed: true })
+    mockCheckUsage.mockResolvedValue({ allowed: true, meterType: 'ai_requests_per_day' })
+    mockIncrementUsage.mockResolvedValue(undefined)
     mockGetReorderAssistance.mockResolvedValue({
       suggestions: [
         {

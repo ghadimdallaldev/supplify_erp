@@ -129,5 +129,55 @@ describe('collections-reminders.service', () => {
     expect(result.candidates).toBeGreaterThan(0)
     expect(result.sent).toBeGreaterThan(0)
     expect(notifyTenantUsers).not.toHaveBeenCalled()
+    expect(String(queryMock.mock.calls[0][0])).toContain('FROM subscription sub')
+    expect(String(queryMock.mock.calls[0][0])).toContain('sub.account_locked_at IS NULL')
+  })
+
+  it('runCollectionsReminderCheck skips sending when supplier locks after candidate scan', async () => {
+    const queryMock = vi.fn()
+    let candidateReturned = false
+    queryMock.mockImplementation(async (sql) => {
+      const s = String(sql)
+      if (s.includes('FROM invoice i') && s.includes('invoice_reminder_log')) {
+        if (candidateReturned) return { rows: [] }
+        candidateReturned = true
+        return {
+          rows: [
+            {
+              id: 'inv-locked',
+              invoice_number: 'INV-LOCKED',
+              restaurant_id: 'rest-locked',
+              supplier_id: 'sup-locked',
+              due_date: '2026-06-20',
+              balance_due: '80.00',
+              total_amount: '80.00',
+              status: 'ISSUED',
+            },
+          ],
+        }
+      }
+      if (s.includes('FROM subscription')) {
+        return { rows: [] }
+      }
+      return { rows: [] }
+    })
+
+    const notifyTenantUsers = vi.fn()
+
+    vi.doMock('../lib/db.js', () => ({ query: queryMock }))
+    vi.doMock('./notification.service.js', () => ({ notifyTenantUsers }))
+
+    const { runCollectionsReminderCheck } = await import('./collections-reminders.service.js')
+    const result = await runCollectionsReminderCheck()
+
+    expect(result.candidates).toBe(1)
+    expect(result.sent).toBe(0)
+    expect(result.skipped).toBe(1)
+    expect(notifyTenantUsers).not.toHaveBeenCalled()
+    expect(
+      queryMock.mock.calls.some((call) =>
+        String(call[0]).includes('INSERT INTO invoice_reminder_log')
+      )
+    ).toBe(false)
   })
 })

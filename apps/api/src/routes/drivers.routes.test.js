@@ -11,6 +11,7 @@ vi.mock('../lib/db.js', () => {
 })
 vi.mock('../lib/subscription.js', () => ({
   requireFeature: () => (_req, _res, next) => next(),
+  requireWithinLimit: () => (_req, _res, next) => next(),
   isFeatureEnabled: vi.fn().mockResolvedValue(true),
 }))
 vi.mock('../lib/rbac.js', async (importOriginal) => {

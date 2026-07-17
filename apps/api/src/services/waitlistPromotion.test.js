@@ -50,14 +50,20 @@ vi.mock('../config/env.js', () => ({
 }))
 
 const isFeatureEnabledMock = vi.fn().mockResolvedValue(true)
+const isTenantUnlockedMock = vi.fn().mockResolvedValue(true)
 vi.mock('../lib/subscription.js', () => ({
   isFeatureEnabled: (...args) => isFeatureEnabledMock(...args),
+}))
+
+vi.mock('../lib/background-write-locks.js', () => ({
+  isTenantUnlockedForBackgroundWrites: (...args) => isTenantUnlockedMock(...args),
 }))
 
 describe('waitlistPromotion', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     isFeatureEnabledMock.mockResolvedValue(true)
+    isTenantUnlockedMock.mockResolvedValue(true)
     getRestaurantSlotAvailabilityMock.mockResolvedValue({
       slots: [{ startTime: new Date().toISOString(), isAvailable: true }],
     })
@@ -205,6 +211,35 @@ describe('waitlistPromotion', () => {
 
       expect(result.expired).toBe(1)
       expect(result.promoted).toBe(0)
+    })
+    it('expires stale offers but does not auto-promote for locked restaurants', async () => {
+      queryMock
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'wl-exp-locked',
+              restaurant_id: 'rest-locked',
+              party_size: 3,
+              branch_id: null,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] })
+      isTenantUnlockedMock.mockResolvedValueOnce(false)
+
+      const result = await checkExpiredWaitlistOffers()
+
+      expect(result.expired).toBe(1)
+      expect(result.promoted).toBe(0)
+      expect(isTenantUnlockedMock).toHaveBeenCalledWith({
+        tenantId: 'rest-locked',
+        tenantType: 'RESTAURANT',
+      })
+      expect(isFeatureEnabledMock).not.toHaveBeenCalledWith(
+        'rest-locked',
+        'RESTAURANT',
+        'waitlist_auto_promo'
+      )
     })
   })
 

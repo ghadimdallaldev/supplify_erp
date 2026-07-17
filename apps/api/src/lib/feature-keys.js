@@ -33,6 +33,8 @@ export const SUPPLIER_FEATURE_KEYS = [
   'chat',
   'order_calendar',
   'reports',
+  'smart_reorder',
+  'ai_platform',
   'multi_branch',
   'warehouses',
   'multi_warehouse',

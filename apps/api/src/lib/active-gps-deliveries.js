@@ -32,6 +32,14 @@ export async function fetchActiveGpsDeliveryRows({ limit = 500 } = {}) {
     WHERE da.status IN ('assigned', 'picked_up', 'out_for_delivery')
       AND o.status IN ('ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED')
       AND COALESCE(o.placed_at, o.created_at) >= date_trunc('day', now())
+      AND EXISTS (
+        SELECT 1
+        FROM subscription sub
+        WHERE sub.tenant_id = da.supplier_id
+          AND sub.tenant_type = 'SUPPLIER'
+          AND sub.status IN ('ACTIVE', 'TRIALING', 'PAST_DUE')
+          AND sub.account_locked_at IS NULL
+      )
     LIMIT $1
     `,
     [limit]

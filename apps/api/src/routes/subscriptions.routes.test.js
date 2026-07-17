@@ -94,14 +94,16 @@ describe('Subscriptions Routes', () => {
     clearAllMocks()
     db = setupMocks()
     // Drop any unconsumed mockResolvedValueOnce values queued by earlier tests
-    // (e.g. when a route takes the tenantContext fast path and never calls
-    // getRequestTenant), then restore the default tenant.
+    // (e.g. when a route takes the tenantContext fast path), then
+    // restore the default tenant and a clean DB mock.
     const rbac = await import('../lib/rbac.js')
     vi.mocked(rbac.getRequestTenant).mockReset().mockResolvedValue({
       tenantId: 'rest-1',
       tenantType: 'RESTAURANT',
       tenantName: 'Test Restaurant',
     })
+    const dbModule = await import('../lib/db.js')
+    vi.mocked(dbModule.query).mockReset()
     mockGetTenantSubscription.mockReset()
     mockCheckLimit.mockReset()
     mockIsFeatureEnabled.mockReset()
@@ -147,7 +149,7 @@ describe('Subscriptions Routes', () => {
 
       expect(res.body.ok).toBe(true)
       expect(res.body.data.subscription).toBeDefined()
-      expect(res.body.data.subscription.plan_name).toBe('Free Trial')
+      expect(res.body.data.subscription.plan_name).toBe('30-day Free Trial')
       expect(res.body.data.subscription.limits.chats_per_day).toBe(10)
     })
 
@@ -193,7 +195,7 @@ describe('Subscriptions Routes', () => {
       const res = await request(appSupplier).get('/api/subscriptions/current').expect(200)
 
       expect(res.body.ok).toBe(true)
-      expect(res.body.data.subscription.plan_name).toBe('Free Trial')
+      expect(res.body.data.subscription.plan_name).toBe('30-day Free Trial')
       expect(res.body.data.subscription.limits.chats_per_day).toBe(10)
     })
 
@@ -202,6 +204,66 @@ describe('Subscriptions Routes', () => {
       vi.mocked(dbModule.query).mockResolvedValueOnce({ rows: [] })
 
       await request(app).get('/api/subscriptions/current').expect(404)
+    })
+  })
+
+  describe('GET /api/subscriptions/plans', () => {
+    it('returns tenant-specific public plan names and DB-derived annual savings', async () => {
+      mockGetTenantSubscription.mockResolvedValueOnce({ plan_id: 'plan-scale', plan_code: 'gold' })
+      const dbModule = await import('../lib/db.js')
+      vi.mocked(dbModule.query).mockImplementation((sql) => {
+        if (String(sql).includes('FROM subscription_plan')) {
+          return Promise.resolve({
+            rows: [
+              {
+                id: 'plan-growth',
+                code: 'silver',
+                name: 'Silver',
+                description: 'Legacy name from an old catalog row',
+                price_per_month: 49,
+                price_per_year: 490,
+                tenant_type: 'RESTAURANT',
+                is_active: true,
+                display_order: 20,
+                limits: { branches: 1 },
+                features: {},
+                trial_days: 0,
+              },
+              {
+                id: 'plan-scale',
+                code: 'gold',
+                name: 'Gold',
+                description: 'Legacy name from an old catalog row',
+                price_per_month: 149,
+                price_per_year: 1490,
+                tenant_type: 'RESTAURANT',
+                is_active: true,
+                display_order: 30,
+                limits: { branches: 3 },
+                features: {},
+                trial_days: 0,
+              },
+            ],
+          })
+        }
+        return db.query(sql)
+      })
+
+      const res = await request(app).get('/api/subscriptions/plans').expect(200)
+
+      expect(res.body.data.plans).toHaveLength(2)
+      expect(res.body.data.plans[0]).toMatchObject({
+        code: 'silver',
+        display_name: 'Restaurant Growth',
+        annual_savings: 98,
+        current_plan: false,
+      })
+      expect(res.body.data.plans[1]).toMatchObject({
+        code: 'gold',
+        display_name: 'Restaurant Scale',
+        annual_savings: 298,
+        current_plan: true,
+      })
     })
   })
 
@@ -282,13 +344,13 @@ describe('Subscriptions Routes', () => {
       expect(res.body.data.entitlements.usage.orders_per_day).toBe(5)
     })
 
-    it('returns Gold entitlements with tier limits', async () => {
+    it('returns Restaurant Scale entitlements with tier limits', async () => {
       mockGetEntitlements.mockResolvedValueOnce({
         tenantType: 'RESTAURANT',
         tenantId: 'rest-1',
         plan: {
           id: 'plan-gold',
-          name: 'Gold',
+          name: 'Restaurant Scale',
           code: 'gold',
           tenant_type: 'RESTAURANT',
           price_monthly: 149,
@@ -320,7 +382,7 @@ describe('Subscriptions Routes', () => {
 
       expect(res.body.ok).toBe(true)
       expect(res.body.data.entitlements).toBeDefined()
-      expect(res.body.data.entitlements.plan.name).toBe('Free Trial')
+      expect(res.body.data.entitlements.plan.name).toBe('30-day Free Trial')
       expect(res.body.data.entitlements.plan.code).toBe('free')
     })
 
@@ -330,7 +392,7 @@ describe('Subscriptions Routes', () => {
         tenantId: 'rest-1',
         plan: {
           id: 'plan-free',
-          name: 'Free Trial',
+          name: '30-day Free Trial',
           code: 'free',
           tenant_type: 'RESTAURANT',
           price_monthly: 0,
@@ -346,7 +408,7 @@ describe('Subscriptions Routes', () => {
 
       const res = await request(app).get('/api/subscriptions/entitlements').expect(200)
 
-      expect(res.body.data.entitlements.plan.name).toBe('Free Trial')
+      expect(res.body.data.entitlements.plan.name).toBe('30-day Free Trial')
     })
   })
 
@@ -370,7 +432,7 @@ describe('Subscriptions Routes', () => {
       mockRecommendPlan.mockResolvedValueOnce({
         recommendedPlanCode: 'gold',
         reason: 'Unlock reports.',
-        comparedToCurrent: { upgrades: ['reports (Gold)'], resolvesLimits: [] },
+        comparedToCurrent: { upgrades: ['reports (Restaurant Scale)'], resolvesLimits: [] },
       })
 
       await request(app)

@@ -77,6 +77,30 @@ describe('Error Handler Middleware', () => {
     })
   })
 
+  describe('LimitExceededError', () => {
+    it('should handle plan limit errors with 403 status and details', () => {
+      const error = new Error('Plan limit exceeded')
+      error.name = 'LimitExceededError'
+      error.code = 'LIMIT_EXCEEDED'
+      error.status = 403
+      error.details = { limitKey: 'active_customer_locations_monthly' }
+
+      errorHandler(error, req, res, next)
+
+      expect(res.status).toHaveBeenCalledWith(403)
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ok: false,
+          error: expect.objectContaining({
+            name: 'LIMIT_EXCEEDED',
+            message: 'Plan limit exceeded',
+            details: { limitKey: 'active_customer_locations_monthly' },
+          }),
+          requestId: 'test-request-id',
+        })
+      )
+    })
+  })
   describe('Generic Error', () => {
     it('should handle generic errors with 500 status', () => {
       const error = new Error('Internal server error')

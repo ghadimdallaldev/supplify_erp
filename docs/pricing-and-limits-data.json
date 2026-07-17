@@ -1,0 +1,448 @@
+{
+  "generatedAt": "2026-07-16T00:00:00Z",
+  "scope": "post_implementation_repository_audit",
+  "commercialModel": {
+    "architectureDecision": "preserve_internal_codes_and_use_tenant_aware_display_names",
+    "publicFreePlan": false,
+    "trial": "30_day_trial_of_selected_paid_plan",
+    "enterpriseCustom": "hidden_admin_only"
+  },
+  "plans": [
+    {
+      "tenantType": "RESTAURANT",
+      "publicName": "Restaurant Growth",
+      "internalCode": "silver",
+      "monthlyUsd": 49,
+      "annualUsd": 490,
+      "annualSavingsUsd": 98,
+      "limits": {
+        "branches": 1,
+        "users": 5,
+        "orders_per_day": -1,
+        "suppliers_per_restaurant": -1,
+        "restaurant_inventory_skus": -1,
+        "quick_lists": -1,
+        "quick_list_items": -1,
+        "scheduled_quick_lists": -1,
+        "deal_redemptions_per_day": -1,
+        "ai_requests_per_day": 30,
+        "storage_mb": 2048
+      },
+      "features": {
+        "chat": "multi_supplier",
+        "order_calendar": true,
+        "quick_lists": "full_schedule",
+        "receiving_quality": "photos_enabled",
+        "disputes_returns": true,
+        "finance_invoices": "record_payments",
+        "inventory_management": "real_time",
+        "recipe_costing": true,
+        "waste_tracking": "analytics_dashboard",
+        "supplier_deals": true,
+        "supplier_deals_redeem": true,
+        "supplier_reviews": true,
+        "order_amendments": true,
+        "notifications": "in_app_and_email",
+        "push_notifications": true,
+        "reports": "basic_kpis",
+        "smart_reorder": "full_90day_trends",
+        "ai_platform": true,
+        "multi_branch": false,
+        "custom_branding": false,
+        "tenant_audit_log": false,
+        "waitlist_auto_promo": false,
+        "advanced_roles": false,
+        "api_integrations": false,
+        "feature_flags_access": false,
+        "fulfillment_tools": false,
+        "support_sla": "standard_72h"
+      }
+    },
+    {
+      "tenantType": "RESTAURANT",
+      "publicName": "Restaurant Scale",
+      "internalCode": "gold",
+      "monthlyUsd": 149,
+      "annualUsd": 1490,
+      "annualSavingsUsd": 298,
+      "limits": {
+        "branches": 3,
+        "users": 20,
+        "orders_per_day": -1,
+        "suppliers_per_restaurant": -1,
+        "restaurant_inventory_skus": -1,
+        "quick_lists": -1,
+        "quick_list_items": -1,
+        "scheduled_quick_lists": -1,
+        "deal_redemptions_per_day": -1,
+        "ai_requests_per_day": 150,
+        "storage_mb": 10240
+      },
+      "addons": ["restaurant_extra_branch"],
+      "features": {
+        "chat": "group_chat_files",
+        "order_calendar": true,
+        "quick_lists": "ai_smart_automation",
+        "receiving_quality": "quality_scoring",
+        "disputes_returns": true,
+        "finance_invoices": "advanced_finance_dashboard",
+        "inventory_management": "multi_branch_tracking",
+        "recipe_costing": true,
+        "waste_tracking": "analytics_dashboard",
+        "supplier_deals": true,
+        "supplier_deals_redeem": true,
+        "supplier_reviews": true,
+        "order_amendments": true,
+        "notifications": "email_whatsapp_webhook",
+        "push_notifications": true,
+        "reports": "advanced_forecasting_custom_reports",
+        "smart_reorder": "ai_forecast_seasonality",
+        "ai_platform": true,
+        "multi_branch": "central_purchasing",
+        "custom_branding": "logo_colors",
+        "tenant_audit_log": true,
+        "waitlist_auto_promo": true,
+        "advanced_roles": true,
+        "api_integrations": "full_api_webhooks",
+        "feature_flags_access": "addon_toggles",
+        "fulfillment_tools": false,
+        "support_sla": "priority_24h"
+      }
+    },
+    {
+      "tenantType": "SUPPLIER",
+      "publicName": "Supplier Growth",
+      "internalCode": "gold",
+      "monthlyUsd": 149,
+      "annualUsd": 1490,
+      "annualSavingsUsd": 298,
+      "limits": {
+        "branches": 1,
+        "warehouses": 1,
+        "active_customer_locations_monthly": 50,
+        "users": 10,
+        "drivers": 5,
+        "supplier_products_skus": -1,
+        "promotions": 10,
+        "ai_requests_per_day": 50,
+        "storage_mb": 5120
+      },
+      "features": {
+        "chat": "group_chat_files",
+        "order_calendar": true,
+        "reports": "basic_kpis",
+        "smart_reorder": "full_90day_trends",
+        "ai_platform": true,
+        "multi_branch": false,
+        "warehouses": true,
+        "multi_warehouse": false,
+        "fulfillment": true,
+        "fulfillment_tools": "manual_orders_invoices",
+        "driver_management": true,
+        "disputes_returns": true,
+        "finance_invoices": "record_payments",
+        "quick_lists": true,
+        "inventory_management": "real_time",
+        "advanced_roles": false,
+        "notifications": "in_app_and_email",
+        "api_integrations": false,
+        "support_sla": "standard_72h",
+        "custom_branding": false,
+        "feature_flags_access": false,
+        "promotions": true,
+        "push_notifications": true,
+        "order_amendments": true,
+        "tenant_audit_log": false,
+        "supplier_growth": true
+      }
+    },
+    {
+      "tenantType": "SUPPLIER",
+      "publicName": "Supplier Scale",
+      "internalCode": "platinum",
+      "monthlyUsd": 349,
+      "annualUsd": 3490,
+      "annualSavingsUsd": 698,
+      "limits": {
+        "branches": 3,
+        "warehouses": 3,
+        "active_customer_locations_monthly": 200,
+        "users": 30,
+        "drivers": 20,
+        "supplier_products_skus": -1,
+        "promotions": 50,
+        "ai_requests_per_day": 300,
+        "storage_mb": 30720
+      },
+      "addons": [
+        "supplier_active_customer_locations_50",
+        "supplier_extra_branch",
+        "supplier_extra_warehouse"
+      ],
+      "features": {
+        "chat": "real_time_media_read_receipts",
+        "order_calendar": true,
+        "reports": "advanced_forecasting_custom_reports",
+        "smart_reorder": "ai_forecast_seasonality",
+        "ai_platform": true,
+        "multi_branch": true,
+        "warehouses": true,
+        "multi_warehouse": true,
+        "fulfillment": true,
+        "fulfillment_tools": "routing_full_suite",
+        "driver_management": true,
+        "disputes_returns": true,
+        "finance_invoices": "advanced_finance_dashboard",
+        "quick_lists": true,
+        "inventory_management": "lot_expiry_tracking",
+        "advanced_roles": true,
+        "notifications": "email_whatsapp_webhook",
+        "api_integrations": "full_api_webhooks",
+        "support_sla": "priority_24h",
+        "custom_branding": "logo_colors",
+        "feature_flags_access": "addon_toggles",
+        "promotions": true,
+        "push_notifications": true,
+        "order_amendments": true,
+        "tenant_audit_log": true,
+        "supplier_growth": true
+      }
+    }
+  ],
+  "hiddenPlans": [
+    {
+      "tenantType": "RESTAURANT",
+      "internalCode": "platinum",
+      "publicHandling": "Restaurant Custom hidden/admin only"
+    },
+    {
+      "tenantType": "SUPPLIER",
+      "internalCode": "silver",
+      "publicHandling": "Supplier Legacy Growth hidden/admin only"
+    },
+    {
+      "tenantType": "ALL",
+      "internalCode": "enterprise",
+      "publicHandling": "Hidden custom/enterprise"
+    },
+    {
+      "tenantType": "ALL",
+      "internalCode": "free",
+      "publicHandling": "Internal 30-day trial row, not permanent public free plan"
+    }
+  ],
+  "addons": [
+    {
+      "key": "restaurant_extra_branch",
+      "availableOn": ["RESTAURANT:gold"],
+      "monthlyUsd": 39,
+      "annualUsd": 390,
+      "increment": {
+        "branches": 1
+      },
+      "provisioning": "admin_only",
+      "includedInBilling": true
+    },
+    {
+      "key": "supplier_active_customer_locations_50",
+      "availableOn": ["SUPPLIER:platinum"],
+      "monthlyUsd": 75,
+      "annualUsd": 750,
+      "increment": {
+        "active_customer_locations_monthly": 50
+      },
+      "provisioning": "admin_only",
+      "includedInBilling": true
+    },
+    {
+      "key": "supplier_extra_branch",
+      "availableOn": ["SUPPLIER:platinum"],
+      "monthlyUsd": 49,
+      "annualUsd": 490,
+      "increment": {
+        "branches": 1
+      },
+      "provisioning": "admin_only",
+      "includedInBilling": true
+    },
+    {
+      "key": "supplier_extra_warehouse",
+      "availableOn": ["SUPPLIER:platinum"],
+      "monthlyUsd": 19,
+      "annualUsd": 190,
+      "increment": {
+        "warehouses": 1
+      },
+      "provisioning": "admin_only",
+      "includedInBilling": true
+    }
+  ],
+  "trial": {
+    "publicName": "30-day Free Trial",
+    "internalPlanCode": "free",
+    "durationDefaultDays": 30,
+    "durationMinDays": 7,
+    "durationMaxDays": 90,
+    "mechanism": "subscription.free_sandbox_expires_at",
+    "targetField": "subscription.trial_target_plan_id",
+    "defaultTargets": {
+      "RESTAURANT": "silver",
+      "SUPPLIER": "gold"
+    },
+    "aiTrialMeter": "ai_trial_requests_total",
+    "aiTrialTotals": {
+      "RESTAURANT": 50,
+      "SUPPLIER": 100
+    },
+    "selfServeTargetRules": [
+      "same_tenant_type",
+      "active",
+      "paid",
+      "not_free",
+      "not_enterprise",
+      "not_admin_assignment"
+    ],
+    "upgradeModalStartsSelectedPaidPlanTrial": true,
+    "internalFreeRowHiddenFromComparisonCards": true
+  },
+  "activeCustomerLocationsMonthly": {
+    "limitKey": "active_customer_locations_monthly",
+    "tenantType": "SUPPLIER",
+    "countExpression": "COUNT(DISTINCT COALESCE(customer_order.branch_id, customer_order.restaurant_id))",
+    "periodSourcePreference": ["subscription_period", "calendar_month_utc"],
+    "timezone": "UTC",
+    "qualifyingStatuses": [
+      "ACKNOWLEDGED",
+      "PROCESSING",
+      "SHIPPED",
+      "DELIVERED",
+      "RECEIVED_PARTIAL",
+      "RECEIVED_FULL",
+      "RECEIVED_WITH_DISPUTE",
+      "INVOICED",
+      "COMPLETED"
+    ],
+    "excludes": ["draft", "placed_only", "cancelled", "rejected", "test_like_activity"],
+    "hardBlockBehavior": "block_supplier_initiated_connection_invite_sponsor_when_current_active_locations_at_cap"
+  },
+  "billing": {
+    "formula": "base_plan_price + active_recurring_addons",
+    "basePricesFromDatabase": true,
+    "addonPricesFromDatabaseOrCatalogDefaults": true,
+    "checkoutIncludesAddons": true,
+    "renewalIncludesAddons": true,
+    "checkoutCreatesInvoiceAndPaymentRows": true,
+    "renewalCreatesInvoiceAndPaymentRows": true,
+    "providersImplemented": ["stub", "manual"],
+    "liveRecurringProviderReady": false,
+    "externalWorkRemaining": [
+      "real PSP subscriptions",
+      "billing webhooks",
+      "external product/price ID mapping",
+      "provider reconciliation"
+    ],
+    "renewalCreatesProcessingClaimBeforeCharge": true,
+    "renewalInvoiceIncludesAddonMetadata": true
+  },
+  "migration": {
+    "migrationFile": "apps/api/db/migrations/0190_four_plan_pricing_model.sql",
+    "previewTable": "pricing_migration_preview",
+    "preservesSubscriptionIds": true,
+    "preservesPlanCodes": true,
+    "recordsTrialTargetPlanId": true,
+    "nonConfidentialPreview": true,
+    "mapping": {
+      "RESTAURANT:free": "silver_trial_target",
+      "RESTAURANT:silver": "silver",
+      "RESTAURANT:gold": "gold",
+      "RESTAURANT:platinum": "gold_with_subscription_change_log",
+      "SUPPLIER:free": "gold_trial_target",
+      "SUPPLIER:silver": "gold_with_subscription_change_log",
+      "SUPPLIER:gold": "gold",
+      "SUPPLIER:platinum": "platinum",
+      "enterprise": "manual_custom_review"
+    },
+    "previewFields": [
+      "tenant_id",
+      "tenant_type",
+      "current_plan_code",
+      "proposed_plan_code",
+      "current_usage",
+      "target_limits",
+      "required_overrides",
+      "preserved_addons",
+      "preserved_overrides",
+      "needs_manual_review",
+      "review_reasons"
+    ],
+    "recordsSupplierSilverRemapHistory": true,
+    "recordsRestaurantPlatinumRemapHistory": true,
+    "supplierSilverRemapReason": "four_plan_pricing_model: supplier_silver_to_supplier_growth",
+    "restaurantPlatinumRemapReason": "four_plan_pricing_model: restaurant_platinum_to_restaurant_scale"
+  },
+  "activationEnforcement": "supplier-initiated connection requests, referral invitations, and sponsorships block with LIMIT_EXCEEDED when current active locations are already at the effective cap; normal incoming orders are not silently rejected",
+  "backgroundWriteLocks": {
+    "scheduledOrdersSkipLockedRestaurants": true,
+    "reorderForecastsSkipLockedRestaurants": true,
+    "collectionsRemindersSkipLockedSuppliers": true,
+    "inventoryExpiryRemindersSkipLockedRestaurants": true,
+    "reorderCadenceRemindersSkipLockedRecipients": true,
+    "deliveryRolloverSkipsLockedSuppliers": true,
+    "staleGpsAlertsSkipLockedSuppliers": true,
+    "fulfillmentExceptionsSkipLockedSuppliers": true,
+    "productImportsFailBeforeWritesForLockedSuppliers": true,
+    "imageImportsFailBeforeWritesForLockedSuppliers": true,
+    "sharedBackgroundWriteLockHelper": true,
+    "promotionsActivateOnlyUnlockedSuppliers": true,
+    "promotionExpiryNotificationsSkipLockedSuppliers": true,
+    "waitlistAutoPromotionSkipsLockedRestaurants": true,
+    "invoiceOverdueNotificationsRequireUnlockedTenants": true,
+    "recipeRecalcSkipsLockedRestaurants": true,
+    "emailDigestSkipsLockedTenantUsers": true,
+    "emailRetrySkipsLockedOperationalTenantSends": true,
+    "emailRetryAllowsBillingLifecycleForLockedTenants": true
+  },
+  "verification": {
+    "oldPublicRuntimeCopyScan": "no Silver/Gold/Platinum/Free plan/legacy prices in apps/api/src or apps/web/src excluding tests",
+    "focusedApiTests": "passing",
+    "focusedWebTests": "passing, including UpgradeModal selected paid-plan trial targeting coverage",
+    "webTypecheck": "fails only on known unrelated FullCalendar/Recharts/Rnd JSX component errors",
+    "currentDocsPublicTierCopyScan": "no Free plan/Free tier/Silver plan/Gold plan/Platinum plan public-copy matches in docs/product, docs/features, or docs/admin",
+    "commands": [
+      {
+        "command": "node --check apps/api/src/lib/subscription/plans.js",
+        "result": "passed"
+      },
+      {
+        "command": "pnpm.cmd --filter @supplify/api exec vitest run apps/api/src/lib/plan-codes.test.js apps/api/src/lib/subscription.test.js apps/api/src/lib/billing/billing-service.test.js apps/api/src/routes/subscriptions.routes.test.js apps/api/src/routes/admin-dashboard.routes.test.js apps/api/src/services/reorder-ai.service.test.js apps/api/src/services/quick-list-ai.service.test.js apps/api/src/services/scheduled-orders.service.test.js",
+        "result": "focused API subscription, billing, admin, AI, and scheduled-order coverage passed"
+      },
+      {
+        "command": "pnpm.cmd --filter @supplify/api exec vitest run apps/api/src/jobs/invoice-overdue.job.test.js apps/api/src/jobs/email-retry.job.test.js apps/api/src/jobs/email-digest.job.test.js apps/api/src/services/reorder-forecast-cache.service.test.js apps/api/src/services/recipe-recalc-queue.service.test.js apps/api/src/services/waitlistPromotion.test.js apps/api/src/services/promotions.service.test.js apps/api/src/jobs/promotions-expiry.job.test.js apps/api/src/services/delivery-rollover.service.test.js apps/api/src/services/product-import.service.test.js apps/api/src/services/product-image-import.service.test.js apps/api/src/services/collections-reminders.service.test.js apps/api/src/services/inventory-expiry.service.test.js apps/api/src/services/reorder-cadence.service.test.js apps/api/src/lib/active-gps-deliveries.test.js apps/api/src/jobs/stale-gps-alerts.job.test.js apps/api/src/jobs/fulfillment-exceptions.job.test.js",
+        "result": "17 files, 84 tests passed"
+      },
+      {
+        "command": "pnpm.cmd --filter @supplify/web exec vitest run src/lib/formatPlanPrice.test.ts src/lib/planComparison.test.ts src/lib/activateFreePlan.test.ts src/lib/upgradeCopy.test.ts src/components/admin/AdminPlatformSettingsPanel.test.tsx",
+        "result": "5 files, 20 tests passed"
+      },
+      {
+        "command": "pnpm.cmd --filter @supplify/web exec vitest run src/components/UpgradeModal.test.ts src/lib/activateFreePlan.test.ts src/lib/planComparison.test.ts",
+        "result": "3 files, 17 tests passed"
+      },
+      {
+        "command": "pnpm.cmd --filter @supplify/web exec tsc --noEmit --pretty false --skipLibCheck",
+        "result": "failed only on known unrelated FullCalendar/Recharts/Rnd JSX component errors; no current pricing/admin files implicated"
+      },
+      {
+        "command": "rg -n -i -e \"Free plan|Free tier|Silver plan|Gold plan|Platinum plan|public free|permanent free\" docs/product docs/features docs/admin -g \"*.md\"",
+        "result": "no matches"
+      }
+    ]
+  },
+  "launchRecommendation": {
+    "demonstration": "ready_after_focused_tests",
+    "supervisedPilot": "reasonable_after_migration_preview_and_manual_QA",
+    "liveManualBilling": "reasonable_with_operational_controls",
+    "liveAutomatedRecurringBilling": "not_ready"
+  }
+}

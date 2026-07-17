@@ -7,12 +7,19 @@ import {
 
 const mockQuery = vi.fn()
 const mockCreatePendingActivation = vi.fn().mockResolvedValue(undefined)
-vi.mock('./db.js', () => ({ query: (...args) => mockQuery(...args) }))
+const mockRecordConversionEvent = vi.fn().mockResolvedValue(undefined)
+vi.mock('./db.js', () => ({
+  query: (...args) => mockQuery(...args),
+  withTransaction: async (fn) => fn({ query: (...args) => mockQuery(...args) }),
+}))
 vi.mock('./logger.js', () => ({
   logger: { error: vi.fn(), debug: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }))
 vi.mock('./billing/subscription-activation.js', () => ({
   createPendingActivationSubscription: (...args) => mockCreatePendingActivation(...args),
+}))
+vi.mock('./conversion-events.js', () => ({
+  recordConversionEvent: (...args) => mockRecordConversionEvent(...args),
 }))
 vi.mock('./cache.js', () => ({
   getCache: vi.fn().mockResolvedValue(null),
@@ -46,6 +53,7 @@ describe('Subscription lib', () => {
   beforeEach(() => {
     mockQuery.mockReset()
     mockCreatePendingActivation.mockClear()
+    mockRecordConversionEvent.mockClear()
     mockQuery.mockImplementation(createSubscriptionQueryRouter())
   })
 
@@ -114,6 +122,165 @@ describe('Subscription lib', () => {
     })
   })
 
+  describe('countSupplierActiveCustomerLocationsMonthly', () => {
+    it('counts distinct customer branches during the supplier subscription period', async () => {
+      const { countSupplierActiveCustomerLocationsMonthly } = await import('./subscription.js')
+      mockQuery
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              current_period_start: '2026-07-01T00:00:00.000Z',
+              current_period_end: '2026-08-01T00:00:00.000Z',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [{ count: '42' }] })
+
+      const result = await countSupplierActiveCustomerLocationsMonthly('supplier-1')
+
+      expect(result.count).toBe(42)
+      expect(result.period).toMatchObject({
+        source: 'subscription_period',
+        timezone: 'UTC',
+      })
+      const countCall = mockQuery.mock.calls[1]
+      expect(countCall[0]).toMatch(/COUNT\(DISTINCT COALESCE\(o\.branch_id, o\.restaurant_id\)\)/)
+      expect(countCall[0]).toMatch(/COALESCE\(o\.placed_at, o\.created_at\) >= \$3/)
+      expect(countCall[0]).toMatch(/COALESCE\(o\.placed_at, o\.created_at\) < \$4/)
+      expect(countCall[1]).toEqual([
+        'supplier-1',
+        expect.arrayContaining(['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED']),
+        '2026-07-01T00:00:00.000Z',
+        '2026-08-01T00:00:00.000Z',
+      ])
+      expect(countCall[1][1]).not.toEqual(
+        expect.arrayContaining(['DRAFT', 'PLACED', 'CANCELLED', 'REJECTED'])
+      )
+    })
+
+    it('falls back to the current UTC calendar month when subscription period is unavailable', async () => {
+      const { countSupplierActiveCustomerLocationsMonthly } = await import('./subscription.js')
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ count: '3' }] })
+
+      const result = await countSupplierActiveCustomerLocationsMonthly('supplier-1')
+
+      expect(result.count).toBe(3)
+      expect(result.period).toMatchObject({
+        source: 'calendar_month_utc',
+        timezone: 'UTC',
+      })
+      const countCall = mockQuery.mock.calls[1]
+      expect(countCall[0]).toMatch(/date_trunc\('month', now\(\) AT TIME ZONE 'UTC'\)/)
+      expect(countCall[1]).toHaveLength(2)
+    })
+  })
+  it('blocks supplier-initiated customer activation when active locations are at the cap', async () => {
+    const { assertSupplierActiveCustomerLocationCapacity } = await import('./subscription.js')
+    const supplierSub = subscriptionRow({
+      tenant_id: 'supplier-1',
+      tenant_type: 'SUPPLIER',
+      plan_id: 'plan-growth',
+      plan_name: 'Supplier Growth',
+      plan_code: 'gold',
+      plan_display_name: 'Supplier Growth',
+      limits: { active_customer_locations_monthly: 50 },
+    })
+    mockQuery.mockImplementation((sql) => {
+      const text = typeof sql === 'string' ? sql : ''
+      if (text.includes('plan_limit_override') || text.includes('tenant_limit_override')) {
+        return Promise.resolve({ rows: [] })
+      }
+      if (text.includes('pending_plan_id') && text.includes('FROM subscription')) {
+        return Promise.resolve({ rows: [subscriptionIdRow({ plan_id: 'plan-growth' })] })
+      }
+      if (text.includes('FROM subscription s') && text.includes('JOIN subscription_plan')) {
+        return Promise.resolve({ rows: [supplierSub] })
+      }
+      if (text.includes('current_period_start') && text.includes('current_period_end')) {
+        return Promise.resolve({
+          rows: [
+            {
+              current_period_start: '2026-07-01T00:00:00.000Z',
+              current_period_end: '2026-08-01T00:00:00.000Z',
+            },
+          ],
+        })
+      }
+      if (text.includes('COUNT(DISTINCT COALESCE(o.branch_id, o.restaurant_id))')) {
+        return Promise.resolve({ rows: [{ count: '50' }] })
+      }
+      if (text.includes('FROM subscription_plan') && text.includes("code != 'free'")) {
+        return Promise.resolve({ rows: [{ code: 'platinum', name: 'Supplier Scale' }] })
+      }
+      return Promise.resolve({ rows: [] })
+    })
+
+    await expect(
+      assertSupplierActiveCustomerLocationCapacity('supplier-1', {
+        action: 'growth.connection_request',
+      })
+    ).rejects.toMatchObject({
+      name: 'LimitExceededError',
+      code: 'LIMIT_EXCEEDED',
+      status: 403,
+      details: expect.objectContaining({
+        limitKey: 'active_customer_locations_monthly',
+        limitValue: 50,
+        currentUsage: 50,
+        currentPlan: 'Supplier Growth',
+        recommendedPlans: ['Supplier Scale'],
+      }),
+    })
+    expect(mockRecordConversionEvent).toHaveBeenCalledWith(
+      'supplier-1',
+      'SUPPLIER',
+      'BLOCKED_LIMIT',
+      {
+        limitKey: 'active_customer_locations_monthly',
+        current: 50,
+        limit: 50,
+        action: 'growth.connection_request',
+      }
+    )
+  })
+
+  it('allows supplier customer activation while active locations remain below the cap', async () => {
+    const { assertSupplierActiveCustomerLocationCapacity } = await import('./subscription.js')
+    const supplierSub = subscriptionRow({
+      tenant_id: 'supplier-1',
+      tenant_type: 'SUPPLIER',
+      plan_id: 'plan-growth',
+      plan_name: 'Supplier Growth',
+      plan_code: 'gold',
+      limits: { active_customer_locations_monthly: 50 },
+    })
+    mockQuery.mockImplementation((sql) => {
+      const text = typeof sql === 'string' ? sql : ''
+      if (text.includes('plan_limit_override') || text.includes('tenant_limit_override')) {
+        return Promise.resolve({ rows: [] })
+      }
+      if (text.includes('pending_plan_id') && text.includes('FROM subscription')) {
+        return Promise.resolve({ rows: [subscriptionIdRow({ plan_id: 'plan-growth' })] })
+      }
+      if (text.includes('FROM subscription s') && text.includes('JOIN subscription_plan')) {
+        return Promise.resolve({ rows: [supplierSub] })
+      }
+      if (text.includes('current_period_start') && text.includes('current_period_end')) {
+        return Promise.resolve({ rows: [] })
+      }
+      if (text.includes('COUNT(DISTINCT COALESCE(o.branch_id, o.restaurant_id))')) {
+        return Promise.resolve({ rows: [{ count: '49' }] })
+      }
+      return Promise.resolve({ rows: [] })
+    })
+
+    const result = await assertSupplierActiveCustomerLocationCapacity('supplier-1')
+
+    expect(result).toMatchObject({ current: 49, limit: 50, isOverLimit: false })
+    expect(mockRecordConversionEvent).not.toHaveBeenCalled()
+  })
   describe('checkLimit', () => {
     it('returns isOverLimit when no subscription', async () => {
       const { checkLimit } = await import('./subscription.js')
@@ -211,7 +378,7 @@ describe('Subscription lib', () => {
   })
 
   describe('recommendPlan', () => {
-    it('returns gold when no entitlements (synthetic)', async () => {
+    it('returns tenant default Growth plan when no entitlements (synthetic)', async () => {
       const { recommendPlan } = await import('./subscription.js')
       mockQuery.mockReset()
       mockQuery
@@ -222,8 +389,8 @@ describe('Subscription lib', () => {
 
       const result = await recommendPlan({ tenantId: 't1', tenantType: 'RESTAURANT' })
 
-      expect(result.recommendedPlanCode).toBe('gold')
-      expect(result.recommendedPlanName).toBe('Gold')
+      expect(result.recommendedPlanCode).toBe('silver')
+      expect(result.recommendedPlanName).toBe('Restaurant Growth')
       expect(result.reasonCode).toBe('FREE_DEFAULT')
       expect(result.reasonText).toBeDefined()
       expect(result.evidence).toBeDefined()
@@ -555,6 +722,86 @@ describe('Subscription lib', () => {
       expect(deleteCache).toHaveBeenCalledWith('sub:RESTAURANT:t1')
       expect(deleteCache).toHaveBeenCalledWith('ent:RESTAURANT:t1')
       expect(mockInvalidateBillingSubscriptionCache).toHaveBeenCalledWith('t1', 'RESTAURANT')
+    })
+  })
+
+  describe('AI usage metering', () => {
+    it('uses a total trial pool for free trial LLM requests', async () => {
+      const { reserveAiUsage } = await import('./subscription.js')
+      const expiresAt = new Date(Date.now() + 30 * 86400000).toISOString()
+      mockQuery.mockImplementation(
+        createSubscriptionQueryRouter({
+          subId: { rows: [subscriptionIdRow()] },
+          fullSub: {
+            rows: [
+              subscriptionRow({
+                tenant_id: 'rest-1',
+                plan_code: 'free',
+                current_period_start: '2026-07-15T00:00:00.000Z',
+                free_sandbox_expires_at: expiresAt,
+              }),
+            ],
+          },
+          fallback: (sql) => {
+            if (String(sql).includes('UPDATE usage_meter')) {
+              return { rows: [{ current_value: 1 }] }
+            }
+            return { rows: [] }
+          },
+        })
+      )
+
+      const result = await reserveAiUsage('rest-1', 'RESTAURANT', 1)
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          allowed: true,
+          meterType: 'ai_trial_requests_total',
+          periodType: 'trial_total',
+          limit: 50,
+          trialPool: true,
+        })
+      )
+      const insertCall = mockQuery.mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('Billing Cycle')
+      )
+      expect(insertCall?.[0]).toContain('Billing Cycle')
+      expect(insertCall?.[1]?.[2]).toBe('ai_trial_requests_total')
+    })
+
+    it('reports trial AI usage with reset at trial expiry', async () => {
+      const { getAiUsageSummary } = await import('./subscription.js')
+      const expiresAt = new Date(Date.now() + 30 * 86400000).toISOString()
+      mockQuery.mockImplementation(
+        createSubscriptionQueryRouter({
+          subId: { rows: [subscriptionIdRow()] },
+          fullSub: {
+            rows: [
+              subscriptionRow({
+                tenant_id: 'rest-1',
+                plan_code: 'free',
+                current_period_start: '2026-07-15T00:00:00.000Z',
+                free_sandbox_expires_at: expiresAt,
+              }),
+            ],
+          },
+          usage: { rows: [{ current_value: 7 }] },
+        })
+      )
+
+      const result = await getAiUsageSummary('rest-1', 'RESTAURANT')
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          meterType: 'ai_trial_requests_total',
+          periodType: 'trial_total',
+          current: 7,
+          limit: 50,
+          remaining: 43,
+          resetAt: expiresAt,
+          trialPool: true,
+        })
+      )
     })
   })
 })

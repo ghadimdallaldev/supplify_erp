@@ -14,6 +14,7 @@ vi.mock('../lib/db.js', () => {
 })
 
 const isFeatureEnabled = vi.fn().mockResolvedValue(true)
+const assertTenantUserSeatAvailable = vi.fn().mockResolvedValue({ allowed: true })
 const ensureTenantSystemRoles = vi.fn().mockResolvedValue(undefined)
 const assignTenantUserRole = vi.fn().mockResolvedValue(undefined)
 const assertCanAssignRole = vi.fn().mockResolvedValue({ id: 'role-1', name: 'Manager' })
@@ -52,6 +53,7 @@ vi.mock('../lib/rbac.js', () => ({
 
 vi.mock('../lib/subscription.js', () => ({
   requireFeature: () => (req, res, next) => next(),
+  assertTenantUserSeatAvailable: (...args) => assertTenantUserSeatAvailable(...args),
   isFeatureEnabled: (...args) => isFeatureEnabled(...args),
 }))
 
@@ -108,6 +110,7 @@ describe('Tenant roles routes', () => {
     const dbModule = await import('../lib/db.js')
     vi.mocked(dbModule.query).mockImplementation((...args) => db.query(...args))
     isFeatureEnabled.mockResolvedValue(true)
+    assertTenantUserSeatAvailable.mockResolvedValue({ allowed: true })
 
     app = express()
     app.use(express.json())
@@ -290,6 +293,13 @@ describe('Tenant roles routes', () => {
       tenant_type: 'RESTAURANT',
     })
     const targetUserId = 'a0000001-0001-4000-8000-000000000088'
+    db.query.mockImplementation((sql) => {
+      const text = String(sql)
+      if (text.includes('SELECT name FROM restaurant')) return { rows: [{ name: 'Tenant' }] }
+      if (text.includes('SELECT email FROM app_user'))
+        return { rows: [{ email: 'target@example.com' }] }
+      return { rows: [] }
+    })
     const res = await request(app)
       .post(`/api/roles/users/${targetUserId}/assign`)
       .send({ role_id: mgrRoleId })
@@ -304,6 +314,27 @@ describe('Tenant roles routes', () => {
     })
   })
 
+  it('POST assign returns USER_LIMIT_REACHED when the plan has no available user seats', async () => {
+    const err = new Error('No seats left')
+    err.code = 'USER_LIMIT_REACHED'
+    err.status = 403
+    err.limitCheck = { current: 5, limit: 5 }
+    assertTenantUserSeatAvailable.mockRejectedValueOnce(err)
+    assertCanAssignRole.mockResolvedValueOnce({
+      id: 'a0000001-0001-4000-8000-000000000098',
+      name: 'Manager',
+      tenant_id: 'tenant-1',
+      tenant_type: 'RESTAURANT',
+    })
+
+    const res = await request(app)
+      .post('/api/roles/users/a0000001-0001-4000-8000-000000000088/assign')
+      .send({ role_id: 'a0000001-0001-4000-8000-000000000098' })
+      .expect(403)
+
+    expect(res.body.error.name).toBe('USER_LIMIT_REACHED')
+    expect(assignTenantUserRole).not.toHaveBeenCalled()
+  })
   it('POST assign allows STAFF_INVITE without SETTINGS_MANAGE', async () => {
     const viewerRoleId = 'a0000001-0001-4000-8000-000000000097'
     assertCanAssignRole.mockResolvedValueOnce({
@@ -323,6 +354,13 @@ describe('Tenant roles routes', () => {
         permissions: ['STAFF_VIEW', 'STAFF_INVITE', 'ORDERS_VIEW'],
       }
       next()
+    })
+    db.query.mockImplementation((sql) => {
+      const text = String(sql)
+      if (text.includes('SELECT name FROM restaurant')) return { rows: [{ name: 'Tenant' }] }
+      if (text.includes('SELECT email FROM app_user'))
+        return { rows: [{ email: 'target@example.com' }] }
+      return { rows: [] }
     })
     inviteOnlyApp.use('/api/roles', tenantRolesRoutes)
     const { errorHandler } = await import('../middlewares/errorHandler.js')

@@ -27,6 +27,7 @@ describe('runFulfillmentExceptionChecks', () => {
       .mockResolvedValueOnce({
         rows: [{ id: 'da1', order_id: 'o1', supplier_id: 's1', warehouse_id: null }],
       })
+      .mockResolvedValueOnce({ rows: [{ ok: 1 }] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
 
@@ -37,5 +38,24 @@ describe('runFulfillmentExceptionChecks', () => {
 
     expect(result.overdue).toBe(1)
     expect(mockCreate).toHaveBeenCalledTimes(1)
+  })
+  it('skips creating fulfillment exceptions when supplier locks after scan', async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'da-locked', order_id: 'o-locked', supplier_id: 's-locked', warehouse_id: null },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const { runFulfillmentExceptionChecks } = await import('./fulfillment-exceptions.job.js')
+    const result = await runFulfillmentExceptionChecks()
+
+    expect(result.overdue).toBe(0)
+    expect(mockCreate).not.toHaveBeenCalled()
+    expect(String(mockQuery.mock.calls[0][0])).toContain('FROM subscription sub')
+    expect(String(mockQuery.mock.calls[0][0])).toContain('sub.account_locked_at IS NULL')
   })
 })

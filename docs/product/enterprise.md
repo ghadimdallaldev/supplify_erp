@@ -1,41 +1,61 @@
-# Enterprise Plan
+# Hidden Custom And Enterprise Handling
 
 ## Overview
 
-The **Enterprise** plan is for large chains, distributors, and organizations that need custom terms, SLAs, and scale beyond the standard Platinum tier (self-serve Platinum: unlimited operational meters, **30 GB** storage per migration `0120`). It is **not** available for self-serve signup or in the public plan selector. Only an **admin** can assign the Enterprise plan to a tenant.
+Hidden custom or enterprise handling is for restaurants, suppliers, and groups that need contracted terms, SLAs, unusual scale, or limits that do not fit the public four-plan catalog. These accounts are not available in self-service signup or public plan selectors. Only an admin can assign a hidden custom or enterprise plan row, or apply tenant-specific overrides and add-ons under an approved commercial agreement.
 
-## What Enterprise Gets
+Current public commercial guidance lives in [four-plan-pricing-model.md](./four-plan-pricing-model.md) and [plans-and-limits.md](./plans-and-limits.md).
 
-- **Unlimited (or very high) limits** — Branches, warehouses, users, orders per day, products/SKUs, chat, and storage are effectively unlimited (or set to very high caps in the plan definition).
-- **Full feature set** — All platform features are enabled (reports, smart reorder, multi-branch, advanced finance, fulfillment suite, API/webhooks, etc.).
-- **Custom pricing** — Price is typically set by contract (e.g. `price_per_month` may be 0 in the catalog; billing is handled outside the plan row).
-- **Manual onboarding** — Onboarding is done by your team: create the tenant, assign the Enterprise plan via Admin Dashboard → Subscriptions, and optionally set limit overrides or custom settings.
+## Public Plan Boundary
+
+The public catalog is:
+
+| Tenant type | Public plans                        |
+| ----------- | ----------------------------------- |
+| Restaurant  | Restaurant Growth, Restaurant Scale |
+| Supplier    | Supplier Growth, Supplier Scale     |
+
+Use hidden custom or enterprise handling when a tenant needs:
+
+- More branches, warehouses, active customer locations, users, storage, or AI allowance than the public plan plus approved add-ons can support
+- Contract-specific pricing, payment terms, invoicing, or SLA commitments
+- Manual onboarding, migration, or account management
+- Preserved overrides during migration from the older internal tier catalog
+
+## What Custom Or Enterprise Gets
+
+- **Contracted limits** - Limits may be unlimited (`-1`) or set through explicit tenant overrides, depending on the operational risk.
+- **Feature access by entitlement** - Features still resolve through plan JSON, feature flags, and tenant overrides. Do not advertise unfinished features just because the account is custom.
+- **Custom pricing** - Price may be stored outside the public plan row and reconciled through manual billing or the external billing system.
+- **Manual onboarding** - Admins create or identify the tenant, assign the plan or overrides, and audit the reason.
 
 ## SLA Options
 
 Enterprise customers can negotiate:
 
-- **Support SLA** — Dedicated or same-day support, dedicated success manager.
-- **Uptime / availability** — Documented in a separate MSA or order form.
-- **Data and security** — Compliance requirements (e.g. data residency, audit support) as per your commercial terms.
+- Dedicated or same-day support and success management
+- Uptime / availability commitments documented in a separate MSA or order form
+- Data, security, audit, or residency terms covered by contract
 
-These are not stored in the product; they are reflected in your contracts and operations.
+These contractual terms are not fully stored in the product; they are reflected in operations and signed agreements.
 
 ## Custom Contracts
 
-- Pricing, payment terms, and renewal are defined in a separate contract (MSA, order form, or similar).
-- The platform does not enforce contract-specific billing; it only enforces the plan’s limits and features. Invoicing for Enterprise may be manual or via your billing system.
+- Pricing, payment terms, renewal, and cancellation are defined in a separate contract.
+- The platform enforces configured plan limits, feature flags, add-ons, and overrides.
+- Live automated recurring provider behavior remains external until a real recurring payment provider and webhooks are implemented.
 
 ## Manual Onboarding Flow
 
-1. **Sales / CS** agrees terms with the customer (pricing, SLA, limits).
-2. **Admin** creates or identifies the tenant (restaurant or supplier) in the Admin Dashboard.
-3. **Admin** opens Subscriptions, finds the tenant’s subscription, and changes the plan to **Enterprise** (Restaurant or Supplier, as appropriate). No self-serve flow is shown for Enterprise.
-4. Optionally, **Admin** applies **limit overrides** (e.g. a specific storage cap) or leaves the plan’s built-in limits as-is.
-5. Customer is given access (invite users, share login/docs) and onboarded per your process.
+1. Sales / CS agrees terms with the customer.
+2. Admin creates or identifies the restaurant or supplier tenant.
+3. Admin opens Subscriptions and assigns the hidden custom/enterprise plan row, or keeps a public plan with approved add-ons/overrides when that is safer.
+4. Admin records the reason, effective limits, add-ons, trial extension if any, and billing status for audit.
+5. Customer is onboarded through the standard invite and support process.
 
 ## Technical Notes
 
-- Plan `code` is `enterprise`; `tenant_type` is `RESTAURANT` or `SUPPLIER` (separate rows).
-- The plan row has `requires_admin_assignment = true` so it is excluded from any self-serve plan picker. Only admin-initiated plan changes can set a tenant to Enterprise.
-- See **[SUBSCRIPTIONS.md](./SUBSCRIPTIONS.md)** for enforcement (limits, features) and **[ADMIN.md](../admin/admin-guide.md)** for admin subscription management.
+- Existing internal codes may include `enterprise` and preserved compatibility rows. Do not rename plan codes solely for display purposes.
+- Hidden rows should be excluded from self-service plan APIs and public selectors through active/admin-assignment flags.
+- Separate rows by `tenant_type` remain important so restaurant and supplier entitlements do not leak across tenant types.
+- See [admin-guide.md](../admin/admin-guide.md) for admin subscription management.

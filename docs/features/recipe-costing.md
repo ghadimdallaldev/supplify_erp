@@ -1,5 +1,7 @@
 # Recipe Costing V1 — Implementation Summary
 
+> Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+
 ## Audit findings (existing codebase)
 
 - **Products/pricing**: `product`, `price`, `restaurant_pricing`; resolved via `resolve-product-price.service.js`

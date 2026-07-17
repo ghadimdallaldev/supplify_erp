@@ -43,24 +43,25 @@ import {
 import { resolveUpgradeUrl } from '../lib/externallyControlledFeatures'
 import type { AppDispatch } from '../store'
 
-const PLAN_PRICE_FALLBACK: Record<string, string> = {
-  free: '$0 trial',
-  silver: '$49/mo',
-  gold: '$149/mo',
-  platinum: '$349/mo',
+function getPlanDisplayName(plan: any): string {
+  return plan?.display_name || formatPlanDisplayName(plan?.code, plan?.name)
 }
 
 function getPlanPrice(plan: any): string {
   if (plan.price_monthly != null) {
     return plan.price_monthly === 0
-      ? formatPlanDisplayName(plan.code, plan.name)
-      : `$${plan.price_monthly}/mo`
+      ? getPlanDisplayName(plan)
+      : '$' + Number(plan.price_monthly).toLocaleString() + '/mo'
   }
-  return PLAN_PRICE_FALLBACK[normalizePlanCode(plan.code)] ?? '—'
+  if (plan.price_per_month != null) {
+    const monthly = Number(plan.price_per_month)
+    return monthly === 0 ? getPlanDisplayName(plan) : '$' + monthly.toLocaleString() + '/mo'
+  }
+  return 'Pricing unavailable'
 }
 
 function formatLimit(val: number | null | undefined): string {
-  if (val == null) return '—'
+  if (val == null) return '-'
   if (val === -1 || val >= 999999) return 'Unlimited'
   return val.toLocaleString()
 }
@@ -109,6 +110,30 @@ function findNextUpgradePlan(plans: any[], currentCode: string, recommendedCode:
   return plans.find((p) => normalizePlanCode(p.code) !== currentCode)
 }
 
+export function getVisibleUpgradePlans(plansInput: any[] | undefined) {
+  return [...(plansInput ?? [])]
+    .filter((p) => {
+      const code = (p.code || '').toLowerCase()
+      return code !== 'enterprise' && code !== 'free'
+    })
+    .sort((a, b) => {
+      const ai = PLAN_TIER_ORDER.indexOf(
+        normalizePlanCode(a.code) as (typeof PLAN_TIER_ORDER)[number]
+      )
+      const bi = PLAN_TIER_ORDER.indexOf(
+        normalizePlanCode(b.code) as (typeof PLAN_TIER_ORDER)[number]
+      )
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+    })
+}
+
+export function getUpgradeModalPlanAction(targetPlan: any | undefined, pendingActivation: boolean) {
+  if (!targetPlan?.id) return null
+  return pendingActivation
+    ? ({ kind: 'trial', trialTargetPlanId: targetPlan.id } as const)
+    : ({ kind: 'checkout', plan: targetPlan } as const)
+}
+
 function openPlanCheckout(dispatch: AppDispatch, plan: any, planLabel: string, onDone: () => void) {
   const monthly = Number(plan.price_per_month ?? 0)
   const yearly = plan.price_per_year != null ? Number(plan.price_per_year) : monthly * 12
@@ -116,7 +141,7 @@ function openPlanCheckout(dispatch: AppDispatch, plan: any, planLabel: string, o
   openCheckoutPayment(dispatch, {
     planId: plan.id,
     planCode: (plan.code || '').toLowerCase(),
-    planName: plan.name || planLabel,
+    planName: plan.display_name || planLabel,
     priceMonthly: monthly,
     priceYearly: yearly,
   })
@@ -168,22 +193,12 @@ export function UpgradeModal() {
   )
 
   const entitlements = entitlementsData?.entitlements
-  const plans = [...(plansData?.plans ?? [])]
-    .filter((p) => (p.code || '').toLowerCase() !== 'enterprise')
-    .sort((a, b) => {
-      const ai = PLAN_TIER_ORDER.indexOf(
-        normalizePlanCode(a.code) as (typeof PLAN_TIER_ORDER)[number]
-      )
-      const bi = PLAN_TIER_ORDER.indexOf(
-        normalizePlanCode(b.code) as (typeof PLAN_TIER_ORDER)[number]
-      )
-      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
-    })
+  const currentCode = normalizePlanCode(entitlements?.plan?.code ?? 'free')
+  const plans = getVisibleUpgradePlans(plansData?.plans)
   const tenantType =
     entitlements?.tenantType ?? (user?.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT')
   const limitKeys = getLimitKeys(tenantType)
   const featureKeys = getFeatureKeys(tenantType)
-  const currentCode = normalizePlanCode(entitlements?.plan?.code ?? 'free')
   const recommendedCode = recommendation?.recommendedPlanCode
     ? normalizePlanCode(recommendation.recommendedPlanCode)
     : null
@@ -238,9 +253,12 @@ export function UpgradeModal() {
     )
     const onUpgradePage = isOnUpgradeDestination(location.pathname, location.search, upgradePath)
     const code = targetCode ?? recommendedCode ?? null
-    const planLabel = code
-      ? formatPlanDisplayName(code, findPlanByCode(plans, code)?.name)
-      : (recommendation?.recommendedPlanName ?? 'a paid plan')
+    const selectedPlan = code ? findPlanByCode(plans, code) : undefined
+    const planLabel = selectedPlan
+      ? getPlanDisplayName(selectedPlan)
+      : code
+        ? formatPlanDisplayName(code)
+        : (recommendation?.recommendedPlanName ?? 'a paid plan')
     const currentPlan =
       (payload as { currentPlan?: string }).currentPlan ??
       entitlements?.plan?.name ??
@@ -268,23 +286,24 @@ export function UpgradeModal() {
       findPlanByCode(plans, code) ??
       (showPlans ? findNextUpgradePlan(plans, currentCode, recommendedCode) : undefined)
 
-    if (targetPlan?.id && (targetPlan.code || '').toLowerCase() === 'free') {
+    const planAction = getUpgradeModalPlanAction(targetPlan, pendingActivation)
+    if (planAction?.kind === 'trial') {
       finishAndClose()
-      void activateFreePlanFromPlans(dispatch, plans).then((result) => {
-        if (result.ok) {
-          toast.success(
-            pendingActivation ? t('toast.freePlanActive') : t('toast.freePlanActiveTesting')
-          )
-          if (pendingActivation) navigate('/app', { replace: true })
-        } else {
-          toast.error(result.message)
+      void activateFreePlanFromPlans(dispatch, plansData?.plans, planAction.trialTargetPlanId).then(
+        (result) => {
+          if (result.ok) {
+            toast.success(t('toast.freePlanActive'))
+            navigate('/app', { replace: true })
+          } else {
+            toast.error(result.message)
+          }
         }
-      })
+      )
       return
     }
 
-    if (targetPlan?.id) {
-      openPlanCheckout(dispatch, targetPlan, planLabel, finishAndClose)
+    if (planAction?.kind === 'checkout') {
+      openPlanCheckout(dispatch, planAction.plan, planLabel, finishAndClose)
       return
     }
 
@@ -321,13 +340,18 @@ export function UpgradeModal() {
     ? findNextUpgradePlan(plans, currentCode, recommendedCode)
     : undefined
   const nextUpgradeCode = nextUpgradePlan ? normalizePlanCode(nextUpgradePlan.code) : null
-  const nextUpgradeName = nextUpgradePlan?.name ?? null
+  const nextUpgradeName = nextUpgradePlan ? getPlanDisplayName(nextUpgradePlan) : null
 
   const currentPlanName =
     (payload as { currentPlan?: string }).currentPlan ?? entitlements?.plan?.name ?? 'Current plan'
+  const recommendedPlan = recommendedCode ? findPlanByCode(plans, recommendedCode) : undefined
   const recommendedPlanName =
     recommendation?.recommendedPlanName ??
-    (recommendedCode ? formatPlanDisplayName(recommendedCode) : null)
+    (recommendedPlan
+      ? getPlanDisplayName(recommendedPlan)
+      : recommendedCode
+        ? formatPlanDisplayName(recommendedCode)
+        : null)
 
   const colCount = Math.max(plans.length, 1)
 
@@ -409,7 +433,7 @@ export function UpgradeModal() {
             {plansLoadingState && (
               <div className="flex flex-col items-center gap-3 py-8 text-sm text-[var(--text-muted)]">
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--brand-mid)] border-t-transparent" />
-                Loading plans…
+                Loading plans...
               </div>
             )}
             {!plansLoadingState && plansError && (
@@ -458,7 +482,7 @@ export function UpgradeModal() {
                               isCurrent ? 'text-[var(--brand-mid)]' : 'text-[var(--text-mid)]'
                             }`}
                           >
-                            {plan.name}
+                            {getPlanDisplayName(plan)}
                           </span>
                           {isCurrent && (
                             <span className="rounded-full bg-[var(--brand)] px-2 py-0.5 text-[10px] font-semibold text-white">
@@ -481,24 +505,13 @@ export function UpgradeModal() {
                       <div className="flex-1" />
 
                       {isCurrent ? (
-                        pendingActivation && code === 'free' && canUpgrade ? (
-                          <button
-                            type="button"
-                            className="touch-target w-full cursor-pointer rounded-md py-2 text-xs font-semibold text-white"
-                            style={{ background: 'var(--brand-mid)' }}
-                            onClick={() => handleUpgrade(code)}
-                          >
-                            Activate free plan
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled
-                            className="touch-target w-full cursor-default rounded-md border border-[var(--app-border)] bg-[var(--bg)] py-2 text-xs text-[var(--text-muted)]"
-                          >
-                            Current plan
-                          </button>
-                        )
+                        <button
+                          type="button"
+                          disabled
+                          className="touch-target w-full cursor-default rounded-md border border-[var(--app-border)] bg-[var(--bg)] py-2 text-xs text-[var(--text-muted)]"
+                        >
+                          Current plan
+                        </button>
                       ) : !canUpgrade ? (
                         <button
                           type="button"
@@ -516,7 +529,9 @@ export function UpgradeModal() {
                           }}
                           onClick={() => handleUpgrade(code)}
                         >
-                          Upgrade to {plan.name}
+                          {pendingActivation
+                            ? t('upgradeModal.startTrialOf', { planName: getPlanDisplayName(plan) })
+                            : `Upgrade to ${getPlanDisplayName(plan)}`}
                         </button>
                       ) : isBelow ? (
                         <button
@@ -524,7 +539,7 @@ export function UpgradeModal() {
                           className="touch-target relative z-10 w-full cursor-pointer rounded-md border border-[var(--app-border)] py-2 text-xs text-[var(--text-muted)] hover:bg-[var(--bg)]"
                           onClick={() => handleUpgrade(code)}
                         >
-                          Downgrade to {plan.name}
+                          Downgrade to {getPlanDisplayName(plan)}
                         </button>
                       ) : null}
                     </div>
@@ -558,8 +573,8 @@ export function UpgradeModal() {
                               isCurrent ? 'text-[var(--brand-mid)]' : 'text-[var(--text-mid)]'
                             }`}
                           >
-                            {plan.name}
-                            {isCurrent && ' ✓'}
+                            {getPlanDisplayName(plan)}
+                            {isCurrent && ' (current)'}
                           </div>
                         </div>
                       )
@@ -673,7 +688,7 @@ export function UpgradeModal() {
           </div>
         </DialogBody>
 
-        {/* Bottom actions — outside scroll so taps are not blocked on mobile */}
+        {/* Bottom actions outside scroll so taps are not blocked on mobile */}
         <div className="action-bar shrink-0 flex-col border-t border-[var(--app-border)] bg-[var(--surface)] px-4 py-4 sm:flex-row sm:px-6">
           {canUpgrade && recommendedCode && recommendedCode !== currentCode && (
             <Button
@@ -681,9 +696,13 @@ export function UpgradeModal() {
               onClick={() => handleUpgrade()}
               className="touch-target w-full sm:w-auto sm:min-w-[10rem]"
             >
-              {onUpgradePage
-                ? `Request ${recommendedPlanName ?? 'upgrade'}`
-                : `Upgrade to ${recommendedPlanName ?? 'recommended plan'}`}
+              {pendingActivation
+                ? t('upgradeModal.startTrialOf', {
+                    planName: recommendedPlanName ?? t('upgradeModal.recommendedPlanFallback'),
+                  })
+                : onUpgradePage
+                  ? `Request ${recommendedPlanName ?? 'upgrade'}`
+                  : `Upgrade to ${recommendedPlanName ?? 'recommended plan'}`}
             </Button>
           )}
           {canUpgrade &&
@@ -697,9 +716,13 @@ export function UpgradeModal() {
                 onClick={() => handleUpgrade(nextUpgradeCode)}
                 className="touch-target w-full sm:w-auto sm:min-w-[10rem]"
               >
-                {onUpgradePage
-                  ? `Request ${nextUpgradeName ?? 'upgrade'}`
-                  : `Upgrade to ${nextUpgradeName ?? 'next plan'}`}
+                {pendingActivation
+                  ? t('upgradeModal.startTrialOf', {
+                      planName: nextUpgradeName ?? t('upgradeModal.nextPlanFallback'),
+                    })
+                  : onUpgradePage
+                    ? `Request ${nextUpgradeName ?? 'upgrade'}`
+                    : `Upgrade to ${nextUpgradeName ?? 'next plan'}`}
               </Button>
             )}
           {canUpgrade &&

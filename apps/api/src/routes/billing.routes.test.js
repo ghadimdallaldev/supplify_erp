@@ -167,6 +167,7 @@ describe('billing.routes', () => {
         planId: '11111111-1111-4111-8111-111111111111',
         billingCycle: 'MONTHLY',
         idempotencyKey: 'free-activate-test-key-01',
+        trialTargetPlanId: '22222222-2222-4222-8222-222222222222',
       })
       .expect(200)
 
@@ -179,6 +180,7 @@ describe('billing.routes', () => {
         planId: '11111111-1111-4111-8111-111111111111',
         billingCycle: 'MONTHLY',
         paymentMethodId: undefined,
+        trialTargetPlanId: '22222222-2222-4222-8222-222222222222',
       })
     )
   })
