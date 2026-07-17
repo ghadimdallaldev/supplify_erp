@@ -5,7 +5,6 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "node --watch src/server.js",
     "build": "echo 'Build not needed for JS'",
     "start": "node src/server.js",
     "db:migrate": "node scripts/migrate.js"
