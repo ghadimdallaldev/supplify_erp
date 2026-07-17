@@ -212,7 +212,7 @@
     }
   },
   "deliveryZones": {
-    "upgradeRequired": "Delivery zones require warehouse locations on Silver or higher.",
+    "upgradeRequired": "Delivery zones require warehouse locations on Supplier Growth or Scale.",
     "viewPlans": "View plans",
     "title": "Delivery zones by warehouse",
     "description": "View and manage delivery coverage, fees, and minimum orders for each warehouse location.",
@@ -379,7 +379,7 @@
     }
   },
   "warehouses": {
-    "upgradeRequired": "Warehouse management requires Silver or higher. Free accounts do not include warehouse locations; any legacy default warehouse from older data is not usable until you upgrade.",
+    "upgradeRequired": "Warehouse management requires Supplier Growth or Scale. Trials do not include warehouse locations; any legacy default warehouse from older data is not usable until you activate a paid plan.",
     "viewPlans": "View plans",
     "title": "Warehouses",
     "description": "Manage your warehouse locations",

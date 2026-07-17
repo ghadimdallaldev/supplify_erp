@@ -33,7 +33,7 @@ export function validateCustomHostname(hostname) {
 export async function assertCustomDomainAllowed(tenantId, tenantType) {
   const eff = await getEffectiveFeaturesForTenant(tenantId, tenantType)
   if (!hasBrandingCapability(eff?.features?.custom_branding, 'customDomain')) {
-    throw new ValidationError('Custom domains require the Platinum plan')
+    throw new ValidationError('Custom domains are available on Scale')
   }
 }
 

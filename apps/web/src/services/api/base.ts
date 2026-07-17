@@ -35,6 +35,20 @@ function redirectToLoginForAuthError(error: ApiErrorBody['error'], requestUrl: s
   window.location.href = `/login${suffix}`
 }
 
+function sanitizePlanLabel(value: unknown): string {
+  const raw = String(value || '').trim()
+  const key = raw.toLowerCase()
+  if (key === 'silver' || key === 'bronze') return 'Growth'
+  if (key === 'gold' || key === 'platinum') return 'Scale'
+  if (key === 'free' || key === 'free trial') return '30-day Free Trial'
+  return raw
+}
+
+function sanitizeRecommendedPlans(value: unknown): string[] {
+  const source = Array.isArray(value) ? value : ['Scale']
+  return source.map(sanitizePlanLabel).filter(Boolean)
+}
+
 // Custom baseQuery to unwrap API response envelope
 const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
   const result = await fetchBaseQuery({
@@ -48,7 +62,7 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
 
   const requestUrl = requestPath(args)
 
-  // Handle 401 — distinguish "not logged in" from "session expired"
+  // Handle 401 - distinguish "not logged in" from "session expired"
   const err = result.error as { status?: number | string; data?: unknown } | undefined
   if (err?.status === 401) {
     const errorData = err.data
@@ -122,12 +136,21 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
                     limitKey: (details.limitKey as string) || 'branches',
                     limitValue: Number(details.limitValue ?? details.limit ?? 0),
                     currentUsage: Number(details.currentUsage ?? details.current ?? 0),
-                    currentPlan: (details.currentPlan as string) ?? null,
-                    recommendedPlans: (details.recommendedPlans as string[]) ?? ['Gold'],
+                    currentPlan: details.currentPlan
+                      ? sanitizePlanLabel(details.currentPlan)
+                      : null,
+                    recommendedPlans: sanitizeRecommendedPlans(details.recommendedPlans),
                     upgradeUrl: normalizedUpgradeUrl,
                   }
                 : {
                     ...details,
+                    currentPlan: details.currentPlan
+                      ? sanitizePlanLabel(details.currentPlan)
+                      : null,
+                    requiredPlan: details.requiredPlan
+                      ? sanitizePlanLabel(details.requiredPlan)
+                      : null,
+                    recommendedPlans: sanitizeRecommendedPlans(details.recommendedPlans),
                     upgradeUrl: normalizedUpgradeUrl,
                   }) as
                 | import('../../features/monetization/monetizationSlice').LimitExceededPayload

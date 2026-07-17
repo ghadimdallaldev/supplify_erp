@@ -845,7 +845,7 @@ router.post(
           error: buildFeatureNotAvailablePayload(
             'quick_lists',
             subscription?.plan_name || subscription?.plan_display_name,
-            'Silver',
+            'Growth',
             recommendedPlans,
             undefined,
             'RESTAURANT'
@@ -879,7 +879,7 @@ router.post(
           error: buildFeatureNotAvailablePayload(
             'quick_lists',
             subscription?.plan_name || subscription?.plan_display_name,
-            'Platinum',
+            'Scale',
             await getRecommendedPlanNames('RESTAURANT'),
             undefined,
             'RESTAURANT'
@@ -1150,7 +1150,7 @@ const aiSuggestApplySchema = z.object({
     .min(1),
 })
 
-// Platinum: forecast-based item suggestions for a quick list
+// Scale: forecast-based item suggestions for a quick list
 router.post(
   '/:id/ai-suggest',
   requireAuth,
@@ -1167,7 +1167,7 @@ router.post(
   }
 )
 
-// Platinum: apply selected suggestions to quick list items
+// Scale: apply selected suggestions to quick list items
 router.post(
   '/:id/ai-suggest/apply',
   requireAuth,

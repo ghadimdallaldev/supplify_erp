@@ -1,9 +1,12 @@
 import { Link } from 'react-router-dom'
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2, Warehouse, Users } from 'lucide-react'
 import { useGetSupplierGrowthMetricsQuery } from '../../services/api/endpoints/growth'
-import { useGetEntitlementsQuery } from '../../services/api'
+import {
+  useGetEntitlementsQuery,
+  useAiRecommendReorderAssistanceMutation,
+} from '../../services/api'
 import { useAppSelector } from '../../hooks/redux'
 import { usePermissions } from '../../hooks/usePermissions'
 import { canUseSupplierGrowth } from '../../lib/planFeatureGates'
@@ -12,6 +15,7 @@ import { toast } from 'sonner'
 import { Skeleton } from '../ui/skeleton'
 import { StatusBadge } from '../ui/status-badge'
 import { formatCurrency } from '../../utils/format'
+import type { ReorderAiRecommendation } from '../../types/reorder'
 import {
   DashboardWidgetPanel,
   SPEND_TREND_PERIOD_OPTIONS,
@@ -39,6 +43,7 @@ export function DashboardWidgetGrid(props: any) {
     financeInvoicesEnabled = false,
     lowStockItems,
     smartReorderEnabled,
+    smartReorderAiRecommendEligible = false,
     inventoryMgmtEnabled,
     reorderSuggestions,
     reorderRemindersData,
@@ -63,6 +68,52 @@ export function DashboardWidgetGrid(props: any) {
   const { data: growthMetrics } = useGetSupplierGrowthMetricsQuery(undefined, {
     skip: !supplierGrowthEnabled,
   })
+
+  const [aiRecommend] = useAiRecommendReorderAssistanceMutation()
+  const [aiRecByProduct, setAiRecByProduct] = useState<Record<string, ReorderAiRecommendation>>({})
+  const dashboardRecKey = useRef<string | null>(null)
+
+  const topReorderProductIds = useMemo(() => {
+    const list = reorderSuggestions?.suggestions ?? []
+    return list
+      .slice(0, 3)
+      .map((s: any) => s.product_id || s.productId)
+      .filter(Boolean)
+      .map(String)
+  }, [reorderSuggestions])
+
+  useEffect(() => {
+    if (!isRestaurant || !smartReorderAiRecommendEligible || topReorderProductIds.length === 0) {
+      setAiRecByProduct({})
+      dashboardRecKey.current = null
+      return
+    }
+    const key = topReorderProductIds.join(',')
+    if (dashboardRecKey.current === key) return
+    dashboardRecKey.current = key
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const result = await aiRecommend({
+          productIds: topReorderProductIds,
+          limit: topReorderProductIds.length,
+        }).unwrap()
+        if (cancelled) return
+        const map: Record<string, ReorderAiRecommendation> = {}
+        for (const rec of result.recommendations || []) {
+          if (rec.productId) map[String(rec.productId)] = rec
+        }
+        setAiRecByProduct(map)
+      } catch {
+        if (!cancelled) setAiRecByProduct({})
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isRestaurant, smartReorderAiRecommendEligible, topReorderProductIds, aiRecommend])
 
   return (
     <>
@@ -447,7 +498,9 @@ export function DashboardWidgetGrid(props: any) {
                 ) : (
                   reorderSuggestions!.suggestions.slice(0, 3).map((s: any, idx: number) => {
                     const coverageDays = (Number(s.lead_time_days) || 7) + 14
-                    const qty =
+                    const productId = String(s.product_id || s.productId || '')
+                    const aiRec = productId ? aiRecByProduct[productId] : undefined
+                    const heuristicQty =
                       s.suggested_reorder_qty != null
                         ? Math.ceil(Number(s.suggested_reorder_qty))
                         : Math.max(
@@ -457,6 +510,17 @@ export function DashboardWidgetGrid(props: any) {
                                 (Number(s.current_qty) || 0)
                             )
                           )
+                    const qty =
+                      aiRec?.recommendedQuantity != null && aiRec.recommendedQuantity > 0
+                        ? aiRec.recommendedQuantity
+                        : heuristicQty
+                    // Only label after ai-recommend responds; never claim heuristic-only as AI
+                    const sourceLabel =
+                      aiRec?.source === 'ai'
+                        ? 'AI Reorder Recommendation'
+                        : aiRec
+                          ? 'Forecast Reorder Recommendation'
+                          : null
                     const urgencyColor =
                       idx === 0 ? 'var(--red)' : idx === 1 ? 'var(--amber)' : 'var(--mint-mid)'
                     const isAdding = addingSuggestionId === s.id
@@ -473,7 +537,7 @@ export function DashboardWidgetGrid(props: any) {
                           quickListId: lists[0].id,
                           body: {
                             productId: s.product_id,
-                            supplierId: s.supplier_id,
+                            supplierId: aiRec?.supplierId || s.supplier_id,
                             quantity: qty,
                           },
                         }).unwrap()
@@ -530,6 +594,20 @@ export function DashboardWidgetGrid(props: any) {
                               suggest: qty,
                             })}
                           </div>
+                          {sourceLabel && (
+                            <div
+                              style={{
+                                fontSize: 10,
+                                marginTop: 2,
+                                color:
+                                  aiRec?.source === 'ai' ? 'var(--mint-mid)' : 'var(--text-muted)',
+                                fontWeight: 600,
+                              }}
+                              data-testid="dashboard-reorder-source-label"
+                            >
+                              {sourceLabel}
+                            </div>
+                          )}
                         </div>
                         <button
                           disabled={

@@ -196,7 +196,7 @@ export function QuickListScheduleDialog(props: any) {
                 </Label>
                 <p className="text-xs text-[var(--text-muted)] mt-1">
                   When orders are auto-created, adjust line quantities using your inventory forecast
-                  (Platinum).
+                  (Scale).
                 </p>
               </div>
             </div>

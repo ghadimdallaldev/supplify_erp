@@ -86,6 +86,14 @@ export async function findUndeliveredAssignmentsForRollover({
     LEFT JOIN drivers d ON d.id = da.driver_id
     WHERE da.status = ANY($1::text[])
       AND o.status <> ALL($2::text[])
+      AND EXISTS (
+        SELECT 1
+        FROM subscription sub
+        WHERE sub.tenant_id = da.supplier_id
+          AND sub.tenant_type = 'SUPPLIER'
+          AND sub.status IN ('ACTIVE', 'TRIALING', 'PAST_DUE')
+          AND sub.account_locked_at IS NULL
+      )
       ${tenantClause}
     ORDER BY da.supplier_id, (${effDate}), da.created_at
     `,
@@ -188,6 +196,22 @@ async function detachOrderFromPriorRoutes(client, { orderId, supplierId, beforeD
   )
 }
 
+async function isSupplierUnlockedForRollover(client, supplierId) {
+  const { rows } = await client.query(
+    `
+    SELECT 1
+    FROM subscription
+    WHERE tenant_id = $1
+      AND tenant_type = 'SUPPLIER'
+      AND status IN ('ACTIVE', 'TRIALING', 'PAST_DUE')
+      AND account_locked_at IS NULL
+    LIMIT 1
+    `,
+    [supplierId]
+  )
+  return rows.length > 0
+}
+
 async function appendStopToRolloverRoute(client, { routeId, orderId, addressJson }) {
   const { rows: existing } = await client.query(
     `SELECT id FROM route_stop WHERE route_id = $1 AND order_id = $2`,
@@ -278,6 +302,9 @@ export async function rolloverAssignmentToNextDay({
     if (!ROLLOVER_ELIGIBLE_ASSIGNMENT_STATUSES.includes(current.status)) {
       return { ok: false, reason: 'ineligible_status', status: current.status }
     }
+    if (!(await isSupplierUnlockedForRollover(client, current.supplier_id))) {
+      return { ok: false, reason: 'tenant_locked', supplierId: current.supplier_id }
+    }
 
     const rolloverNote = ROLLOVER_AUDIT_MESSAGE
     const notes = current.notes ? `${current.notes}\n${rolloverNote}` : rolloverNote
@@ -304,7 +331,7 @@ export async function rolloverAssignmentToNextDay({
 
     let routeId = null
     if (cfg.keepDriver && current.driver_id) {
-      const vehicleInfo = [row.vehicle_type, row.vehicle_plate].filter(Boolean).join(' · ') || null
+      const vehicleInfo = [row.vehicle_type, row.vehicle_plate].filter(Boolean).join(' Â· ') || null
       routeId = await findOrCreateRolloverRoute(client, {
         supplierId: current.supplier_id,
         driverId: current.driver_id,

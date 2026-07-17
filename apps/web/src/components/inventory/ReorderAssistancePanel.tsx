@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -9,6 +9,8 @@ import {
   useAddItemToQuickListMutation,
   useExplainReorderAssistanceMutation,
   useAskReorderAssistanceMutation,
+  useAiRecommendReorderAssistanceMutation,
+  useFeedbackReorderAssistanceMutation,
 } from '../../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -27,6 +29,7 @@ import {
   Loader2,
   HelpCircle,
   MessageSquare,
+  Flag,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '../../lib/utils'
@@ -34,6 +37,7 @@ import { getUsageMeterDisplay } from '../../lib/usageDisplay'
 import type {
   ReorderAiAskResult,
   ReorderAiExplainResult,
+  ReorderAiRecommendation,
   ReorderAssistanceItem,
   ReorderForecast,
 } from '../../types/reorder'
@@ -79,6 +83,17 @@ function formatReorderByDate(date?: string | null): string | null {
   return `Reorder by ${parsed.toLocaleDateString()}`
 }
 
+function recommendationLabel(source?: string): string {
+  return source === 'ai' ? 'AI Reorder Recommendation' : 'Forecast Reorder Recommendation'
+}
+
+function resolveQty(item: ReorderAssistanceItem, recommendation?: ReorderAiRecommendation): number {
+  if (recommendation?.recommendedQuantity != null && recommendation.recommendedQuantity > 0) {
+    return recommendation.recommendedQuantity
+  }
+  return item.suggestedQty ?? 1
+}
+
 const REASON_STYLES: Record<string, string> = {
   low_stock: 'bg-red-50 text-red-700',
   near_expiry: 'bg-amber-50 text-amber-800',
@@ -109,6 +124,8 @@ export function ReorderAssistancePanel({
   const [addItemToQuickList] = useAddItemToQuickListMutation()
   const [explainAssistance, { isLoading: isExplaining }] = useExplainReorderAssistanceMutation()
   const [askAssistance, { isLoading: isAsking }] = useAskReorderAssistanceMutation()
+  const [aiRecommend, { isLoading: isAiRecommending }] = useAiRecommendReorderAssistanceMutation()
+  const [sendFeedback] = useFeedbackReorderAssistanceMutation()
   const [busyId, setBusyId] = useState<string | null>(null)
   const [explainOpen, setExplainOpen] = useState(false)
   const [explainResult, setExplainResult] = useState<ReorderAiExplainResult | null>(null)
@@ -116,6 +133,10 @@ export function ReorderAssistancePanel({
   const [askOpen, setAskOpen] = useState(false)
   const [askResult, setAskResult] = useState<ReorderAiAskResult | null>(null)
   const [askBusyProductId, setAskBusyProductId] = useState<string | null>(null)
+  const [recommendationsByProduct, setRecommendationsByProduct] = useState<
+    Record<string, ReorderAiRecommendation>
+  >({})
+  const recommendAttemptKey = useRef<string | null>(null)
 
   const suggestions = data?.suggestions ?? []
   const forecasts = data?.forecasts ?? []
@@ -126,8 +147,9 @@ export function ReorderAssistancePanel({
   const canAskLlm = data?.ai?.canAskLlm === true
 
   const entitlements = entitlementsData?.entitlements
-  const aiRequestLimit = entitlements?.limits?.ai_requests_per_day ?? 0
-  const aiRequestUsage = entitlements?.usage?.ai_requests_per_day ?? 0
+  const aiUsageSummary = entitlements?.aiUsage
+  const aiRequestLimit = aiUsageSummary?.limit ?? entitlements?.limits?.ai_requests_per_day ?? 0
+  const aiRequestUsage = aiUsageSummary?.current ?? entitlements?.usage?.ai_requests_per_day ?? 0
   const showAiUsageMeter =
     (canExplainLlm || canAskLlm) && typeof aiRequestLimit === 'number' && aiRequestLimit > 0
   const aiUsageMeter = showAiUsageMeter
@@ -135,6 +157,58 @@ export function ReorderAssistancePanel({
     : null
   const aiUsageWarning = (aiUsageMeter?.pct ?? 0) >= 80 && !aiUsageMeter?.atCap
   const aiUsageAtCap = aiUsageMeter?.atCap === true
+  const aiUsagePeriodLabel = aiUsageSummary?.trialPool ? 'this trial' : 'today'
+  const aiUsageLimitTitle = aiUsageSummary?.trialPool
+    ? 'Trial AI assist limit reached'
+    : 'Daily AI assist limit reached'
+
+  const productIdsKey = useMemo(
+    () =>
+      suggestions
+        .filter((s) => s.productId && ['URGENT', 'HIGH', 'MEDIUM'].includes(s.urgency))
+        .slice(0, 8)
+        .map((s) => String(s.productId))
+        .join(','),
+    [suggestions]
+  )
+
+  useEffect(() => {
+    if (!canExplainLlm || !productIdsKey) {
+      setRecommendationsByProduct({})
+      recommendAttemptKey.current = null
+      return
+    }
+    if (recommendAttemptKey.current === productIdsKey) return
+    recommendAttemptKey.current = productIdsKey
+
+    const productIds = productIdsKey.split(',').filter(Boolean)
+    let cancelled = false
+    ;(async () => {
+      try {
+        const result = await aiRecommend({
+          productIds,
+          limit: Math.min(8, productIds.length),
+        }).unwrap()
+        if (cancelled) return
+        if (result.usageLimited) {
+          toast.message(t('toast.aiDailyLimitReached'))
+        }
+        const map: Record<string, ReorderAiRecommendation> = {}
+        for (const rec of result.recommendations || []) {
+          if (rec.productId) map[String(rec.productId)] = rec
+        }
+        setRecommendationsByProduct(map)
+      } catch {
+        if (!cancelled) {
+          setRecommendationsByProduct({})
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [canExplainLlm, productIdsKey, aiRecommend, t])
 
   const handleSnooze = async (item: (typeof suggestions)[0]) => {
     try {
@@ -157,9 +231,39 @@ export function ReorderAssistancePanel({
         scopeId: item.scopeId,
         action: 'not_needed',
       }).unwrap()
+      const rec = item.productId ? recommendationsByProduct[String(item.productId)] : undefined
+      if (item.productId && rec) {
+        try {
+          await sendFeedback({
+            productId: String(item.productId),
+            source: rec.source,
+            actionTaken: 'not_needed',
+            recommendedQuantity: rec.recommendedQuantity,
+          }).unwrap()
+        } catch {
+          // Suppress still succeeded — feedback is best-effort
+        }
+      }
       toast.success(t('toast.reorderMarkedNotNeeded'))
     } catch (e: any) {
       toast.error(e?.data?.error?.message || t('toast.reorderUpdatePreferenceFailed'))
+    }
+  }
+
+  const handleRecommendationIncorrect = async (item: (typeof suggestions)[0]) => {
+    if (!item.productId) return
+    const rec = recommendationsByProduct[String(item.productId)]
+    try {
+      await sendFeedback({
+        productId: String(item.productId),
+        source: rec?.source || 'forecast',
+        actionTaken: 'incorrect',
+        recommendedQuantity: rec?.recommendedQuantity ?? item.suggestedQty,
+        feedbackReason: 'user_marked_incorrect',
+      }).unwrap()
+      toast.success('Thanks — we recorded that this recommendation looks incorrect')
+    } catch (e: any) {
+      toast.error(e?.data?.error?.message || 'Could not send feedback')
     }
   }
 
@@ -175,12 +279,13 @@ export function ReorderAssistancePanel({
     }
     setBusyId(item.id)
     try {
-      const qty = item.suggestedQty ?? 1
+      const rec = recommendationsByProduct[String(item.productId)]
+      const qty = resolveQty(item, rec)
       await addItemToQuickList({
         quickListId: lists[0].id,
         body: {
           productId: item.productId,
-          supplierId: item.supplierId,
+          supplierId: rec?.supplierId || item.supplierId,
           quantity: qty,
         },
       }).unwrap()
@@ -295,6 +400,7 @@ export function ReorderAssistancePanel({
               {!compact && (
                 <CardDescription>
                   Suggestions based on stock levels, expiry, order patterns, and forecasts
+                  {isAiRecommending ? ' · Loading AI recommendations…' : ''}
                 </CardDescription>
               )}
             </div>
@@ -337,7 +443,7 @@ export function ReorderAssistancePanel({
                       title={
                         canAskLlm
                           ? aiUsageAtCap
-                            ? 'Daily AI assist limit reached'
+                            ? aiUsageLimitTitle
                             : undefined
                           : 'AI assistant is off — matching product names by keywords'
                       }
@@ -347,7 +453,7 @@ export function ReorderAssistancePanel({
                       variant="secondary"
                       disabled={isAsking || !askQuery.trim() || aiUsageAtCap}
                       onClick={handleAsk}
-                      title={aiUsageAtCap ? 'Daily AI assist limit reached' : undefined}
+                      title={aiUsageAtCap ? aiUsageLimitTitle : undefined}
                     >
                       {isAsking ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -356,27 +462,27 @@ export function ReorderAssistancePanel({
                       )}
                     </Button>
                   </div>
-                  {showAiUsageMeter && aiUsageMeter && (
-                    <p
-                      className={cn(
-                        'text-xs',
-                        aiUsageAtCap
-                          ? 'text-amber-700 font-medium'
-                          : aiUsageWarning
-                            ? 'text-amber-600'
-                            : 'text-[var(--text-muted)]'
-                      )}
-                    >
-                      {aiUsageMeter.display}/{aiUsageMeter.limit} AI assists today
-                      {aiUsageAtCap ? ' — limit reached' : ''}
-                    </p>
-                  )}
                   {!canAskLlm && (
                     <p className="text-xs text-[var(--text-muted)]">
-                      Keyword matching only — enable AI platform for natural-language assist
+                      Keyword matching only — enable AI platform for purchase-language assist
                     </p>
                   )}
                 </div>
+              )}
+              {showAiUsageMeter && aiUsageMeter && (
+                <p
+                  className={cn(
+                    'text-xs',
+                    aiUsageAtCap
+                      ? 'text-amber-700 font-medium'
+                      : aiUsageWarning
+                        ? 'text-amber-600'
+                        : 'text-[var(--text-muted)]'
+                  )}
+                >
+                  {aiUsageMeter.display}/{aiUsageMeter.limit} AI assists {aiUsagePeriodLabel}
+                  {aiUsageAtCap ? ' - limit reached' : ''}
+                </p>
               )}
             </div>
           )}
@@ -390,13 +496,32 @@ export function ReorderAssistancePanel({
             <ul className="divide-y divide-[var(--app-border)]">
               {visible.map((item) => {
                 const forecast = resolveItemForecast(item, forecasts)
+                const rec = item.productId
+                  ? recommendationsByProduct[String(item.productId)]
+                  : undefined
+                const qty = resolveQty(item, rec)
                 const showForecastBadges =
-                  item.reasonCode === 'forecast' || forecast?.confidence != null
-                const confidenceLabel = formatForecastConfidence(forecast?.confidence)
-                const reorderByLabel = formatReorderByDate(forecast?.reorderByDate)
+                  !rec && (item.reasonCode === 'forecast' || forecast?.confidence != null)
+                const confidenceLabel = formatForecastConfidence(
+                  rec?.confidence ?? forecast?.confidence
+                )
+                const reorderByLabel = formatReorderByDate(
+                  rec?.deliveryDate ?? forecast?.reorderByDate
+                )
+                const sourceLabel = rec
+                  ? recommendationLabel(rec.source)
+                  : canExplainLlm && item.productId
+                    ? null
+                    : item.productId
+                      ? 'Forecast Reorder Recommendation'
+                      : null
 
                 return (
-                  <li key={item.id} className="py-3 first:pt-0 last:pb-0">
+                  <li
+                    key={item.id}
+                    className="py-3 first:pt-0 last:pb-0"
+                    data-testid="reorder-item"
+                  >
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
@@ -407,12 +532,26 @@ export function ReorderAssistancePanel({
                             variant="outline"
                             className={cn(
                               'text-xs',
-                              URGENCY_STYLES[item.urgency] || URGENCY_STYLES.LOW
+                              URGENCY_STYLES[rec?.priority || item.urgency] || URGENCY_STYLES.LOW
                             )}
                           >
-                            {item.urgency}
+                            {rec?.priority || item.urgency}
                           </Badge>
-                          {showForecastBadges && confidenceLabel && (
+                          {sourceLabel && (
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'text-xs',
+                                rec?.source === 'ai'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                  : 'bg-violet-50 text-violet-800 border-violet-200'
+                              )}
+                              data-testid="recommendation-source-label"
+                            >
+                              {sourceLabel}
+                            </Badge>
+                          )}
+                          {confidenceLabel && (
                             <Badge
                               variant="outline"
                               className="text-xs bg-violet-50 text-violet-800 border-violet-200"
@@ -420,7 +559,7 @@ export function ReorderAssistancePanel({
                               {confidenceLabel}
                             </Badge>
                           )}
-                          {showForecastBadges && reorderByLabel && (
+                          {(showForecastBadges || rec?.deliveryDate) && reorderByLabel && (
                             <Badge
                               variant="outline"
                               className="text-xs bg-violet-50 text-violet-700 border-violet-100"
@@ -438,18 +577,54 @@ export function ReorderAssistancePanel({
                           >
                             {item.reasonLabel}
                           </span>
-                          {item.supplierName && (
+                          {(rec?.supplierName || item.supplierName) && (
                             <span className="text-xs text-[var(--text-muted)]">
-                              {item.supplierName}
+                              {rec?.supplierName || item.supplierName}
                             </span>
                           )}
-                          {item.suggestedQty != null && (
-                            <span className="text-xs text-[var(--text-muted)]">
-                              Suggest: {item.suggestedQty}
-                              {item.productUnit ? ` ${item.productUnit}` : ''}
-                            </span>
-                          )}
+                          <span className="text-xs text-[var(--text-muted)]">
+                            Suggest: {qty}
+                            {item.productUnit ? ` ${item.productUnit}` : ''}
+                            {rec?.action ? ` · ${rec.action}` : ''}
+                          </span>
                         </div>
+                        {rec?.summary && (
+                          <p className="mt-1.5 text-xs text-[var(--text)]">{rec.summary}</p>
+                        )}
+                        {rec?.reasoning && rec.reasoning.length > 0 && (
+                          <ul className="mt-1 list-disc pl-4 text-xs text-[var(--text-muted)]">
+                            {rec.reasoning.slice(0, 4).map((reason, idx) => (
+                              <li key={idx}>{reason}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {rec?.warnings && rec.warnings.length > 0 && (
+                          <ul className="mt-1 text-xs text-amber-700">
+                            {rec.warnings.slice(0, 3).map((warning, idx) => (
+                              <li key={idx}>{warning}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {rec?.alternatives && rec.alternatives.length > 0 && (
+                          <p className="mt-1 text-xs text-[var(--text-muted)]">
+                            Alternatives:{' '}
+                            {rec.alternatives
+                              .map(
+                                (a) =>
+                                  a.rationale ||
+                                  (a.recommendedQuantity != null
+                                    ? `qty ${a.recommendedQuantity}`
+                                    : null)
+                              )
+                              .filter(Boolean)
+                              .join('; ')}
+                          </p>
+                        )}
+                        {rec?.estimatedCost != null && (
+                          <p className="mt-1 text-xs text-[var(--text-muted)]">
+                            Est. cost: {rec.estimatedCost}
+                          </p>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-1 shrink-0">
                         {item.productId && (
@@ -478,7 +653,7 @@ export function ReorderAssistancePanel({
                             <Button variant="default" size="sm" asChild>
                               <Link
                                 to={`/app/products/${item.productId}`}
-                                state={{ addToCartQty: item.suggestedQty }}
+                                state={{ addToCartQty: qty }}
                               >
                                 <ShoppingCart className="h-3.5 w-3.5 mr-1" />
                                 Cart
@@ -504,6 +679,16 @@ export function ReorderAssistancePanel({
                         >
                           <Ban className="h-3.5 w-3.5" />
                         </Button>
+                        {item.productId && (rec || !canExplainLlm) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRecommendationIncorrect(item)}
+                            title="Recommendation incorrect"
+                          >
+                            <Flag className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </li>
@@ -578,7 +763,7 @@ export function ReorderAssistancePanel({
             <DialogDescription>
               {explainResult?.source === 'llm'
                 ? 'AI summary based on your inventory signals'
-                : 'Summary from inventory rules and forecasts'}
+                : 'Rule-based summary from inventory rules and forecasts'}
             </DialogDescription>
           </DialogHeader>
           {explainResult && (

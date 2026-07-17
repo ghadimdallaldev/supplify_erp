@@ -6,6 +6,7 @@ import { checkLimit } from '../lib/subscription.js'
 import { escapeCsvField, MAX_UPLOAD_BYTES } from '../lib/sanitize-upload.js'
 import { logger } from '../lib/logger.js'
 import { writeSystemAuditLog } from '../lib/audit.js'
+import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
 import { importImageFromUrl, assertSafeImageUrl } from './product-image-import.service.js'
 
 export const XLSX_MAX_BUFFER_BYTES = MAX_UPLOAD_BYTES
@@ -601,6 +602,20 @@ export async function processProductImportJob(jobId) {
   }
   if (!['pending', 'processing'].includes(job.status)) {
     return job
+  }
+
+  if (
+    !(await isTenantUnlockedForBackgroundWrites({
+      tenantId: job.supplier_id,
+      tenantType: 'SUPPLIER',
+    }))
+  ) {
+    const error = new ConflictError('Supplier account is locked; catalog import was not processed.')
+    await updateProductImportJob(jobId, {
+      status: 'failed',
+      errorMessage: error.message,
+    })
+    throw error
   }
 
   await updateProductImportJob(jobId, { status: 'processing' })

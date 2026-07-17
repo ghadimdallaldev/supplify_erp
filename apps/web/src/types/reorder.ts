@@ -55,12 +55,68 @@ export interface ReorderAssistanceItem {
   expiryDate?: string
   scopeType: 'product' | 'cadence' | 'supplier_product'
   scopeId: string
+  /** Additive AI context fields (optional; ignored by older clients) */
+  leadTimeDays?: number
+  moq?: number
+  orderMultiple?: number
+  avgDailyUsage30?: number
+  lowStockThreshold?: number | null
   forecast?: {
     explanation?: string
     confidence?: number
     forecastReorderQty?: number
     reorderByDate?: string | null
   }
+}
+
+export type ReorderAiRecommendationSource = 'ai' | 'forecast' | 'rule_based'
+
+export interface ReorderAiUsageLimitMetadata {
+  meterType?: string
+  periodType?: string
+  current?: number
+  limit?: number
+  resetAt?: string
+  trialPool?: boolean
+}
+
+export interface ReorderAiRecommendation {
+  productId: string
+  suggestionId?: string
+  source: ReorderAiRecommendationSource
+  action: 'order' | 'wait' | 'manual_review'
+  recommendedQuantity?: number | null
+  supplierId?: string | null
+  supplierName?: string
+  deliveryDate?: string | null
+  priority: string
+  confidence: number
+  summary: string
+  reasoning: string[]
+  warnings: string[]
+  alternatives?: Array<{
+    recommendedQuantity?: number
+    supplierId?: string
+    rationale?: string
+  }>
+  dataQuality?: 'good' | 'fair' | 'poor'
+  estimatedCost?: number | null
+  aiMetadata?: {
+    usedLlm?: boolean
+    fallbackReason?: string
+    normalized?: boolean
+    cached?: boolean
+  }
+}
+
+export interface ReorderAiRecommendResponse {
+  recommendations: ReorderAiRecommendation[]
+  usedLlm: boolean
+  cached?: boolean
+  usageLimited?: boolean
+  resetAt?: string
+  aiUsage?: ReorderAiUsageLimitMetadata
+  ai?: ReorderAssistanceResponse['ai']
 }
 
 export interface ReorderForecast {
@@ -81,6 +137,8 @@ export interface ReorderAiExplainResult {
   source: 'heuristic' | 'llm'
   usedLlm: boolean
   usageLimited?: boolean
+  resetAt?: string
+  aiUsage?: ReorderAiUsageLimitMetadata
 }
 
 export interface ReorderAiAskResult {
@@ -95,6 +153,8 @@ export interface ReorderAiAskResult {
   source: 'heuristic' | 'llm'
   usedLlm: boolean
   usageLimited?: boolean
+  resetAt?: string
+  aiUsage?: ReorderAiUsageLimitMetadata
 }
 
 export interface ReorderAssistanceResponse {

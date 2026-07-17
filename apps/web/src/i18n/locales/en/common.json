@@ -81,9 +81,14 @@
   },
   "toast": {
     "paymentReceivedAccountRestored": "Payment received. Your account has been restored.",
-    "freePlanActive": "Your free plan is active.",
-    "freePlanActiveTesting": "You are now on the Free testing plan. Upgrade anytime for production use.",
+    "freePlanActive": "Your trial is active.",
+    "freePlanActiveTesting": "Your trial is active. Upgrade anytime for production use.",
     "nowOnPlan": "You're now on {{planName}}",
     "checkoutStartFailed": "We could not start checkout for that plan. Try again or contact support."
+  },
+  "upgradeModal": {
+    "startTrialOf": "Start {{planName}} trial",
+    "recommendedPlanFallback": "recommended plan",
+    "nextPlanFallback": "next plan"
   }
 }

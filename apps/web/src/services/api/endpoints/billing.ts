@@ -44,6 +44,10 @@ export const billingApi = api.injectEndpoints({
           name: string
           limits: Record<string, unknown>
           features: Record<string, unknown>
+          price_per_month?: number | null
+          price_per_year?: number | null
+          display_name?: string
+          trial_eligible?: boolean
         }>
       },
       void
@@ -107,6 +111,7 @@ export const billingApi = api.injectEndpoints({
         billingCycle: 'MONTHLY' | 'YEARLY'
         paymentMethodId?: string
         idempotencyKey?: string
+        trialTargetPlanId?: string
       }
     >({
       query: (body) => ({
@@ -167,7 +172,7 @@ export const billingApi = api.injectEndpoints({
           const { refetchAppSession } = await import('../../../lib/refetchAppSession')
           await refetchAppSession(dispatch)
         } catch {
-          /* mutation failed — skip refetch */
+          /* mutation failed â€” skip refetch */
         }
       },
     }),

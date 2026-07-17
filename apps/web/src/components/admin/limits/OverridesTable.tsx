@@ -33,7 +33,7 @@ export function OverridesTable({
             <p className="text-sm">
               Value: {String(row.override_value)}
               {kind === 'plan' && row.plan_code
-                ? ` · ${formatPlanCodeLabel(String(row.plan_code))}`
+                ? ` · ${formatPlanCodeLabel(String(row.plan_code), String(row.tenant_type || ''))}`
                 : ''}
             </p>
             {row.is_active !== false && (
@@ -80,7 +80,10 @@ export function OverridesTable({
                       responsiveDataListClasses.columnSecondary
                     )}
                   >
-                    {formatPlanCodeLabel(String(row.plan_code || ''))}
+                    {formatPlanCodeLabel(
+                      String(row.plan_code || ''),
+                      String(row.tenant_type || '')
+                    )}
                   </td>
                 )}
                 <td className="px-3 py-2">{formatLimitKeyLabel(String(row.limit_type))}</td>

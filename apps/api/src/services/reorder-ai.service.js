@@ -3,8 +3,24 @@ import { query } from '../lib/db.js'
 import { config } from '../config/env.js'
 import { getAiProvider } from '../lib/ai/index.js'
 import { isAiEnvEnabled, isAiPlatformEnabledForTenant } from '../lib/ai-platform.js'
-import { checkAndIncrementUsage, incrementUsage } from '../lib/subscription.js'
+import { reserveAiUsage, refundReservedAiUsage } from '../lib/subscription.js'
+import { logger } from '../lib/logger.js'
+import { parseReorderAiDecisionBatch } from '../lib/reorder-ai-schema.js'
+import {
+  normalizeReorderAiDecision,
+  buildForecastFallbackRecommendation,
+} from '../lib/reorder-ai-normalize.js'
+import { toLlmContextPayload } from './reorder-ai-context.service.js'
 import { getReorderAssistance } from './restaurant-reorder-assistance.service.js'
+
+const RECOMMEND_SYSTEM_PROMPT = `You are a restaurant purchasing assistant.
+Use only the provided inventory, forecast, and supplier data. Do not invent products, suppliers, prices, or events.
+Treat baseSuggestedQuantity / forecastReorderQty as the trusted numerical baseline.
+Prefer action "order" when stock should be replenished, "wait" when inventory covers lead time, or "manual_review" when data is weak.
+Keep recommendedQuantity close to the baseline. Output JSON only.`
+
+const RECOMMEND_SCHEMA_HINT =
+  '{"recommendations":[{"productId":"uuid","action":"order|wait|manual_review","recommendedQuantity":number|null,"supplierId":"uuid|null","deliveryDate":"YYYY-MM-DD|null","priority":"URGENT|HIGH|MEDIUM|LOW","confidence":0-1,"summary":"string","reasoning":["string"],"warnings":["string"],"alternatives":[{"recommendedQuantity":number,"supplierId":"uuid","rationale":"string"}],"dataQuality":"good|fair|poor"}]}'
 
 const explainSchema = z.object({
   summary: z.string(),
@@ -166,13 +182,38 @@ async function isOverTenantDailyCeiling(restaurantId) {
   return used >= ceiling
 }
 
-/** Refund a reserved plan-usage unit when the LLM call did not produce a usable result. */
-async function refundAiUsage(restaurantId) {
-  try {
-    await incrementUsage(restaurantId, 'RESTAURANT', 'ai_requests_per_day', -1)
-  } catch {
-    // Best-effort — never fail the request because a refund could not be applied.
+function nextAiResetAt() {
+  const d = new Date()
+  d.setUTCHours(24, 0, 0, 0)
+  return d.toISOString()
+}
+
+function quotaLimitedDetails(usage = null) {
+  const resetAt = usage?.resetAt ?? nextAiResetAt()
+  const details = {
+    usageLimited: true,
+    resetAt,
+    source: 'heuristic',
+    usedLlm: false,
   }
+
+  if (usage?.meterType) {
+    details.aiUsage = {
+      meterType: usage.meterType,
+      periodType: usage.periodType,
+      current: usage.current,
+      limit: usage.limit,
+      resetAt,
+      trialPool: usage.trialPool === true,
+    }
+  }
+
+  return details
+}
+
+/** Refund a reserved plan-usage unit when the LLM call did not produce a usable result. */
+async function refundAiUsage(restaurantId, reservation) {
+  await refundReservedAiUsage(restaurantId, 'RESTAURANT', reservation)
 }
 
 /**
@@ -208,7 +249,7 @@ export async function explainReorderSuggestions(restaurantId, opts) {
 
   // Env-level safety ceiling (independent of plan limits).
   if (await isOverTenantDailyCeiling(restaurantId)) {
-    return { ...heuristicResult(), usageLimited: true }
+    return { ...heuristicResult(), ...quotaLimitedDetails() }
   }
 
   const payload = {
@@ -223,9 +264,9 @@ export async function explainReorderSuggestions(restaurantId, opts) {
   }
 
   // Reserve a plan-usage unit up front to avoid races; refund if the call fails.
-  const usage = await checkAndIncrementUsage(restaurantId, 'RESTAURANT', 'ai_requests_per_day', 1)
+  const usage = await reserveAiUsage(restaurantId, 'RESTAURANT', 1)
   if (!usage.allowed) {
-    return { ...heuristicResult(), usageLimited: true }
+    return { ...heuristicResult(), ...quotaLimitedDetails(usage) }
   }
 
   try {
@@ -238,7 +279,7 @@ export async function explainReorderSuggestions(restaurantId, opts) {
 
     const parsed = explainSchema.safeParse(result.data)
     if (!parsed.success) {
-      await refundAiUsage(restaurantId)
+      await refundAiUsage(restaurantId, usage)
       await logAiRequest({
         restaurantId,
         userId: opts.userId,
@@ -268,7 +309,7 @@ export async function explainReorderSuggestions(restaurantId, opts) {
 
     return { summary: parsed.data.summary, items: safeItems, source: 'llm', usedLlm: true }
   } catch (error) {
-    await refundAiUsage(restaurantId)
+    await refundAiUsage(restaurantId, usage)
     await logAiRequest({
       restaurantId,
       userId: opts.userId,
@@ -330,14 +371,14 @@ export async function parseReorderIntent(restaurantId, opts) {
 
   // Env-level safety ceiling (independent of plan limits) — fall back gracefully.
   if (await isOverTenantDailyCeiling(restaurantId)) {
-    return keywordFallback(true)
+    return { ...keywordFallback(true), resetAt: nextAiResetAt() }
   }
 
   // Reserve a plan-usage unit up front; on limit fall back to heuristics
   // (symmetric with explain — no hard error).
-  const usage = await checkAndIncrementUsage(restaurantId, 'RESTAURANT', 'ai_requests_per_day', 1)
+  const usage = await reserveAiUsage(restaurantId, 'RESTAURANT', 1)
   if (!usage.allowed) {
-    return keywordFallback(true)
+    return { ...keywordFallback(true), ...quotaLimitedDetails(usage) }
   }
 
   try {
@@ -361,7 +402,7 @@ export async function parseReorderIntent(restaurantId, opts) {
       }))
 
     if (!parsed.success) {
-      await refundAiUsage(restaurantId)
+      await refundAiUsage(restaurantId, usage)
       await logAiRequest({
         restaurantId,
         userId: opts.userId,
@@ -395,7 +436,7 @@ export async function parseReorderIntent(restaurantId, opts) {
       usedLlm: true,
     }
   } catch (error) {
-    await refundAiUsage(restaurantId)
+    await refundAiUsage(restaurantId, usage)
     await logAiRequest({
       restaurantId,
       userId: opts.userId,
@@ -407,5 +448,211 @@ export async function parseReorderIntent(restaurantId, opts) {
     })
     // Symmetric with explain: degrade to heuristic instead of throwing.
     return keywordFallback()
+  }
+}
+
+/**
+ * Map a context object into the normalize helper shape.
+ * @param {object} ctx
+ */
+function contextToNormalizeCtx(ctx) {
+  return {
+    productId: ctx.productId,
+    baseQuantity: ctx.baseSuggestedQuantity,
+    defaultSupplierId: ctx.defaultSupplierId,
+    supplierOptions: ctx.supplierOptions || [],
+    unit: ctx.productUnit,
+    moq: ctx.moq,
+    orderMultiple: ctx.orderMultiple,
+    leadTimeDays: ctx.leadTimeDays,
+    urgency: ctx.urgency,
+    confidence: ctx.forecast?.confidence,
+    summary: ctx.forecast?.explanation || ctx.reasonLabel,
+  }
+}
+
+/**
+ * Forecast/rule_based recommendation for contexts that skip or fail LLM.
+ * @param {object} ctx
+ * @param {string} fallbackReason
+ * @param {string[]} [extraWarnings]
+ */
+function fallbackForContext(ctx, fallbackReason, extraWarnings = []) {
+  const rec = buildForecastFallbackRecommendation(contextToNormalizeCtx(ctx), {
+    fallbackReason,
+    warnings: extraWarnings,
+  })
+  return {
+    ...rec,
+    suggestionId: ctx.suggestionId,
+    supplierName: ctx.supplierOptions?.[0]?.supplierName,
+  }
+}
+
+/**
+ * Batch LLM reorder *decisions* for eligible product contexts.
+ * Quota: one usage increment per batch call (not per product).
+ * Preserves explain/ask; does not place orders.
+ *
+ * @param {object[]} contexts - from buildReorderAiContexts
+ * @param {{ restaurantId: string, userId?: string }} opts
+ * @returns {Promise<{ recommendations: object[], usedLlm: boolean, usageLimited?: boolean }>}
+ */
+export async function generateReorderRecommendations(contexts, opts) {
+  const restaurantId = opts.restaurantId
+  const list = Array.isArray(contexts) ? contexts : []
+
+  if (list.length === 0) {
+    return { recommendations: [], usedLlm: false }
+  }
+
+  const llmEligible = []
+  const skipped = []
+  for (const ctx of list) {
+    if (ctx.eligibility?.skipLlm) {
+      skipped.push(fallbackForContext(ctx, ctx.eligibility.skipReason || 'insufficient_data'))
+    } else {
+      llmEligible.push(ctx)
+    }
+  }
+
+  if (llmEligible.length === 0) {
+    return { recommendations: skipped, usedLlm: false }
+  }
+
+  const aiPlatformOn = await isAiPlatformEnabledForTenant(restaurantId, 'RESTAURANT')
+  const provider = getAiProvider()
+
+  if (!isAiEnvEnabled() || !aiPlatformOn || !provider) {
+    const reason = !isAiEnvEnabled()
+      ? 'ai_disabled'
+      : !aiPlatformOn
+        ? 'ai_platform_off'
+        : 'no_provider'
+    logger.info('reorder AI recommend skipped gate', { restaurantId, reason })
+    return {
+      recommendations: [...skipped, ...llmEligible.map((ctx) => fallbackForContext(ctx, reason))],
+      usedLlm: false,
+    }
+  }
+
+  if (await isOverTenantDailyCeiling(restaurantId)) {
+    return {
+      recommendations: [
+        ...skipped,
+        ...llmEligible.map((ctx) => fallbackForContext(ctx, 'tenant_daily_ceiling')),
+      ],
+      usedLlm: false,
+      ...quotaLimitedDetails(),
+    }
+  }
+
+  const usage = await reserveAiUsage(restaurantId, 'RESTAURANT', 1)
+  if (!usage.allowed) {
+    return {
+      recommendations: [
+        ...skipped,
+        ...llmEligible.map((ctx) => fallbackForContext(ctx, 'usage_limited')),
+      ],
+      usedLlm: false,
+      ...quotaLimitedDetails(usage),
+    }
+  }
+
+  const started = Date.now()
+  try {
+    const payload = { products: toLlmContextPayload(llmEligible) }
+    const result = await provider.completeJson({
+      system: RECOMMEND_SYSTEM_PROMPT,
+      user: JSON.stringify(payload),
+      schemaHint: RECOMMEND_SCHEMA_HINT,
+    })
+
+    const parsed = parseReorderAiDecisionBatch(result.data)
+    if (!parsed.success) {
+      await refundAiUsage(restaurantId, usage)
+      await logAiRequest({
+        restaurantId,
+        userId: opts.userId,
+        endpoint: 'recommend',
+        tokensIn: result.tokensIn,
+        tokensOut: result.tokensOut,
+        latencyMs: result.latencyMs ?? Date.now() - started,
+        success: false,
+        errorCode: 'invalid_schema',
+      })
+      logger.info('reorder AI recommend malformed output', {
+        restaurantId,
+        productCount: llmEligible.length,
+        latencyMs: result.latencyMs,
+      })
+      return {
+        recommendations: [
+          ...skipped,
+          ...llmEligible.map((ctx) => fallbackForContext(ctx, 'invalid_schema')),
+        ],
+        usedLlm: false,
+      }
+    }
+
+    const byProduct = new Map(parsed.recommendations.map((d) => [String(d.productId), d]))
+    const normalized = llmEligible.map((ctx) => {
+      const decision = byProduct.get(String(ctx.productId))
+      const rec = normalizeReorderAiDecision(decision, contextToNormalizeCtx(ctx))
+      return {
+        ...rec,
+        suggestionId: ctx.suggestionId,
+        supplierName: ctx.supplierOptions?.[0]?.supplierName,
+      }
+    })
+
+    await logAiRequest({
+      restaurantId,
+      userId: opts.userId,
+      endpoint: 'recommend',
+      tokensIn: result.tokensIn,
+      tokensOut: result.tokensOut,
+      latencyMs: result.latencyMs ?? Date.now() - started,
+      success: true,
+    })
+
+    logger.info('reorder AI recommend succeeded', {
+      restaurantId,
+      productCount: llmEligible.length,
+      latencyMs: result.latencyMs,
+      tokensIn: result.tokensIn,
+      tokensOut: result.tokensOut,
+      aiCount: normalized.filter((r) => r.source === 'ai').length,
+    })
+
+    return {
+      recommendations: [...skipped, ...normalized],
+      usedLlm: true,
+    }
+  } catch (error) {
+    await refundAiUsage(restaurantId, usage)
+    await logAiRequest({
+      restaurantId,
+      userId: opts.userId,
+      endpoint: 'recommend',
+      tokensIn: 0,
+      tokensOut: 0,
+      latencyMs: Date.now() - started,
+      success: false,
+      errorCode: error.message?.slice(0, 120),
+    })
+    logger.info('reorder AI recommend failed', {
+      restaurantId,
+      error: error.message?.slice(0, 120),
+    })
+    return {
+      recommendations: [
+        ...skipped,
+        ...llmEligible.map((ctx) =>
+          fallbackForContext(ctx, 'llm_error', ['AI recommend failed; using forecast'])
+        ),
+      ],
+      usedLlm: false,
+    }
   }
 }

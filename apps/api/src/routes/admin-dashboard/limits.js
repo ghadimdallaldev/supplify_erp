@@ -33,6 +33,7 @@ import { clearActiveTenantCookie } from '../../lib/tenant-switch.js'
 import {
   defaultAddonUnitPrice,
   getActiveTenantAddons,
+  isAddonKeyCompatibleWithPlan,
   isAddonKeyValidForTenant,
 } from '../../lib/subscription-addons.js'
 import { getAllowedFeatureKeys, featureDisplayName } from '../../lib/feature-keys.js'
@@ -804,7 +805,19 @@ router.put('/tenants/:tenantType/:id/subscription-addons/:addonKey', async (req,
 
     const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
     const entitlements = await getEntitlements(tenantId, tenantType)
-    const planCode = entitlements?.plan?.code ?? 'gold'
+    const planCode = entitlements?.plan?.code ?? null
+
+    if (body.quantity > 0 && !isAddonKeyCompatibleWithPlan(addonKey, planCode)) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: "This add-on is not available for the tenant's current plan",
+        },
+        requestId: req.requestId,
+      })
+    }
 
     if (body.quantity === 0) {
       await query(

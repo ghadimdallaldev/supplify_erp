@@ -172,7 +172,7 @@
   },
   "org": {
     "title": "المؤسسة",
-    "upgradeDescription": "حسابات متعددة الفروع متاحة في Gold وما فوق. قم بترقية خطتك لإضافة مواقع.",
+    "upgradeDescription": "الحسابات متعددة الفروع متاحة في Scale. قم بترقية خطتك لإضافة مواقع.",
     "viewSubscription": "عرض الاشتراك",
     "loadingBranches": "جارٍ تحميل الفروع…",
     "addBranchAccount": "إضافة حساب فرع",

@@ -2,6 +2,7 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
 import { notifyTenantUsers } from './notification.service.js'
+import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
 
 const OPEN_STATUSES = ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE']
 
@@ -123,9 +124,23 @@ async function loadOpenInvoice(invoiceId, supplierId) {
 /**
  * Send a collections reminder to the restaurant tenant for one invoice.
  */
-export async function sendInvoiceReminder(invoiceId, supplierId, { kind = 'manual', userId } = {}) {
-  const invoice = await loadOpenInvoice(invoiceId, supplierId)
+export async function sendInvoiceReminder(
+  invoiceId,
+  supplierId,
+  { kind = 'manual', userId, enforceTenantLock = false } = {}
+) {
   const reminderKind = kind === 'manual' ? 'manual' : kind
+  if (
+    enforceTenantLock &&
+    !(await isTenantUnlockedForBackgroundWrites({
+      tenantId: supplierId,
+      tenantType: 'SUPPLIER',
+    }))
+  ) {
+    return { sent: false, skipped: true, reason: 'tenant_locked', invoiceId, reminderKind }
+  }
+
+  const invoice = await loadOpenInvoice(invoiceId, supplierId)
   const dedupKey = reminderKind === 'manual' ? `manual:${todayKey()}` : String(invoice.due_date)
 
   const logId = await claimReminderDedup({
@@ -211,6 +226,14 @@ export async function runCollectionsReminderCheck({ dryRun = false } = {}) {
       WHERE i.status = ANY($1::text[])
         AND i.balance_due > 0
         AND i.due_date = (${dueDateSql})
+        AND EXISTS (
+          SELECT 1
+          FROM subscription sub
+          WHERE sub.tenant_id = i.supplier_id
+            AND sub.tenant_type = 'SUPPLIER'
+            AND sub.status IN ('ACTIVE', 'TRIALING', 'PAST_DUE')
+            AND sub.account_locked_at IS NULL
+        )
         AND NOT EXISTS (
           SELECT 1 FROM invoice_reminder_log l
           WHERE l.invoice_id = i.id
@@ -232,7 +255,10 @@ export async function runCollectionsReminderCheck({ dryRun = false } = {}) {
       }
 
       try {
-        const result = await sendInvoiceReminder(invoice.id, invoice.supplier_id, { kind })
+        const result = await sendInvoiceReminder(invoice.id, invoice.supplier_id, {
+          kind,
+          enforceTenantLock: true,
+        })
         if (result.sent) {
           summary.sent += 1
           summary.byKind[kind].sent += 1

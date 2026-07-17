@@ -152,7 +152,7 @@ router.post(
             details: {
               current: currentFollowCount,
               limit: limitCheck.limit,
-              requiredPlan: limitCheck.limit === 2 ? 'Silver' : 'Gold',
+              requiredPlan: 'Growth',
             },
           },
           requestId: req.requestId,

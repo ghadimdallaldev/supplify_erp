@@ -114,6 +114,7 @@ function isKeycloakSetupError(error) {
 
 function invitationAcceptErrorStatus(error) {
   if (error.code === 'expired') return 410
+  if (error.code === 'USER_LIMIT_REACHED') return 403
   if (error instanceof WorkspaceMembershipError) return 409
   if (isKeycloakSetupError(error)) return 503
   if (error instanceof ValidationError || error.code === 'email_mismatch') return 400
@@ -122,6 +123,7 @@ function invitationAcceptErrorStatus(error) {
 
 function invitationAcceptErrorName(error) {
   if (error.code === 'expired') return 'INVITATION_EXPIRED'
+  if (error.code === 'USER_LIMIT_REACHED') return 'USER_LIMIT_REACHED'
   if (error instanceof WorkspaceMembershipError) return 'WORKSPACE_MEMBERSHIP_CONFLICT'
   if (error.code === 'email_mismatch') return 'INVITATION_EMAIL_MISMATCH'
   if (error.code === 'account_exists') return 'INVITATION_ACCOUNT_EXISTS'

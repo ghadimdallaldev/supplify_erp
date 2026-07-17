@@ -116,7 +116,7 @@ export async function createDefaultWarehouseForSupplier(client, supplier, db = q
 }
 
 /**
- * Create a default warehouse when the supplier's plan allows warehouses (Silver+).
+ * Create a default warehouse when the supplier's plan allows warehouses.
  * Skipped on Free registration; call when opening warehouse management after upgrade.
  */
 export async function ensureDefaultWarehouseForPaidSupplier(supplierId) {

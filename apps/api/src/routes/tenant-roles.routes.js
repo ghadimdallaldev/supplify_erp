@@ -7,7 +7,7 @@ import {
   requirePermission,
   requireAnyPermission,
 } from '../lib/rbac.js'
-import { requireFeature } from '../lib/subscription.js'
+import { assertTenantUserSeatAvailable, requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
@@ -428,6 +428,10 @@ router.post(
         organizationId: scope.organizationId,
       })
 
+      await assertTenantUserSeatAvailable(tenantId, tenantType, {
+        joiningUserId: targetUserId,
+      })
+
       await assignTenantUserRole({
         userId: targetUserId,
         roleId,
@@ -496,6 +500,18 @@ router.post(
           requestId: req.requestId,
         })
       }
+      if (error.code === 'USER_LIMIT_REACHED') {
+        return res.status(403).json({
+          ok: false,
+
+          data: null,
+
+          error: { name: 'USER_LIMIT_REACHED', message: error.message, details: error.limitCheck },
+
+          requestId: req.requestId,
+        })
+      }
+
       if (error instanceof ForbiddenError) {
         return res.status(403).json({
           ok: false,

@@ -3,6 +3,7 @@ import { logger } from '../lib/logger.js'
 import { listStaleGpsDeliveries } from '../lib/active-gps-deliveries.js'
 import { notifyTenantUsers } from '../services/notification.service.js'
 import { isGpsTrackingEnabled } from '../lib/delivery-tracking-payload.js'
+import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
 
 /**
  * Proactively alert suppliers when active delivery GPS goes stale.
@@ -18,6 +19,15 @@ export async function runStaleGpsAlertsJob({ dryRun = false } = {}) {
   let skipped = 0
 
   for (const delivery of stale) {
+    const unlocked = await isTenantUnlockedForBackgroundWrites({
+      tenantId: delivery.supplierId,
+      tenantType: 'SUPPLIER',
+    })
+    if (!unlocked) {
+      skipped++
+      continue
+    }
+
     const claim = await query(
       `
       INSERT INTO gps_stale_alert_log (order_id, supplier_id, driver_assignment_id, alert_date)

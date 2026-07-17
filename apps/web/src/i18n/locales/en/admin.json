@@ -118,7 +118,8 @@
       "impersonate": "Impersonate",
       "resetPassword": "Reset password",
       "changePlan": "Change plan"
-    }
+    },
+    "edit": "Edit"
   },
   "nav": {
     "brand": "Admin",
@@ -571,7 +572,7 @@
     "noAddonsDescription": "Grant an extra branch or warehouse below.",
     "decreaseQtyAriaLabel": "Decrease quantity",
     "increaseQtyAriaLabel": "Increase quantity",
-    "addonReasonPlaceholder": "e.g. Sales-approved Gold add-on pack",
+    "addonReasonPlaceholder": "e.g. Sales-approved Scale add-on pack",
     "noSubscriptionTitle": "No subscription data",
     "noSubscriptionDescription": "This tenant may not have an active or trialing subscription.",
     "planOverrideTitle": "Plan-tier limit override",
@@ -632,10 +633,10 @@
     "filterLabel": "Filter:",
     "createPlanTitle": "Create Plan",
     "editPlanTitle": "Edit Plan",
-    "codeLabel": "Code (e.g. free, silver)",
-    "codePlaceholder": "free",
+    "codeLabel": "Internal code",
+    "codePlaceholder": "custom_growth",
     "nameLabel": "Name",
-    "namePlaceholder": "Free",
+    "namePlaceholder": "Restaurant Growth",
     "tenantTypeLabel": "Tenant type",
     "descriptionLabel": "Description",
     "priceMonthLabel": "Price / month ($)",
@@ -648,7 +649,22 @@
     "featuresJsonLabel": "Features (JSON)",
     "noLimitsDefined": "No limits defined",
     "enterpriseActivationTitle": "Enterprise activation",
-    "enterpriseConfirmLabel": "I confirm Enterprise catalog activation"
+    "enterpriseConfirmLabel": "I confirm Enterprise catalog activation",
+    "createPlanButton": "Create Plan",
+    "createPlanDescription": "Add a tenant-specific restaurant or supplier plan. Public self-serve plans should remain Growth or Scale.",
+    "editPlanDescription": "Update database-driven pricing, limits, features, trial days, and catalog visibility for this plan.",
+    "editButton": "Edit",
+    "freeTrialBoundsHelp": "Trial catalog rows must keep trial days between 7 and 90.",
+    "editForFullDetails": "Edit plan for full details",
+    "limitsJsonHelp": "Use -1 for unlimited. Numbers stay numbers; booleans are not valid limit values.",
+    "featuresJsonHelp": "Use true/false, tier strings such as basic_kpis, or omit keys. Empty strings are rejected.",
+    "enterpriseActivationMessage": "Enterprise is admin-assigned only. Enabling the catalog row requires explicit confirmation.",
+    "invalidJson": "Invalid JSON",
+    "trialDaysBadge": "{{count}}d trial",
+    "monthSuffix": "/mo",
+    "yearSuffix": "/yr",
+    "limitsFeaturesCount": "{{limits}} limits · {{features}} features",
+    "unlimitedValueLabel": "∞ unlimited"
   },
   "tenants": {
     "searchAriaLabel": "Search tenants",

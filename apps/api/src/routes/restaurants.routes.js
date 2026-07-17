@@ -640,7 +640,7 @@ router.post('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   }
 })
 
-// Upload restaurant logo (Gold+ custom branding)
+// Upload restaurant logo when custom branding is available
 router.post(
   '/:id/logo',
   requireAuth,

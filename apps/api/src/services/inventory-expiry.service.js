@@ -2,6 +2,7 @@ import { query } from '../lib/db.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { computeExpiryStatus, mapLotRow } from '../lib/inventory-expiry-status.js'
 import { notifyTenantUsers } from './notification.service.js'
+import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
 
 const DEFAULT_THRESHOLD = 7
 
@@ -298,6 +299,14 @@ async function fetchExpiryCountsByRestaurant({ restaurantId = null } = {}) {
     FROM restaurant_inventory_lot l
     LEFT JOIN restaurant_inventory_settings s ON s.restaurant_id = l.restaurant_id
     WHERE l.is_archived = false
+      AND EXISTS (
+        SELECT 1
+        FROM subscription sub
+        WHERE sub.tenant_id = l.restaurant_id
+          AND sub.tenant_type = 'RESTAURANT'
+          AND sub.status IN ('ACTIVE', 'TRIALING', 'PAST_DUE')
+          AND sub.account_locked_at IS NULL
+      )
       ${restaurantFilter}
     GROUP BY l.restaurant_id, s.expiring_soon_days
     HAVING
@@ -326,6 +335,11 @@ export async function runExpiryReminderCheck({ restaurantId = null, dryRun = fal
   for (const row of countsByRestaurant) {
     const rid = row.restaurant_id
     const expiringSoonDays = row.expiring_soon_days ?? DEFAULT_THRESHOLD
+    const unlocked = await isTenantUnlockedForBackgroundWrites({
+      tenantId: rid,
+      tenantType: 'RESTAURANT',
+    })
+    if (!unlocked) continue
 
     if (row.expiring_soon_count > 0) {
       const dedupKey = `grouped:expiring:${todayKey}:${expiringSoonDays}`

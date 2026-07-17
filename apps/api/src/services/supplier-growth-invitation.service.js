@@ -5,6 +5,7 @@ import { generateInviteToken, buildInviteUrl, inviteExpiresAt } from './invitati
 import { sendTeamInvitationEmail } from './invitation-mail.service.js'
 import { notifyTenantUsers } from './notification/in-app.js'
 import { writeAuditLog } from '../lib/audit.js'
+import { assertSupplierActiveCustomerLocationCapacity } from '../lib/subscription.js'
 
 function addDays(date, days) {
   const d = new Date(date)
@@ -31,8 +32,12 @@ export async function createGrowthInvitation(supplierId, prospectId, { channel, 
   if (!prospects.length) throw new NotFoundError('Prospect not found')
   const prospect = prospects[0]
   if (prospect.match_status === 'existing_supplify') {
-    throw new ValidationError('Restaurant already on Supplify — use connection request instead')
+    throw new ValidationError('Restaurant already on Supplify - use connection request instead')
   }
+
+  await assertSupplierActiveCustomerLocationCapacity(supplierId, {
+    action: 'growth.invite_sent',
+  })
 
   const token = generateInviteToken()
   const expiresAt = addDays(new Date(), config.referralValidityDays || 90)

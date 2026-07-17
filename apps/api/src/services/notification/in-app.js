@@ -433,7 +433,7 @@ export async function sendNotification({
       })
     }
 
-    // Outbound webhook (Platinum tier) — best-effort, does not block the request.
+    // Outbound webhook for eligible plans; best-effort, does not block the request.
     if (channels.webhook && tenantId) {
       dispatchNotificationWebhook({
         tenantId,

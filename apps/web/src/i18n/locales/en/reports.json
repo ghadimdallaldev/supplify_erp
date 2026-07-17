@@ -172,7 +172,7 @@
   },
   "org": {
     "title": "Organization",
-    "upgradeDescription": "Multi-branch accounts are available on Gold and above. Upgrade your plan to add locations.",
+    "upgradeDescription": "Multi-branch accounts are available on Scale. Upgrade your plan to add locations.",
     "viewSubscription": "View subscription",
     "loadingBranches": "Loading branches…",
     "addBranchAccount": "Add branch account",

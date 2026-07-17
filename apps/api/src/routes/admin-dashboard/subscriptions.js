@@ -50,7 +50,11 @@ import {
   extendFreeSandboxTrial,
   unlockSubscriptionAccount,
 } from '../../lib/billing/billing-service.js'
-import { clampFreeTrialDays } from '../../lib/platform-settings.js'
+import {
+  FREE_TRIAL_MAX_DAYS,
+  FREE_TRIAL_MIN_DAYS,
+  clampFreeTrialDays,
+} from '../../lib/platform-settings.js'
 import {
   notifyBillingCancelled,
   notifyBillingPlanChanged,
@@ -656,7 +660,7 @@ router.patch('/subscriptions/:id', async (req, res) => {
 
 /**
  * POST /subscriptions/:id/extend-free-trial — extend Free Trial expiry and unlock.
- * Body: { days?: number } — clamped to 3–7 (platform default when omitted).
+ * Body: { days?: number } — clamped to platform bounds (platform default when omitted).
  */
 router.post('/subscriptions/:id/extend-free-trial', async (req, res) => {
   try {
@@ -664,13 +668,16 @@ router.post('/subscriptions/:id/extend-free-trial', async (req, res) => {
     const rawDays = req.body?.days ?? req.body?.freeTrialDays
     const days = rawDays !== undefined && rawDays !== null ? Number(rawDays) : undefined
 
-    if (days !== undefined && (!Number.isFinite(days) || days < 3 || days > 7)) {
+    if (
+      days !== undefined &&
+      (!Number.isFinite(days) || days < FREE_TRIAL_MIN_DAYS || days > FREE_TRIAL_MAX_DAYS)
+    ) {
       return res.status(400).json({
         ok: false,
         data: null,
         error: {
           name: 'VALIDATION_ERROR',
-          message: 'freeTrialDays must be between 3 and 7',
+          message: `freeTrialDays must be between ${FREE_TRIAL_MIN_DAYS} and ${FREE_TRIAL_MAX_DAYS}`,
         },
         requestId: req.requestId,
       })
@@ -772,7 +779,7 @@ router.post('/subscriptions/:id/extend-free-trial', async (req, res) => {
 
 /**
  * POST /subscriptions/:id/unlock — clear lock (overdue payment resolved or admin activation).
- * For expired Free Trial, also extends free_sandbox_expires_at (body: freeTrialDays 3–7).
+ * For expired Free Trial, also extends free_sandbox_expires_at (body: freeTrialDays within platform bounds).
  */
 router.post('/subscriptions/:id/unlock', async (req, res) => {
   try {
@@ -784,14 +791,16 @@ router.post('/subscriptions/:id/unlock', async (req, res) => {
 
     if (
       extendFreeTrialDays !== undefined &&
-      (!Number.isFinite(extendFreeTrialDays) || extendFreeTrialDays < 3 || extendFreeTrialDays > 7)
+      (!Number.isFinite(extendFreeTrialDays) ||
+        extendFreeTrialDays < FREE_TRIAL_MIN_DAYS ||
+        extendFreeTrialDays > FREE_TRIAL_MAX_DAYS)
     ) {
       return res.status(400).json({
         ok: false,
         data: null,
         error: {
           name: 'VALIDATION_ERROR',
-          message: 'freeTrialDays must be between 3 and 7',
+          message: `freeTrialDays must be between ${FREE_TRIAL_MIN_DAYS} and ${FREE_TRIAL_MAX_DAYS}`,
         },
         requestId: req.requestId,
       })

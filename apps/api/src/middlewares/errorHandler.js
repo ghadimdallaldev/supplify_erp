@@ -12,6 +12,10 @@ export function resolveHttpError(err) {
     statusCode = 400
     errorName = 'VALIDATION_ERROR'
     message = err.message
+  } else if (err.name === 'LimitExceededError' || err.code === 'LIMIT_EXCEEDED') {
+    statusCode = err.status || 403
+    errorName = 'LIMIT_EXCEEDED'
+    message = err.message || 'Plan limit exceeded'
   } else if (
     err.name === 'UnauthorizedError' ||
     err.name === 'JWTExpired' ||

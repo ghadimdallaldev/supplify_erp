@@ -422,7 +422,7 @@ export function AdminLimitsTab() {
         <>
           <AppPanel
             title={t('limits.tenantSummary')}
-            description={`${addonData.tenantName ?? selectedTenant?.name} · ${formatPlanCodeLabel(addonData.planCode)}`}
+            description={`${addonData.tenantName ?? selectedTenant?.name} · ${formatPlanCodeLabel(addonData.planCode, tenantType)}`}
             testId="admin-limits-tenant-summary"
           >
             <div className="space-y-3 text-sm">
@@ -659,7 +659,7 @@ export function AdminLimitsTab() {
                   <option value="">Select plan tier</option>
                   {plans.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {formatPlanCodeLabel(p.code)} ({p.name})
+                      {formatPlanCodeLabel(p.code, tenantType)} ({p.name})
                     </option>
                   ))}
                 </SelectTrigger>

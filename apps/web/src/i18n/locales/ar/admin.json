@@ -118,7 +118,8 @@
       "impersonate": "انتحال الهوية",
       "resetPassword": "إعادة تعيين كلمة المرور",
       "changePlan": "تغيير الخطة"
-    }
+    },
+    "edit": "تعديل"
   },
   "nav": {
     "brand": "الإدارة",
@@ -571,7 +572,7 @@
     "noAddonsDescription": "امنح فرعًا أو مستودعًا إضافيًا أدناه.",
     "decreaseQtyAriaLabel": "تقليل الكمية",
     "increaseQtyAriaLabel": "زيادة الكمية",
-    "addonReasonPlaceholder": "مثال: حزمة إضافية Gold معتمدة من المبيعات",
+    "addonReasonPlaceholder": "مثال: حزمة إضافية Scale معتمدة من المبيعات",
     "noSubscriptionTitle": "لا بيانات اشتراك",
     "noSubscriptionDescription": "قد لا يكون لهذا المستأجر اشتراك نشط أو تجريبي.",
     "planOverrideTitle": "تجاوز حد مستوى الخطة",
@@ -632,10 +633,10 @@
     "filterLabel": "فلتر:",
     "createPlanTitle": "إنشاء خطة",
     "editPlanTitle": "تعديل الخطة",
-    "codeLabel": "الرمز (مثل free، silver)",
-    "codePlaceholder": "free",
+    "codeLabel": "رمز داخلي",
+    "codePlaceholder": "custom_growth",
     "nameLabel": "الاسم",
-    "namePlaceholder": "Free",
+    "namePlaceholder": "Restaurant Growth",
     "tenantTypeLabel": "نوع المستأجر",
     "descriptionLabel": "الوصف",
     "priceMonthLabel": "السعر / شهر ($)",
@@ -648,7 +649,22 @@
     "featuresJsonLabel": "الميزات (JSON)",
     "noLimitsDefined": "لا حدود محددة",
     "enterpriseActivationTitle": "تفعيل Enterprise",
-    "enterpriseConfirmLabel": "أؤكد تفعيل كتالوج Enterprise"
+    "enterpriseConfirmLabel": "أؤكد تفعيل كتالوج Enterprise",
+    "createPlanButton": "إنشاء خطة",
+    "createPlanDescription": "أضف خطة خاصة بالمطاعم أو الموردين. يجب أن تبقى الخطط العامة ذاتية الخدمة ضمن Growth أو Scale.",
+    "editPlanDescription": "حدّث الأسعار والحدود والميزات وأيام التجربة وظهور الخطة من كتالوج قاعدة البيانات.",
+    "editButton": "تعديل",
+    "freeTrialBoundsHelp": "يجب أن تبقي صفوف كتالوج التجربة أيام التجربة بين 7 و90.",
+    "editForFullDetails": "عدّل الخطة لعرض كل التفاصيل",
+    "limitsJsonHelp": "استخدم -1 للقيم غير المحدودة. تبقى الأرقام أرقامًا؛ القيم المنطقية غير صالحة للحدود.",
+    "featuresJsonHelp": "استخدم true/false أو قيم مستويات مثل basic_kpis أو احذف المفاتيح. السلاسل الفارغة مرفوضة.",
+    "enterpriseActivationMessage": "Enterprise مخصص للإدارة فقط. يتطلب تفعيل صف الكتالوج تأكيدًا صريحًا.",
+    "invalidJson": "JSON غير صالح",
+    "trialDaysBadge": "تجربة {{count}} يوم",
+    "monthSuffix": "/شهر",
+    "yearSuffix": "/سنة",
+    "limitsFeaturesCount": "{{limits}} حدود · {{features}} ميزات",
+    "unlimitedValueLabel": "∞ غير محدود"
   },
   "tenants": {
     "searchAriaLabel": "البحث في المستأجرين",

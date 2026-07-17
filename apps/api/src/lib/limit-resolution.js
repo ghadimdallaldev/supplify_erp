@@ -31,12 +31,15 @@ export function stripHiddenEntitlementLimits(limits, usage, overrides = []) {
 export const SUPPLIER_LIMIT_KEYS = [
   'branches',
   'warehouses',
+  'active_customer_locations_monthly',
   'users',
+  'drivers',
   'supplier_products_skus',
   'chats_per_day',
   'open_conversations',
   'storage_mb',
   'promotions',
+  'ai_requests_per_day',
 ]
 
 export function limitKeysForTenantType(tenantType) {
@@ -86,7 +89,9 @@ export const FREE_TIER_LIMIT_PATCHES = {
   SUPPLIER: {
     branches: 1,
     warehouses: 0,
+    active_customer_locations_monthly: 0,
     users: 1,
+    drivers: 0,
     supplier_products_skus: 10,
     chats_per_day: 3,
     open_conversations: 1,
