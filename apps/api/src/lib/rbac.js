@@ -45,6 +45,7 @@ import {
   extractRefreshToken,
   isBearerAuthRequest,
 } from './mobile-auth.js'
+import { isBillingRecoveryPath } from './billing/billing-recovery-paths.js'
 
 export { extractBearerToken, extractAccessToken, isBearerAuthRequest } from './mobile-auth.js'
 
@@ -764,7 +765,11 @@ export function resolveTenantContext(req, res, next) {
       }
 
       const billingSub = await resolveRequestBillingSubscription(req, tenant)
-      if (billingSub?.status === 'SUSPENDED' && req.userData.role !== 'ADMIN') {
+      if (
+        billingSub?.status === 'SUSPENDED' &&
+        req.userData.role !== 'ADMIN' &&
+        !isBillingRecoveryPath(req.method, req)
+      ) {
         mark(req, 'tenantContext')
         return res.status(403).json({
           ok: false,
