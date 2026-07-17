@@ -137,7 +137,7 @@
     }
   },
   "activityLog": {
-    "locked": "Activity log is not on your plan. Upgrade to Gold or Platinum to view tenant audit history and exports.",
+    "locked": "Activity log is not on your plan. Upgrade to Scale to view tenant audit history and exports.",
     "title": "Activity log",
     "refresh": "Refresh",
     "clearFilters": "Clear filters",

@@ -17,7 +17,13 @@ import {
   HIDDEN_ENTITLEMENT_LIMIT_KEYS,
   isLimitKeyApplicable,
 } from '../limit-resolution.js'
-import { PLAN_TIER_ORDER, normalizePlanCode, formatPlanDisplayName } from '../plan-codes.js'
+import {
+  PLAN_TIER_ORDER,
+  defaultPaidPlanCodeForTenant,
+  formatPlanDisplayName,
+  formatTenantPlanDisplayName,
+  normalizePlanCode,
+} from '../plan-codes.js'
 import { countActiveBranchLocations, countActiveWarehouses } from '../plan-enforcement.js'
 import { getWarehouseSupplierColumn } from '../warehouse-helpers.js'
 import { resolveOrgBillingTenantId } from '../org-billing-tenant.js'
@@ -46,7 +52,7 @@ function subscriptionCacheKey(tenantId, tenantType) {
 }
 
 /**
- * Ensure tenant has an active subscription; if none, create one with the free plan.
+ * Ensure tenant has an active subscription; if none, create one with the trial/free compatibility plan row.
  * Used so suppliers and restaurants never hit "no subscription" (0/0 limits).
  * Run migration 0048 to backfill existing tenants; this handles new tenants created after.
  */
@@ -57,7 +63,7 @@ async function ensureTenantSubscription(tenantId, tenantType) {
   )
   if (plans.length === 0) {
     logger.warn(
-      'No Free plan found for tenant_type; run migration 0048 or seed subscription_plan',
+      'No internal trial plan found for tenant_type; run migrations or seed subscription_plan',
       {
         tenantId,
         tenantType,
@@ -204,7 +210,7 @@ export function getUpgradePathForTenant(tenantType) {
   return tenantType === 'SUPPLIER' ? '/app/settings?tab=plan' : DEFAULT_UPGRADE_PATH
 }
 
-/** Plan codes in tier order (free < silver < gold < platinum); exclude enterprise for self-serve */
+/** Internal compatibility plan codes in tier order; exclude enterprise for self-serve */
 const PLAN_ORDER = [...PLAN_TIER_ORDER]
 
 /** Reason codes for deterministic, explainable recommendations */
@@ -219,7 +225,7 @@ const REASON_CODES = {
 
 /**
  * Recommend a plan: deterministic, explainable. Always returns a result.
- * Picks lowest plan that resolves the issue; Free with no issue → Gold. If current is best → CURRENT_BEST.
+ * Picks lowest plan that resolves the issue; Free with no issue -> Growth. If current is best → CURRENT_BEST.
  * @param {Object} opts
  * @param {string} opts.tenantId - Tenant ID
  * @param {string} opts.tenantType - 'RESTAURANT' | 'SUPPLIER'
@@ -249,11 +255,13 @@ export async function recommendPlan({ tenantId, tenantType, blockedEvents = [] }
   })
 
   if (!entitlements) {
+    const defaultPlanCode = defaultPaidPlanCodeForTenant(tenantType)
+    const defaultPlanName = formatTenantPlanDisplayName(defaultPlanCode, tenantType)
     return buildResponse(
-      'gold',
-      'Gold',
+      defaultPlanCode,
+      defaultPlanName,
       REASON_CODES.FREE_DEFAULT,
-      'Upgrade to Gold to unlock full platform capabilities.',
+      `Start with ${defaultPlanName} to unlock production usage.`,
       { tenantType, currentPlanCode: 'free', blocked: { limitKeys: [], featureKeys: [] } },
       { resolvesLimits: [], unlocksFeatures: [] }
     )
@@ -367,8 +375,9 @@ export async function recommendPlan({ tenantId, tenantType, blockedEvents = [] }
 
   let recommendedIndex = minRecommendedIndex
   if (currentCode === 'free' && minRecommendedIndex <= effectiveCurrentIndex) {
-    const goldIdx = planRows.findIndex((p) => normalizePlanCode(p.code) === 'gold')
-    recommendedIndex = goldIdx >= 0 ? goldIdx : Math.min(1, planRows.length - 1)
+    const defaultPlanCode = defaultPaidPlanCodeForTenant(tenantType)
+    const defaultIdx = planRows.findIndex((p) => normalizePlanCode(p.code) === defaultPlanCode)
+    recommendedIndex = defaultIdx >= 0 ? defaultIdx : Math.min(1, planRows.length - 1)
   }
   if (
     recommendedIndex <= effectiveCurrentIndex &&
@@ -379,7 +388,11 @@ export async function recommendPlan({ tenantId, tenantType, blockedEvents = [] }
 
   const recommended = planRows[recommendedIndex]
   const recommendedPlanCode = normalizePlanCode(recommended?.code || 'gold')
-  const recommendedPlanName = formatPlanDisplayName(recommendedPlanCode, recommended?.name)
+  const recommendedPlanName = formatTenantPlanDisplayName(
+    recommendedPlanCode,
+    tenantType,
+    recommended?.name
+  )
   const isCurrentBest = recommendedPlanCode === currentCode
 
   const evidence = {
@@ -434,8 +447,7 @@ export async function recommendPlan({ tenantId, tenantType, blockedEvents = [] }
   else if (reasonCode === REASON_CODES.MULTIPLE_BLOCKS)
     reasonText = 'You have multiple limits and feature restrictions. Upgrading resolves them.'
   else if (reasonCode === REASON_CODES.FREE_DEFAULT)
-    reasonText =
-      'Gold is the default plan for real daily usage—unlock more orders, branches, and reports.'
+    reasonText = `Start with ${recommendedPlanName} to unlock production usage.`
   else reasonText = 'Upgrade to get more capacity and features.'
 
   return buildResponse(recommendedPlanCode, recommendedPlanName, reasonCode, reasonText, evidence, {
@@ -447,7 +459,7 @@ export async function recommendPlan({ tenantId, tenantType, blockedEvents = [] }
 /**
  * Get recommended plan names for a tenant type (for error payloads).
  * @param {string} tenantType - RESTAURANT | SUPPLIER
- * @returns {Promise<string[]>} Plan names (e.g. ['Silver', 'Gold', 'Platinum'])
+ * @returns {Promise<string[]>} Public plan names
  */
 export async function getRecommendedPlanNames(tenantType) {
   try {
@@ -455,9 +467,12 @@ export async function getRecommendedPlanNames(tenantType) {
       `SELECT code, name FROM subscription_plan WHERE tenant_type = $1 AND code != 'free' AND is_active = true ORDER BY display_order, name`,
       [tenantType]
     )
-    return rows.map((r) => formatPlanDisplayName(r.code, r.name))
+    return rows.map((r) => formatTenantPlanDisplayName(r.code, tenantType, r.name))
   } catch (e) {
-    if (e.code === '42703') return ['Silver', 'Gold', 'Platinum']
+    if (e.code === '42703') {
+      const fallbackCode = defaultPaidPlanCodeForTenant(tenantType)
+      return [formatTenantPlanDisplayName(fallbackCode, tenantType)]
+    }
     return []
   }
 }
@@ -492,7 +507,7 @@ export function buildLimitExceededPayload(
 import { isQuickListSchedulingEnabled } from '../quick-list-tier.js'
 
 /**
- * Whether the plan allows scheduled / automated quick lists (Silver+ tiers).
+ * Whether the plan allows scheduled / automated quick lists.
  */
 export function isQuickListAutomationEnabled(featureValue) {
   return isQuickListSchedulingEnabled(featureValue)

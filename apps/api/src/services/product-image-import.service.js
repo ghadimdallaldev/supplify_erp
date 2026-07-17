@@ -6,9 +6,10 @@ import yauzl from 'yauzl'
 import { query, withTransaction } from '../lib/db.js'
 import { config } from '../config/env.js'
 import { logger } from '../lib/logger.js'
-import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
+import { ValidationError, NotFoundError, ConflictError } from '../middlewares/errorHandler.js'
 import { ensureStorageForUpload } from '../lib/subscription.js'
 import { writeSystemAuditLog } from '../lib/audit.js'
+import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
 import {
   putObject,
   deleteObject,
@@ -772,6 +773,21 @@ export async function processImageImportJob(jobId) {
     return job
   }
 
+  if (
+    !(await isTenantUnlockedForBackgroundWrites({
+      tenantId: job.supplier_id,
+      tenantType: 'SUPPLIER',
+    }))
+  ) {
+    const error = new ConflictError('Supplier account is locked; image import was not processed.')
+    await updateJobProgress(jobId, {
+      status: 'failed',
+      errorMessage: error.message,
+      completedAt: new Date().toISOString(),
+    })
+    throw error
+  }
+
   await updateJobProgress(jobId, {
     status: 'processing',
     startedAt: job.started_at || new Date().toISOString(),
@@ -796,6 +812,15 @@ export async function processImageImportJob(jobId) {
     const entryIndex = await buildZipEntryIndex(zipfile)
 
     for (let offset = 0; offset < matches.length; offset += BATCH_SIZE) {
+      if (
+        !(await isTenantUnlockedForBackgroundWrites({
+          tenantId: job.supplier_id,
+          tenantType: 'SUPPLIER',
+        }))
+      ) {
+        throw new ConflictError('Supplier account is locked; image import was not processed.')
+      }
+
       if (await isJobCancelled(jobId)) {
         await updateJobProgress(jobId, {
           status: 'cancelled',

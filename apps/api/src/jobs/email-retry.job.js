@@ -2,9 +2,16 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { config } from '../config/env.js'
 import { sendEmail, sendTemplateEmail } from '../services/email/email.service.js'
+import { isTenantIdUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
 
 const DEFAULT_MAX_RETRIES = 3
 const BATCH_LIMIT = 50
+const LOCK_EXEMPT_EVENT_PREFIXES = ['billing', 'payment.', 'subscription.']
+
+function isLockExemptEmailEvent(eventType) {
+  const normalized = String(eventType || '').toLowerCase()
+  return LOCK_EXEMPT_EVENT_PREFIXES.some((prefix) => normalized.startsWith(prefix))
+}
 
 /**
  * Retry failed transactional emails that have a stored retry_payload.
@@ -30,6 +37,19 @@ export async function runEmailRetryJob({
         AND retry_count < $1
         AND created_at >= NOW() - ($2::int || ' days')::interval
         AND (last_retry_at IS NULL OR last_retry_at < NOW() - INTERVAL '1 hour')
+        AND (
+          tenant_id IS NULL
+          OR event_type LIKE 'billing%'
+          OR event_type LIKE 'payment.%'
+          OR event_type LIKE 'subscription.%'
+          OR EXISTS (
+            SELECT 1
+            FROM subscription sub
+            WHERE sub.tenant_id = email_delivery_log.tenant_id
+              AND sub.status IN ('ACTIVE', 'TRIALING', 'PAST_DUE')
+              AND sub.account_locked_at IS NULL
+          )
+        )
       ORDER BY created_at ASC
       LIMIT $3
       `,
@@ -39,12 +59,21 @@ export async function runEmailRetryJob({
     scanned = rows.length
 
     for (const row of rows) {
+      const payload = row.retry_payload || {}
+      const tenantId = payload.tenantId ?? row.tenant_id
+      if (tenantId && !isLockExemptEmailEvent(row.event_type)) {
+        const unlocked = await isTenantIdUnlockedForBackgroundWrites({ tenantId })
+        if (!unlocked) {
+          skipped++
+          continue
+        }
+      }
+
       if (dryRun || process.env.JOB_DRY_RUN === 'true') {
         retried++
         continue
       }
 
-      const payload = row.retry_payload
       const nextRetry = (row.retry_count || 0) + 1
       const retryEventKey = `${row.event_key}:retry:${nextRetry}`
 

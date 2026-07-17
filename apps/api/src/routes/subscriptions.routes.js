@@ -17,7 +17,8 @@ import {
   recommendPlan,
   resolveEffectivePlanFeatures,
 } from '../lib/subscription.js'
-import { formatPlanDisplayName } from '../lib/plan-codes.js'
+import { formatTenantPlanDisplayName } from '../lib/plan-codes.js'
+import { getAddonOptionsForPlan } from '../lib/subscription-addons.js'
 import {
   recordConversionEvent,
   ALLOWED_TYPES as CONVERSION_ALLOWED_TYPES,
@@ -117,7 +118,7 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
         tenantType: tenant.tenantType,
         plan: {
           id: null,
-          name: formatPlanDisplayName('free', 'Free'),
+          name: formatTenantPlanDisplayName('free', tenant.tenantType, 'Free'),
           code: 'free',
           tenant_type: tenant.tenantType,
           price_monthly: 0,
@@ -202,8 +203,9 @@ router.get('/current', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (
     // Normalize for frontend: plan_display_name -> plan_name, ensure limits/features are objects
     const subscriptionPayload = {
       ...subscription,
-      plan_name: formatPlanDisplayName(
+      plan_name: formatTenantPlanDisplayName(
         subscription.plan_code,
+        tenant.tenantType,
         subscription.plan_display_name || subscription.plan_name
       ),
       limits:
@@ -304,22 +306,43 @@ router.get('/plans', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (re
       })
     }
     let rows = []
+    let currentSubscription = null
     try {
+      currentSubscription = await getTenantSubscription(tenant.tenantId, tenant.tenantType)
+      const includeTrialPlan = (currentSubscription?.plan_code || '').toLowerCase() === 'free'
       const result = await query(
-        `SELECT id, code, name, limits, features, price_per_month, price_per_year
+        `SELECT id, code, name, description, limits, features, price_per_month, price_per_year, tenant_type, is_active, display_order, trial_days
          FROM subscription_plan
          WHERE tenant_type = $1 AND is_active = true
          ORDER BY display_order NULLS LAST, name`,
         [tenant.tenantType]
       )
-      rows = result.rows.filter((p) => (p.code || '').toLowerCase() !== 'enterprise')
+      rows = result.rows.filter((p) => {
+        const code = (p.code || '').toLowerCase()
+        if (code === 'enterprise') return false
+        if (code === 'free' && !includeTrialPlan) return false
+        return true
+      })
     } catch (e) {
       if (e.code !== '42P01') throw e
     }
     res.json({
       ok: true,
       data: {
-        plans: rows.map((p) => ({ ...p, limits: p.limits || {}, features: p.features || {} })),
+        plans: rows.map((p) => {
+          const monthly = Number(p.price_per_month || 0)
+          const yearly = Number(p.price_per_year || 0)
+          return {
+            ...p,
+            display_name: formatTenantPlanDisplayName(p.code, tenant.tenantType, p.name),
+            limits: p.limits || {},
+            features: p.features || {},
+            annual_savings: monthly > 0 && yearly > 0 ? monthly * 12 - yearly : 0,
+            trial_eligible: (p.code || '').toLowerCase() !== 'free',
+            current_plan: currentSubscription?.plan_id === p.id,
+            addon_options: getAddonOptionsForPlan(tenant.tenantType, p.code),
+          }
+        }),
       },
       error: null,
       requestId: req.requestId,

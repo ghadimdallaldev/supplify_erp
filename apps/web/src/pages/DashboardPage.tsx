@@ -94,9 +94,13 @@ export function DashboardPage() {
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: !shouldLoadTenantEntitlements,
   })
-  const smartReorderEnabled = featureEnabled(
-    entitlementsData?.entitlements?.features?.smart_reorder
-  )
+  const smartReorderFeatureValue = entitlementsData?.entitlements?.features?.smart_reorder
+  const smartReorderEnabled = featureEnabled(smartReorderFeatureValue)
+  // Provider-backed forecast capability; use the same gate as POST .../ai-recommend.
+  const smartReorderAiRecommendEligible =
+    smartReorderFeatureValue === true ||
+    smartReorderFeatureValue === 'full_90day_trends' ||
+    smartReorderFeatureValue === 'ai_forecast_seasonality'
   const { data: reorderSuggestions } = useGetReorderSuggestionsQuery(undefined, {
     skip: !isRestaurant || !smartReorderEnabled,
   })
@@ -356,6 +360,7 @@ export function DashboardPage() {
             financeInvoicesEnabled={financeInvoicesEnabled}
             lowStockItems={lowStockItems}
             smartReorderEnabled={smartReorderEnabled}
+            smartReorderAiRecommendEligible={smartReorderAiRecommendEligible}
             inventoryMgmtEnabled={inventoryMgmtEnabled}
             reorderSuggestions={reorderSuggestions}
             reorderRemindersData={reorderRemindersData}

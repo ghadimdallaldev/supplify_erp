@@ -3,7 +3,7 @@ import type { Product } from './products'
 
 export interface SubscriptionPlan {
   id: string
-  code: string // free, silver, gold, platinum
+  code: string // Internal compatibility code; public labels are tenant-aware.
   name: string
   description?: string
   price_per_month: number
@@ -64,6 +64,15 @@ export interface SubscriptionAddonEntitlement {
   endsAt: string | null
 }
 
+export interface AiUsageSummary {
+  meterType: string
+  periodType: 'daily' | 'trial_total' | string
+  current: number
+  limit: number | null
+  remaining: number | null
+  resetAt: string | null
+  trialPool: boolean
+}
 export interface Entitlements {
   tenantType: 'RESTAURANT' | 'SUPPLIER'
   tenantId: string
@@ -80,7 +89,7 @@ export interface Entitlements {
   features: Record<string, boolean | string>
   /** Raw plan catalog feature JSON (tier strings); use with isEntitlementFeatureEnabled when features is incomplete. */
   planFeatures?: Record<string, unknown>
-  /** How each feature in `features` was resolved (tenant override → global → plan → default). */
+  /** How each feature in `features` was resolved (tenant override -> global -> plan -> default). */
   featureSources?: Record<string, 'tenant_override' | 'global' | 'plan' | 'default'>
   limits: Record<string, number | null>
   baseLimits: Record<string, number | null>
@@ -99,6 +108,7 @@ export interface Entitlements {
   }>
   usage: Record<string, number>
   usageWindowMeta?: Record<string, { date?: string }>
+  aiUsage?: AiUsageSummary | null
   freeSandbox?: { expiresAt: string | null } | null
   /** Resolved smart_reorder tier and capability flags (restaurant). */
   smartReorder?: {
@@ -172,6 +182,7 @@ export interface BillingStatus {
     billingCycle?: string
     nextBillingDate?: string
     currentPeriodEnd?: string
+    trialTargetPlanId?: string | null
     autoRenew: boolean
   } | null
   access: BillingAccessState
@@ -179,11 +190,21 @@ export interface BillingStatus {
   defaultPaymentMethod: BillingPaymentMethod | null
   openInvoices: BillingInvoice[]
   amountDue: number
+  recurringTotal?: {
+    baseAmount: number
+    addonAmount: number
+    totalAmount: number
+  }
+  addons?: Array<{
+    key: string
+    quantity: number
+    unitPriceMonthly: number | null
+    status: string
+  }>
   gracePeriodDays: number
   availableGateways?: string[]
   gateways?: string[]
 }
-
 /** Plan recommendation from GET /api/subscriptions/recommendation */
 export interface PlanRecommendation {
   recommendedPlanCode: string

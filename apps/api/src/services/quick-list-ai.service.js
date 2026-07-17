@@ -8,12 +8,12 @@ import { getCachedForecasts, refreshIfStale } from './reorder-forecast-cache.ser
 import { getReorderAssistance } from './restaurant-reorder-assistance.service.js'
 
 /**
- * Apply forecast-based quantity adjustments to quick-list line items (Platinum).
+ * Apply forecast-based quantity adjustments to quick-list line items (Scale).
  * Returns adjusted items and an audit payload for quick_list_execution.ai_adjustments.
  *
  * @param {string} restaurantId
  * @param {object} quickList
- * @param {Array<object>} items — rows from quick_list_item join product
+ * @param {Array<object>} items - rows from quick_list_item join product
  * @param {{ quickListsFeatureValue?: unknown, smartReorderFeatureValue?: unknown }} opts
  */
 export async function applySmartQuantitiesToItems(restaurantId, quickList, items, opts = {}) {
@@ -120,7 +120,7 @@ export async function applySmartQuantitiesToItems(restaurantId, quickList, items
 }
 
 /**
- * Suggest add/update items for a quick list from reorder assistance (Platinum).
+ * Suggest add/update items for a quick list from reorder assistance (Scale).
  */
 export async function suggestQuickListItems(restaurantId, quickListId) {
   const { rows: lists } = await query(
@@ -133,7 +133,7 @@ export async function suggestQuickListItems(restaurantId, quickListId) {
   const eff = await getEffectiveFeaturesForTenant(restaurantId, 'RESTAURANT')
   const quickListsFeature = eff?.features?.quick_lists
   if (!hasQuickListCapability(quickListsFeature, 'aiSuggest')) {
-    throw new ValidationError('Smart list suggestions require the Platinum plan')
+    throw new ValidationError('Smart list suggestions are available on Scale')
   }
 
   const assistance = await getReorderAssistance(restaurantId, {
@@ -198,7 +198,7 @@ export async function applyQuickListSuggestions(restaurantId, quickListId, propo
 
   const eff = await getEffectiveFeaturesForTenant(restaurantId, 'RESTAURANT')
   if (!hasQuickListCapability(eff?.features?.quick_lists, 'aiSuggest')) {
-    throw new ValidationError('Smart list suggestions require the Platinum plan')
+    throw new ValidationError('Smart list suggestions are available on Scale')
   }
 
   const { rows: lists } = await query(

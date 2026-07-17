@@ -4,6 +4,7 @@ import type {
   ReorderAssistanceResponse,
   ReorderAiExplainResult,
   ReorderAiAskResult,
+  ReorderAiRecommendResponse,
 } from '../../../types'
 export const INVENTORY_IMPORT_CSV_TEMPLATE = `sku,quantity,reason
 RICE-5KG,25,Opening stock count
@@ -180,6 +181,34 @@ export const restaurantInventoryApi = api.injectEndpoints({
         body,
       }),
     }),
+    aiRecommendReorderAssistance: builder.mutation<
+      ReorderAiRecommendResponse,
+      { branchId?: string; productIds?: string[]; limit?: number } | void
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-inventory/reorder-assistance/ai-recommend',
+        method: 'POST',
+        body: body ?? {},
+      }),
+    }),
+    feedbackReorderAssistance: builder.mutation<
+      unknown,
+      {
+        productId: string
+        source: 'ai' | 'forecast' | 'rule_based'
+        actionTaken: 'accepted' | 'adjusted' | 'rejected' | 'not_needed' | 'incorrect' | 'snoozed'
+        recommendedQuantity?: number | null
+        finalQuantity?: number | null
+        selectedSupplierId?: string | null
+        feedbackReason?: string | null
+      }
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-inventory/reorder-assistance/feedback',
+        method: 'POST',
+        body,
+      }),
+    }),
     applyReorderAssistance: builder.mutation<
       { added: Array<{ productId: string; quickListId?: string; message: string }> },
       {
@@ -230,3 +259,6 @@ export const restaurantInventoryApi = api.injectEndpoints({
     }),
   }),
 })
+
+export const { useAiRecommendReorderAssistanceMutation, useFeedbackReorderAssistanceMutation } =
+  restaurantInventoryApi

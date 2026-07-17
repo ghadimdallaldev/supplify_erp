@@ -13,7 +13,7 @@ function platformHostname() {
 }
 
 /**
- * When the SPA is loaded on a verified Platinum custom domain, render the
+ * When the SPA is loaded on a verified custom domain, render the
  * supplier catalog at the site root instead of the main app shell.
  */
 export function CustomDomainCatalogHost({ children }: { children: ReactNode }) {

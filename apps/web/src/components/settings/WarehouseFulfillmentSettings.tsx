@@ -61,7 +61,7 @@ export function WarehouseFulfillmentSettings({ enabled }: Props) {
           Fulfillment mode
         </CardTitle>
         <CardDescription>
-          Enable multi-warehouse dispatch and preview routing rules (Gold+)
+          Enable multi-warehouse dispatch and preview routing rules (Supplier Scale)
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

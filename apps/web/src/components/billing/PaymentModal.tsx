@@ -180,7 +180,7 @@ export function PaymentModal() {
             {isPayOverdue ? 'Pay overdue balance' : `Subscribe to ${plan?.planName ?? 'plan'}`}
           </DialogTitle>
           <DialogDescription>
-            Secure checkout. Card details are tokenized by our payment provider — we never store
+            Secure checkout. Card details are tokenized by our payment provider - we never store
             full card numbers or CVV.
           </DialogDescription>
         </DialogHeader>
@@ -280,7 +280,7 @@ export function PaymentModal() {
                     />
                     <CreditCard className="h-4 w-4 text-[var(--text-muted)]" />
                     <span className="text-sm capitalize">
-                      {m.brand || m.type} •••• {m.last4}
+                      {m.brand || m.type} **** {m.last4}
                       {m.is_default && (
                         <span className="ms-2 text-xs text-[var(--text-muted)]">(default)</span>
                       )}
@@ -383,12 +383,12 @@ export function PaymentModal() {
               {busy ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin me-2" />
-                  Processing…
+                  Processing...
                 </>
               ) : isPayOverdue ? (
                 `Pay ${formatMoney(chargeAmount)} now`
               ) : isFreeCheckout ? (
-                'Activate free plan'
+                'Start trial'
               ) : (
                 `Pay ${formatMoney(chargeAmount)} & activate`
               )}

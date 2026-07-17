@@ -16,16 +16,27 @@ import {
   HIDDEN_ENTITLEMENT_LIMIT_KEYS,
   isLimitKeyApplicable,
 } from '../limit-resolution.js'
-import { PLAN_TIER_ORDER, normalizePlanCode, formatPlanDisplayName } from '../plan-codes.js'
+import {
+  PLAN_TIER_ORDER,
+  normalizePlanCode,
+  formatPlanDisplayName,
+  formatTenantPlanDisplayName,
+} from '../plan-codes.js'
 import { countActiveBranchLocations, countActiveWarehouses } from '../plan-enforcement.js'
 import { getWarehouseSupplierColumn } from '../warehouse-helpers.js'
 import { resolveOrgBillingTenantId } from '../org-billing-tenant.js'
 import {
   addonKeyForLimitKey,
   computeEffectiveWithAddons,
+  addonLimitIncrement,
   ENTERPRISE_BRANCH_THRESHOLD,
   getActiveTenantAddons,
 } from '../subscription-addons.js'
+import {
+  countActiveTenantLoginUsers,
+  countPendingTenantInvitations,
+  isActiveTenantLoginUser,
+} from '../user-seat-limits.js'
 import {
   getTenantSubscription,
   getRecommendedPlanNames,
@@ -34,22 +45,37 @@ import {
 } from './plans.js'
 import { resolveSmartReorderCapabilities } from '../smart-reorder-tier.js'
 import { isAiPlatformEnabledForTenant } from '../ai-platform.js'
-import { resolveEffectivePlanFeatures } from './free-trial-plan-features.js'
+import { getTrialTargetPlan, resolveEffectivePlanFeatures } from './free-trial-plan-features.js'
 
 export { HIDDEN_ENTITLEMENT_LIMIT_KEYS }
 export { normalizePlanCode, formatPlanDisplayName } from '../plan-codes.js'
 export { RESTAURANT_LIMIT_KEYS, SUPPLIER_LIMIT_KEYS, discoverLimitKeys }
 
-/** Plan limits with Free-tier fallbacks applied before enforcement. */
-function getEnforcementPlanLimits(subscription, tenantType) {
-  const limits = { ...(subscription.limits || {}) }
-  fillMissingFreeTierLimits(limits, tenantType, subscription.plan_code)
+/** Plan limits with trial-target and Free-tier fallbacks applied before enforcement. */
+async function resolveEnforcementPlanLimits(subscription, tenantType) {
+  const targetPlan = await getTrialTargetPlan(subscription)
+  const sourceLimits =
+    targetPlan?.limits && typeof targetPlan.limits === 'object'
+      ? targetPlan.limits
+      : subscription?.limits
+  const limits = { ...(sourceLimits || {}) }
+  fillMissingFreeTierLimits(limits, tenantType, subscription?.plan_code)
   return limits
+}
+
+const AI_TRIAL_METER_TYPE = 'ai_trial_requests_total'
+const AI_TRIAL_TOTAL_LIMITS = { RESTAURANT: 50, SUPPLIER: 100 }
+
+function isFreeTrialSubscription(subscription) {
+  return (
+    (subscription?.plan_code || '').toLowerCase() === 'free' &&
+    Boolean(subscription?.free_sandbox_expires_at)
+  )
 }
 
 /** Cache TTL for subscription data (seconds). Short enough to absorb burst traffic while staying fresh. */
 const SUBSCRIPTION_CACHE_TTL = 180
-/** Full entitlements payload (plan, limits, features, usage) — hot path on every app shell load. */
+/** Full entitlements payload (plan, limits, features, usage) - hot path on every app shell load. */
 const ENTITLEMENTS_CACHE_TTL = 300
 /**
  * Stale-while-revalidate: serve cached entitlements immediately on hit; usage counts may lag
@@ -117,7 +143,7 @@ export async function checkLimit(tenantId, tenantType, meterType) {
 
     // Resolve limit: tenant override > plan override > plan default (increase-only)
     const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
-    const planLimits = getEnforcementPlanLimits(subscription, tenantType)
+    const planLimits = await resolveEnforcementPlanLimits(subscription, tenantType)
     const resolved = await resolveEffectiveLimit({
       tenantId: billingTenantId,
       tenantType,
@@ -186,6 +212,9 @@ export async function checkLimit(tenantId, tenantType, meterType) {
         [tenantId]
       )
       current = parseInt(scheduledCount[0]?.count || 0)
+    } else if (meterType === 'active_customer_locations_monthly' && tenantType === 'SUPPLIER') {
+      const activeCustomers = await countSupplierActiveCustomerLocationsMonthly(tenantId)
+      current = activeCustomers.count
     } else if (meterType === 'supplier_products_skus' && tenantType === 'SUPPLIER') {
       const { rows: productCount } = await query(
         `
@@ -196,18 +225,14 @@ export async function checkLimit(tenantId, tenantType, meterType) {
         [tenantId]
       )
       current = parseInt(productCount[0]?.count || 0)
-    } else if (meterType === 'users' && tenantType === 'RESTAURANT') {
-      // Restaurant users = 1 (primary contact) + team members
-      const { rows: teamCount } = await query(
-        `
-        SELECT COUNT(*) as count FROM restaurant_team WHERE restaurant_id = $1
-      `,
+    } else if (meterType === 'drivers' && tenantType === 'SUPPLIER') {
+      const { rows: driverCount } = await query(
+        `SELECT COUNT(*) as count FROM drivers WHERE supplier_id = $1 AND is_active = true`,
         [tenantId]
       )
-      current = 1 + parseInt(teamCount[0]?.count || 0)
-    } else if (meterType === 'users' && tenantType === 'SUPPLIER') {
-      // Suppliers have single contact (no team table); count as 1
-      current = 1
+      current = parseInt(driverCount[0]?.count || 0)
+    } else if (meterType === 'users') {
+      current = await countActiveTenantLoginUsers(tenantId, tenantType)
     } else if (meterType === 'open_conversations') {
       if (tenantType === 'RESTAURANT') {
         const { rows: convCount } = await query(
@@ -283,7 +308,7 @@ export async function checkLimit(tenantId, tenantType, meterType) {
     }
   } catch (error) {
     logger.error('Check limit error:', error)
-    // Fail closed for countable meters — do not treat DB errors as unlimited
+    // Fail closed for countable meters - do not treat DB errors as unlimited
     return {
       current: 0,
       limit: 0,
@@ -395,7 +420,7 @@ export async function resolveDailyMeterEnforcementFromSubscription(
     return { subscription: null, resolved: null }
   }
   const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
-  const planLimits = getEnforcementPlanLimits(subscription, tenantType)
+  const planLimits = await resolveEnforcementPlanLimits(subscription, tenantType)
   const resolved = await resolveEffectiveLimit({
     tenantId: billingTenantId,
     tenantType,
@@ -535,6 +560,162 @@ export async function checkAndIncrementUsage(tenantId, tenantType, meterType, in
   }
 }
 
+async function incrementTrialAiUsageInTransaction(
+  client,
+  tenantId,
+  tenantType,
+  subscription,
+  increment
+) {
+  const limit = AI_TRIAL_TOTAL_LIMITS[tenantType] ?? 0
+  const inc = Number(increment) || 0
+  if (inc <= 0) return { allowed: true }
+
+  const periodStart = subscription.current_period_start || subscription.created_at || new Date()
+  const periodEnd = subscription.free_sandbox_expires_at || null
+  await client.query(
+    `INSERT INTO usage_meter (
+       tenant_id, tenant_type, meter_type, current_value, period_type,
+       period_start_date, period_end_date, limit_value
+     ) VALUES ($1, $2, $3, 0, 'Billing Cycle', $4::date, $5::date, $6)
+     ON CONFLICT (tenant_id, tenant_type, meter_type, period_start_date) DO NOTHING`,
+    [tenantId, tenantType, AI_TRIAL_METER_TYPE, periodStart, periodEnd, limit]
+  )
+
+  const { rows: updated } = await client.query(
+    `UPDATE usage_meter SET
+       current_value = current_value + $5,
+       last_updated = now(),
+       limit_value = $6,
+       is_over_limit = (current_value + $5) >= $6
+     WHERE tenant_id = $1
+       AND tenant_type = $2
+       AND meter_type = $3
+       AND period_start_date = $4::date
+       AND current_value + $5 <= $6
+     RETURNING current_value`,
+    [tenantId, tenantType, AI_TRIAL_METER_TYPE, periodStart, inc, limit]
+  )
+
+  if (updated.length) {
+    return {
+      allowed: true,
+      current: parseInt(updated[0].current_value, 10),
+      limit,
+      meterType: AI_TRIAL_METER_TYPE,
+      periodType: 'trial_total',
+      resetAt: periodEnd ? new Date(periodEnd).toISOString() : null,
+      trialPool: true,
+    }
+  }
+
+  const { rows } = await client.query(
+    `SELECT current_value FROM usage_meter
+     WHERE tenant_id = $1 AND tenant_type = $2 AND meter_type = $3 AND period_start_date = $4::date
+     FOR UPDATE`,
+    [tenantId, tenantType, AI_TRIAL_METER_TYPE, periodStart]
+  )
+  return {
+    allowed: false,
+    current: parseInt(rows[0]?.current_value || 0, 10),
+    limit,
+    meterType: AI_TRIAL_METER_TYPE,
+    periodType: 'trial_total',
+    resetAt: periodEnd ? new Date(periodEnd).toISOString() : null,
+    trialPool: true,
+  }
+}
+
+export async function reserveAiUsage(tenantId, tenantType = 'RESTAURANT', increment = 1) {
+  const subscription = await getTenantSubscription(tenantId, tenantType)
+  if (!subscription) return { allowed: false, current: 0, limit: 0 }
+
+  if (isFreeTrialSubscription(subscription)) {
+    return withTransaction((client) =>
+      incrementTrialAiUsageInTransaction(client, tenantId, tenantType, subscription, increment)
+    )
+  }
+
+  const usage = await checkAndIncrementUsage(tenantId, tenantType, 'ai_requests_per_day', increment)
+  return {
+    ...usage,
+    meterType: 'ai_requests_per_day',
+    periodType: 'daily',
+    resetAt: new Date(new Date().setUTCHours(24, 0, 0, 0)).toISOString(),
+    trialPool: false,
+  }
+}
+
+export async function refundReservedAiUsage(
+  tenantId,
+  tenantType = 'RESTAURANT',
+  reservation = null,
+  decrement = 1
+) {
+  const meterType = reservation?.meterType || 'ai_requests_per_day'
+  const subscription = await getTenantSubscription(tenantId, tenantType)
+  const periodStart =
+    meterType === AI_TRIAL_METER_TYPE && subscription
+      ? subscription.current_period_start || subscription.created_at || new Date()
+      : null
+
+  try {
+    await query(
+      `UPDATE usage_meter
+       SET current_value = GREATEST(0, current_value - $5),
+           last_updated = now(),
+           is_over_limit = CASE
+             WHEN limit_value IS NULL THEN false
+             ELSE GREATEST(0, current_value - $5) >= limit_value
+           END
+       WHERE tenant_id = $1
+         AND tenant_type = $2
+         AND meter_type = $3
+         AND period_start_date = COALESCE($4::date, CURRENT_DATE)`,
+      [tenantId, tenantType, meterType, periodStart, Math.max(1, Number(decrement) || 1)]
+    )
+  } catch {
+    // Best-effort only; never fail the caller because a refund could not be recorded.
+  }
+}
+
+export async function getAiUsageSummary(tenantId, tenantType = 'RESTAURANT') {
+  const subscription = await getTenantSubscription(tenantId, tenantType)
+  if (!subscription) return null
+
+  if (isFreeTrialSubscription(subscription)) {
+    const limit = AI_TRIAL_TOTAL_LIMITS[tenantType] ?? 0
+    const periodStart = subscription.current_period_start || subscription.created_at || new Date()
+    const { rows } = await query(
+      `SELECT current_value FROM usage_meter
+       WHERE tenant_id = $1 AND tenant_type = $2 AND meter_type = $3 AND period_start_date = $4::date`,
+      [tenantId, tenantType, AI_TRIAL_METER_TYPE, periodStart]
+    )
+    const current = parseInt(rows[0]?.current_value || 0, 10)
+    return {
+      meterType: AI_TRIAL_METER_TYPE,
+      periodType: 'trial_total',
+      current,
+      limit,
+      remaining: Math.max(0, limit - current),
+      resetAt: subscription.free_sandbox_expires_at
+        ? new Date(subscription.free_sandbox_expires_at).toISOString()
+        : null,
+      trialPool: true,
+    }
+  }
+
+  const daily = await checkLimit(tenantId, tenantType, 'ai_requests_per_day')
+  return {
+    meterType: 'ai_requests_per_day',
+    periodType: 'daily',
+    current: daily.current,
+    limit: daily.limit,
+    remaining: daily.limit == null ? null : Math.max(0, daily.limit - daily.current),
+    resetAt: new Date(new Date().setUTCHours(24, 0, 0, 0)).toISOString(),
+    trialPool: false,
+  }
+}
 /**
  * Increment usage meter
  * @param {string} tenantId - Tenant ID
@@ -548,7 +729,7 @@ export async function incrementUsage(tenantId, tenantType, meterType, increment 
     if (!subscription) return
 
     const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
-    const planLimits = getEnforcementPlanLimits(subscription, tenantType)
+    const planLimits = await resolveEnforcementPlanLimits(subscription, tenantType)
     const resolved = await resolveEffectiveLimit({
       tenantId: billingTenantId,
       tenantType,
@@ -591,6 +772,113 @@ export async function incrementUsage(tenantId, tenantType, meterType, increment 
 /** Fixed date for cumulative meters (e.g. storage_mb) - one row per tenant */
 const CUMULATIVE_PERIOD_DATE = '2000-01-01'
 
+const SUPPLIER_ACTIVE_CUSTOMER_ORDER_STATUSES = [
+  'ACKNOWLEDGED',
+  'PROCESSING',
+  'SHIPPED',
+  'DELIVERED',
+  'RECEIVED_PARTIAL',
+  'RECEIVED_FULL',
+  'RECEIVED_WITH_DISPUTE',
+  'INVOICED',
+  'COMPLETED',
+]
+
+async function resolveSupplierActiveCustomerLocationPeriod(supplierId) {
+  const { rows } = await query(
+    `SELECT current_period_start, current_period_end
+     FROM subscription
+     WHERE tenant_id = $1 AND tenant_type = 'SUPPLIER' AND status IN ('TRIALING', 'ACTIVE', 'PAST_DUE')
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [supplierId]
+  )
+  const sub = rows[0] || null
+  if (sub?.current_period_start && sub?.current_period_end) {
+    return {
+      start: sub.current_period_start,
+      end: sub.current_period_end,
+      source: 'subscription_period',
+      timezone: 'UTC',
+    }
+  }
+  return {
+    start: null,
+    end: null,
+    source: 'calendar_month_utc',
+    timezone: 'UTC',
+  }
+}
+
+export async function countSupplierActiveCustomerLocationsMonthly(supplierId) {
+  const period = await resolveSupplierActiveCustomerLocationPeriod(supplierId)
+  const params = [supplierId, SUPPLIER_ACTIVE_CUSTOMER_ORDER_STATUSES]
+  let periodSql = `date_trunc('month', now() AT TIME ZONE 'UTC') <= COALESCE(o.placed_at, o.created_at)
+      AND COALESCE(o.placed_at, o.created_at) < (date_trunc('month', now() AT TIME ZONE 'UTC') + INTERVAL '1 month')`
+  if (period.start && period.end) {
+    params.push(period.start, period.end)
+    periodSql = `COALESCE(o.placed_at, o.created_at) >= $3 AND COALESCE(o.placed_at, o.created_at) < $4`
+  }
+
+  const { rows } = await query(
+    `SELECT COUNT(DISTINCT COALESCE(o.branch_id, o.restaurant_id)) AS count
+     FROM customer_order o
+     JOIN order_item oi ON oi.order_id = o.id
+     WHERE oi.supplier_id = $1
+       AND o.status::text = ANY($2::text[])
+       AND ${periodSql}`,
+    params
+  )
+  return {
+    count: parseInt(rows[0]?.count || 0, 10),
+    period,
+  }
+}
+
+export async function assertSupplierActiveCustomerLocationCapacity(
+  supplierId,
+  { action = 'supplier_customer_activation' } = {}
+) {
+  const [limitCheck, subscription] = await Promise.all([
+    checkLimit(supplierId, 'SUPPLIER', 'active_customer_locations_monthly'),
+    getTenantSubscription(supplierId, 'SUPPLIER'),
+  ])
+
+  if (
+    !limitCheck.isUnlimited &&
+    limitCheck.limit != null &&
+    limitCheck.current >= limitCheck.limit
+  ) {
+    const { recordConversionEvent } = await import('../conversion-events.js')
+    recordConversionEvent(supplierId, 'SUPPLIER', 'BLOCKED_LIMIT', {
+      limitKey: 'active_customer_locations_monthly',
+      current: limitCheck.current,
+      limit: limitCheck.limit,
+      action,
+    }).catch(() => {})
+
+    const recommendedPlans = await getRecommendedPlanNames('SUPPLIER')
+    const payload = buildLimitExceededPayload(
+      limitCheck,
+      'active_customer_locations_monthly',
+      subscription?.plan_name || subscription?.plan_display_name,
+      recommendedPlans,
+      undefined,
+      'SUPPLIER'
+    )
+
+    const err = new Error(
+      'This supplier has reached its active customer locations limit for the current billing period.'
+    )
+    err.name = 'LimitExceededError'
+    err.code = 'LIMIT_EXCEEDED'
+    err.status = 403
+    err.details = payload.details
+    throw err
+  }
+
+  return limitCheck
+}
 /** Canonical limit keys re-exported from limit-resolution.js */
 
 /**
@@ -607,7 +895,6 @@ async function getUsageSnapshot(tenantId, tenantType) {
     const [
       inv,
       orders,
-      team,
       suppliers,
       storage,
       quickLists,
@@ -625,7 +912,6 @@ async function getUsageSnapshot(tenantId, tenantType) {
         `SELECT COUNT(*) as c FROM customer_order WHERE restaurant_id = $1 AND status = 'PLACED' AND DATE(placed_at) = CURRENT_DATE`,
         [tenantId]
       ),
-      query(`SELECT COUNT(*) as c FROM restaurant_team WHERE restaurant_id = $1`, [tenantId]),
       query(`SELECT COUNT(*) as c FROM supplier_follow WHERE restaurant_id = $1`, [tenantId]),
       query(
         `SELECT current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT' AND meter_type = 'storage_mb' AND period_start_date = $2`,
@@ -660,7 +946,7 @@ async function getUsageSnapshot(tenantId, tenantType) {
     ])
     usage.restaurant_inventory_skus = parseInt(inv.rows[0]?.c || 0)
     usage.orders_per_day = parseInt(orders.rows[0]?.c || 0)
-    usage.users = 1 + parseInt(team.rows[0]?.c || 0)
+    usage.users = await countActiveTenantLoginUsers(tenantId, tenantType)
     usage.branches = branchCount
     usage.suppliers_per_restaurant = parseInt(suppliers.rows[0]?.c || 0)
     usage.storage_mb = parseInt(storage.rows[0]?.current_value || 0)
@@ -672,10 +958,22 @@ async function getUsageSnapshot(tenantId, tenantType) {
       if (keys.includes(r.meter_type)) usage[r.meter_type] = parseInt(r.current_value || 0)
     })
   } else {
-    const [products, warehouseCount, branchCount, storage, meterRows] = await Promise.all([
+    const [
+      products,
+      warehouseCount,
+      branchCount,
+      activeCustomerLocations,
+      drivers,
+      storage,
+      meterRows,
+    ] = await Promise.all([
       query(`SELECT COUNT(*) as c FROM product WHERE supplier_id = $1`, [tenantId]),
       countActiveWarehouses(tenantId),
       countActiveBranchLocations(tenantId, 'SUPPLIER'),
+      countSupplierActiveCustomerLocationsMonthly(tenantId),
+      query(`SELECT COUNT(*) as c FROM drivers WHERE supplier_id = $1 AND is_active = true`, [
+        tenantId,
+      ]),
       query(
         `SELECT current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'SUPPLIER' AND meter_type = 'storage_mb' AND period_start_date = $2`,
         [tenantId, CUMULATIVE_PERIOD_DATE]
@@ -688,7 +986,9 @@ async function getUsageSnapshot(tenantId, tenantType) {
     usage.supplier_products_skus = parseInt(products.rows[0]?.c || 0)
     usage.warehouses = warehouseCount
     usage.branches = branchCount
-    usage.users = 1
+    usage.active_customer_locations_monthly = activeCustomerLocations.count
+    usage.drivers = parseInt(drivers.rows[0]?.c || 0)
+    usage.users = await countActiveTenantLoginUsers(tenantId, tenantType)
     usage.storage_mb = parseInt(storage.rows[0]?.current_value || 0)
     const [openConvRows, promoRows] = await Promise.all([
       query(
@@ -762,9 +1062,10 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
     if (!subscription) return null
 
     const limitKeys = limitKeysForTenantType(tenantType)
+    const planLimits = await resolveEnforcementPlanLimits(subscription, tenantType)
     const baseLimits = {}
     limitKeys.forEach((k) => {
-      const v = subscription.limits?.[k]
+      const v = planLimits?.[k]
       baseLimits[k] = v === -1 || v === null || v === undefined ? null : parseInt(v)
     })
 
@@ -779,7 +1080,7 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
         tenantType,
         limitKeys,
         planId: subscription.plan_id,
-        planLimits: subscription.limits || {},
+        planLimits,
       }),
       resolveAllFeaturesForTenant(billingTenantId, tenantType, effectivePlanFeatures),
       getActiveTenantAddons(billingTenantId, tenantType),
@@ -816,7 +1117,7 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
 
     fillMissingFreeTierLimits(limits, tenantType, subscription.plan_code)
     fillMissingFreeTierLimits(limitsBeforeAddons, tenantType, subscription.plan_code)
-    const addonBoosts = { branches: 0, warehouses: 0 }
+    const addonBoosts = { branches: 0, warehouses: 0, active_customer_locations_monthly: 0 }
     for (const a of activeAddons) {
       const qty = parseInt(a.quantity, 10) || 0
       if (a.addon_key === addonKeyForLimitKey(tenantType, 'branches')) {
@@ -825,8 +1126,11 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
       if (a.addon_key === addonKeyForLimitKey(tenantType, 'warehouses')) {
         addonBoosts.warehouses = qty
       }
+      if (a.addon_key === addonKeyForLimitKey(tenantType, 'active_customer_locations_monthly')) {
+        addonBoosts.active_customer_locations_monthly = qty * addonLimitIncrement(a.addon_key)
+      }
     }
-    for (const k of ['branches', 'warehouses']) {
+    for (const k of ['branches', 'warehouses', 'active_customer_locations_monthly']) {
       if (!isLimitKeyApplicable(tenantType, k)) continue
       const qty = addonBoosts[k] || 0
       if (limits[k] != null && qty > 0) {
@@ -856,6 +1160,11 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
         addonQuantity: boost,
         effective,
         current,
+        remaining: effective == null ? null : Math.max(0, effective - current),
+        percentUsed:
+          effective == null || effective <= 0 ? null : Math.round((current / effective) * 100),
+        warningThresholdReached:
+          effective != null && effective > 0 && current >= Math.floor(effective * 0.8),
         overIncludedLimit: included != null && current > included,
         overEffectiveLimit: effective != null && current > effective,
         enterpriseThreshold: ENTERPRISE_BRANCH_THRESHOLD,
@@ -872,6 +1181,31 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
         addonQuantity: boost,
         effective,
         current,
+        remaining: effective == null ? null : Math.max(0, effective - current),
+        percentUsed:
+          effective == null || effective <= 0 ? null : Math.round((current / effective) * 100),
+        warningThresholdReached:
+          effective != null && effective > 0 && current >= Math.floor(effective * 0.8),
+        overIncludedLimit: included != null && current > included,
+        overEffectiveLimit: effective != null && current > effective,
+      }
+    }
+    if (isLimitKeyApplicable(tenantType, 'active_customer_locations_monthly')) {
+      const included = limitsBeforeAddons.active_customer_locations_monthly
+      const boost = addonBoosts.active_customer_locations_monthly || 0
+      const effective = limits.active_customer_locations_monthly
+      const current = usage.active_customer_locations_monthly ?? 0
+      locationLimits.activeCustomerLocationsMonthly = {
+        included,
+        addonQuantity: boost / 50,
+        addonIncrement: 50,
+        effective,
+        current,
+        remaining: effective == null ? null : Math.max(0, effective - current),
+        percentUsed:
+          effective == null || effective <= 0 ? null : Math.round((current / effective) * 100),
+        warningThresholdReached:
+          effective != null && effective > 0 && current >= Math.floor(effective * 0.8),
         overIncludedLimit: included != null && current > included,
         overEffectiveLimit: effective != null && current > effective,
       }
@@ -882,6 +1216,13 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
       if (HIDDEN_ENTITLEMENT_LIMIT_KEYS.has(k)) return
       if (k === 'orders_per_day' || k === 'chats_per_day' || k === 'ai_requests_per_day')
         usageWindowMeta[k] = { date: new Date().toISOString().slice(0, 10) }
+      if (k === 'active_customer_locations_monthly' && tenantType === 'SUPPLIER')
+        usageWindowMeta[k] = {
+          period: 'monthly',
+          timezone: 'UTC',
+          definition:
+            'distinct restaurant branch or restaurant with accepted/fulfilled supplier order activity',
+        }
     })
 
     let smartReorder = null
@@ -908,8 +1249,9 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
       usesOrgBilling: billingTenantId !== tenantId,
       plan: {
         id: subscription.plan_id,
-        name: formatPlanDisplayName(
+        name: formatTenantPlanDisplayName(
           subscription.plan_code,
+          tenantType,
           subscription.plan_name || subscription.plan_display_name
         ),
         code: subscription.plan_code,
@@ -948,6 +1290,7 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
       })),
       usage,
       usageWindowMeta,
+      trialTargetPlanId: subscription.trial_target_plan_id || null,
       freeSandbox:
         (subscription.plan_code || '').toLowerCase() === 'free'
           ? {
@@ -1093,6 +1436,51 @@ export async function decrementUsage(tenantId, tenantType, meterType, decrement 
   } catch (error) {
     logger.error('Decrement usage error:', error)
     // Don't throw - usage tracking shouldn't fail operations
+  }
+}
+
+export async function assertTenantUserSeatAvailable(
+  tenantId,
+  tenantType,
+  { includePendingInvitations = false, joiningUserId = null } = {}
+) {
+  if (joiningUserId && (await isActiveTenantLoginUser(tenantId, tenantType, joiningUserId))) {
+    return {
+      current: await countActiveTenantLoginUsers(tenantId, tenantType),
+      pendingInvitations: 0,
+      projected: null,
+      limit: null,
+      alreadyMember: true,
+    }
+  }
+
+  const [limitCheck, pendingInvitations] = await Promise.all([
+    checkLimit(tenantId, tenantType, 'users'),
+    includePendingInvitations ? countPendingTenantInvitations(tenantId, tenantType) : 0,
+  ])
+
+  if (!limitCheck.isUnlimited && limitCheck.limit != null) {
+    const projected = Number(limitCheck.current || 0) + Number(pendingInvitations || 0)
+    if (projected >= Number(limitCheck.limit)) {
+      const err = new Error(
+        `This account has reached its plan limit of ${limitCheck.limit} active user seat(s). Upgrade the plan or remove an inactive invitation/user before adding another login.`
+      )
+      err.name = 'USER_LIMIT_REACHED'
+      err.code = 'USER_LIMIT_REACHED'
+      err.status = 403
+      err.limitCheck = {
+        ...limitCheck,
+        pendingInvitations,
+        projected,
+      }
+      throw err
+    }
+  }
+
+  return {
+    ...limitCheck,
+    pendingInvitations,
+    projected: Number(limitCheck.current || 0) + Number(pendingInvitations || 0),
   }
 }
 

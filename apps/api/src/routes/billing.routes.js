@@ -51,6 +51,7 @@ const checkoutSchema = z.object({
   paymentMethodId: z.string().uuid().optional(),
   idempotencyKey: z.string().min(8).max(128).optional(),
   provider: z.string().optional(),
+  trialTargetPlanId: z.string().uuid().optional(),
 })
 
 const payNowSchema = z.object({
@@ -279,12 +280,17 @@ router.post(
         paymentMethodId: body.paymentMethodId,
         idempotencyKey: body.idempotencyKey || `chk_${req.requestId}`,
         provider: body.provider,
+        trialTargetPlanId: body.trialTargetPlanId,
       })
       await writeAuditLog(req, {
         action_type: 'billing.checkout.completed',
         tenant_type: tenant.tenantType,
         tenant_id: tenant.tenantId,
-        payload_json: { planId: body.planId, billingCycle: body.billingCycle },
+        payload_json: {
+          planId: body.planId,
+          billingCycle: body.billingCycle,
+          trialTargetPlanId: body.trialTargetPlanId || null,
+        },
       })
       await invalidateTenantSubscriptionCache(tenant.tenantId, tenant.tenantType)
       res.json({ ok: true, data: result, error: null, requestId: req.requestId })

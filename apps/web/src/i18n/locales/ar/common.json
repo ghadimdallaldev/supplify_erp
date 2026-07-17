@@ -81,9 +81,14 @@
   },
   "toast": {
     "paymentReceivedAccountRestored": "تم استلام الدفع. تمت استعادة حسابك.",
-    "freePlanActive": "خطتك المجانية نشطة.",
-    "freePlanActiveTesting": "أنت الآن على خطة Free التجريبية. يمكنك الترقية في أي وقت للاستخدام الإنتاجي.",
+    "freePlanActive": "تجربتك نشطة.",
+    "freePlanActiveTesting": "تجربتك نشطة. يمكنك الترقية في أي وقت للاستخدام الإنتاجي.",
     "nowOnPlan": "أنت الآن على {{planName}}",
     "checkoutStartFailed": "تعذّر بدء الدفع لهذه الخطة. حاول مرة أخرى أو تواصل مع الدعم."
+  },
+  "upgradeModal": {
+    "startTrialOf": "ابدأ تجربة {{planName}}",
+    "recommendedPlanFallback": "الخطة الموصى بها",
+    "nextPlanFallback": "الخطة التالية"
   }
 }

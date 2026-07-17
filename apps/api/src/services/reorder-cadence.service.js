@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js'
+import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
 import { formatYmd } from '../lib/reservation-board-date.js'
 import {
   getDefaultTenantTimezone,
@@ -285,7 +286,19 @@ export async function runCadenceReminderCheck({ notify = true } = {}) {
       'SUPPLIER',
       'smart_reorder'
     )
-    if (!restaurantSmartReorder && !supplierSmartReorder) continue
+    const restaurantUnlocked =
+      restaurantSmartReorder &&
+      (await isTenantUnlockedForBackgroundWrites({
+        tenantId: cadence.restaurant_id,
+        tenantType: 'RESTAURANT',
+      }))
+    const supplierUnlocked =
+      supplierSmartReorder &&
+      (await isTenantUnlockedForBackgroundWrites({
+        tenantId: cadence.supplier_id,
+        tenantType: 'SUPPLIER',
+      }))
+    if (!restaurantUnlocked && !supplierUnlocked) continue
 
     const claim = await query(
       `
@@ -305,7 +318,7 @@ export async function runCadenceReminderCheck({ notify = true } = {}) {
     let restaurantNotified = false
     let supplierNotified = false
 
-    if (restaurantSmartReorder) {
+    if (restaurantUnlocked) {
       await notifyTenantUsers({
         tenantId: cadence.restaurant_id,
         tenantType: 'RESTAURANT',
@@ -319,7 +332,7 @@ export async function runCadenceReminderCheck({ notify = true } = {}) {
       restaurantNotified = true
     }
 
-    if (supplierSmartReorder) {
+    if (supplierUnlocked) {
       await notifyTenantUsers({
         tenantId: cadence.supplier_id,
         tenantType: 'SUPPLIER',

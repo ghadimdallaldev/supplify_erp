@@ -22,11 +22,13 @@ const LIMIT_LABELS: Record<string, string> = {
   quick_list_items: 'Quick list products',
   scheduled_quick_lists: 'Scheduled quick lists',
   chats_per_day: 'Daily chats',
-  supplier_products_skus: 'Products',
+  supplier_products_skus: 'Product SKUs',
   restaurant_inventory_skus: 'Inventory SKUs',
   branches: 'Branches',
   warehouses: 'Warehouses',
+  active_customer_locations_monthly: 'Active customer locations',
   users: 'Users',
+  drivers: 'Drivers',
   storage_mb: 'Storage',
   suppliers_per_restaurant: 'Suppliers',
 }
@@ -44,7 +46,7 @@ export function LimitExceededBanner({
   const user = useAppSelector((state) => state.auth.user)
   const label = LIMIT_LABELS[limitKey] || limitKey.replace(/_/g, ' ')
   const upgradeCopy = getLimitUpgradeCopy(limitKey)
-  const planToUnlock = upgradeCopy?.plan ?? recommendedPlans[0] ?? 'Gold'
+  const planToUnlock = upgradeCopy?.plan ?? recommendedPlans[0] ?? 'Scale'
   const valueProp = upgradeCopy?.value
   const resolvedUpgradeUrl = resolveUpgradeUrl(upgradeUrl, null, user?.role)
 
