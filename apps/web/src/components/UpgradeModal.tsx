@@ -451,14 +451,14 @@ export function UpgradeModal() {
             {showPlans && (
               <div className="overflow-x-auto rounded-xl border border-[var(--app-border)]">
                 <div
-                  className="min-w-[min(100%,28rem)]"
+                  className="w-full"
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: `minmax(7.5rem,1.2fr) repeat(${colCount}, minmax(8.5rem,1fr))`,
+                    gridTemplateColumns: `minmax(9rem, 11.5rem) repeat(${colCount}, minmax(0, 1fr))`,
                   }}
                 >
                   {/* Corner + plan headers */}
-                  <div className="border-b border-[var(--app-border)] bg-[var(--bg)] p-3 sm:p-4">
+                  <div className="sticky start-0 z-[1] border-b border-[var(--app-border)] bg-[var(--bg)] p-3 sm:p-4">
                     <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
                       Compare
                     </p>
@@ -557,7 +557,7 @@ export function UpgradeModal() {
                   {showComparison &&
                     limitKeys.map((key) => (
                       <div key={`limit-${key}`} className="contents">
-                        <div className="border-b border-[var(--app-border)] p-2.5 text-xs text-[var(--text-muted)] sm:p-3">
+                        <div className="sticky start-0 z-[1] border-b border-[var(--app-border)] bg-[var(--surface)] p-2.5 text-xs font-medium text-[var(--text-mid)] sm:p-3">
                           {LIMIT_KEY_LABELS[key] ?? key}
                         </div>
                         {plans.map((plan) => {
@@ -576,7 +576,7 @@ export function UpgradeModal() {
                             <div
                               key={`${plan.code}-${key}`}
                               className={cn(
-                                'border-b border-s border-[var(--app-border)] p-2.5 text-center text-xs sm:p-3',
+                                'border-b border-s border-[var(--app-border)] p-2.5 text-center text-sm tabular-nums sm:p-3',
                                 isCurrent &&
                                   'bg-[var(--brand-ultra)] font-semibold text-[var(--brand-mid)]',
                                 better && 'font-medium text-emerald-700',
@@ -594,7 +594,7 @@ export function UpgradeModal() {
                   {showComparison &&
                     featureKeys.map((key) => (
                       <div key={`feature-${key}`} className="contents">
-                        <div className="border-b border-[var(--app-border)] p-2.5 text-xs text-[var(--text-muted)] last:border-b-0 sm:p-3">
+                        <div className="sticky start-0 z-[1] border-b border-[var(--app-border)] bg-[var(--surface)] p-2.5 text-xs font-medium text-[var(--text-mid)] last:border-b-0 sm:p-3">
                           {FEATURE_KEY_LABELS[key] ?? key}
                         </div>
                         {plans.map((plan) => {
@@ -620,22 +620,19 @@ export function UpgradeModal() {
                                 <>
                                   <Check
                                     className={cn(
-                                      'h-3.5 w-3.5',
-                                      isCurrent
-                                        ? 'text-[var(--brand-mid)]'
-                                        : better
-                                          ? 'text-emerald-600'
-                                          : 'text-[var(--text-muted)]'
+                                      'h-4 w-4',
+                                      isCurrent ? 'text-[var(--brand-mid)]' : 'text-emerald-600'
                                     )}
+                                    strokeWidth={2.5}
                                   />
                                   {cell.caption && (
-                                    <span className="text-center text-[9px] leading-tight text-[var(--text-muted)]">
+                                    <span className="max-w-[6.5rem] text-center text-[10px] leading-tight text-[var(--text-muted)]">
                                       {cell.caption}
                                     </span>
                                   )}
                                 </>
                               ) : (
-                                <Minus className="h-3.5 w-3.5 text-[var(--app-border-mid)]" />
+                                <Minus className="h-4 w-4 text-[var(--app-border-mid)]" />
                               )}
                             </div>
                           )
