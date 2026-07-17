@@ -1,6 +1,7 @@
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { isFeatureEnabled } from '../lib/subscription.js'
+import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
 import { config } from '../config/env.js'
 import { sendTemplateEmail } from './email/email.service.js'
 import { sendWhatsAppMessage } from './whatsapp.service.js'
@@ -93,6 +94,13 @@ async function isWaitlistAutoPromoEnabled(restaurantId) {
 }
 
 async function offerNextWaitlistEntryIfEnabled(args) {
+  const unlocked = await isTenantUnlockedForBackgroundWrites({
+    tenantId: args.restaurantId,
+    tenantType: 'RESTAURANT',
+  })
+  if (!unlocked) {
+    return null
+  }
   if (!(await isWaitlistAutoPromoEnabled(args.restaurantId))) {
     return null
   }

@@ -11,6 +11,11 @@ import {
 } from './constants.js'
 import { clampFreeTrialDays, getFreeSandboxDays } from '../platform-settings.js'
 import { formatPlanDisplayName } from '../plan-codes.js'
+import {
+  annualizeAddonMonthlyAmount,
+  defaultAddonUnitPrice,
+  getActiveTenantAddons,
+} from '../subscription-addons.js'
 import { t, resolveLocale } from '../../i18n/index.js'
 
 function addDays(date, days) {
@@ -159,7 +164,7 @@ export function buildPlatformAdminBillingStatus(gateways = []) {
 }
 
 export async function getBillingStatus(tenantId, tenantType) {
-  // Subscription (cached), payment methods, and open invoices are all independent — fetch in parallel.
+  // Subscription (cached), payment methods, and open invoices are all independent Ã¢â‚¬â€ fetch in parallel.
   let subscription, paymentMethods, openInvoices, defaultPaymentMethod
   try {
     const [sub, pmRes, invRes] = await Promise.all([
@@ -192,6 +197,18 @@ export async function getBillingStatus(tenantId, tenantType) {
   }
 
   const access = computeBillingAccessState(subscription)
+  const activeAddons = subscription ? await getActiveTenantAddons(tenantId, tenantType) : []
+  const recurringTotal = subscription
+    ? calculateRecurringSubscriptionTotal(
+        {
+          code: subscription.plan_code,
+          price_per_month: subscription.price_per_month,
+          price_per_year: subscription.price_per_year,
+        },
+        subscription.billing_cycle || 'MONTHLY',
+        activeAddons
+      )
+    : { baseAmount: 0, addonAmount: 0, totalAmount: 0 }
 
   const amountDue = openInvoices.reduce((sum, inv) => sum + Number(inv.amount || 0), 0)
 
@@ -206,6 +223,7 @@ export async function getBillingStatus(tenantId, tenantType) {
           billingCycle: subscription.billing_cycle,
           nextBillingDate: subscription.next_billing_date,
           currentPeriodEnd: subscription.current_period_end,
+          trialTargetPlanId: subscription.trial_target_plan_id || null,
           autoRenew: subscription.auto_renew !== false,
         }
       : null,
@@ -214,6 +232,16 @@ export async function getBillingStatus(tenantId, tenantType) {
     defaultPaymentMethod,
     openInvoices,
     amountDue,
+    recurringTotal,
+    addons: activeAddons.map((addon) => ({
+      key: addon.addon_key,
+      quantity: parseInt(addon.quantity, 10) || 0,
+      unitPriceMonthly:
+        addon.unit_price_monthly != null
+          ? Number(addon.unit_price_monthly)
+          : defaultAddonUnitPrice(addon.addon_key, subscription?.plan_code),
+      status: addon.status,
+    })),
     gracePeriodDays: GRACE_PERIOD_DAYS,
     availableGateways: [process.env.BILLING_GATEWAY || 'stub'],
   }
@@ -307,16 +335,50 @@ function resolvePlanAmount(plan, billingCycle) {
   return Number(plan.price_per_month) || 0
 }
 
+export function calculateAddonRecurringAmount(addons = [], planCode, billingCycle = 'MONTHLY') {
+  return addons.reduce((sum, addon) => {
+    const qty = parseInt(addon.quantity, 10) || 0
+    if (qty <= 0) return sum
+    const monthly =
+      addon.unit_price_monthly != null
+        ? Number(addon.unit_price_monthly)
+        : Number(defaultAddonUnitPrice(addon.addon_key, planCode) || 0)
+    if (!monthly || monthly <= 0) return sum
+    const amount = billingCycle === 'YEARLY' ? annualizeAddonMonthlyAmount(monthly) : monthly
+    return sum + amount * qty
+  }, 0)
+}
+
+export function calculateRecurringSubscriptionTotal(plan, billingCycle = 'MONTHLY', addons = []) {
+  const baseAmount = resolvePlanAmount(plan, billingCycle)
+  const addonAmount = calculateAddonRecurringAmount(addons, plan?.code, billingCycle)
+  return {
+    baseAmount,
+    addonAmount,
+    totalAmount: baseAmount + addonAmount,
+  }
+}
+
 async function createOpenInvoice(
   client,
-  { subscription, tenantId, tenantType, amount, billingCycle, plan, periodStart, periodEnd }
+  {
+    subscription,
+    tenantId,
+    tenantType,
+    amount,
+    billingCycle,
+    plan,
+    periodStart,
+    periodEnd,
+    metadata = {},
+  }
 ) {
   const dueDate = new Date()
   const { rows } = await client.query(
     `INSERT INTO billing_invoice (
       subscription_id, tenant_id, tenant_type, invoice_number, amount, currency,
-      billing_cycle, plan_id, plan_name, status, period_start, period_end, due_date
-    ) VALUES ($1, $2, $3, $4, $5, 'USD', $6, $7, $8, 'OPEN', $9, $10, $11)
+      billing_cycle, plan_id, plan_name, status, period_start, period_end, due_date, metadata
+    ) VALUES ($1, $2, $3, $4, $5, 'USD', $6, $7, $8, 'OPEN', $9, $10, $11, $12)
     RETURNING *`,
     [
       subscription.id,
@@ -330,6 +392,7 @@ async function createOpenInvoice(
       periodStart,
       periodEnd,
       dueDate,
+      JSON.stringify(metadata || {}),
     ]
   )
   return rows[0]
@@ -346,6 +409,7 @@ export async function checkoutSubscription({
   paymentMethodId,
   idempotencyKey,
   provider,
+  trialTargetPlanId = null,
 }) {
   const { rows: planRows } = await query(
     `SELECT * FROM subscription_plan WHERE id = $1 AND tenant_type = $2 AND is_active = true`,
@@ -356,12 +420,7 @@ export async function checkoutSubscription({
   }
   const plan = planRows[0]
   if ((plan.code || '').toLowerCase() === 'free') {
-    return applyFreePlan(tenantId, tenantType, plan)
-  }
-
-  const amount = resolvePlanAmount(plan, billingCycle)
-  if (amount <= 0) {
-    throw Object.assign(new Error('Plan has no price configured'), { name: 'BAD_REQUEST' })
+    return applyFreePlan(tenantId, tenantType, plan, { trialTargetPlanId })
   }
 
   const subscription = await getSubscriptionForBilling(tenantId, tenantType)
@@ -369,6 +428,12 @@ export async function checkoutSubscription({
     throw Object.assign(new Error('No subscription found'), { name: 'NOT_FOUND' })
   }
   const previousPlanId = subscription.plan_id
+  const activeAddons = await getActiveTenantAddons(tenantId, tenantType)
+  const recurringTotal = calculateRecurringSubscriptionTotal(plan, billingCycle, activeAddons)
+  const amount = recurringTotal.totalAmount
+  if (amount <= 0) {
+    throw Object.assign(new Error('Plan has no price configured'), { name: 'BAD_REQUEST' })
+  }
 
   const periodStart = new Date()
   const periodEnd = billingCycle === 'YEARLY' ? addDays(periodStart, 365) : addDays(periodStart, 30)
@@ -402,6 +467,18 @@ export async function checkoutSubscription({
       plan,
       periodStart,
       periodEnd,
+      metadata: {
+        baseAmount: recurringTotal.baseAmount,
+        addonAmount: recurringTotal.addonAmount,
+        addons: activeAddons.map((addon) => ({
+          key: addon.addon_key,
+          quantity: parseInt(addon.quantity, 10) || 0,
+          unitPriceMonthly:
+            addon.unit_price_monthly != null
+              ? Number(addon.unit_price_monthly)
+              : defaultAddonUnitPrice(addon.addon_key, plan.code),
+        })),
+      },
     })
 
     const paymentResult = await processInvoicePayment(client, {
@@ -471,14 +548,43 @@ export async function checkoutSubscription({
   })
 }
 
-async function applyFreePlan(tenantId, tenantType, plan) {
+async function resolveTrialTargetPlan(tenantType, trialTargetPlanId) {
+  if (trialTargetPlanId) {
+    const { rows } = await query(
+      `SELECT id, code, name, price_per_month, price_per_year
+       FROM subscription_plan
+       WHERE id = $1 AND tenant_type = $2 AND is_active = true
+         AND code NOT IN ('free', 'enterprise')
+         AND COALESCE(requires_admin_assignment, false) = false
+       LIMIT 1`,
+      [trialTargetPlanId, tenantType]
+    )
+    if (!rows.length) {
+      throw Object.assign(new Error('Trial target plan not found'), { name: 'NOT_FOUND' })
+    }
+    return rows[0]
+  }
+
+  const { rows } = await query(
+    `SELECT id, code, name, price_per_month, price_per_year
+     FROM subscription_plan
+     WHERE tenant_type = $1 AND code = $2 AND is_active = true
+     LIMIT 1`,
+    [tenantType, tenantType === 'RESTAURANT' ? 'silver' : 'gold']
+  )
+  return rows[0] || null
+}
+
+async function applyFreePlan(tenantId, tenantType, plan, { trialTargetPlanId = null } = {}) {
   const subscription = await getSubscriptionForBilling(tenantId, tenantType)
   if (!subscription) return null
   const wasPendingActivation = subscription.lock_reason === LOCK_REASON_PENDING_ACTIVATION
   const sandboxDays = await getFreeSandboxDays()
+  const targetPlan = await resolveTrialTargetPlan(tenantType, trialTargetPlanId)
   await query(
     `UPDATE subscription SET
       plan_id = $1, plan_name = $2, status = 'ACTIVE', billing_cycle = 'MONTHLY',
+      trial_target_plan_id = COALESCE($5, trial_target_plan_id),
       past_due_since = NULL, grace_period_ends_at = NULL,
       account_locked_at = NULL,
       lock_reason = NULL,
@@ -486,7 +592,7 @@ async function applyFreePlan(tenantId, tenantType, plan) {
       current_period_start = now(), current_period_end = now() + INTERVAL '1 month',
       next_billing_date = NULL, updated_at = now()
      WHERE id = $3`,
-    [plan.id, plan.name, subscription.id, sandboxDays]
+    [plan.id, plan.name, subscription.id, sandboxDays, targetPlan?.id || null]
   )
   if (wasPendingActivation) {
     await query(
@@ -496,7 +602,12 @@ async function applyFreePlan(tenantId, tenantType, plan) {
         subscription.id,
         tenantId,
         tenantType,
-        JSON.stringify({ planCode: plan.code, unlockedBy: 'free_plan' }),
+        JSON.stringify({
+          planCode: plan.code,
+          unlockedBy: 'free_plan',
+          trialTargetPlanId: targetPlan?.id || null,
+          trialTargetPlanCode: targetPlan?.code || null,
+        }),
       ]
     )
   }
@@ -516,6 +627,15 @@ async function applyFreePlan(tenantId, tenantType, plan) {
   return {
     success: true,
     plan: plan.code,
+    trialTargetPlan: targetPlan
+      ? {
+          id: targetPlan.id,
+          code: targetPlan.code,
+          name: targetPlan.name,
+          pricePerMonth: Number(targetPlan.price_per_month || 0),
+          pricePerYear: Number(targetPlan.price_per_year || 0),
+        }
+      : null,
     pendingActivation: false,
     activated: wasPendingActivation,
     freeSandboxDays: sandboxDays,

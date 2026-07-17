@@ -159,10 +159,15 @@ membersRouter.post('/', async (req, res) => {
     })
   } catch (error) {
     logger.error('POST restaurant member invitation error:', error)
-    res.status(500).json({
+    const status = error.status || (error.code === 'USER_LIMIT_REACHED' ? 403 : 500)
+    res.status(status).json({
       ok: false,
       data: null,
-      error: { name: 'INTERNAL_ERROR', message: error.message || 'Failed to create invitation' },
+      error: {
+        name: error.code === 'USER_LIMIT_REACHED' ? 'USER_LIMIT_REACHED' : 'INTERNAL_ERROR',
+        message: error.message || 'Failed to create invitation',
+        details: error.limitCheck || undefined,
+      },
       requestId: req.requestId,
     })
   }

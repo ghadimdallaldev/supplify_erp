@@ -26,6 +26,7 @@ export const RESTAURANT_ONLY_LIMIT_KEYS = new Set([
 const STORAGE_LIMIT_KEYS = new Set(['storage_mb'])
 const USERS_LIMIT_KEY = 'users'
 const WAREHOUSES_LIMIT_KEY = 'warehouses'
+const DRIVERS_LIMIT_KEY = 'drivers'
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -139,6 +140,18 @@ export function validatePlanLimitsAndFeatures(limits, features, tenantType) {
       return {
         valid: false,
         message: 'Limit warehouses must be 0 or greater, or -1 for unlimited',
+      }
+    }
+
+    if (
+      key === DRIVERS_LIMIT_KEY &&
+      tenantType === 'SUPPLIER' &&
+      typeof value === 'number' &&
+      value < 0
+    ) {
+      return {
+        valid: false,
+        message: 'Limit drivers must be 0 or greater, or -1 for unlimited',
       }
     }
   }

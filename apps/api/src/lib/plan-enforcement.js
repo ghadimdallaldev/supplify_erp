@@ -5,6 +5,7 @@ import { getWarehouseSupplierColumn } from './warehouse-helpers.js'
 import { resolveOrgBillingTenantId } from './org-billing-tenant.js'
 import { getTenantSubscription } from './subscription.js'
 import { resolveEffectiveLimit } from './limit-resolution.js'
+import { formatTenantPlanDisplayName } from './plan-codes.js'
 import {
   ENTERPRISE_BRANCH_THRESHOLD,
   addonKeyForLimitKey,
@@ -94,7 +95,11 @@ async function resolveLocationLimitContext(tenantId, tenantType, limitKey, curre
   }
 
   const planCode = subscription.plan_code || ''
-  const planName = subscription.plan_name || subscription.plan_display_name || planCode
+  const planName = formatTenantPlanDisplayName(
+    planCode,
+    tenantType,
+    subscription.plan_name || subscription.plan_display_name
+  )
   const planLimits = subscription.limits || {}
 
   const resolved = await resolveEffectiveLimit({
@@ -136,7 +141,9 @@ async function resolveLocationLimitContext(tenantId, tenantType, limitKey, curre
     effectiveLimit,
     current,
     addonKey,
-    canPurchaseAddons: canPurchaseLocationAddons(planCode),
+    tenantType,
+    limitKey,
+    canPurchaseAddons: canPurchaseLocationAddons(planCode, tenantType, limitKey),
   }
 }
 
@@ -149,6 +156,7 @@ function buildBranchBlockResult(ctx) {
     effectiveLimit,
     current,
     canPurchaseAddons,
+    tenantType,
   } = ctx
 
   if (limitKeyIsBranches(ctx) && current >= ENTERPRISE_BRANCH_THRESHOLD) {
@@ -179,7 +187,7 @@ function buildBranchBlockResult(ctx) {
         effectiveLimit,
         current,
         action: 'ADDON_OR_UPGRADE',
-        requiredPlan: planCode.toLowerCase() === 'gold' ? 'Platinum' : 'Gold',
+        requiredPlan: tenantType === 'SUPPLIER' ? 'Supplier Scale' : 'Restaurant Scale',
       }
     }
 
@@ -188,29 +196,29 @@ function buildBranchBlockResult(ctx) {
       return {
         allowed: false,
         reason:
-          'Extra branch accounts are not available on Free Trial. Upgrade to Gold to add locations.',
+          'Extra branch accounts are not available during trial. Activate a Scale plan to add locations.',
         currentPlan: planName,
         limit: effectiveLimit,
         includedLimit,
         addonQuantity,
         effectiveLimit,
         current,
-        action: 'UPGRADE_TO_GOLD',
-        requiredPlan: 'Gold',
+        action: 'UPGRADE_PLAN',
+        requiredPlan: 'Scale',
       }
     }
 
     return {
       allowed: false,
-      reason: `Branch limit reached (${current}/${effectiveLimit} locations on ${planName}). Upgrade to Gold to add more branches.`,
+      reason: `Branch limit reached (${current}/${effectiveLimit} locations on ${planName}). Upgrade to Scale to add more branches.`,
       currentPlan: planName,
       limit: effectiveLimit,
       includedLimit,
       addonQuantity,
       effectiveLimit,
       current,
-      action: 'UPGRADE_TO_GOLD',
-      requiredPlan: 'Gold',
+      action: 'UPGRADE_PLAN',
+      requiredPlan: 'Scale',
     }
   }
 
@@ -230,21 +238,22 @@ function buildWarehouseBlockResult(ctx) {
     effectiveLimit,
     current,
     canPurchaseAddons,
+    tenantType,
   } = ctx
 
   if (includedLimit === 0 && effectiveLimit === 0) {
     return {
       allowed: false,
       reason:
-        'Warehouses are not available on Free Trial. Upgrade to Silver or higher to add a warehouse.',
+        'Warehouses are not available during trial. Activate Supplier Growth to add a warehouse.',
       currentPlan: planName,
       limit: 0,
       includedLimit: 0,
       addonQuantity: 0,
       effectiveLimit: 0,
       current,
-      action: 'UPGRADE_TO_SILVER',
-      requiredPlan: 'Silver',
+      action: 'UPGRADE_PLAN',
+      requiredPlan: 'Supplier Growth',
     }
   }
 
@@ -261,7 +270,7 @@ function buildWarehouseBlockResult(ctx) {
         effectiveLimit,
         current,
         action: 'ADDON_OR_UPGRADE',
-        requiredPlan: planCode.toLowerCase() === 'gold' ? 'Platinum' : 'Gold',
+        requiredPlan: tenantType === 'SUPPLIER' ? 'Supplier Scale' : 'Restaurant Scale',
       }
     }
 
@@ -270,15 +279,15 @@ function buildWarehouseBlockResult(ctx) {
       return {
         allowed: false,
         reason:
-          'Extra warehouses are not available on Free Trial. Upgrade to Silver for your first warehouse.',
+          'Extra warehouses are not available during trial. Activate Supplier Growth for your first warehouse.',
         currentPlan: planName,
         limit: effectiveLimit,
         includedLimit,
         addonQuantity,
         effectiveLimit,
         current,
-        action: 'UPGRADE_TO_SILVER',
-        requiredPlan: 'Silver',
+        action: 'UPGRADE_PLAN',
+        requiredPlan: 'Supplier Growth',
       }
     }
 
@@ -292,7 +301,7 @@ function buildWarehouseBlockResult(ctx) {
       effectiveLimit,
       current,
       action: 'UPGRADE_PLAN',
-      requiredPlan: 'Gold',
+      requiredPlan: 'Scale',
     }
   }
 

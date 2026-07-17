@@ -5,19 +5,15 @@ import {
   computeBillingAccessState,
   buildAccountLockedError,
 } from '../lib/billing/billing-service.js'
+import {
+  isBillingRecoveryPath,
+  normalizeRequestPath,
+} from '../lib/billing/billing-recovery-paths.js'
 import { startStage, mark } from './request-timing.js'
 import { LOCK_REASON_FREE_SANDBOX_EXPIRED } from '../lib/billing/constants.js'
 import { isImpersonating } from '../lib/impersonation.js'
 import { logger } from '../lib/logger.js'
 import { resolveRequestLocale, localizedError } from '../i18n/index.js'
-
-const ALLOW_PREFIXES = ['/api/billing', '/api/register', '/auth', '/health', '/api/public']
-
-const ALLOW_GET_PATHS = new Set([
-  '/api/subscriptions/entitlements',
-  '/api/subscriptions/current',
-  '/api/subscriptions/plans',
-])
 
 /** GET paths that must stay blocked when billing locks the tenant (including read-only trial expiry). */
 const SENSITIVE_GET_PREFIXES = ['/api/reports/']
@@ -48,9 +44,8 @@ function isFreeTrialExpiredLock(access) {
 export async function billingAccessMiddleware(req, res, next) {
   if (req.method === 'OPTIONS') return next()
 
-  const path = req.path || req.originalUrl?.split('?')[0] || ''
-  if (ALLOW_PREFIXES.some((p) => path.startsWith(p))) return next()
-  if (req.method === 'GET' && ALLOW_GET_PATHS.has(path)) return next()
+  const path = normalizeRequestPath(req)
+  if (isBillingRecoveryPath(req.method, path)) return next()
 
   if (!req.userData) return next()
   // Platform admins bypass locks for admin APIs; impersonation must respect tenant billing state.

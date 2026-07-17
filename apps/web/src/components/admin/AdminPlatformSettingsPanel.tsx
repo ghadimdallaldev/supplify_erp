@@ -51,7 +51,7 @@ export function AdminPlatformSettingsPanel({
     >
       <CardHeader className={variant === 'compact' ? 'px-4 py-3' : undefined}>
         <CardTitle className={variant === 'compact' ? 'text-base' : undefined}>
-          Free Trial length
+          Trial length
         </CardTitle>
         <CardDescription>
           {variant === 'compact'

@@ -2,6 +2,7 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { config } from '../config/env.js'
 import { sendTemplateEmail } from '../services/email/email.service.js'
+import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
 
 const BATCH_USERS = 100
 
@@ -17,13 +18,38 @@ export async function runEmailDigestJob({ dryRun = false } = {}) {
   try {
     const { rows: subscribers } = await query(
       `
-      SELECT np.user_id, np.user_type, u.email
+      SELECT np.user_id, np.user_type, u.email, tenant.tenant_id
       FROM notification_preferences np
       JOIN app_user u ON u.id = np.user_id
+      LEFT JOIN LATERAL (
+        SELECT candidate.tenant_id
+        FROM (
+          SELECT r.id AS tenant_id
+          FROM restaurant r
+          WHERE np.user_type = 'RESTAURANT'
+            AND LOWER(r.contact_email) = LOWER(u.email)
+          UNION
+          SELECT s.id AS tenant_id
+          FROM supplier s
+          WHERE np.user_type = 'SUPPLIER'
+            AND LOWER(s.contact_email) = LOWER(u.email)
+          UNION
+          SELECT tur.tenant_id
+          FROM tenant_user_roles tur
+          WHERE tur.user_id = np.user_id
+            AND tur.tenant_type = np.user_type
+        ) candidate
+        JOIN subscription sub ON sub.tenant_id = candidate.tenant_id
+          AND sub.tenant_type = np.user_type
+          AND sub.status IN ('ACTIVE', 'TRIALING', 'PAST_DUE')
+          AND sub.account_locked_at IS NULL
+        LIMIT 1
+      ) tenant ON true
       WHERE np.notify_email_digest = true
         AND np.email_enabled = true
         AND u.email IS NOT NULL
         AND TRIM(u.email) <> ''
+        AND (np.user_type = 'ADMIN' OR tenant.tenant_id IS NOT NULL)
       LIMIT $1
       `,
       [BATCH_USERS]
@@ -32,6 +58,17 @@ export async function runEmailDigestJob({ dryRun = false } = {}) {
     scanned = subscribers.length
 
     for (const sub of subscribers) {
+      if (sub.user_type !== 'ADMIN') {
+        const unlocked = await isTenantUnlockedForBackgroundWrites({
+          tenantId: sub.tenant_id,
+          tenantType: sub.user_type,
+        })
+        if (!unlocked) {
+          skipped++
+          continue
+        }
+      }
+
       const claim = await query(
         `
         INSERT INTO email_digest_log (user_id, user_type, digest_date, notification_count)

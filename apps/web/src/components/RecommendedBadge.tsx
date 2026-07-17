@@ -1,7 +1,7 @@
 import { Badge } from './ui/badge'
 
 type RecommendedBadgeProps = {
-  /** Plan code for this row/card (e.g. "gold") */
+  /** Internal plan code for this row/card. */
   planCode: string
   /** Recommended plan code from /api/subscriptions/recommendation */
   recommendedPlanCode: string | null | undefined

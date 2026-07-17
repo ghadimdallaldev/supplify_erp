@@ -1,6 +1,6 @@
 /**
  * Canonical limit and feature keys per tenant type for upgrade modal comparison table.
- * Keep in sync with API subscription limits/features; top 6–10 each for display.
+ * Keep in sync with API subscription limits/features; top keys for display.
  */
 
 export const RESTAURANT_LIMIT_KEYS = [
@@ -19,10 +19,11 @@ export const RESTAURANT_LIMIT_KEYS = [
 ] as const
 
 export const SUPPLIER_LIMIT_KEYS = [
-  'supplier_products_skus',
+  'active_customer_locations_monthly',
   'warehouses',
   'branches',
   'users',
+  'drivers',
   'promotions',
   'open_conversations',
   'chats_per_day',
@@ -65,7 +66,9 @@ export const LIMIT_KEY_LABELS: Record<string, string> = {
   scheduled_quick_lists: 'Scheduled quick lists',
   chats_per_day: 'Messages (today)',
   open_conversations: 'Open chats',
-  supplier_products_skus: 'Products',
+  supplier_products_skus: 'Product SKUs',
+  active_customer_locations_monthly: 'Active customer locations',
+  drivers: 'Drivers',
   restaurant_inventory_skus: 'Inventory SKUs',
   branches: 'Branches',
   warehouses: 'Warehouses',
@@ -170,22 +173,28 @@ export function normalizePlanCode(code: string | null | undefined): string {
 /** Plan value subtitles (pricing psychology). */
 export const PLAN_SUBTITLES: Record<string, string> = {
   free: 'Time-limited trial',
-  silver: 'Starter',
-  gold: 'Most Popular',
-  platinum: 'Unlimited Ops',
+  silver: 'Growth',
+  gold: 'Scale',
+  platinum: 'Scale',
 }
 
-/** User-facing plan name; DB code `free` is marketed as Free Trial (not forever-free). */
+/** User-facing plan name; DB code `free` is marketed as a 30-day trial, not forever-free. */
 export function formatPlanDisplayName(
   planCode: string | null | undefined,
   planName?: string | null
 ): string {
   const code = normalizePlanCode(planCode)
-  if (code === 'free') return 'Free Trial'
-  if (code === 'silver') return 'Silver'
+  if (code === 'free') return '30-day Free Trial'
   const name = (planName || '').trim()
-  if (name === 'Bronze') return 'Silver'
+  if (['Bronze', 'Silver', 'Gold', 'Platinum'].includes(name)) {
+    if (code === 'silver') return 'Growth'
+    if (code === 'gold') return 'Scale'
+    if (code === 'platinum') return 'Scale'
+  }
   if (name) return name
+  if (code === 'silver') return 'Growth'
+  if (code === 'gold') return 'Scale'
+  if (code === 'platinum') return 'Scale'
   return 'Plan'
 }
 

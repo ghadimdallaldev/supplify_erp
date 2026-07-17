@@ -9,7 +9,7 @@ import {
 } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
-import { requireFeature, isFeatureEnabled } from '../lib/subscription.js'
+import { requireFeature, requireWithinLimit, isFeatureEnabled } from '../lib/subscription.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import {
   linkDriverToUser,
@@ -149,81 +149,86 @@ router.get('/', requirePermission('FULFILLMENT_VIEW'), async (req, res) => {
   }
 })
 
-router.post('/', requirePermission('FULFILLMENT_MANAGE'), async (req, res) => {
-  try {
-    const supplierId = await resolveSupplierId(req)
-    if (!supplierId) {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: { name: 'FORBIDDEN', message: 'Supplier not found' },
-        requestId: req.requestId,
-      })
-    }
-
-    const body = createDriverSchema.parse(req.body)
-    if (body.user_id) {
-      await assertUserNotLinkedToOtherDriver(body.user_id, supplierId)
-    }
-    if (body.warehouse_id) {
-      const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
-      if (multiActive) {
-        const { rows: wh } = await query(`SELECT id FROM warehouse WHERE id = $1`, [
-          body.warehouse_id,
-        ])
-        if (!wh.length) throw new ValidationError('Warehouse not found')
+router.post(
+  '/',
+  requirePermission('FULFILLMENT_MANAGE'),
+  requireWithinLimit('drivers', resolveSupplierId, () => 'SUPPLIER'),
+  async (req, res) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
       }
-    }
 
-    const { rows } = await query(
-      `INSERT INTO drivers (
+      const body = createDriverSchema.parse(req.body)
+      if (body.user_id) {
+        await assertUserNotLinkedToOtherDriver(body.user_id, supplierId)
+      }
+      if (body.warehouse_id) {
+        const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
+        if (multiActive) {
+          const { rows: wh } = await query(`SELECT id FROM warehouse WHERE id = $1`, [
+            body.warehouse_id,
+          ])
+          if (!wh.length) throw new ValidationError('Warehouse not found')
+        }
+      }
+
+      const { rows } = await query(
+        `INSERT INTO drivers (
          supplier_id, warehouse_id, full_name, phone, vehicle_type, vehicle_plate, notes, user_id
        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [
-        supplierId,
-        body.warehouse_id ?? null,
-        body.full_name,
-        body.phone ?? null,
-        body.vehicle_type ?? null,
-        body.vehicle_plate ?? null,
-        body.notes ?? null,
-        body.user_id ?? null,
-      ]
-    )
+        [
+          supplierId,
+          body.warehouse_id ?? null,
+          body.full_name,
+          body.phone ?? null,
+          body.vehicle_type ?? null,
+          body.vehicle_plate ?? null,
+          body.notes ?? null,
+          body.user_id ?? null,
+        ]
+      )
 
-    res.status(201).json({
-      ok: true,
-      data: { driver: mapDriver(rows[0]) },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.status(201).json({
+        ok: true,
+        data: { driver: mapDriver(rows[0]) },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof ValidationError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      logger.error('Create driver error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
-        error: { name: 'VALIDATION_ERROR', message: error.message },
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to create driver' },
         requestId: req.requestId,
       })
     }
-    if (error instanceof ValidationError) {
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'VALIDATION_ERROR', message: error.message },
-        requestId: req.requestId,
-      })
-    }
-    logger.error('Create driver error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to create driver' },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 router.patch('/:id', requirePermission('FULFILLMENT_MANAGE'), async (req, res) => {
   try {

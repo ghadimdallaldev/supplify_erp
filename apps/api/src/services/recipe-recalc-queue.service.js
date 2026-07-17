@@ -1,6 +1,7 @@
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { calculateRecipeCost, persistRecipeCalculation } from './recipe-cost-engine.service.js'
+import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
 
 const NULL_UUID = '00000000-0000-0000-0000-000000000000'
 const BATCH_LIMIT = 50
@@ -76,8 +77,17 @@ export async function recalculateRecipe(
 export async function processRecipeRecalcQueue(dbQuery = query) {
   const { rows: dirty } = await dbQuery(
     `
-    SELECT * FROM recipe_recalc_dirty
-    ORDER BY created_at ASC
+    SELECT d.*
+    FROM recipe_recalc_dirty d
+    WHERE EXISTS (
+      SELECT 1
+      FROM subscription sub
+      WHERE sub.tenant_id = d.restaurant_id
+        AND sub.tenant_type = 'RESTAURANT'
+        AND sub.status IN ('ACTIVE', 'TRIALING', 'PAST_DUE')
+        AND sub.account_locked_at IS NULL
+    )
+    ORDER BY d.created_at ASC
     LIMIT $1
     `,
     [BATCH_LIMIT]
@@ -85,9 +95,19 @@ export async function processRecipeRecalcQueue(dbQuery = query) {
 
   let processed = 0
   let errors = 0
+  let skippedLocked = 0
 
   for (const row of dirty) {
     try {
+      const unlocked = await isTenantUnlockedForBackgroundWrites({
+        tenantId: row.restaurant_id,
+        tenantType: 'RESTAURANT',
+      })
+      if (!unlocked) {
+        skippedLocked++
+        continue
+      }
+
       let recipeIds = []
       if (row.recipe_id) {
         recipeIds = [row.recipe_id]
@@ -127,5 +147,5 @@ export async function processRecipeRecalcQueue(dbQuery = query) {
     }
   }
 
-  return { processed, errors }
+  return { processed, errors, skippedLocked }
 }

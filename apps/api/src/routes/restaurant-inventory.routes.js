@@ -37,6 +37,8 @@ import {
   getReorderAssistance,
   suppressReorderSuggestion,
   applyReorderAssistance,
+  getReorderAiRecommendations,
+  recordReorderRecommendationFeedback,
 } from '../services/restaurant-reorder-assistance.service.js'
 import { computeSuggestedReorderQty } from '../lib/reorder-quantity.js'
 import {
@@ -1622,7 +1624,9 @@ router.post(
       if (!restaurantId) throw new ValidationError('Restaurant not found')
       const smartReorderFeatureValue = await getSmartReorderFeatureValue(req)
       if (!hasSmartReorderCapability(smartReorderFeatureValue, 'forecast')) {
-        throw new ForbiddenError('AI reorder explanations require Gold or Platinum smart reorder')
+        throw new ForbiddenError(
+          'AI reorder explanations require a Growth or Scale smart reorder plan'
+        )
       }
       const body = reorderExplainSchema.parse(req.body ?? {})
       const data = await explainReorderSuggestions(restaurantId, {
@@ -1651,7 +1655,7 @@ router.post(
       if (!restaurantId) throw new ValidationError('Restaurant not found')
       const smartReorderFeatureValue = await getSmartReorderFeatureValue(req)
       if (!hasSmartReorderCapability(smartReorderFeatureValue, 'seasonality')) {
-        throw new ForbiddenError('Natural-language reorder ask requires Platinum smart reorder')
+        throw new ForbiddenError('Natural-language reorder ask requires a Scale smart reorder plan')
       }
       const body = reorderAskSchema.parse(req.body)
       const data = await parseReorderIntent(restaurantId, {
@@ -1708,6 +1712,81 @@ router.post(
         items: body.items,
         branchId: body.branchId ?? null,
         smartReorderFeatureValue,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+const reorderAiRecommendSchema = z.object({
+  branchId: z.string().uuid().optional(),
+  productIds: z.array(z.string().uuid()).max(15).optional(),
+  limit: z.number().int().min(1).max(15).optional(),
+})
+
+const reorderFeedbackSchema = z.object({
+  productId: z.string().uuid(),
+  source: z.enum(['ai', 'forecast', 'rule_based']),
+  actionTaken: z.enum(['accepted', 'adjusted', 'rejected', 'not_needed', 'incorrect', 'snoozed']),
+  recommendedQuantity: z.number().nonnegative().nullable().optional(),
+  finalQuantity: z.number().nonnegative().nullable().optional(),
+  selectedSupplierId: z.string().uuid().nullable().optional(),
+  feedbackReason: z.string().max(500).nullable().optional(),
+})
+
+router.post(
+  '/reorder-assistance/ai-recommend',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_VIEW'),
+  requireFeature(
+    'smart_reorder',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const smartReorderFeatureValue = await getSmartReorderFeatureValue(req)
+      if (!hasSmartReorderCapability(smartReorderFeatureValue, 'forecast')) {
+        throw new ForbiddenError(
+          'AI reorder recommendations require a Growth or Scale smart reorder plan'
+        )
+      }
+      const body = reorderAiRecommendSchema.parse(req.body ?? {})
+      const data = await getReorderAiRecommendations(restaurantId, {
+        smartReorderFeatureValue,
+        branchId: body.branchId ?? null,
+        productIds: body.productIds,
+        limit: body.limit,
+        userId: req.user?.id,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/reorder-assistance/feedback',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  requireFeature(
+    'smart_reorder',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const body = reorderFeedbackSchema.parse(req.body ?? {})
+      const data = await recordReorderRecommendationFeedback(restaurantId, {
+        ...body,
+        userId: req.user?.id,
       })
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {

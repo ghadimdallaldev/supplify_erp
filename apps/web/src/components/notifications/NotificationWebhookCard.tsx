@@ -51,7 +51,7 @@ export function NotificationChannelPlanNotice() {
 }
 
 /**
- * Outbound notification webhook configuration (Platinum "email_whatsapp_webhook" tier).
+ * Outbound notification webhook configuration (Scale "email_whatsapp_webhook" tier).
  * The backend reports `allowed` based on the tenant plan, so this card stays
  * self-contained and safe to mount in any settings surface.
  */
@@ -111,8 +111,8 @@ export function NotificationWebhookCard() {
           <div className="flex items-start gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-bg-subtle)]/40 p-4">
             <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
             <p className="text-sm text-[var(--text-mid)]">
-              Outbound webhooks are available on the Platinum plan. Upgrade to deliver notifications
-              to your own systems.
+              Outbound webhooks are available on Scale. Upgrade to deliver notifications to your own
+              systems.
             </p>
           </div>
         ) : (

@@ -1,6 +1,6 @@
 {
   "register": {
-    "redirecting": "Redirecting…"
+    "redirecting": "Redirectingâ€¦"
   },
   "registerComplete": {
     "title": "Set up your organization",
@@ -13,26 +13,30 @@
     "phoneLabel": "Phone (optional)",
     "phonePlaceholder": "+961 3 000 000",
     "submit": "Continue to Supplify",
-    "creatingWorkspace": "Creating your workspace…",
-    "almostDone": "Almost done…",
+    "creatingWorkspace": "Creating your workspaceâ€¦",
+    "almostDone": "Almost doneâ€¦",
     "errors": {
       "chooseAccountType": "Please choose whether you are a restaurant or a supplier.",
       "legalRequired": "Please accept all required legal agreements before continuing.",
-      "serverRestart": "The server restarted while saving your profile. Your account may already be set up — refresh this page, or try submitting once more.",
+      "serverRestart": "The server restarted while saving your profile. Your account may already be set up â€” refresh this page, or try submitting once more.",
       "generic": "Could not complete registration. Please try again.",
       "statusVerify": "Could not verify registration status. Refresh the page or try again in a moment."
     }
   },
   "activation": {
     "title": "Activate your account",
-    "descriptionSupplier": "Your supplier workspace was created but is not active yet. Start on the free plan, upgrade to a paid tier, or ask a Supplify administrator to activate you manually.",
-    "descriptionRestaurant": "Your restaurant workspace was created but is not active yet. Start on the free plan, upgrade to a paid tier, or ask a Supplify administrator to activate you manually.",
-    "paidPlanHint": "Pay for Silver, Gold, or Platinum to unlock orders, inventory, and the full app immediately.",
-    "freeTierHint": "Free tier unlocks your workspace immediately with core features. Paid plans add more capacity and modules.",
-    "activateFree": "Activate free plan",
+    "descriptionSupplier": "Your supplier workspace was created but is not active yet. Choose a paid plan to start a 30-day trial, or ask a Supplify administrator to activate you manually.",
+    "descriptionRestaurant": "Your restaurant workspace was created but is not active yet. Choose a paid plan to start a 30-day trial, or ask a Supplify administrator to activate you manually.",
+    "paidPlanHint": "Choose the paid plan you want to trial. Your workspace uses that plan's limits and modules for 30 days.",
+    "freeTierHint": "No card is required to start the trial. After it ends, billing continues only when you move onto a paid subscription.",
+    "activateFree": "Start trial",
     "comparePlans": "Compare plans & pay",
-    "freePlanActive": "Your free plan is active.",
-    "pendingPlan": "Current plan on file: {{planName}} (pending activation)"
+    "freePlanActive": "Your trial is active.",
+    "pendingPlan": "Current plan on file: {{planName}} (pending activation)",
+    "activateTrial": "Start {{planName}} trial",
+    "trialActive": "Your trial is active.",
+    "planPickerLabel": "Trial plan options",
+    "afterTrial": "after trial"
   },
   "restaurantSettings": {
     "title": "Settings",
@@ -150,7 +154,7 @@
   "invite": {
     "welcome": "Welcome to Supplify",
     "acceptTitle": "Accept invitation",
-    "validating": "Validating your invitation…",
+    "validating": "Validating your invitationâ€¦",
     "thisBranch": "this branch",
     "fullName": "Full name",
     "password": "Password",
@@ -164,7 +168,7 @@
     "loggedInAs": "You're logged in as {{name}}. {{headline}}.",
     "headline": {
       "restaurantMember": "You've been invited to join {{branch}} as {{role}}",
-      "restaurantBranchWithOrg": "You've been invited to manage {{branch}} — {{org}}",
+      "restaurantBranchWithOrg": "You've been invited to manage {{branch}} â€” {{org}}",
       "restaurantBranch": "You've been invited to manage {{branch}}",
       "defaultWithOrg": "You've been invited to join {{branch}} ({{org}}) as {{role}}",
       "default": "You've been invited to join {{branch}} as {{role}}"

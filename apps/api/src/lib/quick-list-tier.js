@@ -62,7 +62,7 @@ export function hasQuickListCapability(featureValue, capability) {
   return resolveQuickListCapabilities(featureValue).capabilities[capability] === true
 }
 
-/** Whether scheduled / automated quick lists are allowed (Silver+). */
+/** Whether scheduled / automated quick lists are allowed for the plan. */
 export function isQuickListSchedulingEnabled(featureValue) {
   return resolveQuickListCapabilities(featureValue).capabilities.scheduling
 }

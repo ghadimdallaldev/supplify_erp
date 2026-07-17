@@ -3,6 +3,7 @@ import { getReferralProgramConfig } from '../lib/platform-settings.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { notifyTenantUsers } from './notification/in-app.js'
+import { assertSupplierActiveCustomerLocationCapacity } from '../lib/subscription.js'
 
 function addDays(date, days) {
   const d = new Date(date)
@@ -45,6 +46,10 @@ export async function createConnectionRequest(supplierId, prospectId, { req = nu
   if (pending.length) {
     return { connectionRequest: pending[0], restaurantId }
   }
+
+  await assertSupplierActiveCustomerLocationCapacity(supplierId, {
+    action: 'growth.connection_request',
+  })
 
   const expiresAt = addDays(new Date(), config.connectionRequestExpiryDays || 30)
   const { rows } = await query(

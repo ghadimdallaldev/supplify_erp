@@ -17,7 +17,7 @@ export async function isAiPlatformEnabledForTenant(tenantId, tenantType) {
 }
 
 /**
- * LLM explain: Gold+ smart_reorder + ai_platform.
+ * LLM explain: forecast-capable smart_reorder + ai_platform.
  */
 export async function canUseReorderAiExplain(tenantId, tenantType, smartReorderFeatureValue) {
   if (!(await isAiPlatformEnabledForTenant(tenantId, tenantType))) return false
@@ -25,7 +25,7 @@ export async function canUseReorderAiExplain(tenantId, tenantType, smartReorderF
 }
 
 /**
- * NL ask: Platinum seasonality tier + ai_platform.
+ * NL ask: seasonality-capable smart_reorder + ai_platform.
  */
 export async function canUseReorderAiAsk(tenantId, tenantType, smartReorderFeatureValue) {
   if (!(await isAiPlatformEnabledForTenant(tenantId, tenantType))) return false

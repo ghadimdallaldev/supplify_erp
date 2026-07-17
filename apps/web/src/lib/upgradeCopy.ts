@@ -4,91 +4,96 @@
  */
 export const FEATURE_UPGRADE_COPY: Record<string, { plan: string; value: string }> = {
   reports: {
-    plan: 'Gold',
-    value: 'Upgrade to Gold to unlock reports and see usage and cost trends.',
+    plan: 'Scale',
+    value: 'Upgrade to Scale for advanced reports, controls, and operational analytics.',
   },
   quick_lists: {
-    plan: 'Silver',
-    value: 'Upgrade to Silver to save recurring orders as quick lists and schedule reorders.',
+    plan: 'Growth',
+    value: 'Activate Growth to save recurring orders as quick lists and schedule reorders.',
   },
   smart_reorder: {
-    plan: 'Gold',
-    value: 'Upgrade to Gold to unlock smart reorder and reduce manual stock decisions.',
+    plan: 'Growth',
+    value: 'Activate Growth to unlock reorder forecasting and AI-assisted purchasing.',
   },
   multi_branch: {
-    plan: 'Gold',
-    value: 'Upgrade to Gold to unlock multi-branch inventory and avoid manual sync.',
+    plan: 'Scale',
+    value: 'Upgrade to Scale for multi-location purchasing and inventory controls.',
   },
   chat: {
-    plan: 'Silver',
-    value: 'Upgrade to Silver to chat with more suppliers and send more messages.',
+    plan: 'Growth',
+    value: 'Activate Growth to chat with suppliers and keep ordering conversations in Supplify.',
   },
 }
 
 export const LIMIT_UPGRADE_COPY: Record<string, { plan: string; value: string }> = {
   quick_lists: {
-    plan: 'Silver',
-    value: 'Upgrade to Silver for more saved quick lists and scheduled reorders.',
+    plan: 'Growth',
+    value: 'Activate Growth for more saved quick lists and scheduled reorders.',
   },
   quick_list_items: {
-    plan: 'Silver',
-    value: 'Upgrade to Silver to add more products to your quick lists.',
+    plan: 'Growth',
+    value: 'Activate Growth to add more products to your quick lists.',
   },
   scheduled_quick_lists: {
-    plan: 'Silver',
-    value: 'Upgrade to Silver to schedule more recurring quick list orders.',
+    plan: 'Growth',
+    value: 'Activate Growth to schedule more recurring quick list orders.',
   },
   supplier_deals: {
-    plan: 'Silver',
-    value: 'Upgrade to Silver to browse and redeem supplier deals at checkout.',
+    plan: 'Growth',
+    value: 'Activate Growth to browse and redeem supplier deals at checkout.',
   },
   deal_redemptions_per_day: {
-    plan: 'Gold',
-    value: 'Upgrade to Gold for more deal redemptions per day (up to 50).',
+    plan: 'Growth',
+    value: 'Activate Growth for normal supplier deal redemptions under fair use.',
   },
   promotions: {
-    plan: 'Gold',
-    value: 'Upgrade to Gold for more active deals on your catalog (up to 25).',
+    plan: 'Supplier Scale',
+    value: 'Upgrade to Supplier Scale for more active deals on your catalog.',
   },
   open_conversations: {
-    plan: 'Gold',
-    value: 'Upgrade to Gold for more open chat conversations with customers.',
+    plan: 'Scale',
+    value: 'Upgrade to Scale for more open conversations across your operation.',
   },
   orders_per_day: {
-    plan: 'Gold',
-    value: 'Upgrade to Gold for more daily orders so your team is never blocked.',
+    plan: 'Growth',
+    value: 'Paid restaurant plans do not commercially cap normal ordering volume.',
   },
   chats_per_day: {
-    plan: 'Gold',
-    value: 'Upgrade to Gold for more daily messages and smoother supplier communication.',
+    plan: 'Scale',
+    value: 'Upgrade to Scale for higher daily messaging capacity and advanced operations.',
   },
   branches: {
-    plan: 'Gold',
-    value: 'Upgrade to Gold to add more locations and manage inventory per branch.',
+    plan: 'Scale',
+    value: 'Upgrade to Scale to add more active operating locations.',
   },
   warehouses: {
-    plan: 'Silver',
-    value: 'Upgrade to Silver to add warehouses and organize stock by location.',
+    plan: 'Supplier Growth',
+    value: 'Activate Supplier Growth to add your first warehouse.',
+  },
+  active_customer_locations_monthly: {
+    plan: 'Supplier Scale',
+    value:
+      'Upgrade to Supplier Scale or add customer-location capacity for more active ordering locations.',
   },
   restaurant_inventory_skus: {
-    plan: 'Gold',
-    value: 'Upgrade to Gold for more inventory SKUs and scale your catalog.',
+    plan: 'Growth',
+    value: 'Paid restaurant plans include inventory SKUs under fair use.',
   },
   supplier_products_skus: {
-    plan: 'Gold',
-    value: 'Upgrade to Gold for more products and a larger catalog.',
+    plan: 'Supplier Growth',
+    value: 'Paid supplier plans include product SKUs under fair use.',
   },
   suppliers_per_restaurant: {
-    plan: 'Gold',
-    value: 'Upgrade to Gold to connect more suppliers and diversify ordering.',
+    plan: 'Growth',
+    value: 'Paid restaurant plans let you connect suppliers under fair use.',
   },
   users: {
-    plan: 'Gold',
-    value: 'Upgrade to Gold to add more team members and roles.',
+    plan: 'Scale',
+    value: 'Upgrade to Scale to add more team members and advanced roles.',
   },
   storage_mb: {
-    plan: 'Platinum',
-    value: 'Upgrade to Platinum for 30 GB storage and unlimited operational limits.',
+    plan: 'Scale',
+    value: 'Upgrade to Scale for more storage and advanced operational capacity.',
   },
 }
 

@@ -31,7 +31,7 @@ export function canUseQuickLists(entitlements?: Entitlements | null): boolean {
   return isEntitlementFeatureEnabled(entitlements, 'quick_lists')
 }
 
-/** Purchasing-linked recipe costing (Gold+). */
+/** Purchasing-linked recipe costing for eligible paid plans. */
 export function canUseRecipeCosting(entitlements?: Entitlements | null): boolean {
   return isEntitlementFeatureEnabled(entitlements, 'recipe_costing')
 }

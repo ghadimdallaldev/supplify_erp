@@ -103,7 +103,7 @@ export function TenantBrandingPanel({
               />
             ) : (
               <p className="text-sm text-[var(--text-muted)]">
-                Upgrade to Gold or Platinum to upload your logo.
+                Upgrade to Scale to upload your logo.
               </p>
             )
           ) : (

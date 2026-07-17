@@ -35,7 +35,7 @@
   "plan": {
     "fallbackName": "your plan",
     "lockedTitle": "{{feature}} is not on {{planName}}",
-    "lockedDescription": "Visualize orders, deliveries, and payment due dates in one place. Upgrade to Silver or Gold to unlock the calendar - Free is for setup and light testing only.",
+    "lockedDescription": "Visualize orders, deliveries, and payment due dates in one place. Activate Growth or upgrade to Scale to unlock the calendar.",
     "comparePlans": "Compare plans & upgrade"
   },
   "state": {

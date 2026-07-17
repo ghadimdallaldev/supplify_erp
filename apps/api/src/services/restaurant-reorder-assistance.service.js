@@ -1,12 +1,37 @@
+import { createHash } from 'crypto'
 import { query } from '../lib/db.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { resolveSmartReorderCapabilities } from '../lib/smart-reorder-tier.js'
-import { resolveReorderAiCapabilities } from '../lib/ai-platform.js'
+import { resolveReorderAiCapabilities, canUseReorderAiExplain } from '../lib/ai-platform.js'
 import { computeSuggestedReorderQty } from '../lib/reorder-quantity.js'
 import { applySupplierPackRounding } from '../lib/reorder-unit-normalize.js'
+import { getCache, setCache, deleteCacheByPrefix } from '../lib/cache.js'
+import { logger } from '../lib/logger.js'
 import { listRestaurantReminders } from './reorder-cadence.service.js'
 import { listExpiryLots } from './inventory-expiry.service.js'
 import { getCachedForecasts, refreshIfStale } from './reorder-forecast-cache.service.js'
+import { buildReorderAiContexts } from './reorder-ai-context.service.js'
+
+const AI_RECOMMEND_CACHE_TTL_SECONDS = 15 * 60
+const AI_RECOMMEND_DEFAULT_LIMIT = 8
+const AI_RECOMMEND_MAX_LIMIT = 15
+const AI_RECOMMEND_URGENCIES = new Set(['URGENT', 'HIGH', 'MEDIUM'])
+
+export function reorderAiRecommendCachePrefix(restaurantId) {
+  return `reorder-ai-rec:${restaurantId}:`
+}
+
+export async function invalidateReorderAiRecommendCache(restaurantId) {
+  if (!restaurantId) return
+  try {
+    await deleteCacheByPrefix(reorderAiRecommendCachePrefix(restaurantId))
+  } catch (error) {
+    logger.warn('Failed to invalidate reorder AI recommend cache', {
+      restaurantId,
+      error: error.message,
+    })
+  }
+}
 
 const URGENCY_RANK = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 }
 
@@ -172,6 +197,12 @@ async function fetchLowStockSuggestions(restaurantId, { branchId = null } = {}) 
       urgency: row.urgency_level,
       suggestedQty,
       currentQty: parseFloat(row.current_qty),
+      // Additive fields for AI/context builders (ignored by older clients)
+      leadTimeDays: Number(row.lead_time_days) || 7,
+      moq: Number(row.moq) || 1,
+      orderMultiple: Number(row.order_multiple) || 1,
+      avgDailyUsage30: Number(row.avg_daily_usage_30day) || 0,
+      lowStockThreshold: row.low_stock_threshold != null ? Number(row.low_stock_threshold) : null,
       scopeType: 'product',
       scopeId: String(row.product_id),
     }
@@ -477,4 +508,213 @@ export async function applyReorderAssistance(restaurantId, opts = {}) {
   }
 
   return { added }
+}
+
+function hashCachePart(value) {
+  return createHash('sha256').update(String(value)).digest('hex').slice(0, 16)
+}
+
+function buildAiRecommendCacheKey(restaurantId, branchId, productIds, forecastVersion) {
+  const branchKey = branchId || 'all'
+  const idsHash = hashCachePart([...productIds].sort().join(','))
+  const fv = hashCachePart(forecastVersion || 'none')
+  return `${reorderAiRecommendCachePrefix(restaurantId)}${branchKey}:${idsHash}:${fv}`
+}
+
+function computeForecastVersion(forecasts, productIds) {
+  const idSet = new Set(productIds.map(String))
+  const parts = (forecasts || [])
+    .filter((f) => idSet.has(String(f.productId)))
+    .map(
+      (f) =>
+        `${f.productId}:${f.computedAt || ''}:${f.modelVersion || ''}:${f.forecastReorderQty ?? ''}`
+    )
+    .sort()
+  return parts.join('|') || 'none'
+}
+
+/**
+ * Select top N product suggestions eligible for AI recommend.
+ * @param {object[]} suggestions
+ * @param {{ productIds?: string[], limit?: number }} opts
+ */
+export function selectAiRecommendCandidates(suggestions, opts = {}) {
+  const limit = Math.min(
+    AI_RECOMMEND_MAX_LIMIT,
+    Math.max(1, Number(opts.limit) || AI_RECOMMEND_DEFAULT_LIMIT)
+  )
+  const filterIds = opts.productIds?.length ? new Set(opts.productIds.map(String)) : null
+
+  return (suggestions || [])
+    .filter((s) => s.productId)
+    .filter((s) => !filterIds || filterIds.has(String(s.productId)))
+    .filter((s) => AI_RECOMMEND_URGENCIES.has(String(s.urgency || '').toUpperCase()))
+    .slice(0, limit)
+}
+
+/**
+ * Batch on-demand AI reorder recommendations (does not run inside GET assistance).
+ *
+ * @param {string} restaurantId
+ * @param {{
+ *   smartReorderFeatureValue: unknown,
+ *   branchId?: string | null,
+ *   productIds?: string[],
+ *   limit?: number,
+ *   userId?: string,
+ * }} opts
+ */
+export async function getReorderAiRecommendations(restaurantId, opts = {}) {
+  const branchId = opts.branchId ?? null
+  const assistance = await getReorderAssistance(restaurantId, {
+    smartReorderFeatureValue: opts.smartReorderFeatureValue,
+    branchId,
+    limit: 40,
+  })
+
+  const candidates = selectAiRecommendCandidates(assistance.suggestions, {
+    productIds: opts.productIds,
+    limit: opts.limit,
+  })
+
+  if (candidates.length === 0) {
+    return {
+      recommendations: [],
+      usedLlm: false,
+      cached: false,
+      ai: assistance.ai,
+    }
+  }
+
+  const productIds = candidates.map((c) => String(c.productId))
+  const forecastVersion = computeForecastVersion(assistance.forecasts, productIds)
+  const cacheKey = buildAiRecommendCacheKey(restaurantId, branchId, productIds, forecastVersion)
+
+  const cached = await getCache(cacheKey)
+  if (cached?.recommendations) {
+    logger.info('reorder AI recommend cache hit', {
+      restaurantId,
+      productCount: cached.recommendations.length,
+    })
+    return {
+      ...cached,
+      cached: true,
+      ai: assistance.ai,
+    }
+  }
+
+  const canLlm = await canUseReorderAiExplain(
+    restaurantId,
+    'RESTAURANT',
+    opts.smartReorderFeatureValue
+  )
+
+  const contexts = await buildReorderAiContexts(
+    restaurantId,
+    candidates,
+    assistance.forecasts || []
+  )
+
+  let result
+  if (!canLlm) {
+    const { buildForecastFallbackRecommendation } = await import('../lib/reorder-ai-normalize.js')
+    result = {
+      recommendations: contexts.map((ctx) => {
+        const rec = buildForecastFallbackRecommendation(
+          {
+            productId: ctx.productId,
+            baseQuantity: ctx.baseSuggestedQuantity,
+            defaultSupplierId: ctx.defaultSupplierId,
+            supplierOptions: ctx.supplierOptions,
+            unit: ctx.productUnit,
+            moq: ctx.moq,
+            orderMultiple: ctx.orderMultiple,
+            leadTimeDays: ctx.leadTimeDays,
+            urgency: ctx.urgency,
+            confidence: ctx.forecast?.confidence,
+            summary: ctx.forecast?.explanation || ctx.reasonLabel,
+          },
+          { fallbackReason: 'not_eligible_for_llm' }
+        )
+        return {
+          ...rec,
+          suggestionId: ctx.suggestionId,
+          supplierName: ctx.supplierOptions?.[0]?.supplierName,
+        }
+      }),
+      usedLlm: false,
+    }
+  } else {
+    // Dynamic import avoids circular dependency with reorder-ai.service.js
+    const { generateReorderRecommendations } = await import('./reorder-ai.service.js')
+    result = await generateReorderRecommendations(contexts, {
+      restaurantId,
+      userId: opts.userId,
+    })
+  }
+
+  const response = {
+    recommendations: result.recommendations,
+    usedLlm: Boolean(result.usedLlm),
+    usageLimited: result.usageLimited,
+    cached: false,
+    ai: assistance.ai,
+  }
+
+  await setCache(cacheKey, response, AI_RECOMMEND_CACHE_TTL_SECONDS)
+  return response
+}
+
+/**
+ * Persist light feedback on a recommendation (does not suppress suggestions).
+ *
+ * @param {string} restaurantId
+ * @param {{
+ *   productId: string,
+ *   source: string,
+ *   actionTaken: string,
+ *   recommendedQuantity?: number | null,
+ *   finalQuantity?: number | null,
+ *   selectedSupplierId?: string | null,
+ *   feedbackReason?: string | null,
+ *   userId?: string | null,
+ * }} body
+ */
+export async function recordReorderRecommendationFeedback(restaurantId, body) {
+  const productId = body.productId
+  if (!productId) throw new ValidationError('productId is required')
+  const source = String(body.source || '').trim()
+  const actionTaken = String(body.actionTaken || '').trim()
+  if (!source) throw new ValidationError('source is required')
+  if (!actionTaken) throw new ValidationError('actionTaken is required')
+
+  try {
+    const { rows } = await query(
+      `
+      INSERT INTO reorder_recommendation_feedback (
+        restaurant_id, product_id, source, action_taken,
+        recommended_quantity, final_quantity, selected_supplier_id,
+        feedback_reason, user_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING id, restaurant_id, product_id, source, action_taken, created_at
+      `,
+      [
+        restaurantId,
+        productId,
+        source,
+        actionTaken,
+        body.recommendedQuantity ?? null,
+        body.finalQuantity ?? null,
+        body.selectedSupplierId ?? null,
+        body.feedbackReason ?? null,
+        body.userId ?? null,
+      ]
+    )
+    return rows[0]
+  } catch (error) {
+    if (error.code === '42P01') {
+      throw new ValidationError('Recommendation feedback is not available yet')
+    }
+    throw error
+  }
 }

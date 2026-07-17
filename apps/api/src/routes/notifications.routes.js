@@ -274,7 +274,7 @@ async function resolveWebhookAccess(req) {
   return { allowed, tenantId, tenantType }
 }
 
-// Get outbound notification webhook config (Platinum tier)
+// Get outbound notification webhook config (Scale tier)
 router.get('/webhook', resolveTenantContext, async (req, res, next) => {
   try {
     const { allowed, tenantId, tenantType } = await resolveWebhookAccess(req)
@@ -295,7 +295,7 @@ router.get('/webhook', resolveTenantContext, async (req, res, next) => {
   }
 })
 
-// Create/update outbound notification webhook config (Platinum tier)
+// Create/update outbound notification webhook config (Scale tier)
 router.put('/webhook', ...tenantMutationGuard, async (req, res, next) => {
   try {
     const { allowed, tenantId, tenantType } = await resolveWebhookAccess(req)
@@ -303,7 +303,7 @@ router.put('/webhook', ...tenantMutationGuard, async (req, res, next) => {
       throw new ValidationError('Tenant context required')
     }
     if (!allowed) {
-      throw new ForbiddenError('Notification webhooks require the Platinum plan')
+      throw new ForbiddenError('Notification webhooks require a Scale plan')
     }
     const body = webhookSchema.parse(req.body ?? {})
     const saved = await upsertTenantWebhook(tenantId, tenantType, {
