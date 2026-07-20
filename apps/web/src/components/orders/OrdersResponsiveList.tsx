@@ -25,8 +25,9 @@ import { resolveOrderStatusLabel } from './detail/orderDetailShared'
 import { isDisputeReplacementOrder } from '../../lib/orderPlacement'
 import { getActiveDisputeForOrder } from '../../lib/disputeHelpers'
 
-const thClass = 'px-4 py-3 text-start text-xs font-semibold uppercase text-[var(--text-muted)]'
-const tdClass = 'px-4 py-3 align-middle'
+const thClass =
+  'px-3 py-2 text-start text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]'
+const tdClass = 'px-3 py-2 align-middle text-sm'
 
 type OrdersResponsiveListProps = {
   orders: any[]
@@ -87,12 +88,10 @@ function OrderTableActions({
   onSendReminder: (orderId: string) => void
   onDecline: (orderId: string, label?: string) => void
 }) {
-  const actionBtnClass = cn('px-2.5 xl:px-3')
-  const iconGap = responsiveDataListClasses.actionIconGap
-  const labelClass = responsiveDataListClasses.actionLabel
+  const actionBtnClass = cn('h-8 shrink-0 gap-1 px-2 text-xs')
 
   return (
-    <div className="flex flex-wrap justify-end gap-1.5">
+    <div className="flex flex-nowrap items-center justify-end gap-1">
       {isSupplier && canEditOrders && order.status === 'PLACED' && (
         <>
           <Button
@@ -103,8 +102,8 @@ function OrderTableActions({
             title={t('page.acknowledge')}
             data-testid={`order-${order.id}-acknowledge`}
           >
-            <CheckCircle className={cn('h-4 w-4', iconGap)} />
-            <span className={labelClass}>{t('page.acknowledge')}</span>
+            <CheckCircle className="h-3.5 w-3.5" />
+            <span>{t('page.acknowledge')}</span>
           </Button>
           {canDeclineOrder && (
             <Button
@@ -116,8 +115,8 @@ function OrderTableActions({
               title={t('page.decline')}
               data-testid={`order-${order.id}-decline`}
             >
-              <X className={cn('h-4 w-4', iconGap)} />
-              <span className={labelClass}>{t('page.decline')}</span>
+              <X className="h-3.5 w-3.5" />
+              <span>{t('page.decline')}</span>
             </Button>
           )}
         </>
@@ -131,8 +130,8 @@ function OrderTableActions({
           title={t('page.startProcessing')}
           data-testid={`order-${order.id}-start-processing`}
         >
-          <Package className={cn('h-4 w-4', iconGap)} />
-          <span className={labelClass}>{t('page.startProcessing')}</span>
+          <Package className="h-3.5 w-3.5" />
+          <span>{t('page.startProcessing')}</span>
         </Button>
       )}
       {isSupplier && canEditOrders && order.status === 'PROCESSING' && (
@@ -144,8 +143,8 @@ function OrderTableActions({
           title={t('page.markShipped')}
           data-testid={`order-${order.id}-ship`}
         >
-          <Truck className={cn('h-4 w-4', iconGap)} />
-          <span className={labelClass}>{t('page.markShipped')}</span>
+          <Truck className="h-3.5 w-3.5" />
+          <span>{t('page.markShipped')}</span>
         </Button>
       )}
       {isSupplier &&
@@ -160,8 +159,8 @@ function OrderTableActions({
             title={t('page.markDelivered')}
             data-testid={`order-${order.id}-deliver`}
           >
-            <Truck className={cn('h-4 w-4', iconGap)} />
-            <span className={labelClass}>{t('page.markDelivered')}</span>
+            <Truck className="h-3.5 w-3.5" />
+            <span>{t('page.markDelivered')}</span>
           </Button>
         )}
       {!isSupplier && order.status === 'PLACED' && (
@@ -173,8 +172,8 @@ function OrderTableActions({
           aria-label={t('page.sendReminder')}
           title={t('page.sendReminder')}
         >
-          <AlertCircle className={cn('h-4 w-4', iconGap)} />
-          <span className={labelClass}>{t('page.sendReminder')}</span>
+          <AlertCircle className="h-3.5 w-3.5" />
+          <span>{t('page.sendReminder')}</span>
         </Button>
       )}
       <Button variant="outline" size="sm" className={actionBtnClass} asChild>
@@ -183,8 +182,8 @@ function OrderTableActions({
           aria-label={t('page.viewDetails')}
           title={t('page.viewDetails')}
         >
-          <FileText className={cn('h-4 w-4', iconGap)} />
-          <span className={labelClass}>{t('page.viewDetails')}</span>
+          <FileText className="h-3.5 w-3.5" />
+          <span>{t('page.viewDetails')}</span>
         </Link>
       </Button>
       {isSupplier && (
@@ -194,8 +193,8 @@ function OrderTableActions({
             aria-label={t('page.packingSlip')}
             title={t('page.packingSlip')}
           >
-            <Package className={cn('h-4 w-4', iconGap)} />
-            <span className={labelClass}>{t('page.packingSlip')}</span>
+            <Package className="h-3.5 w-3.5" />
+            <span>{t('page.packingSlip')}</span>
           </Link>
         </Button>
       )}
@@ -253,7 +252,8 @@ export function OrdersResponsiveList({
       items={orders}
       keyExtractor={(order) => order.id}
       tableAriaLabel={ordersTitle}
-      tableMinWidth={640}
+      tableMinWidth={880}
+      cardBreakpoint="lg"
       emptyState={emptyState}
       renderCard={(order) => (
         <Card
@@ -482,22 +482,24 @@ export function OrdersResponsiveList({
           className="border-b border-[var(--app-border)] hover:bg-[var(--brand-ultra)]"
           data-testid={`order-table-row-${order.id}`}
         >
-          <td className={tdClass}>
+          <td className={cn(tdClass, 'whitespace-nowrap')}>
             <Link
               to={`/app/orders/${order.id}`}
-              className="font-medium text-[var(--brand-mid)] hover:underline"
-            >
-              {t('page.orderNumber', {
+              className="font-medium tabular-nums text-[var(--brand-mid)] hover:underline"
+              title={t('page.orderNumber', {
                 id: order.id.slice(-8).toUpperCase(),
               })}
+            >
+              #{order.id.slice(-8).toUpperCase()}
             </Link>
           </td>
           <td
             className={cn(
               tdClass,
-              'max-w-[10rem] truncate',
+              'max-w-[14rem] truncate',
               responsiveDataListClasses.columnSecondary
             )}
+            title={order.restaurant_name}
           >
             {order.restaurant_name}
           </td>
@@ -510,7 +512,7 @@ export function OrdersResponsiveList({
           <td
             className={cn(
               tdClass,
-              'text-[var(--text-muted)]',
+              'whitespace-nowrap text-[var(--text-muted)]',
               responsiveDataListClasses.columnTertiary
             )}
           >
@@ -526,7 +528,10 @@ export function OrdersResponsiveList({
             {order.items?.length || 0}
           </td>
           <td
-            className={cn(tdClass, 'text-end font-semibold tabular-nums text-[var(--brand-mid)]')}
+            className={cn(
+              tdClass,
+              'whitespace-nowrap text-end text-sm font-semibold tabular-nums text-[var(--brand-mid)]'
+            )}
           >
             ${formatPrice(order.total_amount)}
           </td>
