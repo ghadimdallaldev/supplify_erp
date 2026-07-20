@@ -514,7 +514,9 @@
     "toast": {
       "createFailed": "تعذّر إنشاء التذكير",
       "openingChat": "جارٍ فتح الدردشة — الصق رسالتك عند الجاهزية",
-      "prepareFailed": "فشل تحضير الرسالة"
+      "prepareFailed": "فشل تحضير الرسالة",
+      "reminderSent": "تم إرسال التذكير إلى المطعم",
+      "sendFailed": "فشل إرسال التذكير"
     }
   },
   "fulfillmentIssue": {

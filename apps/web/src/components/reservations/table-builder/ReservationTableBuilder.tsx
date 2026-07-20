@@ -754,7 +754,7 @@ export function ReservationTableBuilder({
 
         <div className="space-y-2">
           <Label className="text-xs uppercase text-[var(--text-muted)]">
-            {t('tableBuilder.features')}
+            {t('tableBuilder.featuresLabel')}
           </Label>
           <div className="flex flex-wrap gap-2">
             {featureOptions.map(({ value, label }) => {
