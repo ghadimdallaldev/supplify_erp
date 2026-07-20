@@ -66,7 +66,7 @@ export function FulfillmentTrackingTab() {
                 onClick={() => setViewMode('map')}
               >
                 <Map className="h-3.5 w-3.5" aria-hidden />
-                {t('tracking.map')}
+                {t('tracking.mapView')}
               </Button>
             </div>
           </div>

@@ -356,7 +356,7 @@
     "shape": "الشكل",
     "zone": "المنطقة",
     "signatureColor": "اللون المميز",
-    "features": "الميزات",
+    "featuresLabel": "الميزات",
     "rotation": "الدوران",
     "reset": "إعادة ضبط",
     "specialNotes": "ملاحظات خاصة",
