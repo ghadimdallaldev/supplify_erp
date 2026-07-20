@@ -356,7 +356,7 @@
     "shape": "Shape",
     "zone": "Zone",
     "signatureColor": "Signature color",
-    "features": "Features",
+    "featuresLabel": "Features",
     "rotation": "Rotation",
     "reset": "Reset",
     "specialNotes": "Special notes",

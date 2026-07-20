@@ -242,7 +242,7 @@
     "title": "Delivery Tracking",
     "subtitle": "Active deliveries — refreshes every 30s",
     "board": "Board",
-    "map": "Map",
+    "mapView": "Map",
     "loadFailed": "Could not load active deliveries.",
     "empty": "No active deliveries right now.",
     "table": {
