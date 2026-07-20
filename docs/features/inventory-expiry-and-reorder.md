@@ -83,24 +83,27 @@ Operational features for restaurant inventory expiry, supplier shortage/substitu
 
 ---
 
-## Feature 4b: Deterministic reorder forecasts (Gold / Platinum)
+## Feature 4b: Deterministic reorder forecasts (Restaurant Growth / Scale)
 
-See [ai-smart-reorder.md](./ai-smart-reorder.md) for full spec.
+See [ai-smart-reorder.md](./ai-smart-reorder.md) for full spec. Public plan names: [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md).
 
 - Cached per restaurant / branch / product in `reorder_forecast`
-- Gold: 30/90-day usage + lead time; Platinum: seasonality + trend
+- Restaurant Growth (`full_90day_trends`): 30/90-day usage + lead time
+- Restaurant Scale (`ai_forecast_seasonality`): seasonality + trend on top of forecasts
 - Enriches `GET /reorder-assistance` without replacing cadence, expiry, or quick-list signals
 
 ---
 
-## Feature 5: AI Smart Reorder assistant (Gold / Platinum)
+## Feature 5: AI Smart Reorder assistant (Restaurant Growth / Scale)
 
-See [ai-smart-reorder.md](./ai-smart-reorder.md) § Phase 2.
+See [ai-smart-reorder.md](./ai-smart-reorder.md) for the full API and labeling rules.
 
-- **Gold** (`full_90day_trends`): `POST /reorder-assistance/explain` — LLM or heuristic summary of suggestions
-- **Platinum** (`ai_forecast_seasonality`): above + `POST /reorder-assistance/ask` — natural-language product matching
+- **`explain`**: LLM or heuristic summary of suggestions (`canExplainLlm` when `ai_platform` + forecast-capable `smart_reorder`)
+- **`ask`**: natural-language product matching (Scale / seasonality capability)
+- **`ai-recommend`**: batch qty/supplier/action recommendations; UI labels **AI** vs **Forecast** Reorder Recommendation — never claim forecast fallback as AI
+- **`feedback`**: light acceptance / incorrect / not-needed signals (`0189_reorder_recommendation_feedback.sql`)
 - Gated by plan `smart_reorder` tier, feature flag `ai_platform`, env `AI_ENABLED` + provider key
-- Metered: `ai_requests_per_day` (Gold 20, Platinum 100); heuristic fallbacks do not consume quota
+- Metered: paid `ai_requests_per_day` (Restaurant Growth **30**, Restaurant Scale **150**); trial uses `ai_trial_requests_total` pool; heuristic/forecast fallbacks do not consume quota
 
 ---
 

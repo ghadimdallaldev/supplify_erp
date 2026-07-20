@@ -34,6 +34,6 @@ flowchart TB
 
 - **Operators** — One place to see platform health, revenue, and risk (e.g. overdue invoices).
 - **Support** — Impersonation reproduces the tenant UI end-to-end (including branch context); billing changes stay in the admin console; overrides can unblock tenants while they upgrade or renew.
-- **Revenue** — Plan and subscription management plus conversion stats help tune pricing and positioning (e.g. Gold as default serious plan).
+- **Revenue** — Plan and subscription management plus conversion stats help tune pricing and positioning (e.g. Growth as entry paid, Scale for multi-site volume).
 
 Admin and operations are built so that running and growing the business is manageable and auditable.

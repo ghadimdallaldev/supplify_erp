@@ -15,7 +15,7 @@ The product is not a lightweight ordering widget. It is an end-to-end B2B supply
 - **Unified ordering** — Restaurants browse supplier catalogs, build carts, place orders, schedule re-orders via quick lists, and track status through delivery and invoicing.
 - **Supplier operations** — Suppliers manage products, warehouses, fulfillment boards, driver dispatch, GPS tracking, promotions, and receivables.
 - **Restaurant operations** — Restaurants receive goods, record quality, manage on-hand inventory, run front-of-house reservations, and reconcile invoices.
-- **Monetization** — Tiered subscriptions (Free Trial, Silver, Gold, Platinum) gate features and usage meters for both tenant types.
+- **Monetization** — Tenant-specific Growth / Scale subscriptions plus a 30-day Free Trial gate features and usage meters (see [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md)).
 - **Growth and discovery** — Supplier customer import, referral programs, public mini-store catalogs, quote requests, and consumer B2C ordering extend reach beyond logged-in B2B users.
 - **Platform control** — Admins manage tenants, plans, feature flags, limit overrides, deal approvals, impersonation, and observability.
 
@@ -63,7 +63,7 @@ Restaurants gain a **single pane of glass** for procurement and back-of-house co
 - **Visibility through delivery** — Track in-flight orders, view supplier GPS when enabled, and record receiving with optional quality photos (plan-gated `receiving_quality`).
 - **Financial clarity** — Invoices tied to orders; payment recording; supplier account statements (with known limitations documented in the product guide).
 - **Operational breadth** — Inventory and waste tracking, disputes, deals redemptions, contract pricing, quote requests, and FOH reservations on one platform.
-- **Scalable controls** — Multi-branch inventory, advanced roles, and smart reorder unlock as plans upgrade from Silver through Platinum.
+- **Scalable controls** — Multi-branch inventory, advanced roles, and smart reorder unlock as restaurants move from Growth to Scale (suppliers: Growth → Scale with active customer location metering).
 
 ### Suppliers
 
@@ -71,7 +71,7 @@ Suppliers reduce missed orders and manual coordination:
 
 - **Centralized order intake** — All restaurant orders in one fulfillment workflow with decline reasons, amendments, and calendar views.
 - **Catalog and pricing power** — Product CRUD, bulk CSV import, image ZIP import, contract pricing, and optional public mini-store at `/supplier/:slug`.
-- **Logistics** — Warehouse management, multi-warehouse routing (Gold+), delivery board, driver assignment, route planning, and GPS tracking.
+- **Logistics** — Warehouse management, multi-warehouse routing (Supplier Scale), delivery board, driver assignment, route planning, and GPS tracking.
 - **Revenue tools** — Invoicing from delivered orders, promotions/deals with admin approval, growth program for customer acquisition, and command-center analytics.
 - **Relationship management** — Chat, reviews, disputes resolution, and restaurant connection requests.
 
@@ -144,16 +144,17 @@ The monorepo uses **pnpm workspaces** with a Node.js/Express API and a Vite-powe
 
 ### Subscription tiers
 
-Four **active self-serve tiers** apply to both restaurants and suppliers (separate `subscription_plan` rows per tenant type):
+Public self-serve plans are **tenant-specific**. Canonical commercial doc: [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md).
 
-| Code       | Name       | Monthly (USD) | Positioning                                                                   |
-| ---------- | ---------- | ------------- | ----------------------------------------------------------------------------- |
-| `free`     | Free Trial | $0            | Time-limited evaluation (default 30 days, admin 7–90); read-only after expiry |
-| `silver`   | Silver     | $49           | First paid tier; single-location core                                         |
-| `gold`     | Gold       | $149          | Daily operations; multi-branch, analytics, smart reorder                      |
-| `platinum` | Platinum   | $349          | High limits; full feature catalog                                             |
+| Tenant     | Public name       | Internal code | Monthly (USD) | Positioning                                           |
+| ---------- | ----------------- | ------------- | ------------: | ----------------------------------------------------- |
+| Restaurant | Restaurant Growth | `silver`      |           $49 | Single-branch purchasing & ops                        |
+| Restaurant | Restaurant Scale  | `gold`        |          $149 | Multi-branch (3) + advanced ops / AI                  |
+| Supplier   | Supplier Growth   | `gold`        |          $149 | 50 active customer locations / month                  |
+| Supplier   | Supplier Scale    | `platinum`    |          $349 | 200 active customer locations + multi-warehouse depth |
+| Both       | 30-day Free Trial | `free`        |            $0 | Time-limited; trial target plan features              |
 
-An `enterprise` plan code exists in the database but is **inactive for self-serve** (`requires_admin_assignment`). Bronze was removed in migration `0116`; legacy `bronze` input maps to `silver`.
+Custom / `enterprise` rows are **hidden from self-serve**. Legacy `bronze` input maps to `silver`.
 
 Feature gates and meter limits are enforced server-side via `requireFeature()` middleware and `plan-enforcement.js`, keyed from `feature-keys.js`.
 
@@ -285,18 +286,18 @@ These are product honesty markers, not blockers for core B2B ordering flows.
 
 ## Implementation Evidence
 
-| Topic                 | Primary paths                                                                                                        |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Product definition    | `docs/product/overview.md`, `docs/sales/02_solution.md`, `docs/sales/03_platform_overview.md`                        |
-| Route inventory       | `docs/audits/route-inventory.json`                                                                                   |
-| Bootstrap metrics     | `docs/onboarding/_artifacts/bootstrap-metrics.md`                                                                    |
-| Frontend routing      | `apps/web/src/App.tsx`                                                                                               |
-| RBAC & roles          | `apps/api/src/lib/role-matrix.js`, `apps/api/src/lib/tenant-roles.js`, `docs/architecture/rbac-permission-matrix.md` |
-| Subscriptions & tiers | `docs/product/tier-matrix.md`, `docs/product/plans.md`, `apps/api/db/migrations/0116`–`0120`                         |
-| Auth & registration   | `apps/api/src/lib/rbac.js`, `docs/features/tenant-registration.md`                                                   |
-| Feature catalog       | `docs/product/features.md`, `docs/product/feature-catalog-technical.md`                                              |
-| Cron jobs             | `docs/operations/cron-jobs.md`, `apps/api/src/lib/register-cron-jobs.js`                                             |
-| Demo readiness audit  | `docs/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`                                                                       |
+| Topic                 | Primary paths                                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Product definition    | `docs/product/overview.md`, `docs/sales/02_solution.md`, `docs/sales/03_platform_overview.md`                            |
+| Route inventory       | `docs/audits/route-inventory.json`                                                                                       |
+| Bootstrap metrics     | `docs/onboarding/_artifacts/bootstrap-metrics.md`                                                                        |
+| Frontend routing      | `apps/web/src/App.tsx`                                                                                                   |
+| RBAC & roles          | `apps/api/src/lib/role-matrix.js`, `apps/api/src/lib/tenant-roles.js`, `docs/architecture/rbac-permission-matrix.md`     |
+| Subscriptions & tiers | `docs/product/four-plan-pricing-model.md`, `docs/product/plans-and-limits.md` (historical: `tier-matrix.md`, `plans.md`) |
+| Auth & registration   | `apps/api/src/lib/rbac.js`, `docs/features/tenant-registration.md`                                                       |
+| Feature catalog       | `docs/product/features.md`, `docs/product/feature-catalog-technical.md`                                                  |
+| Cron jobs             | `docs/operations/cron-jobs.md`, `apps/api/src/lib/register-cron-jobs.js`                                                 |
+| Demo readiness audit  | `docs/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`                                                                           |
 
 ---
 

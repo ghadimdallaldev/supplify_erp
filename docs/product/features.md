@@ -37,12 +37,12 @@ Fresh Keycloak users complete organization setup at `/register/complete`, then u
 
 The sidebar (`apps/web/src/components/Sidebar.tsx`) adapts by **effective tenant role** (`useImpersonation()` when an admin is impersonating):
 
-| Role                  | Primary nav                                                                                                                                                                                               |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Restaurant**        | Dashboard, Orders, Products, Cart, Quick Lists, Reservations, Receiving, Suppliers, Deals, Reports, Disputes, Staff, Inventory (+ waste), Recipes & recipe costing (Gold+), Invoices, Chat, Settings, Org |
-| **Supplier**          | Dashboard, Orders, Products, Fulfillment, Restaurants, Promotions, Reports, Disputes, Invoices, Chat, Settings, Org                                                                                       |
-| **Platform admin**    | Admin Dashboard, Supplier Admin, Restaurant Admin, Settings                                                                                                                                               |
-| **Public (no login)** | Reservation portal, staff self-service                                                                                                                                                                    |
+| Role                  | Primary nav                                                                                                                                                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Restaurant**        | Dashboard, Orders, Products, Cart, Quick Lists, Reservations, Receiving, Suppliers, Deals, Reports, Disputes, Staff, Inventory (+ waste), Recipes & recipe costing (Scale / Growth where gated), Invoices, Chat, Settings, Org |
+| **Supplier**          | Dashboard, Orders, Products, Fulfillment, Restaurants, Promotions, Reports, Disputes, Invoices, Chat, Settings, Org                                                                                                            |
+| **Platform admin**    | Admin Dashboard, Supplier Admin, Restaurant Admin, Settings                                                                                                                                                                    |
+| **Public (no login)** | Reservation portal, staff self-service                                                                                                                                                                                         |
 
 RBAC permissions (e.g. `RESERVATIONS_VIEW`, `STAFF_VIEW`, `INVOICES_VIEW`) further filter restaurant nav items.
 
@@ -58,7 +58,7 @@ RBAC permissions (e.g. `RESERVATIONS_VIEW`, `STAFF_VIEW`, `INVOICES_VIEW`) furth
 | Branches        | Settings / tenant config                   | `/api/branches`                          | Multi-branch restaurants                                                                                                                                      |
 | Supplier org    | `/app/org`                                 | `/api/org`                               | Supplier org branches (`multi_branch`)                                                                                                                        |
 | Warehouses      | Supplier settings → Warehouses             | `/api/warehouses`                        | CRUD, zones, inventory (`warehouses`)                                                                                                                         |
-| Multi-warehouse | Supplier settings fulfillment toggle       | `/api/suppliers/me/fulfillment`, routing | Gold+ `multi_warehouse`; order line assignment                                                                                                                |
+| Multi-warehouse | Supplier settings fulfillment toggle       | `/api/suppliers/me/fulfillment`, routing | Supplier Scale `multi_warehouse`; order line assignment                                                                                                       |
 
 **Verify:** Log in as restaurant → Products loads; as supplier → Restaurants loads. API tests: `products.routes.test.js`, `suppliers.routes.test.js`, `restaurants.routes.test.js`.
 
@@ -114,18 +114,18 @@ Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admi
 
 ## Restaurant operations
 
-| Feature              | Web route                            | API prefix                   | Notes                                    |
-| -------------------- | ------------------------------------ | ---------------------------- | ---------------------------------------- |
-| Restaurant inventory | `/app/restaurant-inventory`          | `/api/restaurant-inventory`  | On-hand; waste tab when `waste_tracking` |
-| Receiving            | `/app/receiving`                     | `/api/receiving`             | Goods-in, quality checks                 |
-| Disputes             | `/app/disputes`, `/app/disputes/:id` | `/api/disputes`              | Replacement orders, credit notes         |
-| Onboarding           | `/app/onboarding`                    | `/api/restaurant-onboarding` | Restaurant setup wizard                  |
-| Restaurant pricing   | —                                    | `/api/restaurant-pricing`    | Internal menu / cost pricing             |
-| Restaurant finance   | —                                    | `/api/restaurant-finance`    | COGS / finance hooks                     |
-| Recipes              | `/app/recipes`, `/app/recipes/:id`   | `/api/recipes`               | Recipe builder; plan `recipe_costing`    |
-| Recipe costing       | `/app/recipe-costing`                | `/api/recipe-costing`        | Dashboard, alerts, price-impact; Gold+   |
+| Feature              | Web route                            | API prefix                   | Notes                                                                        |
+| -------------------- | ------------------------------------ | ---------------------------- | ---------------------------------------------------------------------------- |
+| Restaurant inventory | `/app/restaurant-inventory`          | `/api/restaurant-inventory`  | On-hand; waste tab when `waste_tracking`                                     |
+| Receiving            | `/app/receiving`                     | `/api/receiving`             | Goods-in, quality checks                                                     |
+| Disputes             | `/app/disputes`, `/app/disputes/:id` | `/api/disputes`              | Replacement orders, credit notes                                             |
+| Onboarding           | `/app/onboarding`                    | `/api/restaurant-onboarding` | Restaurant setup wizard                                                      |
+| Restaurant pricing   | —                                    | `/api/restaurant-pricing`    | Internal menu / cost pricing                                                 |
+| Restaurant finance   | —                                    | `/api/restaurant-finance`    | COGS / finance hooks                                                         |
+| Recipes              | `/app/recipes`, `/app/recipes/:id`   | `/api/recipes`               | Recipe builder; plan `recipe_costing`                                        |
+| Recipe costing       | `/app/recipe-costing`                | `/api/recipe-costing`        | Dashboard, alerts, price-impact; plan `recipe_costing` (see four-plan model) |
 
-**Verify:** Restaurant → Receiving → record receipt against PO. Feature flags: `receiving_quality`, `inventory_management`. Gold+ → **Recipes** nav loads; Silver → `GET /api/recipes` returns **403 FEATURE_NOT_AVAILABLE**. See [recipe-costing.md](../features/recipe-costing.md).
+**Verify:** Restaurant → Receiving → record receipt against PO. Feature flags: `receiving_quality`, `inventory_management`. Restaurant Scale (or Growth where `recipe_costing` is on) → **Recipes** nav loads; Growth without the feature → `GET /api/recipes` returns **403 FEATURE_NOT_AVAILABLE**. See [recipe-costing.md](../features/recipe-costing.md).
 
 ## Finance & billing
 
@@ -187,13 +187,13 @@ Tests: `subscriptions.routes.test.js`, `feature-flags.test.js`, `subscription.te
 
 ## Notifications
 
-| Feature              | Web route                        | API prefix                   | Notes                                                                       |
-| -------------------- | -------------------------------- | ---------------------------- | --------------------------------------------------------------------------- |
-| In-app notifications | Header bell + toasts             | `/api/notifications`         | Team-wide via `notifyTenantUsers`; `useNotificationAlerts` in Layout        |
-| Email                | Settings → Notifications         | —                            | SMTP (Resend / Mailpit)                                                     |
-| WhatsApp             | Settings → Notifications         | —                            | Meta Cloud API server send via `whatsapp.service.js` (Gold+ tier + prefs)   |
-| Outbound webhooks    | Settings → Notifications         | `/api/notifications/webhook` | Platinum signed HTTP dispatch for tenant events                             |
-| Web Push (PWA)       | Settings (restaurant onboarding) | `/api/push`                  | VAPID keys on API; `usePushNotifications` + `/sw.js`; opt-in `push_enabled` |
+| Feature              | Web route                        | API prefix                   | Notes                                                                                     |
+| -------------------- | -------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------- |
+| In-app notifications | Header bell + toasts             | `/api/notifications`         | Team-wide via `notifyTenantUsers`; `useNotificationAlerts` in Layout                      |
+| Email                | Settings → Notifications         | —                            | SMTP (Resend / Mailpit)                                                                   |
+| WhatsApp             | Settings → Notifications         | —                            | Meta Cloud API server send via `whatsapp.service.js` (Scale / Growth where gated + prefs) |
+| Outbound webhooks    | Settings → Notifications         | `/api/notifications/webhook` | Scale signed HTTP dispatch for tenant events where plan enables `email_whatsapp_webhook`  |
+| Web Push (PWA)       | Settings (restaurant onboarding) | `/api/push`                  | VAPID keys on API; `usePushNotifications` + `/sw.js`; opt-in `push_enabled`               |
 
 See [notifications-summary.md](./notifications-summary.md) and [notifications-and-alerts.md](../features/notifications-and-alerts.md).
 

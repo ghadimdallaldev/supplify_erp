@@ -10,9 +10,10 @@ Restaurant & F&B supplier marketplace monorepo (`apps/api`, `apps/web`).
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Set up locally                          | [guides/setup.md](./guides/setup.md) · [guides/developer-handbook.md](./guides/developer-handbook.md)                                                   |
 | Understand the product                  | [product/overview.md](./product/overview.md)                                                                                                            |
-| Plans & limits                          | [product/plans-and-limits.md](./product/plans-and-limits.md)                                                                                            |
+| Plans & limits                          | [product/plans-and-limits.md](./product/plans-and-limits.md) · [product/four-plan-pricing-model.md](./product/four-plan-pricing-model.md)               |
 | Feature behavior                        | [features/README.md](./features/README.md)                                                                                                              |
-| Recipe costing (restaurant Gold+)       | [features/recipe-costing.md](./features/recipe-costing.md) · migration `0186`                                                                           |
+| Recipe costing (restaurant Scale)       | [features/recipe-costing.md](./features/recipe-costing.md) · migration `0186`                                                                           |
+| Responsive lists (card ↔ table)        | [ui/responsive-data-list.md](./ui/responsive-data-list.md)                                                                                              |
 | Bulk product image import (supplier)    | [features/bulk-product-image-import.md](./features/bulk-product-image-import.md)                                                                        |
 | Supplier customer growth (referral)     | [features/supplier-customer-growth.md](./features/supplier-customer-growth.md) · migration `0169`                                                       |
 | Deploy to Railway                       | [operations/deployment.md](./operations/deployment.md)                                                                                                  |

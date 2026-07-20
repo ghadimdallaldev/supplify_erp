@@ -1033,16 +1033,16 @@ The following user-facing labels are already implemented correctly in `dealDispl
 
 ### Phase 6 — Mobile / Responsive Pass
 
-> **Status: ✅ Completed** — Supplier inventory table responsive column hiding; Orders responsive cards; Admin tab bar fade indicators (Phase 2); Dashboard KPI 2×2 on mobile. **Restaurant bottom nav** added via `RestaurantMobileNav` (Home, Orders, Cart, Products, Chat) — visible on `lg:hidden` for restaurant users. **Deferred:** Dialog→bottom-sheet on mobile (low priority; dialogs remain usable).
+> **Status: ✅ Completed** — Hybrid **`ResponsiveDataList`** card/table system (`docs/ui/responsive-data-list.md`): Orders / inventory / disputes use `cardBreakpoint="lg"` (table from laptop); product catalog keeps cards through laptop (`xl`). Orders laptop density pass (2026-07-17). Admin tab bar fade indicators (Phase 2); Dashboard KPI 2×2 on mobile. **Restaurant bottom nav** via `RestaurantMobileNav` (`lg:hidden`). **Deferred:** Dialog→bottom-sheet on mobile (low priority; dialogs remain usable).
 
-**Scope:** Mobile-first improvements for restaurant staff and drivers.
+**Scope:** Mobile-first and laptop-first improvements for restaurant staff, suppliers, and drivers.
 
-**Tasks:**
+**Tasks (historical — done):**
 
-1. Inventory table: Add responsive column hiding for mobile.
-2. Orders table: Stack customer + ID on mobile, hide date column.
+1. Inventory / disputes: hybrid card/table via `ResponsiveDataList`.
+2. Orders: cards below `lg`, dense table from laptop (`OrdersResponsiveList`).
 3. Admin tab bar: Add fade gradient scroll indicators.
-4. Consider bottom nav bar for restaurant mobile (5 primary destinations).
+4. Bottom nav bar for restaurant mobile (5 primary destinations).
 5. `Dialog` → bottom sheet behavior review on mobile.
 
 **Expected impact:** High for restaurant mobile users  

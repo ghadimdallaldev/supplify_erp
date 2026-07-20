@@ -1,38 +1,39 @@
 # 10 — Subscriptions and Plans
 
-Supplify monetization is **plan-driven**: every restaurant and supplier workspace has a `subscription` row joined to `subscription_plan` (limits + features JSON). Self-serve tiers are **Free Trial**, **Silver**, **Gold**, and **Platinum**. The legacy **Enterprise** tier was deactivated in migration `0066_remove_enterprise_tier.sql` and is not selectable; `normalizePlanCode()` maps `enterprise` → `platinum` for comparisons only.
+> **Commercial source of truth:** Public plan names, prices, primary scale metrics, add-ons, trial behavior, and AI allowances live in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). This guide focuses on **enforcement architecture** (entitlements, middleware, Free Trial mechanics). Do not quote Silver/Gold/Platinum as customer-facing names.
 
-Canonical plan codes: `free`, `silver`, `gold`, `platinum` (`apps/api/src/lib/plan-codes.js`).
-
----
-
-## Plan catalog summary
-
-| Plan       | Display name | Restaurant monthly / yearly | Supplier monthly / yearly | Notes                                                         |
-| ---------- | ------------ | --------------------------- | ------------------------- | ------------------------------------------------------------- |
-| `free`     | Free Trial   | $0 / $0                     | $0 / $0                   | Time-limited sandbox; Gold **feature** gates, Free **limits** |
-| `silver`   | Silver       | $49 / $490                  | $49 / $490                | First paid tier (`0117_silver_tier_limits_features.sql`)      |
-| `gold`     | Gold         | $149 / $1,490               | $149 / $1,490             | Core production tier (`0119_gold_tier_limits_features.sql`)   |
-| `platinum` | Platinum     | $349 / $3,490               | $349 / $3,490             | High-capacity tier (`0120_platinum_tier_limits_features.sql`) |
-
-Prices are stored on `subscription_plan.price_per_month` and `price_per_year`. Migrations **0117**, **0119**, and **0120** set limits, features, and confirm pricing for Silver/Gold/Platinum. Free-tier limits are maintained in `0145_plan_catalog_audit_sync.sql` (and runtime fallbacks in `limit-resolution.js`).
+Supplify monetization is **plan-driven**: every restaurant and supplier workspace has a `subscription` row joined to `subscription_plan` (limits + features JSON). Public self-serve plans are tenant-specific **Growth** and **Scale** tiers plus a **30-day Free Trial**. Internal DB codes remain `free`, `silver`, `gold`, `platinum` for compatibility (`apps/api/src/lib/plan-codes.js`). Hidden `enterprise` / custom rows stay admin-only.
 
 ---
 
-## Free Trial: Gold features, Free limits
+## Plan catalog summary (public)
 
-Free Trial is **not** a stripped-down feature tier. Runtime enforcement uses **Gold feature JSON** while **Free limit caps** apply:
+| Tenant type | Public plan       | Internal code | Monthly / yearly | Primary scale metric                                    |
+| ----------- | ----------------- | ------------- | ---------------- | ------------------------------------------------------- |
+| Restaurant  | Restaurant Growth | `silver`      | $49 / $490       | 1 active branch                                         |
+| Restaurant  | Restaurant Scale  | `gold`        | $149 / $1,490    | 3 active branches                                       |
+| Supplier    | Supplier Growth   | `gold`        | $149 / $1,490    | 50 active customer locations / month                    |
+| Supplier    | Supplier Scale    | `platinum`    | $349 / $3,490    | 200 active customer locations / month                   |
+| Both        | 30-day Free Trial | `free`        | $0               | Trial target plan features + Free/trial limit + AI pool |
 
-1. **DB sync** — Migrations `0112_free_gold_feature_parity.sql`, `0145_plan_catalog_audit_sync.sql`, and `0175_free_trial_supplier_growth_parity.sql` copy Gold `features` onto Free rows.
-2. **Runtime override** — `resolveEffectivePlanFeatures()` (`apps/api/src/lib/subscription/free-trial-plan-features.js`) loads cached Gold features whenever `plan_code === 'free'`, so API gates stay correct even if catalog rows drift.
+Prices and JSON limits/features are stored on `subscription_plan`. Migration `0190_four_plan_pricing_model.sql` aligns the catalog; older `0117`/`0119`/`0120` rows are historical context only.
+
+---
+
+## Free Trial: target-plan features, trial limits
+
+Free Trial is **not** a permanent free tier. Runtime feature resolution uses the subscription’s **`trial_target_plan_id`** (default Restaurant Growth / Supplier Growth). If no target is recorded, `resolveEffectivePlanFeatures()` falls back to the default paid Growth-target features (`free-trial-plan-features.js`).
 
 ```javascript
-// free-trial-plan-features.js — Free Trial uses Gold feature gates
-if (planCode !== 'free' || !tenantType) return raw
-return getGoldPlanFeatures(tenantType)
+// free-trial-plan-features.js — Free Trial mirrors trial target plan features
+const targetPlan = await getTrialTargetPlan(subscription)
+if (targetPlan?.features) return targetPlan.features
+return getDefaultPaidTrialPlanFeatures(tenantType)
 ```
 
-**Sandbox expiry** — Free workspaces get `subscription.free_sandbox_expires_at` (`0113_free_sandbox_expiry.sql`, default 7 days from `platform_setting.free_sandbox_days`). After expiry, `billingAccessMiddleware` locks writes (402); most GETs remain read-only except sensitive exports/reports.
+**Sandbox expiry** — Free workspaces get `subscription.free_sandbox_expires_at` (default **30 days** from `platform_setting.free_sandbox_days`, admin range 7–90). After expiry, `billingAccessMiddleware` locks writes (402); most GETs remain read-only except sensitive exports/reports.
+
+**AI during trial** — Genuine LLM calls use `ai_trial_requests_total` (restaurant 50 total / supplier 100 total), not the paid daily meter.
 
 **Hidden limit** — `scheduled_order_grace_per_day` lets scheduled quick-lists overflow the daily order cap once per day on Free; it is enforced but hidden from the entitlements UI (`HIDDEN_ENTITLEMENT_LIMIT_KEYS`).
 
@@ -77,18 +78,23 @@ From `apps/api/src/lib/limit-resolution.js`.
 | `deal_redemptions_per_day`      | Supplier deal redemptions                   |
 | `ai_requests_per_day`           | LLM reorder assistant calls (`0167`)        |
 
-### Supplier limits (9 keys)
+### Supplier limits (keys)
 
-| Key                      | Meaning                               |
-| ------------------------ | ------------------------------------- |
-| `branches`               | Active branch locations               |
-| `warehouses`             | Active warehouses (`0` = feature off) |
-| `users`                  | Supplier contact (always 1)           |
-| `supplier_products_skus` | Products in catalog                   |
-| `chats_per_day`          | Daily chat meter                      |
-| `open_conversations`     | Non-archived conversations            |
-| `storage_mb`             | Cumulative file storage               |
-| `promotions`             | Non-expired promotions                |
+Canonical commercial meters for suppliers are documented in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md). Primary scale key: **`active_customer_locations_monthly`**. Other keys include `warehouses`, `branches`, `users`, `drivers`, `promotions`, `open_conversations`, `chats_per_day`, `storage_mb`, `ai_requests_per_day`.
+
+| Key                                 | Meaning                                                                  |
+| ----------------------------------- | ------------------------------------------------------------------------ |
+| `active_customer_locations_monthly` | Distinct ordering locations in billing period (primary commercial meter) |
+| `branches`                          | Active branch locations                                                  |
+| `warehouses`                        | Active warehouses (`0` = feature off)                                    |
+| `users`                             | Login-enabled supplier seats                                             |
+| `drivers`                           | Active driver rows                                                       |
+| `supplier_products_skus`            | Products in catalog (fair-use / technical)                               |
+| `chats_per_day`                     | Daily chat meter                                                         |
+| `open_conversations`                | Non-archived conversations                                               |
+| `storage_mb`                        | Cumulative file storage                                                  |
+| `promotions`                        | Non-expired promotions                                                   |
+| `ai_requests_per_day`               | Genuine LLM assists (paid plans)                                         |
 
 **Unlimited** — Limit value `-1` or `null` in plan JSON means no cap (`formatPlanLimitDisplay` → `unlimited`).
 
@@ -99,6 +105,8 @@ From `apps/api/src/lib/limit-resolution.js`.
 ---
 
 ## Plan limit tables
+
+> **Historical matrices below** (Free/Silver/Gold/Platinum columns) are retained for migration archaeology. **Do not use them for current commercial quoting.** Live numbers: [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md).
 
 Values from migrations **0117**, **0119**, **0120**, **0145** (Free), and **0167** (`ai_requests_per_day`). `-1` = unlimited.
 

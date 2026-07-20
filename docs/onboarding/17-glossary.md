@@ -20,11 +20,11 @@ A **workspace** is the authenticated product experience for one tenant. Users se
 
 ### Organization (org)
 
-Restaurant and supplier tenants can have an **organization** parent (`restaurant_organizations`, `supplier_organizations`) with child **branches**. Org-level billing rolls up to the root tenant via `resolveOrgBillingTenantId`. Multi-branch features require plan key `multi_branch` (Gold+ on paid tiers; enabled on Free Trial via Gold feature parity).
+Restaurant and supplier tenants can have an **organization** parent (`restaurant_organizations`, `supplier_organizations`) with child **branches**. Org-level billing rolls up to the root tenant via `resolveOrgBillingTenantId`. Multi-branch features require plan key `multi_branch` (Restaurant Scale; trial follows trial target). See [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md).
 
 ### Branch
 
-A **branch** is a physical or logical site under an org: `restaurant_branch` or `supplier_branch`. Branches scope orders, inventory, quick lists, and delivery coordinates. Plan limit `branches` caps active locations (Free/Silver: 1; Gold: 3; Platinum: unlimited). Branch invites use `/invite/branch`.
+A **branch** is a physical or logical site under an org: `restaurant_branch` or `supplier_branch`. Branches scope orders, inventory, quick lists, and delivery coordinates. Plan limit `branches` caps active locations (Restaurant Growth: 1; Restaurant Scale: 3 + add-ons). Branch invites use `/invite/branch`.
 
 ### Platform role (`app_user.role`)
 
@@ -114,7 +114,7 @@ Quick list with `is_scheduled = true` for automated or calendar-driven reorder. 
 
 ### Smart reorder
 
-Restaurant feature `smart_reorder` (Gold+): cadence detection, at-risk SKUs, dashboard widgets. Uses `reorder-cadence` service and optional `ai_platform` LLM assistant (`ai_requests_per_day` limit on Gold/Platinum).
+Restaurant feature `smart_reorder` (Restaurant Growth+): cadence detection, at-risk SKUs, dashboard widgets, and optional LLM **explain / ask / ai-recommend** when `ai_platform` + quota allow. Paid AI meter `ai_requests_per_day` (Growth 30 / Scale 150); trial uses `ai_trial_requests_total`. Forecast fallbacks must be labeled as forecast, not AI. See [../features/ai-smart-reorder.md](../features/ai-smart-reorder.md).
 
 ### Reorder cadence
 
@@ -170,7 +170,7 @@ Public storefront order at `/order/:restaurantSlug` — separate from B2B `custo
 
 ### Warehouse
 
-Supplier ship-from location (`warehouse` table). Plan feature `warehouses`; limit `warehouses` (0 on Free = feature effectively off; Silver: 1; Gold: 3; Platinum: ∞). Permissions `WAREHOUSES_VIEW`, `WAREHOUSES_EDIT`, `WAREHOUSES_MANAGE`. Multi-warehouse routing: `multi_warehouse` (Gold+).
+Supplier ship-from location (`warehouse` table). Plan feature `warehouses`; limit `warehouses`. Permissions `WAREHOUSES_VIEW`, `WAREHOUSES_EDIT`, `WAREHOUSES_MANAGE`. Multi-warehouse routing: `multi_warehouse` (Supplier Scale). Live caps: [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md).
 
 ### Receiving
 

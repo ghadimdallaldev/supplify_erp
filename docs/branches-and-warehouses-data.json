@@ -1,0 +1,1175 @@
+{
+  "generatedAt": "2026-07-17T15:00:00.000Z",
+  "tenantModel": {
+    "hasUnifiedTenantTable": false,
+    "definition": "A tenant is a row in restaurant or supplier, referenced polymorphically as (tenant_id, tenant_type).",
+    "tenantTypes": ["RESTAURANT", "SUPPLIER"],
+    "primaryTables": ["restaurant", "supplier"],
+    "polymorphicPattern": {
+      "fields": ["tenant_id", "tenant_type"],
+      "foreignKeyToTenant": false,
+      "examples": [
+        "subscription",
+        "tenant_roles",
+        "tenant_user_roles",
+        "tenant_usage",
+        "tenant_subscription_addon"
+      ]
+    },
+    "resolution": {
+      "modules": [
+        "apps/api/src/lib/rbac.js",
+        "apps/api/src/lib/tenant-switch.js",
+        "apps/api/src/lib/workspace-tenant.js",
+        "apps/api/src/lib/org-billing-tenant.js"
+      ],
+      "activeTenantCookie": "active_tenant_token"
+    },
+    "workspaceMembership": {
+      "table": "user_workspace_membership",
+      "migration": "apps/api/db/migrations/0104_user_workspace_membership.sql",
+      "oneWorkspacePerUser": true,
+      "sameOrganizationBranchJoinAllowed": true,
+      "crossOrganizationBlocked": true
+    }
+  },
+  "organizationModel": {
+    "definition": "Billing and org-RBAC parent; not an operational tenant.",
+    "restaurant": {
+      "table": "restaurant_organizations",
+      "migration": "apps/api/db/migrations/0086_restaurant_branch_accounts.sql",
+      "childTable": "restaurant",
+      "childFk": "organization_id",
+      "rbacTables": [
+        "restaurant_org_roles",
+        "restaurant_org_role_permissions",
+        "restaurant_org_user_roles",
+        "restaurant_org_user_branch_access"
+      ],
+      "routesPrefix": "/api/restaurant-org",
+      "lib": "apps/api/src/lib/restaurant-org.js"
+    },
+    "supplier": {
+      "table": "supplier_organizations",
+      "migration": "apps/api/db/migrations/0082_supplier_branch_accounts.sql",
+      "childTable": "supplier",
+      "childFk": "organization_id",
+      "rbacTables": [
+        "org_roles",
+        "org_role_permissions",
+        "org_user_roles",
+        "org_user_branch_access"
+      ],
+      "routesPrefix": "/api/org",
+      "lib": "apps/api/src/lib/supplier-org.js"
+    },
+    "systemRoles": ["Org Owner", "Org Manager", "Org Viewer", "Regional Manager"],
+    "createdOnSignup": true,
+    "signupModule": "apps/api/src/lib/register-account.js",
+    "unifiedAcrossRestaurantAndSupplier": false
+  },
+  "restaurantBranchModel": {
+    "canonical": "separate_tenant_under_organization",
+    "areSeparateTenants": true,
+    "areChildRecords": false,
+    "areLinkedAccounts": "legacy_fallback_only",
+    "table": "restaurant",
+    "orgColumns": ["organization_id", "is_main_branch", "branch_code", "is_branch_active"],
+    "createFunction": "createRestaurantOrgBranch",
+    "createRoute": "POST /api/restaurant-org/branches",
+    "legacyLinkedTable": "tenant_account_link",
+    "legacyLinkedRoute": "POST /api/branches",
+    "legacyOperationalBranchTable": "branch",
+    "legacyOperationalBranchPurpose": "Sub-locations within one restaurant tenant (inventory, reservations, B2C, recipes)",
+    "linkExistingAccountProductFlow": false,
+    "linkExistingAccountMigrationOnly": true,
+    "linkFunction": "linkRestaurantToOrganization"
+  },
+  "supplierBranchModel": {
+    "canonical": "separate_tenant_under_organization",
+    "areSeparateTenants": true,
+    "sameModelAsRestaurant": false,
+    "parallelImplementation": true,
+    "table": "supplier",
+    "orgColumns": ["organization_id", "is_main_branch", "branch_code", "is_branch_active"],
+    "createFunction": "createOrgBranch",
+    "createRoute": "POST /api/org/branches",
+    "createsOwnCatalog": true,
+    "shareCatalogAcrossBranches": false,
+    "sharePricingAcrossBranches": false,
+    "shareCustomersAcrossBranches": false,
+    "restaurantFacingIdentity": "separate_supplier_profile",
+    "linkExistingAccountProductFlow": false,
+    "linkFunction": "linkSupplierToOrganization"
+  },
+  "warehouseModel": {
+    "definition": "Operational storage and fulfillment location under one supplier tenant; not an account or branch.",
+    "table": "warehouse",
+    "owner": "supplier_tenant",
+    "fk": "tenant_id REFERENCES supplier(id) ON DELETE CASCADE",
+    "migrations": [
+      "apps/api/db/migrations/0002_inventory_enhancements.sql",
+      "apps/api/db/migrations/0023_branches_warehouses.sql",
+      "apps/api/db/migrations/0081_warehouse_fulfillment.sql"
+    ],
+    "isAccount": false,
+    "visibleToRestaurantsAsAccount": false,
+    "canServeMultipleSupplierBranches": false,
+    "canServeMultipleRestaurantCustomers": true,
+    "oneBranchMultipleWarehouses": true,
+    "multiWarehouseOrderSplit": true,
+    "stockTransferImplemented": false,
+    "inventoryTables": ["inventory", "warehouse_inventory"],
+    "checkoutAuthoritativeInventory": "inventory",
+    "fulfillmentInventory": "warehouse_inventory",
+    "warehouseInventoryEnforcedWhenMissingRows": false,
+    "relatedTables": [
+      "warehouse_inventory",
+      "order_warehouse_assignment",
+      "warehouse_routing_rule",
+      "delivery_zone"
+    ],
+    "supplierFlags": ["multi_warehouse_enabled", "default_warehouse_id", "fulfillment_mode"],
+    "autoCreateOnOrgBranchCreate": false,
+    "lazyDefaultForPaidSupplier": true
+  },
+  "tables": [
+    {
+      "name": "restaurant",
+      "purpose": "Restaurant tenant account; org branches are additional rows",
+      "primaryKey": "id",
+      "tenantOwnership": "self",
+      "organizationOwnership": "organization_id -> restaurant_organizations",
+      "branchOwnership": "is itself an org branch when organization_id set",
+      "importantForeignKeys": ["organization_id"],
+      "uniqueConstraints": ["slug"],
+      "cascadeBehavior": "organization_id NO ACTION",
+      "activelyUsed": true,
+      "legacyOrDuplicated": false
+    },
+    {
+      "name": "supplier",
+      "purpose": "Supplier tenant account; org branches are additional rows",
+      "primaryKey": "id",
+      "tenantOwnership": "self",
+      "organizationOwnership": "organization_id -> supplier_organizations",
+      "branchOwnership": "is itself an org branch when organization_id set",
+      "importantForeignKeys": ["organization_id", "default_warehouse_id"],
+      "uniqueConstraints": ["slug"],
+      "cascadeBehavior": "organization_id NO ACTION",
+      "activelyUsed": true,
+      "legacyOrDuplicated": false
+    },
+    {
+      "name": "restaurant_organizations",
+      "purpose": "Parent org for restaurant branch tenants",
+      "primaryKey": "id",
+      "tenantOwnership": null,
+      "organizationOwnership": "self",
+      "branchOwnership": null,
+      "importantForeignKeys": [],
+      "uniqueConstraints": ["slug"],
+      "cascadeBehavior": null,
+      "activelyUsed": true,
+      "legacyOrDuplicated": false
+    },
+    {
+      "name": "supplier_organizations",
+      "purpose": "Parent org for supplier branch tenants",
+      "primaryKey": "id",
+      "tenantOwnership": null,
+      "organizationOwnership": "self",
+      "branchOwnership": null,
+      "importantForeignKeys": [],
+      "uniqueConstraints": ["slug"],
+      "cascadeBehavior": null,
+      "activelyUsed": true,
+      "legacyOrDuplicated": false
+    },
+    {
+      "name": "branch",
+      "purpose": "Legacy operational sub-location inside one restaurant tenant",
+      "primaryKey": "id",
+      "tenantOwnership": "tenant_id -> restaurant",
+      "organizationOwnership": null,
+      "branchOwnership": "self as sub-location",
+      "importantForeignKeys": ["tenant_id"],
+      "uniqueConstraints": ["(tenant_id, code)"],
+      "cascadeBehavior": "ON DELETE CASCADE from restaurant",
+      "activelyUsed": true,
+      "legacyOrDuplicated": "duplicated_concept_vs_org_branch_tenants"
+    },
+    {
+      "name": "warehouse",
+      "purpose": "Supplier fulfillment/storage location",
+      "primaryKey": "id",
+      "tenantOwnership": "tenant_id -> supplier",
+      "organizationOwnership": null,
+      "branchOwnership": null,
+      "importantForeignKeys": ["tenant_id"],
+      "uniqueConstraints": ["(tenant_id, code)"],
+      "cascadeBehavior": "ON DELETE CASCADE from supplier",
+      "activelyUsed": true,
+      "legacyOrDuplicated": false
+    },
+    {
+      "name": "tenant_account_link",
+      "purpose": "Legacy parent/child tenant links without organization",
+      "primaryKey": "id",
+      "tenantOwnership": "parent_tenant_id / child_tenant_id polymorphic UUIDs",
+      "organizationOwnership": null,
+      "branchOwnership": "child is branch account",
+      "importantForeignKeys": [],
+      "uniqueConstraints": ["(child_tenant_id, child_tenant_type)"],
+      "cascadeBehavior": "no FKs",
+      "activelyUsed": true,
+      "legacyOrDuplicated": "legacy_fallback"
+    },
+    {
+      "name": "user_workspace_membership",
+      "purpose": "One workspace boundary per user",
+      "primaryKey": "id",
+      "tenantOwnership": "home_tenant_id",
+      "organizationOwnership": "organization_id nullable no FK",
+      "branchOwnership": null,
+      "importantForeignKeys": ["user_id"],
+      "uniqueConstraints": ["user_id"],
+      "cascadeBehavior": "user CASCADE",
+      "activelyUsed": true,
+      "legacyOrDuplicated": false
+    },
+    {
+      "name": "tenant_user_roles",
+      "purpose": "Per-tenant named RBAC assignment",
+      "primaryKey": "id",
+      "tenantOwnership": "tenant_id + tenant_type",
+      "organizationOwnership": null,
+      "branchOwnership": "per branch tenant",
+      "importantForeignKeys": ["user_id", "role_id"],
+      "uniqueConstraints": ["(user_id, tenant_id, tenant_type)"],
+      "cascadeBehavior": "user/role CASCADE",
+      "activelyUsed": true,
+      "legacyOrDuplicated": false
+    },
+    {
+      "name": "org_user_roles",
+      "purpose": "Supplier org membership role",
+      "primaryKey": "id",
+      "tenantOwnership": null,
+      "organizationOwnership": "organization_id",
+      "branchOwnership": null,
+      "importantForeignKeys": ["user_id", "organization_id", "role_id"],
+      "uniqueConstraints": ["(user_id, organization_id)"],
+      "cascadeBehavior": "CASCADE from user",
+      "activelyUsed": true,
+      "legacyOrDuplicated": false
+    },
+    {
+      "name": "restaurant_org_user_roles",
+      "purpose": "Restaurant org membership role",
+      "primaryKey": "id",
+      "tenantOwnership": null,
+      "organizationOwnership": "organization_id",
+      "branchOwnership": null,
+      "importantForeignKeys": ["user_id", "organization_id", "role_id"],
+      "uniqueConstraints": ["(user_id, organization_id)"],
+      "cascadeBehavior": "CASCADE",
+      "activelyUsed": true,
+      "legacyOrDuplicated": false
+    },
+    {
+      "name": "org_user_branch_access",
+      "purpose": "Assigned supplier branch access for Regional Manager",
+      "primaryKey": "(user_id, supplier_id)",
+      "tenantOwnership": "supplier_id",
+      "organizationOwnership": "organization_id",
+      "branchOwnership": "supplier_id branch tenant",
+      "importantForeignKeys": ["user_id", "supplier_id", "organization_id"],
+      "uniqueConstraints": ["PK"],
+      "cascadeBehavior": "CASCADE",
+      "activelyUsed": true,
+      "legacyOrDuplicated": false
+    },
+    {
+      "name": "restaurant_org_user_branch_access",
+      "purpose": "Assigned restaurant branch access for Regional Manager",
+      "primaryKey": "(user_id, restaurant_id)",
+      "tenantOwnership": "restaurant_id",
+      "organizationOwnership": "organization_id",
+      "branchOwnership": "restaurant_id branch tenant",
+      "importantForeignKeys": ["user_id", "restaurant_id", "organization_id"],
+      "uniqueConstraints": ["PK"],
+      "cascadeBehavior": "CASCADE",
+      "activelyUsed": true,
+      "legacyOrDuplicated": false
+    },
+    {
+      "name": "branch_invitations",
+      "purpose": "Supplier branch staff invitations",
+      "primaryKey": "id",
+      "tenantOwnership": "supplier_id",
+      "organizationOwnership": "organization_id",
+      "branchOwnership": "supplier_id",
+      "importantForeignKeys": ["supplier_id", "organization_id", "role_id", "invited_by"],
+      "uniqueConstraints": ["token"],
+      "cascadeBehavior": "supplier/org CASCADE; role RESTRICT",
+      "activelyUsed": true,
+      "legacyOrDuplicated": false
+    },
+    {
+      "name": "restaurant_invitations",
+      "purpose": "Restaurant member and branch_manager invitations",
+      "primaryKey": "id",
+      "tenantOwnership": "restaurant_id",
+      "organizationOwnership": "organization_id",
+      "branchOwnership": "restaurant_id",
+      "importantForeignKeys": ["restaurant_id", "organization_id", "role_id"],
+      "uniqueConstraints": ["token"],
+      "cascadeBehavior": "CASCADE with role RESTRICT",
+      "activelyUsed": true,
+      "legacyOrDuplicated": false
+    },
+    {
+      "name": "subscription",
+      "purpose": "Per-tenant subscription rows; org entitlements resolve to main branch",
+      "primaryKey": "id",
+      "tenantOwnership": "tenant_id + tenant_type polymorphic",
+      "organizationOwnership": "indirect via main branch",
+      "branchOwnership": "each branch may have own row",
+      "importantForeignKeys": ["plan_id"],
+      "uniqueConstraints": ["uq_subscription_active_tenant partial"],
+      "cascadeBehavior": "no FK to tenant",
+      "activelyUsed": true,
+      "legacyOrDuplicated": false
+    },
+    {
+      "name": "tenant_subscription_addon",
+      "purpose": "Extra branch/warehouse add-ons",
+      "primaryKey": "id",
+      "tenantOwnership": "billing tenant",
+      "organizationOwnership": "via main branch",
+      "branchOwnership": null,
+      "importantForeignKeys": [],
+      "uniqueConstraints": ["partial unique on active addons"],
+      "cascadeBehavior": null,
+      "activelyUsed": true,
+      "legacyOrDuplicated": false
+    },
+    {
+      "name": "warehouse_inventory",
+      "purpose": "Per-warehouse product stock",
+      "primaryKey": "id",
+      "tenantOwnership": "via warehouse -> supplier",
+      "organizationOwnership": null,
+      "branchOwnership": null,
+      "importantForeignKeys": ["warehouse_id", "product_id"],
+      "uniqueConstraints": ["(warehouse_id, product_id)"],
+      "cascadeBehavior": "CASCADE",
+      "activelyUsed": true,
+      "legacyOrDuplicated": "overlaps_legacy_inventory"
+    },
+    {
+      "name": "inventory",
+      "purpose": "Legacy/global supplier product stock used at checkout",
+      "primaryKey": "unknown",
+      "tenantOwnership": "via product.supplier_id",
+      "organizationOwnership": null,
+      "branchOwnership": null,
+      "importantForeignKeys": ["product_id", "warehouse_id optional SET NULL"],
+      "uniqueConstraints": "unknown",
+      "cascadeBehavior": "warehouse_id SET NULL",
+      "activelyUsed": true,
+      "legacyOrDuplicated": "authoritative_for_checkout"
+    },
+    {
+      "name": "order_warehouse_assignment",
+      "purpose": "Order/item fulfillment warehouse assignment",
+      "primaryKey": "id",
+      "tenantOwnership": "via order/supplier",
+      "organizationOwnership": null,
+      "branchOwnership": null,
+      "importantForeignKeys": ["order_id", "order_item_id", "warehouse_id"],
+      "uniqueConstraints": "unknown",
+      "cascadeBehavior": "order CASCADE",
+      "activelyUsed": true,
+      "legacyOrDuplicated": false
+    }
+  ],
+  "relationships": [
+    {
+      "from": "restaurant_organizations",
+      "to": "restaurant",
+      "type": "one_to_many",
+      "via": "restaurant.organization_id",
+      "verified": true
+    },
+    {
+      "from": "supplier_organizations",
+      "to": "supplier",
+      "type": "one_to_many",
+      "via": "supplier.organization_id",
+      "verified": true
+    },
+    {
+      "from": "restaurant",
+      "to": "branch",
+      "type": "one_to_many",
+      "via": "branch.tenant_id",
+      "verified": true,
+      "notes": "legacy operational sub-locations"
+    },
+    {
+      "from": "supplier",
+      "to": "warehouse",
+      "type": "one_to_many",
+      "via": "warehouse.tenant_id",
+      "verified": true
+    },
+    {
+      "from": "tenant_account_link",
+      "to": "restaurant_or_supplier",
+      "type": "parent_child_uuids",
+      "via": "parent_tenant_id / child_tenant_id",
+      "verified": true,
+      "foreignKey": false
+    },
+    {
+      "from": "organization",
+      "to": "warehouse",
+      "type": "none",
+      "verified": true,
+      "notes": "No direct FK; warehouse limits aggregate across org suppliers in application code"
+    }
+  ],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/branches",
+      "file": "apps/api/src/routes/branches.routes.js",
+      "purpose": "List legacy linked branch accounts",
+      "status": "fully_functional"
+    },
+    {
+      "method": "POST",
+      "path": "/api/branches",
+      "file": "apps/api/src/routes/branches.routes.js",
+      "purpose": "Create linked branch account (new tenant)",
+      "status": "fully_functional"
+    },
+    {
+      "method": "POST",
+      "path": "/api/branches/switch",
+      "file": "apps/api/src/routes/branches.routes.js",
+      "purpose": "Switch active linked tenant",
+      "status": "fully_functional"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/branches/:childTenantId",
+      "file": "apps/api/src/routes/branches.routes.js",
+      "purpose": "Unlink linked account; does not delete tenant",
+      "status": "fully_functional"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/branches/:id",
+      "file": "apps/web/src/services/api/endpoints/branches.ts",
+      "purpose": "Frontend updateBranch mutation",
+      "status": "broken_no_backend_route"
+    },
+    {
+      "method": "POST",
+      "path": "/api/org/branches",
+      "file": "apps/api/src/routes/org.routes.js",
+      "purpose": "Create supplier org branch tenant",
+      "status": "fully_functional"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/org/branches/:supplierId",
+      "file": "apps/api/src/routes/org.routes.js",
+      "purpose": "Soft deactivate supplier org branch",
+      "status": "fully_functional"
+    },
+    {
+      "method": "POST",
+      "path": "/api/org/context/switch",
+      "file": "apps/api/src/routes/org.routes.js",
+      "purpose": "Switch supplier active branch",
+      "status": "fully_functional"
+    },
+    {
+      "method": "POST",
+      "path": "/api/restaurant-org/branches",
+      "file": "apps/api/src/routes/restaurant-org.routes.js",
+      "purpose": "Create restaurant org branch tenant",
+      "status": "fully_functional"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/restaurant-org/branches/:restaurantId",
+      "file": "apps/api/src/routes/restaurant-org.routes.js",
+      "purpose": "Soft deactivate restaurant org branch",
+      "status": "fully_functional"
+    },
+    {
+      "method": "POST",
+      "path": "/api/restaurant-org/context/switch",
+      "file": "apps/api/src/routes/restaurant-org.routes.js",
+      "purpose": "Switch restaurant active branch",
+      "status": "fully_functional"
+    },
+    {
+      "method": "POST",
+      "path": "/api/org/invitations",
+      "file": "apps/api/src/routes/branch-invitations.routes.js",
+      "purpose": "Create supplier branch staff invitation",
+      "status": "fully_functional"
+    },
+    {
+      "method": "POST",
+      "path": "/api/restaurants/invitations/branches",
+      "file": "apps/api/src/routes/restaurant-invitations.routes.js",
+      "purpose": "Create restaurant branch manager invitation",
+      "status": "fully_functional"
+    },
+    {
+      "method": "POST",
+      "path": "/api/public/invitations/accept",
+      "file": "apps/api/src/routes/branch-invitations-public.routes.js",
+      "purpose": "Accept invitations",
+      "status": "fully_functional"
+    },
+    {
+      "method": "POST",
+      "path": "/api/warehouses",
+      "file": "apps/api/src/routes/warehouses.routes.js",
+      "purpose": "Create warehouse with limit/feature gates",
+      "status": "fully_functional"
+    }
+  ],
+  "services": [
+    {
+      "file": "apps/api/src/lib/supplier-org.js",
+      "functions": [
+        "createOrgBranch",
+        "deactivateOrgBranch",
+        "linkSupplierToOrganization",
+        "listOrgBranchesForUser",
+        "grantOrgBranchAccess"
+      ],
+      "status": "active"
+    },
+    {
+      "file": "apps/api/src/lib/restaurant-org.js",
+      "functions": [
+        "createRestaurantOrgBranch",
+        "deactivateRestaurantOrgBranch",
+        "linkRestaurantToOrganization",
+        "listRestaurantOrgBranchesForUser"
+      ],
+      "status": "active"
+    },
+    {
+      "file": "apps/api/src/lib/linked-accounts.js",
+      "functions": ["createLinkedBranchAccount", "removeLinkedBranchAccount", "listLinkedAccounts"],
+      "status": "active_legacy_fallback"
+    },
+    {
+      "file": "apps/api/src/lib/plan-enforcement.js",
+      "functions": [
+        "countActiveBranchLocations",
+        "countActiveWarehouses",
+        "checkLinkedAccountLimit",
+        "checkWarehouseLimit"
+      ],
+      "status": "active"
+    },
+    {
+      "file": "apps/api/src/lib/org-billing-tenant.js",
+      "functions": ["resolveOrgBillingTenantId", "resolveActiveBillingSubscription"],
+      "status": "active"
+    },
+    {
+      "file": "apps/api/src/lib/tenant-switch.js",
+      "functions": ["userCanAccessTenant", "canSwitchActiveTenant", "createActiveTenantToken"],
+      "status": "active",
+      "notes": "Restaurant org role path missing in userCanAccessTenant"
+    },
+    {
+      "file": "apps/api/src/services/warehouseRouting.js",
+      "functions": ["assignWarehousesToOrder", "resolveWarehouseForItem"],
+      "status": "active"
+    },
+    {
+      "file": "apps/api/src/services/warehouseInventory.js",
+      "functions": ["reserveWarehouseStockBatch", "syncWarehouseFulfillmentOnOrderStatus"],
+      "status": "active_partial_enforcement"
+    },
+    {
+      "file": "apps/api/src/services/supplier-inventory.service.js",
+      "functions": ["assertAndDeductSupplierStock", "assertAndDeductSupplierStockBatch"],
+      "status": "active_authoritative_checkout"
+    }
+  ],
+  "frontendSurfaces": [
+    {
+      "path": "apps/web/src/contexts/BranchContext.tsx",
+      "purpose": "Chooses org vs linked APIs; drives switch",
+      "status": "active"
+    },
+    {
+      "path": "apps/web/src/components/BranchSwitcher.tsx",
+      "purpose": "Header branch/account switcher including All branches",
+      "status": "active"
+    },
+    {
+      "path": "apps/web/src/pages/OrgOverviewPage.tsx",
+      "purpose": "Supplier org overview cards",
+      "status": "active_not_consolidated_analytics"
+    },
+    {
+      "path": "apps/web/src/pages/RestaurantOrgOverviewPage.tsx",
+      "purpose": "Restaurant org overview",
+      "status": "active_not_consolidated_analytics"
+    },
+    {
+      "path": "apps/web/src/components/org/AddBranchModal.tsx",
+      "purpose": "Supplier create branch + invite manager",
+      "status": "active"
+    },
+    {
+      "path": "apps/web/src/components/org/RestaurantAddBranchModal.tsx",
+      "purpose": "Restaurant create branch + invite manager",
+      "status": "active"
+    },
+    {
+      "path": "apps/web/src/pages/BranchDetailPage.tsx",
+      "purpose": "Supplier branch detail and invitations",
+      "status": "active_supplier_only"
+    },
+    {
+      "path": "apps/web/src/components/BranchAccountsPanel.tsx",
+      "purpose": "Settings branch management org or legacy",
+      "status": "active"
+    },
+    {
+      "path": "apps/web/src/lib/planLimits.ts",
+      "purpose": "Frontend branch/warehouse add gates",
+      "status": "active"
+    }
+  ],
+  "permissions": [
+    {
+      "action": "create_org_branch",
+      "who": ["Org Owner"],
+      "backendEnforced": true,
+      "frontendOnly": false,
+      "evidence": "requireOrgOwner on POST /api/org/branches and restaurant-org equivalent"
+    },
+    {
+      "action": "invite_branch_staff",
+      "who": ["users with STAFF_MANAGE|STAFF_INVITE|SETTINGS_MANAGE"],
+      "backendEnforced": true,
+      "frontendOnly": false,
+      "evidence": "branch-invitations.routes.js / restaurant-invitations.routes.js"
+    },
+    {
+      "action": "link_existing_tenant_as_branch",
+      "who": [],
+      "backendEnforced": false,
+      "frontendOnly": false,
+      "evidence": "No product route; migration-only link*ToOrganization"
+    },
+    {
+      "action": "switch_branch",
+      "who": ["org roles with access", "tenant role holders", "linked account accessors"],
+      "backendEnforced": true,
+      "frontendOnly": false,
+      "evidence": "assertBranchAccess / assertRestaurantBranchAccess / canSwitchActiveTenant"
+    },
+    {
+      "action": "view_all_branches",
+      "who": ["Org Owner", "Org Manager", "Org Viewer"],
+      "backendEnforced": true,
+      "frontendOnly": false,
+      "evidence": "listOrgBranchesForUser branch_scope all"
+    },
+    {
+      "action": "manage_assigned_branch_only",
+      "who": ["Regional Manager"],
+      "backendEnforced": "partial",
+      "frontendOnly": false,
+      "evidence": "org_user_branch_access; PATCH blocked by orgStructureGuard SETTINGS_MANAGE"
+    },
+    {
+      "action": "deactivate_branch",
+      "who": ["Org Owner"],
+      "backendEnforced": true,
+      "frontendOnly": false,
+      "evidence": "requireOrgOwner on DELETE"
+    }
+  ],
+  "branchSwitching": {
+    "mechanism": "active_tenant_token cookie JWT",
+    "orgSupplierRoute": "POST /api/org/context/switch",
+    "orgRestaurantRoute": "POST /api/restaurant-org/context/switch",
+    "legacyRoute": "POST /api/branches/switch",
+    "allBranchesClearsCookie": true,
+    "allBranchesEnablesConsolidatedReports": false,
+    "pageReloadAfterSwitch": true,
+    "backendScopeChangesWithCookie": true,
+    "restaurantOrgInUserCanAccessTenant": false,
+    "supplierOrgInUserCanAccessTenant": true
+  },
+  "billingBehavior": {
+    "orgBillingTenant": "main branch is_main_branch=true",
+    "resolver": "apps/api/src/lib/org-billing-tenant.js#resolveOrgBillingTenantId",
+    "childGetsOwnSubscriptionRow": true,
+    "childSubscriptionTypically": "free pending activation",
+    "entitlementsFollowMainBranch": true,
+    "usageMetersOnActiveTenant": true,
+    "legacyLinkedChildBillsSelf": true,
+    "addonKeys": ["restaurant_extra_branch", "supplier_extra_branch", "supplier_extra_warehouse"],
+    "enterpriseBranchThreshold": 6,
+    "planCatalogMigration": "apps/api/db/migrations/0190_four_plan_pricing_model.sql"
+  },
+  "limitBehavior": {
+    "branchesCounts": "active org tenant rows when organization_id set; else 1 + tenant_account_link",
+    "countsPendingInvitations": false,
+    "countsDeactivatedBranches": false,
+    "countsLegacyBranchTableRows": false,
+    "warehousesCounts": "active warehouses across all suppliers in org when organization_id set",
+    "enforcementFunctions": ["checkLinkedAccountLimit", "checkBranchLimit", "checkWarehouseLimit"],
+    "centralPurchasingImplemented": false,
+    "featureFlagCentralPurchasing": "Restaurant Scale multi_branch: central_purchasing"
+  },
+  "dataIsolationMatrix": [
+    {
+      "category": "Users",
+      "restaurantBranches": "isolated_plus_org_shared_roles",
+      "supplierBranches": "isolated_plus_org_shared_roles",
+      "warehouseRelevance": "tenant_permissions_only"
+    },
+    {
+      "category": "Roles",
+      "restaurantBranches": "tenant_isolated_org_shared",
+      "supplierBranches": "tenant_isolated_org_shared",
+      "warehouseRelevance": "none"
+    },
+    {
+      "category": "Products",
+      "restaurantBranches": "n/a_buyer",
+      "supplierBranches": "isolated",
+      "warehouseRelevance": "stocked_when_warehouse_inventory_present"
+    },
+    {
+      "category": "Catalogs",
+      "restaurantBranches": "n/a",
+      "supplierBranches": "isolated",
+      "warehouseRelevance": "n/a"
+    },
+    {
+      "category": "Prices",
+      "restaurantBranches": "per_connected_supplier",
+      "supplierBranches": "isolated",
+      "warehouseRelevance": "n/a"
+    },
+    {
+      "category": "Suppliers",
+      "restaurantBranches": "isolated",
+      "supplierBranches": "n/a",
+      "warehouseRelevance": "n/a"
+    },
+    {
+      "category": "Restaurant customers",
+      "restaurantBranches": "n/a",
+      "supplierBranches": "isolated",
+      "warehouseRelevance": "n/a"
+    },
+    {
+      "category": "Orders",
+      "restaurantBranches": "isolated",
+      "supplierBranches": "isolated",
+      "warehouseRelevance": "assignment"
+    },
+    {
+      "category": "Inventory",
+      "restaurantBranches": "isolated_plus_legacy_branch_filter",
+      "supplierBranches": "dual_global_and_warehouse",
+      "warehouseRelevance": "partial_enforcement"
+    },
+    {
+      "category": "Receiving",
+      "restaurantBranches": "isolated",
+      "supplierBranches": "isolated",
+      "warehouseRelevance": "may_reference"
+    },
+    {
+      "category": "Invoices",
+      "restaurantBranches": "isolated",
+      "supplierBranches": "isolated",
+      "warehouseRelevance": "n/a"
+    },
+    {
+      "category": "Payments",
+      "restaurantBranches": "isolated",
+      "supplierBranches": "isolated",
+      "warehouseRelevance": "n/a"
+    },
+    {
+      "category": "Receivables",
+      "restaurantBranches": "isolated_or_n/a",
+      "supplierBranches": "isolated",
+      "warehouseRelevance": "n/a"
+    },
+    {
+      "category": "Deliveries",
+      "restaurantBranches": "isolated",
+      "supplierBranches": "isolated",
+      "warehouseRelevance": "origin"
+    },
+    {
+      "category": "Routes",
+      "restaurantBranches": "n/a",
+      "supplierBranches": "isolated",
+      "warehouseRelevance": "filter_when_multi"
+    },
+    {
+      "category": "Drivers",
+      "restaurantBranches": "n/a",
+      "supplierBranches": "isolated",
+      "warehouseRelevance": "assignment_context"
+    },
+    {
+      "category": "Staff",
+      "restaurantBranches": "isolated",
+      "supplierBranches": "isolated",
+      "warehouseRelevance": "n/a"
+    },
+    {
+      "category": "Reservations",
+      "restaurantBranches": "isolated_plus_legacy_branch",
+      "supplierBranches": "n/a",
+      "warehouseRelevance": "n/a"
+    },
+    {
+      "category": "Recipes",
+      "restaurantBranches": "isolated_plus_legacy_branch",
+      "supplierBranches": "n/a",
+      "warehouseRelevance": "n/a"
+    },
+    {
+      "category": "Waste",
+      "restaurantBranches": "isolated",
+      "supplierBranches": "isolated_or_n/a",
+      "warehouseRelevance": "n/a"
+    },
+    {
+      "category": "Reports",
+      "restaurantBranches": "isolated_active_tenant",
+      "supplierBranches": "isolated_active_tenant",
+      "warehouseRelevance": "fulfillment_filters"
+    },
+    {
+      "category": "AI recommendations",
+      "restaurantBranches": "isolated",
+      "supplierBranches": "unknown",
+      "warehouseRelevance": "n/a"
+    },
+    {
+      "category": "Notifications",
+      "restaurantBranches": "per_user_tenant_fanout",
+      "supplierBranches": "per_user_tenant_fanout",
+      "warehouseRelevance": "n/a"
+    },
+    {
+      "category": "Promotions",
+      "restaurantBranches": "isolated",
+      "supplierBranches": "isolated",
+      "warehouseRelevance": "n/a"
+    },
+    {
+      "category": "Branding",
+      "restaurantBranches": "isolated",
+      "supplierBranches": "isolated",
+      "warehouseRelevance": "n/a"
+    },
+    {
+      "category": "Settings",
+      "restaurantBranches": "isolated",
+      "supplierBranches": "isolated",
+      "warehouseRelevance": "supplier_fulfillment_flags"
+    }
+  ],
+  "workflows": [
+    {
+      "name": "restaurant_create_parent_add_branch_switch_order",
+      "intendedSteps": [
+        "Create parent restaurant",
+        "Add or link branch",
+        "Assign user",
+        "Switch to branch",
+        "Connect supplier",
+        "Place order",
+        "Receive order",
+        "Update branch inventory",
+        "View branch invoice",
+        "View consolidated parent report"
+      ],
+      "supportedSteps": [
+        "Create parent restaurant",
+        "Add branch (create new only)",
+        "Assign user via invitation",
+        "Switch to branch",
+        "Connect supplier",
+        "Place order",
+        "Receive order",
+        "Update branch inventory",
+        "View branch invoice"
+      ],
+      "unsupportedSteps": [
+        "Link existing standalone restaurant",
+        "View consolidated parent report"
+      ],
+      "validationMethod": "static_call_chains_and_existing_tests",
+      "status": "partially_functional"
+    },
+    {
+      "name": "supplier_create_parent_add_branch_warehouse_fulfill",
+      "intendedSteps": [
+        "Create parent supplier",
+        "Add or link supplier branch",
+        "Create warehouse",
+        "Assign warehouse or branch users",
+        "Receive restaurant order",
+        "Assign fulfillment location",
+        "Dispatch delivery",
+        "Update receivables",
+        "View parent-level reporting"
+      ],
+      "supportedSteps": [
+        "Create parent supplier",
+        "Add branch (create new only)",
+        "Create warehouse",
+        "Assign branch users via invitation",
+        "Receive restaurant order",
+        "Assign fulfillment location",
+        "Dispatch delivery",
+        "Update receivables"
+      ],
+      "unsupportedSteps": [
+        "Link existing standalone supplier",
+        "View genuine parent-level consolidated reporting"
+      ],
+      "validationMethod": "static_call_chains_and_existing_tests",
+      "status": "partially_functional"
+    }
+  ],
+  "tests": [
+    {
+      "file": "apps/api/src/routes/org.routes.test.js",
+      "covers": "supplier org create/switch/deactivate"
+    },
+    {
+      "file": "apps/api/src/routes/branches.routes.test.js",
+      "covers": "legacy linked accounts"
+    },
+    {
+      "file": "apps/api/src/routes/branch-invitations.routes.test.js",
+      "covers": "supplier branch invitations"
+    },
+    {
+      "file": "apps/api/src/routes/branch-invitations-public.routes.test.js",
+      "covers": "public invitation accept"
+    },
+    {
+      "file": "apps/api/src/lib/plan-enforcement.test.js",
+      "covers": "branch and warehouse limit counting"
+    },
+    {
+      "file": "apps/api/src/lib/org-billing-entitlements.test.js",
+      "covers": "child inherits main branch plan"
+    },
+    {
+      "file": "apps/api/src/lib/workspace-membership.test.js",
+      "covers": "same-org branch join vs cross-org block"
+    },
+    {
+      "file": "apps/api/src/services/warehouseRouting.test.js",
+      "covers": "warehouse routing rules"
+    },
+    {
+      "file": "apps/api/src/services/warehouseInventory.test.js",
+      "covers": "warehouse stock reserve/release"
+    },
+    {
+      "file": "apps/web/src/contexts/BranchContext.test.tsx",
+      "covers": "org vs linked API selection"
+    },
+    {
+      "file": "apps/api/src/routes/restaurant-org.routes.test.js",
+      "covers": null,
+      "status": "missing"
+    }
+  ],
+  "findings": [
+    {
+      "id": "P1-1",
+      "severity": "P1",
+      "title": "No product flow to link existing standalone account as branch",
+      "evidence": [
+        "apps/api/src/lib/restaurant-org.js#linkRestaurantToOrganization",
+        "apps/api/src/lib/supplier-org.js#linkSupplierToOrganization",
+        "migration scripts only"
+      ]
+    },
+    {
+      "id": "P1-2",
+      "severity": "P1",
+      "title": "No genuine consolidated parent reporting",
+      "evidence": ["apps/api/src/routes/reports.routes.js", "OrgOverviewPage per-branch cards only"]
+    },
+    {
+      "id": "P1-3",
+      "severity": "P1",
+      "title": "Dual inventory; checkout not warehouse-scoped",
+      "evidence": [
+        "apps/api/src/services/supplier-inventory.service.js",
+        "apps/api/src/services/warehouseInventory.js"
+      ]
+    },
+    {
+      "id": "P1-4",
+      "severity": "P1",
+      "title": "Three concurrent branch concepts",
+      "evidence": ["org tenants", "tenant_account_link", "branch table"]
+    },
+    {
+      "id": "P2-1",
+      "severity": "P2",
+      "title": "userCanAccessTenant missing restaurant org path",
+      "evidence": ["apps/api/src/lib/tenant-switch.js"]
+    },
+    {
+      "id": "P2-2",
+      "severity": "P2",
+      "title": "Org Manager/RM manage-branch docs overstate backend",
+      "evidence": ["apps/api/src/lib/route-permissions.js#orgStructureGuard"]
+    },
+    {
+      "id": "P2-3",
+      "severity": "P2",
+      "title": "No reactivate API after soft deactivate",
+      "evidence": ["deactivateOrgBranch / deactivateRestaurantOrgBranch"]
+    },
+    {
+      "id": "P2-4",
+      "severity": "P2",
+      "title": "Deactivate/unlink leave subscriptions and roles",
+      "evidence": ["apps/api/src/lib/supplier-org.js", "apps/api/src/lib/linked-accounts.js"]
+    },
+    {
+      "id": "P2-5",
+      "severity": "P2",
+      "title": "Dead updateBranch frontend mutation",
+      "evidence": ["apps/web/src/services/api/endpoints/branches.ts"]
+    },
+    {
+      "id": "P2-7",
+      "severity": "P2",
+      "title": "central_purchasing feature string unimplemented",
+      "evidence": ["apps/api/db/migrations/0190_four_plan_pricing_model.sql"]
+    },
+    {
+      "id": "P2-8",
+      "severity": "P2",
+      "title": "Child Free subscription rows vs main-branch entitlements",
+      "evidence": [
+        "createPendingActivationSubscription on branch create",
+        "resolveOrgBillingTenantId"
+      ]
+    },
+    {
+      "id": "P3-1",
+      "severity": "P3",
+      "title": "tenancy.md still centers linked accounts",
+      "evidence": ["docs/architecture/tenancy.md"]
+    },
+    {
+      "id": "P3-3",
+      "severity": "P3",
+      "title": "No inter-warehouse stock transfer",
+      "evidence": "codebase search"
+    },
+    {
+      "id": "P3-4",
+      "severity": "P3",
+      "title": "Missing restaurant-org.routes.test.js",
+      "evidence": "file absent"
+    }
+  ],
+  "unknowns": [
+    "Exact production migration completion rate of tenants onto organization_id",
+    "Whether any admin UI reads child Free subscription and misleads operators in production",
+    "Full mobile parity of branch switcher and org overview",
+    "Whether any report widget outside reports.routes aggregates organization_id (none found in primary report service)",
+    "inventory table primary key exact name in all environments (legacy evolution)"
+  ],
+  "productDecisionQuestions": [
+    "Should a branch remain a full separate tenant or become a child record under one account?",
+    "Must customers be able to link existing standalone accounts into an org, and what happens to subscriptions/users/history?",
+    "Should restaurant and supplier organizations share one unified model?",
+    "What happens to the legacy branch table used by B2C/reservations/recipes?",
+    "Should supplier branches share a catalog or remain separate marketplace identities?",
+    "Are warehouses only fulfillment nodes, or ever customer-facing locations?",
+    "Should checkout enforce warehouse stock, global stock, or both?",
+    "What does Restaurant Scale central_purchasing mean product-wise?",
+    "Who pays when a previously paid standalone account is linked under a parent?",
+    "On unlink/deactivate: orphan retain, soft-hide, or migrate/delete?",
+    "Should parent dashboards be true consolidations or remain switch-and-view?",
+    "Should Regional Managers manage branch metadata without SETTINGS_MANAGE?",
+    "Is one warehouse serving multiple supplier branches allowed by design?",
+    "How should plan branch counts treat invitations, drafts, and deactivated rows long-term?"
+  ],
+  "answersToMainQuestions": {
+    "1_what_is_tenant": "restaurant or supplier row; polymorphic (tenant_id, tenant_type)",
+    "2_what_is_organization": "billing/RBAC parent table; not operational tenant",
+    "3_what_is_branch": "canonical: separate tenant under organization; also legacy linked tenant; also legacy child branch table",
+    "4_what_is_warehouse": "supplier-owned operational fulfillment location",
+    "5_restaurant_branches_separate_tenants": true,
+    "6_supplier_branches_separate_tenants": true,
+    "7_branches_separate_accounts_or_records": "separate_tenant_accounts_under_one_org",
+    "8_connect_existing_standalone": false,
+    "9_parent_create_new_branch": true,
+    "10_branch_owns_own_data": {
+      "users": "yes_plus_org_overlay",
+      "roles": "yes_plus_org",
+      "suppliers_or_customers": "yes",
+      "catalog_access": "supplier_yes_isolated",
+      "inventory": "yes",
+      "orders": "yes",
+      "receiving": "yes",
+      "invoices": "yes",
+      "payments": "yes",
+      "staff": "yes",
+      "reservations": "restaurant_yes",
+      "reports": "yes_active_tenant_only",
+      "settings": "yes"
+    },
+    "11_shared_across_branches": [
+      "org_roles",
+      "plan_entitlements_via_main",
+      "branch_and_warehouse_limit_counts"
+    ],
+    "12_isolated": "most operational data per branch tenant",
+    "13_warehouses_vs_supplier_branches": "warehouse owned by one supplier branch tenant; limits org-aggregated",
+    "14_one_warehouse_multiple_supplier_branches": false,
+    "15_one_supplier_branch_multiple_warehouses": true,
+    "16_billing_counts": "active org tenant rows / active warehouses org-wide; add-ons on billing tenant",
+    "17_branch_permissions": "org roles + branch access + tenant roles; backend enforced with gaps",
+    "18_user_switch_branches": true,
+    "19_parent_consolidated_data": false,
+    "20_functional_status_summary": "org create/invite/switch/limits largely functional; link-existing and consolidated reporting not implemented; warehouse inventory partially enforced"
+  }
+}

@@ -1,18 +1,20 @@
 # Supplify Subscription Plans
 
-> Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [four-plan-pricing-model.md](./four-plan-pricing-model.md) and [plans-and-limits.md](./plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+> **Superseded for commercial guidance.** Use [four-plan-pricing-model.md](./four-plan-pricing-model.md) and [plans-and-limits.md](./plans-and-limits.md) for current public names (Restaurant/Supplier Growth & Scale), prices, add-ons, trial behavior, AI allowances, and billing status.
+>
+> The sections below retain the **legacy Free / Silver / Gold / Platinum catalog** for historical migration context only. Do not quote them in sales, onboarding, or customer materials.
 
 ## Overview
 
-Supplify offers tiered subscription plans designed for **restaurants and suppliers** at various stages of growth. Plans are structured to provide value at every level, with clear upgrade paths and feature alignment.
+Supplify offers tiered subscription plans for **restaurants and suppliers**. Public self-serve plans are now tenant-specific Growth and Scale tiers (internal codes preserved).
 
-- **Legacy catalog:** This historical page describes the old Free/Silver/Gold/Platinum catalog. Current public plans are Restaurant Growth, Restaurant Scale, Supplier Growth, and Supplier Scale.
-- **Current supplier metric:** Current supplier plans scale by active ordering customer locations. The internal trial row remains only for compatibility when no subscription exists.
-- **API:** Both roles can use `GET /api/subscriptions/current` and `GET /api/subscriptions/usage/:meterType` (e.g. `chats_per_day`). See [SUPPLIER_FEATURES.md](SUPPLIER_FEATURES.md#-subscription--plan-suppliers).
+- **Current catalog:** [four-plan-pricing-model.md](./four-plan-pricing-model.md)
+- **Current supplier metric:** `active_customer_locations_monthly`
+- **API:** `GET /api/subscriptions/current` and `GET /api/subscriptions/usage/:meterType`
 
 ---
 
-## Plan Tiers
+## Plan Tiers (historical catalog)
 
 ### Historical Free Trial (internal compatibility code: `free`)
 

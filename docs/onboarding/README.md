@@ -4,29 +4,29 @@
 
 **Policy:** Documentation lives on the `dev` branch only (see root `docs/README.md`). Runtime release branches carry application code without this folder.
 
-**Evidence standard:** Claims in numbered guides should trace to repository paths listed in [20-source-evidence-index.md](./20-source-evidence-index.md). Plan matrices and role permissions are authoritative in [10-subscriptions-and-plans.md](./10-subscriptions-and-plans.md) and [09-authentication-rbac.md](./09-authentication-rbac.md).
+**Evidence standard:** Claims in numbered guides should trace to repository paths listed in [20-source-evidence-index.md](./20-source-evidence-index.md). **Current plan names, prices, and commercial matrices** are authoritative in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). [10-subscriptions-and-plans.md](./10-subscriptions-and-plans.md) covers enforcement architecture (entitlements, 402/403). Role permissions remain authoritative in [09-authentication-rbac.md](./09-authentication-rbac.md).
 
 ---
 
 ## Document index
 
-| #   | File                                                                   | Purpose                                                                                                       |
-| --- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| 01  | [01-executive-overview.md](./01-executive-overview.md)                 | What Supplify is, personas, value props, ecosystem map, high-level architecture — for executives and partners |
-| 02  | [02-complete-product-guide.md](./02-complete-product-guide.md)         | Feature-by-feature product reference: UI routes, APIs, plan gates, known limitations                          |
-| 03  | [03-supplier-onboarding.md](./03-supplier-onboarding.md)               | Step-by-step supplier tenant onboarding from registration through catalog, fulfillment, and billing           |
-| 04  | [04-restaurant-onboarding.md](./04-restaurant-onboarding.md)           | Step-by-step restaurant tenant onboarding: procurement, receiving, branches, finance                          |
-| 05  | [05-driver-onboarding.md](./05-driver-onboarding.md)                   | Driver role setup, deliveries board, routes, GPS, proof of delivery, troubleshooting                          |
-| 06  | [06-admin-onboarding.md](./06-admin-onboarding.md)                     | Platform admin: tenants, subscriptions, impersonation, feature flags, audit                                   |
-| 07  | [07-technical-architecture.md](./07-technical-architecture.md)         | Stack, middleware pipeline, Redis, sessions, deployment topology                                              |
-| 08  | [08-database-guide.md](./08-database-guide.md)                         | Schema domains, key tables, migrations, tenant isolation                                                      |
-| 09  | [09-authentication-rbac.md](./09-authentication-rbac.md)               | Keycloak OIDC, 52 permissions, restaurant/supplier/admin roles, impersonation, staff portal                   |
-| 10  | [10-subscriptions-and-plans.md](./10-subscriptions-and-plans.md)       | Free/Silver/Gold/Platinum features, limits, enforcement (402/403), entitlements API                           |
-| 11  | [11-api-and-workflow-reference.md](./11-api-and-workflow-reference.md) | API pipeline, route inventory summary, workflow diagrams, envelope format                                     |
-| 17  | [17-glossary.md](./17-glossary.md)                                     | Definitions: tenant, workspace, RBAC, entitlement, warehouse, amendment, PWA, etc.                            |
-| 18  | [18-frequently-asked-questions.md](./18-frequently-asked-questions.md) | FAQs for sales, support, onboarding, developers — grounded in plans and RBAC                                  |
-| 19  | [19-onboarding-checklists.md](./19-onboarding-checklists.md)           | Twelve printable checklists: prep, live sessions, go-live, hypercare, deployment                              |
-| 20  | [20-source-evidence-index.md](./20-source-evidence-index.md)           | Traceability table: doc claim → repo path → symbol/route → verification status                                |
+| #   | File                                                                   | Purpose                                                                                                                                     |
+| --- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 01  | [01-executive-overview.md](./01-executive-overview.md)                 | What Supplify is, personas, value props, ecosystem map, high-level architecture — for executives and partners                               |
+| 02  | [02-complete-product-guide.md](./02-complete-product-guide.md)         | Feature-by-feature product reference: UI routes, APIs, plan gates, known limitations                                                        |
+| 03  | [03-supplier-onboarding.md](./03-supplier-onboarding.md)               | Step-by-step supplier tenant onboarding from registration through catalog, fulfillment, and billing                                         |
+| 04  | [04-restaurant-onboarding.md](./04-restaurant-onboarding.md)           | Step-by-step restaurant tenant onboarding: procurement, receiving, branches, finance                                                        |
+| 05  | [05-driver-onboarding.md](./05-driver-onboarding.md)                   | Driver role setup, deliveries board, routes, GPS, proof of delivery, troubleshooting                                                        |
+| 06  | [06-admin-onboarding.md](./06-admin-onboarding.md)                     | Platform admin: tenants, subscriptions, impersonation, feature flags, audit                                                                 |
+| 07  | [07-technical-architecture.md](./07-technical-architecture.md)         | Stack, middleware pipeline, Redis, sessions, deployment topology                                                                            |
+| 08  | [08-database-guide.md](./08-database-guide.md)                         | Schema domains, key tables, migrations, tenant isolation                                                                                    |
+| 09  | [09-authentication-rbac.md](./09-authentication-rbac.md)               | Keycloak OIDC, 52 permissions, restaurant/supplier/admin roles, impersonation, staff portal                                                 |
+| 10  | [10-subscriptions-and-plans.md](./10-subscriptions-and-plans.md)       | Enforcement architecture (entitlements, 402/403); commercial matrices → [four-plan-pricing-model.md](../product/four-plan-pricing-model.md) |
+| 11  | [11-api-and-workflow-reference.md](./11-api-and-workflow-reference.md) | API pipeline, route inventory summary, workflow diagrams, envelope format                                                                   |
+| 17  | [17-glossary.md](./17-glossary.md)                                     | Definitions: tenant, workspace, RBAC, entitlement, warehouse, amendment, PWA, etc.                                                          |
+| 18  | [18-frequently-asked-questions.md](./18-frequently-asked-questions.md) | FAQs for sales, support, onboarding, developers — grounded in plans and RBAC                                                                |
+| 19  | [19-onboarding-checklists.md](./19-onboarding-checklists.md)           | Twelve printable checklists: prep, live sessions, go-live, hypercare, deployment                                                            |
+| 20  | [20-source-evidence-index.md](./20-source-evidence-index.md)           | Traceability table: doc claim → repo path → symbol/route → verification status                                                              |
 
 ### Customer & sales outputs (`output/`)
 

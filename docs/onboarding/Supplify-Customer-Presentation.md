@@ -186,14 +186,15 @@ _Available capabilities depend on your subscription plan._
 
 Start with a **Free Trial** to validate fit with your real suppliers and workflows. Scale into paid tiers as volume, users, and locations grow.
 
-| Plan           | Ideal for                       | What you unlock                                            |
-| -------------- | ------------------------------- | ---------------------------------------------------------- |
-| **Free Trial** | Evaluation                      | Core ordering, receiving, and collaboration — time-limited |
-| **Silver**     | Single location getting serious | Higher limits, reports, calendar, warehouses               |
-| **Gold**       | Daily multi-supplier operations | Drivers, smart reorder, branches, advanced team roles      |
-| **Platinum**   | Multi-site & data-led teams     | AI-assisted reorder, deepest analytics, highest limits     |
+| Plan                  | Ideal for                  | What you unlock                                             |
+| --------------------- | -------------------------- | ----------------------------------------------------------- |
+| **Free Trial**        | Evaluation                 | Core workflows for 30 days against a Growth trial target    |
+| **Restaurant Growth** | Single-location restaurant | Purchasing, receiving, inventory, Growth AI allowance       |
+| **Restaurant Scale**  | Multi-branch restaurant    | Up to 3 branches, advanced roles/reports, richer AI reorder |
+| **Supplier Growth**   | Growing distributor        | Catalog, fulfillment, 50 active customer locations / month  |
+| **Supplier Scale**    | High-volume distributor    | Multi-warehouse / drivers, 200 active customer locations    |
 
-**Restaurants and suppliers** each choose the tier that matches their side of the relationship. Your Supplify contact will recommend a starting point based on branches, users, and order volume.
+**Restaurants and suppliers** each choose the plan that matches their side of the relationship. Your Supplify contact will recommend a starting point based on branches or active customer locations — not a shared Silver/Gold/Platinum ladder. Details: [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md).
 
 ---
 

@@ -10,6 +10,8 @@
 
 _Single-volume onboarding, product, operations, and technical reference assembled from `docs/onboarding/01`–`20`._
 
+> **Stale commercial sections:** This assembled handbook may still embed legacy Silver/Gold/Platinum matrices from before the four-plan model. For current pricing and plan names, use [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md). Regenerate after updating onboarding sources: `pnpm docs:onboarding:handbook`.
+
 ---
 
 ## Disclaimer

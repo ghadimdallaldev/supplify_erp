@@ -16,7 +16,7 @@ Access is determined by **role** and **subscription** (plan limits and features)
 
 - A restaurant can only see and order from suppliers they’re connected to.
 - A supplier only sees orders and chat for their own tenant.
-- Features like reports, smart reorder, and multi-branch are turned on or off by plan; limits (e.g. orders per day, branches, products) are enforced so upgrades are clear when needed.
+- Features like reports, smart reorder, and multi-branch are turned on or off by plan; limits (e.g. branches, active customer locations, users, AI) are enforced so upgrades are clear when needed. See [four-plan-pricing-model.md](../product/four-plan-pricing-model.md).
 
 ```mermaid
 flowchart LR

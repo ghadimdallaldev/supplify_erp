@@ -91,13 +91,13 @@
 
 ### Restaurant-Specific Features
 
-| Feature               | Status     | Purpose                                                                                                      |
-| --------------------- | ---------- | ------------------------------------------------------------------------------------------------------------ |
-| Quick Lists           | ✅         | Save commonly ordered items                                                                                  |
-| Smart Reorder         | ✅ (Gold+) | Forecasts + LLM assist (Gold explain; Platinum ask) — [ai-smart-reorder.md](../features/ai-smart-reorder.md) |
-| Waste Tracking        | ✅         | Track food waste and spoilage                                                                                |
-| Receiving System      | ✅         | Quality control on delivery                                                                                  |
-| Inventory Forecasting | ✅         | Predict inventory needs                                                                                      |
+| Feature               | Status                  | Purpose                                                                                                                                 |
+| --------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Quick Lists           | ✅                      | Save commonly ordered items                                                                                                             |
+| Smart Reorder         | ✅ (Restaurant Growth+) | Forecasts + LLM assist (`explain` / `ask` / `ai-recommend`; Scale adds NL ask) — [ai-smart-reorder.md](../features/ai-smart-reorder.md) |
+| Waste Tracking        | ✅                      | Track food waste and spoilage                                                                                                           |
+| Receiving System      | ✅                      | Quality control on delivery                                                                                                             |
+| Inventory Forecasting | ✅                      | Predict inventory needs                                                                                                                 |
 
 ---
 

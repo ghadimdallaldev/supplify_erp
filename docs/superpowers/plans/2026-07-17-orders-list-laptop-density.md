@@ -1,5 +1,7 @@
 # Orders list laptop density — Implementation Plan
 
+> **Status: Completed (2026-07-17).** Maintainer reference: [../../ui/responsive-data-list.md](../../ui/responsive-data-list.md). Design: [../specs/2026-07-17-orders-list-laptop-density-design.md](../specs/2026-07-17-orders-list-laptop-density-design.md).
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Make the supplier/restaurant orders table dense and usable on laptop screens.

@@ -2,7 +2,7 @@
 
 **Audience:** Sales, customer support, onboarding specialists, and developers answering real customer questions.
 
-**Grounding:** Answers reflect current plan matrices (`10-subscriptions-and-plans.md`), RBAC (`09-authentication-rbac.md`, `role-matrix.js`), and registration/billing flows verified against the repository.
+**Grounding:** Commercial plan names and matrices → [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md). Enforcement details → [10-subscriptions-and-plans.md](./10-subscriptions-and-plans.md). RBAC → [09-authentication-rbac.md](./09-authentication-rbac.md), `role-matrix.js`.
 
 ---
 
@@ -10,19 +10,28 @@
 
 ### What plans does Supplify offer?
 
-Four self-serve tiers for **both** restaurant and supplier workspaces: **Free Trial** (`free`), **Silver** ($49/mo), **Gold** ($149/mo), and **Platinum** ($349/mo). Yearly pricing is available at roughly 10× monthly. Legacy **Enterprise** was removed; `enterprise` codes normalize to `platinum` for comparisons only.
+Tenant-specific **Growth** and **Scale** plans plus a **30-day Free Trial**. Internal codes stay `free` / `silver` / `gold` / `platinum` for compatibility:
+
+| Tenant     | Public plan       | Code       | Monthly |
+| ---------- | ----------------- | ---------- | ------: |
+| Restaurant | Restaurant Growth | `silver`   |     $49 |
+| Restaurant | Restaurant Scale  | `gold`     |    $149 |
+| Supplier   | Supplier Growth   | `gold`     |    $149 |
+| Supplier   | Supplier Scale    | `platinum` |    $349 |
+
+Yearly pricing is roughly 10× monthly (two months free). Custom / Enterprise rows are admin-only. See [four-plan-pricing-model.md](../product/four-plan-pricing-model.md).
 
 ### What is included in Free Trial?
 
-Free Trial uses **Gold feature gates** with **Free limit caps** — prospects can explore nearly the full product surface for ~7 days (configurable `free_sandbox_days`), not a crippled demo. After sandbox expiry, the account becomes read-only for most GETs; writes return **402** until upgrade.
+Free Trial follows the selected **trial target** plan’s features (default Restaurant Growth or Supplier Growth) with trial / Free limit caps and a finite **AI trial pool** — default **30 days** (`free_sandbox_days`, admin 7–90). After sandbox expiry, the account becomes read-only for most GETs; writes return **402** until upgrade.
 
 ### Which plan should a single-location restaurant start on?
 
-**Silver** if they need paid support and modest volume (20 orders/day, 5 suppliers, 1 branch). **Gold** if they need multi-branch (3 branches), smart reorder, advanced roles, API keys, or higher daily order volume (100/day). **Platinum** removes most numeric caps and adds advanced reporting/AI forecast tiers.
+**Restaurant Growth** for one active branch and core purchasing/receiving/inventory. Upgrade to **Restaurant Scale** for multi-branch (up to 3), richer smart reorder / NL ask, advanced roles, and higher AI/storage.
 
 ### Which plan should a regional distributor start on?
 
-**Silver** enables one warehouse and basic fulfillment. **Gold** adds multi-warehouse (3 warehouses, 3 branches), driver management, and warehouse pick/pack fulfillment tools. **Platinum** adds routing suite and unlimited warehouses/branches/SKUs.
+**Supplier Growth** for catalog, fulfillment, finance, and 50 active ordering customer locations / month. **Supplier Scale** for multi-warehouse / driver depth, 200 active customer locations / month, and higher AI/ops limits. Add-ons can extend Scale capacity.
 
 ### Can a customer mix restaurant and supplier accounts on one login?
 
@@ -36,13 +45,21 @@ Free Trial uses **Gold feature gates** with **Free limit caps** — prospects ca
 
 API returns **403 LIMIT_EXCEEDED** with upgrade payload (`recommendPlan()` suggests next tier). Daily meters (`orders_per_day`, `chats_per_day`, `ai_requests_per_day`) reset at UTC day boundary. Admins can apply **tenant limit overrides** (increase-only) without changing plan code.
 
-### Is custom branding available on Silver?
+### Is custom branding available on Restaurant Growth / Supplier Growth?
 
-**No.** `custom_branding` is off on Silver for both tenant types. Gold enables logo/colors; Platinum adds white-label domain tier string.
+Logo + colors land on Growth where `custom_branding` is `logo_colors`. White-label / custom domain is Scale-tier (`white_label_domain`) where implemented. Confirm the tenant’s plan feature JSON before promising domains.
 
-### Can we quote API access on Silver?
+### Can we quote API access on Growth?
 
-**No.** `api_integrations` is disabled on Silver. Gold grants `api_key_access`; Platinum grants `full_api_webhooks`.
+`api_integrations` is plan-gated. Treat developer API / full webhooks as Scale / catalog capabilities — confirm the tenant entitlement before quoting.
+
+### What plan is needed for smart reorder suggestions?
+
+Restaurant **`smart_reorder`** with forecast capability (Restaurant Growth `full_90day_trends` or Scale `ai_forecast_seasonality`). Genuine LLM **explain / ask / ai-recommend** also need `ai_platform`, env AI credentials, and remaining quota (paid: Growth **30**/day, Scale **150**/day; trial: pool). Forecast fallbacks must never be labeled as AI. Details: [../features/ai-smart-reorder.md](../features/ai-smart-reorder.md).
+
+### Can Growth restaurants use multiple branches?
+
+Restaurant Growth is commercially **1 active branch**. Restaurant Scale allows **3** (plus paid branch add-ons). `multi_branch` and the `branches` limit both apply.
 
 ---
 
@@ -95,9 +112,9 @@ Self-serve minimum path: register → activate → profile → first catalog/ord
 
 Restaurant: **Owner** (all permissions); Manager cannot `STAFF_INVITE` per role matrix. Supplier: **Owner** and roles with `STAFF_INVITE` / `STAFF_MANAGE` — Manager lacks staff manage. Custom roles possible with `advanced_roles` (Gold+).
 
-### Can we create custom roles on Silver?
+### Can we create custom roles on Growth?
 
-**No.** `advanced_roles` is off on Silver for both tenant types. System roles only until Gold upgrade.
+`advanced_roles` is typically off on entry Growth and on for Scale — confirm the tenant’s plan feature JSON. System roles only until the plan enables custom roles.
 
 ### What is the Viewer role for?
 
@@ -117,11 +134,11 @@ Read-only audit/training accounts. All `*_VIEW` keys for that tenant type; **no*
 
 ### How many suppliers can a Free Trial restaurant follow?
 
-**One** (`suppliers_per_restaurant` limit on Free). Gold allows 30; Platinum unlimited.
+Confirm current Free / trial `suppliers_per_restaurant` in entitlements (trial follows Free limit caps). Paid Growth/Scale raise or remove commercial supplier caps per [four-plan-pricing-model.md](../product/four-plan-pricing-model.md).
 
 ### Why doesn’t ETA show on tracking?
 
-Common causes: (1) restaurant has not set **delivery coordinates** (lat/long required — address text alone is insufficient); (2) driver has not set status to `out_for_delivery`; (3) supplier lacks `driver_management` (Gold+).
+Common causes: (1) restaurant has not set **delivery coordinates** (lat/long required — address text alone is insufficient); (2) driver has not set status to `out_for_delivery`; (3) supplier lacks `driver_management` (typically Supplier Growth+).
 
 ### Can receiving staff create orders?
 
@@ -129,19 +146,19 @@ Common causes: (1) restaurant has not set **delivery coordinates** (lat/long req
 
 ### What plan is needed for disputes?
 
-`disputes_returns` is enabled on **all tiers** including Free Trial (Gold feature parity). User still needs appropriate permissions (often Manager or Receiving for restaurant side).
+`disputes_returns` is widely enabled including on trial when the trial target includes it. User still needs appropriate permissions (often Manager or Receiving for restaurant side).
 
 ### What plan is needed for smart reorder suggestions?
 
-`smart_reorder` — **off on Silver**; full on Gold (`full_90day_trends`); AI forecast on Platinum. Gold also enables `ai_platform` with `ai_requests_per_day` limit (20 on Gold, 100 on Platinum).
+See **Sales & pricing** above — Restaurant Growth+ with `smart_reorder` forecast capability; LLM paths also need `ai_platform` + quota.
 
 ### Are quick lists available to suppliers?
 
-**No.** `quick_lists` is not enabled on supplier plan JSON — restaurant-only ordering lists feature.
+**No.** `quick_lists` is restaurant-only ordering lists.
 
-### Can Silver restaurants use multiple branches?
+### Can Growth restaurants use multiple branches?
 
-**No.** `multi_branch` is off on Silver (limit still 1 branch). Gold enables multi-branch up to 3 branches; Platinum unlimited.
+See **Sales & pricing** above — Restaurant Growth is 1 branch; Restaurant Scale is 3 (+ add-ons).
 
 ---
 
@@ -167,9 +184,9 @@ Supplier reports substitution from order detail → fulfillment issue + chat not
 
 **No.** Receivables API requires `INVOICES_VIEW`. **Catalog Manager** has catalog/inventory edit only — finance APIs return **403**.
 
-### Is driver management on Silver?
+### Is driver management on Supplier Growth?
 
-**No.** `driver_management` requires **Gold+**. Without it, delivery board features for assigning drivers are gated.
+`driver_management` is plan-gated for suppliers (typically Growth+ where the catalog enables it). Without it, delivery board features for assigning drivers are gated. Confirm entitlements before promising.
 
 ---
 

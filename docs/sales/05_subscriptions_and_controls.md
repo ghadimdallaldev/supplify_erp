@@ -2,16 +2,24 @@
 
 ## Plans That Match How You Use the Platform
 
-Every restaurant and supplier has a **subscription** with a **plan** (Free Trial, Silver, Gold, Platinum). Plans define limits (e.g. orders per day, branches, products, chat messages) and which features are on (e.g. order calendar, basic reports, supplier deals). This keeps the product clear and upgrade paths obvious.
+Every restaurant and supplier has a **subscription** with a **plan**. Plans define limits (e.g. branches, active customer locations, users, AI assists) and which features are on (e.g. order calendar, smart reorder, multi-warehouse). This keeps the product clear and upgrade paths obvious.
 
-### Plan tiers (conceptual)
+**Canonical commercial source:** [four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [plans-and-limits.md](../product/plans-and-limits.md). Historical catalogs in `subscriptions.md` / `tier-matrix.md` are not current pricing guidance.
 
-- **Free Trial** (DB code `free`) — **Time-limited** evaluation sandbox (default **30 days**, admin **7–90**). Broad features during trial; after expiry, **read-only** access to existing data until upgrade or admin extension.
-- **Silver** — First paid tier ($49/mo). Single location, up to 3 users; core ordering, chat, quick lists, receiving photos, marketplace deals (restaurant redemptions capped per day; supplier up to 3 active promotions). **Not** included: smart reorder, advanced roles, driver management, waitlist auto-promotion. Details: [SUBSCRIPTIONS.md](../product/subscriptions.md).
-- **Gold** — The default plan for serious daily use. Multi-branch, more orders and products, analytics, and key features.
-- **Platinum** — For scale. Very high or unlimited limits and the full feature set so you don’t think about caps.
+### Public plans (conceptual)
 
-Restaurant and supplier plans are aligned (same tier names, different limit sets: branches vs warehouses, etc.). See **docs/product/subscriptions.md** and **docs/product/plans.md** for exact matrices.
+| Tenant type | Public plan       | Internal code | Monthly | Primary scale metric                           |
+| ----------- | ----------------- | ------------- | ------: | ---------------------------------------------- |
+| Restaurant  | Restaurant Growth | `silver`      |     $49 | 1 active branch                                |
+| Restaurant  | Restaurant Scale  | `gold`        |    $149 | 3 active branches                              |
+| Supplier    | Supplier Growth   | `gold`        |    $149 | 50 active ordering customer locations / month  |
+| Supplier    | Supplier Scale    | `platinum`    |    $349 | 200 active ordering customer locations / month |
+
+- **30-day Free Trial** (DB code `free`) — Time-limited evaluation (default **30 days**, admin **7–90**). Features/limits follow the selected **trial target** plan (default: Restaurant Growth or Supplier Growth). After expiry, **read-only** until upgrade or admin extension.
+- **Growth** — Entry paid plan for serious daily ops at one primary location (restaurants) or a growing customer book (suppliers).
+- **Scale** — Multi-location / high-volume ops: more branches or active customer locations, advanced roles/reporting/audit where implemented, higher AI and storage allowances.
+
+Restaurant and supplier catalogs are **separate** (same public names, different codes and limit sets). Self-serve APIs never mix them.
 
 ### How subscription changes work
 
@@ -19,7 +27,8 @@ Tenants see their current plan, usage, and limits in the app. When they hit a li
 
 - Change a tenant’s plan (effective immediately or at period end).
 - Preview the impact (e.g. “usage will exceed new limits”) before applying.
-- Temporarily override specific limits (e.g. raise orders per day) with an optional expiry.
+- Temporarily override specific limits with an optional expiry.
+- Provision Scale add-ons (extra branch, warehouse, or +50 active customer locations).
 - **Extend Free Trial** for locked `free` tenants (`extend-free-trial` / unlock with trial extension).
 
 ```mermaid
@@ -37,8 +46,8 @@ flowchart TB
 
 ### Why this matters to buyers
 
-- **Predictable** — You know what you get at each tier; no surprise lockouts.
+- **Predictable** — You know what you get at each plan; no surprise lockouts.
 - **Upgrade when it hurts** — Limits and gated features are visible; recommendations point to the right plan.
-- **Controlled by admin** — Enterprises can assign plans and overrides so teams get what they need without opening the wrong doors.
+- **Controlled by admin** — Enterprises can assign plans, add-ons, and overrides so teams get what they need without opening the wrong doors.
 
 Subscriptions and controls are the lever that keeps the product fair, understandable, and ready for revenue and scale.

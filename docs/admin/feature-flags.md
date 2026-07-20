@@ -74,7 +74,7 @@ DELETE /api/admin-dashboard/tenants/RESTAURANT/{restaurantId}/feature-overrides/
 
 **RESTAURANT** (23 keys): chat, order_calendar, reports, smart_reorder, **ai_platform**, multi_branch, receiving_quality, disputes_returns, finance_invoices, quick_lists, inventory_management, waste_tracking, advanced_roles, notifications, api_integrations, support_sla, custom_branding, feature_flags_access, supplier_reviews, push_notifications, order_amendments, tenant_audit_log, waitlist_auto_promo, supplier_deals
 
-`ai_platform` enables genuine LLM explain/ask for Smart Reorder when `AI_ENABLED`, provider credentials, and AI quota are available. Growth/Scale defaults come from tenant-specific plan feature JSON; the internal trial/free row should not expose AI unless its selected target plan and trial AI pool allow it.
+`ai_platform` enables genuine LLM **explain / ask / ai-recommend** for Smart Reorder when `AI_ENABLED`, provider credentials, and AI quota are available. Forecast and heuristic paths never consume quota. Growth/Scale defaults come from tenant-specific plan feature JSON; the internal trial/free row follows `trial_target_plan_id` and the trial AI pool.
 
 **Removed:** `approvals_budgets` (not shown in admin UI)
 
