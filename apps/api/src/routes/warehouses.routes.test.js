@@ -5,9 +5,11 @@ import { setupMocks, mockSupplierUser, clearAllMocks } from '../test/helpers.js'
 
 vi.mock('../lib/db.js', () => {
   const queryMock = vi.fn()
+  const withTransactionMock = vi.fn(async (handler) => handler({ query: queryMock }))
   return {
     query: queryMock,
     pool: { query: queryMock },
+    withTransaction: withTransactionMock,
     __queryMock: queryMock,
   }
 })
@@ -46,6 +48,14 @@ vi.mock('../lib/warehouse-helpers.js', async (importOriginal) => {
     ensureDefaultWarehouseForPaidSupplier: vi.fn().mockResolvedValue(null),
   }
 })
+
+vi.mock('../services/supplier-stock.service.js', () => ({
+  seedMissingWarehouseInventoryForSupplier: vi.fn().mockResolvedValue({
+    seeded: 0,
+    transferredFromInactive: 0,
+  }),
+  transferWarehouseInventory: vi.fn().mockResolvedValue({ transferred: 0 }),
+}))
 
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },

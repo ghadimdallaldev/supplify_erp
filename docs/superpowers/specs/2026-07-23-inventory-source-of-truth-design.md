@@ -19,7 +19,9 @@ Never deduct both tables for the same order.
 
 - Legacy `inventory` rows are **not** dropped.
 - Inventory UI adjustments still write `inventory`; when in warehouse mode they also upsert the default (or specified) warehouse row.
-- Display overlay (`supplier-stock.service`) continues to prefer warehouse aggregates when in warehouse mode.
+- Display overlay prefers warehouse aggregates when in warehouse mode; **missing WH rows show 0** (no legacy fallback).
+- After warehouse create / set-default / deactivate, `seedMissingWarehouseInventoryForSupplier` / `transferWarehouseInventory` heal orphaned stock (legacy or inactive WH → active default).
+- Order reserve also lazily heals missing rows for the assigned warehouse when `supplierId` is provided.
 - In-flight dual-write orders: cancel releases WH; use reconcile tooling if legacy drifted.
 
 ## Tooling
