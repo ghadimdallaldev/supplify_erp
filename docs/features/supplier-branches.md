@@ -6,12 +6,22 @@ Supplier tenants can operate as a **multi-branch organization**: one parent org 
 
 ## Concepts
 
-| Term                  | Meaning                                                                                    |
-| --------------------- | ------------------------------------------------------------------------------------------ |
-| **Organization**      | `supplier_organizations` row; owns branches and org-level users                            |
-| **Branch**            | A `supplier` row linked via `organization_id`; the main branch has `is_main_branch = true` |
-| **Org-level user**    | `org_user_roles` — may access one or all branches depending on role                        |
-| **Branch-level user** | `tenant_user_roles` with `tenant_type = 'SUPPLIER'` — scoped to a single branch            |
+| Term                  | Meaning                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------- |
+| **Organization**      | `supplier_organizations` row; owns Branch Accounts and org-level users                  |
+| **Branch Account**    | A `supplier` row linked via `organization_id`; main has `is_main_branch = true`         |
+| **Warehouse**         | Operational location under one supplier Branch Account (not a tenant)                   |
+| **Org-level user**    | `org_user_roles` — may access one or all Branch Accounts depending on role              |
+| **Branch-level user** | `tenant_user_roles` with `tenant_type = 'SUPPLIER'` — scoped to a single Branch Account |
+
+## Lifecycle (current)
+
+| Action                                    | Status                                                                           |
+| ----------------------------------------- | -------------------------------------------------------------------------------- |
+| Create / deactivate / reactivate / unlink | Org Owner APIs under `/api/org/branches`                                         |
+| Link existing standalone supplier         | `branch_account_link_invitations`                                                |
+| Consolidated reporting                    | `GET /api/org/reports/overview`                                                  |
+| Warehouse stock                           | Prefer `warehouse_inventory` when warehouses enabled; see supplier-stock service |
 
 Existing single-location suppliers are migrated automatically: one org per primary supplier, main branch flagged, contact users receive **Org Owner**.
 

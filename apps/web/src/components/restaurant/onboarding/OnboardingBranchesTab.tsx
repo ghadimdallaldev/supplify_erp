@@ -26,6 +26,7 @@ import {
   useDeactivateRestaurantOrgBranchMutation,
 } from '../../../services/api'
 import { RestaurantAddBranchModal } from '../../org/RestaurantAddBranchModal'
+import { BranchAccountsPanel } from '../../BranchAccountsPanel'
 import {
   formatBranchGateMessage,
   getBranchAddGate,
@@ -98,6 +99,14 @@ export function OnboardingBranchesTab() {
 
   if (!entitlementsData && user?.id) {
     return <OnboardingTabLoading />
+  }
+
+  if (useRestaurantOrg) {
+    return (
+      <div className="space-y-4" data-testid="restaurant-org-branches-panel">
+        <BranchAccountsPanel entityLabel="Branch Account" />
+      </div>
+    )
   }
 
   return (

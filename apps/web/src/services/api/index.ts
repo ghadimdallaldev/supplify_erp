@@ -291,6 +291,7 @@ export const {
   useAcceptBranchInviteMutation,
   useValidateInviteQuery,
   useAcceptInviteMutation,
+  useRejectInviteMutation,
   useGetRestaurantOrgQuery,
   useGetRestaurantOrgBranchesQuery,
   useCreateRestaurantOrgBranchMutation,

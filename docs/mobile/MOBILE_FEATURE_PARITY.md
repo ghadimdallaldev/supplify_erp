@@ -25,6 +25,12 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 - **Migration**: Run `0168_catalog_image_import.sql` before using Import Product Images in deployed environments.
 - **Docs**: [bulk-product-image-import.md](../features/bulk-product-image-import.md)
 
+## 2026-07-23 — Branch accounts / org / central purchasing foundation (web-first)
+
+- **Scope**: Branch Account link invitations (`bal`), org lifecycle (deactivate/reactivate/unlink), org reports overview, central purchasing draft foundation, warehouse stock overlay + fail-closed reserve. Migration `0191_branch_account_link_invitations.sql`.
+- **Reason**: Org admin and multi-location billing workflows are web cockpit surfaces. Mobile can consume APIs later; document before shipping UI-only org features to mobile.
+- **Central purchasing**: Foundation only (drafts + submit) — not full line-item catalog UX.
+
 ## 2026-07-23 — Supplier-paid sponsorship lifecycle (web-only)
 
 - **Scope**: Offer → restaurant plan select/accept → supplier `billing_invoice` charge (stub/manual gateway) → schedule after trial → activate → complete → restaurant-funded renewal. APIs under `/api/supplier/growth/sponsorships*`, `/api/restaurant/growth/sponsorship-offers*`, admin reconcile/manual-pay/refund. Migration `0192_supplier_sponsorship_lifecycle.sql`.

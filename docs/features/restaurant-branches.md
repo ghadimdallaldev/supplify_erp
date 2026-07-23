@@ -4,9 +4,22 @@
 
 ## Model
 
-- **Restaurant organization** (`restaurant_organizations`) owns one or more **branch accounts** (`restaurant` rows with `organization_id`).
-- Each branch is a full tenant: own orders, inventory, staff, and settings.
-- The **main branch** (`is_main_branch = true`) cannot be deactivated.
+- **Restaurant organization** (`restaurant_organizations`) owns one or more **Branch Accounts** (`restaurant` rows with `organization_id`).
+- Each Branch Account is a full tenant: own orders, inventory, staff, and settings.
+- The **main Branch Account** (`is_main_branch = true`) cannot be deactivated.
+- Do not confuse Branch Accounts with legacy **Locations** (`branch` table rows inside one restaurant).
+
+## Lifecycle (current)
+
+| Action                             | Status                                                                 |
+| ---------------------------------- | ---------------------------------------------------------------------- |
+| Create new Branch Account          | `POST /api/restaurant-org/branches` (transactional roles + limit lock) |
+| Invite existing standalone account | `branch_account_link_invitations` + public accept                      |
+| Deactivate / reactivate            | Soft `is_branch_active`; reactivate checks plan capacity               |
+| Unlink                             | Detaches org link; requires independent subscription for writes        |
+| Switch                             | Cookie + `userCanAccessTenant` (includes restaurant org roles)         |
+| Consolidated reporting             | `GET /api/restaurant-org/reports/overview`                             |
+| Central purchasing                 | Foundation drafts only (`/api/restaurant-org/central-purchasing/*`)    |
 
 ## Org-level roles
 

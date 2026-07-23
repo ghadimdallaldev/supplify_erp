@@ -7,6 +7,7 @@ const queryMock = vi.fn()
 
 vi.mock('../lib/db.js', () => ({
   query: (...args) => queryMock(...args),
+  withTransaction: async (fn) => fn({ query: (...args) => queryMock(...args) }),
 }))
 
 vi.mock('../lib/rbac.js', async (importOriginal) => {
@@ -37,15 +38,53 @@ vi.mock('../lib/supplier-org.js', () => ({
   ]),
   createOrgBranch: vi.fn().mockResolvedValue({ id: 'supplier-3', name: 'East' }),
   deactivateOrgBranch: vi.fn(),
+  reactivateOrgBranch: vi.fn().mockResolvedValue({ ok: true, organizationId: 'org-1' }),
+  unlinkSupplierFromOrganization: vi.fn().mockResolvedValue({ ok: true, organizationId: 'org-1' }),
   userHasOrgBranchAccess: vi.fn().mockResolvedValue(true),
   assignOrgUserRole: vi.fn(),
   grantOrgBranchAccess: vi.fn(),
   revokeOrgBranchAccess: vi.fn(),
+  ensureOrgAccessForBranchStaff: vi.fn(),
+  invalidateOrgPermissionCaches: vi.fn(),
+  listOrgBranches: vi.fn().mockResolvedValue([]),
 }))
 
 vi.mock('../lib/tenant-switch.js', () => ({
   createActiveTenantToken: vi.fn().mockResolvedValue('token'),
   getActiveTenantCookieName: () => 'active_tenant_token',
+  userCanAccessTenant: vi.fn().mockResolvedValue(true),
+  isTenantBranchActive: vi.fn().mockResolvedValue(true),
+}))
+
+vi.mock('../lib/branch-account-link-invitations.js', () => ({
+  createBranchAccountLinkInvitation: vi.fn(),
+  listBranchAccountLinkInvitations: vi.fn().mockResolvedValue([]),
+  cancelBranchAccountLinkInvitation: vi.fn(),
+  resendBranchAccountLinkInvitation: vi.fn(),
+}))
+
+vi.mock('../lib/branch-account-billing.js', () => ({
+  applyOrgBillingOnUnlink: vi.fn().mockResolvedValue({ ok: true }),
+  recordBranchAccountLinkHistory: vi.fn(),
+}))
+
+vi.mock('../services/org-reports.service.js', () => ({
+  supplierOrgConsolidatedOverview: vi.fn().mockResolvedValue({
+    data: {
+      kpis: { order_count: 3, total_revenue: 100, active_branch_accounts: 2 },
+      by_branch: [],
+    },
+    meta: {},
+  }),
+}))
+
+vi.mock('../lib/permissions.js', () => ({
+  invalidateUserPermissionCache: vi.fn(),
+}))
+
+vi.mock('../lib/db.js', () => ({
+  query: (...args) => queryMock(...args),
+  withTransaction: async (fn) => fn({ query: (...args) => queryMock(...args) }),
 }))
 
 vi.mock('../lib/logger.js', () => ({
@@ -58,6 +97,7 @@ vi.mock('../config/env.js', () => ({
 
 import orgRoutes from './org.routes.js'
 import * as supplierOrg from '../lib/supplier-org.js'
+import { supplierOrgConsolidatedOverview } from '../services/org-reports.service.js'
 
 describe('org.routes', () => {
   let app
@@ -69,6 +109,9 @@ describe('org.routes', () => {
       const text = typeof sql === 'string' ? sql : ''
       if (text.includes('is_main_branch')) {
         return { rows: [{ id: 'supplier-main' }] }
+      }
+      if (text.includes('SELECT id, name, is_branch_active FROM supplier WHERE id = $1')) {
+        return { rows: [{ id: 'supplier-2', name: 'North', is_branch_active: true }] }
       }
       if (text.includes('SELECT id, name FROM supplier WHERE id = $1')) {
         return { rows: [{ id: 'supplier-2', name: 'North' }] }
@@ -124,6 +167,18 @@ describe('org.routes', () => {
     supplierOrg.deactivateOrgBranch.mockResolvedValueOnce({ ok: false, reason: 'MAIN_BRANCH' })
     const res = await request(app).delete('/api/org/branches/supplier-main').expect(403)
     expect(res.body.error.name).toBe('MAIN_BRANCH')
+  })
+
+  it('POST /branches/:id/reactivate delegates to reactivateOrgBranch', async () => {
+    const res = await request(app).post('/api/org/branches/supplier-2/reactivate').expect(200)
+    expect(supplierOrg.reactivateOrgBranch).toHaveBeenCalledWith('supplier-2')
+    expect(res.body.data.reactivated).toBe(true)
+  })
+
+  it('GET /reports/overview returns consolidated KPIs', async () => {
+    const res = await request(app).get('/api/org/reports/overview').expect(200)
+    expect(supplierOrgConsolidatedOverview).toHaveBeenCalled()
+    expect(res.body.data.kpis.order_count).toBe(3)
   })
 
   it('POST /users/:userId/role returns 403 for non Org Owner', async () => {

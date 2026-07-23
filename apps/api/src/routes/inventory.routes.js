@@ -17,6 +17,10 @@ import {
   computeSupplierStockFlags,
   DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD,
 } from '../lib/supplier-stock-status.js'
+import {
+  listSupplierStockDisplay,
+  supplierUsesWarehouseInventory,
+} from '../services/supplier-stock.service.js'
 
 const router = express.Router()
 
@@ -96,11 +100,38 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
       query(`${countQueryBase}${whereClause}`, queryParams),
     ])
 
+    // When warehouse inventory is the SoT, overlay aggregated warehouse qty onto legacy rows
+    let warehouseQtyByProduct = null
+    if (req.userData.role === 'SUPPLIER' && queryParams[0]) {
+      const supplierId = queryParams[0]
+      if (await supplierUsesWarehouseInventory(supplierId)) {
+        const stockRows = await listSupplierStockDisplay(supplierId, {
+          productIds: rows.map((r) => r.product_id),
+        })
+        warehouseQtyByProduct = new Map(
+          stockRows.map((r) => [
+            r.product_id,
+            {
+              available_qty: Number(r.available_qty || 0),
+              reserved_qty: Number(r.reserved_qty || 0),
+              source: r.source,
+            },
+          ])
+        )
+      }
+    }
+
     // Format the data for frontend
     const formattedInventory = rows.map((row) => {
-      const flags = computeSupplierStockFlags(row.available_qty, row.low_stock_threshold)
+      const overlay = warehouseQtyByProduct?.get(row.product_id)
+      const availableQty = overlay ? overlay.available_qty : row.available_qty
+      const reservedQty = overlay ? overlay.reserved_qty : row.reserved_qty
+      const flags = computeSupplierStockFlags(availableQty, row.low_stock_threshold)
       return {
         ...row,
+        available_qty: availableQty,
+        reserved_qty: reservedQty,
+        stock_source: overlay?.source || 'inventory',
         low_stock_threshold: flags.lowStockThreshold,
         isLowStock: flags.isLowStock,
         isOutOfStock: flags.isOutOfStock,

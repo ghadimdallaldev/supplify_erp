@@ -46,7 +46,12 @@ export async function reserveWarehouseStockBatch(client, warehouseId, lineItems)
 
   for (const item of lines) {
     const available = availableByProduct.get(item.productId)
-    if (available == null) continue
+    // Fail closed: missing warehouse_inventory row means stock is not available
+    if (available == null) {
+      throw new Error(
+        `Insufficient stock at warehouse for product ${item.productId} (no warehouse inventory row)`
+      )
+    }
     if (available < item.quantity) {
       throw new Error(`Insufficient stock at warehouse for product ${item.productId}`)
     }
@@ -154,7 +159,8 @@ export async function commitDispatchInventoryForOrder(client, orderId) {
 }
 
 const PICKING_ORDER_STATUSES = new Set(['ACKNOWLEDGED', 'PROCESSING'])
-const DISPATCH_ORDER_STATUSES = new Set(['SHIPPED', 'COMPLETED'])
+const DISPATCH_ORDER_STATUSES = new Set(['SHIPPED', 'COMPLETED', 'DELIVERED'])
+const RELEASE_ORDER_STATUSES = new Set(['CANCELLED', 'REJECTED'])
 
 /**
  * Sync assignment status and inventory when customer_order.status changes.
@@ -175,7 +181,7 @@ export async function syncWarehouseFulfillmentOnOrderStatus(client, orderId, new
     await commitDispatchInventoryForOrder(client, orderId)
   }
 
-  if (newStatus === 'CANCELLED' && oldStatus !== 'CANCELLED') {
+  if (RELEASE_ORDER_STATUSES.has(newStatus) && !RELEASE_ORDER_STATUSES.has(oldStatus)) {
     await releaseInventoryForOrder(client, orderId)
   }
 }
