@@ -635,11 +635,13 @@ router.post('/branches/:restaurantId/unlink', requireRestaurantOrgOwner, async (
 
       const billing = await applyOrgBillingOnUnlink(req.params.restaurantId, 'RESTAURANT', {
         client,
+        organizationId: unlinked.organizationId,
         requireIndependentSubscription: true,
       })
       if (!billing.ok) {
         const err = new Error(billing.message || billing.reason)
         err.code = billing.reason
+        err.details = { blockers: billing.blockers, reviews: billing.reviews }
         throw err
       }
 
@@ -654,7 +656,7 @@ router.post('/branches/:restaurantId/unlink', requireRestaurantOrgOwner, async (
         client,
       })
 
-      return unlinked
+      return { ...unlinked, billing }
     })
 
     if (!result.ok) {
@@ -692,22 +694,29 @@ router.post('/branches/:restaurantId/unlink', requireRestaurantOrgOwner, async (
 
     res.json({
       ok: true,
-      data: { unlinked: true, restaurantId: req.params.restaurantId },
+      data: {
+        unlinked: true,
+        restaurantId: req.params.restaurantId,
+        billing: result.billing || null,
+      },
       error: null,
       requestId: req.requestId,
     })
   } catch (error) {
     logger.error('POST restaurant-org unlink error:', error)
-    const status =
-      error.code === 'NO_INDEPENDENT_SUBSCRIPTION' || error.code === 'INVALID_SUBSCRIPTION'
-        ? 403
-        : 500
+    const billingCodes = new Set([
+      'NO_INDEPENDENT_SUBSCRIPTION',
+      'INVALID_SUBSCRIPTION',
+      'OPEN_INVOICES',
+    ])
+    const status = billingCodes.has(error.code) ? 400 : 500
     res.status(status).json({
       ok: false,
       data: null,
       error: {
         name: error.code || 'INTERNAL_ERROR',
         message: error.message || 'Failed to unlink Branch Account',
+        details: error.details,
       },
       requestId: req.requestId,
     })

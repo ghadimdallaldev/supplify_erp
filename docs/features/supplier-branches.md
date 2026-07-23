@@ -21,6 +21,7 @@ Supplier tenants can operate as a **multi-branch organization**: one parent org 
 | Create / deactivate / reactivate / unlink | Org Owner APIs under `/api/org/branches`                                         |
 | Deactivation guards                       | Blocks main branch; open orders; WH reservations; open invoices                  |
 | Permission cache fan-out                  | Deactivate / reactivate / unlink clear caches for all affected users             |
+| Unlink billing policy                     | Block on OPEN invoices; review flags for prepaid/credits/org PAST_DUE; no refund |
 | Link existing standalone supplier         | `branch_account_link_invitations`                                                |
 | Consolidated reporting                    | `GET /api/org/reports/overview`                                                  |
 | Warehouse stock                           | Prefer `warehouse_inventory` when warehouses enabled; see supplier-stock service |
