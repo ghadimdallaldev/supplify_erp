@@ -101,7 +101,8 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
       query(`${countQueryBase}${whereClause}`, queryParams),
     ])
 
-    // When warehouse inventory is the SoT, overlay aggregated warehouse qty onto legacy rows
+    // When warehouse inventory is the SoT, overlay aggregated warehouse qty onto legacy rows.
+    // Missing WH rows mean 0 available (do not fall back to legacy — that caused false "in stock").
     let warehouseQtyByProduct = null
     if (req.userData.role === 'SUPPLIER' && queryParams[0]) {
       const supplierId = queryParams[0]
@@ -125,14 +126,19 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
     // Format the data for frontend
     const formattedInventory = rows.map((row) => {
       const overlay = warehouseQtyByProduct?.get(row.product_id)
-      const availableQty = overlay ? overlay.available_qty : row.available_qty
-      const reservedQty = overlay ? overlay.reserved_qty : row.reserved_qty
+      const availableQty = warehouseQtyByProduct
+        ? Number(overlay?.available_qty ?? 0)
+        : row.available_qty
+      const reservedQty = warehouseQtyByProduct
+        ? Number(overlay?.reserved_qty ?? 0)
+        : row.reserved_qty
       const flags = computeSupplierStockFlags(availableQty, row.low_stock_threshold)
       return {
         ...row,
         available_qty: availableQty,
         reserved_qty: reservedQty,
-        stock_source: overlay?.source || 'inventory',
+        stock_source:
+          overlay?.source || (warehouseQtyByProduct ? 'warehouse_inventory' : 'inventory'),
         low_stock_threshold: flags.lowStockThreshold,
         isLowStock: flags.isLowStock,
         isOutOfStock: flags.isOutOfStock,

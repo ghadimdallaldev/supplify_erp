@@ -2,14 +2,21 @@
  * Warehouse inventory reservations tied to order warehouse assignments.
  */
 
-export async function reserveWarehouseStock(client, warehouseId, productId, quantity) {
-  await reserveWarehouseStockBatch(client, warehouseId, [{ productId, quantity }])
+export async function reserveWarehouseStock(
+  client,
+  warehouseId,
+  productId,
+  quantity,
+  options = {}
+) {
+  await reserveWarehouseStockBatch(client, warehouseId, [{ productId, quantity }], options)
 }
 
 /**
  * Reserve warehouse stock for multiple lines (single lock + batch update).
+ * When supplierId is provided, heals missing rows from legacy/inactive WH stock once.
  */
-export async function reserveWarehouseStockBatch(client, warehouseId, lineItems) {
+export async function reserveWarehouseStockBatch(client, warehouseId, lineItems, options = {}) {
   const items = (lineItems || [])
     .map((item) => ({
       productId: item.productId ?? item.product_id,
@@ -33,16 +40,37 @@ export async function reserveWarehouseStockBatch(client, warehouseId, lineItems)
   const productIds = lines.map((item) => item.productId)
   const quantities = lines.map((item) => item.quantity)
 
-  const { rows } = await client.query(
+  let { rows } = await client.query(
     `SELECT product_id, quantity_available FROM warehouse_inventory
      WHERE warehouse_id = $1 AND product_id = ANY($2)
      FOR UPDATE`,
     [warehouseId, productIds]
   )
 
-  const availableByProduct = new Map(
+  let availableByProduct = new Map(
     rows.map((row) => [row.product_id, Number(row.quantity_available)])
   )
+
+  const missingIds = lines
+    .filter((item) => !availableByProduct.has(item.productId))
+    .map((item) => item.productId)
+
+  if (missingIds.length && options.supplierId) {
+    const { seedMissingWarehouseInventoryForSupplier } = await import('./supplier-stock.service.js')
+    await seedMissingWarehouseInventoryForSupplier(options.supplierId, warehouseId, {
+      client,
+      productIds: missingIds,
+    })
+    ;({ rows } = await client.query(
+      `SELECT product_id, quantity_available FROM warehouse_inventory
+       WHERE warehouse_id = $1 AND product_id = ANY($2)
+       FOR UPDATE`,
+      [warehouseId, productIds]
+    ))
+    availableByProduct = new Map(
+      rows.map((row) => [row.product_id, Number(row.quantity_available)])
+    )
+  }
 
   for (const item of lines) {
     const available = availableByProduct.get(item.productId)

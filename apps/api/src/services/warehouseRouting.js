@@ -221,7 +221,8 @@ export async function assignWarehousesToOrder(
     await reserveWarehouseStockBatch(
       client,
       warehouseId,
-      orderItems.map((item) => ({ productId: item.product_id, quantity: item.quantity }))
+      orderItems.map((item) => ({ productId: item.product_id, quantity: item.quantity })),
+      { supplierId: supplier.id }
     )
     return { mode: 'single', warehouseId, assignments: [assignment] }
   }
@@ -255,7 +256,8 @@ export async function assignWarehousesToOrder(
     await reserveWarehouseStockBatch(
       client,
       warehouseId,
-      orderItems.map((item) => ({ productId: item.product_id, quantity: item.quantity }))
+      orderItems.map((item) => ({ productId: item.product_id, quantity: item.quantity })),
+      { supplierId: supplier.id }
     )
     return { mode: 'single', warehouseId, assignments: [assignment] }
   }
@@ -276,7 +278,8 @@ export async function assignWarehousesToOrder(
       client,
       resolution.warehouseId,
       item.product_id,
-      Number(item.quantity)
+      Number(item.quantity),
+      { supplierId: supplier.id }
     )
 
     const assignment = await insertAssignment(client, {
