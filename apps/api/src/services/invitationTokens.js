@@ -3,7 +3,7 @@ import { config } from '../config/env.js'
 
 export const INVITE_TTL_DAYS = 7
 
-/** @typedef {'supplier_branch' | 'restaurant_member' | 'restaurant_branch' | 'restaurant_referral'} InviteType */
+/** @typedef {'supplier_branch' | 'restaurant_member' | 'restaurant_branch' | 'restaurant_referral' | 'branch_account_link'} InviteType */
 
 const INVITE_TYPE_ALIASES = {
   sb: 'supplier_branch',
@@ -14,6 +14,8 @@ const INVITE_TYPE_ALIASES = {
   restaurant_branch: 'restaurant_branch',
   rr: 'restaurant_referral',
   restaurant_referral: 'restaurant_referral',
+  bal: 'branch_account_link',
+  branch_account_link: 'branch_account_link',
 }
 
 export function normalizeInviteType(type) {
@@ -40,7 +42,13 @@ export function buildInviteUrl(token, type) {
     return `${base}/register?ref=${encodeURIComponent(token)}`
   }
   const typeParam =
-    normalized === 'restaurant_member' ? 'rm' : normalized === 'restaurant_branch' ? 'rb' : 'sb'
+    normalized === 'restaurant_member'
+      ? 'rm'
+      : normalized === 'restaurant_branch'
+        ? 'rb'
+        : normalized === 'branch_account_link'
+          ? 'bal'
+          : 'sb'
   return `${base}/invite?token=${encodeURIComponent(token)}&type=${typeParam}`
 }
 
@@ -51,7 +59,11 @@ export function evaluateInvitationState(invitation) {
   if (invitation.status === 'accepted') {
     return { valid: false, reason: 'invalid' }
   }
-  if (invitation.status === 'revoked') {
+  if (
+    invitation.status === 'revoked' ||
+    invitation.status === 'cancelled' ||
+    invitation.status === 'rejected'
+  ) {
     return { valid: false, reason: 'invalid' }
   }
   if (invitation.status === 'expired' || new Date(invitation.expires_at) < new Date()) {

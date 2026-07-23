@@ -16,14 +16,7 @@ export const branchesApi = api.injectEndpoints({
       }),
       invalidatesTags: ['Branch'],
     }),
-    updateBranch: builder.mutation<any, { id: string; data: Record<string, unknown> }>({
-      query: ({ id, data }) => ({
-        url: `/api/branches/${id}`,
-        method: 'PUT',
-        body: data,
-      }),
-      invalidatesTags: ['Branch'],
-    }),
+    // Dead PUT /api/branches/:id client removed — use org PATCH/lifecycle routes instead.
     deleteBranch: builder.mutation<any, string>({
       query: (id) => ({
         url: `/api/branches/${id}`,
@@ -77,6 +70,65 @@ export const branchesApi = api.injectEndpoints({
         method: 'DELETE',
       }),
       invalidatesTags: ['Branch', 'Org', 'Supplier'],
+    }),
+    reactivateOrgBranch: builder.mutation<{ reactivated: boolean }, string>({
+      query: (supplierId) => ({
+        url: `/api/org/branches/${supplierId}/reactivate`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Branch', 'Org', 'Supplier'],
+    }),
+    unlinkOrgBranch: builder.mutation<{ unlinked: boolean }, string>({
+      query: (supplierId) => ({
+        url: `/api/org/branches/${supplierId}/unlink`,
+        method: 'POST',
+        body: { confirm: true },
+      }),
+      invalidatesTags: ['Branch', 'Org', 'Supplier'],
+    }),
+    getOrgLinkInvitations: builder.query<{ invitations: Array<Record<string, unknown>> }, void>({
+      query: () => '/api/org/link-invitations',
+      providesTags: ['Org'],
+    }),
+    createOrgLinkInvitation: builder.mutation<
+      { invitation: Record<string, unknown>; invite_url: string },
+      { target_owner_email?: string; target_tenant_id?: string; intended_org_role?: string }
+    >({
+      query: (body) => ({ url: '/api/org/link-invitations', method: 'POST', body }),
+      invalidatesTags: ['Org'],
+    }),
+    cancelOrgLinkInvitation: builder.mutation<{ cancelled: boolean }, string>({
+      query: (id) => ({ url: `/api/org/link-invitations/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Org'],
+    }),
+    resendOrgLinkInvitation: builder.mutation<
+      { invitation: Record<string, unknown>; invite_url: string },
+      string
+    >({
+      query: (id) => ({ url: `/api/org/link-invitations/${id}/resend`, method: 'POST' }),
+      invalidatesTags: ['Org'],
+    }),
+    getOrgReportsOverview: builder.query<
+      {
+        kpis: {
+          order_count: number
+          total_revenue?: number
+          total_spend?: number
+          active_branch_accounts: number
+        }
+        by_branch: Array<Record<string, unknown>>
+      },
+      { from?: string; to?: string } | void
+    >({
+      query: (params) => {
+        const qs = new URLSearchParams()
+        if (params?.from) qs.set('from', params.from)
+        if (params?.to) qs.set('to', params.to)
+        const q = qs.toString()
+        return `/api/org/reports/overview${q ? `?${q}` : ''}`
+      },
+      providesTags: ['Org'],
+      keepUnusedDataFor: 60,
     }),
     switchOrgBranchContext: builder.mutation<
       { activeSupplierId: string | null; tenantName?: string },
@@ -186,6 +238,9 @@ export const branchesApi = api.injectEndpoints({
         invited_name?: string
         role_name?: string
         invited_email?: string
+        target_owner_email?: string
+        org_type?: string
+        billing_impact_snapshot?: Record<string, unknown>
         expires_at?: string
       },
       { token: string; type: string }
@@ -200,6 +255,10 @@ export const branchesApi = api.injectEndpoints({
         activeRestaurantId?: string
         needsManualLogin?: boolean
         loginMessage?: string
+        linked?: boolean
+        billingReviewRequired?: boolean
+        tenantId?: string
+        organizationId?: string
       },
       {
         token: string
@@ -212,6 +271,13 @@ export const branchesApi = api.injectEndpoints({
     >({
       query: (body) => ({
         url: '/api/public/invitations/accept',
+        method: 'POST',
+        body,
+      }),
+    }),
+    rejectInvite: builder.mutation<{ rejected?: boolean }, { token: string; type: string }>({
+      query: (body) => ({
+        url: '/api/public/invitations/reject',
         method: 'POST',
         body,
       }),
@@ -262,6 +328,122 @@ export const branchesApi = api.injectEndpoints({
         method: 'DELETE',
       }),
       invalidatesTags: ['RestaurantOrg', 'Branch'],
+    }),
+    reactivateRestaurantOrgBranch: builder.mutation<{ reactivated: boolean }, string>({
+      query: (restaurantId) => ({
+        url: `/api/restaurant-org/branches/${restaurantId}/reactivate`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['RestaurantOrg', 'Branch'],
+    }),
+    unlinkRestaurantOrgBranch: builder.mutation<{ unlinked: boolean }, string>({
+      query: (restaurantId) => ({
+        url: `/api/restaurant-org/branches/${restaurantId}/unlink`,
+        method: 'POST',
+        body: { confirm: true },
+      }),
+      invalidatesTags: ['RestaurantOrg', 'Branch'],
+    }),
+    getRestaurantOrgLinkInvitations: builder.query<
+      { invitations: Array<Record<string, unknown>> },
+      void
+    >({
+      query: () => '/api/restaurant-org/link-invitations',
+      providesTags: ['RestaurantOrg'],
+    }),
+    createRestaurantOrgLinkInvitation: builder.mutation<
+      { invitation: Record<string, unknown>; invite_url: string },
+      { target_owner_email?: string; target_tenant_id?: string; intended_org_role?: string }
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-org/link-invitations',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['RestaurantOrg'],
+    }),
+    cancelRestaurantOrgLinkInvitation: builder.mutation<{ cancelled: boolean }, string>({
+      query: (id) => ({
+        url: `/api/restaurant-org/link-invitations/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['RestaurantOrg'],
+    }),
+    resendRestaurantOrgLinkInvitation: builder.mutation<
+      { invitation: Record<string, unknown>; invite_url: string },
+      string
+    >({
+      query: (id) => ({
+        url: `/api/restaurant-org/link-invitations/${id}/resend`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['RestaurantOrg'],
+    }),
+    getRestaurantOrgReportsOverview: builder.query<
+      {
+        kpis: {
+          order_count: number
+          total_spend: number
+          active_branch_accounts: number
+        }
+        by_branch: Array<Record<string, unknown>>
+      },
+      { from?: string; to?: string } | void
+    >({
+      query: (params) => {
+        const qs = new URLSearchParams()
+        if (params?.from) qs.set('from', params.from)
+        if (params?.to) qs.set('to', params.to)
+        const q = qs.toString()
+        return `/api/restaurant-org/reports/overview${q ? `?${q}` : ''}`
+      },
+      providesTags: ['RestaurantOrg'],
+      keepUnusedDataFor: 60,
+    }),
+    getCentralPurchasingDrafts: builder.query<
+      { drafts: Array<Record<string, unknown>>; foundationOnly?: boolean },
+      void
+    >({
+      query: () => '/api/restaurant-org/central-purchasing/drafts',
+      providesTags: ['RestaurantOrg'],
+    }),
+    createCentralPurchasingDraft: builder.mutation<
+      { draft: Record<string, unknown> },
+      { destination_restaurant_id: string }
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-org/central-purchasing/drafts',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['RestaurantOrg'],
+    }),
+    updateCentralPurchasingDraft: builder.mutation<
+      { draft: Record<string, unknown> },
+      { draftId: string; line_items: Array<Record<string, unknown>> }
+    >({
+      query: ({ draftId, line_items }) => ({
+        url: `/api/restaurant-org/central-purchasing/drafts/${draftId}`,
+        method: 'PATCH',
+        body: { line_items },
+      }),
+      invalidatesTags: ['RestaurantOrg'],
+    }),
+    submitCentralPurchasingDrafts: builder.mutation<
+      {
+        results: Array<Record<string, unknown>>
+        summary: { total: number; succeeded: number; failed: number }
+        partialFailure?: boolean
+        foundationOnly?: boolean
+      },
+      { destination_restaurant_ids: string[] }
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-org/central-purchasing/submit',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['RestaurantOrg', 'Order'],
     }),
     getRestaurantMemberInviteRoles: builder.query<
       { roles: Array<{ id: string; name: string; description?: string }> },

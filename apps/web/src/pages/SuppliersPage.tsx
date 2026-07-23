@@ -48,6 +48,7 @@ import { EmptyState } from '../components/ui/empty-state'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { ConnectionRequestsPanel } from '../components/supplier/ConnectionRequestsPanel'
+import { SponsorshipOffersPanel } from '../components/supplier/SponsorshipOffersPanel'
 import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { cn } from '../lib/utils'
 import { ensureNamespace } from '../i18n'
@@ -313,6 +314,7 @@ export function SuppliersPage() {
       />
 
       {isRestaurant && <ConnectionRequestsPanel />}
+      {isRestaurant && <SponsorshipOffersPanel />}
 
       {isRestaurant && (
         <>

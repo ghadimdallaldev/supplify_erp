@@ -191,6 +191,20 @@ export async function acceptReferralOnRegistration({ token, restaurantId, client
     [restaurantId, trialDays]
   )
 
+  try {
+    const { linkSponsorshipsOnRestaurantRegistration } = await import(
+      './supplier-sponsorship.service.js'
+    )
+    await linkSponsorshipsOnRestaurantRegistration({
+      prospectId: inv.prospect_id,
+      restaurantId,
+      invitationId: inv.id,
+      client: db,
+    })
+  } catch {
+    /* sponsorship link is best-effort if table columns not migrated yet */
+  }
+
   return { attributionId: attrRows[0]?.id, supplierId: inv.supplier_id }
 }
 

@@ -1,9 +1,14 @@
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { normalizeDaysOfWeek } from '../lib/quick-list-schedule.js'
-import { evaluateScheduledOrderLimit, incrementUsage } from '../lib/subscription.js'
+import {
+  evaluateScheduledOrderLimit,
+  incrementUsage,
+  isFeatureEnabled,
+} from '../lib/subscription.js'
 import { notifyScheduledOrderEvent, notifyOrderStatusChange } from './notification.service.js'
 import { applySmartQuantitiesToItems } from './quick-list-ai.service.js'
+import { reserveStockForPlacedOrder } from './supplier-order-stock.service.js'
 
 const DUE_LISTS_BATCH_SIZE = 50
 
@@ -319,12 +324,16 @@ async function createOrderFromQuickList(quickList, client) {
       [restaurantId, totalAmount]
     )
 
+    const insertedItems = []
     for (const item of orderItems) {
-      await q(
+      const {
+        rows: [orderItem],
+      } = await q(
         `
         INSERT INTO order_item (
           order_id, product_id, supplier_id, quantity, unit_price, line_total, notes
         ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING *
       `,
         [
           order.id,
@@ -336,16 +345,25 @@ async function createOrderFromQuickList(quickList, client) {
           item.notes,
         ]
       )
-
-      await q(
-        `
-        UPDATE inventory 
-        SET available_qty = available_qty - $1, updated_at = now()
-        WHERE product_id = $2
-      `,
-        [item.quantity, item.productId]
-      )
+      insertedItems.push(orderItem)
     }
+
+    const { rows: supplierRows } = await q(`SELECT * FROM supplier WHERE id = $1`, [supplierId])
+    const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
+    await reserveStockForPlacedOrder(
+      { query: q },
+      {
+        supplierId,
+        supplier: supplierRows[0] || { id: supplierId },
+        order: { ...order, restaurant_id: restaurantId },
+        orderItems: insertedItems,
+        multiWarehouseActive: multiActive,
+        legacyLineItems: orderItems.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+        })),
+      }
+    )
 
     createdOrders.push(order)
     logger.info(

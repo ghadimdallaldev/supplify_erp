@@ -7,7 +7,7 @@ import {
 } from '../lib/rbac.js'
 import { orgStructureGuard } from '../lib/route-permissions.js'
 import { requireFeature } from '../lib/subscription.js'
-import { query } from '../lib/db.js'
+import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { checkLinkedAccountLimit, createAuditLog } from '../lib/plan-enforcement.js'
 import { getEffectiveTenant } from '../lib/impersonation.js'
@@ -17,14 +17,33 @@ import {
   listOrgBranchesForUser,
   createOrgBranch,
   deactivateOrgBranch,
+  reactivateOrgBranch,
+  unlinkSupplierFromOrganization,
   assignOrgUserRole,
   grantOrgBranchAccess,
   revokeOrgBranchAccess,
   userHasOrgBranchAccess,
   ensureOrgAccessForBranchStaff,
+  invalidateOrgPermissionCaches,
 } from '../lib/supplier-org.js'
-import { createActiveTenantToken, getActiveTenantCookieName } from '../lib/tenant-switch.js'
+import {
+  createActiveTenantToken,
+  getActiveTenantCookieName,
+  userCanAccessTenant,
+  isTenantBranchActive,
+} from '../lib/tenant-switch.js'
 import { config } from '../config/env.js'
+import {
+  createBranchAccountLinkInvitation,
+  listBranchAccountLinkInvitations,
+  cancelBranchAccountLinkInvitation,
+  resendBranchAccountLinkInvitation,
+} from '../lib/branch-account-link-invitations.js'
+import {
+  applyOrgBillingOnUnlink,
+  recordBranchAccountLinkHistory,
+} from '../lib/branch-account-billing.js'
+import { supplierOrgConsolidatedOverview } from '../services/org-reports.service.js'
 
 const router = express.Router()
 
@@ -294,10 +313,12 @@ router.post('/branches', requireOrgOwner, multiBranchFeature, async (req, res) =
       ownerEmail: req.userData.email,
     })
 
+    await invalidateOrgPermissionCaches(req.userData.id, req.orgContext.organizationId)
+
     await createAuditLog('CREATE_ORG_BRANCH', {
       entityType: 'SUPPLIER',
       entityId: branch.id,
-      description: `Created org branch: ${resolvedName}`,
+      description: `Created org Branch Account: ${resolvedName}`,
       changes: { branchName: resolvedName, organizationId: req.orgContext.organizationId },
     })
 
@@ -432,27 +453,48 @@ router.patch('/branches/:supplierId', async (req, res) => {
 })
 
 /**
- * DELETE /api/org/branches/:supplierId — deactivate branch
+ * DELETE /api/org/branches/:supplierId — deactivate Branch Account
  */
 router.delete('/branches/:supplierId', requireOrgOwner, async (req, res) => {
   try {
     const result = await deactivateOrgBranch(req.params.supplierId)
     if (!result.ok) {
+      const { deactivationBlockerMessage } = await import('../lib/branch-lifecycle-guards.js')
       const messages = {
-        MAIN_BRANCH: 'Cannot deactivate the main branch',
-        PENDING_ORDERS: 'Branch has pending orders and cannot be deactivated',
-        NOT_FOUND: 'Branch not found',
+        MAIN_BRANCH: 'Cannot deactivate the main Branch Account',
+        PENDING_ORDERS: deactivationBlockerMessage('PENDING_ORDERS'),
+        ACTIVE_WAREHOUSE_RESERVATIONS: deactivationBlockerMessage('ACTIVE_WAREHOUSE_RESERVATIONS'),
+        OPEN_INVOICES: deactivationBlockerMessage('OPEN_INVOICES'),
+        NOT_FOUND: 'Branch Account not found',
       }
       return res.status(result.reason === 'NOT_FOUND' ? 404 : 403).json({
         ok: false,
         data: null,
         error: {
           name: result.reason,
-          message: messages[result.reason] || 'Cannot deactivate branch',
+          message: messages[result.reason] || 'Cannot deactivate Branch Account',
+          details: result.blockers ? { blockers: result.blockers } : undefined,
         },
         requestId: req.requestId,
       })
     }
+
+    if (req.orgContext.organizationId) {
+      await recordBranchAccountLinkHistory({
+        orgType: 'SUPPLIER',
+        organizationId: req.orgContext.organizationId,
+        tenantType: 'SUPPLIER',
+        tenantId: req.params.supplierId,
+        action: 'deactivated',
+        actorUserId: req.userData.id,
+      })
+    }
+
+    await createAuditLog('DEACTIVATE_ORG_BRANCH', {
+      entityType: 'SUPPLIER',
+      entityId: req.params.supplierId,
+      description: 'Deactivated supplier Branch Account',
+    })
 
     res.json({
       ok: true,
@@ -465,7 +507,304 @@ router.delete('/branches/:supplierId', requireOrgOwner, async (req, res) => {
     res.status(500).json({
       ok: false,
       data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to deactivate branch' },
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to deactivate Branch Account' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post(
+  '/branches/:supplierId/reactivate',
+  requireOrgOwner,
+  multiBranchFeature,
+  async (req, res) => {
+    try {
+      const parentId = req.orgContext.primarySupplierId
+      const limitCheck = await checkLinkedAccountLimit(parentId, 'SUPPLIER')
+      if (!limitCheck.allowed) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'LIMIT_EXCEEDED',
+            message: limitCheck.reason,
+            details: limitCheck,
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      const result = await reactivateOrgBranch(req.params.supplierId)
+      if (!result.ok) {
+        const messages = {
+          NOT_FOUND: 'Branch Account not found',
+          DETACHED: 'Branch Account is not attached to an organization',
+          ALREADY_ACTIVE: 'Branch Account is already active',
+        }
+        return res.status(result.reason === 'NOT_FOUND' ? 404 : 400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: result.reason,
+            message: messages[result.reason] || 'Cannot reactivate Branch Account',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      await recordBranchAccountLinkHistory({
+        orgType: 'SUPPLIER',
+        organizationId: result.organizationId,
+        tenantType: 'SUPPLIER',
+        tenantId: req.params.supplierId,
+        action: 'reactivated',
+        actorUserId: req.userData.id,
+      })
+
+      await createAuditLog('REACTIVATE_ORG_BRANCH', {
+        entityType: 'SUPPLIER',
+        entityId: req.params.supplierId,
+        description: 'Reactivated supplier Branch Account',
+      })
+
+      res.json({
+        ok: true,
+        data: { reactivated: true, supplierId: req.params.supplierId },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('POST org reactivate error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to reactivate Branch Account' },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
+
+router.post('/branches/:supplierId/unlink', requireOrgOwner, async (req, res) => {
+  try {
+    const { confirm } = req.body || {}
+    if (confirm !== true && confirm !== 'unlink') {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'CONFIRMATION_REQUIRED',
+          message: 'Pass confirm: true to unlink this Branch Account',
+        },
+        requestId: req.requestId,
+      })
+    }
+
+    const result = await withTransaction(async (client) => {
+      const unlinked = await unlinkSupplierFromOrganization(req.params.supplierId, { client })
+      if (!unlinked.ok) return unlinked
+
+      const billing = await applyOrgBillingOnUnlink(req.params.supplierId, 'SUPPLIER', {
+        client,
+        organizationId: unlinked.organizationId,
+        requireIndependentSubscription: true,
+      })
+      if (!billing.ok) {
+        const err = new Error(billing.message || billing.reason)
+        err.code = billing.reason
+        err.details = { blockers: billing.blockers, reviews: billing.reviews }
+        throw err
+      }
+
+      await recordBranchAccountLinkHistory({
+        orgType: 'SUPPLIER',
+        organizationId: unlinked.organizationId,
+        tenantType: 'SUPPLIER',
+        tenantId: req.params.supplierId,
+        action: 'unlinked',
+        actorUserId: req.userData.id,
+        metadata: { billing },
+        client,
+      })
+
+      return { ...unlinked, billing }
+    })
+
+    if (!result.ok) {
+      const messages = {
+        NOT_FOUND: 'Branch Account not found',
+        MAIN_BRANCH: 'Cannot unlink the main Branch Account',
+        DETACHED: 'Branch Account is already detached',
+      }
+      return res.status(result.reason === 'NOT_FOUND' ? 404 : 400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: result.reason,
+          message: messages[result.reason] || 'Cannot unlink Branch Account',
+        },
+        requestId: req.requestId,
+      })
+    }
+
+    if (result.organizationId) {
+      const { invalidateCachesForSupplierBranchLifecycle } = await import(
+        '../lib/branch-lifecycle-guards.js'
+      )
+      await invalidateCachesForSupplierBranchLifecycle(req.params.supplierId, result.organizationId)
+    }
+
+    await createAuditLog('UNLINK_ORG_BRANCH', {
+      entityType: 'SUPPLIER',
+      entityId: req.params.supplierId,
+      description: 'Unlinked supplier Branch Account from organization',
+    })
+
+    res.json({
+      ok: true,
+      data: {
+        unlinked: true,
+        supplierId: req.params.supplierId,
+        billing: result.billing || null,
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('POST org unlink error:', error)
+    const billingCodes = new Set([
+      'NO_INDEPENDENT_SUBSCRIPTION',
+      'INVALID_SUBSCRIPTION',
+      'OPEN_INVOICES',
+    ])
+    const status = billingCodes.has(error.code) ? 400 : 500
+    res.status(status).json({
+      ok: false,
+      data: null,
+      error: {
+        name: error.code || 'INTERNAL_ERROR',
+        message: error.message || 'Failed to unlink Branch Account',
+        details: error.details,
+      },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/link-invitations', requireOrgOwner, async (req, res) => {
+  try {
+    const invitations = await listBranchAccountLinkInvitations(
+      'SUPPLIER',
+      req.orgContext.organizationId
+    )
+    res.json({ ok: true, data: { invitations }, error: null, requestId: req.requestId })
+  } catch (error) {
+    logger.error('GET org link-invitations error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to list link invitations' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/link-invitations', requireOrgOwner, multiBranchFeature, async (req, res) => {
+  try {
+    const { target_tenant_id, target_owner_email, intended_org_role } = req.body || {}
+    const created = await createBranchAccountLinkInvitation({
+      orgType: 'SUPPLIER',
+      organizationId: req.orgContext.organizationId,
+      primaryBillingTenantId: req.orgContext.primarySupplierId,
+      inviterUserId: req.userData.id,
+      targetTenantId: target_tenant_id || null,
+      targetOwnerEmail: target_owner_email || null,
+      intendedOrgRole: intended_org_role || 'Branch Manager',
+    })
+    res.status(201).json({
+      ok: true,
+      data: {
+        invitation: created.invitation,
+        invite_url: created.invite_url,
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('POST org link-invitations error:', error)
+    const status =
+      error.code === 'LIMIT_EXCEEDED'
+        ? 403
+        : error.code === 'ALREADY_LINKED' || error.code === 'NOT_FOUND'
+          ? 400
+          : 500
+    res.status(status).json({
+      ok: false,
+      data: null,
+      error: {
+        name: error.code || 'INTERNAL_ERROR',
+        message: error.message || 'Failed to create link invitation',
+        details: error.details,
+      },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.delete('/link-invitations/:id', requireOrgOwner, async (req, res) => {
+  try {
+    const invitation = await cancelBranchAccountLinkInvitation(
+      req.params.id,
+      'SUPPLIER',
+      req.orgContext.organizationId
+    )
+    if (!invitation) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Invitation not found or not cancellable' },
+        requestId: req.requestId,
+      })
+    }
+    res.json({ ok: true, data: { cancelled: true }, error: null, requestId: req.requestId })
+  } catch (error) {
+    logger.error('DELETE org link-invitation error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to cancel invitation' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/link-invitations/:id/resend', requireOrgOwner, async (req, res) => {
+  try {
+    const result = await resendBranchAccountLinkInvitation(
+      req.params.id,
+      'SUPPLIER',
+      req.orgContext.organizationId
+    )
+    if (!result) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Invitation not found' },
+        requestId: req.requestId,
+      })
+    }
+    res.json({
+      ok: true,
+      data: { invitation: result.invitation, invite_url: result.invite_url },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('POST org link-invitation resend error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to resend invitation' },
       requestId: req.requestId,
     })
   }
@@ -610,25 +949,36 @@ router.post('/context/switch', async (req, res) => {
       })
     }
 
-    const allowed = await assertBranchAccess(req, targetId)
+    const allowed =
+      (await assertBranchAccess(req, targetId)) &&
+      (await userCanAccessTenant(req.userData.id, req.userData.email, targetId, 'SUPPLIER')) &&
+      (await isTenantBranchActive(targetId, 'SUPPLIER'))
     if (!allowed) {
       return res.status(403).json({
         ok: false,
         data: null,
-        error: { name: 'FORBIDDEN', message: 'You do not have access to this branch' },
+        error: {
+          name: 'FORBIDDEN',
+          message: 'You do not have access to this Branch Account (inactive or unauthorized)',
+        },
         requestId: req.requestId,
       })
     }
 
-    const { rows } = await query(`SELECT id, name FROM supplier WHERE id = $1`, [targetId])
-    if (!rows.length) {
+    const { rows } = await query(`SELECT id, name, is_branch_active FROM supplier WHERE id = $1`, [
+      targetId,
+    ])
+    if (!rows.length || rows[0].is_branch_active === false) {
       return res.status(404).json({
         ok: false,
         data: null,
-        error: { name: 'NOT_FOUND', message: 'Branch not found' },
+        error: { name: 'NOT_FOUND', message: 'Branch Account not found or inactive' },
         requestId: req.requestId,
       })
     }
+
+    const { invalidateUserPermissionCache } = await import('../lib/permissions.js')
+    await invalidateUserPermissionCache(req.userData.id, targetId, 'SUPPLIER')
 
     const token = await createActiveTenantToken({
       userId: req.userData.id,
@@ -656,7 +1006,34 @@ router.post('/context/switch', async (req, res) => {
     res.status(500).json({
       ok: false,
       data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to switch branch context' },
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to switch Branch Account context' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
+ * GET /api/org/reports/overview — consolidated KPIs across authorized Branch Accounts.
+ * Branch Account IDs are derived server-side; optional branch_ids is intersected only.
+ */
+router.get('/reports/overview', async (req, res) => {
+  try {
+    const result = await supplierOrgConsolidatedOverview(
+      req.userData.id,
+      req.orgContext.organizationId,
+      req.query
+    )
+    res.json({ ok: true, ...result, error: null, requestId: req.requestId })
+  } catch (error) {
+    logger.error('GET /api/org/reports/overview error:', error)
+    const status = error.statusCode || error.status || 500
+    res.status(status).json({
+      ok: false,
+      data: null,
+      error: {
+        name: error.code || 'INTERNAL_ERROR',
+        message: error.message || 'Failed to load org reports',
+      },
       requestId: req.requestId,
     })
   }

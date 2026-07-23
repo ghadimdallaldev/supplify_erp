@@ -1,4 +1,5 @@
 import express from 'express'
+import { z } from 'zod'
 import {
   requireAuth,
   requireRole,
@@ -9,6 +10,12 @@ import {
   listConnectionRequestsForRestaurant,
   respondToConnectionRequest,
 } from '../services/supplier-connection-request.service.js'
+import {
+  listRestaurantSponsorshipOffers,
+  getRestaurantSponsorshipOffer,
+  acceptSponsorship,
+  declineSponsorship,
+} from '../services/supplier-sponsorship.service.js'
 
 const router = express.Router()
 
@@ -44,6 +51,73 @@ router.post('/connection-requests/:id/decline', async (req, res, next) => {
   try {
     const restaurantId = await resolveRestaurantId(req)
     const data = await respondToConnectionRequest(req.params.id, restaurantId, false, { req })
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/sponsorship-offers', async (req, res, next) => {
+  try {
+    const restaurantId = await resolveRestaurantId(req)
+    const data = await listRestaurantSponsorshipOffers(restaurantId)
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/sponsorship-offers/:id', async (req, res, next) => {
+  try {
+    const restaurantId = await resolveRestaurantId(req)
+    const data = await getRestaurantSponsorshipOffer(restaurantId, req.params.id)
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+const acceptSchema = z.object({
+  planId: z.string().uuid(),
+})
+
+router.post('/sponsorship-offers/:id/accept', async (req, res, next) => {
+  try {
+    const restaurantId = await resolveRestaurantId(req)
+    const body = acceptSchema.parse(req.body)
+    const data = await acceptSponsorship(restaurantId, req.params.id, {
+      planId: body.planId,
+      acceptedByUserId: req.userData?.id || null,
+      req,
+    })
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/sponsorship-offers/:id/select-plan', async (req, res, next) => {
+  try {
+    const restaurantId = await resolveRestaurantId(req)
+    const body = acceptSchema.parse(req.body)
+    const data = await acceptSponsorship(restaurantId, req.params.id, {
+      planId: body.planId,
+      acceptedByUserId: req.userData?.id || null,
+      req,
+    })
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/sponsorship-offers/:id/decline', async (req, res, next) => {
+  try {
+    const restaurantId = await resolveRestaurantId(req)
+    const data = await declineSponsorship(restaurantId, req.params.id, {
+      reason: req.body?.reason || 'declined_by_restaurant',
+      req,
+    })
     res.json({ ok: true, data, error: null, requestId: req.requestId })
   } catch (err) {
     next(err)

@@ -405,7 +405,47 @@ router.get('/growth-settings', requirePermission('ADMIN_GROWTH'), async (req, re
 router.patch('/growth-settings', requirePermission('ADMIN_GROWTH'), async (req, res) => {
   try {
     const { setReferralProgramConfig } = await import('../../lib/platform-settings.js')
-    const config = await setReferralProgramConfig(req.body || {})
+    const body = req.body || {}
+    if (body.offerExpiryDays != null) {
+      const d = Number(body.offerExpiryDays)
+      if (!Number.isFinite(d) || d < 1 || d > 90) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: 'offerExpiryDays must be 1–90' },
+          requestId: req.requestId,
+        })
+      }
+    }
+    if (
+      body.referralDiscountAppliesTo != null &&
+      !['first_restaurant_funded', 'sponsored_cycle'].includes(body.referralDiscountAppliesTo)
+    ) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'referralDiscountAppliesTo must be first_restaurant_funded or sponsored_cycle',
+        },
+        requestId: req.requestId,
+      })
+    }
+    if (body.supportedBillingIntervals != null) {
+      const intervals = body.supportedBillingIntervals
+      if (!Array.isArray(intervals) || !intervals.every((i) => i === 'MONTHLY')) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Only MONTHLY is supported for sponsorship billing intervals',
+          },
+          requestId: req.requestId,
+        })
+      }
+    }
+    const config = await setReferralProgramConfig(body)
     res.json({ ok: true, data: config, error: null, requestId: req.requestId })
   } catch (error) {
     logger.error('PATCH growth-settings error:', error)
@@ -417,5 +457,101 @@ router.patch('/growth-settings', requirePermission('ADMIN_GROWTH'), async (req, 
     })
   }
 })
+
+router.get('/sponsorships/:id', requirePermission('ADMIN_GROWTH'), async (req, res, next) => {
+  try {
+    const { query: dbQuery } = await import('../../lib/db.js')
+    const { rows } = await dbQuery(`SELECT * FROM supplier_sponsorship WHERE id = $1`, [
+      req.params.id,
+    ])
+    if (!rows[0]) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Sponsorship not found' },
+        requestId: req.requestId,
+      })
+    }
+    res.json({ ok: true, data: rows[0], error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post(
+  '/sponsorships/:id/manual-pay',
+  requirePermission('ADMIN_GROWTH'),
+  async (req, res, next) => {
+    try {
+      const { adminMarkSponsorshipPaid } = await import(
+        '../../services/supplier-sponsorship.service.js'
+      )
+      const data = await adminMarkSponsorshipPaid(req.params.id, {
+        adminUserId: req.userData?.id || null,
+        reason: req.body?.reason || 'admin_manual_approval',
+        req,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/sponsorships/:id/refund',
+  requirePermission('ADMIN_GROWTH'),
+  async (req, res, next) => {
+    try {
+      const { refundSponsorship } = await import('../../services/supplier-sponsorship.service.js')
+      const data = await refundSponsorship(req.params.id, {
+        amount: req.body?.amount ?? null,
+        reason: req.body?.reason || 'admin_refund',
+        req,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/sponsorships/:id/reconcile',
+  requirePermission('ADMIN_GROWTH'),
+  async (req, res, next) => {
+    try {
+      const { confirmSupplierPayment, activateSponsorship } = await import(
+        '../../services/supplier-sponsorship.service.js'
+      )
+      const { getSponsorshipInvoice } = await import('../../lib/billing/sponsorship-billing.js')
+      const { query: dbQuery } = await import('../../lib/db.js')
+      const { rows } = await dbQuery(`SELECT * FROM supplier_sponsorship WHERE id = $1`, [
+        req.params.id,
+      ])
+      if (!rows[0]) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Sponsorship not found' },
+          requestId: req.requestId,
+        })
+      }
+      const s = rows[0]
+      let data = { sponsorship: s }
+      if (s.supplier_billing_invoice_id) {
+        const inv = await getSponsorshipInvoice(s.supplier_billing_invoice_id, s.supplier_id)
+        if (inv?.status === 'PAID' && ['payment_pending', 'payment_failed'].includes(s.status)) {
+          data = await confirmSupplierPayment(s.id)
+        } else if (inv?.status === 'PAID' && s.status === 'scheduled') {
+          data = await activateSponsorship(s.id)
+        }
+      }
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 
 export default router

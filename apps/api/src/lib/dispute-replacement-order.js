@@ -1,5 +1,6 @@
 import { ValidationError } from '../middlewares/errorHandler.js'
-import { assertAndDeductSupplierStock } from '../services/supplier-inventory.service.js'
+import { reserveStockForPlacedOrder } from '../services/supplier-order-stock.service.js'
+import { isFeatureEnabled } from '../lib/subscription.js'
 
 export const PLACEMENT_SOURCE_DISPUTE_REPLACEMENT = 'DISPUTE_REPLACEMENT'
 
@@ -154,13 +155,11 @@ export async function createReplacementOrderFromDispute(
     ]
   )
 
+  const insertedItems = []
   for (const line of lines) {
-    await assertAndDeductSupplierStock(client, line.productId, line.quantity, {
-      sku: line.productSku,
-      reserve: true,
-    })
-
-    await client.query(
+    const {
+      rows: [orderItem],
+    } = await client.query(
       `
       INSERT INTO order_item (
         order_id,
@@ -173,6 +172,7 @@ export async function createReplacementOrderFromDispute(
         source_order_item_id,
         original_unit_price
       ) VALUES ($1, $2, $3, $4, 0, 0, $5, $6, $7)
+      RETURNING *
       `,
       [
         replacementOrder.id,
@@ -184,7 +184,30 @@ export async function createReplacementOrderFromDispute(
         line.originalUnitPrice,
       ]
     )
+    insertedItems.push({ ...orderItem, sku: line.productSku })
   }
+
+  const { rows: supplierRows } = await client.query(`SELECT * FROM supplier WHERE id = $1`, [
+    supplierId,
+  ])
+  const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
+  await reserveStockForPlacedOrder(client, {
+    supplierId,
+    supplier: supplierRows[0] || { id: supplierId },
+    order: {
+      id: replacementOrder.id,
+      restaurant_id: restaurantId,
+    },
+    orderItems: insertedItems,
+    multiWarehouseActive: multiActive,
+    legacyLineItems: insertedItems.map((oi) => ({
+      productId: oi.product_id,
+      quantity: oi.quantity,
+      sku: oi.sku,
+      reserve: true,
+    })),
+    reserveLegacy: true,
+  })
 
   await client.query(
     `

@@ -52,9 +52,24 @@ const DEFAULT_REFERRAL_PROGRAM_CONFIG = {
   firstPaidDiscountPercent: 20,
   supplierRewardType: 'free_month',
   referralValidityDays: 90,
-  sponsorshipLimitsPerYear: { silver: 2, gold: 10, platinum: 25, enterprise: null },
+  /** Caps keyed by supplier subscription_plan.code (four-plan: gold/platinum; legacy keys kept). */
+  sponsorshipLimitsPerYear: {
+    silver: 2,
+    gold: 10,
+    platinum: 25,
+    enterprise: null,
+  },
   eligibleSponsorPlans: ['silver', 'gold', 'platinum'],
   connectionRequestExpiryDays: 30,
+  sponsorshipEnabled: true,
+  offerExpiryDays: 14,
+  /** Sponsored month is full price; discount applies to first restaurant-funded cycle. */
+  referralDiscountAppliesTo: 'first_restaurant_funded',
+  requireRestaurantPaymentMethodBeforeActivation: false,
+  supplierPaymentAfterAcceptance: true,
+  maxSponsoredAmount: null,
+  supportedBillingIntervals: ['MONTHLY'],
+  paymentPendingStaleDays: 7,
 }
 
 export async function getReferralProgramConfig() {

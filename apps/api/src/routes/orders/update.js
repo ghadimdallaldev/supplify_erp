@@ -316,7 +316,12 @@ router.patch('/:id', async (req, res) => {
         await syncWarehouseFulfillmentOnOrderStatus(client, id, updateData.status, order.status)
       }
 
-      if (updateData.status === 'CANCELLED' && order.status !== 'CANCELLED') {
+      // Unified release: WH-assigned → release reservations; legacy-only → restore inventory.
+      // syncWarehouse already releases WH on CANCELLED/REJECTED (idempotent).
+      if (
+        (updateData.status === 'CANCELLED' || updateData.status === 'REJECTED') &&
+        order.status !== updateData.status
+      ) {
         await restoreSupplierStockForOrder(client, id)
       }
 

@@ -12,6 +12,12 @@ import {
   acceptRestaurantBranchInvitation,
   getRestaurantInvitationByToken,
 } from '../lib/restaurant-invitations.js'
+import {
+  acceptBranchAccountLinkInvitation,
+  evaluateBranchAccountLinkInvitationPublicState,
+  getBranchAccountLinkInvitationByToken,
+  rejectBranchAccountLinkInvitation,
+} from '../lib/branch-account-link-invitations.js'
 import { evaluateInvitationState, normalizeInviteType } from '../services/invitationTokens.js'
 import { createActiveTenantToken, getActiveTenantCookieName } from '../lib/tenant-switch.js'
 import { config } from '../config/env.js'
@@ -47,6 +53,12 @@ router.get('/', async (req, res) => {
     if (type === 'supplier_branch') {
       const invitation = await getInvitationByToken(token)
       const state = evaluateInvitationPublicState(invitation)
+      return res.json({ ok: true, data: state, error: null, requestId: req.requestId })
+    }
+
+    if (type === 'branch_account_link') {
+      const invitation = await getBranchAccountLinkInvitationByToken(token)
+      const state = evaluateBranchAccountLinkInvitationPublicState(invitation)
       return res.json({ ok: true, data: state, error: null, requestId: req.requestId })
     }
 
@@ -176,6 +188,68 @@ router.post('/accept', optionalAuth, async (req, res) => {
     }
 
     const acceptEmail = existingUserId ? existingUserEmail : email
+
+    if (type === 'branch_account_link') {
+      if (!existingUserId) {
+        return res.status(401).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'AUTH_REQUIRED',
+            message: 'Sign in as the Branch Account owner to accept this link invitation',
+          },
+          requestId: req.requestId,
+        })
+      }
+      const result = await acceptBranchAccountLinkInvitation({
+        token,
+        acceptingUserId: existingUserId,
+        acceptingUserEmail: existingUserEmail || email,
+      })
+      if (!result.ok) {
+        const status =
+          result.reason === 'LIMIT_EXCEEDED'
+            ? 403
+            : result.reason === 'NOT_OWNER'
+              ? 403
+              : result.reason === 'NOT_FOUND'
+                ? 404
+                : 400
+        return res.status(status).json({
+          ok: false,
+          data: null,
+          error: {
+            name: result.reason || 'INVITATION_INVALID',
+            message: `Cannot accept link invitation: ${result.reason}`,
+            details: result.details,
+          },
+          requestId: req.requestId,
+        })
+      }
+      try {
+        await recordInviteLegalAcceptances({
+          userId: existingUserId,
+          legalAcceptance,
+          ipAddress: acceptMeta.ipAddress,
+          userAgent: acceptMeta.userAgent,
+        })
+      } catch (legalErr) {
+        logger.warn('Legal acceptance record failed for branch account link', {
+          error: legalErr.message,
+        })
+      }
+      return res.json({
+        ok: true,
+        data: {
+          linked: true,
+          tenantId: result.tenantId,
+          organizationId: result.organizationId,
+          billingReviewRequired: result.billingReviewRequired,
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    }
 
     if (type === 'supplier_branch') {
       return handleSupplierBranchAccept(req, res, {
@@ -388,6 +462,70 @@ router.get('/branch', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to validate invitation' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/reject', optionalAuth, async (req, res) => {
+  try {
+    const token = req.body?.token
+    const type = normalizeInviteType(req.body?.type || req.query?.type)
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'token is required' },
+        requestId: req.requestId,
+      })
+    }
+    if (type !== 'branch_account_link') {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Reject is only supported for branch account link invitations',
+        },
+        requestId: req.requestId,
+      })
+    }
+    const userId = req.userData?.id
+    if (!userId) {
+      return res.status(401).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'AUTH_REQUIRED',
+          message: 'Sign in to reject this link invitation',
+        },
+        requestId: req.requestId,
+      })
+    }
+    const result = await rejectBranchAccountLinkInvitation(token, userId)
+    if (!result.ok) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: result.reason || 'INVITATION_INVALID',
+          message: `Cannot reject invitation: ${result.reason}`,
+        },
+        requestId: req.requestId,
+      })
+    }
+    return res.json({
+      ok: true,
+      data: { rejected: true },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('POST public invitation reject error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to reject invitation' },
       requestId: req.requestId,
     })
   }

@@ -18,6 +18,10 @@ import {
   ensureDefaultWarehouseForPaidSupplier,
 } from '../lib/warehouse-helpers.js'
 import { buildSimulationFromPayload } from '../services/warehouseRouting.js'
+import {
+  seedMissingWarehouseInventoryForSupplier,
+  transferWarehouseInventory,
+} from '../services/supplier-stock.service.js'
 import { NotFoundError } from '../middlewares/errorHandler.js'
 import { withTransaction } from '../lib/db.js'
 
@@ -469,6 +473,7 @@ router.post(
           newWarehouse[0].id,
           supplierId,
         ])
+        await seedMissingWarehouseInventoryForSupplier(supplierId, newWarehouse[0].id)
       }
 
       await createAuditLog('CREATE_WAREHOUSE', {
@@ -610,6 +615,7 @@ router.post(
           warehouseId,
           supplierId,
         ])
+        await seedMissingWarehouseInventoryForSupplier(supplierId, warehouseId, { client })
         return rows[0]
       })
 
@@ -682,12 +688,31 @@ router.delete(
         })
       }
 
-      const { rows } = await query(
-        `UPDATE warehouse SET is_active = FALSE, updated_at = now() WHERE id = $1 RETURNING *`,
-        [warehouseId]
-      )
+      const warehouse = await withTransaction(async (client) => {
+        const { rows: others } = await client.query(
+          `SELECT id FROM warehouse
+           WHERE ${supplierCol} = $1 AND id != $2 AND is_active = TRUE
+           ORDER BY is_default DESC NULLS LAST, is_main DESC NULLS LAST, created_at ASC`,
+          [supplierId, warehouseId]
+        )
+        const targetId = others[0]?.id
+        if (targetId) {
+          await transferWarehouseInventory(client, warehouseId, targetId)
+          await client.query(
+            `UPDATE supplier SET default_warehouse_id = COALESCE(default_warehouse_id, $1)
+             WHERE id = $2 AND (default_warehouse_id IS NULL OR default_warehouse_id = $3)`,
+            [targetId, supplierId, warehouseId]
+          )
+        }
 
-      res.json({ ok: true, data: { warehouse: rows[0] }, error: null, requestId: req.requestId })
+        const { rows } = await client.query(
+          `UPDATE warehouse SET is_active = FALSE, updated_at = now() WHERE id = $1 RETURNING *`,
+          [warehouseId]
+        )
+        return rows[0]
+      })
+
+      res.json({ ok: true, data: { warehouse }, error: null, requestId: req.requestId })
     } catch (error) {
       if (error instanceof NotFoundError) {
         return res.status(404).json({
