@@ -459,9 +459,12 @@ router.delete('/branches/:supplierId', requireOrgOwner, async (req, res) => {
   try {
     const result = await deactivateOrgBranch(req.params.supplierId)
     if (!result.ok) {
+      const { deactivationBlockerMessage } = await import('../lib/branch-lifecycle-guards.js')
       const messages = {
         MAIN_BRANCH: 'Cannot deactivate the main Branch Account',
-        PENDING_ORDERS: 'Branch Account has pending orders and cannot be deactivated',
+        PENDING_ORDERS: deactivationBlockerMessage('PENDING_ORDERS'),
+        ACTIVE_WAREHOUSE_RESERVATIONS: deactivationBlockerMessage('ACTIVE_WAREHOUSE_RESERVATIONS'),
+        OPEN_INVOICES: deactivationBlockerMessage('OPEN_INVOICES'),
         NOT_FOUND: 'Branch Account not found',
       }
       return res.status(result.reason === 'NOT_FOUND' ? 404 : 403).json({
@@ -470,6 +473,7 @@ router.delete('/branches/:supplierId', requireOrgOwner, async (req, res) => {
         error: {
           name: result.reason,
           message: messages[result.reason] || 'Cannot deactivate Branch Account',
+          details: result.blockers ? { blockers: result.blockers } : undefined,
         },
         requestId: req.requestId,
       })
@@ -641,8 +645,11 @@ router.post('/branches/:supplierId/unlink', requireOrgOwner, async (req, res) =>
       })
     }
 
-    if (req.userData?.id && result.organizationId) {
-      await invalidateOrgPermissionCaches(req.userData.id, result.organizationId)
+    if (result.organizationId) {
+      const { invalidateCachesForSupplierBranchLifecycle } = await import(
+        '../lib/branch-lifecycle-guards.js'
+      )
+      await invalidateCachesForSupplierBranchLifecycle(req.params.supplierId, result.organizationId)
     }
 
     await createAuditLog('UNLINK_ORG_BRANCH', {

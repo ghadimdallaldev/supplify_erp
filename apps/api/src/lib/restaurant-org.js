@@ -457,16 +457,26 @@ export async function deactivateRestaurantOrgBranch(restaurantId) {
   )
   if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
   if (rows[0].is_main_branch) return { ok: false, reason: 'MAIN_BRANCH' }
-  if (await restaurantBranchHasPendingOrders(restaurantId)) {
-    return { ok: false, reason: 'PENDING_ORDERS' }
+
+  const { getRestaurantDeactivationBlockers, invalidateCachesForRestaurantBranchLifecycle } =
+    await import('./branch-lifecycle-guards.js')
+
+  const blockers = await getRestaurantDeactivationBlockers(restaurantId, {
+    hasPendingOrders: await restaurantBranchHasPendingOrders(restaurantId),
+  })
+  if (blockers.length) {
+    return { ok: false, reason: blockers[0].code, blockers }
   }
+
   await query(
     `UPDATE restaurant
      SET is_branch_active = false, deactivated_at = NOW(), updated_at = NOW()
      WHERE id = $1`,
     [restaurantId]
   )
-  return { ok: true }
+
+  await invalidateCachesForRestaurantBranchLifecycle(restaurantId, rows[0].organization_id)
+  return { ok: true, organizationId: rows[0].organization_id }
 }
 
 export async function reactivateRestaurantOrgBranch(restaurantId) {
@@ -483,6 +493,10 @@ export async function reactivateRestaurantOrgBranch(restaurantId) {
      WHERE id = $1`,
     [restaurantId]
   )
+  const { invalidateCachesForRestaurantBranchLifecycle } = await import(
+    './branch-lifecycle-guards.js'
+  )
+  await invalidateCachesForRestaurantBranchLifecycle(restaurantId, rows[0].organization_id)
   return { ok: true, organizationId: rows[0].organization_id }
 }
 
@@ -509,7 +523,7 @@ export async function unlinkRestaurantFromOrganization(restaurantId, { client = 
      WHERE id = $1`,
     [restaurantId]
   )
-  return { ok: true, organizationId }
+  return { ok: true, organizationId, restaurantId }
 }
 
 export async function linkRestaurantToOrganization(

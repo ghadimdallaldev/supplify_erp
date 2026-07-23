@@ -19,6 +19,8 @@ Supplier tenants can operate as a **multi-branch organization**: one parent org 
 | Action                                    | Status                                                                           |
 | ----------------------------------------- | -------------------------------------------------------------------------------- |
 | Create / deactivate / reactivate / unlink | Org Owner APIs under `/api/org/branches`                                         |
+| Deactivation guards                       | Blocks main branch; open orders; WH reservations; open invoices                  |
+| Permission cache fan-out                  | Deactivate / reactivate / unlink clear caches for all affected users             |
 | Link existing standalone supplier         | `branch_account_link_invitations`                                                |
 | Consolidated reporting                    | `GET /api/org/reports/overview`                                                  |
 | Warehouse stock                           | Prefer `warehouse_inventory` when warehouses enabled; see supplier-stock service |
@@ -60,19 +62,19 @@ After switch, reload the app or reset RTK Query cache so lists use the new branc
 
 All routes: `requireAuth`, supplier role, org membership (except admin with `organization_id` query).
 
-| Method | Path                                          | Who                             | Notes                                    |
-| ------ | --------------------------------------------- | ------------------------------- | ---------------------------------------- |
-| GET    | `/api/org`                                    | Org members                     | Org info + accessible branches           |
-| GET    | `/api/org/branches`                           | Org members                     | Branch list + stats                      |
-| POST   | `/api/org/branches`                           | Org Owner                       | Requires `multi_branch` feature          |
-| GET    | `/api/org/branches/:supplierId`               | Branch access                   | Detail                                   |
-| PATCH  | `/api/org/branches/:supplierId`               | Owner / Regional Mgr (assigned) | Name, code, phone, address               |
-| DELETE | `/api/org/branches/:supplierId`               | Org Owner                       | Deactivates; not main; no pending orders |
-| GET    | `/api/org/users`                              | Org Owner                       | Org users + branch assignments           |
-| POST   | `/api/org/users/:userId/branches`             | Org Owner                       | Grant Regional Manager branch            |
-| DELETE | `/api/org/users/:userId/branches/:supplierId` | Org Owner                       | Revoke                                   |
-| POST   | `/api/org/users/:userId/role`                 | Org Owner                       | Assign org role                          |
-| POST   | `/api/org/context/switch`                     | Branch access                   | Set active branch cookie                 |
+| Method | Path                                          | Who                             | Notes                           |
+| ------ | --------------------------------------------- | ------------------------------- | ------------------------------- |
+| GET    | `/api/org`                                    | Org members                     | Org info + accessible branches  |
+| GET    | `/api/org/branches`                           | Org members                     | Branch list + stats             |
+| POST   | `/api/org/branches`                           | Org Owner                       | Requires `multi_branch` feature |
+| GET    | `/api/org/branches/:supplierId`               | Branch access                   | Detail                          |
+| PATCH  | `/api/org/branches/:supplierId`               | Owner / Regional Mgr (assigned) | Name, code, phone, address      |
+| DELETE | `/api/org/branches/:supplierId`               | Org Owner                       | Deactivates; guards below       |
+| GET    | `/api/org/users`                              | Org Owner                       | Org users + branch assignments  |
+| POST   | `/api/org/users/:userId/branches`             | Org Owner                       | Grant Regional Manager branch   |
+| DELETE | `/api/org/users/:userId/branches/:supplierId` | Org Owner                       | Revoke                          |
+| POST   | `/api/org/users/:userId/role`                 | Org Owner                       | Assign org role                 |
+| POST   | `/api/org/context/switch`                     | Branch access                   | Set active branch cookie        |
 
 Restaurant linked accounts remain on `/api/branches`.
 

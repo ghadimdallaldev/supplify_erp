@@ -487,9 +487,13 @@ router.delete('/branches/:restaurantId', requireRestaurantOrgOwner, async (req, 
   try {
     const result = await deactivateRestaurantOrgBranch(req.params.restaurantId)
     if (!result.ok) {
+      const { deactivationBlockerMessage } = await import('../lib/branch-lifecycle-guards.js')
       const messages = {
         MAIN_BRANCH: 'Cannot deactivate the main Branch Account',
-        PENDING_ORDERS: 'Branch Account has pending orders and cannot be deactivated',
+        PENDING_ORDERS: deactivationBlockerMessage('PENDING_ORDERS'),
+        OPEN_INVOICES: deactivationBlockerMessage('OPEN_INVOICES'),
+        SCHEDULED_STAFF: deactivationBlockerMessage('SCHEDULED_STAFF'),
+        PENDING_CENTRAL_PURCHASING: deactivationBlockerMessage('PENDING_CENTRAL_PURCHASING'),
         NOT_FOUND: 'Branch Account not found',
       }
       return res.status(result.reason === 'NOT_FOUND' ? 404 : 403).json({
@@ -498,6 +502,7 @@ router.delete('/branches/:restaurantId', requireRestaurantOrgOwner, async (req, 
         error: {
           name: result.reason,
           message: messages[result.reason] || 'Cannot deactivate Branch Account',
+          details: result.blockers ? { blockers: result.blockers } : undefined,
         },
         requestId: req.requestId,
       })
@@ -669,8 +674,14 @@ router.post('/branches/:restaurantId/unlink', requireRestaurantOrgOwner, async (
       })
     }
 
-    if (req.userData?.id && result.organizationId) {
-      await invalidateRestaurantOrgPermissionCaches(req.userData.id, result.organizationId)
+    if (result.organizationId) {
+      const { invalidateCachesForRestaurantBranchLifecycle } = await import(
+        '../lib/branch-lifecycle-guards.js'
+      )
+      await invalidateCachesForRestaurantBranchLifecycle(
+        req.params.restaurantId,
+        result.organizationId
+      )
     }
 
     await createAuditLog('UNLINK_RESTAURANT_ORG_BRANCH', {

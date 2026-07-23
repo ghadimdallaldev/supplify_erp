@@ -494,16 +494,26 @@ export async function deactivateOrgBranch(supplierId) {
   )
   if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
   if (rows[0].is_main_branch) return { ok: false, reason: 'MAIN_BRANCH' }
-  if (await branchHasPendingOrders(supplierId)) {
-    return { ok: false, reason: 'PENDING_ORDERS' }
+
+  const { getSupplierDeactivationBlockers, invalidateCachesForSupplierBranchLifecycle } =
+    await import('./branch-lifecycle-guards.js')
+
+  const blockers = await getSupplierDeactivationBlockers(supplierId, {
+    hasPendingOrders: await branchHasPendingOrders(supplierId),
+  })
+  if (blockers.length) {
+    return { ok: false, reason: blockers[0].code, blockers }
   }
+
   await query(
     `UPDATE supplier
      SET is_branch_active = false, deactivated_at = NOW(), updated_at = NOW()
      WHERE id = $1`,
     [supplierId]
   )
-  return { ok: true }
+
+  await invalidateCachesForSupplierBranchLifecycle(supplierId, rows[0].organization_id)
+  return { ok: true, organizationId: rows[0].organization_id }
 }
 
 export async function reactivateOrgBranch(supplierId) {
@@ -520,6 +530,10 @@ export async function reactivateOrgBranch(supplierId) {
      WHERE id = $1`,
     [supplierId]
   )
+  const { invalidateCachesForSupplierBranchLifecycle } = await import(
+    './branch-lifecycle-guards.js'
+  )
+  await invalidateCachesForSupplierBranchLifecycle(supplierId, rows[0].organization_id)
   return { ok: true, organizationId: rows[0].organization_id }
 }
 
@@ -544,7 +558,7 @@ export async function unlinkSupplierFromOrganization(supplierId, { client = null
      WHERE id = $1`,
     [supplierId]
   )
-  return { ok: true, organizationId }
+  return { ok: true, organizationId, supplierId }
 }
 
 export async function linkSupplierToOrganization(
