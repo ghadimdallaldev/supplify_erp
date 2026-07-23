@@ -25,6 +25,12 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 - **Migration**: Run `0168_catalog_image_import.sql` before using Import Product Images in deployed environments.
 - **Docs**: [bulk-product-image-import.md](../features/bulk-product-image-import.md)
 
+## 2026-07-23 — Supplier-paid sponsorship lifecycle (web-only)
+
+- **Scope**: Offer → restaurant plan select/accept → supplier `billing_invoice` charge (stub/manual gateway) → schedule after trial → activate → complete → restaurant-funded renewal. APIs under `/api/supplier/growth/sponsorships*`, `/api/restaurant/growth/sponsorship-offers*`, admin reconcile/manual-pay/refund. Migration `0192_supplier_sponsorship_lifecycle.sql`.
+- **Reason**: Financial consent, invoice payment, and admin reconciliation are web cockpit workflows. Mobile remains metrics/invite-capable later; no mobile sponsorship accept/pay UI in this release.
+- **Honesty**: Not PSP-live until a real payment gateway replaces stub/manual.
+
 ## 2026-06-15 — Supplier customer growth (web-only)
 
 - **Scope**: Supplier customer import, referral invites, sponsored onboarding, and growth dashboard at `/app/customer-growth`. APIs at `/api/supplier/growth/*`, `/api/growth/referral/:token`, `/api/restaurant/growth/connection-requests`.

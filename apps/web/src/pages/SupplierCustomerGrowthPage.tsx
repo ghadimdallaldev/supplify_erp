@@ -20,7 +20,11 @@ import {
   useExecuteCustomerImportMutation,
   useInviteProspectMutation,
   useConnectProspectMutation,
-  useSponsorProspectMutation,
+  useCreateSponsorshipOfferMutation,
+  useGetSupplierSponsorshipsQuery,
+  usePaySponsorshipMutation,
+  useRetrySponsorshipPaymentMutation,
+  useCancelSponsorshipMutation,
   CUSTOMER_IMPORT_CSV_TEMPLATE,
 } from '../services/api/endpoints/growth'
 import { useGetEntitlementsQuery } from '../services/api'
@@ -92,7 +96,15 @@ export function SupplierCustomerGrowthPage() {
   const [executeImport, { isLoading: importing }] = useExecuteCustomerImportMutation()
   const [inviteProspect] = useInviteProspectMutation()
   const [connectProspect] = useConnectProspectMutation()
-  const [sponsorProspect] = useSponsorProspectMutation()
+  const [createSponsorshipOffer] = useCreateSponsorshipOfferMutation()
+  const [paySponsorship] = usePaySponsorshipMutation()
+  const [retrySponsorshipPayment] = useRetrySponsorshipPaymentMutation()
+  const [cancelSponsorship] = useCancelSponsorshipMutation()
+  const { data: sponsorshipsData, refetch: refetchSponsorships } = useGetSupplierSponsorshipsQuery(
+    undefined,
+    { skip: skipGrowthApi }
+  )
+  const canManageCustomers = can('CUSTOMERS_MANAGE')
   const [csvText, setCsvText] = useState('')
   const [importPreview, setImportPreview] = useState<ImportPreviewRow[]>([])
   const [importPreviewMeta, setImportPreviewMeta] = useState<{
@@ -405,9 +417,18 @@ export function SupplierCustomerGrowthPage() {
                 )}
               </div>
               <p className="text-xs text-[var(--text-muted)]">
-                {t('customerGrowth.prospects.sponsorHelp', {
-                  plan: SPONSORSHIP_PLAN_LABELS[sponsorPlanCode],
-                })}
+                You are offering to sponsor one billing month only. Future subscription charges are
+                the restaurant&apos;s responsibility. The restaurant must accept and select a plan;
+                you are charged only after acceptance.
+                {metrics?.sponsorshipUsage
+                  ? ` Usage: ${metrics.sponsorshipUsage.used}${
+                      metrics.sponsorshipUsage.unlimited
+                        ? ' (unlimited)'
+                        : ` / ${metrics.sponsorshipUsage.limit} this year`
+                    }.`
+                  : metrics?.sponsorshipLimit != null
+                    ? ` Limit: ${metrics.sponsorshipLimit}/year.`
+                    : ''}
               </p>
             </div>
           )}
@@ -472,21 +493,51 @@ export function SupplierCustomerGrowthPage() {
                         <td className="py-3">
                           <div className="flex flex-wrap gap-2">
                             {p.match_status === 'existing_supplify' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={async () => {
-                                  try {
-                                    await connectProspect({ prospectId: p.id }).unwrap()
-                                    toast.success(t('customerGrowth.toasts.connectionSent'))
-                                    refetchProspects()
-                                  } catch {
-                                    toast.error(t('customerGrowth.toasts.connectionFailed'))
-                                  }
-                                }}
-                              >
-                                {t('customerGrowth.prospects.connect')}
-                              </Button>
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={!canManageCustomers}
+                                  onClick={async () => {
+                                    try {
+                                      await connectProspect({ prospectId: p.id }).unwrap()
+                                      toast.success(t('customerGrowth.toasts.connectionSent'))
+                                      refetchProspects()
+                                    } catch {
+                                      toast.error(t('customerGrowth.toasts.connectionFailed'))
+                                    }
+                                  }}
+                                >
+                                  {t('customerGrowth.prospects.connect')}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={!canManageCustomers}
+                                  onClick={async () => {
+                                    try {
+                                      await createSponsorshipOffer({
+                                        prospectId: p.id,
+                                        idempotencyKey: `offer_${p.id}_${Date.now()}`,
+                                      }).unwrap()
+                                      toast.success(
+                                        'Sponsorship offer sent. Restaurant must accept and select a plan before you are charged.'
+                                      )
+                                      refetchProspects()
+                                      refetchSponsorships()
+                                    } catch (e: unknown) {
+                                      const msg =
+                                        (e as { data?: { error?: { message?: string } } })?.data
+                                          ?.error?.message ||
+                                        t('customerGrowth.toasts.sponsorFailed')
+                                      toast.error(msg)
+                                    }
+                                  }}
+                                >
+                                  <Gift className="h-3 w-3 mr-1" />
+                                  Sponsor first month
+                                </Button>
+                              </>
                             )}
                             {p.match_status === 'import_only' && (
                               <>
@@ -512,14 +563,18 @@ export function SupplierCustomerGrowthPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
+                                  disabled={!canManageCustomers}
                                   onClick={async () => {
                                     try {
-                                      await sponsorProspect({
+                                      await createSponsorshipOffer({
                                         prospectId: p.id,
-                                        planCode: sponsorPlanCode,
+                                        idempotencyKey: `offer_${p.id}_${Date.now()}`,
                                       }).unwrap()
-                                      toast.success(t('customerGrowth.toasts.sponsorStarted'))
+                                      toast.success(
+                                        'Sponsorship offer sent. Restaurant must accept and select a plan before you are charged.'
+                                      )
                                       refetchProspects()
+                                      refetchSponsorships()
                                     } catch (e: unknown) {
                                       const msg =
                                         (e as { data?: { error?: { message?: string } } })?.data
@@ -530,7 +585,7 @@ export function SupplierCustomerGrowthPage() {
                                   }}
                                 >
                                   <Gift className="h-3 w-3 mr-1" />
-                                  {t('customerGrowth.prospects.sponsor')}
+                                  Sponsor first month
                                 </Button>
                               </>
                             )}
@@ -541,6 +596,117 @@ export function SupplierCustomerGrowthPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card data-testid="supplier-sponsorships-panel">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Gift className="h-5 w-5" />
+            Sponsorship offers &amp; payments
+          </CardTitle>
+          <CardDescription>
+            Track offer status, pay one-time invoices after restaurant acceptance, and retry failed
+            charges. You are paying for one billing month only.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(sponsorshipsData?.sponsorships || []).length === 0 ? (
+            <p className="text-sm text-[var(--text-muted)]">No sponsorships yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[var(--text-muted)] border-b">
+                    <th className="py-2 pr-4">Prospect / restaurant</th>
+                    <th className="py-2 pr-4">Status</th>
+                    <th className="py-2 pr-4">Amount</th>
+                    <th className="py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(sponsorshipsData?.sponsorships || []).map((s) => (
+                    <tr key={s.id} className="border-b border-[var(--app-border)]">
+                      <td className="py-3 pr-4">
+                        {s.prospect_name || s.restaurant_id || s.prospect_id}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <Badge>{s.status}</Badge>
+                        {s.failure_reason && (
+                          <span className="block text-xs text-[var(--red)] mt-1">
+                            {s.failure_reason}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 pr-4">
+                        {s.sponsored_amount != null
+                          ? `$${Number(s.sponsored_amount).toFixed(2)} ${s.currency || 'USD'}`
+                          : '—'}
+                      </td>
+                      <td className="py-3">
+                        <div className="flex flex-wrap gap-2">
+                          {['payment_pending', 'payment_failed'].includes(s.status) &&
+                            canManageCustomers && (
+                              <Button
+                                size="sm"
+                                onClick={async () => {
+                                  try {
+                                    const key = `pay_${s.id}_${Date.now()}`
+                                    if (s.status === 'payment_failed') {
+                                      await retrySponsorshipPayment({
+                                        id: s.id,
+                                        idempotencyKey: key,
+                                      }).unwrap()
+                                    } else {
+                                      await paySponsorship({
+                                        id: s.id,
+                                        idempotencyKey: key,
+                                      }).unwrap()
+                                    }
+                                    toast.success('Sponsorship payment submitted')
+                                    refetchSponsorships()
+                                  } catch (e: unknown) {
+                                    toast.error(
+                                      (e as { data?: { error?: { message?: string } } })?.data
+                                        ?.error?.message || 'Payment failed'
+                                    )
+                                  }
+                                }}
+                              >
+                                {s.status === 'payment_failed' ? 'Retry payment' : 'Pay invoice'}
+                              </Button>
+                            )}
+                          {['offered', 'accepted', 'payment_pending', 'payment_failed'].includes(
+                            s.status
+                          ) &&
+                            canManageCustomers && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={async () => {
+                                  try {
+                                    await cancelSponsorship({ id: s.id }).unwrap()
+                                    toast.success('Sponsorship cancelled')
+                                    refetchSponsorships()
+                                  } catch (e: unknown) {
+                                    toast.error(
+                                      (e as { data?: { error?: { message?: string } } })?.data
+                                        ?.error?.message || 'Cancel failed'
+                                    )
+                                  }
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </CardContent>

@@ -59,4 +59,4 @@ Authentication uses session cookies after Keycloak OAuth. Protected routes use `
 
 **Admin dashboard (subscription ops):** `POST /api/admin-dashboard/subscriptions/:id/unlock`, `POST …/extend-free-trial`, `GET/PATCH …/platform-settings` (`freeSandboxDays` **7–90**, default 30), `GET/PATCH …/growth-settings` (referral program config).
 
-**Supplier growth:** `/api/supplier/growth/*` (import, prospects, invite, sponsor, metrics); public `GET /api/growth/referral/:token`; restaurant `GET/POST /api/restaurant/growth/connection-requests/*`. See [supplier-customer-growth.md](../features/supplier-customer-growth.md).
+**Supplier growth:** `/api/supplier/growth/*` (import, prospects, invite, sponsorships offer/quote/pay, metrics); public `GET /api/growth/referral/:token`; restaurant connection requests + `/api/restaurant/growth/sponsorship-offers/*`; admin growth-settings + sponsorships manual-pay/refund/reconcile. See [supplier-customer-growth.md](../features/supplier-customer-growth.md). Migration `0192` for sponsorship lifecycle.
