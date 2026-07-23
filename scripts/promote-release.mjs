@@ -91,6 +91,11 @@ try {
 const syncRef = tier === 'prod' ? 'origin/preprod' : 'origin/dev'
 run(`git checkout ${syncRef} -- apps/`)
 run(`git checkout ${syncRef} -- apps/api/db/migrations`)
+// package.json must come from source too — release branches keep a pruned copy without
+// pnpm.overrides, which breaks `pnpm install --frozen-lockfile` in Railway Docker builds.
+run(
+  `git checkout ${syncRef} -- package.json apps/api/package.json apps/web/package.json pnpm-lock.yaml pnpm-workspace.yaml`
+)
 
 // Prune script is dev-only; restore from dev before running on the release branch.
 const pruneSrc = runCapture('git show origin/dev:scripts/prune-release-tree.mjs')
