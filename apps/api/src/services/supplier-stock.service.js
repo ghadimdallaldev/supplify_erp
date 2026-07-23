@@ -5,12 +5,12 @@
  */
 import { query } from '../lib/db.js'
 import { getWarehouseSupplierColumn, isDefaultWarehouse } from '../lib/warehouse-helpers.js'
-import { hasFeature } from '../lib/subscription.js'
+import { isFeatureEnabled } from '../lib/subscription.js'
 import { resolveOrgBillingTenantId } from '../lib/org-billing-tenant.js'
 
 export async function supplierUsesWarehouseInventory(supplierId, { client = null } = {}) {
   const billingId = await resolveOrgBillingTenantId(supplierId, 'SUPPLIER')
-  const multiWh = await hasFeature(billingId, 'SUPPLIER', 'multi_warehouse')
+  const multiWh = await isFeatureEnabled(billingId, 'SUPPLIER', 'multi_warehouse')
   if (multiWh) return true
 
   const db = client ? (sql, params) => client.query(sql, params) : query
