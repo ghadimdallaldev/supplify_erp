@@ -1,8 +1,7 @@
 import { performance } from 'node:perf_hooks'
 import { incrementDailyUsageMeterInTransaction } from '../lib/subscription.js'
 import { insertOrderItemsBatch } from './order-create.service.js'
-import { assertAndDeductSupplierStockBatch } from './supplier-inventory.service.js'
-import { assignWarehousesToOrder } from './warehouseRouting.js'
+import { reserveStockForPlacedOrder } from './supplier-order-stock.service.js'
 
 function elapsedMsSince(start) {
   return Math.round(performance.now() - start)
@@ -74,19 +73,29 @@ export async function createRestaurantOrdersInTransaction({
     timings.orderHeaderInsertMs += elapsedMsSince(phaseStart)
 
     phaseStart = performance.now()
-    await assertAndDeductSupplierStockBatch(
-      { query: q },
-      items.map((item) => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        sku: item.product.sku,
-      }))
-    )
-    timings.stockLockAndReserveMs += elapsedMsSince(phaseStart)
-
-    phaseStart = performance.now()
     const orderItems = await insertOrderItemsBatch({ query: q }, order.id, supplierId, items)
     timings.orderItemsInsertMs += elapsedMsSince(phaseStart)
+
+    phaseStart = performance.now()
+    const multiActive = supplierMultiWarehouse.get(supplierId) === true
+    const { mode: stockMode, fulfillment } = await reserveStockForPlacedOrder(
+      { query: q },
+      {
+        supplierId,
+        supplier,
+        order: { ...order, restaurant_id: restaurantId },
+        orderItems,
+        multiWarehouseActive: multiActive,
+        legacyLineItems: items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          sku: item.product.sku,
+        })),
+      }
+    )
+    const stockMs = elapsedMsSince(phaseStart)
+    timings.stockLockAndReserveMs += stockMs
+    if (stockMode === 'warehouse') timings.warehouseRoutingMs += stockMs
 
     let totalAmount = orderItems.reduce((sum, row) => sum + Number(row.line_total), 0)
 
@@ -173,22 +182,8 @@ export async function createRestaurantOrdersInTransaction({
       status: orderStatus,
       appliedPromotion,
       loyaltyRedemption,
-    }
-
-    if (supplierProfiles.has(supplierId)) {
-      const multiActive = supplierMultiWarehouse.get(supplierId) === true
-      phaseStart = performance.now()
-      const fulfillment = await assignWarehousesToOrder(
-        { query: q },
-        {
-          order: { ...order, restaurant_id: restaurantId },
-          orderItems,
-          supplier,
-          multiWarehouseActive: multiActive,
-        }
-      )
-      timings.warehouseRoutingMs += elapsedMsSince(phaseStart)
-      finalOrder = { ...finalOrder, warehouseFulfillment: fulfillment }
+      stockMode,
+      warehouseFulfillment: fulfillment,
     }
 
     createdOrders.push(finalOrder)

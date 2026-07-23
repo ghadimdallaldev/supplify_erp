@@ -396,31 +396,43 @@ export async function createRestaurantOrgBranch({
   phone = null,
   address = null,
   ownerUserId,
+  ownerEmail = null,
 }) {
   const name = branchName.trim()
+  const normalizedEmail = (ownerEmail || '').trim().toLowerCase()
 
   return withTransaction(async (client) => {
+    // Serialize Branch Account creates for this org (limit race guard)
+    await client.query(
+      `SELECT id FROM restaurant
+       WHERE organization_id = $1 AND is_main_branch = true
+       FOR UPDATE`,
+      [organizationId]
+    )
+
     const slug = await uniqueRestaurantSlug(client, slugifyName(name))
     const addressJson = address ? JSON.stringify(address) : '{}'
 
     const { rows: branchRows } = await client.query(
       `
       INSERT INTO restaurant (name, slug, contact_email, phone, address_json, organization_id, is_main_branch, branch_code)
-      VALUES ($1, $2, '', $3, $4::jsonb, $5, false, $6)
+      VALUES ($1, $2, $3, $4, $5::jsonb, $6, false, $7)
       RETURNING *
     `,
-      [name, slug, phone, addressJson, organizationId, branchCode]
+      [name, slug, normalizedEmail, phone, addressJson, organizationId, branchCode]
     )
     const branch = branchRows[0]
 
     await createPendingActivationSubscription(client, branch.id, 'RESTAURANT', 'free')
 
-    return branch
-  }).then(async (branch) => {
-    await ensureTenantSystemRoles(branch.id, 'RESTAURANT')
+    // Role seeding inside the same transaction so failed post-steps cannot leave orphan tenants
+    await ensureTenantSystemRoles(branch.id, 'RESTAURANT', client)
     if (ownerUserId) {
-      await assignOwnerRoleForUser(ownerUserId, branch.id, 'RESTAURANT')
+      await assignOwnerRoleForUser(ownerUserId, branch.id, 'RESTAURANT', null, client, {
+        rolesAlreadyEnsured: true,
+      })
     }
+
     return branch
   })
 }
@@ -445,28 +457,91 @@ export async function deactivateRestaurantOrgBranch(restaurantId) {
   )
   if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
   if (rows[0].is_main_branch) return { ok: false, reason: 'MAIN_BRANCH' }
-  if (await restaurantBranchHasPendingOrders(restaurantId)) {
-    return { ok: false, reason: 'PENDING_ORDERS' }
+
+  const { getRestaurantDeactivationBlockers, invalidateCachesForRestaurantBranchLifecycle } =
+    await import('./branch-lifecycle-guards.js')
+
+  const blockers = await getRestaurantDeactivationBlockers(restaurantId, {
+    hasPendingOrders: await restaurantBranchHasPendingOrders(restaurantId),
+  })
+  if (blockers.length) {
+    return { ok: false, reason: blockers[0].code, blockers }
   }
-  await query(`UPDATE restaurant SET is_branch_active = false, updated_at = NOW() WHERE id = $1`, [
-    restaurantId,
-  ])
-  return { ok: true }
+
+  await query(
+    `UPDATE restaurant
+     SET is_branch_active = false, deactivated_at = NOW(), updated_at = NOW()
+     WHERE id = $1`,
+    [restaurantId]
+  )
+
+  await invalidateCachesForRestaurantBranchLifecycle(restaurantId, rows[0].organization_id)
+  return { ok: true, organizationId: rows[0].organization_id }
+}
+
+export async function reactivateRestaurantOrgBranch(restaurantId) {
+  const { rows } = await query(
+    `SELECT is_main_branch, organization_id, is_branch_active FROM restaurant WHERE id = $1`,
+    [restaurantId]
+  )
+  if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
+  if (!rows[0].organization_id) return { ok: false, reason: 'DETACHED' }
+  if (rows[0].is_branch_active !== false) return { ok: false, reason: 'ALREADY_ACTIVE' }
+  await query(
+    `UPDATE restaurant
+     SET is_branch_active = true, deactivated_at = NULL, updated_at = NOW()
+     WHERE id = $1`,
+    [restaurantId]
+  )
+  const { invalidateCachesForRestaurantBranchLifecycle } = await import(
+    './branch-lifecycle-guards.js'
+  )
+  await invalidateCachesForRestaurantBranchLifecycle(restaurantId, rows[0].organization_id)
+  return { ok: true, organizationId: rows[0].organization_id }
+}
+
+/**
+ * Unlink a Branch Account from its organization. Retains the tenant and history.
+ * Clears org branch access rows for this restaurant.
+ */
+export async function unlinkRestaurantFromOrganization(restaurantId, { client = null } = {}) {
+  const db = client ? (sql, params) => client.query(sql, params) : query
+  const { rows } = await db(
+    `SELECT is_main_branch, organization_id FROM restaurant WHERE id = $1`,
+    [restaurantId]
+  )
+  if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
+  if (rows[0].is_main_branch) return { ok: false, reason: 'MAIN_BRANCH' }
+  if (!rows[0].organization_id) return { ok: false, reason: 'DETACHED' }
+
+  const organizationId = rows[0].organization_id
+  await db(`DELETE FROM restaurant_org_user_branch_access WHERE restaurant_id = $1`, [restaurantId])
+  await db(
+    `UPDATE restaurant
+     SET organization_id = NULL, is_main_branch = false, is_branch_active = true,
+         deactivated_at = NULL, updated_at = NOW()
+     WHERE id = $1`,
+    [restaurantId]
+  )
+  return { ok: true, organizationId, restaurantId }
 }
 
 export async function linkRestaurantToOrganization(
   restaurantId,
   organizationId,
-  { isMain = false } = {}
+  { isMain = false, client = null } = {}
 ) {
-  await query(
+  const db = client ? (sql, params) => client.query(sql, params) : query
+  const { rowCount } = await db(
     `
     UPDATE restaurant
-    SET organization_id = $2, is_main_branch = $3, updated_at = NOW()
+    SET organization_id = $2, is_main_branch = $3, is_branch_active = true,
+        deactivated_at = NULL, updated_at = NOW()
     WHERE id = $1 AND organization_id IS NULL
   `,
     [restaurantId, organizationId, isMain]
   )
+  return { ok: (rowCount ?? 0) > 0 }
 }
 
 export async function isRestaurantOrgMigrationComplete() {

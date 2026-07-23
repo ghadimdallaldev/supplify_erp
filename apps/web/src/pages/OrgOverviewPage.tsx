@@ -3,7 +3,11 @@ import { useTranslation } from 'react-i18next'
 import { Building2, Plus, Settings } from 'lucide-react'
 import { RestaurantOrgOverviewPage } from './RestaurantOrgOverviewPage'
 import { Link, useNavigate } from 'react-router-dom'
-import { useGetOrgQuery, useSwitchOrgBranchContextMutation } from '../services/api'
+import {
+  useGetOrgQuery,
+  useGetOrgReportsOverviewQuery,
+  useSwitchOrgBranchContextMutation,
+} from '../services/api'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { usePermissions } from '../hooks/usePermissions'
 import { RequirePermission } from '../components/RequirePermission'
@@ -13,6 +17,14 @@ import { AddBranchModal } from '../components/org/AddBranchModal'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { ensureNamespace } from '../i18n'
+
+function formatMoney(n: number) {
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(n || 0)
+}
 
 export function OrgOverviewPage() {
   const { t } = useTranslation('reports')
@@ -29,6 +41,9 @@ export function OrgOverviewPage() {
   const { data, isLoading } = useGetOrgQuery(undefined, {
     skip: !isEffectiveSupplier,
   })
+  const { data: reports } = useGetOrgReportsOverviewQuery(undefined, {
+    skip: !isEffectiveSupplier || !multiBranch,
+  })
   const [addBranchOpen, setAddBranchOpen] = useState(false)
   const [switchBranch] = useSwitchOrgBranchContextMutation()
 
@@ -44,6 +59,11 @@ export function OrgOverviewPage() {
   const canManageOrg = can('SETTINGS_MANAGE')
 
   const branches = data?.branches ?? []
+  const kpis = reports?.kpis
+  const byBranch = reports?.by_branch ?? []
+  const spendById = new Map(
+    byBranch.map((row) => [String(row.branch_account_id), Number(row.total_revenue || 0)])
+  )
 
   const handleOpenBranch = async (supplierId: string) => {
     await switchBranch({ supplier_id: supplierId }).unwrap()
@@ -92,6 +112,25 @@ export function OrgOverviewPage() {
           }
         />
 
+        {kpis ? (
+          <div className="grid gap-3 sm:grid-cols-3 mb-6">
+            <div className="rounded-lg border border-[var(--app-border)] p-4">
+              <p className="text-xs text-[var(--text-muted)]">Orders (period)</p>
+              <p className="text-2xl font-semibold mt-1">{kpis.order_count}</p>
+            </div>
+            <div className="rounded-lg border border-[var(--app-border)] p-4">
+              <p className="text-xs text-[var(--text-muted)]">Revenue (period)</p>
+              <p className="text-2xl font-semibold mt-1">
+                {formatMoney(Number(kpis.total_revenue || 0))}
+              </p>
+            </div>
+            <div className="rounded-lg border border-[var(--app-border)] p-4">
+              <p className="text-xs text-[var(--text-muted)]">Active Branch Accounts</p>
+              <p className="text-2xl font-semibold mt-1">{kpis.active_branch_accounts}</p>
+            </div>
+          </div>
+        ) : null}
+
         {isLoading && (
           <p className="text-sm text-[var(--text-muted)]">{t('org.loadingBranches')}</p>
         )}
@@ -132,6 +171,9 @@ export function OrgOverviewPage() {
                         staff: b.staff_count ?? 0,
                         orders: b.order_count ?? 0,
                       })}
+                      {spendById.has(b.id)
+                        ? ` · ${formatMoney(spendById.get(b.id) || 0)} revenue`
+                        : ''}
                     </p>
                     <div className="flex flex-wrap gap-3 mt-3 text-sm">
                       <button

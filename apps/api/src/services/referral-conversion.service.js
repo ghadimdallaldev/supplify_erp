@@ -21,6 +21,23 @@ export async function getActiveReferralAttribution(restaurantId) {
 }
 
 export async function applyReferralDiscountToAmount(restaurantId, amount) {
+  const config = await getReferralProgramConfig()
+  const appliesTo = config.referralDiscountAppliesTo || 'first_restaurant_funded'
+
+  // While supplier-sponsored period is active, do not consume/apply referral discount
+  // when discount is reserved for the first restaurant-funded cycle.
+  if (appliesTo === 'first_restaurant_funded') {
+    const { rows: activeSponsor } = await query(
+      `SELECT id FROM supplier_sponsorship
+       WHERE restaurant_id = $1 AND status IN ('active', 'scheduled')
+       LIMIT 1`,
+      [restaurantId]
+    )
+    if (activeSponsor.length) {
+      return { amount, discountPercent: 0, attributionId: null, deferred: true }
+    }
+  }
+
   const attr = await getActiveReferralAttribution(restaurantId)
   if (!attr) return { amount, discountPercent: 0, attributionId: null }
   const pct = Number(attr.first_paid_discount_percent) || 0

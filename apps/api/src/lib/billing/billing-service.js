@@ -802,6 +802,7 @@ export async function payOpenInvoices({
   const { rows: invoices } = await query(
     `SELECT * FROM billing_invoice
      WHERE tenant_id = $1 AND tenant_type = $2 AND status = 'OPEN'
+       AND COALESCE(metadata->>'type', '') <> 'supplier_sponsorship'
      ORDER BY due_date ASC`,
     [tenantId, tenantType]
   )

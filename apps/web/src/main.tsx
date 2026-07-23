@@ -16,6 +16,24 @@ import './i18n/index.ts'
 assertHostedWebConfig()
 registerServiceWorker()
 
+const PRELOAD_RELOAD_KEY = 'vite-preload-reload'
+
+/**
+ * After a deploy, hashed lazy chunks from the previous build 404. Reload once
+ * so the browser picks up the new index.html + asset map (Vite version skew).
+ * @see https://vite.dev/guide/build.html#load-error-handling
+ */
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault()
+  try {
+    if (sessionStorage.getItem(PRELOAD_RELOAD_KEY) === '1') return
+    sessionStorage.setItem(PRELOAD_RELOAD_KEY, '1')
+  } catch {
+    // sessionStorage may be unavailable; still attempt a single reload
+  }
+  window.location.reload()
+})
+
 const appLoadT0 = performance.now()
 perfLog('app.bootstrap.start')
 
@@ -35,5 +53,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 )
 
 window.addEventListener('load', () => {
+  try {
+    sessionStorage.removeItem(PRELOAD_RELOAD_KEY)
+  } catch {
+    // ignore
+  }
   perfLog('app.bootstrap.load', { durationMs: Math.round(performance.now() - appLoadT0) })
 })

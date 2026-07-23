@@ -1,6 +1,5 @@
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { query } from '../lib/db.js'
-import { releaseInventoryForOrder } from './warehouseInventory.js'
 
 /**
  * Decrease supplier available stock when a restaurant (or supplier) places an order.
@@ -116,29 +115,12 @@ export async function assertAndDeductSupplierStockBatch(client, lineItems) {
 }
 
 /**
- * Put supplier stock back when an order is cancelled (before fulfillment completes).
+ * Put supplier stock back when an order is cancelled/rejected.
+ * Delegates to the unified stock path (warehouse release XOR legacy restore).
  */
 export async function restoreSupplierStockForOrder(client, orderId) {
-  const { rows: items } = await client.query(
-    `SELECT product_id, quantity FROM order_item WHERE order_id = $1`,
-    [orderId]
-  )
-
-  for (const item of items) {
-    const qty = Number(item.quantity)
-    if (!qty || qty <= 0) continue
-
-    await client.query(
-      `UPDATE inventory
-       SET available_qty = available_qty + $1,
-           reserved_qty = GREATEST(0, reserved_qty - $1),
-           updated_at = now()
-       WHERE product_id = $2`,
-      [qty, item.product_id]
-    )
-  }
-
-  await releaseInventoryForOrder(client, orderId)
+  const { releaseStockForOrder } = await import('./supplier-order-stock.service.js')
+  return releaseStockForOrder(client, orderId)
 }
 
 /**

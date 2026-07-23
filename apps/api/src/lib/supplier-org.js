@@ -433,6 +433,14 @@ export async function createOrgBranch({
   const name = branchName.trim()
 
   return withTransaction(async (client) => {
+    // Serialize Branch Account creates for this org (limit race guard)
+    await client.query(
+      `SELECT id FROM supplier
+       WHERE organization_id = $1 AND is_main_branch = true
+       FOR UPDATE`,
+      [organizationId]
+    )
+
     const slug = await uniqueSupplierSlug(client, slugifyName(name))
     const addressJson = address ? JSON.stringify(address) : '{}'
 
@@ -453,12 +461,14 @@ export async function createOrgBranch({
 
     await createPendingActivationSubscription(client, branch.id, 'SUPPLIER', 'free')
 
-    return branch
-  }).then(async (branch) => {
-    await ensureTenantSystemRoles(branch.id, 'SUPPLIER')
+    // Role seeding inside the same transaction so failed post-steps cannot leave orphan tenants
+    await ensureTenantSystemRoles(branch.id, 'SUPPLIER', client)
     if (ownerUserId) {
-      await assignOwnerRoleForUser(ownerUserId, branch.id, 'SUPPLIER')
+      await assignOwnerRoleForUser(ownerUserId, branch.id, 'SUPPLIER', null, client, {
+        rolesAlreadyEnsured: true,
+      })
     }
+
     return branch
   })
 }
@@ -484,28 +494,89 @@ export async function deactivateOrgBranch(supplierId) {
   )
   if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
   if (rows[0].is_main_branch) return { ok: false, reason: 'MAIN_BRANCH' }
-  if (await branchHasPendingOrders(supplierId)) {
-    return { ok: false, reason: 'PENDING_ORDERS' }
+
+  const { getSupplierDeactivationBlockers, invalidateCachesForSupplierBranchLifecycle } =
+    await import('./branch-lifecycle-guards.js')
+
+  const blockers = await getSupplierDeactivationBlockers(supplierId, {
+    hasPendingOrders: await branchHasPendingOrders(supplierId),
+  })
+  if (blockers.length) {
+    return { ok: false, reason: blockers[0].code, blockers }
   }
-  await query(`UPDATE supplier SET is_branch_active = false, updated_at = NOW() WHERE id = $1`, [
+
+  await query(
+    `UPDATE supplier
+     SET is_branch_active = false, deactivated_at = NOW(), updated_at = NOW()
+     WHERE id = $1`,
+    [supplierId]
+  )
+
+  await invalidateCachesForSupplierBranchLifecycle(supplierId, rows[0].organization_id)
+  return { ok: true, organizationId: rows[0].organization_id }
+}
+
+export async function reactivateOrgBranch(supplierId) {
+  const { rows } = await query(
+    `SELECT is_main_branch, organization_id, is_branch_active FROM supplier WHERE id = $1`,
+    [supplierId]
+  )
+  if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
+  if (!rows[0].organization_id) return { ok: false, reason: 'DETACHED' }
+  if (rows[0].is_branch_active !== false) return { ok: false, reason: 'ALREADY_ACTIVE' }
+  await query(
+    `UPDATE supplier
+     SET is_branch_active = true, deactivated_at = NULL, updated_at = NOW()
+     WHERE id = $1`,
+    [supplierId]
+  )
+  const { invalidateCachesForSupplierBranchLifecycle } = await import(
+    './branch-lifecycle-guards.js'
+  )
+  await invalidateCachesForSupplierBranchLifecycle(supplierId, rows[0].organization_id)
+  return { ok: true, organizationId: rows[0].organization_id }
+}
+
+/**
+ * Unlink a Branch Account from its organization. Retains the tenant and history.
+ */
+export async function unlinkSupplierFromOrganization(supplierId, { client = null } = {}) {
+  const db = client ? (sql, params) => client.query(sql, params) : query
+  const { rows } = await db(`SELECT is_main_branch, organization_id FROM supplier WHERE id = $1`, [
     supplierId,
   ])
-  return { ok: true }
+  if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
+  if (rows[0].is_main_branch) return { ok: false, reason: 'MAIN_BRANCH' }
+  if (!rows[0].organization_id) return { ok: false, reason: 'DETACHED' }
+
+  const organizationId = rows[0].organization_id
+  await db(`DELETE FROM org_user_branch_access WHERE supplier_id = $1`, [supplierId])
+  await db(
+    `UPDATE supplier
+     SET organization_id = NULL, is_main_branch = false, is_branch_active = true,
+         deactivated_at = NULL, updated_at = NOW()
+     WHERE id = $1`,
+    [supplierId]
+  )
+  return { ok: true, organizationId, supplierId }
 }
 
 export async function linkSupplierToOrganization(
   supplierId,
   organizationId,
-  { isMain = false } = {}
+  { isMain = false, client = null } = {}
 ) {
-  await query(
+  const db = client ? (sql, params) => client.query(sql, params) : query
+  const { rowCount } = await db(
     `
     UPDATE supplier
-    SET organization_id = $2, is_main_branch = $3, updated_at = NOW()
+    SET organization_id = $2, is_main_branch = $3, is_branch_active = true,
+        deactivated_at = NULL, updated_at = NOW()
     WHERE id = $1 AND organization_id IS NULL
   `,
     [supplierId, organizationId, isMain]
   )
+  return { ok: (rowCount ?? 0) > 0 }
 }
 
 export async function isOrgMigrationComplete() {

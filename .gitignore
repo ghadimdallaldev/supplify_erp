@@ -3,6 +3,9 @@ node_modules/
 .pnp
 .pnp.js
 
+# Local git worktrees (isolated feature checkouts)
+.worktrees/
+
 # Production builds
 dist/
 build/
