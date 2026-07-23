@@ -59,6 +59,12 @@ export function AdminGrowthSettingsPanel() {
   const [rewardType, setRewardType] = useState<'free_month' | 'account_credit'>('free_month')
   const [sponsorshipLimits, setSponsorshipLimits] =
     useState<SponsorshipLimitForm>(EMPTY_SPONSORSHIP_LIMITS)
+  const [sponsorshipEnabled, setSponsorshipEnabled] = useState(true)
+  const [offerExpiryDays, setOfferExpiryDays] = useState('14')
+  const [referralDiscountAppliesTo, setReferralDiscountAppliesTo] = useState<
+    'first_restaurant_funded' | 'sponsored_cycle'
+  >('first_restaurant_funded')
+  const [requirePm, setRequirePm] = useState(false)
 
   useEffect(() => {
     if (data) {
@@ -66,18 +72,31 @@ export function AdminGrowthSettingsPanel() {
       setValidityDays(String(data.referralValidityDays))
       setRewardType(data.supplierRewardType)
       setSponsorshipLimits(sponsorshipLimitsFromData(data.sponsorshipLimitsPerYear))
+      setSponsorshipEnabled(data.sponsorshipEnabled !== false)
+      setOfferExpiryDays(String(data.offerExpiryDays ?? 14))
+      setReferralDiscountAppliesTo(
+        data.referralDiscountAppliesTo === 'sponsored_cycle'
+          ? 'sponsored_cycle'
+          : 'first_restaurant_funded'
+      )
+      setRequirePm(Boolean(data.requireRestaurantPaymentMethodBeforeActivation))
     }
   }, [data])
 
   const handleSave = async () => {
     const discountNum = Number(discount)
     const validityNum = Number(validityDays)
+    const offerDays = Number(offerExpiryDays)
     if (!Number.isFinite(discountNum) || discountNum < 0 || discountNum > 100) {
       toast.error(t('growthToasts.discountRange'))
       return
     }
     if (!Number.isFinite(validityNum) || validityNum < 1) {
       toast.error(t('growthToasts.validityMin'))
+      return
+    }
+    if (!Number.isFinite(offerDays) || offerDays < 1 || offerDays > 90) {
+      toast.error('Offer expiry must be between 1 and 90 days')
       return
     }
     const parsedLimits = parseSponsorshipLimits(sponsorshipLimits)
@@ -88,6 +107,12 @@ export function AdminGrowthSettingsPanel() {
         referralValidityDays: Math.round(validityNum),
         supplierRewardType: rewardType,
         sponsorshipLimitsPerYear: parsedLimits,
+        sponsorshipEnabled,
+        offerExpiryDays: Math.round(offerDays),
+        referralDiscountAppliesTo,
+        requireRestaurantPaymentMethodBeforeActivation: requirePm,
+        supplierPaymentAfterAcceptance: true,
+        supportedBillingIntervals: ['MONTHLY'],
       }).unwrap()
       toast.success(t('growthToasts.saved'))
     } catch {
@@ -100,8 +125,8 @@ export function AdminGrowthSettingsPanel() {
       <CardHeader>
         <CardTitle>Referral &amp; sponsorship program</CardTitle>
         <CardDescription>
-          Configure referral discounts, supplier rewards, and sponsorship limits (stored in platform
-          settings).
+          Configure referral discounts, supplier rewards, and supplier-paid sponsorship (monthly
+          only). Caps are keyed by supplier plan code (e.g. gold / platinum).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 max-w-md">
@@ -144,18 +169,68 @@ export function AdminGrowthSettingsPanel() {
                 <option value="account_credit">Account credit (platform billing)</option>
               </select>
             </div>
+            <div className="flex items-center gap-2">
+              <input
+                id="sponsorshipEnabled"
+                type="checkbox"
+                checked={sponsorshipEnabled}
+                onChange={(e) => setSponsorshipEnabled(e.target.checked)}
+              />
+              <Label htmlFor="sponsorshipEnabled">Sponsorship enabled</Label>
+            </div>
+            <div>
+              <Label htmlFor="offerExpiry">Sponsorship offer expiry (days)</Label>
+              <Input
+                id="offerExpiry"
+                type="number"
+                min={1}
+                max={90}
+                value={offerExpiryDays}
+                onChange={(e) => setOfferExpiryDays(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="discountApplies">Referral discount applies to</Label>
+              <select
+                id="discountApplies"
+                className="mt-1 w-full rounded-md border border-[var(--app-border)] bg-transparent px-3 py-2 text-sm"
+                value={referralDiscountAppliesTo}
+                onChange={(e) =>
+                  setReferralDiscountAppliesTo(
+                    e.target.value as 'first_restaurant_funded' | 'sponsored_cycle'
+                  )
+                }
+              >
+                <option value="first_restaurant_funded">
+                  First restaurant-funded cycle (after sponsored month)
+                </option>
+                <option value="sponsored_cycle">Sponsored cycle (consume on activation)</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                id="requirePm"
+                type="checkbox"
+                checked={requirePm}
+                onChange={(e) => setRequirePm(e.target.checked)}
+              />
+              <Label htmlFor="requirePm">
+                Require restaurant payment method before sponsorship activation
+              </Label>
+            </div>
             <fieldset className="space-y-3">
               <legend className="text-sm font-medium text-[var(--text)]">
-                Sponsorship limits per year
+                Sponsorship limits per year (by supplier plan code)
               </legend>
               <p className="text-xs text-[var(--text-muted)]">
-                Max sponsored onboarding gifts a supplier can grant per calendar year, by plan tier.
-                Leave blank for unlimited.
+                Max sponsorships per calendar year. Leave blank for unlimited. Supplier Growth uses
+                code gold; Supplier Scale uses platinum.
               </p>
               {SPONSORSHIP_PLAN_KEYS.map((planKey) => (
                 <div key={planKey}>
                   <Label htmlFor={`sponsorship-${planKey}`}>
-                    {SPONSORSHIP_PLAN_LABELS[planKey]} plan
+                    {SPONSORSHIP_PLAN_LABELS[planKey]} ({planKey})
                   </Label>
                   <Input
                     id={`sponsorship-${planKey}`}

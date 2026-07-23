@@ -219,15 +219,26 @@ router.post('/switch', requireRole(['RESTAURANT', 'SUPPLIER']), async (req, res)
     }
 
     const table = resolvedType === 'SUPPLIER' ? 'supplier' : 'restaurant'
-    const { rows } = await query(`SELECT id, name FROM ${table} WHERE id = $1`, [tenantId])
-    if (!rows.length) {
+    const { rows } = await query(`SELECT id, name, is_branch_active FROM ${table} WHERE id = $1`, [
+      tenantId,
+    ])
+    if (!rows.length || rows[0].is_branch_active === false) {
+      res.clearCookie(getActiveTenantCookieName(), {
+        path: '/',
+        httpOnly: true,
+        secure: config.NODE_ENV === 'production',
+        sameSite: 'lax',
+      })
       return res.status(404).json({
         ok: false,
         data: null,
-        error: { name: 'NOT_FOUND', message: 'Account not found' },
+        error: { name: 'NOT_FOUND', message: 'Account not found or inactive' },
         requestId: req.requestId,
       })
     }
+
+    const { invalidateUserPermissionCache } = await import('../lib/permissions.js')
+    await invalidateUserPermissionCache(req.userData.id, tenantId, resolvedType)
 
     const token = await createActiveTenantToken({
       userId: req.userData.id,

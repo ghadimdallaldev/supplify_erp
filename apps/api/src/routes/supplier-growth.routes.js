@@ -24,6 +24,15 @@ import { createConnectionRequest } from '../services/supplier-connection-request
 import {
   sponsorProspect,
   getSponsorshipLimitForSupplier,
+  getSponsorshipUsage,
+  canCreateSponsorship,
+  quoteSponsorship,
+  createSponsorshipOffer,
+  listSupplierSponsorships,
+  getSupplierSponsorship,
+  cancelSponsorship,
+  initiateSupplierPayment,
+  retrySupplierPayment,
 } from '../services/supplier-sponsorship.service.js'
 import { getSupplierGrowthMetrics } from '../services/supplier-growth-metrics.service.js'
 import { getReferralProgramConfig } from '../lib/platform-settings.js'
@@ -168,7 +177,11 @@ router.post(
   }
 )
 
-const sponsorSchema = z.object({ planCode: z.enum(['silver', 'gold', 'platinum']) })
+const sponsorSchema = z.object({
+  planCode: z.enum(['silver', 'gold', 'platinum']).optional(),
+  planId: z.string().uuid().optional(),
+  idempotencyKey: z.string().max(128).optional(),
+})
 
 router.post(
   '/customers/prospects/:id/sponsor',
@@ -176,9 +189,171 @@ router.post(
   async (req, res, next) => {
     try {
       const supplierId = await resolveSupplierId(req)
-      const body = sponsorSchema.parse(req.body)
-      const data = await sponsorProspect(supplierId, req.params.id, {
-        planCode: body.planCode,
+      const body = sponsorSchema.parse(req.body || {})
+      let data
+      if (body.planId) {
+        data = await createSponsorshipOffer(supplierId, {
+          prospectId: req.params.id,
+          suggestedPlanId: body.planId,
+          idempotencyKey: body.idempotencyKey || null,
+          offeredByUserId: req.userData?.id || null,
+          req,
+        })
+      } else {
+        data = await sponsorProspect(supplierId, req.params.id, {
+          planCode: body.planCode || 'silver',
+          req,
+        })
+      }
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+const createSponsorshipSchema = z.object({
+  prospectId: z.string().uuid(),
+  restaurantId: z.string().uuid().optional().nullable(),
+  invitationId: z.string().uuid().optional().nullable(),
+  suggestedPlanId: z.string().uuid().optional().nullable(),
+  idempotencyKey: z.string().max(128).optional().nullable(),
+})
+
+router.get('/sponsorships', requirePermission('GROWTH_VIEW'), async (req, res, next) => {
+  try {
+    const supplierId = await resolveSupplierId(req)
+    const data = await listSupplierSponsorships(supplierId, {
+      limit: Number(req.query.limit) || 50,
+      offset: Number(req.query.offset) || 0,
+      status: req.query.status || null,
+    })
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get(
+  '/sponsorships/eligibility',
+  requirePermission('CUSTOMERS_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      const data = await canCreateSponsorship(supplierId, {
+        prospectId: req.query.prospectId || null,
+        restaurantId: req.query.restaurantId || null,
+      })
+      const usage = await getSponsorshipUsage(supplierId)
+      res.json({
+        ok: true,
+        data: { ...data, usage },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+const quoteSchema = z.object({
+  planId: z.string().uuid(),
+  prospectId: z.string().uuid().optional().nullable(),
+})
+
+router.post(
+  '/sponsorships/quote',
+  requirePermission('CUSTOMERS_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      const body = quoteSchema.parse(req.body)
+      const data = await quoteSponsorship(supplierId, body)
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post('/sponsorships', requirePermission('CUSTOMERS_MANAGE'), async (req, res, next) => {
+  try {
+    const supplierId = await resolveSupplierId(req)
+    const body = createSponsorshipSchema.parse(req.body)
+    const data = await createSponsorshipOffer(supplierId, {
+      ...body,
+      offeredByUserId: req.userData?.id || null,
+      req,
+    })
+    res.status(201).json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/sponsorships/:id', requirePermission('GROWTH_VIEW'), async (req, res, next) => {
+  try {
+    const supplierId = await resolveSupplierId(req)
+    const data = await getSupplierSponsorship(supplierId, req.params.id)
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post(
+  '/sponsorships/:id/cancel',
+  requirePermission('CUSTOMERS_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      const data = await cancelSponsorship(supplierId, req.params.id, {
+        reason: req.body?.reason || 'cancelled_by_supplier',
+        req,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+const paySchema = z.object({
+  paymentMethodId: z.string().uuid().optional().nullable(),
+  idempotencyKey: z.string().min(8).max(128),
+  provider: z.string().optional().nullable(),
+})
+
+router.post(
+  '/sponsorships/:id/payment',
+  requirePermission('CUSTOMERS_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      const body = paySchema.parse(req.body)
+      const data = await initiateSupplierPayment(supplierId, req.params.id, {
+        ...body,
+        req,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/sponsorships/:id/retry-payment',
+  requirePermission('CUSTOMERS_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      const body = paySchema.partial().parse(req.body || {})
+      const data = await retrySupplierPayment(supplierId, req.params.id, {
+        paymentMethodId: body.paymentMethodId,
+        idempotencyKey: body.idempotencyKey,
+        provider: body.provider,
         req,
       })
       res.json({ ok: true, data, error: null, requestId: req.requestId })
@@ -191,16 +366,18 @@ router.post(
 router.get('/metrics', requirePermission('GROWTH_VIEW'), async (req, res, next) => {
   try {
     const supplierId = await resolveSupplierId(req)
-    const [metrics, sponsorshipLimit, referralConfig] = await Promise.all([
+    const [metrics, sponsorshipLimit, referralConfig, usage] = await Promise.all([
       getSupplierGrowthMetrics(supplierId),
       getSponsorshipLimitForSupplier(supplierId),
       getReferralProgramConfig(),
+      getSponsorshipUsage(supplierId),
     ])
     res.json({
       ok: true,
       data: {
         ...metrics,
         sponsorshipLimit,
+        sponsorshipUsage: usage,
         eligibleSponsorPlans: referralConfig.eligibleSponsorPlans ?? [],
       },
       error: null,

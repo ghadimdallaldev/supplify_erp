@@ -8,7 +8,14 @@ export function resolveHttpError(err) {
   let errorName = 'INTERNAL_ERROR'
   let message = 'Internal server error'
 
-  if (err.name === 'ValidationError') {
+  if (
+    err.name === 'SponsorshipError' ||
+    (err.code && String(err.code).startsWith('SPONSORSHIP_'))
+  ) {
+    statusCode = err.statusCode || 400
+    errorName = err.code || 'SPONSORSHIP_INVALID_STATE'
+    message = err.message
+  } else if (err.name === 'ValidationError') {
     statusCode = 400
     errorName = 'VALIDATION_ERROR'
     message = err.message
@@ -141,5 +148,16 @@ export class ConflictError extends Error {
   constructor(message = 'Resource conflict') {
     super(message)
     this.name = 'ConflictError'
+  }
+}
+
+/** Domain errors for supplier-paid sponsorship (code becomes API error.name). */
+export class SponsorshipError extends Error {
+  constructor(code, message, { statusCode = 400, details = null } = {}) {
+    super(message)
+    this.name = 'SponsorshipError'
+    this.code = code
+    this.statusCode = statusCode
+    this.details = details
   }
 }

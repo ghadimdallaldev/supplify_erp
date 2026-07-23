@@ -1,11 +1,16 @@
 import { query } from './db.js'
-import { getCache, setCache } from './cache.js'
+import { getCache, setCache, deleteCache } from './cache.js'
 import { singleflight } from './singleflight.js'
 
 const ORG_BILLING_CACHE_TTL_SECONDS = 300
 
 function orgBillingCacheKey(tenantId, tenantType) {
   return `orgbill:${tenantType}:${tenantId}`
+}
+
+export async function invalidateOrgBillingTenantCache(tenantId, tenantType) {
+  if (!tenantId || !tenantType) return
+  await deleteCache(orgBillingCacheKey(tenantId, tenantType))
 }
 
 /**

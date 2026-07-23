@@ -34,7 +34,6 @@ import {
 import { writeAuditLog } from '../../lib/audit.js'
 import { orderAmendmentsRouter } from '../order-amendments.routes.js'
 import { ordersDriverRoutes } from '../orders-driver.routes.js'
-import { assignWarehousesToOrder } from '../../services/warehouseRouting.js'
 import { syncWarehouseFulfillmentOnOrderStatus } from '../../services/warehouseInventory.js'
 import { hasPermission } from '../../lib/permissions.js'
 import {
@@ -47,10 +46,7 @@ import {
   getDefaultCatalogPricesBatch,
 } from '../../services/resolve-product-price.service.js'
 import { createRestaurantOrdersInTransaction } from '../../services/restaurant-order-create.service.js'
-import {
-  assertAndDeductSupplierStock,
-  restoreSupplierStockForOrder,
-} from '../../services/supplier-inventory.service.js'
+import { reserveStockForPlacedOrder } from '../../services/supplier-order-stock.service.js'
 import { ordersRouterMutationGuard } from '../../lib/route-permissions.js'
 import { releaseOrderFromPlannedRoutes } from '../../services/delivery-routes.service.js'
 import { redeemLoyaltyAtCheckout } from '../../services/loyalty.service.js'
@@ -653,11 +649,6 @@ router.post(
             throw new ValidationError(`No valid price found for product ${product.sku}`)
           }
 
-          await assertAndDeductSupplierStock(client, item.productId, item.quantity, {
-            sku: product.sku,
-            reserve: true,
-          })
-
           const unitPrice = Number(resolved.unitPrice)
           const lineTotal = unitPrice * item.quantity
           totalAmount += lineTotal
@@ -686,7 +677,7 @@ router.post(
             ]
           )
 
-          orderItems.push(orderItem)
+          orderItems.push({ ...orderItem, sku: product.sku })
         }
 
         // Update order total
@@ -702,22 +693,28 @@ router.post(
         const { rows: supplierRows } = await client.query(`SELECT * FROM supplier WHERE id = $1`, [
           supplierId,
         ])
-        let warehouseFulfillment = null
-        if (supplierRows.length) {
-          const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
-          warehouseFulfillment = await assignWarehousesToOrder(client, {
-            order: { ...order, restaurant_id: order.restaurant_id },
-            orderItems,
-            supplier: supplierRows[0],
-            multiWarehouseActive: multiActive,
-          })
-        }
+        const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
+        const reserved = await reserveStockForPlacedOrder(client, {
+          supplierId,
+          supplier: supplierRows[0] || { id: supplierId },
+          order: { ...order, restaurant_id: order.restaurant_id },
+          orderItems,
+          multiWarehouseActive: multiActive,
+          legacyLineItems: orderItems.map((oi) => ({
+            productId: oi.product_id,
+            quantity: oi.quantity,
+            sku: oi.sku,
+            reserve: true,
+          })),
+          reserveLegacy: true,
+        })
 
         return {
           ...order,
           total_amount: totalAmount,
           items: orderItems,
-          warehouseFulfillment,
+          warehouseFulfillment: reserved.fulfillment,
+          stockMode: reserved.mode,
         }
       })
 

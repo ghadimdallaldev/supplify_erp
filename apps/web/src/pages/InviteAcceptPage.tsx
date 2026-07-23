@@ -63,10 +63,12 @@ export function InviteAcceptPage() {
   const orgLabel = invite?.org_name
   const isRestaurantMember = type === 'rm'
   const isRestaurantBranch = type === 'rb'
+  const isBranchAccountLink = type === 'bal'
   const loginHref = `/login?${searchParams.toString()}`
   const invitePath = `/invite?${searchParams.toString()}`
 
-  const requiredInviteEmail = invite?.invited_email?.trim() || ''
+  const requiredInviteEmail =
+    invite?.invited_email?.trim() || invite?.target_owner_email?.trim() || ''
 
   useEffect(() => {
     void ensureNamespace('onboarding')
@@ -79,22 +81,26 @@ export function InviteAcceptPage() {
   }, [requiredInviteEmail, invite?.invited_email, invite?.invited_name])
 
   const headline = invite
-    ? isRestaurantMember
-      ? t('invite.headline.restaurantMember', {
-          branch: branchLabel,
-          role: invite.role_name,
-        })
-      : isRestaurantBranch
-        ? orgLabel
-          ? t('invite.headline.restaurantBranchWithOrg', { branch: branchLabel, org: orgLabel })
-          : t('invite.headline.restaurantBranch', { branch: branchLabel })
-        : orgLabel
-          ? t('invite.headline.defaultWithOrg', {
-              branch: branchLabel,
-              org: orgLabel,
-              role: invite.role_name,
-            })
-          : t('invite.headline.default', { branch: branchLabel, role: invite.role_name })
+    ? isBranchAccountLink
+      ? `Link your Branch Account to ${orgLabel || 'the organization'}${
+          invite.target_owner_email ? ` (owner: ${invite.target_owner_email})` : ''
+        }`
+      : isRestaurantMember
+        ? t('invite.headline.restaurantMember', {
+            branch: branchLabel,
+            role: invite.role_name,
+          })
+        : isRestaurantBranch
+          ? orgLabel
+            ? t('invite.headline.restaurantBranchWithOrg', { branch: branchLabel, org: orgLabel })
+            : t('invite.headline.restaurantBranch', { branch: branchLabel })
+          : orgLabel
+            ? t('invite.headline.defaultWithOrg', {
+                branch: branchLabel,
+                org: orgLabel,
+                role: invite.role_name,
+              })
+            : t('invite.headline.default', { branch: branchLabel, role: invite.role_name })
     : ''
 
   if (!token || !type) {
@@ -207,27 +213,38 @@ export function InviteAcceptPage() {
   }
 
   const emailMismatch =
-    sessionUser && inviteSessionEmailMismatch(invite.invited_email, sessionUser.email)
+    sessionUser &&
+    inviteSessionEmailMismatch(invite.invited_email || invite.target_owner_email, sessionUser.email)
 
   if (sessionUser && !sessionExpired) {
     return (
       <InvitePageLayout>
         <Card>
-          <h1 className="text-xl font-semibold">{t('invite.acceptTitle')}</h1>
-          {emailMismatch && invite.invited_email ? (
+          <h1 className="text-xl font-semibold">
+            {isBranchAccountLink ? 'Accept Branch Account link' : t('invite.acceptTitle')}
+          </h1>
+          {emailMismatch && (invite.invited_email || invite.target_owner_email) ? (
             <InviteEmailMismatchCard
-              invitedEmail={invite.invited_email}
+              invitedEmail={invite.invited_email || invite.target_owner_email || ''}
               sessionEmail={sessionUser.email}
               invitePath={invitePath}
             />
           ) : (
             <>
               <p className="text-sm text-[var(--text-muted)]">
-                {t('invite.loggedInAs', {
-                  name: sessionUser.displayName || sessionUser.email,
-                  headline,
-                })}
+                {isBranchAccountLink
+                  ? `Signed in as ${sessionUser.displayName || sessionUser.email}. ${headline}. Billing for this Branch Account will move to the organization main account.`
+                  : t('invite.loggedInAs', {
+                      name: sessionUser.displayName || sessionUser.email,
+                      headline,
+                    })}
               </p>
+              {isBranchAccountLink && invite.billing_impact_snapshot ? (
+                <p className="text-xs text-[var(--text-muted)] rounded-md border border-[var(--app-border)] p-3">
+                  Billing impact was captured when this invite was created. After linking, child
+                  auto-renew is suspended while organization billing owns the Branch Account.
+                </p>
+              ) : null}
               <LegalAcceptancePanel
                 variant="invite"
                 value={acceptedLegal}
@@ -243,7 +260,7 @@ export function InviteAcceptPage() {
                 disabled={accepting || !legalComplete}
                 onClick={() => handleAcceptLoggedIn()}
               >
-                {t('invite.acceptJoin')}
+                {isBranchAccountLink ? 'Accept link' : t('invite.acceptJoin')}
               </Button>
               <Link
                 to={loginHref}
@@ -253,6 +270,26 @@ export function InviteAcceptPage() {
               </Link>
             </>
           )}
+        </Card>
+      </InvitePageLayout>
+    )
+  }
+
+  if (isBranchAccountLink) {
+    return (
+      <InvitePageLayout>
+        <Card>
+          <h1 className="text-xl font-semibold">Branch Account link invitation</h1>
+          <p className="text-sm text-[var(--text-muted)]">{headline}.</p>
+          <p className="text-sm text-[var(--text-muted)]">
+            Sign in as the Branch Account owner to accept. New account signup is not supported for
+            link invitations.
+          </p>
+          <Link to={loginHref}>
+            <Button type="button" className="w-full">
+              {t('invite.signIn')}
+            </Button>
+          </Link>
         </Card>
       </InvitePageLayout>
     )

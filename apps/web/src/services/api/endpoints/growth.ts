@@ -13,6 +13,22 @@ export type ReferralProgramConfig = {
   sponsorshipLimitsPerYear: Record<string, number | null>
   eligibleSponsorPlans: string[]
   connectionRequestExpiryDays: number
+  sponsorshipEnabled?: boolean
+  offerExpiryDays?: number
+  referralDiscountAppliesTo?: 'first_restaurant_funded' | 'sponsored_cycle'
+  requireRestaurantPaymentMethodBeforeActivation?: boolean
+  supplierPaymentAfterAcceptance?: boolean
+  maxSponsoredAmount?: number | null
+  supportedBillingIntervals?: string[]
+  paymentPendingStaleDays?: number
+}
+
+export type SponsorshipUsage = {
+  used: number
+  remaining: number | null
+  limit: number | null
+  resetDate: string
+  unlimited: boolean
 }
 
 export type SupplierProspect = {
@@ -29,6 +45,39 @@ export type SupplierProspect = {
   created_at: string
 }
 
+export type RestaurantConnectionRequest = {
+  id: string
+  supplier_id: string
+  supplier_name: string
+  restaurant_id: string
+  status: string
+  expires_at: string
+  created_at: string
+}
+
+export type SupplierSponsorship = {
+  id: string
+  supplier_id: string
+  prospect_id?: string | null
+  restaurant_id?: string | null
+  status: string
+  plan_code: string
+  selected_plan_id?: string | null
+  selected_plan_name?: string | null
+  sponsored_amount?: number | null
+  currency?: string
+  offer_expires_at?: string | null
+  supplier_payment_status?: string | null
+  period_start?: string | null
+  period_end?: string | null
+  failure_reason?: string | null
+  prospect_name?: string | null
+  supplier_name?: string | null
+  price_per_month?: number | null
+  pricing_snapshot?: Record<string, unknown> | null
+  created_at: string
+}
+
 export type SupplierGrowthMetrics = {
   importedCustomers: number
   existingSupplifyCustomers: number
@@ -39,7 +88,20 @@ export type SupplierGrowthMetrics = {
   revenueGenerated: number
   rewardsEarned: { freeMonths: number; accountCredit: number }
   sponsorshipLimit?: number | null
+  sponsorshipUsage?: SponsorshipUsage
   eligibleSponsorPlans?: string[]
+  sponsorship?: {
+    offersCreated: number
+    offersAccepted: number
+    offersDeclined: number
+    offersExpired: number
+    paymentsPending: number
+    paymentsFailed: number
+    monthsActivated: number
+    monthsCompleted: number
+    totalSpend: number
+    averageValue: number
+  }
 }
 
 export type RestaurantConnectionRequest = {
@@ -122,6 +184,109 @@ export const growthApi = api.injectEndpoints({
       }),
       invalidatesTags: ['SupplierGrowth'],
     }),
+    createSponsorshipOffer: builder.mutation<
+      { sponsorship: SupplierSponsorship },
+      {
+        prospectId: string
+        suggestedPlanId?: string
+        idempotencyKey?: string
+      }
+    >({
+      query: (body) => ({
+        url: '/api/supplier/growth/sponsorships',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['SupplierGrowth'],
+    }),
+    getSupplierSponsorships: builder.query<
+      { sponsorships: SupplierSponsorship[]; total: number },
+      { status?: string; limit?: number } | void
+    >({
+      query: (params) => ({
+        url: '/api/supplier/growth/sponsorships',
+        params: params || undefined,
+      }),
+      providesTags: ['SupplierGrowth'],
+    }),
+    getSponsorshipEligibility: builder.query<
+      { eligible: boolean; reasons: string[]; usage: SponsorshipUsage },
+      { prospectId?: string } | void
+    >({
+      query: (params) => ({
+        url: '/api/supplier/growth/sponsorships/eligibility',
+        params: params || undefined,
+      }),
+    }),
+    quoteSponsorship: builder.mutation<
+      {
+        snapshot: {
+          planId: string
+          planName: string
+          finalSponsoredAmount: number
+          currency: string
+          baseAmount: number
+          taxAmount: number
+        }
+        disclosure: string
+      },
+      { planId: string; prospectId?: string }
+    >({
+      query: (body) => ({
+        url: '/api/supplier/growth/sponsorships/quote',
+        method: 'POST',
+        body,
+      }),
+    }),
+    cancelSponsorship: builder.mutation<unknown, { id: string; reason?: string }>({
+      query: ({ id, reason }) => ({
+        url: `/api/supplier/growth/sponsorships/${id}/cancel`,
+        method: 'POST',
+        body: { reason },
+      }),
+      invalidatesTags: ['SupplierGrowth'],
+    }),
+    paySponsorship: builder.mutation<
+      unknown,
+      { id: string; paymentMethodId?: string; idempotencyKey: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/supplier/growth/sponsorships/${id}/payment`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['SupplierGrowth'],
+    }),
+    retrySponsorshipPayment: builder.mutation<
+      unknown,
+      { id: string; paymentMethodId?: string; idempotencyKey?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/supplier/growth/sponsorships/${id}/retry-payment`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['SupplierGrowth'],
+    }),
+    getRestaurantSponsorshipOffers: builder.query<{ offers: SupplierSponsorship[] }, void>({
+      query: () => '/api/restaurant/growth/sponsorship-offers',
+      providesTags: ['Supplier'],
+    }),
+    acceptSponsorshipOffer: builder.mutation<unknown, { id: string; planId: string }>({
+      query: ({ id, planId }) => ({
+        url: `/api/restaurant/growth/sponsorship-offers/${id}/accept`,
+        method: 'POST',
+        body: { planId },
+      }),
+      invalidatesTags: ['Supplier'],
+    }),
+    declineSponsorshipOffer: builder.mutation<unknown, string>({
+      query: (id) => ({
+        url: `/api/restaurant/growth/sponsorship-offers/${id}/decline`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Supplier'],
+    }),
     getAdminGrowthSettings: builder.query<ReferralProgramConfig, void>({
       query: () => '/api/admin-dashboard/growth-settings',
       providesTags: ['Admin'],
@@ -169,6 +334,16 @@ export const {
   useInviteProspectMutation,
   useConnectProspectMutation,
   useSponsorProspectMutation,
+  useCreateSponsorshipOfferMutation,
+  useGetSupplierSponsorshipsQuery,
+  useGetSponsorshipEligibilityQuery,
+  useQuoteSponsorshipMutation,
+  useCancelSponsorshipMutation,
+  usePaySponsorshipMutation,
+  useRetrySponsorshipPaymentMutation,
+  useGetRestaurantSponsorshipOffersQuery,
+  useAcceptSponsorshipOfferMutation,
+  useDeclineSponsorshipOfferMutation,
   useGetAdminGrowthSettingsQuery,
   useUpdateAdminGrowthSettingsMutation,
   useGetRestaurantConnectionRequestsQuery,
