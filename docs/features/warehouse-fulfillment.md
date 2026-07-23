@@ -39,6 +39,22 @@ Priority (lowest number wins within same rule type ordering in `warehouseRouting
 
 On assignment in multi mode, stock is reserved: `quantity_available` decreases, `quantity_reserved` increases.
 
+## Inventory source of truth (P0-1)
+
+Order place / cancel / reject / dispatch use **one** stock path via `supplier-order-stock.service.js`:
+
+| Mode        | Condition                                | Place                              | Cancel / Reject         | Dispatch                  |
+| ----------- | ---------------------------------------- | ---------------------------------- | ----------------------- | ------------------------- |
+| `warehouse` | Active warehouse(s) or `multi_warehouse` | Reserve `warehouse_inventory` only | Release WH reservations | Commit reserved → on-hand |
+| `legacy`    | No warehouses                            | Deduct `inventory` only            | Restore `inventory`     | N/A                       |
+
+Legacy `inventory` is kept for UI/compatibility. Adjustments mirror into default warehouse stock when in warehouse mode. Ops tooling:
+
+- `node apps/api/scripts/seed-warehouse-inventory-from-inventory.js [--apply]`
+- `node apps/api/scripts/reconcile-inventory-sources.js [--apply-seed-missing-wh] [--apply-mirror-legacy]`
+
+Design: `docs/superpowers/specs/2026-07-23-inventory-source-of-truth-design.md`.
+
 ## API (supplier)
 
 All warehouse routes: `requireAuth` → `requireFeature('warehouses')` → `requirePermission(...)`.
@@ -60,7 +76,7 @@ All warehouse routes: `requireAuth` → `requireFeature('warehouses')` → `requ
 | PATCH                 | `/api/orders/:id/warehouses/:assignmentId`          | Manual reassign (pending/picking)   |
 | POST                  | `/api/orders/:id/warehouses/:assignmentId/dispatch` | Mark dispatched                     |
 
-Order creation (`POST /api/orders`, supplier manual create) calls `assignWarehousesToOrder` in the **same transaction**; failure rolls back the order.
+Order creation (`POST /api/orders`, supplier manual create) calls `reserveStockForPlacedOrder` in the **same transaction** (warehouse reserve XOR legacy deduct); failure rolls back the order.
 
 ## Frontend
 

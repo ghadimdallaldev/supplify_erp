@@ -49,7 +49,7 @@ Supplify is a B2B food-supply ERP connecting **restaurants** (purchasing, receiv
 **Biggest architecture risks**
 
 1. **Three “branch” concepts:** org Branch Accounts (tenants), legacy `tenant_account_link`, legacy restaurant `branch` locations — easy to confuse and dual-path in APIs.
-2. **Dual supplier inventory:** legacy `inventory` vs `warehouse_inventory`; order deduct still hits legacy table while WH path reserves separately.
+2. **Supplier inventory SoT (P0-1):** order place/cancel/reject/dispatch use one path via `supplier-order-stock.service` — `warehouse_inventory` when warehouses exist, else legacy `inventory` (mirror + reconcile tooling retained).
 3. **In-process crons** on API replicas (mitigated by advisory locks, still operationally fragile).
 4. **Billing:** stub/manual only; Stripe/Wish listed but not registered.
 

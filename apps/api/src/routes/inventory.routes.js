@@ -21,6 +21,7 @@ import {
   listSupplierStockDisplay,
   supplierUsesWarehouseInventory,
 } from '../services/supplier-stock.service.js'
+import { syncWarehouseMirrorFromLegacy } from '../services/supplier-order-stock.service.js'
 
 const router = express.Router()
 
@@ -363,9 +364,15 @@ router.patch(
       const updateData = inventoryUpdateSchema.parse(req.body)
 
       // Verify product ownership for suppliers
+      let supplierId = null
       if (req.userData.role === 'SUPPLIER') {
-        const supplierId = await getSupplierIdForRequest(req)
+        supplierId = await getSupplierIdForRequest(req)
         await checkProductOwnership(productId, supplierId)
+      } else if (req.userData.role === 'ADMIN') {
+        const { rows: productRows } = await query(`SELECT supplier_id FROM product WHERE id = $1`, [
+          productId,
+        ])
+        supplierId = productRows[0]?.supplier_id || null
       }
 
       // Update or insert inventory
@@ -381,6 +388,15 @@ router.patch(
     `,
         [productId, updateData.availableQty]
       )
+
+      if (supplierId) {
+        await syncWarehouseMirrorFromLegacy(query, {
+          supplierId,
+          productId,
+          availableQty: updateData.availableQty,
+          reservedQty: rows[0]?.reserved_qty || 0,
+        })
+      }
 
       logger.info('Inventory updated', {
         productId,
@@ -435,8 +451,9 @@ router.post(
       const adjustmentData = adjustmentSchema.parse(req.body)
 
       // Verify product ownership for suppliers
+      let supplierId = null
       if (req.userData.role === 'SUPPLIER') {
-        const supplierId = await getSupplierIdForRequest(req)
+        supplierId = await getSupplierIdForRequest(req)
         await checkProductOwnership(productId, supplierId)
       }
 
@@ -451,6 +468,14 @@ router.post(
 
         if (inventory.length === 0) {
           throw new NotFoundError('Inventory not found for this product')
+        }
+
+        if (!supplierId) {
+          const { rows: productRows } = await query(
+            `SELECT supplier_id FROM product WHERE id = $1`,
+            [productId]
+          )
+          supplierId = productRows[0]?.supplier_id || null
         }
 
         const currentQty = parseFloat(inventory[0].available_qty)
@@ -470,6 +495,16 @@ router.post(
       `,
           [newQty, productId]
         )
+
+        if (supplierId) {
+          await syncWarehouseMirrorFromLegacy(query, {
+            supplierId,
+            productId,
+            availableQty: newQty,
+            reservedQty: updatedInventory[0]?.reserved_qty || 0,
+            warehouseId: adjustmentData.warehouseId || null,
+          })
+        }
 
         // Create adjustment record
         const { rows: adjustmentRecord } = await query(

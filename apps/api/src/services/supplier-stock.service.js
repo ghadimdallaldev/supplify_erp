@@ -8,13 +8,14 @@ import { getWarehouseSupplierColumn, isDefaultWarehouse } from '../lib/warehouse
 import { hasFeature } from '../lib/subscription.js'
 import { resolveOrgBillingTenantId } from '../lib/org-billing-tenant.js'
 
-export async function supplierUsesWarehouseInventory(supplierId) {
+export async function supplierUsesWarehouseInventory(supplierId, { client = null } = {}) {
   const billingId = await resolveOrgBillingTenantId(supplierId, 'SUPPLIER')
   const multiWh = await hasFeature(billingId, 'SUPPLIER', 'multi_warehouse')
   if (multiWh) return true
 
-  const supplierCol = await getWarehouseSupplierColumn()
-  const { rows } = await query(
+  const db = client ? (sql, params) => client.query(sql, params) : query
+  const supplierCol = await getWarehouseSupplierColumn((sql, params) => db(sql, params))
+  const { rows } = await db(
     `SELECT COUNT(*)::int AS c FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE`,
     [supplierId]
   )

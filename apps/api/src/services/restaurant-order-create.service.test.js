@@ -15,12 +15,11 @@ vi.mock('./order-create.service.js', () => ({
   ]),
 }))
 
-vi.mock('./supplier-inventory.service.js', () => ({
-  assertAndDeductSupplierStockBatch: vi.fn().mockResolvedValue(undefined),
-}))
-
-vi.mock('./warehouseRouting.js', () => ({
-  assignWarehousesToOrder: vi.fn().mockResolvedValue({ mode: 'single', assignments: [] }),
+vi.mock('./supplier-order-stock.service.js', () => ({
+  reserveStockForPlacedOrder: vi.fn().mockResolvedValue({
+    mode: 'warehouse',
+    fulfillment: { mode: 'single', assignments: [] },
+  }),
 }))
 
 describe('restaurant-order-create.service', () => {
@@ -33,6 +32,7 @@ describe('restaurant-order-create.service', () => {
       './restaurant-order-create.service.js'
     )
     const { incrementDailyUsageMeterInTransaction } = await import('../lib/subscription.js')
+    const { reserveStockForPlacedOrder } = await import('./supplier-order-stock.service.js')
 
     const supplierId = '660e8400-e29b-41d4-a716-446655440001'
     const items = [
@@ -89,7 +89,9 @@ describe('restaurant-order-create.service', () => {
     })
 
     expect(incrementDailyUsageMeterInTransaction).toHaveBeenCalled()
+    expect(reserveStockForPlacedOrder).toHaveBeenCalled()
     expect(result.orders).toHaveLength(1)
+    expect(result.orders[0].stockMode).toBe('warehouse')
     expect(result.lineCount).toBe(1)
     expect(result.supplierCount).toBe(1)
     expect(result.totalTransactionMs).toBeGreaterThanOrEqual(0)

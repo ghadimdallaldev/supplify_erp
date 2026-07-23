@@ -1,16 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ValidationError } from '../middlewares/errorHandler.js'
 
-vi.mock('./warehouseInventory.js', () => ({
-  releaseInventoryForOrder: vi.fn().mockResolvedValue(undefined),
-}))
-
 import {
   assertAndDeductSupplierStock,
   assertAndDeductSupplierStockBatch,
-  restoreSupplierStockForOrder,
 } from './supplier-inventory.service.js'
-import { releaseInventoryForOrder } from './warehouseInventory.js'
 
 describe('supplier-inventory.service', () => {
   beforeEach(() => {
@@ -94,24 +88,5 @@ describe('supplier-inventory.service', () => {
     ])
 
     expect(client.query.mock.calls[1][1][1]).toEqual([7])
-  })
-
-  it('restores stock for cancelled order items', async () => {
-    const client = {
-      query: vi
-        .fn()
-        .mockResolvedValueOnce({
-          rows: [{ product_id: 'prod-1', quantity: 1 }],
-        })
-        .mockResolvedValueOnce({}),
-    }
-
-    await restoreSupplierStockForOrder(client, 'order-1')
-
-    expect(client.query).toHaveBeenCalledWith(
-      expect.stringContaining('available_qty = available_qty + $1'),
-      [1, 'prod-1']
-    )
-    expect(releaseInventoryForOrder).toHaveBeenCalledWith(client, 'order-1')
   })
 })
