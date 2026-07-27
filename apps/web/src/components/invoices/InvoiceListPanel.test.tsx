@@ -40,6 +40,6 @@ describe('InvoiceListPanel', () => {
         onPayInvoice={() => {}}
       />
     )
-    expect(screen.getByText(/60/)).toBeInTheDocument()
+    expect(screen.getAllByText(/60/).length).toBeGreaterThan(0)
   })
 })

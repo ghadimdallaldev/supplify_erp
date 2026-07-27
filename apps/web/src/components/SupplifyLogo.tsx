@@ -13,8 +13,8 @@ export function SupplifyLogo({
   theme = 'light',
   tagline = true,
 }: SupplifyLogoProps) {
-  const wordmarkColor = theme === 'dark' ? '#ffffff' : '#1e0b3a'
-  const taglineColor = theme === 'dark' ? 'rgba(255,255,255,0.5)' : '#8b7aaa'
+  const wordmarkColor = theme === 'dark' ? '#ffffff' : '#111827'
+  const taglineColor = theme === 'dark' ? 'rgba(255,255,255,0.62)' : '#64748b'
 
   const mark = (
     <img
@@ -38,9 +38,9 @@ export function SupplifyLogo({
         <div
           style={{
             fontSize: wordmarkSize,
-            fontWeight: 800,
+            fontWeight: 700,
             color: wordmarkColor,
-            letterSpacing: '-0.04em',
+            letterSpacing: 0,
             lineHeight: 1.1,
             fontFamily: "'Inter', system-ui, sans-serif",
           }}
@@ -53,7 +53,7 @@ export function SupplifyLogo({
               fontSize: taglineSize,
               fontWeight: 500,
               color: taglineColor,
-              letterSpacing: '0.02em',
+              letterSpacing: 0,
               fontFamily: "'Inter', system-ui, sans-serif",
             }}
           >

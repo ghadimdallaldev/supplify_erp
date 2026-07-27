@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ComponentType } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -60,6 +61,7 @@ const viewOptionKeys: Array<{ labelKey: string; value: CalendarViewType }> = [
 ]
 
 const DEFAULT_PAGE_SIZE = 60
+const FullCalendarComponent = FullCalendar as unknown as ComponentType<any>
 
 export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarViewProps) {
   const { t, i18n } = useTranslation('calendar')
@@ -225,7 +227,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             <div
               className={`h-3.5 w-3.5 rounded-full shadow-sm transition-transform duration-150 [@media(hover:hover)_and_(pointer:fine)]:group-hover:scale-150 ${dotTheme}`}
             />
-            <div className="pointer-events-none absolute left-1/2 top-full z-30 hidden w-60 -translate-x-1/2 translate-y-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 text-xs text-[var(--text-mid)] shadow-xl group-hover:block">
+            <div className="pointer-events-none absolute left-1/2 top-full z-30 hidden w-60 -translate-x-1/2 translate-y-2 rounded-md border border-[var(--app-border)] bg-[var(--surface)] p-3 text-xs text-[var(--text-mid)] shadow-xl group-hover:block">
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                 {event.type?.replace(/_/g, ' ') || t('eventCard.order')}
               </p>
@@ -284,7 +286,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
 
       return (
         <div
-          className={`supplify-calendar-event group relative border-l-4 p-2 rounded-lg shadow-sm transition-[box-shadow] duration-150 hover:shadow-md ${statusTheme}`}
+          className={`supplify-calendar-event group relative border-l-[3px] p-2 rounded-md shadow-sm transition-[box-shadow] duration-150 hover:shadow-md ${statusTheme}`}
         >
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide">
@@ -340,13 +342,13 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
   )
 
   return (
-    <div className="rounded-3xl border border-[var(--app-border)] bg-[var(--surface)] p-6 shadow-sm">
+    <div className="rounded-md border border-[var(--app-border)] bg-[var(--surface)] p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:p-5">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <div className="flex items-center gap-3 text-[var(--text)]">
-            <span className="text-3xl leading-none">📅</span>
+          <div className="flex items-center gap-2.5 text-[var(--text)]">
+            <CalendarDays className="h-5 w-5 text-[var(--brand)]" aria-hidden />
             <div>
-              <h2 className="text-xl font-semibold">{t('title')}</h2>
+              <h2 className="text-lg font-semibold">{t('title')}</h2>
               <p className="text-sm text-[var(--text-muted)]">
                 {activeRole === 'RESTAURANT' ? t('subtitle.restaurant') : t('subtitle.supplier')}
               </p>
@@ -389,7 +391,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
         </div>
       </div>
 
-      <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Select
           value={statusFilter}
           onValueChange={(val) => {
@@ -485,7 +487,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
         )}
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-2xl border border-[var(--app-border)]">
+      <div className="mt-5 overflow-hidden rounded-md border border-[var(--app-border)]">
         {(entitlementsLoading || (isLoading && !calendarBlocked)) && (
           <div className="flex h-64 items-center justify-center text-[var(--text-muted)]">
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -495,7 +497,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
 
         {!entitlementsLoading && calendarBlocked?.kind === 'plan' && (
           <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 px-6 py-10 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--brand-ultra)] text-[var(--brand-mid)]">
+            <div className="flex h-14 w-14 items-center justify-center rounded-md bg-[var(--brand-ultra)] text-[var(--brand-mid)]">
               <Lock className="h-7 w-7" aria-hidden />
             </div>
             <div className="max-w-md space-y-2">
@@ -531,7 +533,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
           )}
 
         {!calendarBlocked && !isLoading && !entitlementsLoading && (
-          <FullCalendar
+          <FullCalendarComponent
             ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
             headerToolbar={false}
@@ -714,7 +716,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
                   </Button>
                 ) : null}
 
-                <div className="rounded-xl bg-[var(--brand-ultra)] p-4 text-xs text-[var(--text-muted)]">
+                <div className="rounded-md bg-[var(--brand-ultra)] p-4 text-xs text-[var(--text-muted)]">
                   <p className="font-semibold text-[var(--text-muted)]">
                     {t('eventSheet.tipTitle')}
                   </p>

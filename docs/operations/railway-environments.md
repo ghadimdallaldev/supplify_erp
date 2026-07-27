@@ -206,7 +206,7 @@ Port comes from `docker/.env` → `REDIS_PORT` (default `6379`).
 
 - One Railway Postgres **per environment** — never point dev/preprod at prod.
 - Set `DATABASE_SSL=true` on preprod and prod.
-- Backups: use Railway Postgres backups / logical dumps for prod (see go-live checklist).
+- Backups: see **[backup-and-restore.md](./backup-and-restore.md)** (Railway snapshots + logical dump/restore drill). Do not onboard pilot clients until a restore drill is logged.
 
 ## K. Keycloak per environment
 
@@ -235,13 +235,13 @@ Full upload pipeline (presign, keys, local vs S3): [../operations/STORAGE_UPLOAD
 
 ## M. Payment mode per environment
 
-| Mode   | env     | Behavior                                               |
-| ------ | ------- | ------------------------------------------------------ |
-| `mock` | dev     | Stub gateway (`BILLING_GATEWAY=stub`)                  |
-| `test` | preprod | Stub/test — no live charges                            |
-| `live` | prod    | Real provider when integrated; webhook secret required |
+| Mode   | env     | Gateway                          | Behavior                                                         |
+| ------ | ------- | -------------------------------- | ---------------------------------------------------------------- |
+| `mock` | dev     | `stub`                           | Dev-only stub charges                                            |
+| `test` | preprod | `stub`                           | No live charges                                                  |
+| `live` | prod    | **`manual` (pilot)** or real PSP | **`BILLING_GATEWAY=stub` is rejected** with `PAYMENTS_MODE=live` |
 
-API blocks `PAYMENTS_MODE=mock` when `APP_ENV=prod` or `preprod`.
+API blocks `PAYMENTS_MODE=mock` in prod/preprod, and blocks **stub + live** at startup validation and at gateway resolve.
 
 ## N. CORS and security
 

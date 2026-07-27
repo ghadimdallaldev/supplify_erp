@@ -58,6 +58,16 @@ vi.mock('../services/notification.service.js', () => ({
   notifyOutOfStock: vi.fn().mockResolvedValue(null),
 }))
 
+vi.mock('../services/supplier-stock.service.js', () => ({
+  listSupplierStockDisplay: vi.fn().mockResolvedValue([]),
+  supplierUsesWarehouseInventory: vi.fn().mockResolvedValue(false),
+  transferWarehouseInventory: vi.fn().mockResolvedValue({ transferred: 0 }),
+}))
+
+vi.mock('../services/supplier-order-stock.service.js', () => ({
+  syncWarehouseMirrorFromLegacy: vi.fn().mockResolvedValue(null),
+}))
+
 // Import routes after mocks
 import { inventoryRoutes } from './inventory.routes.js'
 

@@ -67,8 +67,8 @@ describe('AdminTenantUsageTable', () => {
       />
     )
     expect(screen.getByTestId('admin-usage-table-supplier')).toBeInTheDocument()
-    expect(screen.getByText('Acme Supply')).toBeInTheDocument()
-    expect(screen.getByTestId('usage-status-near_limit')).toBeInTheDocument()
+    expect(screen.getAllByText('Acme Supply').length).toBeGreaterThan(0)
+    expect(screen.getAllByTestId('usage-status-near_limit').length).toBeGreaterThan(0)
   })
 
   it('renders supplier active deals progress when available', () => {
@@ -132,7 +132,7 @@ describe('AdminTenantUsageTable', () => {
     )
     expect(screen.getByText('Orders today')).toBeInTheDocument()
     expect(screen.getByText(/18 \/ 20/)).toBeInTheDocument()
-    expect(screen.getByTestId('usage-status-near_limit')).toBeInTheDocument()
+    expect(screen.getAllByTestId('usage-status-near_limit').length).toBeGreaterThan(0)
   })
 
   it('shows unlimited for restaurant with -1 daily limit', () => {

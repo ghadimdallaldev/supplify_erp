@@ -519,7 +519,8 @@ export async function createInvoiceFromOrder(order, orderItems, supplierId, clie
   }
 }
 
-// Helper function to handle order delivery and update restaurant inventory
+// Legacy COMPLETED status: mark DELIVERED only. Restaurant inventory and invoices
+// are applied exclusively via receiving (prevents double-count if receive also runs).
 async function handleOrderDelivery(orderId, userData, res, req) {
   try {
     const result = await withTransaction(async (client) => {
@@ -564,33 +565,7 @@ async function handleOrderDelivery(orderId, userData, res, req) {
         }
       }
 
-      const supplierItems = orderItems
-
-      // Update restaurant inventory ONLY for this supplier's items (batch upsert — avoids N+1)
-      if (supplierItems.length > 0) {
-        // Build VALUES list: ($1,$2,$3), ($4,$5,$6), ...
-        const vals = []
-        const params = []
-        let p = 1
-        for (const item of supplierItems) {
-          vals.push(`($${p},$${p + 1},$${p + 2},now())`)
-          params.push(order.restaurant_id, item.product_id, item.quantity)
-          p += 3
-        }
-        await client.query(
-          `INSERT INTO restaurant_inventory (restaurant_id, product_id, quantity, updated_at)
-           VALUES ${vals.join(', ')}
-           ON CONFLICT (restaurant_id, product_id)
-           DO UPDATE SET quantity = restaurant_inventory.quantity + EXCLUDED.quantity, updated_at = now()`,
-          params
-        )
-      }
-
-      // Create invoice from the order (orders are now single-supplier)
-      // Do not create invoice here; invoice will be created after restaurant receiving
-      const invoice = null
-
-      // Mark order as DELIVERED; restaurant will move it to RECEIVED_* upon receiving
+      // Mark order as DELIVERED; restaurant inventory updates only on receiving
       await client.query(
         `
         UPDATE customer_order 
@@ -601,26 +576,19 @@ async function handleOrderDelivery(orderId, userData, res, req) {
       )
       order.status = 'DELIVERED'
 
-      logger.info('Order delivered and restaurant inventory updated', {
+      logger.info('Order marked DELIVERED; inventory deferred to receiving', {
         orderId: order.id,
         restaurantId: order.restaurant_id,
         supplierId,
-        itemCount: supplierItems.length,
+        itemCount: orderItems.length,
         actor: userData.id,
       })
 
       return { order, supplierId }
     })
 
-    // Send notification to restaurant about completed order
+    // Notify restaurant that goods are ready to receive
     try {
-      const { rows: restaurantInfo } = await query(
-        `
-        SELECT id, name FROM restaurant WHERE id = $1
-      `,
-        [result.order.restaurant_id]
-      )
-
       const { rows: supplierInfo } = await query(
         `
         SELECT id, name FROM supplier WHERE id = $1
@@ -636,7 +604,7 @@ async function handleOrderDelivery(orderId, userData, res, req) {
           supplier_id: result.supplierId,
           supplier_name: supplierInfo[0]?.name || 'Supplier',
         },
-        'COMPLETED'
+        'DELIVERED'
       )
 
       logger.info('Notification sent successfully')

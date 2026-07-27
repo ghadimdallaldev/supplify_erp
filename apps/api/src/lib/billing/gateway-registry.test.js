@@ -19,10 +19,21 @@ describe('billing gateway registry', () => {
     expect(typeof gateway.charge).toBe('function')
   })
 
-  it('falls back to stub for unknown provider', async () => {
+  it('falls back to stub for unknown provider when not live', async () => {
     const { getBillingGateway } = await import('./gateway-registry.js')
     const gateway = getBillingGateway('unknown-provider')
     expect(gateway.id).toBe('stub')
+  })
+
+  it('throws when stub is requested under PAYMENTS_MODE=live', async () => {
+    vi.resetModules()
+    vi.doMock('../../config/env.js', () => ({
+      config: { APP_ENV: 'prod', PAYMENTS_MODE: 'live', BILLING_GATEWAY: 'stub' },
+    }))
+    const { getBillingGateway } = await import('./gateway-registry.js')
+    expect(() => getBillingGateway('stub')).toThrow(/stub.*live/i)
+    vi.doUnmock('../../config/env.js')
+    vi.resetModules()
   })
 
   it('registers custom gateway implementations', async () => {

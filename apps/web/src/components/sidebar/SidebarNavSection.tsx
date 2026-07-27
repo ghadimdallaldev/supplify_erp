@@ -43,7 +43,7 @@ export function SidebarNavSection({
 
   return (
     <div className="mb-3 first:mb-2">
-      <div className="section-label px-1.5 pb-1 pt-3 text-[var(--sidebar-section)] first:pt-1.5">
+      <div className="section-label px-2 pb-1.5 pt-3 text-[var(--sidebar-section)] first:pt-1.5">
         {sectionLabel}
       </div>
       {section.items.map((item) => (
@@ -100,14 +100,11 @@ function SidebarNavLink({
       onClick={() => onNavigate?.()}
       data-testid={item.testId || `nav-${label.toLowerCase().replace(/\s+/g, '-')}`}
       className={cn(
-        'sidebar-nav-item relative mb-0.5 flex h-[34px] items-center gap-2 rounded-lg px-2.5 text-[13px] no-underline',
+        'sidebar-nav-item relative mb-0.5 flex h-8 items-center gap-2 rounded-md px-2.5 text-[13px] no-underline',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30 focus-visible:ring-offset-1',
-        isActive ? 'font-medium text-[var(--text)]' : 'font-medium text-[var(--text-muted)]'
+        isActive ? 'font-semibold text-[var(--text)]' : 'font-medium text-[var(--text-muted)]'
       )}
     >
-      {isActive && (
-        <span aria-hidden className="size-[2px] shrink-0 rounded-full bg-[var(--brand)]" />
-      )}
       <item.icon
         size={15}
         className={cn('shrink-0', isActive ? 'text-[var(--brand)]' : 'text-[var(--text-muted)]')}
@@ -136,7 +133,7 @@ function SidebarNavLink({
         <span
           title={t('badge.dailyOrdersUsed')}
           className={cn(
-            'min-w-[18px] rounded-lg px-1.5 py-px text-center text-[10px] font-bold',
+            'min-w-[18px] rounded-md px-1.5 py-px text-center text-[10px] font-semibold',
             orderUsageBadge.atLimit
               ? 'bg-[var(--red)] text-white'
               : orderUsageBadge.nearLimit
@@ -166,7 +163,7 @@ function NavCountBadge({
     <span
       title={title}
       className={cn(
-        'min-w-[18px] rounded-lg px-1.5 py-px text-center text-[10px] font-bold',
+        'min-w-[18px] rounded-md px-1.5 py-px text-center text-[10px] font-semibold',
         variant === 'red' ? 'bg-[var(--red)] text-white' : 'bg-[var(--amber-mid)] text-black'
       )}
     >

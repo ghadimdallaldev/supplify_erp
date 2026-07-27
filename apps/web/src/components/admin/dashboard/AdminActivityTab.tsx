@@ -86,7 +86,7 @@ const EVENT_VISUAL_KEYS: Record<
   },
   deal_activity: {
     icon: Activity,
-    badgeClass: 'bg-violet-50 text-violet-700 border-violet-200',
+    badgeClass: 'bg-[var(--app-bg-subtle)] text-[var(--text)] border-[var(--app-border-mid)]',
     labelKey: 'activity.badges.deal',
   },
   cart_updated: {
@@ -101,7 +101,7 @@ const EVENT_VISUAL_KEYS: Record<
   },
   plan_changed: {
     icon: CreditCard,
-    badgeClass: 'bg-violet-50 text-violet-700 border-violet-200',
+    badgeClass: 'bg-[var(--app-bg-subtle)] text-[var(--text)] border-[var(--app-border-mid)]',
     labelKey: 'activity.badges.planChange',
   },
   subscription_status: {
@@ -116,7 +116,7 @@ const EVENT_VISUAL_KEYS: Record<
   },
   reservation: {
     icon: Activity,
-    badgeClass: 'bg-pink-50 text-pink-700 border-pink-200',
+    badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
     labelKey: 'activity.badges.reservation',
   },
   invoice_issued: {
@@ -141,7 +141,7 @@ const EVENT_VISUAL_KEYS: Record<
   },
   chat_started: {
     icon: MessageSquare,
-    badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    badgeClass: 'bg-sky-50 text-sky-800 border-sky-200',
     labelKey: 'activity.badges.chat',
   },
 }
@@ -256,7 +256,7 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
         }
       />
 
-      <div className="mb-4 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4">
+      <div className="mb-4 rounded-md border border-[var(--app-border)] bg-[var(--surface)] p-4">
         <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
           <Filter className="h-3.5 w-3.5" />
           {t('common.filters')}

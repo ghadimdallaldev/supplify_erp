@@ -12,6 +12,7 @@ const mockConfig = vi.hoisted(() => ({
   SMTP_HOST: 'smtp.example.com',
   SMTP_PASS: 'smtp-secret',
   PAYMENTS_MODE: 'live',
+  BILLING_GATEWAY: 'manual',
   STORAGE_DRIVER: 's3',
   STORAGE_ACCESS_KEY_ID: 'access-key-prod',
   STORAGE_SECRET_ACCESS_KEY: 'secret-key-prod-32chars-min',
@@ -41,6 +42,7 @@ describe('validateProductionConfig prod safety', () => {
       APP_ENV: 'prod',
       NODE_ENV: 'production',
       PAYMENTS_MODE: 'live',
+      BILLING_GATEWAY: 'manual',
       STORAGE_DRIVER: 's3',
       WEB_ORIGINS: ['https://app.example.com'],
       ENABLE_DEBUG_ROUTES: false,
@@ -94,10 +96,18 @@ describe('validateProductionConfig prod safety', () => {
     expect(() => validateProductionConfig()).toThrow(/ALLOW_DB_RESET/)
   })
 
-  it('allows PAYMENTS_MODE=live in prod', async () => {
+  it('allows PAYMENTS_MODE=live in prod with manual gateway', async () => {
     mockConfig.PAYMENTS_MODE = 'live'
+    mockConfig.BILLING_GATEWAY = 'manual'
     const { validateProductionConfig } = await import('./validate-config.js')
     expect(() => validateProductionConfig()).not.toThrow()
+  })
+
+  it('rejects BILLING_GATEWAY=stub with PAYMENTS_MODE=live in prod', async () => {
+    mockConfig.PAYMENTS_MODE = 'live'
+    mockConfig.BILLING_GATEWAY = 'stub'
+    const { validateProductionConfig } = await import('./validate-config.js')
+    expect(() => validateProductionConfig()).toThrow(/BILLING_GATEWAY=stub/)
   })
 
   it('rejects SEED_DEMO_DATA in prod', async () => {
@@ -134,6 +144,7 @@ describe('validateProductionConfig REDIS_URL', () => {
       DATABASE_SSL: true,
       WEB_ORIGINS: ['https://app.example.com'],
       PAYMENTS_MODE: 'live',
+      BILLING_GATEWAY: 'manual',
       STORAGE_DRIVER: 's3',
       STORAGE_ACCESS_KEY_ID: 'access-key-prod',
       STORAGE_SECRET_ACCESS_KEY: 'secret-key-prod-32chars-min',

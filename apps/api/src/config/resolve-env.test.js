@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { envBool, resolveAppEnv, resolvePaymentsMode, resolveWebOrigins } from './resolve-env.js'
+import {
+  envBool,
+  resolveAppEnv,
+  resolvePaymentsMode,
+  resolveBillingGatewayId,
+  validateBillingGatewayPaymentsMode,
+  resolveWebOrigins,
+} from './resolve-env.js'
 import { resolveNativeDatabaseUrl } from './resolve-database-url.js'
 
 describe('resolve-env', () => {
@@ -12,6 +19,32 @@ describe('resolve-env', () => {
     expect(resolvePaymentsMode('dev', 'development')).toBe('mock')
     expect(resolvePaymentsMode('preprod', 'production')).toBe('test')
     expect(resolvePaymentsMode('prod', 'production')).toBe('live')
+  })
+
+  it('resolveBillingGatewayId defaults to manual for live (never silent stub)', () => {
+    const prev = process.env.BILLING_GATEWAY
+    const prevProv = process.env.PAYMENTS_PROVIDER
+    delete process.env.BILLING_GATEWAY
+    delete process.env.PAYMENTS_PROVIDER
+    expect(resolveBillingGatewayId('live')).toBe('manual')
+    expect(resolveBillingGatewayId('mock')).toBe('stub')
+    expect(resolveBillingGatewayId('test')).toBe('stub')
+    if (prev == null) delete process.env.BILLING_GATEWAY
+    else process.env.BILLING_GATEWAY = prev
+    if (prevProv == null) delete process.env.PAYMENTS_PROVIDER
+    else process.env.PAYMENTS_PROVIDER = prevProv
+  })
+
+  it('validateBillingGatewayPaymentsMode rejects stub+live', () => {
+    expect(
+      validateBillingGatewayPaymentsMode({ paymentsMode: 'live', billingGateway: 'stub' })
+    ).toMatch(/stub/)
+    expect(
+      validateBillingGatewayPaymentsMode({ paymentsMode: 'live', billingGateway: 'manual' })
+    ).toBeNull()
+    expect(
+      validateBillingGatewayPaymentsMode({ paymentsMode: 'test', billingGateway: 'stub' })
+    ).toBeNull()
   })
 
   it('resolveWebOrigins rejects wildcard', () => {

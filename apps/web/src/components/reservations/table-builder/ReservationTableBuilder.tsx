@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Rnd } from 'react-rnd'
 import { Button } from '../../ui/button'
@@ -53,6 +54,8 @@ import {
   type TableZone,
 } from './tableBuilderShared'
 import { ChairLayer } from './ChairLayer'
+
+const RndComponent = Rnd as unknown as ComponentType<any>
 
 export function ReservationTableBuilder({
   tables,
@@ -485,7 +488,7 @@ export function ReservationTableBuilder({
     }
 
     return (
-      <Rnd
+      <RndComponent
         key={table.localId}
         size={{ width: widthPx, height: heightPx }}
         position={{ x: xPx, y: yPx }}
@@ -581,7 +584,7 @@ export function ReservationTableBuilder({
             ))}
           </div>
         </div>
-      </Rnd>
+      </RndComponent>
     )
   }
 

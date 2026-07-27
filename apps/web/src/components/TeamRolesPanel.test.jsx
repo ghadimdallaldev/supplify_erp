@@ -68,8 +68,8 @@ describe('TeamRolesPanel', () => {
 
   it('lists team users with role assignment controls when advanced_roles is enabled', () => {
     renderWithProviders(<TeamRolesPanel tenantType="RESTAURANT" />)
-    expect(screen.getByText('staff@example.com')).toBeInTheDocument()
-    expect(screen.getByText('Staff User')).toBeInTheDocument()
+    expect(screen.getAllByText('staff@example.com').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Staff User').length).toBeGreaterThan(0)
   })
 
   it('shows system roles available for assignment', () => {

@@ -25,10 +25,12 @@ vi.mock('../services/api', async (importOriginal) => {
   }
 })
 
-function rowScope(productName: string) {
-  const row = screen.getByText(productName).closest('tr')
-  if (!row) throw new Error(`Row not found for ${productName}`)
-  return within(row)
+function itemScope(productName: string) {
+  // Card list is always in the DOM (lg:hidden); table is lg:block — both present in jsdom.
+  const cards = screen.getByTestId('inventory-card-list')
+  const card = within(cards).getByText(productName).closest('div.space-y-3')
+  if (!card) throw new Error(`Card not found for ${productName}`)
+  return within(card as HTMLElement)
 }
 
 describe('InventoryPage supplier stock status', () => {
@@ -59,7 +61,7 @@ describe('InventoryPage supplier stock status', () => {
     })
 
     renderWithProviders(<InventoryPage />)
-    expect(rowScope('Empty Product').getByText('Out of stock')).toBeInTheDocument()
+    expect(itemScope('Empty Product').getByText('Out of stock')).toBeInTheDocument()
   })
 
   it('shows Low stock when API marks isLowStock', () => {
@@ -84,7 +86,7 @@ describe('InventoryPage supplier stock status', () => {
     })
 
     renderWithProviders(<InventoryPage />)
-    expect(rowScope('Low Product').getByText('Low stock')).toBeInTheDocument()
+    expect(itemScope('Low Product').getByText('Low stock')).toBeInTheDocument()
   })
 
   it('shows In stock for healthy inventory', () => {
@@ -109,6 +111,6 @@ describe('InventoryPage supplier stock status', () => {
     })
 
     renderWithProviders(<InventoryPage />)
-    expect(rowScope('Healthy Product').getByText('In stock')).toBeInTheDocument()
+    expect(itemScope('Healthy Product').getByText('In stock')).toBeInTheDocument()
   })
 })

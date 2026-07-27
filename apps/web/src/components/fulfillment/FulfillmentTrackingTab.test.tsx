@@ -59,7 +59,7 @@ describe('FulfillmentTrackingTab', () => {
   it('renders GPS column and opens tracking drawer from board', () => {
     renderWithFulfillmentI18n(<FulfillmentTrackingTab />)
     expect(screen.getByTestId('tracking-gps-status')).toHaveTextContent(/Live/i)
-    fireEvent.click(screen.getByTestId('tracking-view-order-abc-1234'))
+    fireEvent.click(screen.getAllByTestId('tracking-view-order-abc-1234')[0])
     expect(screen.getByTestId('delivery-tracking-drawer')).toBeInTheDocument()
   })
 
