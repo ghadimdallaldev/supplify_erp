@@ -340,9 +340,9 @@ export function DashboardPage() {
         <Suspense
           fallback={
             <div className="dashboard-content-grid">
-              <Skeleton className="h-64 rounded-xl" />
-              <Skeleton className="h-64 rounded-xl" />
-              <Skeleton className="h-64 rounded-xl" />
+              <Skeleton className="h-64 rounded-md" />
+              <Skeleton className="h-64 rounded-md" />
+              <Skeleton className="h-64 rounded-md" />
             </div>
           }
         >
@@ -375,16 +375,7 @@ export function DashboardPage() {
         </Suspense>
 
         {showDashboardCalendar && (
-          <div
-            className="min-w-0"
-            style={{
-              marginTop: DASHBOARD_CALENDAR_EXTRA_GAP,
-              background: 'var(--surface)',
-              border: '1px solid var(--app-border)',
-              borderRadius: 12,
-              overflow: 'hidden',
-            }}
-          >
+          <div className="min-w-0" style={{ marginTop: DASHBOARD_CALENDAR_EXTRA_GAP }}>
             <Suspense
               fallback={
                 <div className="p-6">

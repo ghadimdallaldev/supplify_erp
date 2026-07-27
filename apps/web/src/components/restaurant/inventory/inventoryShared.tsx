@@ -67,9 +67,11 @@ export function getMovementTypeText(typeLabel: string) {
   return typeLabel === 'WASTE' ? 'Wastage' : typeLabel === 'SPOIL' ? 'Spoilage' : typeLabel
 }
 
-export function getStockStatus(quantity: number, threshold: number) {
-  if (quantity === 0) return 'OUT_OF_STOCK'
-  if (threshold && quantity <= threshold) return 'LOW_STOCK'
+export function getStockStatus(quantity: number | string, threshold: number | string) {
+  const qty = Number(quantity) || 0
+  const thresh = Number(threshold) || 0
+  if (qty === 0) return 'OUT_OF_STOCK'
+  if (thresh && qty <= thresh) return 'LOW_STOCK'
   return 'IN_STOCK'
 }
 

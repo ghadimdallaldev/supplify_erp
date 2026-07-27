@@ -101,6 +101,11 @@ function validateProdRules(issues) {
   if (config.PAYMENTS_MODE === 'mock') {
     issues.push('PAYMENTS_MODE=mock is not allowed in production')
   }
+  if (config.PAYMENTS_MODE === 'live' && config.BILLING_GATEWAY === 'stub') {
+    issues.push(
+      'BILLING_GATEWAY=stub is not allowed with PAYMENTS_MODE=live — set BILLING_GATEWAY=manual for pilot or register a live PSP'
+    )
+  }
   if (config.STORAGE_DRIVER === 'local') {
     issues.push(
       'STORAGE_DRIVER=local is not allowed in production — use s3-compatible external storage'

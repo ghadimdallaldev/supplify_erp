@@ -144,7 +144,7 @@ export function Sidebar({
       data-testid="sidebar"
       aria-label={t('sidebar.mainNavAriaLabel')}
       className={[
-        'flex flex-col border-e border-[var(--app-border)]/40 bg-[var(--surface)] font-sans',
+        'flex flex-col border-e border-[var(--app-border)] bg-[var(--surface)] font-sans',
         'h-screen overflow-y-auto',
         'fixed inset-y-0 start-0 z-50 w-[min(100vw-3rem,14rem)] lg:sticky lg:w-52 lg:translate-x-0 xl:w-56',
         'transition-transform duration-200',
@@ -152,12 +152,12 @@ export function Sidebar({
       ].join(' ')}
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
-      <div className="shrink-0 border-b border-[var(--app-border)]/40 px-3.5 py-3.5">
+      <div className="shrink-0 border-b border-[var(--app-border)] px-3.5 py-3">
         <SupplifyLogo size={34} variant="lockup" theme="light" tagline={true} />
       </div>
 
       <nav
-        style={{ flex: 1, padding: '6px 10px', display: 'flex', flexDirection: 'column' }}
+        style={{ flex: 1, padding: '8px 10px', display: 'flex', flexDirection: 'column' }}
         aria-label={t('sidebar.sectionsAriaLabel')}
       >
         {sections.map((section) => (
@@ -171,23 +171,24 @@ export function Sidebar({
         ))}
       </nav>
 
-      <div className="border-t border-[var(--app-border)]/40 p-3 lg:hidden [&>div]:max-w-none [&>div]:w-full [&_select]:max-w-none">
+      <div className="border-t border-[var(--app-border)] p-3 lg:hidden [&>div]:max-w-none [&>div]:w-full [&_select]:max-w-none">
         <BranchSwitcher />
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 border-t border-[var(--app-border)]/40 px-3.5 py-2.5">
+      <div className="flex shrink-0 items-center gap-2 border-t border-[var(--app-border)] px-3.5 py-2.5">
         <div
           style={{
             width: 32,
             height: 32,
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--brand), var(--mint-mid))',
+            borderRadius: 6,
+            border: '1px solid var(--app-border-mid)',
+            background: 'var(--app-bg-subtle)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: 11,
             fontWeight: 700,
-            color: '#fff',
+            color: 'var(--text-mid)',
             flexShrink: 0,
           }}
         >
@@ -211,10 +212,10 @@ export function Sidebar({
         {planLabel && (
           <span
             className={cn(
-              'shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide',
+              'shrink-0 rounded-md border px-1.5 py-0.5 text-[9px] font-semibold uppercase',
               planCode === 'free'
-                ? 'bg-[var(--amber-pale)] text-[var(--amber)]'
-                : 'bg-[var(--brand-pale)] text-[var(--brand-mid)]'
+                ? 'border-[var(--amber-mid)]/40 bg-[var(--amber-pale)] text-[var(--amber)]'
+                : 'border-[var(--app-border)] bg-[var(--app-bg-subtle)] text-[var(--text-mid)]'
             )}
           >
             {formatPlanDisplayName(planCode, planLabel)}

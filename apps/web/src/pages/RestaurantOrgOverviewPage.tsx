@@ -25,10 +25,13 @@ function formatMoney(n: number) {
 }
 
 function hasCentralPurchasing(
-  entitlements: {
-    features?: Record<string, unknown>
-    planFeatures?: Record<string, unknown>
-  } | null
+  entitlements:
+    | {
+        features?: Record<string, unknown>
+        planFeatures?: Record<string, unknown>
+      }
+    | null
+    | undefined
 ) {
   const v = entitlements?.features?.multi_branch ?? entitlements?.planFeatures?.multi_branch
   return v === 'central_purchasing'
@@ -157,7 +160,7 @@ export function RestaurantOrgOverviewPage() {
                     orders: Number(branch.orders_this_month ?? 0),
                   })}
                   {spendById.has(String(branch.id))
-                    ? ` · ${formatMoney(spendById.get(String(branch.id)) || 0)} spend`
+                    ? ` · ${formatMoney(Number(spendById.get(String(branch.id)) ?? 0))} spend`
                     : ''}
                 </p>
               </div>

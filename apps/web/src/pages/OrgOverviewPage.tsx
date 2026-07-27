@@ -172,7 +172,7 @@ export function OrgOverviewPage() {
                         orders: b.order_count ?? 0,
                       })}
                       {spendById.has(b.id)
-                        ? ` · ${formatMoney(spendById.get(b.id) || 0)} revenue`
+                        ? ` · ${formatMoney(Number(spendById.get(b.id) ?? 0))} revenue`
                         : ''}
                     </p>
                     <div className="flex flex-wrap gap-3 mt-3 text-sm">
