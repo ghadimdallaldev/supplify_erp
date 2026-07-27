@@ -63,7 +63,7 @@ import {
   scheduleOrderPlacedNotification,
   handleOrderDelivery,
 } from './orders.helpers.js'
-import { invalidateOrdersCalendarCacheForTenants } from '../../lib/orders-calendar-cache.js'
+import { scheduleOrdersCalendarCacheInvalidation } from '../../lib/orders-calendar-cache.js'
 
 const router = express.Router()
 
@@ -351,7 +351,7 @@ router.patch('/:id', async (req, res) => {
     }
 
     if (updateData.status && updateData.status !== order.status) {
-      await invalidateOrdersCalendarCacheForTenants([rows[0].restaurant_id, order.supplier_id], {
+      scheduleOrdersCalendarCacheInvalidation([rows[0].restaurant_id, order.supplier_id], {
         reason: 'order.updated',
         requestId: req.requestId,
       })

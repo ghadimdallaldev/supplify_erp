@@ -4,7 +4,7 @@ import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { canViewSupplierGrowth } from '../lib/tenantRoles'
 import { useImpersonation } from '../hooks/useImpersonation'
-import { useGetEntitlementsQuery, useGetDashboardStatsQuery } from '../services/api'
+import { useGetEntitlementsQuery, useGetDashboardSummaryQuery } from '../services/api'
 import { canUseSupplierGrowth } from '../lib/planFeatureGates'
 import { isNavItemActive } from './sidebar/sidebarNavConfig'
 import { StatusDot } from './ui/status-badge'
@@ -42,10 +42,12 @@ export function SupplierMobileNav() {
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: !shouldLoadTenantEntitlements,
   })
-  const { data: statsData } = useGetDashboardStatsQuery(undefined, {
+  const { data: summaryData } = useGetDashboardSummaryQuery(undefined, {
     skip: !isEffectiveSupplier,
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
   })
-  const pendingOrders = Number(statsData?.pendingOrders) || 0
+  const pendingOrders = Number(summaryData?.stats?.pendingOrders) || 0
 
   if (!isEffectiveSupplier) return null
 

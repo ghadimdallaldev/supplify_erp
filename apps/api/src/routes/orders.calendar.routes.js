@@ -13,6 +13,31 @@ import { getCache, setCache } from '../lib/cache.js'
 
 const router = express.Router()
 
+/** Schema probe is process-lifetime — migrations don't change mid-process. */
+let customerOrderHasBranchIdPromise = null
+
+async function customerOrderHasBranchId() {
+  if (!customerOrderHasBranchIdPromise) {
+    customerOrderHasBranchIdPromise = query(
+      `
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'customer_order'
+            AND column_name = 'branch_id'
+        ) AS exists
+      `
+    ).then((result) => result.rows[0]?.exists === true)
+  }
+  return customerOrderHasBranchIdPromise
+}
+
+/** Test-only: clear schema probe cache between cases. */
+function __resetOrdersCalendarSchemaCacheForTests() {
+  customerOrderHasBranchIdPromise = null
+}
+
 const calendarQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   pageSize: z.coerce.number().min(1).max(200).default(100),
@@ -207,31 +232,6 @@ router.get(
       const startDate = params.start ? new Date(params.start) : null
       const endDate = params.end ? new Date(params.end) : null
 
-      const { rows: branchColumnRows } = await query(
-        `
-        SELECT EXISTS (
-          SELECT 1
-          FROM information_schema.columns
-          WHERE table_name = 'customer_order'
-            AND column_name = 'branch_id'
-        ) AS exists
-      `
-      )
-
-      const hasBranchColumn = branchColumnRows[0]?.exists === true
-
-      if (params.branch && !hasBranchColumn) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'UNSUPPORTED_FILTER',
-            message: 'Branch filtering is unavailable in this environment',
-          },
-          requestId: req.requestId,
-        })
-      }
-
       const cacheKey = `orders-calendar:${tenant.id}:${effectiveRole}:${JSON.stringify({
         page: params.page,
         pageSize: params.pageSize,
@@ -249,6 +249,20 @@ router.get(
           ok: true,
           data: cached,
           error: null,
+          requestId: req.requestId,
+        })
+      }
+
+      const hasBranchColumn = await customerOrderHasBranchId()
+
+      if (params.branch && !hasBranchColumn) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'UNSUPPORTED_FILTER',
+            message: 'Branch filtering is unavailable in this environment',
+          },
           requestId: req.requestId,
         })
       }
@@ -617,4 +631,4 @@ router.get(
   }
 )
 
-export { router as ordersCalendarRoutes }
+export { router as ordersCalendarRoutes, __resetOrdersCalendarSchemaCacheForTests }

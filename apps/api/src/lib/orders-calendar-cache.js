@@ -41,3 +41,8 @@ export async function invalidateOrdersCalendarCacheForTenants(
 
   return normalizedTenantIds.length
 }
+
+/** Fire-and-forget invalidation so order/invoice writes are not blocked on Redis SCAN. */
+export function scheduleOrdersCalendarCacheInvalidation(tenantIds, meta = {}) {
+  void invalidateOrdersCalendarCacheForTenants(tenantIds, meta)
+}
