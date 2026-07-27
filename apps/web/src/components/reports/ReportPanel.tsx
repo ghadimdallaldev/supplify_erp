@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react'
+import type { ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Download, AlertCircle, BarChart3 } from 'lucide-react'
 import { Button } from '../ui/button'
@@ -25,6 +26,12 @@ import {
   type ReportDef,
 } from './reportSummary'
 import { ensureNamespace } from '../../i18n'
+
+const ChartXAxis = XAxis as unknown as ComponentType<any>
+const ChartYAxis = YAxis as unknown as ComponentType<any>
+const ChartTooltip = Tooltip as unknown as ComponentType<any>
+const ChartLine = Line as unknown as ComponentType<any>
+const ChartBar = Bar as unknown as ComponentType<any>
 
 const CHART_GRID = 'var(--app-border)'
 const CHART_BRAND = 'var(--brand-mid)'
@@ -146,19 +153,19 @@ export function ReportPanel({
                 {def.chart === 'line' ? (
                   <LineChart data={chartData}>
                     <CartesianGrid stroke={CHART_GRID} strokeDasharray="3 3" vertical={false} />
-                    <XAxis
+                    <ChartXAxis
                       dataKey="name"
                       tick={{ fontSize: 11, fill: CHART_MUTED }}
                       axisLine={{ stroke: CHART_GRID }}
                       tickLine={false}
                     />
-                    <YAxis
+                    <ChartYAxis
                       tick={{ fontSize: 11, fill: CHART_MUTED }}
                       axisLine={false}
                       tickLine={false}
                       width={48}
                     />
-                    <Tooltip
+                    <ChartTooltip
                       contentStyle={{
                         borderRadius: 8,
                         border: '1px solid var(--app-border)',
@@ -166,7 +173,7 @@ export function ReportPanel({
                         fontSize: 12,
                       }}
                     />
-                    <Line
+                    <ChartLine
                       type="monotone"
                       dataKey="value"
                       stroke={CHART_BRAND}
@@ -178,19 +185,19 @@ export function ReportPanel({
                 ) : (
                   <BarChart data={chartData} barCategoryGap="20%">
                     <CartesianGrid stroke={CHART_GRID} strokeDasharray="3 3" vertical={false} />
-                    <XAxis
+                    <ChartXAxis
                       dataKey="name"
                       tick={{ fontSize: 11, fill: CHART_MUTED }}
                       axisLine={{ stroke: CHART_GRID }}
                       tickLine={false}
                     />
-                    <YAxis
+                    <ChartYAxis
                       tick={{ fontSize: 11, fill: CHART_MUTED }}
                       axisLine={false}
                       tickLine={false}
                       width={48}
                     />
-                    <Tooltip
+                    <ChartTooltip
                       contentStyle={{
                         borderRadius: 8,
                         border: '1px solid var(--app-border)',
@@ -198,7 +205,12 @@ export function ReportPanel({
                         fontSize: 12,
                       }}
                     />
-                    <Bar dataKey="value" fill={CHART_BRAND} radius={[4, 4, 0, 0]} maxBarSize={48} />
+                    <ChartBar
+                      dataKey="value"
+                      fill={CHART_BRAND}
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={48}
+                    />
                   </BarChart>
                 )}
               </ResponsiveContainer>

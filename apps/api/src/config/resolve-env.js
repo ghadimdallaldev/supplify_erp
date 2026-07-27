@@ -35,9 +35,24 @@ export function resolvePaymentsMode(appEnv, nodeEnv) {
 }
 
 export function resolveBillingGatewayId(paymentsMode) {
-  if (process.env.BILLING_GATEWAY) return process.env.BILLING_GATEWAY
+  if (process.env.BILLING_GATEWAY) return process.env.BILLING_GATEWAY.trim().toLowerCase()
   if (paymentsMode === 'mock' || paymentsMode === 'test') return 'stub'
-  return process.env.PAYMENTS_PROVIDER?.trim() || 'stub'
+  // live (and unknown): never silently auto-charge via stub — require explicit gateway
+  return process.env.PAYMENTS_PROVIDER?.trim().toLowerCase() || 'manual'
+}
+
+/**
+ * Fail closed: stub gateway must not run when PAYMENTS_MODE=live.
+ * @param {{ paymentsMode: string, billingGateway: string }} opts
+ * @returns {string|null} error message or null if ok
+ */
+export function validateBillingGatewayPaymentsMode({ paymentsMode, billingGateway }) {
+  const mode = String(paymentsMode || '').toLowerCase()
+  const gateway = String(billingGateway || '').toLowerCase()
+  if (mode === 'live' && gateway === 'stub') {
+    return 'BILLING_GATEWAY=stub is not allowed with PAYMENTS_MODE=live (use manual for pilot, or a real PSP gateway)'
+  }
+  return null
 }
 
 /**

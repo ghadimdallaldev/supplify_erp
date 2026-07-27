@@ -5,13 +5,13 @@ import { cn } from '../../lib/utils'
 
 export type KpiTone = 'brand' | 'success' | 'warning' | 'danger' | 'neutral' | 'info'
 
-const toneStyles: Record<KpiTone, { bg: string; icon: string }> = {
-  brand: { bg: 'var(--brand-ultra)', icon: 'var(--brand)' },
-  success: { bg: 'var(--mint-pale)', icon: 'var(--mint)' },
-  warning: { bg: 'var(--amber-pale)', icon: 'var(--amber)' },
-  danger: { bg: 'var(--red-pale)', icon: 'var(--red)' },
-  neutral: { bg: 'var(--app-bg-subtle)', icon: 'var(--text-muted)' },
-  info: { bg: '#eff6ff', icon: '#2563eb' },
+const toneStyles: Record<KpiTone, { accent: string; icon: string }> = {
+  brand: { accent: 'var(--brand)', icon: 'var(--brand)' },
+  success: { accent: 'var(--mint)', icon: 'var(--mint)' },
+  warning: { accent: 'var(--amber)', icon: 'var(--amber)' },
+  danger: { accent: 'var(--red)', icon: 'var(--red)' },
+  neutral: { accent: 'var(--app-border-mid)', icon: 'var(--text-muted)' },
+  info: { accent: '#2563eb', icon: '#2563eb' },
 }
 
 export function KpiCard({
@@ -41,13 +41,20 @@ export function KpiCard({
   const trendContent = trend ?? sparkline
   return (
     <Card
-      className={cn('kpi-card', size === 'sm' ? 'p-3 sm:p-3.5' : 'p-3.5 xl:p-5', className)}
+      className={cn(
+        'kpi-card border-l-[3px]',
+        size === 'sm' ? 'p-3 sm:p-3.5' : 'p-3.5 xl:p-5',
+        className
+      )}
       data-testid={testId}
+      style={{ borderLeftColor: styles.accent }}
     >
       <div className="mb-2.5 flex items-center gap-2.5 xl:mb-3">
         <div
-          className={cn('rounded-lg', size === 'sm' ? 'p-1.5' : 'p-2')}
-          style={{ background: styles.bg }}
+          className={cn(
+            'rounded-md border border-[var(--app-border)] bg-[var(--app-bg-subtle)]',
+            size === 'sm' ? 'p-1.5' : 'p-2'
+          )}
         >
           <Icon
             className={cn(size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4')}
@@ -55,12 +62,14 @@ export function KpiCard({
             aria-hidden
           />
         </div>
-        <span className="text-xs font-medium leading-snug text-[var(--text-mid)]">{label}</span>
+        <span className="text-[11px] font-semibold uppercase leading-snug text-[var(--text-muted)]">
+          {label}
+        </span>
       </div>
       <p
         className={cn(
-          'font-bold tabular-nums leading-none tracking-tight text-[var(--text)]',
-          size === 'sm' ? 'text-lg sm:text-xl' : 'text-2xl xl:text-[1.75rem]'
+          'font-semibold tabular-nums leading-none text-[var(--text)]',
+          size === 'sm' ? 'text-lg sm:text-xl' : 'text-xl xl:text-2xl'
         )}
       >
         {value}

@@ -400,7 +400,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                   />
                 ) : (
                   <>
-                    <div className="mb-4 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4">
+                    <div className="mb-4 rounded-md border border-[var(--app-border)] bg-[var(--surface)] p-4">
                       <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                         <Filter className="h-3.5 w-3.5" />
                         Filter errors

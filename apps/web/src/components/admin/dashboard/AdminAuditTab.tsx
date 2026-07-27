@@ -37,7 +37,7 @@ type AuditLog = {
 const ACTION_BADGE_TONES: Record<string, string> = {
   subscription: 'bg-[var(--brand-pale)] text-[var(--brand)] border-[var(--brand)]/20',
   plan: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  impersonation: 'bg-violet-50 text-violet-700 border-violet-200',
+  impersonation: 'bg-[var(--app-bg-subtle)] text-[var(--text)] border-[var(--app-border-mid)]',
   override: 'bg-amber-50 text-amber-800 border-amber-200',
   feature_flag: 'bg-cyan-50 text-cyan-800 border-cyan-200',
   tenant: 'bg-sky-50 text-sky-800 border-sky-200',
@@ -141,7 +141,7 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
         }
       />
 
-      <div className="mb-4 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4">
+      <div className="mb-4 rounded-md border border-[var(--app-border)] bg-[var(--surface)] p-4">
         <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
           <Filter className="h-3.5 w-3.5" />
           Filters

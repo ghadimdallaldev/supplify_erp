@@ -86,21 +86,7 @@ export function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left side - Branding and Features */}
-      <div
-        className="relative hidden lg:flex lg:flex-1 text-white p-12 flex-col justify-between overflow-hidden"
-        style={{ background: 'linear-gradient(145deg, #5b21b6 0%, #4c1d95 50%, #1e0b3a 100%)' }}
-      >
-        {/* Ambient depth glows */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(167,139,250,0.28), transparent 70%)' }}
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -bottom-32 -left-16 h-96 w-96 rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.18), transparent 70%)' }}
-        />
+      <div className="relative hidden flex-col justify-between overflow-hidden bg-[#103f46] p-12 text-white lg:flex lg:flex-1">
         <div>
           <div className="mb-10">
             <SupplifyLogo size={48} variant="lockup" theme="dark" tagline={true} />
@@ -109,8 +95,8 @@ export function LoginPage() {
           <h2
             style={{
               fontSize: 40,
-              fontWeight: 900,
-              letterSpacing: '-0.03em',
+              fontWeight: 700,
+              letterSpacing: 0,
               marginBottom: 16,
               lineHeight: 1.1,
             }}
@@ -139,14 +125,13 @@ export function LoginPage() {
               key={idx}
               className="hover-lift"
               style={{
-                background: 'rgba(255,255,255,0.08)',
-                backdropFilter: 'blur(8px)',
-                borderRadius: 12,
+                background: 'rgba(255,255,255,0.06)',
+                borderRadius: 6,
                 padding: '14px 16px',
-                border: '1px solid rgba(255,255,255,0.12)',
+                border: '1px solid rgba(255,255,255,0.16)',
               }}
             >
-              <feature.icon style={{ width: 20, height: 20, marginBottom: 8, color: '#a78bfa' }} />
+              <feature.icon style={{ width: 20, height: 20, marginBottom: 8, color: '#67e8f9' }} />
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 3 }}>{feature.title}</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>{feature.desc}</div>
             </div>
@@ -184,7 +169,7 @@ export function LoginPage() {
             className="animate-rise-in"
             style={{
               border: '1px solid var(--app-border)',
-              boxShadow: '0 8px 32px rgba(91,33,182,0.10)',
+              boxShadow: '0 10px 30px rgba(15,23,42,0.08)',
             }}
           >
             <CardHeader className="space-y-1 pb-4">

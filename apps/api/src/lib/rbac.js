@@ -16,6 +16,7 @@ import {
   getImpersonationEffectivePermissions,
   isImpersonating,
 } from './impersonation.js'
+import { assertImpersonationAllowsMutation } from './impersonation-guards.js'
 import {
   getActiveTenantFromRequest,
   getPrimaryTenantForUser,
@@ -303,6 +304,7 @@ export async function requireAuth(req, res, next) {
         return res.status(staffPortalBlock.status).json(staffPortalBlock.body)
       }
       mark(req, 'auth')
+      if (await assertImpersonationAllowsMutation(req, res)) return
       next()
     } catch (error) {
       logger.debug('Token verification failed, attempting refresh')
@@ -389,6 +391,7 @@ export async function requireAuth(req, res, next) {
         return res.status(staffPortalBlock.status).json(staffPortalBlock.body)
       }
       mark(req, 'auth')
+      if (await assertImpersonationAllowsMutation(req, res)) return
       next()
     }
   } catch (error) {

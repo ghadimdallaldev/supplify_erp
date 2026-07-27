@@ -37,7 +37,7 @@ type TenantRevenueRow = {
 
 function tenantTypeTone(type?: string): string {
   return type === 'SUPPLIER'
-    ? 'bg-violet-50 text-violet-700 border-violet-200'
+    ? 'bg-[var(--app-bg-subtle)] text-[var(--text)] border-[var(--app-border-mid)]'
     : 'bg-sky-50 text-sky-800 border-sky-200'
 }
 
@@ -250,7 +250,7 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
                   {overdueTenants.map((tenant, i) => (
                     <article
                       key={`${tenant.tenant_id}-${i}-card`}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-[var(--app-border)] p-4"
+                      className="flex items-center justify-between gap-3 rounded-md border border-[var(--app-border)] p-4"
                     >
                       <div>
                         <span className="font-mono text-xs text-[var(--text)]">

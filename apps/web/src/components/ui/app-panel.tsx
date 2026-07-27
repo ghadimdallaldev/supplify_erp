@@ -24,16 +24,16 @@ export function AppPanel({
     <section
       data-testid={testId}
       className={cn(
-        'overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]',
+        'overflow-hidden rounded-md border border-[var(--app-border)] bg-[var(--surface)] shadow-[0_1px_2px_rgba(15,23,42,0.04)]',
         className
       )}
     >
-      <header className="border-b border-[var(--app-border)] px-4 py-3 sm:px-5">
+      <header className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)] px-4 py-3 sm:px-5">
         <div
           className={cn('flex items-center justify-between gap-3', description && 'items-start')}
         >
           <div className="min-w-0">
-            <h2 className={cn('text-base font-medium text-[var(--text)]', titleClassName)}>
+            <h2 className={cn('text-sm font-semibold text-[var(--text)]', titleClassName)}>
               {title}
             </h2>
             {description ? (
@@ -146,7 +146,7 @@ export function SummaryStrip({
     <section
       data-testid={testId}
       className={cn(
-        'overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--surface)]',
+        'overflow-hidden rounded-md border border-[var(--app-border)] bg-[var(--surface)] shadow-[0_1px_2px_rgba(15,23,42,0.04)]',
         className
       )}
     >

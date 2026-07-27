@@ -117,13 +117,11 @@ export function SponsorshipOffersPanel() {
                         setPlanByOffer((prev) => ({ ...prev, [offer.id]: e.target.value }))
                       }
                     >
-                      {restaurantPlans.map(
-                        (p: { id: string; name: string; price_per_month: number }) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} — ${Number(p.price_per_month).toFixed(2)}/mo
-                          </option>
-                        )
-                      )}
+                      {restaurantPlans.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} — ${Number(p.price_per_month).toFixed(2)}/mo
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <p className="text-sm text-[var(--text)]">
