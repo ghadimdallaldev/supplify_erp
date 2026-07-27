@@ -1,7 +1,10 @@
 import express from 'express'
 import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ordersCalendarRoutes } from './orders.calendar.routes.js'
+import {
+  ordersCalendarRoutes,
+  __resetOrdersCalendarSchemaCacheForTests,
+} from './orders.calendar.routes.js'
 
 const mockUser = {
   id: 'user-1',
@@ -62,6 +65,7 @@ describe('orders.calendar.routes', () => {
     queryMock.mockReset()
     getCacheMock.mockReset()
     setCacheMock.mockReset()
+    __resetOrdersCalendarSchemaCacheForTests()
     mockUser.role = 'RESTAURANT'
     mockUser.email = 'orders@goldenfork.com'
 
@@ -175,7 +179,7 @@ describe('orders.calendar.routes', () => {
     expect(response.body.ok).toBe(true)
     expect(response.body.data).toEqual(cachedData)
     expect(setCacheMock).not.toHaveBeenCalled()
-    expect(queryMock).toHaveBeenCalledTimes(1)
+    expect(queryMock).not.toHaveBeenCalled()
   })
 
   it('filters events by status for supplier users', async () => {

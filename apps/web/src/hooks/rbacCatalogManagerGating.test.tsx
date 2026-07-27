@@ -53,7 +53,7 @@ vi.mock('../services/api', () => ({
   useGetEntitlementsQuery: () => ({
     data: { entitlements: { plan: { code: 'gold' }, features: {} } },
   }),
-  useGetDashboardStatsQuery: () => ({ data: {} }),
+  useGetDashboardSummaryQuery: () => ({ data: { stats: {} } }),
   useGetDisputesQuery: () => ({ data: { disputes: [] } }),
   useGetIncomingDisputesQuery: () => ({ data: { disputes: [] } }),
 }))

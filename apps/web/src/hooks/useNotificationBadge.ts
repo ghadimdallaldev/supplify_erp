@@ -5,11 +5,17 @@ import { getAppSocket } from '../lib/appSocket'
 
 const UNREAD_POLL_CONNECTED_MS = 60_000
 
+type UseNotificationBadgeOptions = {
+  /** When false, skip the full notifications list (sidebar badge only). */
+  includeList?: boolean
+}
+
 /**
- * Badge + dropdown list. When the socket is connected, unread count comes from the
+ * Badge + optional dropdown list. When the socket is connected, unread count comes from the
  * lightweight /unread-count endpoint; the full list stays in RTK cache for the dropdown.
  */
-export function useNotificationBadge() {
+export function useNotificationBadge(options: UseNotificationBadgeOptions = {}) {
+  const includeList = options.includeList !== false
   const { user } = useAppSelector((state) => state.auth)
   const [socketConnected, setSocketConnected] = useState(false)
 
@@ -44,7 +50,7 @@ export function useNotificationBadge() {
   const { data: notificationsData } = useGetNotificationsQuery(
     { limit: 25, offset: 0 },
     {
-      skip: !user,
+      skip: !user || !includeList,
       refetchOnFocus: false,
       refetchOnReconnect: false,
       refetchOnMountOrArgChange: false,
@@ -54,7 +60,9 @@ export function useNotificationBadge() {
   const notifications = notificationsData?.notifications ?? []
   const unreadCount = socketConnected
     ? (unreadData?.unreadCount ?? 0)
-    : notifications.filter((n: { is_read?: boolean }) => !n.is_read).length
+    : includeList
+      ? notifications.filter((n: { is_read?: boolean }) => !n.is_read).length
+      : (unreadData?.unreadCount ?? 0)
 
   return { notifications, unreadCount }
 }

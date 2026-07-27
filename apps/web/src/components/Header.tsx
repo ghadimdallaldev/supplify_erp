@@ -160,7 +160,9 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
     })
   }
 
-  const { notifications, unreadCount } = useNotificationBadge()
+  const { notifications, unreadCount } = useNotificationBadge({
+    includeList: notificationsMounted,
+  })
 
   const handleLogout = async () => {
     try {

@@ -63,7 +63,7 @@ import {
 } from './orders.helpers.js'
 import {
   collectOrdersCalendarTenantIdsFromOrder,
-  invalidateOrdersCalendarCacheForTenants,
+  scheduleOrdersCalendarCacheInvalidation,
 } from '../../lib/orders-calendar-cache.js'
 
 const router = express.Router()
@@ -465,7 +465,7 @@ router.post(
       orderCreateTimings.notificationScheduleMs = elapsedMsSince(phaseStart)
       orderCreateTimings.notificationsScheduled = notificationsScheduled
 
-      await invalidateOrdersCalendarCacheForTenants(
+      scheduleOrdersCalendarCacheInvalidation(
         result.flatMap((order) => collectOrdersCalendarTenantIdsFromOrder(order)),
         { reason: 'order.created', requestId: req.requestId }
       )
@@ -735,13 +735,10 @@ router.post(
         actor: req.userData.id,
       })
 
-      await invalidateOrdersCalendarCacheForTenants(
-        collectOrdersCalendarTenantIdsFromOrder(result),
-        {
-          reason: 'order.manual_created',
-          requestId: req.requestId,
-        }
-      )
+      scheduleOrdersCalendarCacheInvalidation(collectOrdersCalendarTenantIdsFromOrder(result), {
+        reason: 'order.manual_created',
+        requestId: req.requestId,
+      })
 
       res.status(201).json({
         ok: true,
