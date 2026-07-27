@@ -5,7 +5,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { useNotificationBadge } from '../hooks/useNotificationBadge'
 import {
-  useGetDashboardStatsQuery,
+  useGetDashboardSummaryQuery,
   useGetEntitlementsQuery,
   useGetDisputesQuery,
   useGetIncomingDisputesQuery,
@@ -52,10 +52,13 @@ export function Sidebar({
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: !shouldLoadTenantEntitlements,
   })
-  const { data: statsData } = useGetDashboardStatsQuery(undefined, {
-    skip: (isPlatformAdmin && !isImpersonating) || isDriverRole,
+  const skipNavBadges = (isPlatformAdmin && !isImpersonating) || isDriverRole
+  const { data: summaryData } = useGetDashboardSummaryQuery(undefined, {
+    skip: skipNavBadges,
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
   })
-  const { unreadCount: notificationUnreadCount } = useNotificationBadge()
+  const { unreadCount: notificationUnreadCount } = useNotificationBadge({ includeList: false })
 
   const hasAdminNavAccess = isPlatformAdmin && !isImpersonating
   const isSupplier = isEffectiveSupplier
@@ -63,7 +66,7 @@ export function Sidebar({
   const impersonatingRestaurant = isImpersonating && isEffectiveRestaurant
   const impersonatingSupplier = isImpersonating && isEffectiveSupplier
 
-  const pendingOrders = Number(statsData?.pendingOrders) || 0
+  const pendingOrders = Number(summaryData?.stats?.pendingOrders) || 0
   const unreadCount = notificationUnreadCount
   const planLabel = entitlementsData?.entitlements?.plan?.name ?? ''
   const planCode = (entitlementsData?.entitlements?.plan?.code ?? 'free').toLowerCase()
@@ -77,15 +80,16 @@ export function Sidebar({
     entitlementsData?.entitlements,
     'disputes_returns'
   )
+  // Badge only — no polling. Disputes pages own live refresh.
   const { data: restaurantDisputesData } = useGetDisputesQuery(undefined, {
     skip: !disputesEnabled || isSupplier || !user,
-    pollingInterval: 60_000,
-    skipPollingIfUnfocused: true,
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
   })
   const { data: supplierDisputesData } = useGetIncomingDisputesQuery(undefined, {
     skip: !disputesEnabled || !isSupplier || !user || isDriverRole || !can('FULFILLMENT_VIEW'),
-    pollingInterval: 60_000,
-    skipPollingIfUnfocused: true,
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
   })
   const activeDisputeCount = countActiveDisputes(
     (isSupplier ? supplierDisputesData?.disputes : restaurantDisputesData?.disputes) ?? []

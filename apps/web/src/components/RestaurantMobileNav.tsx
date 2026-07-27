@@ -5,7 +5,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { useAppSelector } from '../hooks/redux'
-import { useGetDashboardStatsQuery } from '../services/api'
+import { useGetDashboardSummaryQuery } from '../services/api'
 import { StatusDot } from './ui/status-badge'
 import type { StatusTone } from './ui/status-badge'
 import { cn } from '../lib/utils'
@@ -46,10 +46,12 @@ export function RestaurantMobileNav() {
   const { isEffectiveRestaurant } = useImpersonation()
   const { persona } = useWorkspaceRole()
   const cartItemCount = useAppSelector((state) => state.cart.items.length)
-  const { data: statsData } = useGetDashboardStatsQuery(undefined, {
+  const { data: summaryData } = useGetDashboardSummaryQuery(undefined, {
     skip: !isEffectiveRestaurant,
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
   })
-  const pendingOrders = Number(statsData?.pendingOrders) || 0
+  const pendingOrders = Number(summaryData?.stats?.pendingOrders) || 0
 
   const isRestaurantUser = isEffectiveRestaurant
   if (!isRestaurantUser) return null

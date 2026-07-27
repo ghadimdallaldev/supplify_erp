@@ -50,33 +50,33 @@
 
 @layer base {
   :root {
-    /* shadcn / Tailwind - professional neutral shell with restrained teal accents */
-    --background: 210 20% 97%;
-    --foreground: 222 47% 11%;
+    /* shadcn / Tailwind — cool neutral shell + violet accents */
+    --background: 210 40% 98%;
+    --foreground: 266 69% 14%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 266 69% 14%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 190 84% 26%;
+    --popover-foreground: 266 69% 14%;
+    --primary: 262 68% 42%;
     --primary-foreground: 0 0% 100%;
     --secondary: 210 35% 96%;
-    --secondary-foreground: 215 25% 27%;
+    --secondary-foreground: 266 45% 28%;
     --muted: 210 30% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 25% 96%;
-    --accent-foreground: 222 47% 11%;
+    --muted-foreground: 258 18% 46%;
+    --accent: 262 55% 97%;
+    --accent-foreground: 266 69% 14%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 190 84% 32%;
+    --ring: 258 90% 60%;
     --radius: 0.5rem;
 
     /* Supplify brand tokens (hex) */
-    --brand: #155e75;
-    --brand-mid: #0f766e;
-    --brand-light: #67e8f9;
-    --brand-pale: #e0f2fe;
+    --brand: #5b21b6;
+    --brand-mid: #7c3aed;
+    --brand-light: #a78bfa;
+    --brand-pale: #ede9fe;
     /* Row hovers / subtle fills — neutral, not lavender */
     --brand-ultra: #f8fafc;
     --mint: #059669;
@@ -88,17 +88,18 @@
     --amber-pale: #fef3c7;
     --red: #dc2626;
     --red-pale: #fee2e2;
-    --bg: #f6f7f9;
+    --bg: #f1f5f9;
     --surface: #ffffff;
     --app-border: #e2e8f0;
-    --app-border-mid: #94a3b8;
-    --text: #111827;
-    --text-mid: #374151;
-    /* Secondary text clears WCAG AA on white and the neutral app background. */
-    --text-muted: #6b7280;
-    --app-bg-subtle: #f9fafb;
+    --app-border-mid: #cbd5e1;
+    --text: #1e0b3a;
+    --text-mid: #4a3570;
+    /* Secondary text. #74638f clears WCAG AA (4.5:1) on white (5.35:1) and on the
+       gray --bg (4.89:1); the previous #8b7aaa was ~3.84:1 and failed AA. */
+    --text-muted: #74638f;
+    --app-bg-subtle: #f8fafc;
     --surface-mid: #f1f5f9;
-    --sidebar-section: #64748b;
+    --sidebar-section: #c4b5fd;
 
     /* Layout contract — single source for page width & padding */
     --content-padding-x-mobile: 1rem;
@@ -975,9 +976,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .kpi-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 18px -8px rgba(15, 23, 42, 0.18);
-      border-color: var(--app-border-mid);
+      border-color: var(--brand-light);
     }
   }
 
@@ -997,25 +996,21 @@
     transition-duration: 0ms !important;
   }
 
-  /* Skeleton → content crossfade */
+  /* Skeleton → content crossfade (opacity only — blur forces expensive paint) */
   .content-reveal {
     opacity: 1;
-    filter: blur(0);
-    transition:
-      opacity var(--duration-ui) var(--ease-out),
-      filter var(--duration-ui) var(--ease-out);
+    transition: opacity var(--duration-ui) var(--ease-out);
   }
 
   @starting-style {
     .content-reveal {
       opacity: 0;
-      filter: blur(2px);
     }
   }
 
-  /* Smooth every data-table row hover (paint-only, no layout cost).
-     Scoped away from FullCalendar's internal tables. */
-  table:not(.fc-scrollgrid) tbody tr {
+  /* Row hover transition only on explicit data tables (not every table in the app). */
+  .table-scroll tbody tr,
+  .data-table tbody tr {
     transition: background-color 0.12s ease;
   }
 
@@ -1039,14 +1034,6 @@
     }
     .erp-pressable:active {
       transform: none;
-    }
-    .content-reveal {
-      filter: none;
-    }
-    @starting-style {
-      .content-reveal {
-        filter: none;
-      }
     }
   }
 
