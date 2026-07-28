@@ -138,7 +138,7 @@ export function ReorderAssistancePanel({
   >({})
   const recommendAttemptKey = useRef<string | null>(null)
 
-  const suggestions = data?.suggestions ?? []
+  const suggestions = useMemo(() => data?.suggestions ?? [], [data])
   const forecasts = data?.forecasts ?? []
   const visible = maxItems ? suggestions.slice(0, maxItems) : suggestions
   const canExplain = data?.smartReorder?.capabilities?.forecast === true

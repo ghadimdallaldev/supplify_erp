@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
@@ -33,7 +33,7 @@ export function CentralPurchasingPage() {
   const branches = (branchesData?.branches ?? []).filter(
     (b: { is_branch_active?: boolean }) => b.is_branch_active !== false
   )
-  const drafts = draftsData?.drafts ?? []
+  const drafts = useMemo(() => draftsData?.drafts ?? [], [draftsData])
 
   useEffect(() => {
     setSelected(

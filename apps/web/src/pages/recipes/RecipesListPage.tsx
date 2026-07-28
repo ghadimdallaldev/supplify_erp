@@ -88,7 +88,7 @@ export function RecipesListPage() {
   const [recalculate, { isLoading: recalculating }] = useRecalculateRecipeMutation()
   const [search, setSearch] = useState(filters.search || '')
 
-  const recipes = data?.recipes ?? []
+  const recipes = useMemo(() => data?.recipes ?? [], [data])
   const activeFilter = activeFilterFromParams(searchParams)
 
   const summary = useMemo(() => {

@@ -52,7 +52,8 @@ async function supplierHasPublicCatalog(supplierId) {
     [supplierId]
   )
   if (!rows.length) return false
-  return rows[0].public_catalog_enabled !== false
+  // Fail closed, matching public-supplier-catalog.service.js (`= true`).
+  return rows[0].public_catalog_enabled === true
 }
 
 async function restaurantHasCatalogAccess(restaurantId, supplierId) {

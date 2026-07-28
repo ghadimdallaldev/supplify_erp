@@ -31,6 +31,10 @@ const signupSchema = z.object({
   displayName: z.string().min(1).max(128).optional(),
   email: z.string().email().optional(),
   phone: z.string().max(32).optional(),
+  phoneCountryCode: z
+    .string()
+    .regex(/^\d{1,4}$/)
+    .optional(),
 })
 
 const loginSchema = z.object({
@@ -59,7 +63,12 @@ consumerAuthPublicRoutes.post('/signup', async (req, res) => {
     if (error.name === 'USERNAME_TAKEN' || error.name === 'EMAIL_TAKEN') {
       return jsonError(res, 409, error.name, error.message)
     }
-    if (error.name === 'INVALID_USERNAME' || error.name === 'INVALID_PASSWORD') {
+    if (
+      error.name === 'INVALID_USERNAME' ||
+      error.name === 'INVALID_PASSWORD' ||
+      error.name === 'INVALID_EMAIL' ||
+      error.name === 'INVALID_PHONE'
+    ) {
       return jsonError(res, 400, error.name, error.message)
     }
     logger.error('Consumer signup failed', { error: error.message })

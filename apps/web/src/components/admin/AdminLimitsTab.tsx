@@ -8,7 +8,6 @@ import { toast } from 'sonner'
 import { Filter, Loader2, Minus, Plus, RefreshCw, Search, X } from 'lucide-react'
 import { AppPanel, SummaryStrip } from '../ui/app-panel'
 import { TableScroll } from '../ui/table-scroll'
-import { responsiveDataListClasses } from '../ui/responsive-data-list'
 import {
   AdminEmptyState,
   AdminErrorState,

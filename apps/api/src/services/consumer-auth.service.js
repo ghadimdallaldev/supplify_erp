@@ -1,6 +1,11 @@
 import bcrypt from 'bcryptjs'
 import * as jose from 'jose'
 import { config } from '../config/env.js'
+import {
+  normalizeConsumerUsername,
+  normalizeIdentityEmail,
+  normalizePhoneE164,
+} from '../lib/identity-normalize.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 
@@ -130,24 +135,17 @@ async function awardWelcomeBonus(client, restaurantId, memberId) {
 }
 
 export async function signupConsumer(restaurantId, payload) {
-  const username = String(payload.username || '')
-    .trim()
-    .toLowerCase()
+  const username = normalizeConsumerUsername(payload.username)
   const password = String(payload.password || '')
   const displayName = String(payload.displayName || payload.display_name || username).trim()
-  const email = payload.email ? String(payload.email).trim().toLowerCase() : null
-  const phone = payload.phone ? String(payload.phone).trim() : null
+  const email = payload.email ? normalizeIdentityEmail(payload.email) : null
+  const phone = payload.phone
+    ? normalizePhoneE164(
+        payload.phone,
+        payload.phoneCountryCode || process.env.DEFAULT_PHONE_COUNTRY_CODE
+      )
+    : null
 
-  if (!username || username.length < 3 || username.length > 32) {
-    throw Object.assign(new Error('Username must be 3–32 characters'), {
-      name: 'INVALID_USERNAME',
-    })
-  }
-  if (!/^[a-z0-9_]+$/.test(username)) {
-    throw Object.assign(new Error('Username must be alphanumeric'), {
-      name: 'INVALID_USERNAME',
-    })
-  }
   if (password.length < 6) {
     throw Object.assign(new Error('Password must be at least 6 characters'), {
       name: 'INVALID_PASSWORD',
@@ -204,9 +202,7 @@ export async function signupConsumer(restaurantId, payload) {
 }
 
 export async function loginConsumer(restaurantId, payload) {
-  const username = String(payload.username || '')
-    .trim()
-    .toLowerCase()
+  const username = normalizeConsumerUsername(payload.username)
   const password = String(payload.password || '')
 
   if (!username || !password) {
