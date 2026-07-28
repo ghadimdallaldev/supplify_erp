@@ -10,6 +10,10 @@ export class LoginPage extends BasePage {
     await this.page.goto('/login', { waitUntil: 'domcontentloaded' })
   }
 
+  async goto(): Promise<void> {
+    await this.goToLogin()
+  }
+
   get loginButton() {
     return this.getByTestId('login-button')
   }

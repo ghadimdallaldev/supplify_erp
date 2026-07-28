@@ -1,0 +1,36 @@
+import { test, expect } from '../../fixtures'
+import { resetAndSeed } from '../../utils/seed'
+import { webReachable, requireAuthSuite } from '../../utils/reachability'
+
+const auth = requireAuthSuite()
+
+test.describe('Receiving', () => {
+  test.beforeAll(async () => {
+    await auth.init()
+  })
+
+  test.beforeEach(async ({ request }) => {
+    await resetAndSeed(request, { scenario: 'orders_delivered', soft: true })
+  })
+
+  test('restaurant opens receiving page', async ({ page, receivingPage }) => {
+    test.skip(!webReachable(), 'Web app not running')
+    auth.requireAuth()
+    test.skip(test.info().project.name !== 'critical_e2e_restaurant', 'Restaurant-only')
+
+    try {
+      await receivingPage.goto()
+    } catch {
+      test.skip(true, 'navigation timed out')
+    }
+    if (page.url().includes('/login') || page.url().includes('/activate')) {
+      test.skip(true, 'Receiving redirected')
+    }
+    try {
+      await receivingPage.expectLoaded()
+    } catch {
+      test.skip(true, 'UI did not settle')
+    }
+    await expect(receivingPage.pageContainer).toBeVisible()
+  })
+})

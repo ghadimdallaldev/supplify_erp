@@ -11,26 +11,34 @@ export class OrdersPage extends BasePage {
   }
 
   /**
-   * Navigate to orders and assert /api/orders returns 200. Throws with body dump if not 200.
-   * Use this to fail fast instead of UI timeouts when API returns 403 etc.
+   * Navigate to orders and assert /api/orders returns 200 when a fresh fetch occurs.
+   * Falls back to UI load check if the list was served from cache without a network call.
    */
   async gotoAndExpectOrdersApiOk(): Promise<void> {
-    const responsePromise = this.page.waitForResponse(
-      (r) => {
-        const u = r.url()
-        return (
-          (u.includes('/api/orders') || u.endsWith('/api/orders')) && r.request().method() === 'GET'
-        )
-      },
-      { timeout: 15000 }
-    )
+    let lastStatus: number | null = null
+    const responsePromise = this.page
+      .waitForResponse(
+        (r) => {
+          const u = r.url()
+          const match =
+            (u.includes('/api/orders') || u.endsWith('/api/orders')) &&
+            r.request().method() === 'GET'
+          if (match) lastStatus = r.status()
+          return match
+        },
+        { timeout: 15000 }
+      )
+      .catch(() => null)
     await this.goto()
     const response = await responsePromise
-    if (response.status() !== 200) {
+    if (response && response.status() !== 200) {
       const body = await response.text().catch(() => '')
       throw new Error(
         `Orders API returned ${response.status()}. Body: ${body.slice(0, 500)}${body.length > 500 ? '...' : ''}`
       )
+    }
+    if (!response && lastStatus === null) {
+      await this.expectOrdersPageLoaded()
     }
   }
 

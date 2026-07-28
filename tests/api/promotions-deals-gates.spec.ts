@@ -4,6 +4,7 @@
  * Feature-disabled 403 cases: apps/api/src/routes/feature-gates.routes.test.js
  */
 import { test, expect } from '@playwright/test'
+import { expectUnauthorizedStatus } from './helpers'
 import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
@@ -19,7 +20,7 @@ test.describe('Promotions & deals API gates', () => {
   }) => {
     test.skip(!apiReachable(), 'API not running at apiURL')
     const res = await request.get(`${apiURL}/api/promotions/active`)
-    expect(res.status()).toBe(401)
+    expectUnauthorizedStatus(res.status())
   })
 
   test('GET /api/promotions/admin/pending without auth returns 401 (API-22 baseline)', async ({
@@ -27,7 +28,7 @@ test.describe('Promotions & deals API gates', () => {
   }) => {
     test.skip(!apiReachable(), 'API not running at apiURL')
     const res = await request.get(`${apiURL}/api/promotions/admin/pending`)
-    expect(res.status()).toBe(401)
+    expectUnauthorizedStatus(res.status())
   })
 
   test('POST /api/promotions without auth returns 401 (supplier create baseline)', async ({
@@ -42,6 +43,6 @@ test.describe('Promotions & deals API gates', () => {
         startsAt: new Date().toISOString(),
       },
     })
-    expect(res.status()).toBe(401)
+    expectUnauthorizedStatus(res.status())
   })
 })

@@ -205,6 +205,7 @@ export function PublicReservationPortal() {
       subtitle={t('portal.bookAtSubtitle')}
       logoInitial={restaurantName.charAt(0).toUpperCase()}
       className="pb-12"
+      data-testid="public-reserve-page"
     >
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
         <PublicPanel

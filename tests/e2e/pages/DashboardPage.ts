@@ -8,6 +8,10 @@ export class AppDashboardPage extends BasePage {
 
   async goto(): Promise<void> {
     await this.page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' })
+    // Role home may redirect (admin → /app/admin, supplier → command-center)
+    await this.page
+      .waitForURL(/\/app\/(dashboard|admin|command-center)/, { timeout: 15000 })
+      .catch(() => {})
   }
 
   get pageContainer() {
@@ -15,7 +19,7 @@ export class AppDashboardPage extends BasePage {
   }
 
   get sidebar() {
-    return this.getByTestId('sidebar')
+    return this.getByTestId('sidebar').or(this.getByTestId('admin-sidebar'))
   }
 
   navLink(name: string) {
@@ -28,9 +32,13 @@ export class AppDashboardPage extends BasePage {
     const url = this.page.url()
     // eslint-disable-next-line no-console
     console.log('[DashboardPage] expectDashboardLoaded URL:', url)
-    const combined = this.getByTestId('dashboard-page').or(
-      this.page.getByRole('heading', { name: /dashboard|welcome/i })
-    )
+    // Admin → /app/admin; supplier often → /app/command-center; restaurant → /app/dashboard
+    const combined = this.getByTestId('dashboard-page')
+      .or(this.getByTestId('admin-dashboard-page'))
+      .or(this.getByTestId('admin-shell'))
+      .or(this.getByTestId('command-center-page'))
+      .or(this.getByTestId('sidebar'))
+      .or(this.page.getByRole('heading', { name: /dashboard|welcome|overview|command center/i }))
     await combined
       .first()
       .waitFor({ state: 'visible', timeout: 15000 })

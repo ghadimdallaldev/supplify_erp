@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { expectUnauthorizedStatus } from './helpers'
 import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
@@ -12,7 +13,7 @@ test.describe('Registration & billing activation API', () => {
   test('GET /api/register/status without auth returns 401', async ({ request }) => {
     test.skip(!apiReachable(), 'API not running at apiURL')
     const res = await request.get(`${apiURL}/api/register/status`)
-    expect(res.status()).toBe(401)
+    expectUnauthorizedStatus(res.status())
   })
 
   test('POST /api/register/complete without auth returns 401', async ({ request }) => {
@@ -23,7 +24,7 @@ test.describe('Registration & billing activation API', () => {
         businessName: 'Test Supply Co',
       },
     })
-    expect(res.status()).toBe(401)
+    expectUnauthorizedStatus(res.status())
   })
 
   test('POST /api/billing/checkout without auth returns 401', async ({ request }) => {
@@ -35,12 +36,12 @@ test.describe('Registration & billing activation API', () => {
         idempotencyKey: 'test-registration-activation-401',
       },
     })
-    expect(res.status()).toBe(401)
+    expectUnauthorizedStatus(res.status())
   })
 
   test('GET /api/billing/status without auth returns 401', async ({ request }) => {
     test.skip(!apiReachable(), 'API not running at apiURL')
     const res = await request.get(`${apiURL}/api/billing/status`)
-    expect(res.status()).toBe(401)
+    expectUnauthorizedStatus(res.status())
   })
 })

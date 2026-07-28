@@ -10,12 +10,35 @@ export class AdminDashboardPage extends BasePage {
     await this.page.goto('/app/admin', { waitUntil: 'domcontentloaded' })
   }
 
+  async gotoTenants(): Promise<void> {
+    await this.page.goto('/app/admin/tenants', { waitUntil: 'domcontentloaded' })
+  }
+
   get pageContainer() {
     return this.getByTestId('admin-dashboard-page')
   }
 
+  get sidebar() {
+    return this.getByTestId('admin-sidebar')
+  }
+
+  navTab(tab: string) {
+    return this.getByTestId(`admin-nav-${tab}`)
+  }
+
+  get tenantsTab() {
+    return this.getByTestId('admin-tenants-tab')
+  }
+
   async expectAdminDashboardLoaded(): Promise<void> {
-    await this.assertNotLoginOrExpired()
-    await this.pageContainer.waitFor({ state: 'visible', timeout: 15000 })
+    await this.expectVisibleByTestIdOrHeading(
+      ['admin-dashboard-page', 'admin-shell'],
+      /overview|admin|platform/i,
+      'Admin dashboard'
+    )
+  }
+
+  async expectSidebarVisible(): Promise<void> {
+    await this.sidebar.waitFor({ state: 'visible', timeout: 15000 })
   }
 }

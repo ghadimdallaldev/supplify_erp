@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { expectUnauthorizedStatus } from './helpers'
 import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
@@ -17,7 +18,7 @@ test.describe('Admin impersonation API', () => {
   test('GET /api/admin-dashboard/impersonate without auth returns 401', async ({ request }) => {
     test.skip(!apiReachable(), 'API not running at apiURL')
     const res = await request.get(`${apiURL}/api/admin-dashboard/impersonate`)
-    expect(res.status()).toBe(401)
+    expectUnauthorizedStatus(res.status())
   })
 
   test('POST /api/admin-dashboard/impersonate without auth returns 401', async ({ request }) => {
@@ -25,7 +26,7 @@ test.describe('Admin impersonation API', () => {
     const res = await request.post(`${apiURL}/api/admin-dashboard/impersonate`, {
       data: { tenantId: '00000000-0000-4000-8000-000000000001', tenantType: 'RESTAURANT' },
     })
-    expect(res.status()).toBe(401)
+    expectUnauthorizedStatus(res.status())
   })
 
   test('POST /api/admin-dashboard/impersonate/stop without auth returns 401', async ({
@@ -33,6 +34,6 @@ test.describe('Admin impersonation API', () => {
   }) => {
     test.skip(!apiReachable(), 'API not running at apiURL')
     const res = await request.post(`${apiURL}/api/admin-dashboard/impersonate/stop`)
-    expect(res.status()).toBe(401)
+    expectUnauthorizedStatus(res.status())
   })
 })

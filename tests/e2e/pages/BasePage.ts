@@ -31,4 +31,28 @@ export class BasePage {
       )
     }
   }
+
+  /** Wait for any of the given testids, optionally falling back to a heading (for undeployed testids). */
+  async expectVisibleByTestIdOrHeading(
+    testIds: string | string[],
+    heading?: RegExp,
+    label = 'Page'
+  ): Promise<void> {
+    await this.assertNotLoginOrExpired()
+    const ids = Array.isArray(testIds) ? testIds : [testIds]
+    let locator = this.getByTestId(ids[0])
+    for (const id of ids.slice(1)) {
+      locator = locator.or(this.getByTestId(id))
+    }
+    if (heading) {
+      locator = locator.or(this.page.getByRole('heading', { name: heading }))
+    }
+    const url = this.page.url()
+    await locator
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {
+        throw new Error(`${label} did not load. URL: ${url}`)
+      })
+  }
 }

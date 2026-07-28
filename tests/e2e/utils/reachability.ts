@@ -16,7 +16,7 @@ const authDir = path.join(__dirname, '..', '.auth')
 const KEYCLOAK_BASE_URL =
   process.env.E2E_KEYCLOAK_BASE_URL || process.env.KEYCLOAK_BASE_URL || 'http://localhost:8080'
 const KEYCLOAK_REALM = process.env.E2E_KEYCLOAK_REALM || process.env.KEYCLOAK_REALM || 'Supplify'
-const AUTH_CHECK_TIMEOUT_MS = 5000
+const AUTH_CHECK_TIMEOUT_MS = process.env.PLAYWRIGHT_BASE_URL?.startsWith('https://') ? 15000 : 5000
 
 /** True if probe/setup wrote that the web app is reachable (file-based, for backward compat). */
 export function webReachable(): boolean {

@@ -119,7 +119,7 @@ export function InventoryPage() {
   if (isLoading) {
     return (
       <RequirePermission permission="INVENTORY_VIEW" title={t('supplierPage.gateTitle')}>
-        <PageShell maxWidth="wide">
+        <PageShell maxWidth="wide" data-testid="inventory-page">
           <div className="space-y-5">
             <div className="flex flex-col gap-2">
               <Skeleton className="h-8 w-48" style={{ background: 'var(--brand-ultra)' }} />
@@ -171,7 +171,7 @@ export function InventoryPage() {
   if (error) {
     return (
       <RequirePermission permission="INVENTORY_VIEW" title={t('supplierPage.gateTitle')}>
-        <PageShell maxWidth="wide">
+        <PageShell maxWidth="wide" data-testid="inventory-page">
           <ErrorState
             title={t('supplierPage.error.title')}
             description={t('supplierPage.error.description')}
@@ -190,7 +190,7 @@ export function InventoryPage() {
   return (
     <ContentReveal>
       <RequirePermission permission="INVENTORY_VIEW" title={t('supplierPage.gateTitle')}>
-        <PageShell maxWidth="wide">
+        <PageShell maxWidth="wide" data-testid="inventory-page">
           <PageHeader
             title={t('supplierPage.title')}
             description={t('supplierPage.description')}

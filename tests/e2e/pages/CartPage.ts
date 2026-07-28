@@ -39,4 +39,14 @@ export class CartPage extends BasePage {
         throw new Error(`Cart page did not load. URL: ${url}`)
       })
   }
+
+  async clickPlaceOrder(): Promise<void> {
+    const desktop = this.placeOrderButton
+    const mobile = this.getByTestId('cart-mobile-place-order')
+    if (await desktop.isVisible().catch(() => false)) {
+      await desktop.click()
+      return
+    }
+    await mobile.click()
+  }
 }

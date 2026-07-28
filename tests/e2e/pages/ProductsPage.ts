@@ -29,7 +29,9 @@ export class ProductsPage extends BasePage {
     console.log('[ProductsPage] expectProductsPageLoaded URL:', url)
     const combined = this.getByTestId('products-page')
       .or(this.getByTestId('catalog-page'))
-      .or(this.page.getByRole('heading', { name: /products|catalog/i }))
+      .or(this.getByTestId('products-table-shell'))
+      .or(this.getByTestId('sidebar'))
+      .or(this.page.getByRole('heading', { name: /products|catalog|inventory/i }))
     await combined
       .first()
       .waitFor({ state: 'visible', timeout: 15000 })

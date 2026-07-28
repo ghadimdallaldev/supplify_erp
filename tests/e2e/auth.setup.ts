@@ -22,6 +22,8 @@ const testResultsDir = path.join(__dirname, '..', 'test-results')
 
 const APP_ORIGIN = new URL(baseURL).origin
 const SIDEBAR_TESTID = 'sidebar'
+/** Platform admin uses AdminShell (`admin-sidebar`), not the tenant Layout sidebar. */
+const AUTHED_SHELL_TESTIDS = [SIDEBAR_TESTID, 'admin-sidebar', 'admin-shell'] as const
 const KEYCLOAK_REALM_PATH = '/realms/Supplify/'
 const REDIRECT_TIMEOUT_MS = 15000
 
@@ -73,6 +75,11 @@ function patchSecureCookiesForLocalHttp(
     sameSite?: 'Strict' | 'Lax' | 'None'
   }[]
 ): typeof cookies {
+  // Only strip Secure for local HTTP. On HTTPS (app-dev), SameSite=None cookies
+  // require Secure=true — flipping secure off drops the app session from storageState.
+  if (baseURL.startsWith('https://')) {
+    return cookies
+  }
   return cookies.map((c) => ({ ...c, secure: false }))
 }
 
@@ -221,20 +228,27 @@ async function keycloakLogin(
     )
   }
 
-  const sidebar = activePage.getByTestId(SIDEBAR_TESTID)
-  await sidebar.waitFor({ state: 'visible', timeout: 15000 }).catch(async () => {
-    await dumpFailureDiagnostics(activePage, roleLabel)
-    const nowUrl = activePage.url()
-    if (nowUrl.includes('/login') || nowUrl.includes('expired=true')) {
+  const authedShell = activePage.locator(
+    AUTHED_SHELL_TESTIDS.map((id) => `[data-testid="${id}"]`).join(', ')
+  )
+  await authedShell
+    .first()
+    .waitFor({ state: 'visible', timeout: 15000 })
+    .catch(async () => {
+      await dumpFailureDiagnostics(activePage, roleLabel)
+      const nowUrl = activePage.url()
+      if (nowUrl.includes('/login') || nowUrl.includes('expired=true')) {
+        throw new Error(
+          `Auth setup failed (role=${roleLabel}): session invalid, redirected to login. URL: ${nowUrl}.`
+        )
+      }
       throw new Error(
-        `Auth setup failed (role=${roleLabel}): session invalid, redirected to login. URL: ${nowUrl}.`
+        `Auth setup failed (role=${roleLabel}): authenticated shell (${AUTHED_SHELL_TESTIDS.join(
+          ' / '
+        )}) did not appear. URL: ${nowUrl}.`
       )
-    }
-    throw new Error(
-      `Auth setup failed (role=${roleLabel}): sidebar (data-testid="${SIDEBAR_TESTID}") did not appear. URL: ${nowUrl}.`
-    )
-  })
-  log(`Sidebar visible at ${activePage.url()}`)
+    })
+  log(`Authenticated shell visible at ${activePage.url()}`)
 
   const authMePromise = activePage.waitForResponse(
     (res) => {
@@ -284,10 +298,15 @@ async function keycloakLogin(
   }
 
   const cookies = await context.cookies()
-  if (!cookies.length) {
+  log(
+    `Cookies before save (${cookies.length}): ${cookies
+      .map((c) => `${c.name}@${c.domain}(secure=${c.secure},sameSite=${c.sameSite})`)
+      .join(', ')}`
+  )
+  if (!cookies.some((c) => c.name === 'access_token')) {
     await dumpFailureDiagnostics(activePage, roleLabel)
     throw new Error(
-      `Auth setup failed (role=${roleLabel}): no cookies in context before save. Keycloak Secure+SameSite=None cookies are not sent over HTTP; use HTTPS for Keycloak or adjust cookie settings for localhost.`
+      `Auth setup failed (role=${roleLabel}): access_token cookie missing before save. Session was not persisted for ${APP_ORIGIN}.`
     )
   }
 
