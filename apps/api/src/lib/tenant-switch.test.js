@@ -7,7 +7,12 @@ vi.mock('./db.js', () => ({
 }))
 
 vi.mock('../config/env.js', () => ({
-  config: { IMPERSONATION_SECRET: 'test-secret-key-at-least-32-chars!!', NODE_ENV: 'test' },
+  config: {
+    IMPERSONATION_SECRET: 'test-secret-key-at-least-32-chars!!',
+    ACTIVE_TENANT_SECRET: 'active-tenant-secret-key-at-least-32',
+    COOKIE_SAME_SITE: 'lax',
+    NODE_ENV: 'test',
+  },
 }))
 
 vi.mock('./logger.js', () => ({

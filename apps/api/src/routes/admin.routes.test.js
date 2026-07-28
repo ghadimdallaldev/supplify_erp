@@ -39,6 +39,13 @@ vi.mock('../lib/rbac.js', () => ({
     next()
   },
   getRequestTenant: (...args) => getRequestTenant(...args),
+  resolveTenantContext: (_req, _res, next) => next(),
+  resolveAdminContext: (req, _res, next) => {
+    req.adminContext = { permissions: ['ADMIN_ACCESS', 'CATALOG_VIEW', 'ORDERS_VIEW'] }
+    next()
+  },
+  requireAnyPermission: () => (_req, _res, next) => next(),
+  requirePermission: () => (_req, _res, next) => next(),
 }))
 
 vi.mock('../lib/impersonation.js', () => ({
@@ -97,6 +104,11 @@ describe('admin.routes', () => {
     expect(res.body.ok).toBe(true)
     expect(res.body.data.stats).toBeDefined()
     expect(getRequestTenant).toHaveBeenCalled()
+    const productQuery = queryMock.mock.calls.find(([sql]) =>
+      String(sql).includes('FROM product p')
+    )
+    expect(productQuery?.[0]).toContain('supplier_follow')
+    expect(productQuery?.[1]).toEqual(['rest-1'])
   })
 
   it('GET /dashboard returns 403 for unsupported platform roles', async () => {

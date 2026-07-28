@@ -25,6 +25,7 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { config } from '../config/env.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
+import { isUniqueViolation } from '../lib/identity-normalize.js'
 import {
   getUserLegalAcceptanceStatus,
   recordLoginLegalReacceptances,
@@ -264,6 +265,16 @@ router.get('/callback', async (req, res) => {
     }
     res.redirect(redirectUrl)
   } catch (error) {
+    if (isUniqueViolation(error) || error?.code === 'IDENTITY_CONFLICT') {
+      logger.warn('Callback identity conflict', { requestId: req.requestId })
+      const origin = process.env.WEB_ORIGIN || 'http://localhost:5173'
+      return res.redirect(`${origin}/login?error=account_conflict`)
+    }
+    if (error?.code === 'ACCOUNT_DEACTIVATED') {
+      logger.warn('Callback rejected deactivated account', { requestId: req.requestId })
+      const origin = process.env.WEB_ORIGIN || 'http://localhost:5173'
+      return res.redirect(`${origin}/login?error=account_deactivated`)
+    }
     logger.error('Callback error', { error: error.message })
     const origin = process.env.WEB_ORIGIN || 'http://localhost:5173'
     res.redirect(`${origin}/login?error=callback_failed`)

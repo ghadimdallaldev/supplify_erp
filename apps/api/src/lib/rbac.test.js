@@ -275,6 +275,16 @@ describe('RBAC Utilities', () => {
     })
   })
 
+  it('normalizes identity email before lookup and write', async () => {
+    const { query } = await import('./db.js')
+    query.mockResolvedValueOnce({ rows: [] })
+    query.mockResolvedValueOnce({ rows: [{ id: 'user-normalized', email: 'new@example.com' }] })
+
+    await upsertUser({ sub: 'sub-normalized', email: '  New@Example.COM ', given_name: 'New' }, [])
+
+    expect(query.mock.calls[0][1]).toEqual(['sub-normalized', 'new@example.com'])
+    expect(query.mock.calls[1][1][1]).toBe('new@example.com')
+  })
   describe('getUserBySub', () => {
     it('should return user by Keycloak sub', async () => {
       const { query } = await import('./db.js')
@@ -288,7 +298,8 @@ describe('RBAC Utilities', () => {
 
       expect(user).toBeDefined()
       expect(user.email).toBe('test@example.com')
-      expect(query.mock.calls[0][0]).toBe('SELECT * FROM app_user WHERE keycloak_sub = $1')
+      expect(query.mock.calls[0][0]).toContain('SELECT * FROM app_user WHERE keycloak_sub = $1')
+      expect(query.mock.calls[0][0]).toContain('COALESCE(is_active, TRUE) = TRUE')
       expect(query.mock.calls[0][1]).toEqual(['sub-123'])
       expect(setCache).toHaveBeenCalled()
     })

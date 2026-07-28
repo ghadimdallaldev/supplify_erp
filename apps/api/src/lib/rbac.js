@@ -47,6 +47,7 @@ import {
   isBearerAuthRequest,
 } from './mobile-auth.js'
 import { isBillingRecoveryPath } from './billing/billing-recovery-paths.js'
+import { normalizeIdentityEmail, isUniqueViolation } from './identity-normalize.js'
 
 export { extractBearerToken, extractAccessToken, isBearerAuthRequest } from './mobile-auth.js'
 
@@ -128,7 +129,11 @@ export async function getUserBySub(sub, req = null) {
       }
 
       const lookupStart = req?._perf ? process.hrtime.bigint() : null
-      const result = await query('SELECT * FROM app_user WHERE keycloak_sub = $1', [sub], req)
+      const result = await query(
+        'SELECT * FROM app_user WHERE keycloak_sub = $1 AND COALESCE(is_active, TRUE) = TRUE',
+        [sub],
+        req
+      )
       if (lookupStart != null && req?._perf) {
         req._perf.stages.userLookup = Math.round(
           Number(process.hrtime.bigint() - lookupStart) / 1_000_000
@@ -172,7 +177,8 @@ export async function ensureUserForAccessPayload(payload, req = null) {
 export async function upsertUser(userInfo, roles = []) {
   try {
     const { sub, email, given_name, family_name } = userInfo
-    const displayName = `${given_name || ''} ${family_name || ''}`.trim() || email
+    const normalizedEmail = normalizeIdentityEmail(email)
+    const displayName = `${given_name || ''} ${family_name || ''}`.trim() || normalizedEmail
 
     logger.debug('Upserting user', { sub })
 
@@ -191,7 +197,7 @@ export async function upsertUser(userInfo, roles = []) {
     } else if (hasRole('staff_portal') || hasRole('staff_portal_user')) {
       explicitRole = STAFF_PORTAL_APP_ROLE
     } else {
-      const emailLower = (email || '').toLowerCase()
+      const emailLower = normalizedEmail
       if (emailLower === 'admin@supplify.com' || emailLower === 'supplifyadmin@supplify.com') {
         explicitRole = 'ADMIN'
       } else if (emailLower === 'supplier@supplify.com') {
@@ -204,10 +210,17 @@ export async function upsertUser(userInfo, roles = []) {
 
     const PLATFORM_ROLES = new Set(['ADMIN', 'SUPPLIER', 'RESTAURANT'])
     const existingLookup = await query(
-      `SELECT role FROM app_user WHERE keycloak_sub = $1 OR LOWER(email) = LOWER($2) LIMIT 1`,
-      [sub, email]
+      `SELECT role, is_active FROM app_user WHERE keycloak_sub = $1 OR LOWER(email) = LOWER($2) LIMIT 1`,
+      [sub, normalizedEmail]
     )
-    const existingRole = existingLookup.rows[0]?.role
+    const existingUser = existingLookup.rows[0]
+    if (existingUser && existingUser.is_active === false) {
+      throw Object.assign(new Error('Account is deactivated'), {
+        name: 'ACCOUNT_DEACTIVATED',
+        code: 'ACCOUNT_DEACTIVATED',
+      })
+    }
+    const existingRole = existingUser?.role
     if (
       existingRole &&
       PLATFORM_ROLES.has(existingRole) &&
@@ -240,7 +253,7 @@ export async function upsertUser(userInfo, roles = []) {
       UNION ALL
       SELECT * FROM inserted
     `,
-      [sub, email, displayName, explicitRole, insertRole]
+      [sub, normalizedEmail, displayName, explicitRole, insertRole]
     )
 
     logger.debug('User upserted', { userId: result.rows[0]?.id, role: result.rows[0]?.role })
@@ -248,7 +261,8 @@ export async function upsertUser(userInfo, roles = []) {
     if (sub) await invalidateUserBySubCache(sub)
     return row
   } catch (error) {
-    logger.error('Error upserting user', { error: error.message })
+    logger.error('Error upserting user', { error: error.message, code: error.code })
+    if (isUniqueViolation(error)) error.identityField = 'email'
     throw error
   }
 }

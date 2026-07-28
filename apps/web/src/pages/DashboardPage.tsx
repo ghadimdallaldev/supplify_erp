@@ -94,7 +94,7 @@ export function DashboardPage() {
     const enable = () => {
       if (!cancelled) setCalendarReady(true)
     }
-    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    if (typeof requestIdleCallback === 'function') {
       const idleId = window.requestIdleCallback(enable, { timeout: 900 })
       return () => {
         cancelled = true

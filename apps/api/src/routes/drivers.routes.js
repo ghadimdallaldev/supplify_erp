@@ -4,10 +4,13 @@ import {
   requireAuth,
   requireRole,
   resolveTenantContext,
+  resolveAdminContext,
   getSupplierIdForRequest,
   requirePermission,
 } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
+import { getEffectiveTenant } from '../lib/impersonation.js'
+import { writeAuditLog } from '../lib/audit.js'
 import { logger } from '../lib/logger.js'
 import { requireFeature, requireWithinLimit, isFeatureEnabled } from '../lib/subscription.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
@@ -22,7 +25,8 @@ const router = express.Router()
 
 const driverManagementFeature = requireFeature(
   'driver_management',
-  (req) => req.tenantContext?.tenantId,
+  (req) =>
+    req.tenantContext?.tenantId || (req.userData?.role === 'ADMIN' ? req.query.supplier_id : null),
   (req) => req.tenantContext?.tenantType || 'SUPPLIER'
 )
 
@@ -30,14 +34,37 @@ router.use(
   requireAuth,
   resolveTenantContext,
   requireRole(['SUPPLIER', 'ADMIN']),
+  resolveAdminContext,
   driverManagementFeature
 )
 
 async function resolveSupplierId(req) {
-  return (
-    (await getSupplierIdForRequest(req)) ||
-    (req.userData.role === 'ADMIN' ? req.query.supplier_id : null)
-  )
+  const requestedSupplierId =
+    typeof req.query.supplier_id === 'string' ? req.query.supplier_id.trim() : null
+  const effective = getEffectiveTenant(req)
+
+  if (requestedSupplierId) {
+    if (effective) {
+      return effective.tenantType === 'SUPPLIER' && effective.tenantId === requestedSupplierId
+        ? requestedSupplierId
+        : null
+    }
+    const adminPermissions = req.adminContext?.permissions || []
+    if (
+      req.userData?.role === 'ADMIN' &&
+      (adminPermissions.includes('ADMIN_TENANTS') || adminPermissions.includes('ADMIN_ACCESS'))
+    ) {
+      await writeAuditLog(req, {
+        action_type: 'admin.tenant_override',
+        tenant_type: 'SUPPLIER',
+        tenant_id: requestedSupplierId,
+        payload_json: { resource_type: 'SUPPLIER', source: 'supplier_id_query' },
+      })
+      return requestedSupplierId
+    }
+  }
+
+  return getSupplierIdForRequest(req)
 }
 
 const createDriverSchema = z.object({

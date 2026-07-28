@@ -1,8 +1,8 @@
 # Dev API Route Test Matrix
 
-Generated: 2026-06-17T16:02:43.217Z
+Generated: 2026-07-28T17:39:27.015Z
 
-Total routes discovered: **554**
+Total routes discovered: **640**
 
 | Method | Path                                                                         | File                                     | Auth     | Classification | Test strategy | Expected |
 | ------ | ---------------------------------------------------------------------------- | ---------------------------------------- | -------- | -------------- | ------------- | -------- |
@@ -32,6 +32,10 @@ Total routes discovered: **554**
 | POST   | `/api/admin-dashboard/plans/:planId/override-limit`                          | limits.js                                | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/admin-dashboard/platform-settings`                                     | overview.js                              | yes      | SAFE           | LIVE_GET      | 200      |
 | PATCH  | `/api/admin-dashboard/platform-settings`                                     | overview.js                              | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
+| GET    | `/api/admin-dashboard/sponsorships/:id`                                      | overview.js                              | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/admin-dashboard/sponsorships/:id/manual-pay`                           | overview.js                              | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/admin-dashboard/sponsorships/:id/reconcile`                            | overview.js                              | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/admin-dashboard/sponsorships/:id/refund`                               | overview.js                              | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/admin-dashboard/subscriptions`                                         | subscriptions.js                         | yes      | SAFE           | LIVE_GET      | 200      |
 | PATCH  | `/api/admin-dashboard/subscriptions/:id`                                     | subscriptions.js                         | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
 | POST   | `/api/admin-dashboard/subscriptions/:id/extend-free-trial`                   | subscriptions.js                         | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
@@ -58,6 +62,7 @@ Total routes discovered: **554**
 | POST   | `/api/admin-dashboard/users/reset-password`                                  | audit.js                                 | yes      | UNSAFE         | SKIP_UNSAFE   | 201      |
 | GET    | `/api/admin/audit`                                                           | admin.routes.js                          | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/admin/dashboard`                                                       | admin.routes.js                          | yes      | SAFE           | LIVE_GET      | 200      |
+| GET    | `/api/admin/dashboard/summary`                                               | admin.routes.js                          | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/audit/logs`                                                            | tenant-audit.routes.js                   | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/audit/logs/export`                                                     | tenant-audit.routes.js                   | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/audit/logs/filters`                                                    | tenant-audit.routes.js                   | yes      | SAFE           | LIVE_GET      | 200      |
@@ -121,6 +126,7 @@ Total routes discovered: **554**
 | GET    | `/api/fulfillment/routes/:id`                                                | routes.js                                | yes      | SAFE           | LIVE_GET      | 200      |
 | PATCH  | `/api/fulfillment/routes/:id`                                                | routes.js                                | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
 | PATCH  | `/api/fulfillment/routes/:id/next-stop`                                      | routes.js                                | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
+| POST   | `/api/fulfillment/routes/:id/optimize`                                       | routes.js                                | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/fulfillment/routes/:id/stops`                                          | routes.js                                | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | DELETE | `/api/fulfillment/routes/:id/stops/:orderId`                                 | routes.js                                | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
 | PATCH  | `/api/fulfillment/routes/:id/stops/:stopId`                                  | routes.js                                | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
@@ -149,6 +155,8 @@ Total routes discovered: **554**
 | POST   | `/api/notifications/read-all`                                                | notifications.routes.js                  | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/notifications/test`                                                    | notifications.routes.js                  | yes      | UNSAFE         | SKIP_UNSAFE   | 201      |
 | GET    | `/api/notifications/unread-count`                                            | notifications.routes.js                  | yes      | SAFE           | LIVE_GET      | 200      |
+| GET    | `/api/notifications/webhook`                                                 | notifications.routes.js                  | yes      | SAFE           | LIVE_GET      | 200      |
+| PUT    | `/api/notifications/webhook`                                                 | notifications.routes.js                  | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
 | GET    | `/api/orders/`                                                               | list.js                                  | yes      | SAFE           | LIVE_GET      | 200      |
 | POST   | `/api/orders/`                                                               | create.js                                | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/orders/:id`                                                            | detail.js                                | yes      | SAFE           | LIVE_GET      | 200      |
@@ -161,6 +169,7 @@ Total routes discovered: **554**
 | GET    | `/api/orders/:id/proof-of-delivery`                                          | orders-driver.routes.js                  | yes      | SAFE           | LIVE_GET      | 200      |
 | POST   | `/api/orders/:id/proof-of-delivery`                                          | orders-driver.routes.js                  | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/orders/:id/proof-of-delivery/confirm`                                  | orders-driver.routes.js                  | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/orders/:id/proof-of-delivery/presign`                                  | orders-driver.routes.js                  | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/orders/:id/reassign-driver`                                            | orders-driver.routes.js                  | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/orders/:id/remind`                                                     | documents.js                             | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/orders/:id/tracking`                                                   | orders-driver.routes.js                  | yes      | SAFE           | LIVE_GET      | 200      |
@@ -180,12 +189,19 @@ Total routes discovered: **554**
 | DELETE | `/api/org/branches/:supplierId`                                              | org.routes.js                            | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
 | GET    | `/api/org/branches/:supplierId`                                              | org.routes.js                            | yes      | SAFE           | LIVE_GET      | 200      |
 | PATCH  | `/api/org/branches/:supplierId`                                              | org.routes.js                            | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
+| POST   | `/api/org/branches/:supplierId/reactivate`                                   | org.routes.js                            | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/org/branches/:supplierId/unlink`                                       | org.routes.js                            | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/org/context/switch`                                                    | org.routes.js                            | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/org/invitations/`                                                      | branch-invitations.routes.js             | yes      | SAFE           | LIVE_GET      | 200      |
 | POST   | `/api/org/invitations/`                                                      | branch-invitations.routes.js             | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | DELETE | `/api/org/invitations/:id`                                                   | branch-invitations.routes.js             | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
 | POST   | `/api/org/invitations/:id/regenerate`                                        | branch-invitations.routes.js             | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/org/invitations/roles`                                                 | branch-invitations.routes.js             | yes      | SAFE           | LIVE_GET      | 200      |
+| GET    | `/api/org/link-invitations`                                                  | org.routes.js                            | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/org/link-invitations`                                                  | org.routes.js                            | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| DELETE | `/api/org/link-invitations/:id`                                              | org.routes.js                            | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
+| POST   | `/api/org/link-invitations/:id/resend`                                       | org.routes.js                            | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/org/reports/overview`                                                  | org.routes.js                            | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/org/users`                                                             | org.routes.js                            | yes      | SAFE           | LIVE_GET      | 200      |
 | POST   | `/api/org/users/:userId/branches`                                            | org.routes.js                            | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | DELETE | `/api/org/users/:userId/branches/:supplierId`                                | org.routes.js                            | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
@@ -240,6 +256,7 @@ Total routes discovered: **554**
 | POST   | `/api/public/invitations/accept`                                             | branch-invitations-public.routes.js      | no       | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/public/invitations/branch`                                             | branch-invitations-public.routes.js      | no       | SAFE           | LIVE_GET      | 200      |
 | POST   | `/api/public/invitations/branch/accept`                                      | branch-invitations-public.routes.js      | no       | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/public/invitations/reject`                                             | branch-invitations-public.routes.js      | no       | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/public/reservations`                                                   | public.routes.js                         | no       | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/public/reservations/availability`                                      | public.routes.js                         | no       | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/public/reservations/manage`                                            | public.routes.js                         | no       | SAFE           | LIVE_GET      | 200      |
@@ -248,6 +265,7 @@ Total routes discovered: **554**
 | POST   | `/api/public/reservations/waitlist`                                          | public.routes.js                         | no       | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/public/reservations/waitlist/:token/accept`                            | public.routes.js                         | no       | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/public/reservations/waitlist/:token/decline`                           | public.routes.js                         | no       | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/public/resolve-host`                                                   | public.routes.js                         | no       | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/public/restaurants/:idOrSlug`                                          | public.routes.js                         | no       | SAFE           | LIVE_GET      | 200      |
 | POST   | `/api/public/staff/announcements/:id/ack`                                    | public.routes.js                         | no       | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/public/staff/availability`                                             | public.routes.js                         | no       | SAFE           | LIVE_GET      | 200      |
@@ -263,6 +281,8 @@ Total routes discovered: **554**
 | GET    | `/api/public/suppliers/:idOrSlug`                                            | public.routes.js                         | no       | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/public/suppliers/:idOrSlug/products`                                   | public.routes.js                         | no       | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/public/suppliers/:idOrSlug/products/priced`                            | public.routes.js                         | no       | SAFE           | LIVE_GET      | 200      |
+| DELETE | `/api/push/devices`                                                          | push.routes.js                           | yes      | UNSAFE         | SKIP_UNSAFE   | 200      |
+| POST   | `/api/push/devices`                                                          | push.routes.js                           | yes      | UNSAFE         | SKIP_UNSAFE   | 201      |
 | POST   | `/api/push/subscribe`                                                        | push.routes.js                           | yes      | UNSAFE         | SKIP_UNSAFE   | 201      |
 | DELETE | `/api/push/unsubscribe`                                                      | push.routes.js                           | yes      | UNSAFE         | SKIP_UNSAFE   | 200      |
 | GET    | `/api/push/vapid-public-key`                                                 | push.routes.js                           | yes      | UNSAFE         | SKIP_UNSAFE   | 200      |
@@ -271,6 +291,8 @@ Total routes discovered: **554**
 | DELETE | `/api/quick-lists/:id`                                                       | quick-lists.routes.js                    | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
 | GET    | `/api/quick-lists/:id`                                                       | quick-lists.routes.js                    | yes      | SAFE           | LIVE_GET      | 200      |
 | PATCH  | `/api/quick-lists/:id`                                                       | quick-lists.routes.js                    | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
+| POST   | `/api/quick-lists/:id/ai-suggest`                                            | quick-lists.routes.js                    | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/quick-lists/:id/ai-suggest/apply`                                      | quick-lists.routes.js                    | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/quick-lists/:id/items`                                                 | quick-lists.routes.js                    | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | DELETE | `/api/quick-lists/:id/items/:itemId`                                         | quick-lists.routes.js                    | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
 | DELETE | `/api/quick-lists/:id/schedule`                                              | quick-lists.routes.js                    | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
@@ -324,8 +346,10 @@ Total routes discovered: **554**
 | GET    | `/api/restaurant-finance/invoices/export.csv`                                | restaurant-finance.routes.js             | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/restaurant-finance/orders/:orderId/invoices`                           | restaurant-finance.routes.js             | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/restaurant-finance/overdue`                                            | restaurant-finance.routes.js             | yes      | SAFE           | LIVE_GET      | 200      |
+| GET    | `/api/restaurant-finance/payables`                                           | restaurant-finance.routes.js             | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/restaurant-finance/suppliers/:supplierId/statement`                    | restaurant-finance.routes.js             | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/restaurant-inventory/`                                                 | restaurant-inventory.routes.js           | yes      | SAFE           | LIVE_GET      | 200      |
+| PATCH  | `/api/restaurant-inventory/:productId`                                       | restaurant-inventory.routes.js           | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
 | POST   | `/api/restaurant-inventory/add`                                              | restaurant-inventory.routes.js           | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/restaurant-inventory/adjust`                                           | restaurant-inventory.routes.js           | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/restaurant-inventory/expiry`                                           | restaurant-inventory.routes.js           | yes      | SAFE           | LIVE_GET      | 200      |
@@ -338,10 +362,14 @@ Total routes discovered: **554**
 | GET    | `/api/restaurant-inventory/expiry/summary`                                   | restaurant-inventory.routes.js           | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/restaurant-inventory/history`                                          | restaurant-inventory.routes.js           | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/restaurant-inventory/history/:productId`                               | restaurant-inventory.routes.js           | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/restaurant-inventory/import`                                           | restaurant-inventory.routes.js           | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/restaurant-inventory/import/preview`                                   | restaurant-inventory.routes.js           | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/restaurant-inventory/reorder-assistance`                               | restaurant-inventory.routes.js           | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/restaurant-inventory/reorder-assistance/ai-recommend`                  | restaurant-inventory.routes.js           | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/restaurant-inventory/reorder-assistance/apply`                         | restaurant-inventory.routes.js           | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/restaurant-inventory/reorder-assistance/ask`                           | restaurant-inventory.routes.js           | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/restaurant-inventory/reorder-assistance/explain`                       | restaurant-inventory.routes.js           | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/restaurant-inventory/reorder-assistance/feedback`                      | restaurant-inventory.routes.js           | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/restaurant-inventory/reorder-assistance/suppress`                      | restaurant-inventory.routes.js           | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/restaurant-inventory/reorder-cadence/recompute`                        | restaurant-inventory.routes.js           | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/restaurant-inventory/reorder-forecasts`                                | restaurant-inventory.routes.js           | yes      | SAFE           | LIVE_GET      | 200      |
@@ -360,7 +388,19 @@ Total routes discovered: **554**
 | DELETE | `/api/restaurant-org/branches/:restaurantId`                                 | restaurant-org.routes.js                 | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
 | GET    | `/api/restaurant-org/branches/:restaurantId`                                 | restaurant-org.routes.js                 | yes      | SAFE           | LIVE_GET      | 200      |
 | PATCH  | `/api/restaurant-org/branches/:restaurantId`                                 | restaurant-org.routes.js                 | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
+| POST   | `/api/restaurant-org/branches/:restaurantId/reactivate`                      | restaurant-org.routes.js                 | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/restaurant-org/branches/:restaurantId/unlink`                          | restaurant-org.routes.js                 | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/restaurant-org/central-purchasing/branches`                            | restaurant-org.routes.js                 | yes      | SAFE           | LIVE_GET      | 200      |
+| GET    | `/api/restaurant-org/central-purchasing/drafts`                              | restaurant-org.routes.js                 | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/restaurant-org/central-purchasing/drafts`                              | restaurant-org.routes.js                 | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| PATCH  | `/api/restaurant-org/central-purchasing/drafts/:draftId`                     | restaurant-org.routes.js                 | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
+| POST   | `/api/restaurant-org/central-purchasing/submit`                              | restaurant-org.routes.js                 | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/restaurant-org/context/switch`                                         | restaurant-org.routes.js                 | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/restaurant-org/link-invitations`                                       | restaurant-org.routes.js                 | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/restaurant-org/link-invitations`                                       | restaurant-org.routes.js                 | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| DELETE | `/api/restaurant-org/link-invitations/:id`                                   | restaurant-org.routes.js                 | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
+| POST   | `/api/restaurant-org/link-invitations/:id/resend`                            | restaurant-org.routes.js                 | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/restaurant-org/reports/overview`                                       | restaurant-org.routes.js                 | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/restaurant-org/users`                                                  | restaurant-org.routes.js                 | yes      | SAFE           | LIVE_GET      | 200      |
 | POST   | `/api/restaurant-org/users/:userId/branches`                                 | restaurant-org.routes.js                 | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | DELETE | `/api/restaurant-org/users/:userId/branches/:restaurantId`                   | restaurant-org.routes.js                 | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
@@ -449,10 +489,15 @@ Total routes discovered: **554**
 | GET    | `/api/subscriptions/plans`                                                   | subscriptions.routes.js                  | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/subscriptions/recommendation`                                          | subscriptions.routes.js                  | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/subscriptions/usage/:meterType`                                        | subscriptions.routes.js                  | yes      | SAFE           | LIVE_GET      | 200      |
+| GET    | `/api/supplier/accounting/summary.csv`                                       | supplier-ops.routes.js                   | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/supplier/command-center`                                               | supplier-ops.routes.js                   | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/supplier/deliveries/board`                                             | supplier-ops.routes.js                   | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/supplier/invoices/:invoiceId/send-reminder`                            | supplier-ops.routes.js                   | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/supplier/invoices/export.csv`                                          | supplier-ops.routes.js                   | yes      | SAFE           | LIVE_GET      | 200      |
+| GET    | `/api/supplier/invoices/export/quickbooks.csv`                               | supplier-ops.routes.js                   | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/supplier/invoices/receivables`                                         | supplier-ops.routes.js                   | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/supplier/invoices/receivables/statement/:restaurantId`                 | supplier-ops.routes.js                   | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/supplier/invoices/remind-overdue`                                      | supplier-ops.routes.js                   | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/supplier/orders/:orderId/fulfillment-issues`                           | supplier-ops.routes.js                   | yes      | SAFE           | LIVE_GET      | 200      |
 | POST   | `/api/supplier/orders/:orderId/fulfillment-issues/open-chat`                 | supplier-ops.routes.js                   | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/supplier/orders/:orderId/fulfillment-issues/shortage`                  | supplier-ops.routes.js                   | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
@@ -461,6 +506,7 @@ Total routes discovered: **554**
 | POST   | `/api/supplier/orders/:orderId/substitutions/:amendmentId/accept`            | supplier-ops.routes.js                   | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/supplier/orders/:orderId/substitutions/:amendmentId/reject`            | supplier-ops.routes.js                   | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/supplier/orders/:orderId/substitutions/propose`                        | supplier-ops.routes.js                   | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/supplier/payments/export.csv`                                          | supplier-ops.routes.js                   | yes      | UNSAFE         | SKIP_UNSAFE   | 200      |
 | GET    | `/api/supplier/products/:productId/substitutes`                              | supplier-ops.routes.js                   | yes      | SAFE           | LIVE_GET      | 200      |
 | POST   | `/api/supplier/products/:productId/substitutes`                              | supplier-ops.routes.js                   | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | DELETE | `/api/supplier/products/:productId/substitutes/:substituteId`                | supplier-ops.routes.js                   | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
@@ -478,6 +524,8 @@ Total routes discovered: **554**
 | GET    | `/api/supplier/reorder-cadence/at-risk`                                      | supplier-ops.routes.js                   | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/supplier/reorder-intelligence`                                         | supplier-ops.routes.js                   | yes      | SAFE           | LIVE_GET      | 200      |
 | POST   | `/api/supplier/reorder-intelligence/:restaurantId/reminder-draft`            | supplier-ops.routes.js                   | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/supplier/reorder-intelligence/reminder-drafts/:draftId/send`           | supplier-ops.routes.js                   | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/supplier/run-sheet`                                                    | supplier-ops.routes.js                   | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/suppliers/`                                                            | catalog.js                               | yes      | SAFE           | LIVE_GET      | 200      |
 | POST   | `/api/suppliers/`                                                            | admin.js                                 | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/suppliers/:id`                                                         | profile.js                               | yes      | SAFE           | LIVE_GET      | 200      |
@@ -496,11 +544,24 @@ Total routes discovered: **554**
 | GET    | `/api/suppliers/me`                                                          | profile.js                               | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/suppliers/me/branding`                                                 | profile.js                               | yes      | SAFE           | LIVE_GET      | 200      |
 | PATCH  | `/api/suppliers/me/branding`                                                 | profile.js                               | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
+| GET    | `/api/suppliers/me/business`                                                 | profile.js                               | yes      | SAFE           | LIVE_GET      | 200      |
+| PATCH  | `/api/suppliers/me/business`                                                 | profile.js                               | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
+| GET    | `/api/suppliers/me/custom-domain`                                            | profile.js                               | yes      | SAFE           | LIVE_GET      | 200      |
+| PUT    | `/api/suppliers/me/custom-domain`                                            | profile.js                               | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
+| POST   | `/api/suppliers/me/custom-domain/verify`                                     | profile.js                               | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/suppliers/me/fulfillment`                                              | profile.js                               | yes      | SAFE           | LIVE_GET      | 200      |
 | PATCH  | `/api/suppliers/me/fulfillment`                                              | profile.js                               | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
 | GET    | `/api/unknown/`                                                              | menu.routes.js                           | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/unknown/`                                                              | recipes.routes.js                        | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | DELETE | `/api/unknown/:id`                                                           | consumer-reviews.routes.js               | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
+| GET    | `/api/unknown/:id`                                                           | recipes.routes.js                        | yes      | SAFE           | LIVE_GET      | 200      |
 | PATCH  | `/api/unknown/:id`                                                           | consumer-reviews.routes.js               | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
+| GET    | `/api/unknown/:id/cost-breakdown`                                            | recipes.routes.js                        | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/unknown/:id/deactivate`                                                | recipes.routes.js                        | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/unknown/:id/duplicate`                                                 | recipes.routes.js                        | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/unknown/:id/print`                                                     | recipes.routes.js                        | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/unknown/:id/recalculate`                                               | recipes.routes.js                        | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/unknown/alerts`                                                        | recipes.routes.js                        | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/unknown/connection-requests`                                           | restaurant-connection-requests.routes.js | yes      | SAFE           | LIVE_GET      | 200      |
 | POST   | `/api/unknown/connection-requests/:id/accept`                                | restaurant-connection-requests.routes.js | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/unknown/connection-requests/:id/decline`                               | restaurant-connection-requests.routes.js | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
@@ -515,20 +576,44 @@ Total routes discovered: **554**
 | POST   | `/api/unknown/customers/prospects/:id/invite`                                | supplier-growth.routes.js                | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/unknown/customers/prospects/:id/rematch`                               | supplier-growth.routes.js                | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/api/unknown/customers/prospects/:id/sponsor`                               | supplier-growth.routes.js                | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/unknown/dashboard`                                                     | recipes.routes.js                        | yes      | SAFE           | LIVE_GET      | 200      |
+| GET    | `/api/unknown/export.csv`                                                    | recipes.routes.js                        | yes      | SAFE           | LIVE_GET      | 200      |
 | DELETE | `/api/unknown/history`                                                       | search.routes.js                         | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
 | GET    | `/api/unknown/history`                                                       | search.routes.js                         | yes      | SAFE           | LIVE_GET      | 200      |
 | POST   | `/api/unknown/history`                                                       | search.routes.js                         | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/unknown/ingredient-impact/:productId`                                  | recipes.routes.js                        | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/unknown/metrics`                                                       | supplier-growth.routes.js                | yes      | SAFE           | LIVE_GET      | 200      |
+| PATCH  | `/api/unknown/pick-lists/:id/items/:itemId`                                  | waves.js                                 | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
+| GET    | `/api/unknown/price-impacts`                                                 | recipes.routes.js                        | yes      | SAFE           | LIVE_GET      | 200      |
+| GET    | `/api/unknown/price-impacts/export.csv`                                      | recipes.routes.js                        | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/unknown/recalculate-impacted`                                          | recipes.routes.js                        | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/unknown/restaurant/balance/:supplierId`                                | loyalty.routes.js                        | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/unknown/restaurant/balances`                                           | loyalty.routes.js                        | yes      | SAFE           | LIVE_GET      | 200      |
 | POST   | `/api/unknown/restaurant/redeem-preview`                                     | loyalty.routes.js                        | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/unknown/restaurants/:restaurantId`                                     | consumer-reviews.routes.js               | yes      | SAFE           | LIVE_GET      | 200      |
 | POST   | `/api/unknown/restaurants/:restaurantId`                                     | consumer-reviews.routes.js               | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/unknown/restaurants/:restaurantId/summary`                             | consumer-reviews.routes.js               | yes      | SAFE           | LIVE_GET      | 200      |
+| GET    | `/api/unknown/sponsorship-offers`                                            | restaurant-connection-requests.routes.js | yes      | SAFE           | LIVE_GET      | 200      |
+| GET    | `/api/unknown/sponsorship-offers/:id`                                        | restaurant-connection-requests.routes.js | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/unknown/sponsorship-offers/:id/accept`                                 | restaurant-connection-requests.routes.js | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/unknown/sponsorship-offers/:id/decline`                                | restaurant-connection-requests.routes.js | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/unknown/sponsorship-offers/:id/select-plan`                            | restaurant-connection-requests.routes.js | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/unknown/sponsorships`                                                  | supplier-growth.routes.js                | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/unknown/sponsorships`                                                  | supplier-growth.routes.js                | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/unknown/sponsorships/:id`                                              | supplier-growth.routes.js                | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/unknown/sponsorships/:id/cancel`                                       | supplier-growth.routes.js                | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/unknown/sponsorships/:id/payment`                                      | supplier-growth.routes.js                | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/unknown/sponsorships/:id/retry-payment`                                | supplier-growth.routes.js                | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| GET    | `/api/unknown/sponsorships/eligibility`                                      | supplier-growth.routes.js                | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/unknown/sponsorships/quote`                                            | supplier-growth.routes.js                | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/unknown/supplier/balances`                                             | loyalty.routes.js                        | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/unknown/supplier/balances/:restaurantId/ledger`                        | loyalty.routes.js                        | yes      | SAFE           | LIVE_GET      | 200      |
 | GET    | `/api/unknown/supplier/program`                                              | loyalty.routes.js                        | yes      | SAFE           | LIVE_GET      | 200      |
 | PUT    | `/api/unknown/supplier/program`                                              | loyalty.routes.js                        | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
+| GET    | `/api/unknown/waves`                                                         | waves.js                                 | yes      | SAFE           | LIVE_GET      | 200      |
+| GET    | `/api/unknown/waves/:id`                                                     | waves.js                                 | yes      | SAFE           | LIVE_GET      | 200      |
+| POST   | `/api/unknown/waves/:id/complete-picking`                                    | waves.js                                 | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
+| POST   | `/api/unknown/waves/generate`                                                | waves.js                                 | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/api/warehouses/`                                                           | warehouses.routes.js                     | yes      | SAFE           | LIVE_GET      | 200      |
 | POST   | `/api/warehouses/`                                                           | warehouses.routes.js                     | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | DELETE | `/api/warehouses/:id`                                                        | warehouses.routes.js                     | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
@@ -554,6 +639,7 @@ Total routes discovered: **554**
 | GET    | `/auth/logout`                                                               | auth.routes.js                           | yes      | SAFE           | LIVE_GET      | 200      |
 | POST   | `/auth/logout`                                                               | auth.routes.js                           | yes      | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/auth/me`                                                                   | auth.routes.js                           | yes      | SAFE           | LIVE_GET      | 200      |
+| PATCH  | `/auth/me/locale`                                                            | auth.routes.js                           | yes      | CONDITIONAL    | SKIP_MUTATION | 200      |
 | POST   | `/auth/mobile/refresh`                                                       | auth.routes.js                           | no       | CONDITIONAL    | SKIP_MUTATION | 201      |
 | POST   | `/auth/refresh`                                                              | auth.routes.js                           | no       | CONDITIONAL    | SKIP_MUTATION | 201      |
 | GET    | `/auth/register`                                                             | auth.routes.js                           | no       | SAFE           | LIVE_GET      | 200      |
@@ -563,12 +649,12 @@ Total routes discovered: **554**
 
 ## Summary by classification
 
-- **CONDITIONAL**: 278
-- **SAFE**: 258
-- **UNSAFE**: 18
+- **CONDITIONAL**: 328
+- **SAFE**: 291
+- **UNSAFE**: 21
 
 ## Summary by test strategy
 
-- **LIVE_GET**: 258
-- **SKIP_MUTATION**: 278
-- **SKIP_UNSAFE**: 18
+- **LIVE_GET**: 291
+- **SKIP_MUTATION**: 328
+- **SKIP_UNSAFE**: 21

@@ -101,6 +101,9 @@ vi.mock('../jobs/reorder-forecast.job.js', () => ({
 vi.mock('../jobs/sponsorship-expiry.job.js', () => ({
   runGrowthProgramMaintenanceJob: vi.fn().mockResolvedValue({}),
 }))
+vi.mock('../jobs/recipe-recalc.job.js', () => ({
+  runRecipeRecalcJob: vi.fn().mockResolvedValue({}),
+}))
 vi.mock('./branch-invitations.js', () => ({
   expireOldBranchInvitations: vi.fn().mockResolvedValue(0),
 }))
@@ -113,11 +116,11 @@ describe('registerCronJobs', () => {
     vi.clearAllMocks()
   })
 
-  it('registers 19 cron jobs in non-test environments', async () => {
+  it('registers 20 cron jobs in non-test environments', async () => {
     const { registerCronJobs } = await import('./register-cron-jobs.js')
     const result = registerCronJobs({ trackInterval })
-    expect(result).toEqual({ registered: 19, skipped: false })
-    expect(trackInterval).toHaveBeenCalledTimes(19)
+    expect(result).toEqual({ registered: 20, skipped: false })
+    expect(trackInterval).toHaveBeenCalledTimes(20)
   })
 })
 

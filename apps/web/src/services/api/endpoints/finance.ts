@@ -52,6 +52,7 @@ export const financeApi = api.injectEndpoints({
       invalidatesTags: (_result, _error, { invoiceId }) => [
         { type: 'RestaurantFinance', id: invoiceId },
         'RestaurantFinance',
+        'CreditNotes',
         'Order',
       ],
     }),

@@ -23,7 +23,6 @@ import {
 } from './adminUi'
 import { cn } from '../../lib/utils'
 import { TableScroll } from '../ui/table-scroll'
-import { responsiveDataListClasses } from '../ui/responsive-data-list'
 import { ADMIN_EMPTY_STATE } from '../../lib/dealDisplayLabels'
 import {
   DEAL_PAGE_SIZES,

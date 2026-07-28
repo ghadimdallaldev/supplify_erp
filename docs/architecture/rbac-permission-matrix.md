@@ -1,3 +1,5 @@
+> Current Phase 1 matrix: [docs/security/rbac-permission-matrix.md](../security/rbac-permission-matrix.md). This architecture document is retained as historical context.
+
 # RBAC Permission Matrix
 
 Stored permission codes use `SNAKE_CASE` in `tenant_role_permissions.permission`. Conceptual keys (e.g. `orders.decline`) map via `PERMISSION_ALIASES` in `apps/api/src/lib/permission-keys.js`.

@@ -10,7 +10,7 @@ const ALG = 'HS256'
 const ORG_ALL_SCOPE_ROLES = new Set(['Org Owner', 'Org Manager', 'Org Viewer'])
 
 function secret() {
-  return new TextEncoder().encode(config.IMPERSONATION_SECRET)
+  return new TextEncoder().encode(config.ACTIVE_TENANT_SECRET)
 }
 
 export function getActiveTenantCookieName() {
@@ -24,7 +24,7 @@ export function clearActiveTenantCookie(res) {
     path: '/',
     httpOnly: true,
     secure: config.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: config.COOKIE_SAME_SITE,
   })
 }
 

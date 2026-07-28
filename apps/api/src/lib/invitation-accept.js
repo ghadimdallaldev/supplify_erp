@@ -4,9 +4,14 @@
  */
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { invalidateUserAuthCaches } from './access-cache.js'
+import { normalizeIdentityEmail } from './identity-normalize.js'
 
 export function normalizeInvitationEmail(email) {
-  return (email || '').trim().toLowerCase()
+  try {
+    return normalizeIdentityEmail(email)
+  } catch {
+    return ''
+  }
 }
 
 /**

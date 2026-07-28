@@ -38,6 +38,15 @@ vi.mock('./access-cache.js', () => ({
   invalidateUserAuthCaches: (...args) => invalidateUserAuthCaches(...args),
 }))
 
+// Seat availability is enforced/tested separately; these cases cover role assignment.
+vi.mock('./subscription.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    assertTenantUserSeatAvailable: vi.fn().mockResolvedValue(undefined),
+  }
+})
+
 vi.mock('./supplier-org.js', async (importOriginal) => {
   const actual = await importOriginal()
   return {

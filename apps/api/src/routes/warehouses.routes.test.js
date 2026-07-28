@@ -20,6 +20,7 @@ vi.mock('../lib/rbac.js', () => ({
     next()
   }),
   requireRole: () => (req, res, next) => next(),
+  resolveAdminContext: (_req, _res, next) => next(),
   resolveTenantContext: (req, res, next) => {
     req.tenantContext = req.tenantContext || {
       tenantId: 'supplier-1',

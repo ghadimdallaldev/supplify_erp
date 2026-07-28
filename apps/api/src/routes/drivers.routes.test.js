@@ -19,6 +19,7 @@ vi.mock('../lib/rbac.js', async (importOriginal) => {
   return {
     ...actual,
     getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
+    resolveAdminContext: (_req, _res, next) => next(),
     resolveTenantContext: (_req, _res, next) => {
       _req.tenantContext = {
         tenantId: 'supplier-1',

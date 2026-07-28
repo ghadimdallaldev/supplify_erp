@@ -11,6 +11,10 @@ vi.mock('../db.js', () => ({
 vi.mock('../platform-settings.js', () => ({
   getFreeSandboxDays: vi.fn().mockResolvedValue(7),
   clampFreeTrialDays: (d, f) => d ?? f,
+  getReferralProgramConfig: vi.fn().mockResolvedValue({
+    firstPaidDiscountPercent: 20,
+    referralDiscountAppliesTo: 'first_restaurant_funded',
+  }),
 }))
 
 vi.mock('../logger.js', () => ({

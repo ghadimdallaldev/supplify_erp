@@ -8,6 +8,8 @@ vi.mock('./db.js', () => ({
 vi.mock('../config/env.js', () => ({
   config: {
     IMPERSONATION_SECRET: 'test-secret-key-for-impersonation-tests',
+    ACTIVE_TENANT_SECRET: 'test-active-tenant-secret-key-123456',
+    COOKIE_SAME_SITE: 'lax',
     IMPERSONATION_MAX_DURATION_MINUTES: 60,
     NODE_ENV: 'test',
   },

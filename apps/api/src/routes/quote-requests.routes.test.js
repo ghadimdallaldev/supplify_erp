@@ -15,12 +15,16 @@ vi.mock('../lib/db.js', () => {
 
 vi.mock('../lib/rbac.js', async (importOriginal) => {
   const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
+  const actual = await importOriginal()
   return loadRbacRouteMock(importOriginal, {
+    requirePermission: actual.requirePermission,
     resolveTenantContext: (req, res, next) => {
       req.tenantContext = req.tenantContext || {
-        permissions: ['ORDERS_CREATE', 'CATALOG_VIEW', 'ORDERS_VIEW'],
+        permissions: req.headers['x-test-permissions']
+          ? req.headers['x-test-permissions'].split(',')
+          : ['ORDERS_CREATE', 'CATALOG_VIEW', 'ORDERS_VIEW', 'ORDERS_MANAGE'],
         tenantId: 'rest-1',
-        tenantType: 'RESTAURANT',
+        tenantType: req.headers['x-test-role'] === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT',
       }
       next()
     },
@@ -78,7 +82,10 @@ describe('quote-requests.routes', () => {
     app.use((req, res, next) => {
       req.requestId = 'test-request-id'
       req.user = mockUser
-      req.userData = { ...mockUser, role: 'RESTAURANT' }
+      req.userData = {
+        ...mockUser,
+        role: req.headers['x-test-role'] || 'RESTAURANT',
+      }
       next()
     })
     app.use('/api/quote-requests', quoteRequestsRoutes)
@@ -104,6 +111,17 @@ describe('quote-requests.routes', () => {
     const res = await request(app).get('/api/quote-requests')
     expect(res.status).toBe(200)
     expect(res.body.data.quoteRequests).toHaveLength(1)
+  })
+
+  it('denies supplier quote responses without order management permission', async () => {
+    const res = await request(app)
+      .post('/api/quote-requests/supplier/inbox/qrs-1/respond')
+      .set('x-test-role', 'SUPPLIER')
+      .set('x-test-permissions', 'ORDERS_VIEW')
+      .send({ items: [{ quoteRequestItemId: '11111111-1111-1111-1111-111111111111' }] })
+
+    expect(res.status).toBe(403)
+    expect(quoteService.submitQuoteResponse).not.toHaveBeenCalled()
   })
 
   it('POST to-cart returns cart payload without order', async () => {

@@ -1,0 +1,117 @@
+{
+  "auditDate": "2026-07-28",
+  "scope": "Security Pilot Hardening Phase 1",
+  "routeInventory": "docs/audits/route-inventory.json",
+  "findings": [
+    {
+      "id": "SEC-001",
+      "severity": "P0",
+      "title": "Restaurant dashboard product count was unscoped",
+      "status": "fixed",
+      "enforcement": true,
+      "evidence": [
+        "apps/api/src/routes/admin.routes.js",
+        "apps/api/src/routes/admin.routes.test.js"
+      ]
+    },
+    {
+      "id": "SEC-002",
+      "severity": "P1",
+      "title": "Legacy admin routes had weaker permission gates",
+      "status": "fixed",
+      "enforcement": true,
+      "evidence": [
+        "apps/api/src/routes/admin.routes.js",
+        "apps/api/src/routes/admin.routes.test.js"
+      ]
+    },
+    {
+      "id": "SEC-003",
+      "severity": "P1",
+      "title": "Supplier quote inbox/actions lacked fine permissions",
+      "status": "fixed",
+      "enforcement": true,
+      "evidence": [
+        "apps/api/src/routes/quote-requests.routes.js",
+        "apps/api/src/routes/quote-requests.routes.test.js"
+      ]
+    },
+    {
+      "id": "SEC-004",
+      "severity": "P1",
+      "title": "Restaurant connection mutations were role-only",
+      "status": "fixed",
+      "enforcement": true,
+      "evidence": [
+        "apps/api/src/routes/restaurant-connection-requests.routes.js",
+        "apps/api/src/routes/restaurant-connection-requests.routes.test.js"
+      ]
+    },
+    {
+      "id": "SEC-005",
+      "severity": "P1",
+      "title": "app_user email uniqueness was case-sensitive",
+      "status": "implemented_pending_migration",
+      "enforcement": true,
+      "evidence": [
+        "apps/api/db/migrations/0193_identity_hardening.sql",
+        "apps/api/src/lib/identity-normalize.js",
+        "apps/api/src/lib/identity-normalize.test.js"
+      ]
+    },
+    {
+      "id": "SEC-006",
+      "severity": "P2",
+      "title": "Active-tenant and impersonation tokens shared a signing secret",
+      "status": "fixed",
+      "enforcement": true,
+      "evidence": [
+        "apps/api/src/config/env.js",
+        "apps/api/src/lib/tenant-switch.js",
+        "apps/api/src/lib/impersonation.test.js"
+      ]
+    },
+    {
+      "id": "SEC-007",
+      "severity": "P2",
+      "title": "Refresh, invitation acceptance, and availability lacked dedicated limits",
+      "status": "implemented_pending_live_verification",
+      "enforcement": true,
+      "evidence": ["apps/api/src/server.js"]
+    },
+    {
+      "id": "SEC-008",
+      "severity": "P2",
+      "title": "Non-production issuer mismatch remains warning-only",
+      "status": "remaining_risk",
+      "enforcement": false,
+      "evidence": ["apps/api/src/lib/auth.js"]
+    },
+    {
+      "id": "SEC-009",
+      "severity": "P1",
+      "title": "Admin supplier_id query overrides were not consistently bound",
+      "status": "implemented_pending_test",
+      "enforcement": true,
+      "evidence": [
+        "apps/api/src/routes/warehouses.routes.js",
+        "apps/api/src/routes/drivers.routes.js"
+      ]
+    },
+    {
+      "id": "SEC-010",
+      "severity": "P2",
+      "title": "app_user deactivation was not enforced by authentication",
+      "status": "implemented_pending_test",
+      "enforcement": true,
+      "evidence": ["apps/api/db/migrations/0193_identity_hardening.sql", "apps/api/src/lib/rbac.js"]
+    }
+  ],
+  "deferred": [
+    "full route matrix",
+    "global username/phone schema",
+    "OWASP ZAP",
+    "malware scanning",
+    "PostgreSQL RLS"
+  ]
+}

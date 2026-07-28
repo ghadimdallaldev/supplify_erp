@@ -97,6 +97,7 @@ export const FREE_TIER_LIMIT_PATCHES = {
     open_conversations: 1,
     storage_mb: 50,
     promotions: 1,
+    ai_requests_per_day: 0,
   },
 }
 
