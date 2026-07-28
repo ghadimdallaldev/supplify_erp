@@ -55,7 +55,7 @@ export function FulfillmentPage() {
 
   return (
     <RequirePermission permission="FULFILLMENT_VIEW" title={t('page.permissionTitle')}>
-      <PageShell maxWidth="wide" className="overflow-x-hidden">
+      <PageShell maxWidth="wide" className="overflow-x-hidden" data-testid="fulfillment-page">
         <PageHeader title={t('page.title')} description={t('page.description')} />
 
         {multiWarehouseActive && warehouses.length > 0 && (

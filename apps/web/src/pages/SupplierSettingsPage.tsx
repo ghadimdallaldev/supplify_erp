@@ -118,6 +118,7 @@ export function SupplierSettingsPage() {
   return (
     <RequirePermission permission="SETTINGS_VIEW" title={t('settings.permissionTitle')}>
       <SettingsHubLayout
+        testId="supplier-settings-page"
         title={t('settings.title')}
         description={t('settings.description')}
         stats={
