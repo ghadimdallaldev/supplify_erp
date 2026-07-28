@@ -75,10 +75,14 @@ try {
     if (fs.existsSync(path.join(ROOT, rel))) run(`git rm -f ${rel}`)
   }
   let stillDirty = runCapture('git status --porcelain')
-  if (hasUnmergedPaths(stillDirty) && fs.existsSync(path.join(ROOT, 'docs'))) {
-    // Release branches must not contain docs/ (pruned tree).
-    run('git rm -rf docs')
-    stillDirty = runCapture('git status --porcelain')
+  // Modify/delete conflicts: release branches pruned these; keep deletions.
+  for (const pruned of ['docs', 'tests', 'apps/api/src/routes/e2e.routes.js']) {
+    if (!hasUnmergedPaths(stillDirty)) break
+    const abs = path.join(ROOT, pruned)
+    if (fs.existsSync(abs) || stillDirty.includes(pruned.replace(/\\/g, '/'))) {
+      run(`git rm -rf ${pruned}`)
+      stillDirty = runCapture('git status --porcelain')
+    }
   }
   if (hasUnmergedPaths(stillDirty)) {
     console.error('Merge has unresolved conflicts. Resolve manually, then re-run promote.')
