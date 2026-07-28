@@ -17,7 +17,7 @@ export async function activeTenantContext(req, res, next) {
           path: '/',
           httpOnly: true,
           secure: config.NODE_ENV === 'production',
-          sameSite: 'lax',
+          sameSite: config.COOKIE_SAME_SITE,
         })
       }
       return next()

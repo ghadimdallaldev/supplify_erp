@@ -3,6 +3,7 @@ import https from 'https'
 import axios from 'axios'
 import { config } from '../config/env.js'
 import { logger } from './logger.js'
+import { normalizeIdentityEmail } from './identity-normalize.js'
 
 const KEYCLOAK_HTTP_TIMEOUT_MS = 10000
 const ADMIN_TOKEN_SKEW_MS = 30_000
@@ -83,7 +84,11 @@ async function getCachedRealmRole(token, roleName) {
 }
 
 export function normalizeKeycloakEmail(email) {
-  return (email || '').trim().toLowerCase()
+  try {
+    return normalizeIdentityEmail(email)
+  } catch {
+    return ''
+  }
 }
 
 /** Derive a stable, unique Keycloak username from an email (avoids collisions on local-part only). */

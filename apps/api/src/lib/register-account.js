@@ -19,6 +19,7 @@ import {
 } from '../services/notification.service.js'
 import { recordRegistrationLegalAcceptances } from './legal-acceptance.js'
 import { logger } from './logger.js'
+import { normalizeIdentityEmail } from './identity-normalize.js'
 
 const KC_ROLE = { RESTAURANT: 'restaurant', SUPPLIER: 'supplier', ADMIN: 'admin' }
 
@@ -208,7 +209,7 @@ export async function completeTenantRegistration({
   userAgent,
   referralToken = null,
 }) {
-  const normalizedEmail = email.trim().toLowerCase()
+  const normalizedEmail = normalizeIdentityEmail(email)
   const type = accountType === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
   const name = businessName.trim()
   if (!name) throw new ValidationError('Business name is required')

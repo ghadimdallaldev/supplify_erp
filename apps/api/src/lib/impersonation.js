@@ -79,7 +79,7 @@ export function clearImpersonationCookie(res) {
     path: '/',
     httpOnly: true,
     secure: config.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: config.COOKIE_SAME_SITE,
   })
 }
 
@@ -94,6 +94,9 @@ export function getEffectiveTenant(req) {
   const ctx = req.impersonationContext
   if (!ctx || !req.userData) return null
   if (ctx.adminUserId !== req.userData.id) return null
+  // Re-check the CURRENT role, not just the token: a demoted admin otherwise keeps
+  // cross-tenant access until the impersonation token expires.
+  if (req.userData.role !== 'ADMIN') return null
   return {
     tenantId: ctx.tenantId,
     tenantType: ctx.tenantType,

@@ -6,7 +6,6 @@ import { Input } from '../ui/input'
 import { StatusBadge } from '../ui/status-badge'
 import { AppPanel, SummaryStrip } from '../ui/app-panel'
 import { TableScroll } from '../ui/table-scroll'
-import { responsiveDataListClasses } from '../ui/responsive-data-list'
 import { Filter, Flag, Loader2, RefreshCw, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {

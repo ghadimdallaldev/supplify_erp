@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 import { query } from '../../lib/db.js'
 import { logger } from '../../lib/logger.js'
+import { assertPublicHttpUrl } from '../../lib/ssrf-guard.js'
 
 const WEBHOOK_TIMEOUT_MS = 5000
 
@@ -123,6 +124,28 @@ export async function dispatchNotificationWebhook({ tenantId, tenantType, notifi
     sentAt: new Date().toISOString(),
   }
 
+  // Re-check at send time: rows stored before this guard existed, and DNS for a
+  // once-public host can be repointed at an internal address later.
+  try {
+    assertPublicHttpUrl(webhook.url, { protocols: ['https:'], label: 'Webhook URL' })
+  } catch (error) {
+    await logWebhookDelivery({
+      tenantId,
+      tenantType,
+      url: webhook.url,
+      eventCategory: event.category,
+      status: 'failed',
+      errorMessage: 'BLOCKED_URL',
+    })
+    logger.warn({
+      msg: 'Blocked notification webhook to non-public URL',
+      tenantId,
+      tenantType,
+      reason: error.message,
+    })
+    return { delivered: false, reason: 'BLOCKED_URL' }
+  }
+
   const { body, headers } = buildWebhookRequest(event, webhook.secret)
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS)
@@ -133,7 +156,22 @@ export async function dispatchNotificationWebhook({ tenantId, tenantType, notifi
       headers,
       body,
       signal: controller.signal,
+      // Following redirects would let a public URL bounce the request to an
+      // internal address, defeating the check above.
+      redirect: 'manual',
     })
+    if (response.status >= 300 && response.status < 400) {
+      await logWebhookDelivery({
+        tenantId,
+        tenantType,
+        url: webhook.url,
+        eventCategory: event.category,
+        status: 'failed',
+        httpStatus: response.status,
+        errorMessage: 'REDIRECT_NOT_ALLOWED',
+      })
+      return { delivered: false, reason: 'REDIRECT_NOT_ALLOWED', httpStatus: response.status }
+    }
     if (!response.ok) {
       await logWebhookDelivery({
         tenantId,

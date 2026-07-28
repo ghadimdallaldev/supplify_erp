@@ -24,6 +24,12 @@ function validateSharedProductionRules(issues) {
   if (isWeakSecret(config.IMPERSONATION_SECRET)) {
     issues.push('IMPERSONATION_SECRET must be at least 32 characters and not a default value')
   }
+  if (isWeakSecret(config.ACTIVE_TENANT_SECRET)) {
+    issues.push('ACTIVE_TENANT_SECRET must be at least 32 characters and not a default value')
+  }
+  if (config.ACTIVE_TENANT_SECRET && config.ACTIVE_TENANT_SECRET === config.IMPERSONATION_SECRET) {
+    issues.push('ACTIVE_TENANT_SECRET must be distinct from IMPERSONATION_SECRET')
+  }
   if (!config.KEYCLOAK_CLIENT_SECRET || config.KEYCLOAK_CLIENT_SECRET === 'changeme') {
     issues.push('KEYCLOAK_CLIENT_SECRET must be set to a strong value')
   }
@@ -139,6 +145,9 @@ export function validateProductionConfig() {
   if (config.NODE_ENV !== 'production' && !hosted) return
 
   const issues = []
+  if (config.ACTIVE_TENANT_SECRET_IS_FALLBACK && config.NODE_ENV !== 'production') {
+    logger.warn('ACTIVE_TENANT_SECRET is not set; using the non-production compatibility fallback')
+  }
   validateSharedProductionRules(issues)
 
   if (config.E2E_SECRET && config.APP_ENV !== 'dev') {

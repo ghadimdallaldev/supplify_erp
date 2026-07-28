@@ -17,6 +17,7 @@ import {
   sendNotification,
 } from '../services/notification.service.js'
 import { getTenantWebhook, upsertTenantWebhook } from '../services/notification/webhook.js'
+import { isPrivateHostname } from '../lib/ssrf-guard.js'
 
 const router = express.Router()
 
@@ -255,7 +256,16 @@ const webhookSchema = z.object({
   url: z
     .string()
     .url()
-    .refine((u) => u.startsWith('https://'), 'Webhook URL must use https'),
+    .refine((u) => u.startsWith('https://'), 'Webhook URL must use https')
+    .refine((u) => {
+      // Reject loopback/RFC1918/link-local targets up front (SSRF). Delivery
+      // re-checks this and refuses redirects, since DNS can change after save.
+      try {
+        return !isPrivateHostname(new URL(u).hostname)
+      } catch {
+        return false
+      }
+    }, 'Webhook URL must not point to a private or local address'),
   enabled: z.boolean().optional(),
   secret: z.string().max(200).optional(),
 })

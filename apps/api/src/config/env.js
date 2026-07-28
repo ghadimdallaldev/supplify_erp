@@ -114,6 +114,14 @@ export const config = {
     process.env.IMPERSONATION_SECRET ||
     process.env.SESSION_SECRET ||
     (isProductionNode ? '' : 'dev-session-secret-change-me'),
+  ACTIVE_TENANT_SECRET:
+    process.env.ACTIVE_TENANT_SECRET ||
+    (isProductionNode
+      ? ''
+      : process.env.IMPERSONATION_SECRET ||
+        process.env.SESSION_SECRET ||
+        'dev-active-tenant-secret'),
+  ACTIVE_TENANT_SECRET_IS_FALLBACK: !process.env.ACTIVE_TENANT_SECRET,
   IMPERSONATION_MAX_DURATION_MINUTES: envInt(process.env.IMPERSONATION_MAX_DURATION_MINUTES, 60),
   STORAGE_DRIVER:
     process.env.STORAGE_DRIVER ||

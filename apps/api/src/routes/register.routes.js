@@ -4,6 +4,7 @@ import { requireAuth } from '../lib/rbac.js'
 import { completeTenantRegistration, userNeedsTenantSetup } from '../lib/register-account.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
+import { isUniqueViolation } from '../lib/identity-normalize.js'
 
 const router = express.Router()
 
@@ -102,6 +103,14 @@ router.post('/complete', requireAuth, async (req, res) => {
         ok: false,
         data: null,
         error: { name: 'VALIDATION_ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    if (isUniqueViolation(error)) {
+      return res.status(409).json({
+        ok: false,
+        data: null,
+        error: { name: 'IDENTITY_CONFLICT', message: 'An account with this email already exists' },
         requestId: req.requestId,
       })
     }

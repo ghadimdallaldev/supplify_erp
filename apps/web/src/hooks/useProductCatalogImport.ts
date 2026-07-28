@@ -99,7 +99,7 @@ export function useProductCatalogImport({
       importTerminalToastRef.current = toastKey
       toast.error(importJob.errorMessage || t('toast.catalogBulkUploadFailed'))
     }
-  }, [importJob, applyImportResult])
+  }, [importJob, applyImportResult, t])
 
   const previewImportFile = useCallback(
     async (file: File, onPreview: (rows: unknown[]) => void) => {

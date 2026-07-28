@@ -44,6 +44,7 @@ export function AdminShellNavProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({ nav: navRef.current, registerNav }),
     // revision forces consumers to re-read navRef after registration changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [revision, registerNav]
   )
 

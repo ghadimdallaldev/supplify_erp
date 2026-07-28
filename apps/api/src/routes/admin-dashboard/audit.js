@@ -257,7 +257,7 @@ router.post('/impersonate', async (req, res) => {
     res.cookie(getImpersonationCookieName(), token, {
       httpOnly: true,
       secure: config.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: config.COOKIE_SAME_SITE,
       maxAge: maxAgeMs,
       path: '/',
     })
