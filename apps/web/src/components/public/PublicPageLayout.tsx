@@ -13,6 +13,7 @@ type PublicPageLayoutProps = {
   wide?: boolean
   className?: string
   style?: CSSProperties
+  'data-testid'?: string
 }
 
 export function PublicPageLayout({
@@ -27,12 +28,17 @@ export function PublicPageLayout({
   wide = false,
   className,
   style,
+  'data-testid': testId,
 }: PublicPageLayoutProps) {
   const showHero = title || subtitle || logoUrl || logoInitial
   const widthClass = narrow ? 'max-w-xl' : wide ? 'max-w-6xl' : 'max-w-3xl'
 
   return (
-    <div className={cn('min-h-dvh bg-[var(--brand-ultra)]', className)} style={style}>
+    <div
+      className={cn('min-h-dvh bg-[var(--brand-ultra)]', className)}
+      style={style}
+      data-testid={testId}
+    >
       {showHero && (
         <header className="border-b border-[var(--app-border)] bg-[var(--surface)] pwa-safe-top">
           <div className={cn('mx-auto px-4 py-5 sm:px-6', widthClass, centered && 'text-center')}>

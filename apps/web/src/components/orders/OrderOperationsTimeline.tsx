@@ -234,7 +234,7 @@ export function OrderOperationsTimeline({
       : t('timeline.restaurantDescription')
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_220px]">
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_220px]" data-testid="order-timeline">
       <Card className="xl:order-1">
         <CardHeader>
           <CardTitle>{t('timeline.title')}</CardTitle>

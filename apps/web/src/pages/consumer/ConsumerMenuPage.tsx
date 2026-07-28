@@ -233,7 +233,7 @@ export function ConsumerMenuPage() {
   }
 
   return (
-    <PageShell className="space-y-5 p-4 pb-28">
+    <PageShell className="space-y-5 p-4 pb-28" data-testid="consumer-menu-page">
       {orderingStatus.mode !== 'LIVE' && (
         <Alert
           className={

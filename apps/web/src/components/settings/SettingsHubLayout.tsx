@@ -7,19 +7,16 @@ export function SettingsHubLayout({
   description,
   stats,
   children,
+  testId = 'restaurant-settings-page',
 }: {
   title: string
   description?: string
   stats?: ReactNode
   children: ReactNode
+  testId?: string
 }) {
   return (
-    <PageShell
-      maxWidth="default"
-      padding
-      className="w-full overflow-x-hidden"
-      data-testid="restaurant-settings-page"
-    >
+    <PageShell maxWidth="default" padding className="w-full overflow-x-hidden" data-testid={testId}>
       <PageHeader title={title} description={description} />
       {stats}
       {children}
